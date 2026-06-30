@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPanel } from "@/components/board/BoardPanel";
+import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
+import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
@@ -37,6 +40,7 @@ function getDevDemoBoard(): LiveBoardResponse | null {
     flags: {},
     status_started_at: now,
     completed_at: null,
+    display_until: null,
     last_seen_from_gingr_at: now,
     hidden: false,
     updated_at: now
@@ -45,26 +49,28 @@ function getDevDemoBoard(): LiveBoardResponse | null {
   return {
     checking_in: [
       demoDog("Beau", "Anderson", "Parking Lot", "checking_in"),
-      demoDog("Cooper", "Martinez", "Front Desk", "checking_in"),
-      demoDog("Daisy", "Lee", "Lobby", "checking_in")
+      demoDog("Cooper", "Martinez", "Front Desk", "checking_in")
     ],
-    checking_out: [
-      demoDog("Brody", "Johnson", "Front Desk", "checking_out"),
-      demoDog("Luna", "Patel", "Lobby", "checking_out"),
-      demoDog("Milo", "Chen", "Front Desk", "checking_out")
-    ],
-    counts: { checking_in: 3, checking_out: 3, total: 6 },
+    checking_out: [demoDog("Brody", "Johnson", "Front Desk", "checking_out")],
+    counts: { checking_in: 2, checking_out: 1, total: 3 },
     last_updated: now
   };
 }
 
 export function BoardClient() {
+  const searchParams = useSearchParams();
+  const staffMode = searchParams.get("staff") === "1";
+
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [clock, setClock] = useState<Date | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
   const [useDevDemo, setUseDevDemo] = useState(false);
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
+
+  const { visibleCheckingInDogs } = useNewCheckingInAlerts(board.checking_in);
+  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
 
   const loadBoard = useCallback(async (mode: ConnectionState = "polling") => {
     try {
@@ -95,12 +101,14 @@ export function BoardClient() {
     const initialLoad = window.setTimeout(() => void loadBoard("connecting"), 0);
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
     const clockTimer = window.setInterval(() => setClock(new Date()), 1000);
+    const nowTimer = window.setInterval(() => setNowMs(Date.now()), 1000);
     const pollTimer = window.setInterval(() => void loadBoard("polling"), 15000);
 
     return () => {
       window.clearTimeout(initialLoad);
       window.clearTimeout(initialClock);
       window.clearInterval(clockTimer);
+      window.clearInterval(nowTimer);
       window.clearInterval(pollTimer);
     };
   }, [loadBoard]);
@@ -143,6 +151,16 @@ export function BoardClient() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  const handleClearCheckout = useCallback(
+    (dogId: string) => {
+      const entry = visibleCheckoutDogs.find((item: { dog: LiveDog }) => item.dog.id === dogId);
+      if (entry) {
+        manuallyExpireCheckout(entry.dog);
+      }
+    },
+    [manuallyExpireCheckout, visibleCheckoutDogs]
+  );
+
   const dateTime = useMemo(
     () => (clock ? formatBoardDateTime(clock) : { time: "--:--", date: "LOADING" }),
     [clock]
@@ -161,8 +179,20 @@ export function BoardClient() {
         />
 
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
-          <BoardPanel title="Checking In" subtitle="Dogs Arriving Today" dogs={board.checking_in} mode="in" />
-          <BoardPanel title="Checking Out" subtitle="Dogs Heading Home" dogs={board.checking_out} mode="out" />
+          <BoardPanel
+            title="Checking In"
+            subtitle="Dogs Arriving Today"
+            mode="in"
+            checkingInEntries={visibleCheckingInDogs}
+          />
+          <BoardPanel
+            title="Checking Out"
+            subtitle="Dogs Heading Home"
+            mode="out"
+            checkingOutEntries={visibleCheckoutDogs}
+            showStaffClear={staffMode}
+            onClearCheckout={handleClearCheckout}
+          />
         </div>
 
         <footer className="mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
@@ -175,6 +205,12 @@ export function BoardClient() {
       {useDevDemo ? (
         <div className="pointer-events-none fixed left-4 top-4 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">
           Development demo data
+        </div>
+      ) : null}
+
+      {staffMode ? (
+        <div className="fixed bottom-4 left-4 rounded-full border border-slate-600/50 bg-slate-950/80 px-3 py-1 text-xs font-semibold text-slate-300">
+          Staff mode
         </div>
       ) : null}
 

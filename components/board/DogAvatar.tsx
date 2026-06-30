@@ -9,9 +9,11 @@ import { resolveDogPhotoUrl } from "@/lib/board-utils";
 type DogAvatarProps = {
   dog: LiveDog;
   mode: "in" | "out";
+  isAlerting?: boolean;
+  isNew?: boolean;
 };
 
-export function DogAvatar({ dog, mode }: DogAvatarProps) {
+export function DogAvatar({ dog, mode, isAlerting = false, isNew = false }: DogAvatarProps) {
   const [imageFailed, setImageFailed] = useState(false);
   const photoUrl = resolveDogPhotoUrl(dog);
   const initial = dog.animal_name.slice(0, 1).toUpperCase();
@@ -23,7 +25,9 @@ export function DogAvatar({ dog, mode }: DogAvatarProps) {
         "relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-full border-2 sm:h-[100px] sm:w-[100px]",
         mode === "in"
           ? "border-fitdog-blue/80 shadow-glowBlue"
-          : "border-fitdog-orange/80 shadow-glowOrange"
+          : "border-fitdog-orange/80 shadow-glowOrange",
+        isNew && mode === "out" && "checkout-avatar-pop",
+        isAlerting && mode === "out" && "checkout-avatar-alert-ring"
       )}
     >
       {showPhoto ? (
@@ -31,7 +35,10 @@ export function DogAvatar({ dog, mode }: DogAvatarProps) {
         <img
           src={photoUrl ?? undefined}
           alt={`${dog.animal_name} profile`}
-          className="h-full w-full object-cover object-center"
+          className={clsx(
+            "h-full w-full object-cover object-center",
+            isNew && mode === "out" && "checkout-avatar-photo-pop"
+          )}
           loading="lazy"
           decoding="async"
           onError={() => setImageFailed(true)}

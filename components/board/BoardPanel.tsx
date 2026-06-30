@@ -1,18 +1,34 @@
 import clsx from "clsx";
 import { LogIn, LogOut } from "lucide-react";
-import type { LiveDog } from "@/lib/types";
+import type { CheckoutDisplayEntry } from "@/hooks/useCheckoutDisplayTimers";
+import type { CheckingInDisplayEntry } from "@/hooks/useNewCheckingInAlerts";
 import { DogStatusCard } from "@/components/board/DogStatusCard";
 import { EmptyBoardState } from "@/components/board/EmptyBoardState";
 
-type BoardPanelProps = {
-  title: string;
-  subtitle: string;
-  dogs: LiveDog[];
-  mode: "in" | "out";
-};
+type BoardPanelProps =
+  | {
+      title: string;
+      subtitle: string;
+      mode: "in";
+      checkingInEntries: CheckingInDisplayEntry[];
+      checkingOutEntries?: never;
+      showStaffClear?: boolean;
+      onClearCheckout?: never;
+    }
+  | {
+      title: string;
+      subtitle: string;
+      mode: "out";
+      checkingOutEntries: CheckoutDisplayEntry[];
+      checkingInEntries?: never;
+      showStaffClear?: boolean;
+      onClearCheckout?: (dogId: string) => void;
+    };
 
-export function BoardPanel({ title, subtitle, dogs, mode }: BoardPanelProps) {
+export function BoardPanel(props: BoardPanelProps) {
+  const { title, subtitle, mode, showStaffClear = false } = props;
   const Icon = mode === "in" ? LogIn : LogOut;
+  const count = mode === "in" ? props.checkingInEntries.length : props.checkingOutEntries.length;
 
   return (
     <section
@@ -58,14 +74,38 @@ export function BoardPanel({ title, subtitle, dogs, mode }: BoardPanelProps) {
               mode === "in" ? "text-fitdog-blue" : "text-fitdog-orange"
             )}
           >
-            {dogs.length}
+            {count}
           </span>
           <span className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 sm:text-xs">Total</span>
         </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 sm:gap-4">
-        {dogs.length ? dogs.map((dog) => <DogStatusCard key={dog.id} dog={dog} mode={mode} />) : <EmptyBoardState mode={mode} />}
+        {mode === "in" ? (
+          props.checkingInEntries.length ? (
+            props.checkingInEntries.map(({ dog, isNew }) => (
+              <DogStatusCard key={dog.id} dog={dog} mode="in" isNew={isNew} />
+            ))
+          ) : (
+            <EmptyBoardState mode="in" />
+          )
+        ) : props.checkingOutEntries.length ? (
+          props.checkingOutEntries.map((entry) => (
+            <DogStatusCard
+              key={entry.stableKey}
+              dog={entry.dog}
+              mode="out"
+              isNew={entry.isNew}
+              isAlerting={entry.isAlerting}
+              isReminding={entry.isReminding}
+              isExpiringSoon={entry.isExpiringSoon}
+              showStaffClear={showStaffClear}
+              onClear={() => props.onClearCheckout?.(entry.dog.id)}
+            />
+          ))
+        ) : (
+          <EmptyBoardState mode="out" />
+        )}
       </div>
     </section>
   );

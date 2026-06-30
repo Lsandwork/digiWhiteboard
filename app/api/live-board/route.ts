@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getServiceSupabase } from "@/lib/supabase/server";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
+import { getServiceSupabase } from "@/lib/supabase/server";
 import { shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
@@ -19,7 +20,15 @@ export async function GET() {
 
     if (visibleError) throw visibleError;
 
-    const dogsToHide = (visibleDogs ?? []).filter((dog) => shouldHideCompletedDog(dog as LiveDog, now));
+    const completedToHide = (visibleDogs ?? []).filter(
+      (dog) => dog.display_status === "checking_in" && shouldHideCompletedDog(dog as LiveDog, now)
+    );
+
+    const checkoutExpired = (visibleDogs ?? []).filter(
+      (dog) => dog.display_status === "checking_out" && shouldExpireCheckoutDog(dog as LiveDog, now)
+    );
+
+    const dogsToHide = [...completedToHide, ...checkoutExpired];
 
     if (dogsToHide.length > 0) {
       const hideIds = dogsToHide.map((dog) => dog.id);
@@ -28,6 +37,8 @@ export async function GET() {
         .update({
           hidden: true,
           display_status: "removed",
+          current_status: "checkout_expired",
+          completed_at: now.toISOString(),
           updated_at: now.toISOString()
         })
         .in("id", hideIds);
@@ -49,8 +60,11 @@ export async function GET() {
       ...dog,
       photo_url: resolveDogPhotoUrl(dog)
     }));
+
     const checkingIn = enrichedDogs.filter((dog) => dog.display_status === "checking_in");
-    const checkingOut = enrichedDogs.filter((dog) => dog.display_status === "checking_out");
+    const checkingOut = enrichedDogs.filter(
+      (dog) => dog.display_status === "checking_out" && !shouldExpireCheckoutDog(dog, now)
+    );
 
     const response: LiveBoardResponse = {
       checking_in: checkingIn,
@@ -58,7 +72,7 @@ export async function GET() {
       counts: {
         checking_in: checkingIn.length,
         checking_out: checkingOut.length,
-        total: dogs.length
+        total: checkingIn.length + checkingOut.length
       },
       last_updated: now.toISOString()
     };

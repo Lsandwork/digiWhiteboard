@@ -15,6 +15,7 @@ export type LiveDog = {
   flags: Record<string, boolean | string | number | null>;
   status_started_at: string | null;
   completed_at: string | null;
+  display_until: string | null;
   last_seen_from_gingr_at: string | null;
   raw_payload?: Record<string, unknown> | null;
   hidden: boolean;

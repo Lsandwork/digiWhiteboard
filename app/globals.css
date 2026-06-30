@@ -97,3 +97,164 @@ body {
 .board-card-out {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 24px rgba(255, 159, 28, 0.08);
 }
+
+.checkin-entrance {
+  animation: checkinEntrance 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.checkout-entrance {
+  animation: checkoutEntrance 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.checkout-alert-active {
+  animation: checkoutAlertGlow 2.4s ease-in-out infinite;
+  border-color: rgba(255, 183, 77, 0.55);
+}
+
+.checkout-name-alert {
+  animation: checkoutNamePulse 2s ease-in-out infinite;
+  text-shadow: 0 0 18px rgba(255, 183, 77, 0.35);
+}
+
+.checkout-ready-badge,
+.checkout-status-badge-alert {
+  animation: checkoutBadgePulse 2.2s ease-in-out infinite;
+}
+
+.checkout-avatar-alert-ring {
+  animation: checkoutAvatarRing 2.2s ease-in-out infinite;
+}
+
+.checkout-avatar-pop,
+.checkout-avatar-photo-pop {
+  animation: checkoutAvatarPop 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.checkout-reminder-pulse {
+  animation: checkoutReminderBorder 2.5s ease-in-out;
+}
+
+.checkout-expiring-soon {
+  border-color: rgba(255, 159, 28, 0.35);
+}
+
+@keyframes checkinEntrance {
+  0% {
+    opacity: 0;
+    transform: translateX(-12px) translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+}
+
+@keyframes checkoutEntrance {
+  0% {
+    opacity: 0;
+    transform: translateX(24px) scale(0.96);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes checkoutAlertGlow {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(255, 183, 77, 0.28),
+      0 0 28px rgba(255, 159, 28, 0.22);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 1px rgba(255, 208, 120, 0.55),
+      0 0 42px rgba(255, 159, 28, 0.38);
+  }
+}
+
+@keyframes checkoutNamePulse {
+  0%,
+  100% {
+    color: #fff7ed;
+  }
+  50% {
+    color: #ffcf73;
+  }
+}
+
+@keyframes checkoutBadgePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 0.92;
+  }
+}
+
+@keyframes checkoutAvatarRing {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 159, 28, 0.35), 0 0 18px rgba(255, 159, 28, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(255, 159, 28, 0.12), 0 0 28px rgba(255, 183, 77, 0.45);
+  }
+}
+
+@keyframes checkoutAvatarPop {
+  0% {
+    transform: scale(0.9);
+  }
+  70% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes checkoutReminderBorder {
+  0%,
+  100% {
+    border-color: rgba(148, 163, 184, 0.16);
+  }
+  50% {
+    border-color: rgba(255, 159, 28, 0.42);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkin-entrance,
+  .checkout-entrance,
+  .checkout-alert-active,
+  .checkout-name-alert,
+  .checkout-ready-badge,
+  .checkout-status-badge-alert,
+  .checkout-avatar-alert-ring,
+  .checkout-avatar-pop,
+  .checkout-avatar-photo-pop,
+  .checkout-reminder-pulse,
+  .animate-fade-up {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .checkout-alert-active {
+    border-color: rgba(255, 183, 77, 0.55);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(255, 183, 77, 0.35),
+      0 0 24px rgba(255, 159, 28, 0.2);
+  }
+}

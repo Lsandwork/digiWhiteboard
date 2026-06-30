@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:cleanup": "tsx scripts/test-transition-cleanup.ts",
+    "test:checkout-display": "tsx scripts/test-checkout-display.ts",
     "test:webhook": "tsx scripts/test-webhook.ts",
     "test:bad-signature": "tsx scripts/test-bad-signature.ts"
   },
