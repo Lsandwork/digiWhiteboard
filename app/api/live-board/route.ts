@@ -1,29 +1,39 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import { shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-const minimumVisibleMs = 3 * 60 * 1000;
-
 export async function GET() {
   try {
     const supabase = getServiceSupabase();
-    const expiredBefore = new Date(Date.now() - minimumVisibleMs).toISOString();
+    const now = new Date();
 
-    const { error: cleanupError } = await supabase
+    const { data: visibleDogs, error: visibleError } = await supabase
       .from("live_transition_dogs")
-      .update({
-        hidden: true,
-        display_status: "removed",
-        updated_at: new Date().toISOString()
-      })
+      .select("*")
       .eq("hidden", false)
-      .not("completed_at", "is", null)
-      .lte("status_started_at", expiredBefore);
+      .in("display_status", ["checking_in", "checking_out"]);
 
-    if (cleanupError) throw cleanupError;
+    if (visibleError) throw visibleError;
+
+    const dogsToHide = (visibleDogs ?? []).filter((dog) => shouldHideCompletedDog(dog as LiveDog, now));
+
+    if (dogsToHide.length > 0) {
+      const hideIds = dogsToHide.map((dog) => dog.id);
+      const { error: cleanupError } = await supabase
+        .from("live_transition_dogs")
+        .update({
+          hidden: true,
+          display_status: "removed",
+          updated_at: now.toISOString()
+        })
+        .in("id", hideIds);
+
+      if (cleanupError) throw cleanupError;
+    }
 
     const { data, error } = await supabase
       .from("live_transition_dogs")
@@ -50,7 +60,7 @@ export async function GET() {
         checking_out: checkingOut.length,
         total: dogs.length
       },
-      last_updated: new Date().toISOString()
+      last_updated: now.toISOString()
     };
 
     return NextResponse.json(response);

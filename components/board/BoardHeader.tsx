@@ -31,7 +31,7 @@ export function BoardHeader({
         </div>
         <div className="min-w-0">
           <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Fitdog Checking In / Checking Out Board
+            Fitdog Health & Social Club
           </h1>
           <p className="mt-2 text-base text-slate-400 sm:text-lg">Real-time updates of our four-legged guests.</p>
         </div>

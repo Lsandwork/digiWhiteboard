@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
 
 export const dynamic = "force-dynamic";
 
 const activeTypes = new Set(["checking_in", "checking_out"]);
-const completionTypes = new Set(["check_in", "check_out"]);
-const minimumVisibleMs = 3 * 60 * 1000;
+const completionTypes = new Set(["check_in", "check_out", "checked_in", "checked_out"]);
 const acceptedPassiveTypes = new Set([
   "animal_created",
   "animal_edited",
@@ -17,7 +17,8 @@ const acceptedPassiveTypes = new Set([
 ]);
 
 function completionStatus(webhookType: string) {
-  return webhookType === "check_in" ? "checked_in" : "checked_out";
+  if (webhookType === "check_in" || webhookType === "checked_in") return "checked_in";
+  return "checked_out";
 }
 
 async function findExistingDog(supabase: ReturnType<typeof getServiceSupabase>, reservationId: string | null, animalId: string | null) {
@@ -81,13 +82,17 @@ export async function POST(request: Request) {
       const dog = normalizeDog(payload);
       const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
       const now = new Date().toISOString();
+      const continuing = isContinuingSameTransition(
+        existing,
+        webhookType as "checking_in" | "checking_out"
+      );
       const row = {
         ...dog,
         current_status: webhookType,
         display_status: webhookType,
         hidden: false,
-        status_started_at: now,
-        completed_at: null,
+        status_started_at: continuing && existing?.status_started_at ? existing.status_started_at : now,
+        completed_at: continuing ? existing?.completed_at ?? null : null,
         last_seen_from_gingr_at: now,
         raw_payload: payload,
         updated_at: now
@@ -150,14 +155,18 @@ export async function POST(request: Request) {
         const newStatus = completionStatus(webhookType);
         const nowDate = new Date();
         const now = nowDate.toISOString();
-        const statusStartedAt = existing.status_started_at ? new Date(existing.status_started_at) : nowDate;
-        const visibleLongEnough = nowDate.getTime() - statusStartedAt.getTime() >= minimumVisibleMs;
+        const pendingHide = {
+          ...existing,
+          current_status: newStatus,
+          completed_at: now
+        };
+        const hideNow = shouldHideCompletedDog(pendingHide, nowDate);
         const { error } = await supabase
           .from("live_transition_dogs")
           .update({
             current_status: newStatus,
-            display_status: visibleLongEnough ? "removed" : existing.display_status,
-            hidden: visibleLongEnough,
+            display_status: hideNow ? "removed" : existing.display_status,
+            hidden: hideNow,
             completed_at: now,
             last_seen_from_gingr_at: now,
             raw_payload: payload,

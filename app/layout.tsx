@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Fitdog Checking In / Checking Out Board",
+  title: "Fitdog Health & Social Club",
   description: "Live Fitdog board for dogs actively checking in or checking out.",
   manifest: "/manifest.json"
 };
