@@ -1,20 +1,26 @@
 "use client";
 
 import Image from "next/image";
-import { lobbyAssets, lobbyIconPath } from "@/lib/lobby/assets";
+import { lobbyAssets } from "@/lib/lobby/assets";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { LobbyScheduleCard } from "@/components/lobby/LobbyScheduleCard";
 
 export function LobbyClassSchedule() {
   return (
-    <section className="lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-3 sm:p-4">
-      <Image src={lobbyAssets.eventsCard} alt="" fill className="pointer-events-none object-cover opacity-50" loading="lazy" />
+    <section className="lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-4">
+      <Image
+        src={lobbyAssets.eventsScenery}
+        alt=""
+        fill
+        className="pointer-events-none object-cover object-bottom opacity-[0.12]"
+        loading="lazy"
+      />
       <div className="relative z-10">
         <div className="mb-3 flex items-center gap-2">
-          <Image src={lobbyIconPath("events")} alt="" width={24} height={24} className="h-6 w-6" />
-          <h3 className="text-base font-black uppercase tracking-[0.18em] text-white xl:text-lg">Class Schedule</h3>
+          <Image src={lobbyAssets.calendarIcon} alt="" width={22} height={22} className="h-5 w-5" unoptimized />
+          <h3 className="text-lg font-black uppercase tracking-[0.16em] text-white">Class Schedule</h3>
         </div>
-        <div className="lobby-class-schedule-grid grid grid-cols-5 gap-2">
+        <div className="lobby-class-schedule-grid grid grid-cols-5 gap-3">
           {LOBBY_CLASS_SCHEDULE.map((entry) => (
             <LobbyScheduleCard key={entry.day} day={entry.day} classes={entry.classes} />
           ))}

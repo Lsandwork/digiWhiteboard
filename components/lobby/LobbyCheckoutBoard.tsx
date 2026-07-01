@@ -112,40 +112,41 @@ export function LobbyCheckoutBoard() {
     <main className={`lobby-shell ${tvMode ? "lobby-tv-mode" : ""}`}>
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" />
 
-      <div className="lobby-content relative z-10 flex min-h-screen flex-col px-5 py-4 sm:px-7 sm:py-5 lg:px-9">
+      <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} />
 
         {refreshMessage ? (
-          <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm font-semibold text-amber-100">
+          <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm text-amber-100">
             {refreshMessage}
           </div>
         ) : null}
 
-        <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[1.72fr_1fr]">
+        <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
           <div className="flex min-h-0 flex-col gap-4">
             {checkouts.featured ? (
               <LobbyFeaturedCard dog={checkouts.featured} />
             ) : (
-              <section className="lobby-panel lobby-empty-card relative min-h-[150px] overflow-hidden rounded-2xl p-5 sm:min-h-[170px] sm:p-6">
-                <Image src={lobbyAssets.idleCard} alt="" fill className="pointer-events-none object-cover opacity-90" />
+              <section className="lobby-panel lobby-empty-card relative overflow-hidden rounded-2xl border-l-[6px] border-l-lobby-teal px-6 py-5">
                 <Image
-                  src={lobbyAssets.pawPattern}
+                  src={lobbyAssets.pawIcon}
                   alt=""
-                  width={140}
-                  height={140}
-                  className="pointer-events-none absolute bottom-3 right-6 h-28 w-28 opacity-[0.18]"
+                  width={160}
+                  height={160}
+                  className="pointer-events-none absolute bottom-2 right-8 h-36 w-36 opacity-[0.12]"
+                  unoptimized
                 />
-                <div className="relative z-10 flex items-center gap-5">
+                <div className="relative z-10 flex items-center gap-6">
                   <Image
                     src={lobbyAssets.logoBadge}
                     alt=""
                     width={96}
                     height={96}
-                    className="h-20 w-20 shrink-0 rounded-full border-2 border-lobby-teal/50 xl:h-24 xl:w-24"
+                    className="h-24 w-24 shrink-0 rounded-full ring-2 ring-lobby-teal/60"
+                    unoptimized
                   />
                   <div>
-                    <h2 className="text-3xl font-black text-white xl:text-4xl">No dogs currently checking out</h2>
-                    <p className="mt-2 text-base text-lobby-teal/90 xl:text-lg">
+                    <h2 className="text-4xl font-black leading-tight text-white">No dogs currently checking out</h2>
+                    <p className="mt-2 text-lg text-white/85">
                       We&apos;ll update this screen as soon as a pup is on the way.
                     </p>
                   </div>
@@ -161,11 +162,16 @@ export function LobbyCheckoutBoard() {
           {settings.show_promotions ? <LobbyServicesGrid /> : null}
         </div>
 
-        <footer className="lobby-footer relative mt-4 shrink-0 overflow-hidden rounded-xl">
-          <Image src={lobbyAssets.footerBar} alt="" width={1920} height={72} className="h-14 w-full object-cover" />
-          <p className="absolute inset-0 flex items-center justify-center px-8 text-center text-sm font-semibold text-white xl:text-base">
-            {footerMessage}
-          </p>
+        <footer className="lobby-footer mt-4 flex h-14 shrink-0 items-center gap-4 px-8">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15">
+            <Image src={lobbyAssets.pawIcon} alt="" width={20} height={20} className="h-5 w-5 brightness-0 invert" unoptimized />
+          </div>
+          <p className="flex-1 text-center text-base font-semibold text-white">{footerMessage}</p>
+          <div className="flex shrink-0 items-center gap-1 opacity-30" aria-hidden>
+            <Image src={lobbyAssets.pawIcon} alt="" width={18} height={18} className="h-4 w-4" unoptimized />
+            <Image src={lobbyAssets.pawIcon} alt="" width={14} height={14} className="h-3.5 w-3.5" unoptimized />
+            <Image src={lobbyAssets.pawIcon} alt="" width={12} height={12} className="h-3 w-3" unoptimized />
+          </div>
         </footer>
       </div>
     </main>

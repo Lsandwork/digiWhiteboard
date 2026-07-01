@@ -13,42 +13,44 @@ export function LobbyHeader({ clock, healthy }: LobbyHeaderProps) {
   const { time, date } = formatBoardDateTime(clock);
 
   return (
-    <header className="lobby-header grid grid-cols-[minmax(0,220px)_1fr_auto] items-center gap-4 xl:gap-6">
-      <Image
-        src={lobbyAssets.logoLockup}
-        alt="Fitdog Health and Social Club"
-        width={240}
-        height={80}
-        className="h-14 w-auto shrink-0 xl:h-16"
-        priority
-      />
+    <header className="lobby-header mb-1 grid grid-cols-[200px_1fr_auto] items-center gap-6">
+      <div>
+        <Image
+          src={lobbyAssets.logoLockup}
+          alt="Fitdog Health and Social Club"
+          width={200}
+          height={72}
+          className="h-[3.25rem] w-auto"
+          priority
+        />
+      </div>
 
-      <div className="min-w-0 text-center">
-        <h1 className="lobby-title text-3xl font-black uppercase tracking-[0.04em] text-white xl:text-5xl">
-          Now Checking Out
-        </h1>
-        <p className="mt-1 text-sm font-bold uppercase tracking-[0.18em] text-lobby-orange xl:text-base">
-          Your Dog&apos;s Best Life
-        </p>
-        <p className="mt-1 text-sm text-white/90 xl:text-base">
+      <div className="text-center">
+        <h1 className="text-[2.75rem] font-black uppercase leading-none tracking-wide text-white">Now Checking Out</h1>
+        <p className="mt-2 text-base font-bold uppercase tracking-[0.22em] text-lobby-orange">Your Dog&apos;s Best Life</p>
+        <p className="mt-1.5 text-lg text-white">
           Thank you for letting us <span className="font-semibold text-lobby-teal">play, care &amp; connect!</span>
         </p>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-2">
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Image src={lobbyAssets.syncedBadge} alt="Synced with Gingr" width={190} height={42} className="h-9 w-auto" />
-          <span
-            className={`lobby-sync-pill rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wide xl:text-xs ${
-              healthy ? "lobby-sync-pill--live" : "lobby-sync-pill--refresh"
-            }`}
-          >
-            {healthy ? "Live Checkout Sync" : "Refreshing"}
+      <div className="flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2">
+          <Image src={lobbyAssets.syncedBadge} alt="Synced with Gingr" width={175} height={38} className="h-9 w-auto" />
+          <span className={`lobby-sync-pill inline-flex items-center ${healthy ? "lobby-sync-pill--live" : "lobby-sync-pill--refresh"}`}>
+            <Image
+              src={lobbyAssets.syncSignalIcon}
+              alt=""
+              width={14}
+              height={14}
+              className="mr-1.5 inline-block h-3.5 w-3.5"
+              unoptimized
+            />
+            {healthy ? "LIVE CHECKOUT SYNC" : "REFRESHING"}
           </span>
         </div>
         <div className="text-right">
-          <p className="text-3xl font-bold tabular-nums text-white xl:text-4xl">{time}</p>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-lobby-teal">{date}</p>
+          <p className="text-4xl font-bold tabular-nums leading-none text-white">{time}</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-lobby-teal">{date}</p>
         </div>
       </div>
     </header>
