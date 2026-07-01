@@ -36,6 +36,10 @@ export function BoardDebugPanel({
           <dd>{lastFetchAt ?? "—"}</dd>
         </div>
         <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Mode</dt>
+          <dd>{board.debug?.mode ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Raw records</dt>
           <dd>{board.debug?.raw_record_count ?? "—"}</dd>
         </div>

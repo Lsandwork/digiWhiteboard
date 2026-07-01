@@ -110,7 +110,7 @@ export async function POST(request: Request) {
             ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil, nowDate)
             : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil, nowDate),
         last_seen_from_gingr_at: now,
-        raw_payload: payload,
+        raw_payload: { ...payload, source: "gingr_webhook" },
         updated_at: now
       };
 
