@@ -232,51 +232,63 @@ export async function syncGingrBoardState(
       ? await fetchAnimalPhotoMap(subdomain, apiKey, animalIds)
       : new Map<string, string | null>();
 
-  for (const { normalized, direction, sourceRecord } of rows) {
-    const row = normalized;
-    if (row.gingr_animal_id && photoMap.has(row.gingr_animal_id)) {
-      row.photo_url = photoMap.get(row.gingr_animal_id) ?? row.photo_url;
-    }
+  const { data: existingDogs } = await supabase
+    .from("live_transition_dogs")
+    .select("*")
+    .in(
+      "gingr_reservation_id",
+      rows.map(({ normalized }) => normalized.gingr_reservation_id).filter(Boolean) as string[]
+    );
 
-    const { data: existing } = await supabase
-      .from("live_transition_dogs")
-      .select("*")
-      .eq("gingr_reservation_id", row.gingr_reservation_id)
-      .maybeSingle();
+  const existingByReservation = new Map(
+    (existingDogs ?? []).map((dog) => [dog.gingr_reservation_id, dog as LiveDog])
+  );
 
-    const continuing =
-      row.gingr_reservation_id &&
-      isSameActiveTransition(existing as LiveDog | null, direction, row.gingr_reservation_id);
-    const statusStartedAt = continuing && existing?.status_started_at ? existing.status_started_at : row.status_started_at ?? now;
-    const displayUntil = displayUntilFor(direction, statusStartedAt, continuing ? existing?.display_until : null);
+  await Promise.all(
+    rows.map(async ({ normalized, direction, sourceRecord }) => {
+      const row = normalized;
+      if (row.gingr_animal_id && photoMap.has(row.gingr_animal_id)) {
+        row.photo_url = photoMap.get(row.gingr_animal_id) ?? row.photo_url;
+      }
 
-    const upsertRow = {
-      gingr_reservation_id: row.gingr_reservation_id,
-      gingr_animal_id: row.gingr_animal_id,
-      animal_name: row.animal_name,
-      owner_name: row.owner_name,
-      photo_url: row.photo_url ?? existing?.photo_url ?? null,
-      reservation_type: row.reservation_type,
-      current_status: direction,
-      display_status: direction,
-      room: row.room,
-      notes: row.notes,
-      flags: row.flags,
-      status_started_at: statusStartedAt,
-      completed_at: null,
-      display_until: displayUntil,
-      hidden: false,
-      last_seen_from_gingr_at: now,
-      raw_payload: { source: "gingr_back_of_house", record: sourceRecord },
-      updated_at: now
-    };
+      const existing = row.gingr_reservation_id
+        ? existingByReservation.get(row.gingr_reservation_id)
+        : undefined;
+      const continuing =
+        row.gingr_reservation_id &&
+        isSameActiveTransition(existing, direction, row.gingr_reservation_id);
+      const statusStartedAt =
+        continuing && existing?.status_started_at ? existing.status_started_at : row.status_started_at ?? now;
+      const displayUntil = displayUntilFor(direction, statusStartedAt, continuing ? existing?.display_until : null);
 
-    if (existing) {
-      await supabase.from("live_transition_dogs").update(upsertRow).eq("id", existing.id);
-    } else {
-      await supabase.from("live_transition_dogs").insert(upsertRow);
-    }
-  }
+      const upsertRow = {
+        gingr_reservation_id: row.gingr_reservation_id,
+        gingr_animal_id: row.gingr_animal_id,
+        animal_name: row.animal_name,
+        owner_name: row.owner_name,
+        photo_url: row.photo_url ?? existing?.photo_url ?? null,
+        reservation_type: row.reservation_type,
+        current_status: direction,
+        display_status: direction,
+        room: row.room,
+        notes: row.notes,
+        flags: row.flags,
+        status_started_at: statusStartedAt,
+        completed_at: null,
+        display_until: displayUntil,
+        hidden: false,
+        last_seen_from_gingr_at: now,
+        raw_payload: { source: "gingr_back_of_house", record: sourceRecord },
+        updated_at: now
+      };
+
+      if (existing) {
+        await supabase.from("live_transition_dogs").update(upsertRow).eq("id", existing.id);
+      } else {
+        await supabase.from("live_transition_dogs").insert(upsertRow);
+      }
+    })
+  );
 
   const { data: currentlyVisible } = await supabase
     .from("live_transition_dogs")
@@ -284,20 +296,21 @@ export async function syncGingrBoardState(
     .eq("hidden", false)
     .in("display_status", ["checking_in", "checking_out"]);
 
-  for (const dog of currentlyVisible ?? []) {
-    const key = `${dog.display_status}::${dog.gingr_reservation_id}`;
-    if (!activeKeys.has(key)) {
-      await supabase
-        .from("live_transition_dogs")
-        .update({
-          hidden: true,
-          display_status: "removed",
-          current_status: "synced_removed",
-          completed_at: now,
-          updated_at: now
-        })
-        .eq("id", dog.id);
-    }
+  const hideIds = (currentlyVisible ?? [])
+    .filter((dog) => !activeKeys.has(`${dog.display_status}::${dog.gingr_reservation_id}`))
+    .map((dog) => dog.id);
+
+  if (hideIds.length) {
+    await supabase
+      .from("live_transition_dogs")
+      .update({
+        hidden: true,
+        display_status: "removed",
+        current_status: "synced_removed",
+        completed_at: now,
+        updated_at: now
+      })
+      .in("id", hideIds);
   }
 
   return {
