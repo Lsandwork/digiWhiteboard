@@ -10,6 +10,7 @@ import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
@@ -104,6 +105,22 @@ export function LobbyCheckoutBoard() {
     const pollTimer = window.setInterval(() => void loadLobbyData(), intervalMs);
     return () => window.clearInterval(pollTimer);
   }, [loadLobbyData, settings.refresh_interval_ms]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabase();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel("lobby-live-transition-dogs")
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
+        void loadLobbyData();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [loadLobbyData]);
 
   const hasCheckout = Boolean(checkouts.featured || checkouts.queue.length);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;

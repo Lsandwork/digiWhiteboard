@@ -12,19 +12,28 @@ const defaultSettings: LobbySettings = {
 };
 
 export async function loadLobbySettings(supabase: SupabaseClient): Promise<LobbySettings> {
-  const { data, error } = await supabase.from("lobby_settings").select("*").eq("id", "default").maybeSingle();
-  if (error) throw error;
-  if (!data) return defaultSettings;
+  try {
+    const { data, error } = await supabase.from("lobby_settings").select("*").eq("id", "default").maybeSingle();
+    if (error) {
+      if (error.code === "42P01" || error.message.toLowerCase().includes("lobby_settings")) {
+        return defaultSettings;
+      }
+      throw error;
+    }
+    if (!data) return defaultSettings;
 
-  const refreshIntervalMs = Number(data.refresh_interval_ms ?? defaultSettings.refresh_interval_ms);
-  return {
-    max_queue_count: Math.min(6, Math.max(3, Number(data.max_queue_count ?? defaultSettings.max_queue_count))),
-    refresh_interval_ms: Math.max(10000, refreshIntervalMs),
-    show_promotions: Boolean(data.show_promotions ?? defaultSettings.show_promotions),
-    show_events: Boolean(data.show_events ?? defaultSettings.show_events),
-    footer_message: data.footer_message ?? defaultSettings.footer_message,
-    lobby_message: data.lobby_message ?? defaultSettings.lobby_message
-  };
+    const refreshIntervalMs = Number(data.refresh_interval_ms ?? defaultSettings.refresh_interval_ms);
+    return {
+      max_queue_count: Math.min(6, Math.max(3, Number(data.max_queue_count ?? defaultSettings.max_queue_count))),
+      refresh_interval_ms: Math.max(10000, refreshIntervalMs),
+      show_promotions: Boolean(data.show_promotions ?? defaultSettings.show_promotions),
+      show_events: Boolean(data.show_events ?? defaultSettings.show_events),
+      footer_message: data.footer_message ?? defaultSettings.footer_message,
+      lobby_message: data.lobby_message ?? defaultSettings.lobby_message
+    };
+  } catch {
+    return defaultSettings;
+  }
 }
 
 export async function loadLobbyPromotions(supabase: SupabaseClient, now = new Date()) {
