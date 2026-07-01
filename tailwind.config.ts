@@ -23,7 +23,7 @@ const config: Config = {
           "card-2": "#222B32",
           cream: "#FFF8EF",
           muted: "#B9C2CC",
-          navy: "#101418"
+          navy: "#0a1724"
         }
       },
       boxShadow: {

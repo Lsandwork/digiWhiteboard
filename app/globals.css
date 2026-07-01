@@ -388,7 +388,7 @@ body {
 
 .lobby-root,
 .lobby-shell {
-  background: #101418;
+  background: #0a1724;
   color: #fff;
 }
 
@@ -396,6 +396,24 @@ body {
   position: relative;
   min-height: 100vh;
   overflow: hidden;
+}
+
+.lobby-panel {
+  border: 2px solid rgba(100, 185, 220, 0.28);
+  background: rgba(23, 30, 36, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.lobby-sync-pill--live {
+  border: 1px solid rgba(100, 185, 220, 0.45);
+  background: rgba(100, 185, 220, 0.18);
+  color: #9fd9ef;
+}
+
+.lobby-sync-pill--refresh {
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fde68a;
 }
 
 .lobby-tv-mode {

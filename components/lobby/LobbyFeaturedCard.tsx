@@ -12,7 +12,7 @@ type LobbyFeaturedCardProps = {
 
 export function LobbyFeaturedCard({ dog, message }: LobbyFeaturedCardProps) {
   return (
-    <section className="lobby-featured-card relative overflow-hidden rounded-2xl border-2 border-lobby-teal/35 bg-lobby-card/80 p-5 sm:p-6">
+    <section className="lobby-panel lobby-featured-card relative overflow-hidden rounded-2xl p-5 sm:p-6">
       <Image
         src={lobbyAssets.featuredCard}
         alt=""

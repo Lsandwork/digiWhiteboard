@@ -5,8 +5,8 @@ export const LOBBY_BRAND_ORANGE = "#F15F2A";
 export const LOBBY_BRAND_TEAL = "#64B9DC";
 
 export const lobbyAssets = {
-  background: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-coastal-light-1920x1080.png`,
-  backgroundDark: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png`,
+  background: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png`,
+  backgroundLight: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-coastal-light-1920x1080.png`,
   logoLockup: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-lockup-dark-transparent.png`,
   logoBadge: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-circle-badge-512.png`,
   logoMark: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-mark-transparent.png`,
@@ -52,7 +52,8 @@ const iconAliases: Record<string, string> = {
   events: "events",
   sync: "sync",
   bell: "workshop",
-  workshop: "workshop"
+  workshop: "workshop",
+  member: "member"
 };
 
 export function lobbyIconPath(iconKey: string | null | undefined) {

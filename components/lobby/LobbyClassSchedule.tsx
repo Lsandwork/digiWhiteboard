@@ -7,12 +7,12 @@ import { LobbyScheduleCard } from "@/components/lobby/LobbyScheduleCard";
 
 export function LobbyClassSchedule() {
   return (
-    <section className="lobby-class-schedule relative overflow-hidden rounded-2xl border-2 border-lobby-teal/30 bg-lobby-card/60 p-3 backdrop-blur-sm sm:p-4">
-      <Image src={lobbyAssets.eventsCard} alt="" fill className="pointer-events-none object-cover opacity-20" loading="lazy" />
+    <section className="lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-3 sm:p-4">
+      <Image src={lobbyAssets.eventsCard} alt="" fill className="pointer-events-none object-cover opacity-50" loading="lazy" />
       <div className="relative z-10">
         <div className="mb-3 flex items-center gap-2">
-          <Image src={lobbyIconPath("events")} alt="" width={22} height={22} className="h-5 w-5" />
-          <h3 className="text-base font-black uppercase tracking-[0.2em] text-white xl:text-lg">Class Schedule</h3>
+          <Image src={lobbyIconPath("events")} alt="" width={24} height={24} className="h-6 w-6" />
+          <h3 className="text-base font-black uppercase tracking-[0.18em] text-white xl:text-lg">Class Schedule</h3>
         </div>
         <div className="lobby-class-schedule-grid grid grid-cols-5 gap-2">
           {LOBBY_CLASS_SCHEDULE.map((entry) => (
