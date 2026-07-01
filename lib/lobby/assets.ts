@@ -1,9 +1,12 @@
 export const LOBBY_ASSET_BASE = "/assets/fitdog-lobby-whiteboard";
+export const LOBBY_REFERENCE_BASE = "/assets/lobby-whiteboard/reference";
 
 export const LOBBY_BRAND_ORANGE = "#F15F2A";
+export const LOBBY_BRAND_TEAL = "#64B9DC";
 
 export const lobbyAssets = {
-  background: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png`,
+  background: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-coastal-light-1920x1080.png`,
+  backgroundDark: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png`,
   logoLockup: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-lockup-dark-transparent.png`,
   logoBadge: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-circle-badge-512.png`,
   logoMark: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-mark-transparent.png`,
@@ -21,7 +24,9 @@ export const lobbyAssets = {
   statusWayOut: `${LOBBY_ASSET_BASE}/03-ui-components/status-on-the-way-out.png`,
   statusGroom: `${LOBBY_ASSET_BASE}/03-ui-components/status-finishing-groom.png`,
   dogProfileFallback: `${LOBBY_ASSET_BASE}/05-dog-placeholders/dog-profile-fallback-fitdog-logo.png`,
-  mockupReference: `${LOBBY_ASSET_BASE}/09-mockup-reference/fitdog-lobby-checkout-board-layout-reference-with-provided-logo.png`
+  mockupReference: `${LOBBY_ASSET_BASE}/09-mockup-reference/fitdog-lobby-checkout-board-layout-reference-with-provided-logo.png`,
+  implementationReference: `${LOBBY_REFERENCE_BASE}/cursor-implementation-requirements.png`,
+  pawPattern: `${LOBBY_ASSET_BASE}/07-patterns/paw-pattern-fitdog-orange.svg`
 } as const;
 
 const iconAliases: Record<string, string> = {

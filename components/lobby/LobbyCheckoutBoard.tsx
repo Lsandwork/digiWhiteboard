@@ -107,39 +107,45 @@ export function LobbyCheckoutBoard() {
 
   const hasCheckout = Boolean(checkouts.featured || checkouts.queue.length);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
-  const lobbyMessage = settings.lobby_message ?? defaultSettings.lobby_message;
 
   return (
     <main className={`lobby-shell ${tvMode ? "lobby-tv-mode" : ""}`}>
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" />
 
-      <div className="lobby-content relative z-10 flex min-h-screen flex-col px-5 py-4 sm:px-8 sm:py-5 lg:px-10 lg:py-6">
-        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} lobbyMessage={lobbyMessage} />
+      <div className="lobby-content relative z-10 flex min-h-screen flex-col px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-5">
+        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} lobbyMessage={settings.lobby_message} />
 
         {refreshMessage ? (
-          <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm font-semibold text-amber-100">
+          <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm font-semibold text-amber-100">
             {refreshMessage}
           </div>
         ) : null}
 
-        <div className="mt-4 grid min-h-0 flex-1 gap-4 lg:grid-cols-[1.65fr_1fr] lg:gap-5">
-          <div className="flex min-h-0 flex-col gap-4">
+        <div className="lobby-main-grid mt-3 grid min-h-0 flex-1 gap-3 lg:grid-cols-[1.7fr_1fr] lg:gap-4">
+          <div className="flex min-h-0 flex-col gap-3">
             {checkouts.featured ? (
-              <LobbyFeaturedCard dog={checkouts.featured} message={lobbyMessage} />
+              <LobbyFeaturedCard dog={checkouts.featured} />
             ) : (
-              <section className="lobby-empty-card relative overflow-hidden rounded-[1.5rem] border border-white/10 p-6 text-center sm:p-8">
-                <Image src={lobbyAssets.idleCard} alt="" fill className="pointer-events-none object-cover opacity-80" />
-                <div className="relative z-10 flex items-center gap-6 text-left">
+              <section className="lobby-empty-card relative min-h-[140px] overflow-hidden rounded-2xl border-2 border-lobby-teal/35 bg-lobby-card/70 p-5 backdrop-blur-sm sm:min-h-[160px] sm:p-6">
+                <Image src={lobbyAssets.idleCard} alt="" fill className="pointer-events-none object-cover opacity-60" />
+                <Image
+                  src={lobbyAssets.pawPattern}
+                  alt=""
+                  width={120}
+                  height={120}
+                  className="pointer-events-none absolute bottom-2 right-4 h-24 w-24 opacity-20"
+                />
+                <div className="relative z-10 flex items-center gap-5">
                   <Image
                     src={lobbyAssets.logoBadge}
                     alt=""
-                    width={80}
-                    height={80}
-                    className="h-16 w-16 shrink-0 opacity-90 sm:h-20 sm:w-20"
+                    width={88}
+                    height={88}
+                    className="h-16 w-16 shrink-0 rounded-full border-2 border-lobby-teal/40 sm:h-20 sm:w-20"
                   />
                   <div>
-                    <h2 className="text-3xl font-black text-white sm:text-4xl">No dogs currently checking out</h2>
-                    <p className="mt-2 text-base text-slate-200 sm:text-lg">
+                    <h2 className="text-2xl font-black text-white sm:text-3xl xl:text-4xl">No dogs currently checking out</h2>
+                    <p className="mt-1 text-sm text-lobby-muted sm:text-base">
                       We&apos;ll update this screen as soon as a pup is on the way.
                     </p>
                   </div>
@@ -152,15 +158,14 @@ export function LobbyCheckoutBoard() {
             {settings.show_events ? <LobbyClassSchedule /> : null}
           </div>
 
-          {settings.show_promotions ? (
-            <div className="min-h-0">
-              <LobbyServicesGrid sidebar />
-            </div>
-          ) : null}
+          {settings.show_promotions ? <LobbyServicesGrid /> : null}
         </div>
 
-        <footer className="lobby-footer mt-4 shrink-0 rounded-xl border border-white/10 bg-lobby-card/80 px-6 py-3 text-center">
-          <p className="text-sm font-semibold text-slate-200 sm:text-base">{footerMessage}</p>
+        <footer className="lobby-footer relative mt-3 shrink-0 overflow-hidden rounded-xl">
+          <Image src={lobbyAssets.footerBar} alt="" width={1600} height={64} className="h-12 w-full object-cover sm:h-14" />
+          <p className="absolute inset-0 flex items-center justify-center px-6 text-center text-xs font-semibold text-white sm:text-sm">
+            {footerMessage}
+          </p>
         </footer>
       </div>
     </main>

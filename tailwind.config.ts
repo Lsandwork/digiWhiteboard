@@ -18,10 +18,12 @@ const config: Config = {
         },
         lobby: {
           orange: "#F15F2A",
+          teal: "#64B9DC",
           card: "#171E24",
           "card-2": "#222B32",
           cream: "#FFF8EF",
-          muted: "#B9C2CC"
+          muted: "#B9C2CC",
+          navy: "#101418"
         }
       },
       boxShadow: {

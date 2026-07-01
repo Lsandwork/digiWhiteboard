@@ -388,7 +388,7 @@ body {
 
 .lobby-root,
 .lobby-shell {
-  background: #02060b;
+  background: #101418;
   color: #fff;
 }
 
@@ -406,17 +406,12 @@ body {
 .lobby-tv-mode .lobby-content {
   height: 100vh;
   overflow: hidden;
-  padding-top: 1rem;
-  padding-bottom: 1rem;
+  padding-top: 0.75rem;
+  padding-bottom: 0.5rem;
 }
 
-.lobby-tv-mode .lobby-header {
-  gap: 1rem;
-}
-
-.lobby-tv-mode .lobby-title {
-  font-size: clamp(2rem, 3.2vw, 3.25rem);
-  line-height: 1.05;
+.lobby-tv-mode .lobby-main-grid {
+  min-height: 0;
 }
 
 .lobby-tv-mode .lobby-class-schedule-grid {
@@ -424,13 +419,11 @@ body {
 }
 
 .lobby-tv-mode .lobby-empty-card {
-  padding: 1.25rem 1.5rem;
+  min-height: 130px;
 }
 
 .lobby-tv-mode .lobby-footer {
-  margin-top: 0.75rem;
-  padding-top: 0.65rem;
-  padding-bottom: 0.65rem;
+  margin-top: 0.5rem;
 }
 
 .lobby-background {
