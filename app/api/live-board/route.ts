@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,31 +20,32 @@ export async function GET() {
 
     if (visibleError) throw visibleError;
 
-    const completedToHide = (visibleDogs ?? []).filter(
-      (dog) => dog.display_status === "checking_in" && shouldHideCompletedDog(dog as LiveDog, now)
+    const checkinExpired = (visibleDogs ?? []).filter(
+      (dog) => dog.display_status === "checking_in" && shouldExpireCheckinDog(dog as LiveDog, now)
     );
 
     const checkoutExpired = (visibleDogs ?? []).filter(
       (dog) => dog.display_status === "checking_out" && shouldExpireCheckoutDog(dog as LiveDog, now)
     );
 
-    const dogsToHide = [...completedToHide, ...checkoutExpired];
-
-    if (dogsToHide.length > 0) {
-      const hideIds = dogsToHide.map((dog) => dog.id);
-      const { error: cleanupError } = await supabase
+    const hideGroup = async (dogs: typeof visibleDogs, currentStatus: string) => {
+      if (!dogs?.length) return;
+      const hideIds = dogs.map((dog) => dog.id);
+      const { error } = await supabase
         .from("live_transition_dogs")
         .update({
           hidden: true,
           display_status: "removed",
-          current_status: "checkout_expired",
+          current_status: currentStatus,
           completed_at: now.toISOString(),
           updated_at: now.toISOString()
         })
         .in("id", hideIds);
+      if (error) throw error;
+    };
 
-      if (cleanupError) throw cleanupError;
-    }
+    await hideGroup(checkinExpired, "checkin_expired");
+    await hideGroup(checkoutExpired, "checkout_expired");
 
     const { data, error } = await supabase
       .from("live_transition_dogs")
@@ -61,7 +62,9 @@ export async function GET() {
       photo_url: resolveDogPhotoUrl(dog)
     }));
 
-    const checkingIn = enrichedDogs.filter((dog) => dog.display_status === "checking_in");
+    const checkingIn = enrichedDogs.filter(
+      (dog) => dog.display_status === "checking_in" && !shouldExpireCheckinDog(dog, now)
+    );
     const checkingOut = enrichedDogs.filter(
       (dog) => dog.display_status === "checking_out" && !shouldExpireCheckoutDog(dog, now)
     );

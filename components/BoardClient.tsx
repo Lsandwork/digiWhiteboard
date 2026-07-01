@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPanel } from "@/components/board/BoardPanel";
+import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
@@ -69,7 +70,8 @@ export function BoardClient() {
   const [useDevDemo, setUseDevDemo] = useState(false);
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
 
-  const { visibleCheckingInDogs } = useNewCheckingInAlerts(board.checking_in);
+  const { visibleCheckingInDogs: activeCheckingInDogs } = useCheckinDisplayTimers(board.checking_in, nowMs);
+  const { visibleCheckingInDogs } = useNewCheckingInAlerts(activeCheckingInDogs);
   const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
 
   const loadBoard = useCallback(async (mode: ConnectionState = "polling") => {

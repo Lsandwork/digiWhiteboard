@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { computeCheckinDisplayUntilIso } from "@/lib/checkin-display";
 import { computeCheckoutDisplayUntilIso } from "@/lib/checkout-display";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -100,7 +101,9 @@ export async function POST(request: Request) {
             ? continuing && existing?.display_until
               ? existing.display_until
               : computeCheckoutDisplayUntilIso(statusStartedAt)
-            : null,
+            : continuing && existing?.display_until
+              ? existing.display_until
+              : computeCheckinDisplayUntilIso(statusStartedAt),
         last_seen_from_gingr_at: now,
         raw_payload: payload,
         updated_at: now
