@@ -57,8 +57,12 @@ assert.equal(
   "2026-06-30T12:04:00.000Z"
 );
 assert.equal(
-  resolveActiveCheckoutDisplayUntil("2026-06-30T12:00:00.000Z", "2026-06-30T11:00:00.000Z"),
-  "2026-06-30T12:04:00.000Z"
+  resolveActiveCheckoutDisplayUntil(
+    "2026-06-30T12:00:00.000Z",
+    "2026-06-30T11:00:00.000Z",
+    new Date("2026-06-30T12:05:00.000Z")
+  ),
+  "2026-06-30T12:09:00.000Z"
 );
 
 const keyA = getStableCheckoutKey(dog);

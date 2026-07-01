@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { resolveActiveCheckinDisplayUntil } from "@/lib/checkin-display";
-import { resolveActiveCheckoutDisplayUntil } from "@/lib/checkout-display";
+import { resolveActiveCheckinDisplayUntil, shouldExpireCheckinDog } from "@/lib/checkin-display";
+import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/lib/checkout-display";
+import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
+import type { LiveDog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
   const payload = (await request.json()) as GingrWebhookPayload;
   const supabase = getServiceSupabase();
   const webhookType = String(payload.webhook_type ?? "");
-  const verified = verifyGingrSignature(payload, process.env.GINGR_WEBHOOK_SIGNATURE_KEY);
+  const verified = verifyGingrSignature(payload, getGingrWebhookSignatureKey());
 
   const { data: event, error: eventError } = await supabase
     .from("gingr_webhook_events")
@@ -83,11 +85,17 @@ export async function POST(request: Request) {
     if (activeTypes.has(webhookType)) {
       const dog = normalizeDog(payload);
       const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
-      const now = new Date().toISOString();
-      const continuing = isContinuingSameTransition(
-        existing,
-        webhookType as "checking_in" | "checking_out"
-      );
+      const nowDate = new Date();
+      const now = nowDate.toISOString();
+      const windowExpired =
+        existing &&
+        !existing.hidden &&
+        (webhookType === "checking_out"
+          ? shouldExpireCheckoutDog(existing as LiveDog, nowDate)
+          : shouldExpireCheckinDog(existing as LiveDog, nowDate));
+      const continuing =
+        !windowExpired &&
+        isContinuingSameTransition(existing, webhookType as "checking_in" | "checking_out");
       const statusStartedAt = continuing && existing?.status_started_at ? existing.status_started_at : now;
       const existingUntil = continuing ? existing?.display_until : null;
       const row = {
@@ -99,8 +107,8 @@ export async function POST(request: Request) {
         completed_at: continuing ? existing?.completed_at ?? null : null,
         display_until:
           webhookType === "checking_out"
-            ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil)
-            : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil),
+            ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil, nowDate)
+            : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil, nowDate),
         last_seen_from_gingr_at: now,
         raw_payload: payload,
         updated_at: now

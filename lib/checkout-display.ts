@@ -65,11 +65,17 @@ export function computeCheckoutDisplayUntilIso(anchorIso: string) {
 
 export function resolveActiveCheckoutDisplayUntil(
   statusStartedAt: string,
-  existingUntil: string | null | undefined
+  existingUntil: string | null | undefined,
+  now = new Date()
 ) {
-  const computed = computeCheckoutDisplayUntilIso(statusStartedAt);
-  if (existingUntil && new Date(existingUntil).getTime() > Date.now()) {
+  if (existingUntil && new Date(existingUntil).getTime() > now.getTime()) {
     return existingUntil;
   }
-  return computed;
+
+  const computed = computeCheckoutDisplayUntilIso(statusStartedAt);
+  if (new Date(computed).getTime() > now.getTime()) {
+    return computed;
+  }
+
+  return computeCheckoutDisplayUntilIso(now.toISOString());
 }

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PawPrint } from "lucide-react";
+import { BoardDebugPanel } from "@/components/board/BoardDebugPanel";
+import { BoardErrorBanner } from "@/components/board/BoardErrorBanner";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPanel } from "@/components/board/BoardPanel";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
@@ -14,6 +16,7 @@ import { formatBoardDateTime } from "@/lib/board-utils";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 type ConnectionState = "connecting" | "live" | "polling" | "offline";
+type FetchStatus = "idle" | "loading" | "ok" | "error";
 
 const emptyBoard: LiveBoardResponse = {
   checking_in: [],
@@ -61,9 +64,14 @@ function getDevDemoBoard(): LiveBoardResponse | null {
 export function BoardClient() {
   const searchParams = useSearchParams();
   const staffMode = searchParams.get("staff") === "1";
+  const debugBoard = searchParams.get("debugBoard") === "1";
 
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(null);
+  const [lastFetchAt, setLastFetchAt] = useState<string | null>(null);
   const [clock, setClock] = useState<Date | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
@@ -74,30 +82,50 @@ export function BoardClient() {
   const { visibleCheckingInDogs } = useNewCheckingInAlerts(activeCheckingInDogs);
   const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
 
-  const loadBoard = useCallback(async (mode: ConnectionState = "polling") => {
-    try {
-      const response = await fetch("/api/live-board", { cache: "no-store" });
-      if (!response.ok) throw new Error("Board request failed.");
-      const data = (await response.json()) as LiveBoardResponse;
-      const hasLiveDogs = data.checking_in.length > 0 || data.checking_out.length > 0;
+  const apiEndpoint = debugBoard ? "/api/live-board?debugBoard=1" : "/api/live-board";
 
-      if (!hasLiveDogs && process.env.NODE_ENV === "development") {
-        const demo = getDevDemoBoard();
-        if (demo) {
-          setBoard(demo);
-          setUseDevDemo(true);
-          setConnection((current) => (current === "live" ? "live" : mode));
-          return;
+  const loadBoard = useCallback(
+    async (mode: ConnectionState = "polling") => {
+      setFetchStatus("loading");
+      try {
+        const response = await fetch(apiEndpoint, { cache: "no-store" });
+        const data = (await response.json()) as LiveBoardResponse;
+        setLastFetchAt(new Date().toISOString());
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error ?? `Board request failed (${response.status}).`);
         }
-      }
 
-      setUseDevDemo(false);
-      setBoard(data);
-      setConnection((current) => (current === "live" ? "live" : mode));
-    } catch {
-      setConnection("offline");
-    }
-  }, []);
+        const hasLiveDogs = data.checking_in.length > 0 || data.checking_out.length > 0;
+
+        if (!hasLiveDogs && process.env.NODE_ENV === "development") {
+          const demo = getDevDemoBoard();
+          if (demo) {
+            setBoard(demo);
+            setUseDevDemo(true);
+            setFetchError(null);
+            setFetchStatus("ok");
+            setLastSuccessAt(demo.last_updated);
+            setConnection((current) => (current === "live" ? "live" : mode));
+            return;
+          }
+        }
+
+        setUseDevDemo(false);
+        setBoard(data);
+        setFetchError(null);
+        setFetchStatus("ok");
+        setLastSuccessAt(data.last_updated);
+        setConnection((current) => (current === "live" ? "live" : mode));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Live board data is not loading.";
+        setFetchError(message);
+        setFetchStatus("error");
+        setConnection("offline");
+      }
+    },
+    [apiEndpoint]
+  );
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadBoard("connecting"), 0);
@@ -168,6 +196,9 @@ export function BoardClient() {
     [clock]
   );
 
+  const showEmptyState = fetchStatus === "ok" && !fetchError;
+  const expiredCheckoutCount = Math.max(0, board.checking_out.length - visibleCheckoutDogs.length);
+
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
       <div className="mx-auto flex h-full w-full max-w-[1920px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
@@ -180,12 +211,22 @@ export function BoardClient() {
           onRequestWakeLock={() => void requestWakeLock()}
         />
 
+        {fetchError ? (
+          <BoardErrorBanner
+            message="Live board data is not loading."
+            lastSuccessAt={lastSuccessAt}
+            onRetry={() => void loadBoard("polling")}
+            devDetail={process.env.NODE_ENV === "development" ? fetchError : null}
+          />
+        ) : null}
+
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
           <BoardPanel
             title="Checking In"
             subtitle="Dogs Arriving Today"
             mode="in"
             checkingInEntries={visibleCheckingInDogs}
+            showEmptyState={showEmptyState}
           />
           <BoardPanel
             title="Checking Out"
@@ -194,6 +235,7 @@ export function BoardClient() {
             checkingOutEntries={visibleCheckoutDogs}
             showStaffClear={staffMode}
             onClearCheckout={handleClearCheckout}
+            showEmptyState={showEmptyState}
           />
         </div>
 
@@ -214,6 +256,18 @@ export function BoardClient() {
         <div className="fixed bottom-4 left-4 rounded-full border border-slate-600/50 bg-slate-950/80 px-3 py-1 text-xs font-semibold text-slate-300">
           Staff mode
         </div>
+      ) : null}
+
+      {debugBoard ? (
+        <BoardDebugPanel
+          endpoint={apiEndpoint}
+          fetchStatus={fetchStatus}
+          lastFetchAt={lastFetchAt}
+          board={board}
+          visibleCheckingInCount={visibleCheckingInDogs.length}
+          visibleCheckingOutCount={visibleCheckoutDogs.length}
+          expiredCheckoutCount={expiredCheckoutCount}
+        />
       ) : null}
 
       {toast ? (

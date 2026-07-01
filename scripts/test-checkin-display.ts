@@ -64,8 +64,12 @@ assert.equal(
   "2026-06-30T12:03:00.000Z"
 );
 assert.equal(
-  resolveActiveCheckinDisplayUntil("2026-06-30T12:00:00.000Z", "2026-06-30T11:00:00.000Z"),
-  "2026-06-30T12:03:00.000Z"
+  resolveActiveCheckinDisplayUntil(
+    "2026-06-30T12:00:00.000Z",
+    "2026-06-30T11:00:00.000Z",
+    new Date("2026-06-30T12:04:00.000Z")
+  ),
+  "2026-06-30T12:07:00.000Z"
 );
 
 const keyA = getStableCheckinKey(dog);

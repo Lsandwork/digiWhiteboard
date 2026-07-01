@@ -62,11 +62,17 @@ export function computeCheckinDisplayUntilIso(anchorIso: string) {
 
 export function resolveActiveCheckinDisplayUntil(
   statusStartedAt: string,
-  existingUntil: string | null | undefined
+  existingUntil: string | null | undefined,
+  now = new Date()
 ) {
-  const computed = computeCheckinDisplayUntilIso(statusStartedAt);
-  if (existingUntil && new Date(existingUntil).getTime() > Date.now()) {
+  if (existingUntil && new Date(existingUntil).getTime() > now.getTime()) {
     return existingUntil;
   }
-  return computed;
+
+  const computed = computeCheckinDisplayUntilIso(statusStartedAt);
+  if (new Date(computed).getTime() > now.getTime()) {
+    return computed;
+  }
+
+  return computeCheckinDisplayUntilIso(now.toISOString());
 }

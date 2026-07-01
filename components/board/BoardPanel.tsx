@@ -5,7 +5,9 @@ import type { CheckingInDisplayEntry } from "@/hooks/useNewCheckingInAlerts";
 import { DogStatusCard } from "@/components/board/DogStatusCard";
 import { EmptyBoardState } from "@/components/board/EmptyBoardState";
 
-type BoardPanelProps =
+type BoardPanelProps = {
+  showEmptyState?: boolean;
+} & (
   | {
       title: string;
       subtitle: string;
@@ -23,10 +25,11 @@ type BoardPanelProps =
       checkingInEntries?: never;
       showStaffClear?: boolean;
       onClearCheckout?: (dogId: string) => void;
-    };
+    }
+);
 
 export function BoardPanel(props: BoardPanelProps) {
-  const { title, subtitle, mode, showStaffClear = false } = props;
+  const { title, subtitle, mode, showStaffClear = false, showEmptyState = true } = props;
   const Icon = mode === "in" ? LogIn : LogOut;
   const count = mode === "in" ? props.checkingInEntries.length : props.checkingOutEntries.length;
 
@@ -86,9 +89,9 @@ export function BoardPanel(props: BoardPanelProps) {
             props.checkingInEntries.map(({ dog, isNew }) => (
               <DogStatusCard key={dog.id} dog={dog} mode="in" isNew={isNew} />
             ))
-          ) : (
+          ) : showEmptyState ? (
             <EmptyBoardState mode="in" />
-          )
+          ) : null
         ) : props.checkingOutEntries.length ? (
           props.checkingOutEntries.map((entry) => (
             <DogStatusCard
@@ -103,9 +106,9 @@ export function BoardPanel(props: BoardPanelProps) {
               onClear={() => props.onClearCheckout?.(entry.dog.id)}
             />
           ))
-        ) : (
+        ) : showEmptyState ? (
           <EmptyBoardState mode="out" />
-        )}
+        ) : null}
       </div>
     </section>
   );

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getBoardEnvCheck, getGingrWebhookSignatureKey } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -44,15 +45,12 @@ export async function GET(request: Request) {
     failed_events: failedEvents.data ?? [],
     webhook_url: `${publicOrigin(request)}/api/gingr/webhook`,
     env: {
-      NEXT_PUBLIC_SUPABASE_URL: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-      SUPABASE_SERVICE_ROLE_KEY: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      ...getBoardEnvCheck(),
       GINGR_SUBDOMAIN: Boolean(process.env.GINGR_SUBDOMAIN),
-      GINGR_API_KEY: Boolean(process.env.GINGR_API_KEY),
-      GINGR_WEBHOOK_SIGNATURE_KEY: Boolean(process.env.GINGR_WEBHOOK_SIGNATURE_KEY),
       GINGR_LOCATION_ID: Boolean(process.env.GINGR_LOCATION_ID),
-      GINGR_SYNC_SECRET: Boolean(process.env.GINGR_SYNC_SECRET),
-      ADMIN_PASSWORD: Boolean(process.env.ADMIN_PASSWORD)
+      ADMIN_PASSWORD: Boolean(process.env.ADMIN_PASSWORD),
+      CRON_SECRET: Boolean(process.env.CRON_SECRET),
+      GINGR_WEBHOOK_SIGNATURE_KEY: Boolean(getGingrWebhookSignatureKey())
     }
   });
 }

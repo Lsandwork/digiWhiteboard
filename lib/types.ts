@@ -31,6 +31,17 @@ export type LiveBoardResponse = {
     total: number;
   };
   last_updated: string;
+  error?: string;
+  debug?: {
+    endpoint?: string;
+    raw_record_count?: number;
+    checking_in_count?: number;
+    checking_out_count?: number;
+    expired_checkin_count?: number;
+    expired_checkout_count?: number;
+    missing_env?: string[];
+    env?: Record<string, boolean>;
+  };
 };
 
 export type WebhookEvent = {
