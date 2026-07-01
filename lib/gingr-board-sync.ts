@@ -197,6 +197,43 @@ function isSameActiveTransition(existing: LiveDog | null | undefined, direction:
   );
 }
 
+export function mapGingrBoardToLiveDogs(board: Awaited<ReturnType<typeof fetchGingrBackOfHouse>>) {
+  const now = new Date().toISOString();
+  const dogs: LiveDog[] = [];
+
+  for (const direction of ["checking_in", "checking_out"] as const) {
+    for (const record of board[direction]) {
+      const normalized = normalizeBoardDog(toBoardSource(record, direction));
+      if (!normalized.gingr_reservation_id) continue;
+
+      const statusStartedAt = normalized.status_started_at ?? now;
+      dogs.push({
+        id: `gingr-${direction}-${normalized.gingr_reservation_id}`,
+        gingr_reservation_id: normalized.gingr_reservation_id,
+        gingr_animal_id: normalized.gingr_animal_id,
+        animal_name: normalized.animal_name,
+        owner_name: normalized.owner_name,
+        photo_url: normalized.photo_url,
+        reservation_type: normalized.reservation_type,
+        current_status: direction,
+        display_status: direction,
+        room: normalized.room,
+        notes: normalized.notes,
+        flags: normalized.flags,
+        status_started_at: statusStartedAt,
+        completed_at: null,
+        display_until: displayUntilFor(direction, statusStartedAt),
+        last_seen_from_gingr_at: now,
+        raw_payload: { source: "gingr_back_of_house", record },
+        hidden: false,
+        updated_at: now
+      });
+    }
+  }
+
+  return dogs;
+}
+
 export async function syncGingrBoardState(
   supabase: ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>
 ) {
