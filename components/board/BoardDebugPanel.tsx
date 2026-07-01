@@ -52,6 +52,22 @@ export function BoardDebugPanel({
           <dd>{board.counts.checking_out}</dd>
         </div>
         <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Raw checkout candidates</dt>
+          <dd>{board.debug?.raw_checking_out_candidates ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Prompted checkout</dt>
+          <dd>{board.debug?.prompted_checkout_count ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Scheduled only filtered</dt>
+          <dd>{board.debug?.scheduled_only_checkout_count ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Unprompted filtered</dt>
+          <dd>{board.debug?.filtered_unprompted_checkout_count ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Visible Checking In</dt>
           <dd>{visibleCheckingInCount}</dd>
         </div>
@@ -61,9 +77,21 @@ export function BoardDebugPanel({
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Expired Checking Out</dt>
-          <dd>{expiredCheckoutCount}</dd>
+          <dd>{board.debug?.expired_checking_out_count ?? expiredCheckoutCount}</dd>
         </div>
       </dl>
+      {board.debug?.filtered_checkout_reasons?.length ? (
+        <div className="mt-3 border-t border-slate-700/70 pt-3">
+          <p className="mb-1 font-semibold text-slate-300">Filtered checkout sample</p>
+          <ul className="space-y-1 text-[11px] text-slate-400">
+            {board.debug.filtered_checkout_reasons.map((item, index) => (
+              <li key={`${item.reservation_id ?? "no-res"}-${index}`}>
+                {item.reservation_id ?? "unknown"}: {item.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {board.debug?.env ? (
         <div className="mt-3 border-t border-slate-700/70 pt-3">
           <p className="mb-1 font-semibold text-slate-300">Env availability</p>

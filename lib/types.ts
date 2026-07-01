@@ -39,6 +39,16 @@ export type LiveBoardResponse = {
     checking_out_count?: number;
     expired_checkin_count?: number;
     expired_checkout_count?: number;
+    raw_checking_out_candidates?: number;
+    prompted_checkout_count?: number;
+    scheduled_only_checkout_count?: number;
+    filtered_unprompted_checkout_count?: number;
+    visible_checking_out_count?: number;
+    expired_checking_out_count?: number;
+    supabase_checkout_rows?: number;
+    supabase_prompted_checkout_rows?: number;
+    supabase_filtered_unprompted_checkout_rows?: number;
+    filtered_checkout_reasons?: Array<Record<string, string | null>>;
     gingr_sync?: Record<string, unknown>;
     mode: "webhook_only" | "gingr_live";
     recommended_env?: string[];

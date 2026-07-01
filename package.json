@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test:cleanup": "tsx scripts/test-transition-cleanup.ts",
     "test:checkout-display": "tsx scripts/test-checkout-display.ts",
+    "test:checkout-prompt": "tsx scripts/test-checkout-prompt.ts",
     "test:checkin-display": "tsx scripts/test-checkin-display.ts",
     "test:board-dog": "tsx scripts/test-board-dog.ts",
     "test:webhook": "tsx scripts/test-webhook.ts",

@@ -1,4 +1,5 @@
 import type { LiveDog } from "@/lib/types";
+import { getCheckoutPromptKey } from "@/lib/checkout-prompt";
 
 export const CHECKOUT_ALERT_MS = 20 * 1000;
 export const CHECKOUT_REMINDER_INTERVAL_MS = 60 * 1000;
@@ -24,6 +25,9 @@ export function getCheckoutAnchorAt(dog: LiveDog) {
 }
 
 export function getStableCheckoutKey(dog: LiveDog) {
+  const promptKey = getCheckoutPromptKey(dog);
+  if (promptKey) return promptKey;
+
   const anchor = dog.status_started_at ?? dog.updated_at ?? dog.id;
   const reservation = dog.gingr_reservation_id ?? "no-reservation";
   const animal = dog.gingr_animal_id ?? dog.id;

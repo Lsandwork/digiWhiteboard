@@ -1,5 +1,6 @@
 import { resolveActiveCheckinDisplayUntil } from "@/lib/checkin-display";
 import { resolveActiveCheckoutDisplayUntil } from "@/lib/checkout-display";
+import { getCheckoutFilterReason, isPromptedCheckoutRecord } from "@/lib/checkout-prompt";
 import { normalizeBoardDog, type BoardDogSource } from "@/lib/board-dog";
 import type { LiveDog } from "@/lib/types";
 
@@ -172,12 +173,23 @@ export async function fetchGingrBackOfHouse() {
 }
 
 function toBoardSource(record: GingrBackOfHouseRecord, direction: "checking_in" | "checking_out"): BoardDogSource {
+  const rawRecord = record as UnknownRecord;
+  const promptTimestamp =
+    direction === "checking_out"
+      ? rawRecord.checkout_prompted_at ??
+        rawRecord.checking_out_prompted_at ??
+        rawRecord.checkout_requested_at ??
+        rawRecord.ready_for_pickup_at ??
+        rawRecord.prompted_at ??
+        rawRecord.user_prompted_at
+      : null;
+
   return {
     record,
     direction,
     reservation_id: record.id,
     animal_id: record.animal_id,
-    event_timestamp: record.event_time,
+    event_timestamp: (promptTimestamp as string | number | null | undefined) ?? record.event_time,
     updated_at: record.event_time
   };
 }
@@ -203,6 +215,8 @@ export function mapGingrBoardToLiveDogs(board: Awaited<ReturnType<typeof fetchGi
 
   for (const direction of ["checking_in", "checking_out"] as const) {
     for (const record of board[direction]) {
+      if (direction === "checking_out" && !isPromptedCheckoutRecord(record as UnknownRecord)) continue;
+
       const normalized = normalizeBoardDog(toBoardSource(record, direction));
       if (!normalized.gingr_reservation_id) continue;
 
@@ -234,6 +248,26 @@ export function mapGingrBoardToLiveDogs(board: Awaited<ReturnType<typeof fetchGi
   return dogs;
 }
 
+export function getGingrCheckoutPromptStats(board: Awaited<ReturnType<typeof fetchGingrBackOfHouse>>) {
+  const rawCheckoutCandidates = board.checking_out.length;
+  const promptedCheckoutCount = board.checking_out.filter((record) =>
+    isPromptedCheckoutRecord(record as UnknownRecord)
+  ).length;
+  const scheduledOnlyCheckoutCount = rawCheckoutCandidates - promptedCheckoutCount;
+
+  return {
+    raw_checking_out_candidates: rawCheckoutCandidates,
+    prompted_checkout_count: promptedCheckoutCount,
+    scheduled_only_checkout_count: scheduledOnlyCheckoutCount,
+    filtered_unprompted_checkout_count: scheduledOnlyCheckoutCount,
+    filtered_checkout_reasons: board.checking_out.slice(0, 8).map((record) => ({
+      reservation_id: record.id != null ? String(record.id) : null,
+      animal_id: record.animal_id != null ? String(record.animal_id) : null,
+      reason: getCheckoutFilterReason(record as UnknownRecord)
+    }))
+  };
+}
+
 export async function syncGingrBoardState(
   supabase: ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>
 ) {
@@ -253,6 +287,8 @@ export async function syncGingrBoardState(
 
   for (const direction of ["checking_in", "checking_out"] as const) {
     for (const record of board[direction]) {
+      if (direction === "checking_out" && !isPromptedCheckoutRecord(record as UnknownRecord)) continue;
+
       const normalized = normalizeBoardDog(toBoardSource(record, direction));
       if (!normalized.gingr_reservation_id) continue;
 
@@ -331,7 +367,8 @@ export async function syncGingrBoardState(
     .from("live_transition_dogs")
     .select("id, gingr_reservation_id, display_status")
     .eq("hidden", false)
-    .in("display_status", ["checking_in", "checking_out"]);
+    .in("display_status", ["checking_in", "checking_out"])
+    .filter("raw_payload->>source", "eq", "gingr_back_of_house");
 
   const hideIds = (currentlyVisible ?? [])
     .filter((dog) => !activeKeys.has(`${dog.display_status}::${dog.gingr_reservation_id}`))
@@ -354,6 +391,7 @@ export async function syncGingrBoardState(
     synced: true,
     reason: null,
     checking_in: board.checking_in.length,
-    checking_out: board.checking_out.length
+    checking_out: [...activeKeys].filter((key) => key.startsWith("checking_out::")).length,
+    ...getGingrCheckoutPromptStats(board)
   };
 }

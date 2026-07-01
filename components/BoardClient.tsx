@@ -13,6 +13,7 @@ import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
+import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 type ConnectionState = "connecting" | "live" | "polling" | "offline";
@@ -41,11 +42,20 @@ function getDevDemoBoard(): LiveBoardResponse | null {
     display_status: status,
     room,
     notes: null,
-    flags: {},
+    flags: status === "checking_out" ? { checkout_prompted: true } : {},
     status_started_at: now,
     completed_at: null,
     display_until: null,
     last_seen_from_gingr_at: now,
+    raw_payload:
+      status === "checking_out"
+        ? {
+            source: "user_prompt",
+            checkout_prompted: true,
+            checkout_prompted_at: now,
+            prompted_by: "development"
+          }
+        : null,
     hidden: false,
     updated_at: now
   });
@@ -80,7 +90,11 @@ export function BoardClient() {
 
   const { visibleCheckingInDogs: activeCheckingInDogs } = useCheckinDisplayTimers(board.checking_in, nowMs);
   const { visibleCheckingInDogs } = useNewCheckingInAlerts(activeCheckingInDogs);
-  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
+  const promptedCheckingOutDogs = useMemo(
+    () => board.checking_out.filter(isPromptedCheckoutDog),
+    [board.checking_out]
+  );
+  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(promptedCheckingOutDogs, nowMs);
 
   const apiEndpoint = debugBoard ? "/api/live-board?debugBoard=1" : "/api/live-board";
 
@@ -197,7 +211,7 @@ export function BoardClient() {
   );
 
   const showEmptyState = fetchStatus === "ok" && !fetchError;
-  const expiredCheckoutCount = Math.max(0, board.checking_out.length - visibleCheckoutDogs.length);
+  const expiredCheckoutCount = Math.max(0, promptedCheckingOutDogs.length - visibleCheckoutDogs.length);
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">

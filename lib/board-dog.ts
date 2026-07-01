@@ -149,7 +149,21 @@ export function normalizeBoardDog(source: BoardDogSource) {
   const direction = resolveBoardDirection(source, firstString(record, ["webhook_type"]));
   const eventTimestamp =
     toIsoTimestamp(source.event_timestamp) ??
-    toIsoTimestamp(firstString(record, ["checking_out_at", "checkout_requested_at", "checking_in_at", "requested_at", "event_timestamp", "event_time", "gingr_updated_at", "status_changed_at"])) ??
+    toIsoTimestamp(
+      firstString(record, [
+        "checkout_prompted_at",
+        "checking_out_prompted_at",
+        "checkout_requested_at",
+        "ready_for_pickup_at",
+        "checking_out_at",
+        "checking_in_at",
+        "requested_at",
+        "event_timestamp",
+        "event_time",
+        "gingr_updated_at",
+        "status_changed_at"
+      ])
+    ) ??
     toIsoTimestamp(source.updated_at) ??
     toIsoTimestamp(firstString(record, ["updated_at", "created_at"])) ??
     new Date().toISOString();
