@@ -109,17 +109,26 @@ async function getReservationTypeIds(subdomain: string, apiKey: string, configur
 
 async function fetchAnimalPhotoMap(subdomain: string, apiKey: string, animalIds: string[]) {
   const photoMap = new Map<string, string | null>();
-  const uniqueIds = [...new Set(animalIds.filter(Boolean))].slice(0, 40);
+  const uniqueIds = [...new Set(animalIds.filter(Boolean))].slice(0, 12);
 
   await Promise.all(
     uniqueIds.map(async (animalId) => {
       try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
         const url = gingrUrl(subdomain, "/api/v1/animals", {
           key: apiKey,
           "params[id]": animalId
         });
-        const animals = await fetchGingrJson<UnknownRecord[]>(url);
-        const animal = animals?.[0];
+        const response = await fetch(url, {
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (!response.ok) return;
+        const body = (await response.json()) as { data?: UnknownRecord[] };
+        const animal = body.data?.[0];
         if (!animal) return;
         const photo =
           (typeof animal.image === "string" && animal.image) ||
@@ -217,7 +226,11 @@ export async function syncGingrBoardState(
   }
 
   const { subdomain, apiKey } = getGingrConfig();
-  const photoMap = apiKey ? await fetchAnimalPhotoMap(subdomain, apiKey, animalIds) : new Map<string, string | null>();
+  const shouldFetchPhotos = process.env.GINGR_FETCH_ANIMAL_PHOTOS === "true";
+  const photoMap =
+    shouldFetchPhotos && apiKey
+      ? await fetchAnimalPhotoMap(subdomain, apiKey, animalIds)
+      : new Map<string, string | null>();
 
   for (const { normalized, direction, sourceRecord } of rows) {
     const row = normalized;
