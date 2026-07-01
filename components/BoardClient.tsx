@@ -132,7 +132,7 @@ export function BoardClient() {
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
     const clockTimer = window.setInterval(() => setClock(new Date()), 1000);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    const pollTimer = window.setInterval(() => void loadBoard("polling"), 15000);
+    const pollTimer = window.setInterval(() => void loadBoard("polling"), 10000);
 
     return () => {
       window.clearTimeout(initialLoad);

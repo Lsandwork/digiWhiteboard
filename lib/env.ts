@@ -33,8 +33,8 @@ export function getRecommendedBoardEnvVars() {
   const recommended: string[] = [];
   const check = getBoardEnvCheck();
 
-  if (!check.hasGingrWebhookKey) recommended.push("GINGR_WEBHOOK_SIGNATURE_KEY");
   if (!check.hasGingrApiKey) recommended.push("GINGR_API_KEY");
+  if (!check.hasGingrWebhookKey) recommended.push("GINGR_WEBHOOK_SIGNATURE_KEY");
 
   return recommended;
 }

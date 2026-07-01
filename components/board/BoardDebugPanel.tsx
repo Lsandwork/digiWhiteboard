@@ -73,6 +73,14 @@ export function BoardDebugPanel({
           </ul>
         </div>
       ) : null}
+      {board.debug?.gingr_sync ? (
+        <div className="mt-3 border-t border-slate-700/70 pt-3">
+          <p className="mb-1 font-semibold text-slate-300">Gingr sync</p>
+          <pre className="overflow-x-auto whitespace-pre-wrap text-[11px] text-slate-400">
+            {JSON.stringify(board.debug.gingr_sync, null, 2)}
+          </pre>
+        </div>
+      ) : null}
       {board.debug?.recommended_env?.length ? (
         <p className="mt-2 text-amber-300">Recommended: {board.debug.recommended_env.join(", ")}</p>
       ) : null}

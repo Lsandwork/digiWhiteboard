@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
+import { normalizeBoardDog, type BoardDogSource } from "@/lib/board-dog";
 import { extractPhotoUrl } from "@/lib/board-utils";
 
 type UnknownRecord = Record<string, unknown>;
@@ -12,17 +13,7 @@ export type GingrWebhookPayload = {
   [key: string]: unknown;
 };
 
-export type NormalizedDog = {
-  gingr_reservation_id: string | null;
-  gingr_animal_id: string | null;
-  animal_name: string;
-  owner_name: string | null;
-  photo_url: string | null;
-  reservation_type: string | null;
-  room: string | null;
-  notes: string | null;
-  flags: Record<string, boolean>;
-};
+export type NormalizedDog = ReturnType<typeof normalizeBoardDog>;
 
 const flagKeys = [
   "vip",
@@ -41,7 +32,8 @@ export function verifyGingrSignature(payload: GingrWebhookPayload, key: string |
     return false;
   }
 
-  const message = `${payload.webhook_type ?? ""}${payload.entity_id ?? ""}${payload.entity_type ?? ""}`;
+  const entityId = payload.entity_id == null ? "" : String(payload.entity_id);
+  const message = `${payload.webhook_type ?? ""}${entityId}${payload.entity_type ?? ""}`;
   const expected = createHmac("sha256", key).update(message).digest("hex");
   const received = String(payload.signature);
 
@@ -53,15 +45,6 @@ export function verifyGingrSignature(payload: GingrWebhookPayload, key: string |
   }
 
   return timingSafeEqual(expectedBuffer, receivedBuffer);
-}
-
-function firstString(source: UnknownRecord, keys: string[]) {
-  for (const key of keys) {
-    const value = source[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
-    if (typeof value === "number") return String(value);
-  }
-  return null;
 }
 
 function hasFlag(data: UnknownRecord, key: string) {
@@ -86,38 +69,36 @@ function hasFlag(data: UnknownRecord, key: string) {
 
 export function normalizeDog(payload: GingrWebhookPayload): NormalizedDog {
   const data = payload.entity_data ?? {};
-  const animal = typeof data.animal === "object" && data.animal ? (data.animal as UnknownRecord) : {};
-  const owner = typeof data.owner === "object" && data.owner ? (data.owner as UnknownRecord) : {};
-  const reservation = typeof data.reservation === "object" && data.reservation ? (data.reservation as UnknownRecord) : {};
+  const reservationId = data.reservation_id ?? data.id ?? payload.entity_id;
+  const animalId = data.animal_id ?? data.pet_id;
+  const source: BoardDogSource = {
+    record: {
+      ...data,
+      webhook_type: payload.webhook_type,
+      reservation_id: reservationId,
+      animal_id: animalId
+    },
+    direction: null,
+    reservation_id: reservationId == null ? null : String(reservationId),
+    animal_id: animalId == null ? null : String(animalId),
+    event_timestamp:
+      (typeof data.event_time === "string" || typeof data.event_time === "number" ? data.event_time : null) ??
+      (typeof data.event_timestamp === "string" || typeof data.event_timestamp === "number" ? data.event_timestamp : null) ??
+      (typeof data.updated_at === "string" ? data.updated_at : null),
+    updated_at: typeof data.updated_at === "string" ? data.updated_at : typeof data.created_at === "string" ? data.created_at : null
+  };
 
-  const merged = { ...reservation, ...data, ...animal };
-  const ownerName =
-    firstString(data, ["owner_name", "customer_name", "client_name"]) ??
-    firstString(owner, ["name", "full_name", "first_name"]);
-
-  const animalName =
-    firstString(animal, ["name", "animal_name", "pet_name"]) ??
-    firstString(data, ["animal_name", "pet_name", "dog_name", "name"]) ??
-    "Unknown Dog";
-
+  const normalized = normalizeBoardDog(source);
+  const merged = { ...data };
   const flags = Object.fromEntries(flagKeys.map((key) => [key, hasFlag(merged, key)]));
 
   return {
-    gingr_reservation_id:
-      firstString(data, ["reservation_id", "gingr_reservation_id", "id"]) ??
-      firstString(reservation, ["id", "reservation_id"]) ??
-      (payload.entity_type === "reservation" ? String(payload.entity_id ?? "") : null),
-    gingr_animal_id:
-      firstString(data, ["animal_id", "gingr_animal_id", "pet_id"]) ??
-      firstString(animal, ["id", "animal_id"]) ??
-      (payload.entity_type === "animal" ? String(payload.entity_id ?? "") : null),
-    animal_name: animalName,
-    owner_name: ownerName,
-    photo_url: extractPhotoUrl(animal, reservation, data, payload as UnknownRecord),
-    reservation_type: firstString(data, ["reservation_type", "service", "type_name"]) ?? firstString(reservation, ["type", "type_name"]),
-    room: firstString(data, ["room", "area", "location", "run_name"]) ?? firstString(reservation, ["room", "area"]),
-    notes: firstString(data, ["notes", "note", "special_notes", "public_notes"]),
-    flags
+    ...normalized,
+    photo_url: normalized.photo_url ?? extractPhotoUrl(data),
+    flags: {
+      ...flags,
+      ...normalized.flags
+    }
   };
 }
 
