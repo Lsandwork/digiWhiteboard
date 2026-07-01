@@ -1,4 +1,5 @@
 import type { LiveDog } from "@/lib/types";
+import { toIsoTimestamp } from "@/lib/board-dog";
 import { getCheckoutPromptTimestamp } from "@/lib/checkout-prompt";
 
 type UnknownRecord = Record<string, unknown>;
@@ -41,5 +42,10 @@ export function getLobbyCheckoutStatus(dog: LiveDog, featured = false) {
 
 export function getLobbyPromptedAt(dog: LiveDog) {
   const timestamp = getCheckoutPromptTimestamp((dog.raw_payload ?? {}) as UnknownRecord);
-  return timestamp ? new Date(timestamp).toISOString() : dog.status_started_at;
+  return (
+    toIsoTimestamp(timestamp) ??
+    toIsoTimestamp(dog.status_started_at) ??
+    toIsoTimestamp(dog.updated_at) ??
+    null
+  );
 }

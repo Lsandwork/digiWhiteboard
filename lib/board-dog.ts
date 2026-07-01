@@ -83,7 +83,7 @@ export function resolveBoardDirection(
   return null;
 }
 
-function toIsoTimestamp(value: string | number | null | undefined) {
+export function toIsoTimestamp(value: string | number | null | undefined) {
   if (value == null || value === "") return null;
   if (typeof value === "number") {
     const ms = value < 10_000_000_000 ? value * 1000 : value;

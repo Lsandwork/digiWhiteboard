@@ -1,3 +1,4 @@
+import { toIsoTimestamp } from "@/lib/board-dog";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
@@ -69,6 +70,13 @@ function toLobbyCheckoutDog(dog: LiveDog, featured = false): LobbyCheckoutDog {
   };
 }
 
+function lobbySortTime(dog: LiveDog) {
+  const iso = getLobbyPromptedAt(dog) ?? toIsoTimestamp(dog.status_started_at) ?? toIsoTimestamp(dog.updated_at);
+  if (!iso) return 0;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCount = 6, now = new Date()) {
   const [gingrDogs, supabaseDogs] = await Promise.all([
     loadGingrCheckoutDogs(now),
@@ -79,11 +87,7 @@ export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCo
   const withStoredPhotos = await applyStoredAnimalPhotos(supabase, merged);
   const enriched = enrichDogPhotos(withStoredPhotos);
 
-  const sorted = enriched.sort(
-    (a, b) =>
-      new Date(getLobbyPromptedAt(b) ?? b.updated_at).getTime() -
-      new Date(getLobbyPromptedAt(a) ?? a.updated_at).getTime()
-  );
+  const sorted = enriched.sort((a, b) => lobbySortTime(b) - lobbySortTime(a));
 
   const featuredDog = sorted[0] ?? null;
   const queueDogs = sorted.slice(1, maxQueueCount + 1);
