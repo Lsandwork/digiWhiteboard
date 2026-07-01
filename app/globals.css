@@ -84,6 +84,23 @@ body {
     0 24px 60px rgba(0, 0, 0, 0.35);
 }
 
+.board-panel-out-active {
+  border-color: rgba(255, 183, 77, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(255, 183, 77, 0.22),
+    0 0 38px rgba(255, 159, 28, 0.18),
+    0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.checkout-panel-sublabel {
+  text-shadow: 0 0 16px rgba(255, 183, 77, 0.38);
+}
+
+.checkout-panel-count-pulse {
+  animation: checkoutPanelCountPulse 2.6s ease-in-out infinite;
+}
+
 .board-card {
   border: 1px solid rgba(148, 163, 184, 0.16);
   background: linear-gradient(145deg, rgba(10, 18, 30, 0.92), rgba(4, 10, 18, 0.88));
@@ -95,7 +112,25 @@ body {
 }
 
 .board-card-out {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 24px rgba(255, 159, 28, 0.08);
+  border-color: rgba(255, 159, 28, 0.26);
+  background:
+    linear-gradient(145deg, rgba(24, 16, 8, 0.94), rgba(5, 10, 18, 0.9)),
+    radial-gradient(circle at 18% 0%, rgba(255, 183, 77, 0.08), transparent 30%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 0 0 1px rgba(255, 159, 28, 0.08),
+    0 0 26px rgba(255, 159, 28, 0.11);
+}
+
+.checkout-card {
+  isolation: isolate;
+}
+
+.checkout-card-active {
+  transition:
+    border-color 250ms ease,
+    box-shadow 250ms ease,
+    filter 250ms ease;
 }
 
 .checkin-entrance {
@@ -103,26 +138,57 @@ body {
 }
 
 .checkout-entrance {
-  animation: checkoutEntrance 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: checkout-card-enter 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .checkout-alert-active {
-  animation: checkoutAlertGlow 2.4s ease-in-out infinite;
-  border-color: rgba(255, 183, 77, 0.55);
+  animation: checkout-row-alert-pulse 2.35s ease-in-out infinite;
+  border-color: rgba(255, 208, 120, 0.78);
+  filter: brightness(1.08);
+}
+
+.checkout-row-gold-sweep {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.checkout-row-gold-sweep::before {
+  position: absolute;
+  top: -30%;
+  left: -55%;
+  width: 46%;
+  height: 160%;
+  content: "";
+  transform: skewX(-18deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 245, 205, 0.06),
+    rgba(255, 183, 77, 0.25),
+    rgba(255, 245, 205, 0.06),
+    transparent
+  );
+  animation: checkout-row-gold-sweep 3.4s ease-in-out infinite;
 }
 
 .checkout-name-alert {
-  animation: checkoutNamePulse 2s ease-in-out infinite;
-  text-shadow: 0 0 18px rgba(255, 183, 77, 0.35);
+  animation: checkout-name-glow-pulse 2s ease-in-out infinite;
+  text-shadow:
+    0 0 12px rgba(255, 255, 255, 0.24),
+    0 0 26px rgba(255, 183, 77, 0.42);
 }
 
 .checkout-ready-badge,
 .checkout-status-badge-alert {
-  animation: checkoutBadgePulse 2.2s ease-in-out infinite;
+  animation: checkout-ready-badge-pulse 1.8s ease-in-out infinite;
 }
 
 .checkout-avatar-alert-ring {
-  animation: checkoutAvatarRing 2.2s ease-in-out infinite;
+  animation: checkout-avatar-ring-pulse 1.9s ease-in-out infinite;
 }
 
 .checkout-avatar-pop,
@@ -131,11 +197,15 @@ body {
 }
 
 .checkout-reminder-pulse {
-  animation: checkoutReminderBorder 2.5s ease-in-out;
+  animation: checkout-reminder-pulse 2.5s ease-in-out;
 }
 
 .checkout-expiring-soon {
-  border-color: rgba(255, 159, 28, 0.35);
+  border-color: rgba(255, 208, 120, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 0 1px rgba(255, 183, 77, 0.18),
+    0 0 22px rgba(255, 159, 28, 0.14);
 }
 
 @keyframes checkinEntrance {
@@ -149,66 +219,104 @@ body {
   }
 }
 
-@keyframes checkoutEntrance {
+@keyframes checkout-card-enter {
   0% {
     opacity: 0;
-    transform: translateX(24px) scale(0.96);
+    transform: translateX(44px) scale(0.94);
+    filter: brightness(1);
   }
   70% {
     opacity: 1;
-    transform: translateX(-2px) scale(1.02);
+    transform: translateX(-4px) scale(1.035);
+    filter: brightness(1.12);
   }
   100% {
     opacity: 1;
     transform: translateX(0) scale(1);
+    filter: brightness(1.04);
   }
 }
 
-@keyframes checkoutAlertGlow {
+@keyframes checkout-row-alert-pulse {
   0%,
   100% {
+    background:
+      linear-gradient(145deg, rgba(33, 22, 10, 0.96), rgba(5, 10, 18, 0.9)),
+      radial-gradient(circle at 15% 0%, rgba(255, 183, 77, 0.12), transparent 34%);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.05),
-      0 0 0 1px rgba(255, 183, 77, 0.28),
-      0 0 28px rgba(255, 159, 28, 0.22);
+      0 0 0 1px rgba(255, 183, 77, 0.34),
+      0 0 34px rgba(255, 159, 28, 0.24),
+      0 12px 34px rgba(255, 159, 28, 0.06);
   }
   50% {
+    background:
+      linear-gradient(145deg, rgba(44, 29, 12, 0.98), rgba(7, 12, 20, 0.92)),
+      radial-gradient(circle at 18% 0%, rgba(255, 208, 120, 0.2), transparent 38%);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.06),
-      0 0 0 1px rgba(255, 208, 120, 0.55),
-      0 0 42px rgba(255, 159, 28, 0.38);
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 0 0 1px rgba(255, 226, 163, 0.74),
+      0 0 52px rgba(255, 159, 28, 0.42),
+      0 16px 42px rgba(255, 159, 28, 0.1);
   }
 }
 
-@keyframes checkoutNamePulse {
+@keyframes checkout-row-gold-sweep {
+  0%,
+  44% {
+    transform: translateX(0) skewX(-18deg);
+    opacity: 0;
+  }
+  58% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(360%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes checkout-name-glow-pulse {
   0%,
   100% {
     color: #fff7ed;
+    text-shadow:
+      0 0 10px rgba(255, 255, 255, 0.2),
+      0 0 22px rgba(255, 183, 77, 0.38);
   }
   50% {
-    color: #ffcf73;
+    color: #ffe4a3;
+    text-shadow:
+      0 0 16px rgba(255, 255, 255, 0.32),
+      0 0 34px rgba(255, 183, 77, 0.7);
   }
 }
 
-@keyframes checkoutBadgePulse {
+@keyframes checkout-ready-badge-pulse {
   0%,
   100% {
     transform: scale(1);
     opacity: 1;
+    box-shadow: 0 0 0 rgba(255, 183, 77, 0);
   }
   50% {
-    transform: scale(1.04);
-    opacity: 0.92;
+    transform: scale(1.07);
+    opacity: 0.96;
+    box-shadow: 0 0 22px rgba(255, 183, 77, 0.32);
   }
 }
 
-@keyframes checkoutAvatarRing {
+@keyframes checkout-avatar-ring-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 159, 28, 0.35), 0 0 18px rgba(255, 159, 28, 0.25);
+    box-shadow:
+      0 0 0 0 rgba(255, 159, 28, 0.36),
+      0 0 20px rgba(255, 159, 28, 0.3);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(255, 159, 28, 0.12), 0 0 28px rgba(255, 183, 77, 0.45);
+    box-shadow:
+      0 0 0 7px rgba(255, 159, 28, 0.13),
+      0 0 34px rgba(255, 183, 77, 0.52);
   }
 }
 
@@ -224,17 +332,35 @@ body {
   }
 }
 
-@keyframes checkoutReminderBorder {
+@keyframes checkout-reminder-pulse {
   0%,
   100% {
-    border-color: rgba(148, 163, 184, 0.16);
+    border-color: rgba(255, 159, 28, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.04),
+      0 0 24px rgba(255, 159, 28, 0.08);
   }
   50% {
-    border-color: rgba(255, 159, 28, 0.42);
+    border-color: rgba(255, 208, 120, 0.62);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 34px rgba(255, 159, 28, 0.26);
+  }
+}
+
+@keyframes checkoutPanelCountPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(255, 159, 28, 0.18), 0 0 18px rgba(255, 159, 28, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(255, 208, 120, 0.46), 0 0 28px rgba(255, 159, 28, 0.28);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .checkout-animated,
+  .checkout-animated *,
   .checkin-entrance,
   .checkout-entrance,
   .checkout-alert-active,
@@ -245,6 +371,7 @@ body {
   .checkout-avatar-pop,
   .checkout-avatar-photo-pop,
   .checkout-reminder-pulse,
+  .checkout-panel-count-pulse,
   .animate-fade-up {
     animation: none !important;
     transition: none !important;

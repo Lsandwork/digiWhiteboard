@@ -5,6 +5,7 @@ import {
   CHECKOUT_ALERT_MS,
   CHECKOUT_REMINDER_DURATION_MS,
   CHECKOUT_REMINDER_INTERVAL_MS,
+  getStableCheckoutKey,
   shouldExpireCheckoutDog
 } from "@/lib/checkout-display";
 import type { LiveDog } from "@/lib/types";
@@ -33,7 +34,7 @@ export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number
     const entries: CheckoutDisplayEntry[] = [];
 
     for (const dog of checkingOutDogs) {
-      const stableKey = dog.id;
+      const stableKey = getStableCheckoutKey(dog);
       if (manuallyExpired.has(stableKey)) continue;
       if (shouldExpireCheckoutDog(dog, new Date(now))) continue;
 
@@ -83,7 +84,7 @@ export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number
   }, [now, visibleCheckoutDogs]);
 
   const manuallyExpireCheckout = useCallback((dog: LiveDog) => {
-    setManuallyExpired((current) => new Set(current).add(dog.id));
+    setManuallyExpired((current) => new Set(current).add(getStableCheckoutKey(dog)));
   }, []);
 
   return {

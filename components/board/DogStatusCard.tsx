@@ -5,6 +5,7 @@ import { MapPin, X } from "lucide-react";
 import type { LiveDog } from "@/lib/types";
 import { getDogLocationLabel, getDogStatusLabel } from "@/lib/board-utils";
 import { DogAvatar } from "@/components/board/DogAvatar";
+import { getCheckoutDisplayMs } from "@/lib/checkout-display";
 
 type DogStatusCardProps = {
   dog: LiveDog;
@@ -13,6 +14,8 @@ type DogStatusCardProps = {
   isAlerting?: boolean;
   isReminding?: boolean;
   isExpiringSoon?: boolean;
+  displayUntil?: number;
+  nowMs?: number;
   showStaffClear?: boolean;
   onClear?: () => void;
 };
@@ -24,6 +27,8 @@ export function DogStatusCard({
   isAlerting = false,
   isReminding = false,
   isExpiringSoon = false,
+  displayUntil,
+  nowMs = 0,
   showStaffClear = false,
   onClear
 }: DogStatusCardProps) {
@@ -31,19 +36,28 @@ export function DogStatusCard({
   const locationLabel = getDogLocationLabel(dog);
   const personLabel = mode === "in" ? "Owner" : "Pickup";
   const personName = dog.owner_name;
+  const remainingMs = mode === "out" && displayUntil ? Math.max(0, displayUntil - nowMs) : 0;
+  const progressPercent =
+    mode === "out" && displayUntil ? Math.max(0, Math.min(100, (remainingMs / getCheckoutDisplayMs()) * 100)) : 0;
+  const remainingMinutes = Math.floor(remainingMs / 60_000);
+  const remainingSeconds = Math.floor((remainingMs % 60_000) / 1000);
+  const remainingLabel = `${remainingMinutes}:${String(remainingSeconds).padStart(2, "0")}`;
 
   return (
     <article
       className={clsx(
-        "board-card relative rounded-2xl p-4 sm:p-5",
+        "board-card relative overflow-hidden rounded-2xl p-4 sm:p-5",
         mode === "in" ? "board-card-in" : "board-card-out",
         mode === "in" && isNew && "checkin-entrance",
         mode === "out" && isNew && "checkout-entrance",
-        mode === "out" && isAlerting && "checkout-alert-active",
+        mode === "out" && "checkout-card checkout-card-active",
+        mode === "out" && isAlerting && "checkout-alert-active checkout-card-alerting checkout-animated",
         mode === "out" && !isAlerting && isReminding && "checkout-reminder-pulse",
         mode === "out" && isExpiringSoon && !isAlerting && "checkout-expiring-soon"
       )}
     >
+      {mode === "out" && isAlerting ? <span className="checkout-row-gold-sweep" aria-hidden="true" /> : null}
+
       {showStaffClear && mode === "out" && onClear ? (
         <button
           type="button"
@@ -107,6 +121,24 @@ export function DogStatusCard({
           ) : null}
         </div>
       </div>
+
+      {mode === "out" && displayUntil ? (
+        <div className="mt-4">
+          <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200/80 sm:text-xs">
+            <span>Pickup Window</span>
+            <span>Clears in {remainingLabel}</span>
+          </div>
+          <div className="h-1.5 overflow-hidden rounded-full bg-slate-900/90">
+            <div
+              className={clsx(
+                "h-full rounded-full transition-[width] duration-700",
+                isExpiringSoon ? "bg-amber-300" : "bg-gradient-to-r from-amber-500 via-yellow-300 to-amber-200"
+              )}
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }

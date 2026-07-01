@@ -66,7 +66,7 @@ async function run() {
   await postWebhook("checking_out", "reservation-test-001", "Atlas");
   await expectCount("checking_out", 1);
   await postWebhook("check_out", "reservation-test-001", "Atlas");
-  await expectCount("checking_out", 1);
+  await expectCount("checking_out", 0);
   console.log("Webhook flow passed.");
 }
 

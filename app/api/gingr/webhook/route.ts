@@ -25,6 +25,10 @@ function completionStatus(webhookType: string) {
   return "checked_out";
 }
 
+function isCheckoutCompletion(webhookType: string) {
+  return webhookType === "check_out" || webhookType === "checked_out";
+}
+
 async function findExistingDog(supabase: ReturnType<typeof getServiceSupabase>, reservationId: string | null, animalId: string | null) {
   if (reservationId) {
     const { data } = await supabase
@@ -176,7 +180,7 @@ export async function POST(request: Request) {
           current_status: newStatus,
           completed_at: now
         };
-        const hideNow = shouldHideCompletedDog(pendingHide, nowDate);
+        const hideNow = isCheckoutCompletion(webhookType) || shouldHideCompletedDog(pendingHide, nowDate);
         const { error } = await supabase
           .from("live_transition_dogs")
           .update({

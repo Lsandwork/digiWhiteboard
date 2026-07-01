@@ -7,6 +7,7 @@ import { EmptyBoardState } from "@/components/board/EmptyBoardState";
 
 type BoardPanelProps = {
   showEmptyState?: boolean;
+  nowMs: number;
 } & (
   | {
       title: string;
@@ -29,15 +30,17 @@ type BoardPanelProps = {
 );
 
 export function BoardPanel(props: BoardPanelProps) {
-  const { title, subtitle, mode, showStaffClear = false, showEmptyState = true } = props;
+  const { title, subtitle, mode, nowMs, showStaffClear = false, showEmptyState = true } = props;
   const Icon = mode === "in" ? LogIn : LogOut;
   const count = mode === "in" ? props.checkingInEntries.length : props.checkingOutEntries.length;
+  const hasCheckoutAlerts = mode === "out" && count > 0;
 
   return (
     <section
       className={clsx(
         "board-panel flex min-h-0 flex-1 flex-col rounded-3xl p-4 sm:p-5 lg:p-6",
-        mode === "in" ? "board-panel-in" : "board-panel-out"
+        mode === "in" ? "board-panel-in" : "board-panel-out",
+        hasCheckoutAlerts && "board-panel-out-active"
       )}
     >
       <div className="mb-4 flex items-start justify-between gap-4 sm:mb-5">
@@ -57,10 +60,11 @@ export function BoardPanel(props: BoardPanelProps) {
             <p
               className={clsx(
                 "mt-0.5 text-xs font-bold uppercase tracking-[0.18em] sm:text-sm",
-                mode === "in" ? "text-fitdog-blue" : "text-fitdog-orange"
+                mode === "in" ? "text-fitdog-blue" : "text-fitdog-orange",
+                hasCheckoutAlerts && "checkout-panel-sublabel"
               )}
             >
-              {subtitle}
+              {hasCheckoutAlerts ? "Ready For Handler" : subtitle}
             </p>
           </div>
         </div>
@@ -68,7 +72,8 @@ export function BoardPanel(props: BoardPanelProps) {
         <div
           className={clsx(
             "flex shrink-0 flex-col items-center rounded-xl border px-3 py-2 sm:px-4 sm:py-2.5",
-            mode === "in" ? "border-fitdog-blue/40 bg-fitdog-blue/8" : "border-fitdog-orange/40 bg-fitdog-orange/8"
+            mode === "in" ? "border-fitdog-blue/40 bg-fitdog-blue/8" : "border-fitdog-orange/40 bg-fitdog-orange/8",
+            hasCheckoutAlerts && "checkout-panel-count-pulse"
           )}
         >
           <span
@@ -102,6 +107,8 @@ export function BoardPanel(props: BoardPanelProps) {
               isAlerting={entry.isAlerting}
               isReminding={entry.isReminding}
               isExpiringSoon={entry.isExpiringSoon}
+              displayUntil={entry.displayUntil}
+              nowMs={nowMs}
               showStaffClear={showStaffClear}
               onClear={() => props.onClearCheckout?.(entry.dog.id)}
             />

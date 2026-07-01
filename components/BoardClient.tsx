@@ -226,6 +226,7 @@ export function BoardClient() {
             subtitle="Dogs Arriving Today"
             mode="in"
             checkingInEntries={visibleCheckingInDogs}
+            nowMs={nowMs}
             showEmptyState={showEmptyState}
           />
           <BoardPanel
@@ -233,6 +234,7 @@ export function BoardClient() {
             subtitle="Dogs Heading Home"
             mode="out"
             checkingOutEntries={visibleCheckoutDogs}
+            nowMs={nowMs}
             showStaffClear={staffMode}
             onClearCheckout={handleClearCheckout}
             showEmptyState={showEmptyState}
