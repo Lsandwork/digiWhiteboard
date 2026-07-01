@@ -27,9 +27,14 @@ export function getStableCheckinKey(dog: LiveDog) {
   return `${reservation}::${animal}::${anchor}`;
 }
 
-export function getCheckinDisplayUntilAt(dog: LiveDog, firstSeenAt?: number) {
+export function getCheckinDisplayUntilAt(dog: LiveDog, firstSeenAt?: number, now = new Date()) {
+  const nowMs = now.getTime();
+
   if (dog.display_until && dog.display_status === "checking_in") {
-    return new Date(dog.display_until);
+    const untilMs = new Date(dog.display_until).getTime();
+    if (untilMs > nowMs) {
+      return new Date(untilMs);
+    }
   }
 
   const anchor = getCheckinAnchorAt(dog);
@@ -46,11 +51,22 @@ export function getCheckinDisplayUntilAt(dog: LiveDog, firstSeenAt?: number) {
 
 export function shouldExpireCheckinDog(dog: LiveDog, now = new Date(), firstSeenAt?: number) {
   if (dog.display_status !== "checking_in") return false;
-  const until = getCheckinDisplayUntilAt(dog, firstSeenAt);
+  const until = getCheckinDisplayUntilAt(dog, firstSeenAt, now);
   if (!until) return false;
   return now.getTime() >= until.getTime();
 }
 
 export function computeCheckinDisplayUntilIso(anchorIso: string) {
   return new Date(new Date(anchorIso).getTime() + getCheckinDisplayMs()).toISOString();
+}
+
+export function resolveActiveCheckinDisplayUntil(
+  statusStartedAt: string,
+  existingUntil: string | null | undefined
+) {
+  const computed = computeCheckinDisplayUntilIso(statusStartedAt);
+  if (existingUntil && new Date(existingUntil).getTime() > Date.now()) {
+    return existingUntil;
+  }
+  return computed;
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { computeCheckinDisplayUntilIso } from "@/lib/checkin-display";
-import { computeCheckoutDisplayUntilIso } from "@/lib/checkout-display";
+import { resolveActiveCheckinDisplayUntil } from "@/lib/checkin-display";
+import { resolveActiveCheckoutDisplayUntil } from "@/lib/checkout-display";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
@@ -89,6 +89,7 @@ export async function POST(request: Request) {
         webhookType as "checking_in" | "checking_out"
       );
       const statusStartedAt = continuing && existing?.status_started_at ? existing.status_started_at : now;
+      const existingUntil = continuing ? existing?.display_until : null;
       const row = {
         ...dog,
         current_status: webhookType,
@@ -98,12 +99,8 @@ export async function POST(request: Request) {
         completed_at: continuing ? existing?.completed_at ?? null : null,
         display_until:
           webhookType === "checking_out"
-            ? continuing && existing?.display_until
-              ? existing.display_until
-              : computeCheckoutDisplayUntilIso(statusStartedAt)
-            : continuing && existing?.display_until
-              ? existing.display_until
-              : computeCheckinDisplayUntilIso(statusStartedAt),
+            ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil)
+            : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil),
         last_seen_from_gingr_at: now,
         raw_payload: payload,
         updated_at: now

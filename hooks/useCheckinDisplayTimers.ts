@@ -72,17 +72,24 @@ function buildCheckinDisplay(
     const eventAnchor = getEventAnchor(dog);
 
     if (isExpiredForDog(nextExpired, stableKey, eventAnchor)) {
-      continue;
+      if (!shouldExpireCheckinDog(dog, new Date(now))) {
+        delete nextExpired[stableKey];
+      } else {
+        continue;
+      }
     }
 
     const backendExpired = shouldExpireCheckinDog(dog, new Date(now));
     let timer = nextTimerMap[stableKey];
+    const displayUntil =
+      getCheckinDisplayUntilAt(dog, timer?.firstSeenAt ?? now, new Date(now))?.getTime() ??
+      (timer?.firstSeenAt ?? now) + getCheckinDisplayMs();
 
     if (!timer || timer.eventAnchor !== eventAnchor) {
-      const firstSeenAt = now;
-      const displayUntil = getCheckinDisplayUntilAt(dog, firstSeenAt)?.getTime() ?? firstSeenAt + getCheckinDisplayMs();
-
-      timer = { firstSeenAt, displayUntil, eventAnchor };
+      timer = { firstSeenAt: now, displayUntil, eventAnchor };
+      nextTimerMap[stableKey] = timer;
+    } else {
+      timer = { ...timer, displayUntil };
       nextTimerMap[stableKey] = timer;
     }
 

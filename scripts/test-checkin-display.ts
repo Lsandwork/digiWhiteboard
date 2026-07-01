@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import {
   getCheckinDisplayMinutes,
   getCheckinDisplayMs,
+  getCheckinDisplayUntilAt,
   getStableCheckinKey,
+  resolveActiveCheckinDisplayUntil,
   shouldExpireCheckinDog
 } from "../lib/checkin-display";
 import type { LiveDog } from "../lib/types";
@@ -48,6 +50,23 @@ const stuckDog: LiveDog = {
   display_until: "2026-06-30T12:03:00.000Z"
 };
 assert.equal(shouldExpireCheckinDog(stuckDog, new Date("2026-06-30T12:03:01.000Z")), true);
+
+const staleDisplayUntilDog: LiveDog = {
+  ...dog,
+  display_until: "2026-06-30T11:00:00.000Z"
+};
+assert.equal(
+  shouldExpireCheckinDog(staleDisplayUntilDog, new Date("2026-06-30T12:02:00.000Z")),
+  false
+);
+assert.equal(
+  getCheckinDisplayUntilAt(staleDisplayUntilDog, undefined, new Date("2026-06-30T12:02:00.000Z"))?.toISOString(),
+  "2026-06-30T12:03:00.000Z"
+);
+assert.equal(
+  resolveActiveCheckinDisplayUntil("2026-06-30T12:00:00.000Z", "2026-06-30T11:00:00.000Z"),
+  "2026-06-30T12:03:00.000Z"
+);
 
 const keyA = getStableCheckinKey(dog);
 const keyB = getStableCheckinKey({

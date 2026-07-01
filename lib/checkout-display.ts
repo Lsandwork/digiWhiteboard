@@ -30,9 +30,14 @@ export function getStableCheckoutKey(dog: LiveDog) {
   return `${reservation}::${animal}::${anchor}`;
 }
 
-export function getCheckoutDisplayUntilAt(dog: LiveDog, firstSeenAt?: number) {
-  if (dog.display_until) {
-    return new Date(dog.display_until);
+export function getCheckoutDisplayUntilAt(dog: LiveDog, firstSeenAt?: number, now = new Date()) {
+  const nowMs = now.getTime();
+
+  if (dog.display_until && dog.display_status === "checking_out") {
+    const untilMs = new Date(dog.display_until).getTime();
+    if (untilMs > nowMs) {
+      return new Date(untilMs);
+    }
   }
 
   const anchor = getCheckoutAnchorAt(dog);
@@ -49,11 +54,22 @@ export function getCheckoutDisplayUntilAt(dog: LiveDog, firstSeenAt?: number) {
 
 export function shouldExpireCheckoutDog(dog: LiveDog, now = new Date(), firstSeenAt?: number) {
   if (dog.display_status !== "checking_out") return false;
-  const until = getCheckoutDisplayUntilAt(dog, firstSeenAt);
+  const until = getCheckoutDisplayUntilAt(dog, firstSeenAt, now);
   if (!until) return false;
   return now.getTime() >= until.getTime();
 }
 
 export function computeCheckoutDisplayUntilIso(anchorIso: string) {
   return new Date(new Date(anchorIso).getTime() + getCheckoutDisplayMs()).toISOString();
+}
+
+export function resolveActiveCheckoutDisplayUntil(
+  statusStartedAt: string,
+  existingUntil: string | null | undefined
+) {
+  const computed = computeCheckoutDisplayUntilIso(statusStartedAt);
+  if (existingUntil && new Date(existingUntil).getTime() > Date.now()) {
+    return existingUntil;
+  }
+  return computed;
 }

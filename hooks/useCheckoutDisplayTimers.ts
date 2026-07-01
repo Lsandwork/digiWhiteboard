@@ -88,22 +88,30 @@ function buildCheckoutDisplay(
     const eventAnchor = getEventAnchor(dog);
 
     if (isExpiredForDog(nextExpired, stableKey, eventAnchor)) {
-      continue;
+      if (!shouldExpireCheckoutDog(dog, new Date(now))) {
+        delete nextExpired[stableKey];
+      } else {
+        continue;
+      }
     }
 
     const backendExpired = shouldExpireCheckoutDog(dog, new Date(now));
     let timer = nextTimerMap[stableKey];
+    const displayUntil =
+      getCheckoutDisplayUntilAt(dog, timer?.firstSeenAt ?? now, new Date(now))?.getTime() ??
+      (timer?.firstSeenAt ?? now) + getCheckoutDisplayMs();
 
     if (!timer || timer.eventAnchor !== eventAnchor) {
       const firstSeenAt = now;
-      const displayUntil = getCheckoutDisplayUntilAt(dog, firstSeenAt)?.getTime() ?? firstSeenAt + getCheckoutDisplayMs();
-
       timer = {
         firstSeenAt,
         alertUntil: firstSeenAt + CHECKOUT_ALERT_MS,
         displayUntil,
         eventAnchor
       };
+      nextTimerMap[stableKey] = timer;
+    } else {
+      timer = { ...timer, displayUntil };
       nextTimerMap[stableKey] = timer;
     }
 

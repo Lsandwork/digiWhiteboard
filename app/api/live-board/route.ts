@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
-import { shouldExpireCheckinDog } from "@/lib/checkin-display";
-import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
+import {
+  computeCheckinDisplayUntilIso,
+  getCheckinDisplayUntilAt,
+  shouldExpireCheckinDog
+} from "@/lib/checkin-display";
+import {
+  computeCheckoutDisplayUntilIso,
+  getCheckoutDisplayUntilAt,
+  shouldExpireCheckoutDog
+} from "@/lib/checkout-display";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
@@ -19,6 +27,36 @@ export async function GET() {
       .in("display_status", ["checking_in", "checking_out"]);
 
     if (visibleError) throw visibleError;
+
+    const refreshDisplayUntil = async (dogs: typeof visibleDogs) => {
+      for (const dog of dogs ?? []) {
+        const liveDog = dog as LiveDog;
+        const anchor = liveDog.status_started_at;
+        if (!anchor) continue;
+
+        const resolvedUntil =
+          liveDog.display_status === "checking_out"
+            ? getCheckoutDisplayUntilAt(liveDog, undefined, now)
+            : getCheckinDisplayUntilAt(liveDog, undefined, now);
+        if (!resolvedUntil || resolvedUntil <= now) continue;
+
+        const storedUntil = liveDog.display_until ? new Date(liveDog.display_until) : null;
+        if (storedUntil && storedUntil > now) continue;
+
+        const displayUntil =
+          liveDog.display_status === "checking_out"
+            ? computeCheckoutDisplayUntilIso(anchor)
+            : computeCheckinDisplayUntilIso(anchor);
+
+        const { error } = await supabase
+          .from("live_transition_dogs")
+          .update({ display_until: displayUntil, updated_at: now.toISOString() })
+          .eq("id", liveDog.id);
+        if (error) throw error;
+      }
+    };
+
+    await refreshDisplayUntil(visibleDogs);
 
     const checkinExpired = (visibleDogs ?? []).filter(
       (dog) => dog.display_status === "checking_in" && shouldExpireCheckinDog(dog as LiveDog, now)

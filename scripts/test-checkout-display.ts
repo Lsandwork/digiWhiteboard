@@ -3,7 +3,9 @@ import {
   CHECKOUT_ALERT_MS,
   getCheckoutDisplayMinutes,
   getCheckoutDisplayMs,
+  getCheckoutDisplayUntilAt,
   getStableCheckoutKey,
+  resolveActiveCheckoutDisplayUntil,
   shouldExpireCheckoutDog
 } from "../lib/checkout-display";
 import type { LiveDog } from "../lib/types";
@@ -40,6 +42,23 @@ assert.equal(
 assert.equal(
   shouldExpireCheckoutDog(dog, new Date("2026-06-30T12:04:00.000Z")),
   true
+);
+
+const staleDisplayUntilDog: LiveDog = {
+  ...dog,
+  display_until: "2026-06-30T11:00:00.000Z"
+};
+assert.equal(
+  shouldExpireCheckoutDog(staleDisplayUntilDog, new Date("2026-06-30T12:03:00.000Z")),
+  false
+);
+assert.equal(
+  getCheckoutDisplayUntilAt(staleDisplayUntilDog, undefined, new Date("2026-06-30T12:03:00.000Z"))?.toISOString(),
+  "2026-06-30T12:04:00.000Z"
+);
+assert.equal(
+  resolveActiveCheckoutDisplayUntil("2026-06-30T12:00:00.000Z", "2026-06-30T11:00:00.000Z"),
+  "2026-06-30T12:04:00.000Z"
 );
 
 const keyA = getStableCheckoutKey(dog);
