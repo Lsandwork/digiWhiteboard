@@ -39,6 +39,7 @@ export type LiveBoardResponse = {
     checking_out_count?: number;
     expired_checkin_count?: number;
     expired_checkout_count?: number;
+    recommended_env?: string[];
     missing_env?: string[];
     env?: Record<string, boolean>;
   };

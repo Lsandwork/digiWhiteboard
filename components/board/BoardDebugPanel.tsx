@@ -73,8 +73,8 @@ export function BoardDebugPanel({
           </ul>
         </div>
       ) : null}
-      {board.debug?.missing_env?.length ? (
-        <p className="mt-2 text-red-300">Missing: {board.debug.missing_env.join(", ")}</p>
+      {board.debug?.recommended_env?.length ? (
+        <p className="mt-2 text-amber-300">Recommended: {board.debug.recommended_env.join(", ")}</p>
       ) : null}
       {board.error ? <p className="mt-2 text-red-300">{board.error}</p> : null}
     </div>

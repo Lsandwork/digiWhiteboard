@@ -10,7 +10,7 @@ import {
   getCheckoutDisplayUntilAt,
   shouldExpireCheckoutDog
 } from "@/lib/checkout-display";
-import { getBoardEnvCheck, getMissingBoardEnvVars } from "@/lib/env";
+import { getBoardEnvCheck, getMissingBoardEnvVars, getRecommendedBoardEnvVars } from "@/lib/env";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
@@ -54,6 +54,10 @@ export async function GET(request: Request) {
   console.log("[Fitdog Board API] env check", envCheck);
 
   const missingEnv = getMissingBoardEnvVars();
+  const recommendedEnv = getRecommendedBoardEnvVars();
+  if (recommendedEnv.length) {
+    console.warn("[Fitdog Board API] recommended env vars missing:", recommendedEnv.join(", "));
+  }
   if (missingEnv.length) {
     console.error("[Fitdog Board API] missing env vars:", missingEnv.join(", "));
     return NextResponse.json(
@@ -159,7 +163,7 @@ export async function GET(request: Request) {
         total: checkingIn.length + checkingOut.length
       },
       last_updated: now.toISOString(),
-      ...(debugBoard
+        ...(debugBoard
         ? {
             debug: {
               endpoint: "/api/live-board",
@@ -168,6 +172,7 @@ export async function GET(request: Request) {
               checking_out_count: checkingOut.length,
               expired_checkin_count: checkinExpired.length,
               expired_checkout_count: checkoutExpired.length,
+              recommended_env: recommendedEnv,
               env: envCheck
             }
           }
