@@ -81,6 +81,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 403 });
   }
 
+  if (payload.entity_id) {
+    const dedupeSince = new Date(Date.now() - 30_000).toISOString();
+    const { data: duplicateEvents } = await supabase
+      .from("gingr_webhook_events")
+      .select("id")
+      .eq("webhook_type", webhookType)
+      .eq("entity_id", String(payload.entity_id))
+      .eq("verified", true)
+      .eq("processed", true)
+      .neq("id", event.id)
+      .gte("created_at", dedupeSince)
+      .limit(1);
+
+    if (duplicateEvents?.length) {
+      await supabase.from("gingr_webhook_events").update({ processed: true }).eq("id", event.id);
+      return NextResponse.json({ ok: true, webhook_type: webhookType, deduplicated: true });
+    }
+  }
+
   try {
     if (!activeTypes.has(webhookType) && !completionTypes.has(webhookType) && !acceptedPassiveTypes.has(webhookType)) {
       throw new Error(`Unsupported webhook_type: ${webhookType}`);

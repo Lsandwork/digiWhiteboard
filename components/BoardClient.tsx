@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { BoardDebugPanel } from "@/components/board/BoardDebugPanel";
@@ -13,7 +13,6 @@ import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
-import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 type ConnectionState = "connecting" | "live" | "polling" | "offline";
@@ -77,6 +76,7 @@ export function BoardClient() {
   const debugBoard = searchParams.get("debugBoard") === "1";
 
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
+  const boardRef = useRef(board);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -90,13 +90,13 @@ export function BoardClient() {
 
   const { visibleCheckingInDogs: activeCheckingInDogs } = useCheckinDisplayTimers(board.checking_in, nowMs);
   const { visibleCheckingInDogs } = useNewCheckingInAlerts(activeCheckingInDogs);
-  const promptedCheckingOutDogs = useMemo(
-    () => board.checking_out.filter(isPromptedCheckoutDog),
-    [board.checking_out]
-  );
-  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(promptedCheckingOutDogs, nowMs);
+  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
 
   const apiEndpoint = debugBoard ? "/api/live-board?debugBoard=1" : "/api/live-board";
+
+  useEffect(() => {
+    boardRef.current = board;
+  }, [board]);
 
   const loadBoard = useCallback(
     async (mode: ConnectionState = "polling") => {
@@ -133,9 +133,11 @@ export function BoardClient() {
         setConnection((current) => (current === "live" ? "live" : mode));
       } catch (error) {
         const message = error instanceof Error ? error.message : "Live board data is not loading.";
+        const hasData =
+          boardRef.current.checking_in.length > 0 || boardRef.current.checking_out.length > 0;
         setFetchError(message);
-        setFetchStatus("error");
-        setConnection("offline");
+        setFetchStatus(hasData ? "ok" : "error");
+        setConnection(hasData ? (mode === "connecting" ? "polling" : mode) : "offline");
       }
     },
     [apiEndpoint]
@@ -210,8 +212,9 @@ export function BoardClient() {
     [clock]
   );
 
+  const hasBoardData = board.checking_in.length > 0 || board.checking_out.length > 0;
   const showEmptyState = fetchStatus === "ok" && !fetchError;
-  const expiredCheckoutCount = Math.max(0, promptedCheckingOutDogs.length - visibleCheckoutDogs.length);
+  const expiredCheckoutCount = Math.max(0, board.checking_out.length - visibleCheckoutDogs.length);
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
@@ -225,7 +228,7 @@ export function BoardClient() {
           onRequestWakeLock={() => void requestWakeLock()}
         />
 
-        {fetchError ? (
+        {fetchError && !hasBoardData ? (
           <BoardErrorBanner
             message="Live board data is not loading."
             lastSuccessAt={lastSuccessAt}

@@ -1,7 +1,14 @@
 import { resolveActiveCheckinDisplayUntil } from "@/lib/checkin-display";
 import { resolveActiveCheckoutDisplayUntil } from "@/lib/checkout-display";
+import { extractPhotoUrl } from "@/lib/board-utils";
 import { getCheckoutFilterReason, isPromptedCheckoutRecord } from "@/lib/checkout-prompt";
 import { normalizeBoardDog, type BoardDogSource } from "@/lib/board-dog";
+import {
+  canCallGingrEndpoint,
+  getCachedBackOfHouseBoard,
+  markGingrEndpointCalled,
+  setCachedBackOfHouseBoard
+} from "@/lib/gingr-request-guard";
 import type { LiveDog } from "@/lib/types";
 
 type UnknownRecord = Record<string, unknown>;
@@ -61,30 +68,35 @@ function gingrUrl(subdomain: string, path: string, params: Record<string, string
   return url.toString();
 }
 
-async function fetchGingrJson<T>(url: string): Promise<T> {
+async function fetchGingrJson<T>(url: string, endpoint: "back_of_house" | "reservation_types"): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
 
-  const response = await fetch(url, {
-    headers: { Accept: "application/json" },
-    cache: "no-store",
-    signal: controller.signal
-  }).finally(() => clearTimeout(timeout));
+  try {
+    markGingrEndpointCalled(endpoint);
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal
+    });
 
-  if (!response.ok) {
-    throw new Error(`Gingr API returned ${response.status} for ${url}`);
-  }
-
-  const body = (await response.json()) as GingrApiResponse<T> | T;
-  if (body && typeof body === "object" && "data" in (body as GingrApiResponse<T>)) {
-    const wrapped = body as GingrApiResponse<T>;
-    if (wrapped.error) {
-      throw new Error(typeof wrapped.error === "string" ? wrapped.error : "Gingr API returned an error.");
+    if (!response.ok) {
+      throw new Error(`Gingr API returned ${response.status} for ${url}`);
     }
-    return wrapped.data as T;
-  }
 
-  return body as T;
+    const body = (await response.json()) as GingrApiResponse<T> | T;
+    if (body && typeof body === "object" && "data" in (body as GingrApiResponse<T>)) {
+      const wrapped = body as GingrApiResponse<T>;
+      if (wrapped.error) {
+        throw new Error(typeof wrapped.error === "string" ? wrapped.error : "Gingr API returned an error.");
+      }
+      return wrapped.data as T;
+    }
+
+    return body as T;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 let cachedTypeIds: string[] | null = null;
@@ -98,11 +110,15 @@ async function getReservationTypeIds(subdomain: string, apiKey: string, configur
     return cachedTypeIds;
   }
 
+  if (!canCallGingrEndpoint("reservation_types") && cachedTypeIds) {
+    return cachedTypeIds;
+  }
+
   const url = gingrUrl(subdomain, "/api/v1/reservation_types", {
     key: apiKey,
     active_only: "true"
   });
-  const types = await fetchGingrJson<ReservationType[]>(url);
+  const types = await fetchGingrJson<ReservationType[]>(url, "reservation_types");
   const ids = (types ?? [])
     .map((type) => String(type.id))
     .filter(Boolean);
@@ -112,42 +128,8 @@ async function getReservationTypeIds(subdomain: string, apiKey: string, configur
   return cachedTypeIds;
 }
 
-async function fetchAnimalPhotoMap(subdomain: string, apiKey: string, animalIds: string[]) {
-  const photoMap = new Map<string, string | null>();
-  const uniqueIds = [...new Set(animalIds.filter(Boolean))].slice(0, 12);
-
-  await Promise.all(
-    uniqueIds.map(async (animalId) => {
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2500);
-        const url = gingrUrl(subdomain, "/api/v1/animals", {
-          key: apiKey,
-          "params[id]": animalId
-        });
-        const response = await fetch(url, {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-          signal: controller.signal
-        });
-        clearTimeout(timeout);
-        if (!response.ok) return;
-        const body = (await response.json()) as { data?: UnknownRecord[] };
-        const animal = body.data?.[0];
-        if (!animal) return;
-        const photo =
-          (typeof animal.image === "string" && animal.image) ||
-          (typeof animal.image_url === "string" && animal.image_url) ||
-          (typeof animal.photo_url === "string" && animal.photo_url) ||
-          null;
-        photoMap.set(animalId, photo);
-      } catch {
-        photoMap.set(animalId, null);
-      }
-    })
-  );
-
-  return photoMap;
+function photoUrlFromRecord(record: GingrBackOfHouseRecord) {
+  return record.photo_url ?? extractPhotoUrl(record as UnknownRecord) ?? null;
 }
 
 export async function fetchGingrBackOfHouse() {
@@ -156,24 +138,40 @@ export async function fetchGingrBackOfHouse() {
     return { checking_in: [] as GingrBackOfHouseRecord[], checking_out: [] as GingrBackOfHouseRecord[], source: "disabled" as const };
   }
 
+  if (!canCallGingrEndpoint("back_of_house")) {
+    const cachedBoard = getCachedBackOfHouseBoard(undefined, true);
+    if (cachedBoard) return cachedBoard;
+  }
+
   const typeIds = await getReservationTypeIds(subdomain, apiKey, configuredTypeIds);
   const url = gingrUrl(subdomain, "/api/v1/back_of_house", {
     key: apiKey,
     location_id: locationId,
-    full_day: "true",
     type_ids: typeIds
   });
 
   const data = await fetchGingrJson<{
     checking_in?: GingrBackOfHouseRecord[];
     checking_out?: GingrBackOfHouseRecord[];
-  }>(url);
+  }>(url, "back_of_house");
 
-  return {
-    checking_in: data?.checking_in ?? [],
-    checking_out: data?.checking_out ?? [],
+  const checkingIn = (data?.checking_in ?? []).map((record) => ({
+    ...record,
+    photo_url: photoUrlFromRecord(record)
+  }));
+  const checkingOut = (data?.checking_out ?? []).map((record) => ({
+    ...record,
+    photo_url: photoUrlFromRecord(record)
+  }));
+
+  const board = {
+    checking_in: checkingIn,
+    checking_out: checkingOut,
     source: "gingr_back_of_house" as const
   };
+
+  setCachedBackOfHouseBoard(board);
+  return board;
 }
 
 function toBoardSource(record: GingrBackOfHouseRecord, direction: "checking_in" | "checking_out"): BoardDogSource {
@@ -213,13 +211,18 @@ function isSameActiveTransition(existing: LiveDog | null | undefined, direction:
   );
 }
 
+function isActiveCheckinRecord(record: GingrBackOfHouseRecord) {
+  const status = record.status_string?.trim().toLowerCase();
+  return Boolean(record.check_in_stamp) || status === "checked in" || status === "checked_in";
+}
+
 export function mapGingrBoardToLiveDogs(board: Awaited<ReturnType<typeof fetchGingrBackOfHouse>>) {
   const now = new Date().toISOString();
   const dogs: LiveDog[] = [];
 
   for (const direction of ["checking_in", "checking_out"] as const) {
     for (const record of board[direction]) {
-      if (direction === "checking_out" && !isPromptedCheckoutRecord(record as UnknownRecord)) continue;
+      if (direction === "checking_in" && !isActiveCheckinRecord(record)) continue;
 
       const normalized = normalizeBoardDog(toBoardSource(record, direction));
       if (!normalized.gingr_reservation_id) continue;
@@ -273,129 +276,38 @@ export function getGingrCheckoutPromptStats(board: Awaited<ReturnType<typeof fet
 }
 
 export async function syncGingrBoardState(
-  supabase: ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>
+  supabase: ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>,
+  board?: Awaited<ReturnType<typeof fetchGingrBackOfHouse>>
 ) {
-  const board = await fetchGingrBackOfHouse();
-  if (board.source === "disabled") {
+  const resolvedBoard = board ?? (await fetchGingrBackOfHouse());
+  if (resolvedBoard.source === "disabled") {
     return { synced: false, reason: "GINGR_API_KEY missing", checking_in: 0, checking_out: 0 };
   }
 
   const now = new Date().toISOString();
-  const activeKeys = new Set<string>();
-  const animalIds: string[] = [];
-  const rows: Array<{
-    normalized: ReturnType<typeof normalizeBoardDog>;
-    direction: "checking_in" | "checking_out";
-    sourceRecord: GingrBackOfHouseRecord;
-  }> = [];
-
-  for (const direction of ["checking_in", "checking_out"] as const) {
-    for (const record of board[direction]) {
-      if (direction === "checking_out" && !isPromptedCheckoutRecord(record as UnknownRecord)) continue;
-
-      const normalized = normalizeBoardDog(toBoardSource(record, direction));
-      if (!normalized.gingr_reservation_id) continue;
-
-      activeKeys.add(`${direction}::${normalized.gingr_reservation_id}`);
-      if (normalized.gingr_animal_id) animalIds.push(normalized.gingr_animal_id);
-      rows.push({ normalized, direction, sourceRecord: record });
-    }
-  }
-
-  const { subdomain, apiKey } = getGingrConfig();
-  const shouldFetchPhotos = process.env.GINGR_FETCH_ANIMAL_PHOTOS === "true";
-  const photoMap =
-    shouldFetchPhotos && apiKey
-      ? await fetchAnimalPhotoMap(subdomain, apiKey, animalIds)
-      : new Map<string, string | null>();
-
-  const { data: existingDogs } = await supabase
+  const { data: removed, error } = await supabase
     .from("live_transition_dogs")
-    .select("*")
-    .in(
-      "gingr_reservation_id",
-      rows.map(({ normalized }) => normalized.gingr_reservation_id).filter(Boolean) as string[]
-    );
-
-  const existingByReservation = new Map(
-    (existingDogs ?? []).map((dog) => [dog.gingr_reservation_id, dog as LiveDog])
-  );
-
-  await Promise.all(
-    rows.map(async ({ normalized, direction, sourceRecord }) => {
-      const row = normalized;
-      if (row.gingr_animal_id && photoMap.has(row.gingr_animal_id)) {
-        row.photo_url = photoMap.get(row.gingr_animal_id) ?? row.photo_url;
-      }
-
-      const existing = row.gingr_reservation_id
-        ? existingByReservation.get(row.gingr_reservation_id)
-        : undefined;
-      const continuing =
-        row.gingr_reservation_id &&
-        isSameActiveTransition(existing, direction, row.gingr_reservation_id);
-      const statusStartedAt =
-        continuing && existing?.status_started_at ? existing.status_started_at : row.status_started_at ?? now;
-      const displayUntil = displayUntilFor(direction, statusStartedAt, continuing ? existing?.display_until : null);
-
-      const upsertRow = {
-        gingr_reservation_id: row.gingr_reservation_id,
-        gingr_animal_id: row.gingr_animal_id,
-        animal_name: row.animal_name,
-        owner_name: row.owner_name,
-        photo_url: row.photo_url ?? existing?.photo_url ?? null,
-        reservation_type: row.reservation_type,
-        current_status: direction,
-        display_status: direction,
-        room: row.room,
-        notes: row.notes,
-        flags: row.flags,
-        status_started_at: statusStartedAt,
-        completed_at: null,
-        display_until: displayUntil,
-        hidden: false,
-        last_seen_from_gingr_at: now,
-        raw_payload: { source: "gingr_back_of_house", record: sourceRecord },
-        updated_at: now
-      };
-
-      if (existing) {
-        await supabase.from("live_transition_dogs").update(upsertRow).eq("id", existing.id);
-      } else {
-        await supabase.from("live_transition_dogs").insert(upsertRow);
-      }
+    .update({
+      hidden: true,
+      display_status: "removed",
+      current_status: "synced_removed",
+      completed_at: now,
+      updated_at: now
     })
-  );
-
-  const { data: currentlyVisible } = await supabase
-    .from("live_transition_dogs")
-    .select("id, gingr_reservation_id, display_status")
     .eq("hidden", false)
     .in("display_status", ["checking_in", "checking_out"])
-    .filter("raw_payload->>source", "eq", "gingr_back_of_house");
+    .filter("raw_payload->>source", "eq", "gingr_back_of_house")
+    .select("id");
 
-  const hideIds = (currentlyVisible ?? [])
-    .filter((dog) => !activeKeys.has(`${dog.display_status}::${dog.gingr_reservation_id}`))
-    .map((dog) => dog.id);
-
-  if (hideIds.length) {
-    await supabase
-      .from("live_transition_dogs")
-      .update({
-        hidden: true,
-        display_status: "removed",
-        current_status: "synced_removed",
-        completed_at: now,
-        updated_at: now
-      })
-      .in("id", hideIds);
-  }
+  if (error) throw error;
 
   return {
     synced: true,
     reason: null,
-    checking_in: board.checking_in.length,
-    checking_out: [...activeKeys].filter((key) => key.startsWith("checking_out::")).length,
-    ...getGingrCheckoutPromptStats(board)
+    checking_in: 0,
+    checking_out: 0,
+    removed_back_of_house_rows: removed?.length ?? 0,
+    raw_checking_in_candidates: resolvedBoard.checking_in.length,
+    ...getGingrCheckoutPromptStats(resolvedBoard)
   };
 }

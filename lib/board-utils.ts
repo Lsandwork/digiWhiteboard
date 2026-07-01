@@ -9,6 +9,11 @@ const photoKeys = [
   "photo_url",
   "profile_photo",
   "profile_photo_url",
+  "profile_pic",
+  "profile_pic_url",
+  "profile_image",
+  "profile_image_url",
+  "avatar",
   "avatar_url",
   "profileImage",
   "gingr_photo",
@@ -19,6 +24,8 @@ const photoKeys = [
   "animal_photo",
   "picture",
   "picture_url",
+  "pic",
+  "pic_url",
   "thumbnail",
   "thumbnail_url",
   "profile_picture",
@@ -55,7 +62,7 @@ export function extractPhotoUrl(...sources: UnknownRecord[]) {
 
       if (value && typeof value === "object" && !Array.isArray(value)) {
         const nested = value as UnknownRecord;
-        const nestedUrl = firstString(nested, ["url", "href", "src", "path", "link"]);
+        const nestedUrl = firstString(nested, ["url", "href", "src", "path", "link", "original", "large", "medium", "small"]);
         if (nestedUrl) return normalizePhotoUrl(nestedUrl);
       }
     }
@@ -71,10 +78,11 @@ export function resolveDogPhotoUrl(dog: LiveDog) {
   if (!payload) return null;
 
   const data = (payload.entity_data ?? {}) as UnknownRecord;
+  const record = (payload.record ?? {}) as UnknownRecord;
   const animal = typeof data.animal === "object" && data.animal ? (data.animal as UnknownRecord) : {};
   const reservation = typeof data.reservation === "object" && data.reservation ? (data.reservation as UnknownRecord) : {};
 
-  return extractPhotoUrl(animal, reservation, data, payload);
+  return extractPhotoUrl(animal, reservation, data, record, payload);
 }
 
 export function formatBoardTime(value: string | null | undefined) {

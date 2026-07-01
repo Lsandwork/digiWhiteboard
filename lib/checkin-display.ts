@@ -6,9 +6,9 @@ export function getCheckinDisplayMinutes() {
   const raw =
     process.env.CHECKIN_DISPLAY_MINUTES ??
     process.env.NEXT_PUBLIC_CHECKIN_DISPLAY_MINUTES ??
-    "3";
+    "4";
   const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3;
+  return Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 4) : 4;
 }
 
 export function getCheckinDisplayMs() {
@@ -29,17 +29,18 @@ export function getStableCheckinKey(dog: LiveDog) {
 
 export function getCheckinDisplayUntilAt(dog: LiveDog, firstSeenAt?: number, now = new Date()) {
   const nowMs = now.getTime();
+  const anchor = getCheckinAnchorAt(dog);
+  const anchorUntil = anchor ? anchor.getTime() + getCheckinDisplayMs() : null;
 
   if (dog.display_until && dog.display_status === "checking_in") {
     const untilMs = new Date(dog.display_until).getTime();
     if (untilMs > nowMs) {
-      return new Date(untilMs);
+      return new Date(anchorUntil ? Math.min(untilMs, anchorUntil) : untilMs);
     }
   }
 
-  const anchor = getCheckinAnchorAt(dog);
-  if (anchor) {
-    return new Date(anchor.getTime() + getCheckinDisplayMs());
+  if (anchorUntil) {
+    return new Date(anchorUntil);
   }
 
   if (firstSeenAt) {
@@ -65,11 +66,15 @@ export function resolveActiveCheckinDisplayUntil(
   existingUntil: string | null | undefined,
   now = new Date()
 ) {
-  if (existingUntil && new Date(existingUntil).getTime() > now.getTime()) {
+  const computed = computeCheckinDisplayUntilIso(statusStartedAt);
+  if (
+    existingUntil &&
+    new Date(existingUntil).getTime() > now.getTime() &&
+    new Date(existingUntil).getTime() <= new Date(computed).getTime()
+  ) {
     return existingUntil;
   }
 
-  const computed = computeCheckinDisplayUntilIso(statusStartedAt);
   if (new Date(computed).getTime() > now.getTime()) {
     return computed;
   }

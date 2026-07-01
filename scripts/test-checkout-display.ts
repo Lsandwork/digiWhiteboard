@@ -10,8 +10,8 @@ import {
 } from "../lib/checkout-display";
 import type { LiveDog } from "../lib/types";
 
-assert.equal(getCheckoutDisplayMinutes(), 4);
-assert.equal(getCheckoutDisplayMs(), 4 * 60 * 1000);
+assert.equal(getCheckoutDisplayMinutes(), 5);
+assert.equal(getCheckoutDisplayMs(), 5 * 60 * 1000);
 assert.equal(CHECKOUT_ALERT_MS, 20_000);
 
 const dog: LiveDog = {
@@ -29,18 +29,18 @@ const dog: LiveDog = {
   flags: {},
   status_started_at: "2026-06-30T12:00:00.000Z",
   completed_at: null,
-  display_until: "2026-06-30T12:04:00.000Z",
+  display_until: "2026-06-30T12:05:00.000Z",
   last_seen_from_gingr_at: "2026-06-30T12:00:00.000Z",
   hidden: false,
   updated_at: "2026-06-30T12:00:00.000Z"
 };
 
 assert.equal(
-  shouldExpireCheckoutDog(dog, new Date("2026-06-30T12:03:59.000Z")),
+  shouldExpireCheckoutDog(dog, new Date("2026-06-30T12:04:59.000Z")),
   false
 );
 assert.equal(
-  shouldExpireCheckoutDog(dog, new Date("2026-06-30T12:04:00.000Z")),
+  shouldExpireCheckoutDog(dog, new Date("2026-06-30T12:05:00.000Z")),
   true
 );
 
@@ -49,20 +49,20 @@ const staleDisplayUntilDog: LiveDog = {
   display_until: "2026-06-30T11:00:00.000Z"
 };
 assert.equal(
-  shouldExpireCheckoutDog(staleDisplayUntilDog, new Date("2026-06-30T12:03:00.000Z")),
+  shouldExpireCheckoutDog(staleDisplayUntilDog, new Date("2026-06-30T12:04:00.000Z")),
   false
 );
 assert.equal(
-  getCheckoutDisplayUntilAt(staleDisplayUntilDog, undefined, new Date("2026-06-30T12:03:00.000Z"))?.toISOString(),
-  "2026-06-30T12:04:00.000Z"
+  getCheckoutDisplayUntilAt(staleDisplayUntilDog, undefined, new Date("2026-06-30T12:04:00.000Z"))?.toISOString(),
+  "2026-06-30T12:05:00.000Z"
 );
 assert.equal(
   resolveActiveCheckoutDisplayUntil(
     "2026-06-30T12:00:00.000Z",
     "2026-06-30T11:00:00.000Z",
-    new Date("2026-06-30T12:05:00.000Z")
+    new Date("2026-06-30T12:06:00.000Z")
   ),
-  "2026-06-30T12:09:00.000Z"
+  "2026-06-30T12:11:00.000Z"
 );
 
 const keyA = getStableCheckoutKey(dog);

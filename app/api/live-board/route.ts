@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
+import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
@@ -23,17 +24,30 @@ function enrichDogs(dogs: LiveDog[]) {
   }));
 }
 
-function filterVisibleDogs(dogs: LiveDog[], now: Date) {
+function filterVisibleDogs(
+  dogs: LiveDog[],
+  now: Date,
+  options: { requireStoredLiveTrigger?: boolean; requirePromptedCheckout?: boolean } = {}
+) {
+  const { requireStoredLiveTrigger = false, requirePromptedCheckout = false } = options;
   const checkingIn = dogs.filter(
-    (dog) => dog.display_status === "checking_in" && !shouldExpireCheckinDog(dog, now)
+    (dog) =>
+      dog.display_status === "checking_in" &&
+      (!requireStoredLiveTrigger || isStoredLiveTriggeredDog(dog)) &&
+      !shouldExpireCheckinDog(dog, now)
   );
   const checkingOut = dogs.filter(
     (dog) =>
       dog.display_status === "checking_out" &&
-      isPromptedCheckoutDog(dog) &&
+      (!requireStoredLiveTrigger || isStoredLiveTriggeredDog(dog)) &&
+      (!requirePromptedCheckout || isPromptedCheckoutDog(dog)) &&
       !shouldExpireCheckoutDog(dog, now)
   );
   return { checkingIn, checkingOut };
+}
+
+function isStoredLiveTriggeredDog(dog: LiveDog) {
+  return dog.raw_payload?.source !== "gingr_back_of_house";
 }
 
 function mergeCheckoutDogs(primary: LiveDog[], secondary: LiveDog[]) {
@@ -100,6 +114,47 @@ async function loadPromptedCheckoutRows(
   };
 }
 
+async function loadActiveCheckinRows(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  now: Date
+) {
+  const { data, error } = await supabase
+    .from("live_transition_dogs")
+    .select("*")
+    .eq("hidden", false)
+    .eq("display_status", "checking_in")
+    .order("status_started_at", { ascending: true });
+
+  if (error) throw error;
+
+  const rows = enrichDogs((data ?? []) as LiveDog[]).filter(
+    (dog) => dog.raw_payload?.source !== "gingr_back_of_house"
+  );
+  const expired = rows.filter((dog) => shouldExpireCheckinDog(dog, now));
+  const visible = rows.filter((dog) => !shouldExpireCheckinDog(dog, now));
+
+  if (expired.length) {
+    await supabase
+      .from("live_transition_dogs")
+      .update({
+        hidden: true,
+        display_status: "removed",
+        completed_at: now.toISOString(),
+        updated_at: now.toISOString()
+      })
+      .in(
+        "id",
+        expired.map((dog) => dog.id)
+      );
+  }
+
+  return {
+    visible,
+    expiredCheckinRows: expired.length,
+    rawCheckinRows: rows.length
+  };
+}
+
 async function loadSupabaseBoardRows(supabase: ReturnType<typeof getServiceSupabase>) {
   const { data, error } = await supabase
     .from("live_transition_dogs")
@@ -115,8 +170,6 @@ async function loadSupabaseBoardRows(supabase: ReturnType<typeof getServiceSupab
 export async function GET(request: Request) {
   const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
   const now = new Date();
-
-  console.log("[Fitdog Board API] request received", { debugBoard, mode: "gingr_live" });
 
   const envCheck = getBoardEnvCheck();
   const missingEnv = getMissingBoardEnvVars();
@@ -145,7 +198,9 @@ export async function GET(request: Request) {
       gingrBoard = await fetchGingrBackOfHouse();
     } catch (error) {
       gingrError = error instanceof Error ? error.message : "Gingr fetch failed.";
-      console.error("[Fitdog Board API] Gingr fetch failed, using Supabase fallback:", gingrError);
+      if (debugBoard) {
+        console.error("[Fitdog Board API] Gingr fetch failed, using Supabase fallback:", gingrError);
+      }
     }
 
     let checkingIn: LiveDog[] = [];
@@ -153,6 +208,12 @@ export async function GET(request: Request) {
     let rawRecordCount = 0;
     let syncSummary: Record<string, unknown> = { synced: false };
     let checkoutDebug: Record<string, unknown> = {};
+    let checkinDebug: Record<string, unknown> = {};
+    const activeCheckinRows = await timeoutResult(loadActiveCheckinRows(supabase, now), 2500, {
+      visible: [] as LiveDog[],
+      expiredCheckinRows: 0,
+      rawCheckinRows: 0
+    });
     const promptedCheckoutRows = await timeoutResult(loadPromptedCheckoutRows(supabase, now), 2500, {
       visible: [] as LiveDog[],
       rawCheckoutRows: 0,
@@ -163,18 +224,26 @@ export async function GET(request: Request) {
 
     if (gingrBoard && gingrBoard.source !== "disabled") {
       const gingrPromptStats = getGingrCheckoutPromptStats(gingrBoard);
-      const liveDogs = enrichDogs(mapGingrBoardToLiveDogs(gingrBoard));
+      const mappedLiveDogs = enrichDogs(mapGingrBoardToLiveDogs(gingrBoard));
+      const liveDogs = await timeoutResult(applyStoredAnimalPhotos(supabase, mappedLiveDogs), 1500, mappedLiveDogs);
       rawRecordCount = gingrBoard.checking_in.length + gingrBoard.checking_out.length;
       const visible = filterVisibleDogs(liveDogs, now);
       checkingIn = visible.checkingIn;
-      checkingOut = mergeCheckoutDogs(visible.checkingOut, promptedCheckoutRows.visible);
+      checkingOut = visible.checkingOut;
+      checkinDebug = {
+        raw_checking_in_candidates: gingrBoard.checking_in.length,
+        webhook_checking_in_rows: activeCheckinRows.rawCheckinRows,
+        expired_checking_in_count: activeCheckinRows.expiredCheckinRows,
+        filtered_back_of_house_checking_in_count: Math.max(0, gingrBoard.checking_in.length - checkingIn.length)
+      };
       checkoutDebug = {
         ...gingrPromptStats,
         supabase_checkout_rows: promptedCheckoutRows.rawCheckoutRows,
         supabase_prompted_checkout_rows: promptedCheckoutRows.promptedCheckoutRows,
         supabase_filtered_unprompted_checkout_rows: promptedCheckoutRows.filteredUnpromptedRows,
         expired_checking_out_count: promptedCheckoutRows.expiredCheckoutRows,
-        visible_checking_out_count: checkingOut.length
+        visible_checking_out_count: checkingOut.length,
+        ignored_unprompted_checkout_rows_while_gingr_live: promptedCheckoutRows.filteredUnpromptedRows
       };
       syncSummary = {
         synced: true,
@@ -187,9 +256,11 @@ export async function GET(request: Request) {
 
       after(async () => {
         try {
-          await syncGingrBoardState(supabase);
+          await syncGingrBoardState(supabase, gingrBoard);
         } catch (error) {
-          console.error("[Fitdog Board API] background sync failed:", error);
+          if (debugBoard) {
+            console.error("[Fitdog Board API] background sync failed:", error);
+          }
         }
       });
     } else {
@@ -205,10 +276,28 @@ export async function GET(request: Request) {
       }
 
       const supabaseDogs = await loadSupabaseBoardRows(supabase);
-      rawRecordCount = supabaseDogs.length;
-      const visible = filterVisibleDogs(supabaseDogs, now);
-      checkingIn = visible.checkingIn;
-      checkingOut = mergeCheckoutDogs(visible.checkingOut, promptedCheckoutRows.visible);
+      const storedSupabaseDogs = await timeoutResult(applyStoredAnimalPhotos(supabase, supabaseDogs), 1500, supabaseDogs);
+      rawRecordCount = storedSupabaseDogs.length;
+      const visible = filterVisibleDogs(storedSupabaseDogs, now, {
+        requireStoredLiveTrigger: true,
+        requirePromptedCheckout: true
+      });
+      const storedActiveCheckins = await timeoutResult(
+        applyStoredAnimalPhotos(supabase, activeCheckinRows.visible),
+        1500,
+        activeCheckinRows.visible
+      );
+      const storedPromptedCheckouts = await timeoutResult(
+        applyStoredAnimalPhotos(supabase, promptedCheckoutRows.visible),
+        1500,
+        promptedCheckoutRows.visible
+      );
+      checkingIn = storedActiveCheckins.length ? storedActiveCheckins : visible.checkingIn;
+      checkingOut = mergeCheckoutDogs(visible.checkingOut, storedPromptedCheckouts);
+      checkinDebug = {
+        webhook_checking_in_rows: activeCheckinRows.rawCheckinRows,
+        expired_checking_in_count: activeCheckinRows.expiredCheckinRows
+      };
       checkoutDebug = {
         raw_checking_out_candidates: promptedCheckoutRows.rawCheckoutRows,
         prompted_checkout_count: promptedCheckoutRows.promptedCheckoutRows,
@@ -218,11 +307,6 @@ export async function GET(request: Request) {
         visible_checking_out_count: checkingOut.length
       };
     }
-
-    console.log("[Fitdog Board API] visible counts:", {
-      checking_in: checkingIn.length,
-      checking_out: checkingOut.length
-    });
 
     const response: LiveBoardResponse = {
       checking_in: checkingIn,
@@ -241,6 +325,7 @@ export async function GET(request: Request) {
               raw_record_count: rawRecordCount,
               checking_in_count: checkingIn.length,
               checking_out_count: checkingOut.length,
+              ...checkinDebug,
               ...checkoutDebug,
               recommended_env: recommendedEnv,
               gingr_sync: syncSummary,

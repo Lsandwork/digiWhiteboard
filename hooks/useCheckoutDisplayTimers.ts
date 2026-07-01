@@ -5,6 +5,8 @@ import {
   CHECKOUT_ALERT_MS,
   CHECKOUT_REMINDER_DURATION_MS,
   CHECKOUT_REMINDER_INTERVAL_MS,
+  getCheckoutDisplayUntilAt,
+  getCheckoutDisplayMs,
   getStableCheckoutKey,
   shouldExpireCheckoutDog
 } from "@/lib/checkout-display";
@@ -40,7 +42,7 @@ export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number
 
       const startedAt = getStartedAtMs(dog);
       const alertUntil = startedAt + CHECKOUT_ALERT_MS;
-      const displayUntil = dog.display_until ? new Date(dog.display_until).getTime() : startedAt + 4 * 60 * 1000;
+      const displayUntil = getCheckoutDisplayUntilAt(dog, undefined, new Date(now))?.getTime() ?? startedAt + getCheckoutDisplayMs();
       const msUntilExpiry = displayUntil - now;
 
       entries.push({
