@@ -62,10 +62,14 @@ function gingrUrl(subdomain: string, path: string, params: Record<string, string
 }
 
 async function fetchGingrJson<T>(url: string): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
   const response = await fetch(url, {
     headers: { Accept: "application/json" },
-    cache: "no-store"
-  });
+    cache: "no-store",
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     throw new Error(`Gingr API returned ${response.status} for ${url}`);

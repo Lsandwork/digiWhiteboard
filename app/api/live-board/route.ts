@@ -49,6 +49,15 @@ function mergeCheckoutDogs(primary: LiveDog[], secondary: LiveDog[]) {
   );
 }
 
+function timeoutResult<T>(promise: Promise<T>, ms: number, fallback: T) {
+  return Promise.race([
+    promise,
+    new Promise<T>((resolve) => {
+      setTimeout(() => resolve(fallback), ms);
+    })
+  ]);
+}
+
 async function loadPromptedCheckoutRows(
   supabase: ReturnType<typeof getServiceSupabase>,
   now: Date
@@ -91,6 +100,18 @@ async function loadPromptedCheckoutRows(
   };
 }
 
+async function loadSupabaseBoardRows(supabase: ReturnType<typeof getServiceSupabase>) {
+  const { data, error } = await supabase
+    .from("live_transition_dogs")
+    .select("*")
+    .eq("hidden", false)
+    .in("display_status", ["checking_in", "checking_out"])
+    .order("status_started_at", { ascending: true });
+
+  if (error) throw error;
+  return enrichDogs((data ?? []) as LiveDog[]);
+}
+
 export async function GET(request: Request) {
   const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
   const now = new Date();
@@ -116,16 +137,31 @@ export async function GET(request: Request) {
   }
 
   try {
-    const gingrBoard = await fetchGingrBackOfHouse();
+    const supabase = getServiceSupabase();
+    let gingrBoard: Awaited<ReturnType<typeof fetchGingrBackOfHouse>> | null = null;
+    let gingrError: string | null = null;
+
+    try {
+      gingrBoard = await fetchGingrBackOfHouse();
+    } catch (error) {
+      gingrError = error instanceof Error ? error.message : "Gingr fetch failed.";
+      console.error("[Fitdog Board API] Gingr fetch failed, using Supabase fallback:", gingrError);
+    }
+
     let checkingIn: LiveDog[] = [];
     let checkingOut: LiveDog[] = [];
     let rawRecordCount = 0;
     let syncSummary: Record<string, unknown> = { synced: false };
     let checkoutDebug: Record<string, unknown> = {};
-    const supabase = getServiceSupabase();
-    const promptedCheckoutRows = await loadPromptedCheckoutRows(supabase, now);
+    const promptedCheckoutRows = await timeoutResult(loadPromptedCheckoutRows(supabase, now), 2500, {
+      visible: [] as LiveDog[],
+      rawCheckoutRows: 0,
+      promptedCheckoutRows: 0,
+      filteredUnpromptedRows: 0,
+      expiredCheckoutRows: 0
+    });
 
-    if (gingrBoard.source !== "disabled") {
+    if (gingrBoard && gingrBoard.source !== "disabled") {
       const gingrPromptStats = getGingrCheckoutPromptStats(gingrBoard);
       const liveDogs = enrichDogs(mapGingrBoardToLiveDogs(gingrBoard));
       rawRecordCount = gingrBoard.checking_in.length + gingrBoard.checking_out.length;
@@ -157,19 +193,20 @@ export async function GET(request: Request) {
         }
       });
     } else {
-      syncSummary = await syncGingrBoardState(supabase);
+      if (gingrBoard?.source === "disabled") {
+        syncSummary = await timeoutResult(syncGingrBoardState(supabase), 2500, {
+          synced: false,
+          reason: "sync timed out",
+          checking_in: 0,
+          checking_out: 0
+        });
+      } else {
+        syncSummary = { synced: false, reason: gingrError ?? "Gingr unavailable", fallback: "supabase" };
+      }
 
-      const { data, error } = await supabase
-        .from("live_transition_dogs")
-        .select("*")
-        .eq("hidden", false)
-        .in("display_status", ["checking_in", "checking_out"])
-        .order("status_started_at", { ascending: true });
-
-      if (error) throw error;
-
-      rawRecordCount = data?.length ?? 0;
-      const visible = filterVisibleDogs(enrichDogs((data ?? []) as LiveDog[]), now);
+      const supabaseDogs = await loadSupabaseBoardRows(supabase);
+      rawRecordCount = supabaseDogs.length;
+      const visible = filterVisibleDogs(supabaseDogs, now);
       checkingIn = visible.checkingIn;
       checkingOut = mergeCheckoutDogs(visible.checkingOut, promptedCheckoutRows.visible);
       checkoutDebug = {
@@ -207,6 +244,7 @@ export async function GET(request: Request) {
               ...checkoutDebug,
               recommended_env: recommendedEnv,
               gingr_sync: syncSummary,
+              gingr_error: gingrError,
               env: envCheck
             }
           }

@@ -50,6 +50,7 @@ export type LiveBoardResponse = {
     supabase_filtered_unprompted_checkout_rows?: number;
     filtered_checkout_reasons?: Array<Record<string, string | null>>;
     gingr_sync?: Record<string, unknown>;
+    gingr_error?: string | null;
     mode: "webhook_only" | "gingr_live";
     recommended_env?: string[];
     missing_env?: string[];
