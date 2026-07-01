@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="walking_dog">
-  <rect width="64" height="64" rx="18" fill="#151b22"/>
-  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    
-      <circle cx="22" cy="14" r="5"/><path d="M22 21l-5 12 9 5 6 12M18 34l-7 12M25 25l9 9"/>
-      <path d="M38 39h10l4 6M39 39l-4 9M48 39l3-6 5 3M42 39v8"/>
-    
-  </g>
-</svg>

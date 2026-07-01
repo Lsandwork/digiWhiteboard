@@ -1,0 +1,34 @@
+Cursor implementation notes
+
+Place this full folder at:
+public/assets/fitdog-lobby-whiteboard/
+
+Use the provided logo files from:
+01-brand/logo/
+
+Header logo:
+public/assets/fitdog-lobby-whiteboard/01-brand/logo/fitdog-logo-lockup-dark-transparent.png
+
+Small logo:
+public/assets/fitdog-lobby-whiteboard/01-brand/logo/fitdog-logo-circle-badge-512.png
+
+Brand token file:
+public/assets/fitdog-lobby-whiteboard/01-brand/tokens/fitdog-lobby-whiteboard-brand-tokens.json
+
+Detected logo orange:
+#F15F2A
+
+Frontend should call only:
+GET /api/lobby/checkouts
+GET /api/lobby/promotions
+GET /api/lobby/events
+GET /api/lobby/status
+
+Polling:
+Default 15 seconds.
+Minimum 10 seconds.
+
+Do not modify:
+- existing staff digital whiteboard route
+- existing staff whiteboard API response shape
+- existing Gingr webhook behavior

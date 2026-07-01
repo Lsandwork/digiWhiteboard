@@ -7,31 +7,33 @@ import { formatBoardDateTime } from "@/lib/board-utils";
 type LobbyHeaderProps = {
   clock: Date;
   healthy: boolean;
-  subtitle?: string | null;
+  lobbyMessage?: string | null;
 };
 
-export function LobbyHeader({ clock, healthy, subtitle }: LobbyHeaderProps) {
+export function LobbyHeader({ clock, healthy, lobbyMessage }: LobbyHeaderProps) {
   const { time, date } = formatBoardDateTime(clock);
 
   return (
     <header className="lobby-header flex items-start justify-between gap-6">
-      <div className="flex min-w-0 items-center gap-5">
+      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center">
         <Image
-          src={lobbyAssets.logoSvg}
+          src={lobbyAssets.logoLockup}
           alt="Fitdog Health and Social Club"
-          width={88}
-          height={88}
-          className="h-16 w-16 shrink-0 sm:h-20 sm:w-20"
+          width={420}
+          height={96}
+          className="h-14 w-auto shrink-0 sm:h-16 lg:h-[4.5rem]"
           priority
         />
         <div className="min-w-0">
-          <p className="text-sm font-semibold uppercase tracking-[0.35em] text-fitdog-orange/90 sm:text-base">
-            Fitdog Health &amp; Social Club
-          </p>
-          <h1 className="lobby-title mt-1 text-4xl font-black uppercase tracking-wide text-white sm:text-6xl">
+          <h1 className="lobby-title text-4xl font-black uppercase tracking-wide text-white sm:text-5xl xl:text-6xl">
             Now Checking Out
           </h1>
-          {subtitle ? <p className="mt-2 max-w-3xl text-lg text-slate-300 sm:text-xl">{subtitle}</p> : null}
+          <p className="mt-2 text-lg font-bold uppercase tracking-[0.22em] text-lobby-orange sm:text-xl">
+            Your Dog&apos;s Best Life
+          </p>
+          {lobbyMessage ? (
+            <p className="mt-2 max-w-3xl text-base text-slate-300 sm:text-lg">{lobbyMessage}</p>
+          ) : null}
         </div>
       </div>
 
@@ -39,10 +41,10 @@ export function LobbyHeader({ clock, healthy, subtitle }: LobbyHeaderProps) {
         <div className="flex items-center gap-3">
           <Image
             src={lobbyAssets.syncedBadge}
-            alt=""
-            width={180}
-            height={40}
-            className="h-8 w-auto opacity-95"
+            alt="Synced with Gingr"
+            width={200}
+            height={44}
+            className="h-9 w-auto opacity-95"
           />
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${

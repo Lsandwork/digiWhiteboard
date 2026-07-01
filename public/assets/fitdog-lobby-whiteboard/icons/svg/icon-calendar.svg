@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="calendar">
-  <rect width="64" height="64" rx="18" fill="#151b22"/>
-  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    
-      <rect x="13" y="17" width="38" height="34" rx="5"/><path d="M13 26h38M23 12v10M41 12v10"/>
-      <path d="M23 36h.1M32 36h.1M41 36h.1M23 44h.1M32 44h.1"/>
-    
-  </g>
-</svg>

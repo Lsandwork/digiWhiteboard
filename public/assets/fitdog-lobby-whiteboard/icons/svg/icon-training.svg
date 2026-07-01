@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="training">
-  <rect width="64" height="64" rx="18" fill="#151b22"/>
-  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    
-      <circle cx="22" cy="21" r="7"/><path d="M29 29l11 11M43 43l7 7M12 50c2-11 7-18 15-18 5 0 9 2 12 6"/>
-    
-  </g>
-</svg>

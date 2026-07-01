@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="sync">
-  <rect width="64" height="64" rx="18" fill="#151b22"/>
-  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    
-      <path d="M49 22a20 20 0 0 0-32-5l-4 4M15 42a20 20 0 0 0 32 5l4-4"/>
-      <path d="M13 13v8h8M51 51v-8h-8"/>
-    
-  </g>
-</svg>

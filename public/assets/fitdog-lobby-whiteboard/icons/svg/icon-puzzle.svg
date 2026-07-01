@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="puzzle">
-  <rect width="64" height="64" rx="18" fill="#151b22"/>
-  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
-    
-      <path d="M18 18h13c0-5 3-8 7-8s7 3 7 7c0 3-2 5-4 6h5v15h-6c2 1 4 3 4 6 0 4-3 7-7 7s-7-3-7-8H18z"/>
-    
-  </g>
-</svg>

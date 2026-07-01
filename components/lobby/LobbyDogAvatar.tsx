@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import clsx from "clsx";
+import Image from "next/image";
+import { lobbyAssets } from "@/lib/lobby/assets";
 
 type LobbyDogAvatarProps = {
   dogName: string;
@@ -10,22 +12,20 @@ type LobbyDogAvatarProps = {
 };
 
 export function LobbyDogAvatar({ dogName, imageUrl, size = "queue" }: LobbyDogAvatarProps) {
-  const [failed, setFailed] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const [brandFallbackFailed, setBrandFallbackFailed] = useState(false);
   const initial = dogName.trim().slice(0, 1).toUpperCase() || "?";
-  const showImage = Boolean(imageUrl) && !failed;
+  const showPhoto = Boolean(imageUrl) && !photoFailed;
+  const showBrandFallback = !showPhoto && !brandFallbackFailed;
 
   return (
     <div
       className={clsx(
-        "relative shrink-0 overflow-hidden rounded-full border-2 border-fitdog-orange/70 bg-ink-900/80 shadow-glowOrange",
+        "relative shrink-0 overflow-hidden rounded-full border-2 border-lobby-orange/70 bg-lobby-card shadow-lobbyGlow",
         size === "featured" ? "h-36 w-36 sm:h-44 sm:w-44" : "h-16 w-16 sm:h-20 sm:w-20"
       )}
     >
-      {!showImage ? (
-        <div className="grid h-full w-full place-items-center bg-fitdog-orange/15 text-2xl font-black text-orange-100 sm:text-3xl">
-          {initial}
-        </div>
-      ) : (
+      {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={imageUrl ?? undefined}
@@ -33,8 +33,21 @@ export function LobbyDogAvatar({ dogName, imageUrl, size = "queue" }: LobbyDogAv
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
-          onError={() => setFailed(true)}
+          onError={() => setPhotoFailed(true)}
         />
+      ) : showBrandFallback ? (
+        <Image
+          src={lobbyAssets.dogProfileFallback}
+          alt={`${dogName} avatar`}
+          fill
+          className="object-cover"
+          sizes={size === "featured" ? "176px" : "80px"}
+          onError={() => setBrandFallbackFailed(true)}
+        />
+      ) : (
+        <div className="grid h-full w-full place-items-center bg-lobby-orange/15 text-2xl font-black text-orange-50 sm:text-3xl">
+          {initial}
+        </div>
       )}
     </div>
   );

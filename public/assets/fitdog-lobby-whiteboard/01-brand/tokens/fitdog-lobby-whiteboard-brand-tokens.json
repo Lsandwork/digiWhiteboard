@@ -1,0 +1,32 @@
+{
+  "brand_name": "Fitdog Health & Social Club",
+  "display_name": "Lobby Checkout Whiteboard",
+  "logo_source": "User-provided Fitdog logo uploaded in this chat.",
+  "detected_logo_orange": "#F15F2A",
+  "colors": {
+    "fitdog_orange_from_uploaded_logo": "#F15F2A",
+    "near_black": "#101418",
+    "card": "#171E24",
+    "card_2": "#222B32",
+    "cream": "#FFF8EF",
+    "white": "#FFFFFF",
+    "sky_blue": "#64B9DC",
+    "active_green": "#88C641",
+    "sand": "#F4E8D7",
+    "muted_text": "#B9C2CC",
+    "alert_gold": "#FFC857",
+    "brick": "#8C4A37",
+    "deep_orange": "#D95A1A"
+  },
+  "routes": {
+    "admin": "/admin/lobby",
+    "tv_display": "/lobby/checkouts?display=tv"
+  },
+  "rules": [
+    "Checking-out only",
+    "Never call Gingr directly from the browser",
+    "Poll internal API every 15 seconds",
+    "Do not modify the existing staff whiteboard"
+  ],
+  "primary_logo": "01-brand/logo/fitdog-logo-lockup-dark-transparent.png"
+}

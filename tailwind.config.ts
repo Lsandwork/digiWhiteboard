@@ -15,11 +15,19 @@ const config: Config = {
           blue: "#4da3ff",
           green: "#68f77f",
           violet: "#b77cff"
+        },
+        lobby: {
+          orange: "#F15F2A",
+          card: "#171E24",
+          "card-2": "#222B32",
+          cream: "#FFF8EF",
+          muted: "#B9C2CC"
         }
       },
       boxShadow: {
         glowBlue: "0 0 28px rgba(77, 163, 255, 0.28)",
-        glowOrange: "0 0 28px rgba(255, 159, 28, 0.28)"
+        glowOrange: "0 0 28px rgba(255, 159, 28, 0.28)",
+        lobbyGlow: "0 0 28px rgba(241, 95, 42, 0.28)"
       },
       animation: {
         "fade-up": "fadeUp 420ms ease-out both",

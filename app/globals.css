@@ -400,6 +400,12 @@ body {
 
 .lobby-tv-mode {
   height: 100vh;
+  overflow: hidden;
+}
+
+.lobby-tv-mode .lobby-content {
+  height: 100vh;
+  overflow: hidden;
 }
 
 .lobby-background {
@@ -428,10 +434,10 @@ body {
 @keyframes lobbyFeaturedPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgba(255, 159, 28, 0.18), 0 0 24px rgba(255, 159, 28, 0.12);
+    box-shadow: 0 0 0 1px rgba(241, 95, 42, 0.18), 0 0 24px rgba(241, 95, 42, 0.12);
   }
   50% {
-    box-shadow: 0 0 0 1px rgba(255, 208, 120, 0.42), 0 0 36px rgba(255, 159, 28, 0.24);
+    box-shadow: 0 0 0 1px rgba(241, 95, 42, 0.42), 0 0 36px rgba(241, 95, 42, 0.24);
   }
 }
 

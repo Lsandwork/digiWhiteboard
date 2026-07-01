@@ -291,7 +291,11 @@ export function AdminLobbyClient() {
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-ink-900/70 p-5">
-          <h2 className="text-xl font-bold">Events & Workshops</h2>
+          <h2 className="text-xl font-bold">Class Schedule</h2>
+          <p className="mt-2 text-sm text-slate-400">
+            The lobby TV displays the fixed weekly Class Schedule (Monday–Friday). Database events below are optional
+            for future admin use.
+          </p>
           <div className="mt-4 space-y-3">
             {data.events.map((event) => (
               <div key={event.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3">
