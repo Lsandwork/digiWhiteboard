@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import Image from "next/image";
 import { RefreshCw } from "lucide-react";
 import { ClockDate } from "@/components/board/ClockDate";
 import { LiveStatus } from "@/components/board/LiveStatus";
@@ -23,11 +27,28 @@ export function BoardHeader({
   wakeLockStatus,
   onRequestWakeLock
 }: BoardHeaderProps) {
+  const [logoFailed, setLogoFailed] = useState(false);
+
   return (
     <header className="mb-5 grid gap-5 lg:mb-6 lg:grid-cols-[1fr_auto] lg:items-start">
-      <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-        <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full border-2 border-fitdog-blue/70 bg-slate-950 text-2xl font-black text-white shadow-glowBlue sm:h-[4.5rem] sm:w-[4.5rem] sm:text-3xl">
-          F
+      <div className="flex min-w-0 items-start gap-4 sm:gap-5 lg:gap-6">
+        <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue sm:h-24 sm:w-24 lg:h-28 lg:w-28">
+          {logoFailed ? (
+            <span className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-3xl font-black text-white sm:text-4xl">
+              F
+            </span>
+          ) : (
+            <Image
+              src="/assets/fitdog/replace_f-logo.png"
+              alt="Fitdog Team"
+              width={224}
+              height={224}
+              priority
+              className="h-full w-full rounded-full object-contain"
+              draggable={false}
+              onError={() => setLogoFailed(true)}
+            />
+          )}
         </div>
         <div className="min-w-0">
           <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
