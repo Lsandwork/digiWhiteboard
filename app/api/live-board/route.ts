@@ -1,24 +1,41 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { getBoardEnvCheck, getMissingBoardEnvVars, getRecommendedBoardEnvVars } from "@/lib/env";
+import {
+  fetchGingrBackOfHouse,
+  mapGingrBoardToLiveDogs,
+  syncGingrBoardState
+} from "@/lib/gingr-board-sync";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function isWebhookSourcedDog(dog: LiveDog) {
-  const payload = dog.raw_payload as { source?: string; webhook_type?: string } | null | undefined;
-  if (payload?.source === "gingr_back_of_house") return false;
-  return true;
+function enrichDogs(dogs: LiveDog[]) {
+  return dogs.map((dog) => ({
+    ...dog,
+    photo_url: resolveDogPhotoUrl(dog)
+  }));
+}
+
+function filterVisibleDogs(dogs: LiveDog[], now: Date) {
+  const checkingIn = dogs.filter(
+    (dog) => dog.display_status === "checking_in" && !shouldExpireCheckinDog(dog, now)
+  );
+  const checkingOut = dogs.filter(
+    (dog) => dog.display_status === "checking_out" && !shouldExpireCheckoutDog(dog, now)
+  );
+  return { checkingIn, checkingOut };
 }
 
 export async function GET(request: Request) {
   const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
   const now = new Date();
 
-  console.log("[Fitdog Board API] request received", { debugBoard, mode: "webhook_only" });
+  console.log("[Fitdog Board API] request received", { debugBoard, mode: "gingr_live" });
 
   const envCheck = getBoardEnvCheck();
   const missingEnv = getMissingBoardEnvVars();
@@ -32,71 +49,60 @@ export async function GET(request: Request) {
         checking_out: [],
         counts: { checking_in: 0, checking_out: 0, total: 0 },
         last_updated: now.toISOString(),
-        ...(debugBoard ? { debug: { env: envCheck, missing_env: missingEnv, mode: "webhook_only" } } : {})
+        ...(debugBoard ? { debug: { env: envCheck, missing_env: missingEnv, mode: "gingr_live" } } : {})
       },
       { status: 503 }
     );
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const gingrBoard = await fetchGingrBackOfHouse();
+    let checkingIn: LiveDog[] = [];
+    let checkingOut: LiveDog[] = [];
+    let rawRecordCount = 0;
+    let syncSummary: Record<string, unknown> = { synced: false };
 
-    await supabase
-      .from("live_transition_dogs")
-      .update({
-        hidden: true,
-        display_status: "removed",
-        current_status: "synced_removed",
-        updated_at: now.toISOString()
-      })
-      .eq("hidden", false)
-      .filter("raw_payload->>source", "eq", "gingr_back_of_house");
+    if (gingrBoard.source !== "disabled") {
+      const liveDogs = enrichDogs(mapGingrBoardToLiveDogs(gingrBoard));
+      rawRecordCount = liveDogs.length;
+      const visible = filterVisibleDogs(liveDogs, now);
+      checkingIn = visible.checkingIn;
+      checkingOut = visible.checkingOut;
+      syncSummary = {
+        synced: true,
+        source: gingrBoard.source,
+        checking_in: gingrBoard.checking_in.length,
+        checking_out: gingrBoard.checking_out.length
+      };
 
-    const { data, error } = await supabase
-      .from("live_transition_dogs")
-      .select("*")
-      .eq("hidden", false)
-      .in("display_status", ["checking_in", "checking_out"])
-      .order("status_started_at", { ascending: true });
+      after(async () => {
+        try {
+          const supabase = getServiceSupabase();
+          await syncGingrBoardState(supabase);
+        } catch (error) {
+          console.error("[Fitdog Board API] background sync failed:", error);
+        }
+      });
+    } else {
+      const supabase = getServiceSupabase();
+      syncSummary = await syncGingrBoardState(supabase);
 
-    if (error) throw error;
-
-    const dogs = ((data ?? []) as LiveDog[]).filter(isWebhookSourcedDog);
-    const rawRecordCount = dogs.length;
-
-    const enrichedDogs = dogs.map((dog) => ({
-      ...dog,
-      photo_url: resolveDogPhotoUrl(dog)
-    }));
-
-    const expiredCheckin = enrichedDogs.filter(
-      (dog) => dog.display_status === "checking_in" && shouldExpireCheckinDog(dog, now)
-    );
-    const expiredCheckout = enrichedDogs.filter(
-      (dog) => dog.display_status === "checking_out" && shouldExpireCheckoutDog(dog, now)
-    );
-
-    const hideIds = [...expiredCheckin, ...expiredCheckout].map((dog) => dog.id);
-    if (hideIds.length) {
-      await supabase
+      const { data, error } = await supabase
         .from("live_transition_dogs")
-        .update({
-          hidden: true,
-          display_status: "removed",
-          completed_at: now.toISOString(),
-          updated_at: now.toISOString()
-        })
-        .in("id", hideIds);
+        .select("*")
+        .eq("hidden", false)
+        .in("display_status", ["checking_in", "checking_out"])
+        .order("status_started_at", { ascending: true });
+
+      if (error) throw error;
+
+      rawRecordCount = data?.length ?? 0;
+      const visible = filterVisibleDogs(enrichDogs((data ?? []) as LiveDog[]), now);
+      checkingIn = visible.checkingIn;
+      checkingOut = visible.checkingOut;
     }
 
-    const checkingIn = enrichedDogs.filter(
-      (dog) => dog.display_status === "checking_in" && !shouldExpireCheckinDog(dog, now)
-    );
-    const checkingOut = enrichedDogs.filter(
-      (dog) => dog.display_status === "checking_out" && !shouldExpireCheckoutDog(dog, now)
-    );
-
-    console.log("[Fitdog Board API] webhook-only counts:", {
+    console.log("[Fitdog Board API] visible counts:", {
       checking_in: checkingIn.length,
       checking_out: checkingOut.length
     });
@@ -114,13 +120,12 @@ export async function GET(request: Request) {
         ? {
             debug: {
               endpoint: "/api/live-board",
-              mode: "webhook_only",
+              mode: "gingr_live",
               raw_record_count: rawRecordCount,
               checking_in_count: checkingIn.length,
               checking_out_count: checkingOut.length,
-              expired_checkin_count: expiredCheckin.length,
-              expired_checkout_count: expiredCheckout.length,
               recommended_env: recommendedEnv,
+              gingr_sync: syncSummary,
               env: envCheck
             }
           }
@@ -138,7 +143,7 @@ export async function GET(request: Request) {
         checking_out: [],
         counts: { checking_in: 0, checking_out: 0, total: 0 },
         last_updated: now.toISOString(),
-        ...(debugBoard ? { debug: { env: envCheck, recommended_env: recommendedEnv, mode: "webhook_only" } } : {})
+        ...(debugBoard ? { debug: { env: envCheck, recommended_env: recommendedEnv, mode: "gingr_live" } } : {})
       },
       { status: 500 }
     );

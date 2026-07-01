@@ -40,7 +40,7 @@ export type LiveBoardResponse = {
     expired_checkin_count?: number;
     expired_checkout_count?: number;
     gingr_sync?: Record<string, unknown>;
-    mode: "webhook_only";
+    mode: "webhook_only" | "gingr_live";
     recommended_env?: string[];
     missing_env?: string[];
     env?: Record<string, boolean>;
