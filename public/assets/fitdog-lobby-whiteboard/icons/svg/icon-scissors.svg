@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="scissors">
+  <rect width="64" height="64" rx="18" fill="#151b22"/>
+  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    
+      <circle cx="20" cy="45" r="7"/><circle cx="20" cy="19" r="7"/>
+      <path d="M26 39L50 15M26 25l24 24M30 32h8"/>
+    
+  </g>
+</svg>

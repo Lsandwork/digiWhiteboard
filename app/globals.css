@@ -385,3 +385,60 @@ body {
       0 0 24px rgba(255, 159, 28, 0.2);
   }
 }
+
+.lobby-root,
+.lobby-shell {
+  background: #02060b;
+  color: #fff;
+}
+
+.lobby-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.lobby-tv-mode {
+  height: 100vh;
+}
+
+.lobby-background {
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobby-content {
+  max-width: 1920px;
+  margin: 0 auto;
+}
+
+.lobby-featured-card {
+  animation: lobbyFeaturedPulse 4s ease-in-out infinite;
+}
+
+.lobby-queue-row {
+  transition: transform 220ms ease, border-color 220ms ease;
+}
+
+.lobby-queue-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 159, 28, 0.25);
+}
+
+@keyframes lobbyFeaturedPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(255, 159, 28, 0.18), 0 0 24px rgba(255, 159, 28, 0.12);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(255, 208, 120, 0.42), 0 0 36px rgba(255, 159, 28, 0.24);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-featured-card,
+  .lobby-queue-row {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="bell">
+  <rect width="64" height="64" rx="18" fill="#151b22"/>
+  <g fill="none" stroke="#f26a21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    
+      <path d="M16 45h32M20 41c2-12 8-19 12-19s10 7 12 19zM28 22c0-3 2-5 4-5s4 2 4 5"/>
+    
+  </g>
+</svg>
