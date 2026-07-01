@@ -406,6 +406,31 @@ body {
 .lobby-tv-mode .lobby-content {
   height: 100vh;
   overflow: hidden;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.lobby-tv-mode .lobby-header {
+  gap: 1rem;
+}
+
+.lobby-tv-mode .lobby-title {
+  font-size: clamp(2rem, 3.2vw, 3.25rem);
+  line-height: 1.05;
+}
+
+.lobby-tv-mode .lobby-class-schedule-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.lobby-tv-mode .lobby-empty-card {
+  padding: 1.25rem 1.5rem;
+}
+
+.lobby-tv-mode .lobby-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
 }
 
 .lobby-background {
