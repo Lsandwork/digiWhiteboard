@@ -6,6 +6,7 @@ export type PresentationConnectionLike = {
 
 type PresentationRequestLike = {
   start: () => Promise<PresentationConnectionLike>;
+  getAvailability?: () => Promise<{ value: boolean }>;
 };
 
 type PresentationRequestConstructor = new (urls: string[]) => PresentationRequestLike;

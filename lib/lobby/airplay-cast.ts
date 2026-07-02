@@ -1,6 +1,8 @@
 type AirPlayVideo = HTMLVideoElement & {
   webkitShowPlaybackTargetPicker?: () => void;
   webkitCurrentPlaybackTargetIsWireless?: boolean;
+  webkitPlaybackTargetAvailabilityChangedEvent?: Event;
+  webkitplaybacktargetavailabilitychanged?: Event;
 };
 
 let activeAirPlayStream: MediaStream | null = null;
@@ -28,6 +30,25 @@ function cleanupAirPlayPreview() {
   activeAirPlayVideo = null;
 }
 
+function createAirPlayVideo(stream: MediaStream) {
+  const video = document.createElement("video") as AirPlayVideo;
+  video.playsInline = true;
+  video.muted = true;
+  video.autoplay = true;
+  video.setAttribute("webkit-playsinline", "true");
+  video.setAttribute("x-webkit-airplay", "allow");
+  video.setAttribute("airplay", "allow");
+  video.style.position = "fixed";
+  video.style.width = "1px";
+  video.style.height = "1px";
+  video.style.opacity = "0";
+  video.style.pointerEvents = "none";
+  video.style.inset = "0";
+  document.body.appendChild(video);
+  video.srcObject = stream;
+  return video;
+}
+
 export async function startAirPlayCast() {
   if (!isDisplayMediaSupported()) {
     throw new Error("Screen sharing is not supported in this browser.");
@@ -43,21 +64,7 @@ export async function startAirPlayCast() {
     preferCurrentTab: true
   } as MediaStreamConstraints & { preferCurrentTab?: boolean });
 
-  const video = document.createElement("video") as AirPlayVideo;
-  video.playsInline = true;
-  video.muted = true;
-  video.autoplay = true;
-  video.setAttribute("webkit-playsinline", "true");
-  video.setAttribute("x-webkit-airplay", "allow");
-  video.style.position = "fixed";
-  video.style.width = "1px";
-  video.style.height = "1px";
-  video.style.opacity = "0";
-  video.style.pointerEvents = "none";
-  video.style.inset = "0";
-  document.body.appendChild(video);
-
-  video.srcObject = stream;
+  const video = createAirPlayVideo(stream);
   await video.play();
 
   activeAirPlayStream = stream;

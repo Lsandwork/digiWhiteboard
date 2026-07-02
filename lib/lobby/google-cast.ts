@@ -1,9 +1,11 @@
 import { buildLobbyTvCastUrl } from "@/lib/lobby/tv-cast";
 
 export const LOBBY_CAST_NAMESPACE = "urn:x-cast:com.fitdog.lobby";
+export const DEFAULT_MEDIA_RECEIVER_APP_ID = "CC1AD845";
 
 type CastSessionLike = {
   sendMessage: (namespace: string, data: string | Record<string, unknown>) => Promise<void>;
+  loadMedia: (request: unknown) => Promise<void>;
 };
 
 type CastContextLike = {
@@ -38,19 +40,43 @@ declare global {
         AutoJoinPolicy: {
           ORIGIN_SCOPED: string;
         };
+        media?: {
+          DEFAULT_MEDIA_RECEIVER_APP_ID: string;
+          MediaInfo: new (contentId: string, contentType: string) => Record<string, unknown>;
+          LoadRequest: new (mediaInfo: Record<string, unknown>) => Record<string, unknown>;
+          StreamType: {
+            BUFFERED: string;
+          };
+        };
       };
     };
   }
 }
 
 let castSdkPromise: Promise<void> | null = null;
+let castInitialized = false;
 
 export function getGoogleCastAppId() {
   return process.env.NEXT_PUBLIC_GOOGLE_CAST_APP_ID?.trim() ?? "";
 }
 
+export function getEffectiveGoogleCastAppId() {
+  const customAppId = getGoogleCastAppId();
+  if (customAppId) return customAppId;
+  return window.chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID ?? DEFAULT_MEDIA_RECEIVER_APP_ID;
+}
+
 export function isGoogleCastConfigured() {
   return Boolean(getGoogleCastAppId());
+}
+
+export function isGoogleCastFrameworkReady() {
+  return Boolean(window.cast?.framework);
+}
+
+export function isGoogleCastBrowser() {
+  if (typeof navigator === "undefined") return false;
+  return /Chrome|Chromium|Edg/i.test(navigator.userAgent) && !/OPR|Opera/i.test(navigator.userAgent);
 }
 
 export function loadGoogleCastSdk() {
@@ -98,36 +124,80 @@ function getCastContext() {
 }
 
 export async function initializeGoogleCast() {
-  const appId = getGoogleCastAppId();
-  if (!appId) {
-    throw new Error("Chromecast is not configured for this site.");
-  }
-
   await loadGoogleCastSdk();
   const context = getCastContext();
   if (!context) {
     throw new Error("Google Cast could not be initialized.");
   }
 
-  context.setOptions({
-    receiverApplicationId: appId,
-    autoJoinPolicy: window.chrome?.cast?.AutoJoinPolicy.ORIGIN_SCOPED ?? "origin_scoped"
-  });
+  if (!castInitialized) {
+    context.setOptions({
+      receiverApplicationId: getEffectiveGoogleCastAppId(),
+      autoJoinPolicy: window.chrome?.cast?.AutoJoinPolicy.ORIGIN_SCOPED ?? "origin_scoped"
+    });
+    castInitialized = true;
+  }
 
   return context;
 }
 
-export async function startGoogleCastSession() {
+export async function preloadGoogleCast() {
+  if (!isGoogleCastBrowser()) return;
+  try {
+    await initializeGoogleCast();
+  } catch {
+    // Ignore preload failures; picker flow will surface a useful error.
+  }
+}
+
+async function loadLobbyUrlOnCastSession(session: CastSessionLike) {
+  const url = buildLobbyTvCastUrl();
+  const MediaInfoCtor = window.chrome?.cast?.media?.MediaInfo;
+  const LoadRequestCtor = window.chrome?.cast?.media?.LoadRequest;
+  const streamType = window.chrome?.cast?.media?.StreamType?.BUFFERED;
+
+  if (!MediaInfoCtor || !LoadRequestCtor) {
+    throw new Error("Google Cast media APIs are unavailable.");
+  }
+
+  const mediaInfo = new MediaInfoCtor(url, "text/html");
+  if (streamType) {
+    mediaInfo.streamType = streamType;
+  }
+  mediaInfo.metadata = {
+    title: "Fitdog Lobby Board",
+    subtitle: "Lobby checkout display"
+  };
+
+  await session.loadMedia(new LoadRequestCtor(mediaInfo));
+}
+
+export async function requestGoogleCastDevicePicker() {
   const context = await initializeGoogleCast();
   await context.requestSession();
+  return context;
+}
 
+export async function startGoogleCastSession() {
+  const context = await requestGoogleCastDevicePicker();
   const session = context.getCurrentSession();
   if (!session) {
     throw new Error("No cast session was created.");
   }
 
   const url = buildLobbyTvCastUrl();
-  await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
+
+  if (isGoogleCastConfigured()) {
+    await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
+    return context;
+  }
+
+  try {
+    await loadLobbyUrlOnCastSession(session);
+  } catch {
+    await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
+  }
+
   return context;
 }
 

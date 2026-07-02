@@ -9,6 +9,7 @@ import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
+import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
@@ -57,6 +58,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     canAirPlay,
     canFullscreen,
     closeCastMenu,
+    openCastMenu,
     startChromecast,
     startAirPlay,
     startFullscreenKiosk,
@@ -189,6 +191,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         canAirPlay={canAirPlay}
         canFullscreen={canFullscreen}
         onToggle={() => void toggleTvCast()}
+        onOpenMenu={openCastMenu}
         onCloseMenu={closeCastMenu}
         onChromecast={() => void runCastAction(startChromecast)}
         onAirPlay={() => void runCastAction(startAirPlay)}
@@ -212,44 +215,19 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
           </div>
         ) : null}
 
-        <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
-          <div className="flex min-h-0 flex-col gap-4">
-            {featured ? (
-              <LobbyFeaturedCard dog={featured} />
-            ) : (
-              <section className="lobby-panel lobby-empty-card relative overflow-hidden rounded-2xl border-l-[6px] border-l-lobby-teal px-6 py-5">
-                <LobbyAssetImage
-                  src={lobbyAssets.pawIcon}
-                  alt=""
-                  width={160}
-                  height={160}
-                  className="pointer-events-none absolute bottom-2 right-8 h-36 w-36 opacity-[0.12]"
-                />
-                <div className="relative z-10 flex items-center gap-6">
-                  <LobbyAssetImage
-                    src={lobbyAssets.logoBadge}
-                    alt=""
-                    width={96}
-                    height={96}
-                    className="h-24 w-24 shrink-0 rounded-full ring-2 ring-lobby-teal/60"
-                  />
-                  <div>
-                    <h2 className="text-4xl font-black leading-tight text-white">No dogs currently checking out</h2>
-                    <p className="mt-2 text-lg text-white/85">
-                      We&apos;ll update this screen as soon as a pup is on the way.
-                    </p>
-                  </div>
-                </div>
-              </section>
-            )}
+        {hasCheckout ? (
+          <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
+            <div className="flex min-h-0 flex-col gap-4">
+              {featured ? <LobbyFeaturedCard dog={featured} /> : null}
+              <LobbyQueueList dogs={queue} />
+              {settings.show_events ? <LobbyClassSchedule /> : null}
+            </div>
 
-            {hasCheckout ? <LobbyQueueList dogs={queue} /> : null}
-
-            {settings.show_events ? <LobbyClassSchedule /> : null}
+            {settings.show_promotions ? <LobbyServicesGrid /> : null}
           </div>
-
-          {settings.show_promotions ? <LobbyServicesGrid /> : null}
-        </div>
+        ) : (
+          <LobbyIdleSlideshow />
+        )}
 
         <footer className="lobby-footer mt-4 flex h-14 shrink-0 items-center gap-4 px-8">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center">

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Cast, Copy, Link2, Monitor, MonitorOff, Radio, Tv, X } from "lucide-react";
+import { Cast, Copy, Link2, Monitor, MonitorOff, MoreHorizontal, Radio, Tv, X } from "lucide-react";
 
 type LobbyCastButtonProps = {
   menuOpen: boolean;
@@ -13,6 +13,7 @@ type LobbyCastButtonProps = {
   canAirPlay: boolean;
   canFullscreen: boolean;
   onToggle: () => void;
+  onOpenMenu: () => void;
   onCloseMenu: () => void;
   onChromecast: () => void;
   onAirPlay: () => void;
@@ -62,6 +63,7 @@ export function LobbyCastButton({
   canAirPlay,
   canFullscreen,
   onToggle,
+  onOpenMenu,
   onCloseMenu,
   onChromecast,
   onAirPlay,
@@ -71,26 +73,41 @@ export function LobbyCastButton({
 }: LobbyCastButtonProps) {
   return (
     <div className="lobby-cast-control">
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`lobby-cast-button ${isCasting ? "lobby-cast-button--active" : ""}`}
-        aria-pressed={isCasting || menuOpen}
-        aria-expanded={menuOpen}
-        aria-haspopup="dialog"
-        aria-label={isCasting ? "Stop casting lobby board" : "Cast lobby board to TV"}
-      >
-        {isCasting ? <MonitorOff className="h-4 w-4 shrink-0" aria-hidden /> : <Tv className="h-4 w-4 shrink-0" aria-hidden />}
-        <span>{isCasting ? "Stop Casting" : "Cast to TV"}</span>
-        {!isCasting ? <Cast className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden /> : null}
-      </button>
+      <div className="lobby-cast-actions">
+        <button
+          type="button"
+          onClick={onToggle}
+          className={`lobby-cast-button ${isCasting ? "lobby-cast-button--active" : ""}`}
+          aria-pressed={isCasting}
+          aria-label={isCasting ? "Stop casting lobby board" : "Choose a TV or cast device"}
+        >
+          {isCasting ? <MonitorOff className="h-4 w-4 shrink-0" aria-hidden /> : <Tv className="h-4 w-4 shrink-0" aria-hidden />}
+          <span>{isCasting ? "Stop Casting" : "Cast to TV"}</span>
+          {!isCasting ? <Cast className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden /> : null}
+        </button>
+
+        {!isCasting ? (
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="lobby-cast-button lobby-cast-button--menu"
+            aria-expanded={menuOpen}
+            aria-haspopup="dialog"
+            aria-label="More casting options"
+          >
+            <MoreHorizontal className="h-4 w-4 shrink-0" aria-hidden />
+          </button>
+        ) : null}
+      </div>
 
       {menuOpen ? (
-        <div className="lobby-cast-menu" role="dialog" aria-label="Cast lobby board to TV">
+        <div className="lobby-cast-menu" role="dialog" aria-label="More casting options">
           <div className="lobby-cast-menu__header">
             <div>
-              <p className="lobby-cast-menu__title">Cast to TV</p>
-              <p className="lobby-cast-menu__subtitle">Choose Chromecast, AirPlay, or a TV browser.</p>
+              <p className="lobby-cast-menu__title">More options</p>
+              <p className="lobby-cast-menu__subtitle">
+                Use Cast to TV to open your browser&apos;s device picker. These are fallbacks.
+              </p>
             </div>
             <button type="button" className="lobby-cast-menu__close" onClick={onCloseMenu} aria-label="Close cast menu">
               <X className="h-4 w-4" />
@@ -99,12 +116,12 @@ export function LobbyCastButton({
 
           <div className="lobby-cast-menu__options">
             <CastOption
-              title="Chromecast"
+              title="Chromecast devices"
               description={
                 canChromecast
                   ? chromecastAppId
-                    ? "Cast the full lobby board to Chromecast or Google TV."
-                    : "Opens Chrome's device picker for Chromecast, smart TVs, and wireless displays."
+                    ? "Open the Chromecast device picker again."
+                    : "Open Chrome's cast picker for Chromecast, Google TV, and smart TVs."
                   : "Use Chrome on desktop to cast to Chromecast."
               }
               disabled={!canChromecast}
@@ -112,7 +129,7 @@ export function LobbyCastButton({
               icon={<Cast className="h-4 w-4" />}
             />
             <CastOption
-              title="AirPlay"
+              title="AirPlay devices"
               description={
                 canAirPlay
                   ? "Share this tab, then choose your Apple TV or AirPlay TV."
