@@ -10,7 +10,7 @@ export function useLobbyCheckoutTimers(checkouts: LobbyCheckoutsResponse, nowMs:
       checkouts.featured && !isLobbyCheckoutDogExpired(checkouts.featured, nowMs)
         ? checkouts.featured
         : null;
-    const queue = checkouts.queue.filter((dog) => !isLobbyCheckoutDogExpired(dog, nowMs));
+    const queue = (checkouts.queue ?? []).filter((dog) => !isLobbyCheckoutDogExpired(dog, nowMs));
     const activeCount = (featured ? 1 : 0) + queue.length;
 
     return {

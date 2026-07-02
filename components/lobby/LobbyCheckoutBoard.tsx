@@ -30,10 +30,20 @@ const emptyCheckouts: LobbyCheckoutsResponse = {
   last_updated: ""
 };
 
-export function LobbyCheckoutBoard() {
+function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null | undefined): LobbyCheckoutsResponse {
+  return {
+    featured: body?.featured ?? null,
+    queue: body?.queue ?? [],
+    counts: body?.counts ?? { active: 0, queue: 0 },
+    last_updated: body?.last_updated ?? "",
+    error: body?.error
+  };
+}
+
+export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayToken?: string }) {
   const searchParams = useSearchParams();
   const tvMode = searchParams.get("display") === "tv";
-  const displayToken = searchParams.get("token")?.trim() ?? "";
+  const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
 
   const [clock, setClock] = useState(() => new Date());
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -67,12 +77,12 @@ export function LobbyCheckoutBoard() {
         if (body.settings) setSettings(body.settings);
       }
 
-      const checkoutBody = (await checkoutsRes.json()) as LobbyCheckoutsResponse;
+      const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
       if (checkoutsRes.ok && !checkoutBody.error) {
         setCheckouts(checkoutBody);
         setRefreshMessage(null);
       } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
-        setRefreshMessage("Live board temporarily refreshing");
+        setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
       } else {
         setCheckouts(checkoutBody);
         setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");

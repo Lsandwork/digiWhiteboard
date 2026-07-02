@@ -17,6 +17,6 @@ export function isLobbyDisplayAuthorized(request: Request) {
   return queryToken === requiredToken || headerToken === requiredToken;
 }
 
-export function unauthorizedLobbyResponse() {
-  return Response.json({ error: "Unauthorized." }, { status: 401 });
+export function unauthorizedLobbyResponse(body: Record<string, unknown> = { error: "Unauthorized." }) {
+  return Response.json(body, { status: 401 });
 }

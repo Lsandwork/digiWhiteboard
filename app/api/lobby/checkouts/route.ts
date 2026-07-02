@@ -7,7 +7,15 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!isLobbyDisplayAuthorized(request) && !isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+  if (!isLobbyDisplayAuthorized(request) && !isLobbyAdmin(request)) {
+    return unauthorizedLobbyResponse({
+      featured: null,
+      queue: [],
+      counts: { active: 0, queue: 0 },
+      last_updated: new Date().toISOString(),
+      error: "Unauthorized."
+    });
+  }
 
   const now = new Date();
 
