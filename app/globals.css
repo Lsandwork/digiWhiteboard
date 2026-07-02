@@ -548,13 +548,17 @@ html.lobby-tv-display .lobby-idle-slideshow--tv {
 }
 
 html.lobby-tv-display .lobby-idle-slideshow--tv .lobby-idle-slideshow__frame {
-  min-height: 42vh;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
   flex: 1;
+  max-height: 46vh;
   border-width: 3px;
 }
 
+html.lobby-tv-display .lobby-idle-slideshow--tv .lobby-idle-slideshow__image,
 html.lobby-tv-display .lobby-idle-slideshow--tv .lobby-idle-slideshow__image.is-active {
-  object-fit: cover;
+  object-fit: contain;
+  object-position: center;
 }
 
 html.lobby-tv-display .lobby-idle-slideshow__dots span {
@@ -585,7 +589,9 @@ html.lobby-tv-display .lobby-has-checkout .lobby-queue-row p {
 
 .lobby-idle-slideshow__frame {
   position: relative;
+  aspect-ratio: 16 / 9;
   min-height: 12rem;
+  width: 100%;
   flex: 1;
   overflow: hidden;
   border-radius: 1rem;
@@ -595,6 +601,7 @@ html.lobby-tv-display .lobby-has-checkout .lobby-queue-row p {
 
 .lobby-idle-slideshow__image {
   object-fit: contain;
+  object-position: center;
   opacity: 0;
   transition: opacity 1s ease;
 }

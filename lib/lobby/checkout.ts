@@ -18,6 +18,17 @@ import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+function isGingrBackOfHouseDog(dog: LiveDog) {
+  return dog.raw_payload?.source === "gingr_back_of_house";
+}
+
+/** Gingr basket rows are authoritative when live; Supabase rows still require a prompt. */
+export function isLobbyCheckoutCandidate(dog: LiveDog, gingrLive: boolean) {
+  if (dog.display_status !== "checking_out") return false;
+  if (gingrLive && isGingrBackOfHouseDog(dog)) return true;
+  return isPromptedCheckoutDog(dog);
+}
+
 function enrichDogPhotos(dogs: LiveDog[]) {
   return dogs.map((dog) => ({
     ...dog,
@@ -73,10 +84,7 @@ async function loadGingrCheckoutDogs(now: Date): Promise<{ dogs: LiveDog[]; ging
 
     const mapped = enrichDogPhotos(mapGingrBoardToLiveDogs(gingrBoard));
     const dogs = mapped.filter(
-      (dog) =>
-        dog.display_status === "checking_out" &&
-        isPromptedCheckoutDog(dog) &&
-        !shouldExpireLobbyCheckoutDog(dog, now)
+      (dog) => dog.display_status === "checking_out" && !shouldExpireLobbyCheckoutDog(dog, now)
     );
 
     return { dogs, gingrLive: true };
@@ -93,7 +101,7 @@ function toLobbyCheckoutDog(dog: LiveDog, featured = false): LobbyCheckoutDog {
     gingr_animal_id: dog.gingr_animal_id,
     dog_name: dog.animal_name,
     breed: extractLobbyBreed(dog),
-    dog_photo_url: resolveDogPhotoUrl(dog),
+    dog_photo_url: dog.photo_url ?? resolveDogPhotoUrl(dog),
     checkout_status: getLobbyCheckoutStatus(dog, featured),
     prompted_at: getLobbyPromptedAt(dog),
     estimated_ready_at: displayUntil,
@@ -116,7 +124,7 @@ export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCo
 
   const merged = mergeCheckoutDogs(gingrDogs, supabaseDogs);
   const reconciled = gingrLive ? reconcileGingrSourcedCheckouts(merged, gingrDogs) : merged;
-  const candidates = reconciled.filter(isPromptedCheckoutDog);
+  const candidates = reconciled.filter((dog) => isLobbyCheckoutCandidate(dog, gingrLive));
 
   const withStoredPhotos = await applyStoredAnimalPhotos(supabase, candidates);
   const enriched = await enrichLobbyGingrAnimalPhotos(supabase, withStoredPhotos);
