@@ -1,4 +1,8 @@
 import { toIsoTimestamp } from "@/lib/board-dog";
+import {
+  mergeCheckoutDogs,
+  reconcileGingrSourcedCheckouts
+} from "@/lib/board-checkout-merge";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import {
@@ -76,8 +80,13 @@ function lobbySortTime(dog: LiveDog) {
 }
 
 export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCount = 6, now = new Date()) {
-  const { dogs: gingrDogs, gingrLive } = await loadGingrCheckoutDogs(now);
-  const candidates = gingrLive ? gingrDogs : await loadSupabasePromptedCheckoutDogs(supabase, now);
+  const [{ dogs: gingrDogs, gingrLive }, supabaseDogs] = await Promise.all([
+    loadGingrCheckoutDogs(now),
+    loadSupabasePromptedCheckoutDogs(supabase, now)
+  ]);
+
+  const merged = mergeCheckoutDogs(gingrDogs, supabaseDogs);
+  const candidates = gingrLive ? reconcileGingrSourcedCheckouts(merged, gingrDogs) : merged;
 
   const withStoredPhotos = await applyStoredAnimalPhotos(supabase, candidates);
   const enriched = enrichDogPhotos(withStoredPhotos);
@@ -91,6 +100,6 @@ export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCo
     queue: queueDogs.map((dog) => toLobbyCheckoutDog(dog, false)),
     activeCount: sorted.length,
     lastPromptedAt: featuredDog ? getLobbyPromptedAt(featuredDog) : sorted[0] ? getLobbyPromptedAt(sorted[0]) : null,
-    data_source: gingrLive ? "gingr_back_of_house" : "supabase_live_transition_dogs"
+    data_source: gingrLive ? "gingr_and_supabase" : "supabase_live_transition_dogs"
   };
 }

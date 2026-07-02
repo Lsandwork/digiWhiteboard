@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
+import { mergeCheckoutDogs } from "@/lib/board-checkout-merge";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
@@ -50,15 +51,8 @@ function isStoredLiveTriggeredDog(dog: LiveDog) {
   return dog.raw_payload?.source !== "gingr_back_of_house";
 }
 
-function mergeCheckoutDogs(primary: LiveDog[], secondary: LiveDog[]) {
-  const dogsByKey = new Map<string, LiveDog>();
-
-  for (const dog of [...primary, ...secondary]) {
-    const key = dog.gingr_reservation_id ?? dog.gingr_animal_id ?? dog.id;
-    if (!dogsByKey.has(key)) dogsByKey.set(key, dog);
-  }
-
-  return [...dogsByKey.values()].sort(
+function sortCheckoutDogs(dogs: LiveDog[]) {
+  return [...dogs].sort(
     (a, b) => new Date(a.status_started_at ?? a.updated_at).getTime() - new Date(b.status_started_at ?? b.updated_at).getTime()
   );
 }
@@ -229,7 +223,9 @@ export async function GET(request: Request) {
       rawRecordCount = gingrBoard.checking_in.length + gingrBoard.checking_out.length;
       const visible = filterVisibleDogs(liveDogs, now);
       checkingIn = visible.checkingIn;
-      checkingOut = visible.checkingOut;
+      checkingOut = sortCheckoutDogs(
+        mergeCheckoutDogs(visible.checkingOut, promptedCheckoutRows.visible)
+      );
       checkinDebug = {
         raw_checking_in_candidates: gingrBoard.checking_in.length,
         webhook_checking_in_rows: activeCheckinRows.rawCheckinRows,
@@ -293,7 +289,7 @@ export async function GET(request: Request) {
         promptedCheckoutRows.visible
       );
       checkingIn = storedActiveCheckins.length ? storedActiveCheckins : visible.checkingIn;
-      checkingOut = mergeCheckoutDogs(visible.checkingOut, storedPromptedCheckouts);
+      checkingOut = sortCheckoutDogs(mergeCheckoutDogs(visible.checkingOut, storedPromptedCheckouts));
       checkinDebug = {
         webhook_checking_in_rows: activeCheckinRows.rawCheckinRows,
         expired_checking_in_count: activeCheckinRows.expiredCheckinRows

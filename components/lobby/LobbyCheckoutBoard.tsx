@@ -11,6 +11,7 @@ import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_SETTINGS_POLL_MS } from "@/lib/board-checkout-merge";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -19,7 +20,7 @@ import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
-  refresh_interval_ms: 15000,
+  refresh_interval_ms: 5000,
   show_promotions: true,
   show_events: true,
   footer_message: "Thanks for being part of the Fitdog family. We'll take care of the rest.",
@@ -100,11 +101,34 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     return headers;
   }, [displayToken]);
 
-  const loadLobbyData = useCallback(async () => {
+  const loadLobbyCheckouts = useCallback(async () => {
     try {
-      const [settingsRes, checkoutsRes, statusRes] = await Promise.all([
+      const checkoutsRes = await fetch("/api/lobby/checkouts", { cache: "no-store", headers: requestHeaders });
+      const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
+
+      if (checkoutsRes.ok && !checkoutBody.error) {
+        setCheckouts(checkoutBody);
+        setRefreshMessage(null);
+        setHealthy(true);
+      } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
+        setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
+      } else {
+        setCheckouts(checkoutBody);
+        setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
+        setHealthy(false);
+      }
+    } catch {
+      if (!checkoutsRef.current.featured && !checkoutsRef.current.queue.length) {
+        setHealthy(false);
+      }
+      setRefreshMessage("Live board temporarily refreshing");
+    }
+  }, [requestHeaders]);
+
+  const loadLobbyMeta = useCallback(async () => {
+    try {
+      const [settingsRes, statusRes] = await Promise.all([
         fetch("/api/lobby/settings", { cache: "no-store", headers: requestHeaders }),
-        fetch("/api/lobby/checkouts", { cache: "no-store", headers: requestHeaders }),
         fetch("/api/lobby/status", { cache: "no-store", headers: requestHeaders })
       ]);
 
@@ -113,31 +137,21 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         if (body.settings) setSettings(body.settings);
       }
 
-      const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
-      if (checkoutsRes.ok && !checkoutBody.error) {
-        setCheckouts(checkoutBody);
-        setRefreshMessage(null);
-      } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
-        setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
-      } else {
-        setCheckouts(checkoutBody);
-        setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
-      }
-
       if (statusRes.ok) {
         const body = (await statusRes.json()) as LobbyStatusResponse;
         setHealthy(body.healthy);
-        if (body.refresh_interval_ms >= 10000) {
+        if (body.refresh_interval_ms >= BOARD_CHECKOUT_POLL_MS) {
           setSettings((current) => ({ ...current, refresh_interval_ms: body.refresh_interval_ms }));
         }
-      } else {
-        setHealthy(false);
       }
     } catch {
-      setHealthy(false);
-      setRefreshMessage("Live board temporarily refreshing");
+      // Checkout polling owns the visible error state.
     }
   }, [requestHeaders]);
+
+  const loadLobbyData = useCallback(async () => {
+    await Promise.all([loadLobbyCheckouts(), loadLobbyMeta()]);
+  }, [loadLobbyCheckouts, loadLobbyMeta]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void loadLobbyData(), 0);
@@ -153,10 +167,15 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   }, []);
 
   useEffect(() => {
-    const intervalMs = Math.max(10000, settings.refresh_interval_ms);
-    const pollTimer = window.setInterval(() => void loadLobbyData(), intervalMs);
+    const intervalMs = Math.max(BOARD_CHECKOUT_POLL_MS, settings.refresh_interval_ms);
+    const pollTimer = window.setInterval(() => void loadLobbyCheckouts(), intervalMs);
     return () => window.clearInterval(pollTimer);
-  }, [loadLobbyData, settings.refresh_interval_ms]);
+  }, [loadLobbyCheckouts, settings.refresh_interval_ms]);
+
+  useEffect(() => {
+    const metaTimer = window.setInterval(() => void loadLobbyMeta(), BOARD_SETTINGS_POLL_MS);
+    return () => window.clearInterval(metaTimer);
+  }, [loadLobbyMeta]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -165,14 +184,14 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     const channel = supabase
       .channel("lobby-live-transition-dogs")
       .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
-        void loadLobbyData();
+        void loadLobbyCheckouts();
       })
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadLobbyData]);
+  }, [loadLobbyCheckouts]);
 
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;

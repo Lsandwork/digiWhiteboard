@@ -11,6 +11,7 @@ import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
+import { BOARD_CHECKOUT_POLL_MS } from "@/lib/board-checkout-merge";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
@@ -148,7 +149,7 @@ export function BoardClient() {
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
     const clockTimer = window.setInterval(() => setClock(new Date()), 1000);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    const pollTimer = window.setInterval(() => void loadBoard("polling"), 10000);
+    const pollTimer = window.setInterval(() => void loadBoard("polling"), BOARD_CHECKOUT_POLL_MS);
 
     return () => {
       window.clearTimeout(initialLoad);

@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       active_checkout_count: 0,
       last_successful_sync_at: null,
       data_source: "supabase_live_transition_dogs",
-      refresh_interval_ms: 15000
+      refresh_interval_ms: 5000
     });
   }
 }

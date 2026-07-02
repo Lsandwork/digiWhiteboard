@@ -4,7 +4,7 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
-  refresh_interval_ms: 15000,
+  refresh_interval_ms: 5000,
   show_promotions: true,
   show_events: true,
   footer_message: "Thanks for being part of the Fitdog family. We'll take care of the rest.",
@@ -25,7 +25,7 @@ export async function loadLobbySettings(supabase: SupabaseClient): Promise<Lobby
     const refreshIntervalMs = Number(data.refresh_interval_ms ?? defaultSettings.refresh_interval_ms);
     return {
       max_queue_count: Math.min(6, Math.max(3, Number(data.max_queue_count ?? defaultSettings.max_queue_count))),
-      refresh_interval_ms: Math.max(10000, refreshIntervalMs),
+      refresh_interval_ms: Math.max(5000, refreshIntervalMs),
       show_promotions: Boolean(data.show_promotions ?? defaultSettings.show_promotions),
       show_events: Boolean(data.show_events ?? defaultSettings.show_events),
       footer_message: data.footer_message ?? defaultSettings.footer_message,
@@ -74,7 +74,7 @@ export async function updateLobbySettings(
   patch: Partial<LobbySettings> & { refresh_interval_ms?: number }
 ) {
   const refreshIntervalMs = patch.refresh_interval_ms
-    ? Math.max(10000, patch.refresh_interval_ms)
+    ? Math.max(5000, patch.refresh_interval_ms)
     : undefined;
 
   const { data, error } = await supabase

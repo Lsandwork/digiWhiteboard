@@ -222,7 +222,7 @@ export function AdminLobbyClient() {
             <span className="text-sm text-slate-400">Refresh interval (ms)</span>
             <input
               type="number"
-              min={10000}
+              min={5000}
               step={1000}
               defaultValue={data.settings.refresh_interval_ms}
               className="mt-1 w-full rounded-xl border border-white/10 bg-ink-950 px-3 py-2"
