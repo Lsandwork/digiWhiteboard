@@ -11,7 +11,7 @@ export function useLobbyDogPhoto(animalId: string | null | undefined, initialUrl
 
   useEffect(() => {
     const trimmedAnimalId = animalId?.trim();
-    if (photoUrl || !trimmedAnimalId) return;
+    if (!trimmedAnimalId) return;
 
     let cancelled = false;
 
@@ -28,14 +28,14 @@ export function useLobbyDogPhoto(animalId: string | null | undefined, initialUrl
           setPhotoUrl(nextUrl);
         }
       } catch {
-        // Keep the letter fallback when the photo cannot be loaded.
+        // Keep the server-provided URL or letter fallback.
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [animalId, photoUrl]);
+  }, [animalId]);
 
   return photoUrl;
 }
