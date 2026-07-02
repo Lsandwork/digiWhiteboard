@@ -17,7 +17,8 @@ export const fitdogAssets = {
   serviceBeach: `${FITDOG_ASSET_BASE}/service-beach.svg`,
   servicePuppySocialization: `${FITDOG_ASSET_BASE}/service-puppy-socialization.svg`,
   serviceObedience: `${FITDOG_ASSET_BASE}/service-obedience.svg`,
-  serviceFitness: `${FITDOG_ASSET_BASE}/service-fitness.svg`
+  serviceFitness: `${FITDOG_ASSET_BASE}/service-fitness.svg`,
+  gingrLogoRed: `${FITDOG_ASSET_BASE}/gingr-logo-red.png`
 } as const;
 
 export const lobbyAssets = {
@@ -25,6 +26,7 @@ export const lobbyAssets = {
   logoLockup: fitdogAssets.logoCircleBadge,
   logoBadge: fitdogAssets.logoCircleBadge,
   logoWhite: fitdogAssets.logoWhite,
+  gingrLogoRed: fitdogAssets.gingrLogoRed,
   syncedBadge: `${LOBBY_ASSET_BASE}/03-ui-components/badge-live-sync-with-gingr.png`,
   heartIcon: `${LOBBY_ASSET_BASE}/icons/png/icon-heart.png`,
   calendarIcon: `${LOBBY_ASSET_BASE}/icons/png/icon-calendar.png`,

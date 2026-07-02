@@ -36,7 +36,28 @@ export function LobbyHeader({ clock, healthy }: LobbyHeaderProps) {
 
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-2">
-          <Image src={lobbyAssets.syncedBadge} alt="Synced with Gingr" width={175} height={38} className="h-9 w-auto" />
+          <div
+            className="lobby-gingr-badge inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-lobby-orange/55 bg-[#171E24] px-3"
+            aria-label="Live with Gingr"
+          >
+            <Image
+              src={lobbyAssets.syncSignalIcon}
+              alt=""
+              width={16}
+              height={16}
+              className="h-4 w-4 shrink-0 brightness-0 invert"
+              unoptimized
+            />
+            <span className="text-sm font-extrabold leading-none text-white">Live with</span>
+            <Image
+              src={lobbyAssets.gingrLogoRed}
+              alt="Gingr"
+              width={72}
+              height={24}
+              className="h-5 w-auto shrink-0 object-contain"
+              unoptimized
+            />
+          </div>
           <span className={`lobby-sync-pill inline-flex items-center ${healthy ? "lobby-sync-pill--live" : "lobby-sync-pill--refresh"}`}>
             <Image
               src={lobbyAssets.syncSignalIcon}
