@@ -470,6 +470,42 @@ body {
   width: 100%;
 }
 
+.lobby-service-icon-wrap {
+  display: grid;
+  place-items: center;
+  animation: lobbyServiceFloat 3.2s ease-in-out infinite;
+}
+
+.lobby-service-icon-image {
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.55)) drop-shadow(0 0 18px rgba(100, 185, 220, 0.35));
+}
+
+.lobby-service-label {
+  color: #fff;
+  text-shadow:
+    0 0 8px rgba(255, 255, 255, 0.45),
+    0 0 1px #fff,
+    0 1px 0 #fff;
+}
+
+@keyframes lobbyServiceFloat {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.04);
+    filter: brightness(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-service-icon-wrap {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .lobby-featured-card,
   .lobby-queue-row {

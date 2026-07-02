@@ -23,8 +23,9 @@ export const fitdogAssets = {
 
 export const lobbyAssets = {
   background: `${LOBBY_ASSET_BASE}/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png`,
-  logoLockup: fitdogAssets.logoCircleBadge,
-  logoBadge: fitdogAssets.logoCircleBadge,
+  logoLockup: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-circle-badge-512.png`,
+  logoBadge: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-circle-badge-512.png`,
+  logoBadgeSvg: fitdogAssets.logoCircleBadge,
   logoWhite: fitdogAssets.logoWhite,
   gingrLogoRed: fitdogAssets.gingrLogoRed,
   syncedBadge: `${LOBBY_ASSET_BASE}/03-ui-components/badge-live-sync-with-gingr.png`,
@@ -35,9 +36,10 @@ export const lobbyAssets = {
   statusFrontDesk: `${LOBBY_ASSET_BASE}/03-ui-components/status-ready-at-front-desk.png`,
   statusWayOut: `${LOBBY_ASSET_BASE}/03-ui-components/status-on-the-way-out.png`,
   statusGroom: `${LOBBY_ASSET_BASE}/03-ui-components/status-finishing-groom.png`,
-  dogProfileFallback: fitdogAssets.logoCircleBadge,
+  dogProfileFallback: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-circle-badge-512.png`,
   appIcon192: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-app-icon-192.png`,
-  pawIcon: fitdogAssets.pawAccent,
+  pawIcon: `${LOBBY_ASSET_BASE}/04-icons/png/fitdog-icon-paw.png`,
+  pawIconSvg: fitdogAssets.pawAccent,
   syncSignalIcon: `${LOBBY_ASSET_BASE}/04-icons/png/fitdog-icon-sync.png`
 } as const;
 
@@ -81,7 +83,7 @@ export function lobbyServiceIconPath(iconKey: string | null | undefined) {
 export function lobbyServiceIconFallbackPath(iconKey: string | null | undefined) {
   const normalized = (iconKey ?? "paw").trim().toLowerCase();
   const resolved = iconAliases[normalized] ?? normalized;
-  return lobbyIconPath(resolved, "png");
+  return fitdogServiceIcons[resolved] ?? lobbyIconPath(resolved, "svg");
 }
 
 export function lobbyIconPath(iconKey: string | null | undefined, format: "svg" | "png" = "png") {

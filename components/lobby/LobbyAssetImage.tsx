@@ -11,6 +11,7 @@ type LobbyAssetImageProps = {
   className?: string;
   fallbackSrc?: string;
   priority?: boolean;
+  loading?: "eager" | "lazy";
   fill?: boolean;
   sizes?: string;
   onFailed?: () => void;
@@ -24,6 +25,7 @@ export function LobbyAssetImage({
   className,
   fallbackSrc,
   priority,
+  loading = "lazy",
   fill,
   sizes,
   onFailed
@@ -43,7 +45,13 @@ export function LobbyAssetImage({
     if (fill) {
       return (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={currentSrc} alt={alt} className={className} onError={handleError} />
+        <img
+          src={currentSrc}
+          alt={alt}
+          className={className}
+          loading={priority ? "eager" : loading}
+          onError={handleError}
+        />
       );
     }
 
@@ -55,6 +63,7 @@ export function LobbyAssetImage({
         width={width}
         height={height}
         className={className}
+        loading={priority ? "eager" : loading}
         onError={handleError}
       />
     );
