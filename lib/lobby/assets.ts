@@ -1,4 +1,5 @@
 export const FITDOG_ASSET_BASE = "/assets/fitdog";
+export const FITDOG_SERVICES_BASE = `${FITDOG_ASSET_BASE}/services`;
 export const LOBBY_ASSET_BASE = "/assets/fitdog-lobby-whiteboard";
 export const LOBBY_REFERENCE_BASE = "/assets/lobby-whiteboard/reference";
 
@@ -63,15 +64,15 @@ const iconAliases: Record<string, string> = {
 };
 
 const fitdogServiceIcons: Record<string, string> = {
-  daycare: fitdogAssets.serviceDaycare,
-  overnight: fitdogAssets.serviceOvernight,
-  grooming: fitdogAssets.serviceGrooming,
-  taxi: fitdogAssets.serviceTaxi,
-  hiking: fitdogAssets.serviceDogHiking,
-  beach: fitdogAssets.serviceBeach,
-  "puppy-socialization": fitdogAssets.servicePuppySocialization,
-  obedience: fitdogAssets.serviceObedience,
-  fitness: fitdogAssets.serviceFitness
+  daycare: `${FITDOG_SERVICES_BASE}/daycare.svg`,
+  overnight: `${FITDOG_SERVICES_BASE}/overnight.svg`,
+  grooming: `${FITDOG_SERVICES_BASE}/grooming.svg`,
+  taxi: `${FITDOG_SERVICES_BASE}/taxi.svg`,
+  hiking: `${FITDOG_SERVICES_BASE}/dog-hiking.svg`,
+  beach: `${FITDOG_SERVICES_BASE}/beach-excursions.svg`,
+  "puppy-socialization": `${FITDOG_SERVICES_BASE}/puppy-socialization.svg`,
+  obedience: `${FITDOG_SERVICES_BASE}/obedience-manners.svg`,
+  fitness: `${FITDOG_SERVICES_BASE}/canine-fitness.svg`
 };
 
 export function lobbyServiceIconPath(iconKey: string | null | undefined) {
