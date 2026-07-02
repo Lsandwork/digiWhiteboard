@@ -11,11 +11,17 @@ type PresentationRequestLike = {
 
 type PresentationRequestConstructor = new (urls: string[]) => PresentationRequestLike;
 
-export function buildLobbyTvCastUrl(currentHref?: string) {
+export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {
   const base =
     typeof window !== "undefined" ? window.location.href : (currentHref ?? "http://localhost/lobby/checkouts");
   const url = new URL(base);
   url.searchParams.set("display", "tv");
+
+  const token = displayToken?.trim() || url.searchParams.get("token")?.trim();
+  if (token) {
+    url.searchParams.set("token", token);
+  }
+
   return url.toString();
 }
 

@@ -150,8 +150,8 @@ export async function preloadGoogleCast() {
   }
 }
 
-async function loadLobbyUrlOnCastSession(session: CastSessionLike) {
-  const url = buildLobbyTvCastUrl();
+async function loadLobbyUrlOnCastSession(session: CastSessionLike, displayToken?: string) {
+  const url = buildLobbyTvCastUrl(undefined, displayToken);
   const MediaInfoCtor = window.chrome?.cast?.media?.MediaInfo;
   const LoadRequestCtor = window.chrome?.cast?.media?.LoadRequest;
   const streamType = window.chrome?.cast?.media?.StreamType?.BUFFERED;
@@ -178,14 +178,14 @@ export async function requestGoogleCastDevicePicker() {
   return context;
 }
 
-export async function startGoogleCastSession() {
+export async function startGoogleCastSession(displayToken?: string) {
   const context = await requestGoogleCastDevicePicker();
   const session = context.getCurrentSession();
   if (!session) {
     throw new Error("No cast session was created.");
   }
 
-  const url = buildLobbyTvCastUrl();
+  const url = buildLobbyTvCastUrl(undefined, displayToken);
 
   if (isGoogleCastConfigured()) {
     await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
@@ -193,7 +193,7 @@ export async function startGoogleCastSession() {
   }
 
   try {
-    await loadLobbyUrlOnCastSession(session);
+    await loadLobbyUrlOnCastSession(session, displayToken);
   } catch {
     await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
   }

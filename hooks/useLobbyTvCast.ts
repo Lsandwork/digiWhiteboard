@@ -48,7 +48,7 @@ function applyCastResult(
   void requestWakeLock();
 }
 
-export function useLobbyTvCast(initialTvLayout = false) {
+export function useLobbyTvCast(initialTvLayout = false, displayToken = "") {
   const [menuOpen, setMenuOpen] = useState(false);
   const [tvLayoutActive, setTvLayoutActive] = useState(initialTvLayout);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -59,7 +59,8 @@ export function useLobbyTvCast(initialTvLayout = false) {
   const presentationConnectionRef = useRef<PresentationConnectionLike | null>(null);
   const { requestWakeLock, releaseWakeLock } = useScreenWakeLock();
 
-  const tvCastUrl = typeof window !== "undefined" ? buildLobbyTvCastUrl() : "/lobby/checkouts?display=tv";
+  const tvCastUrl =
+    typeof window !== "undefined" ? buildLobbyTvCastUrl(undefined, displayToken) : "/lobby/checkouts?display=tv";
   const isTvLayout = initialTvLayout || tvLayoutActive;
   const isCasting =
     castStatus === "casting" ||
@@ -85,7 +86,7 @@ export function useLobbyTvCast(initialTvLayout = false) {
   useEffect(() => {
     if (typeof document === "undefined") return;
 
-    const href = buildLobbyTvCastUrl();
+    const href = buildLobbyTvCastUrl(undefined, displayToken);
     let link = document.querySelector<HTMLLinkElement>('link[rel="presentation"]');
     if (!link) {
       link = document.createElement("link");
@@ -97,7 +98,7 @@ export function useLobbyTvCast(initialTvLayout = false) {
     return () => {
       link?.remove();
     };
-  }, []);
+  }, [displayToken]);
 
   const stopTvCast = useCallback(async () => {
     setCastError(null);
@@ -147,9 +148,9 @@ export function useLobbyTvCast(initialTvLayout = false) {
   );
 
   const handleCastPickerResult = useCallback(
-    async (picker: () => Promise<CastPickerResult>) => {
+    async (picker: (token?: string) => Promise<CastPickerResult>) => {
       setCastError(null);
-      const result = await picker();
+      const result = await picker(displayToken || undefined);
 
       if (result.method === "wireless") {
         attachPresentationConnection(result.connection);
@@ -158,7 +159,7 @@ export function useLobbyTvCast(initialTvLayout = false) {
 
       applyCastResult(result.method, setCastMethod, setCastStatus, setMenuOpen, requestWakeLock);
     },
-    [attachPresentationConnection, requestWakeLock]
+    [attachPresentationConnection, displayToken, requestWakeLock]
   );
 
   const openCastDevicePickerFlow = useCallback(async () => {

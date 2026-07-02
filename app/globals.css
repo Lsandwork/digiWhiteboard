@@ -470,7 +470,7 @@ body {
 
 .lobby-idle-slideshow__frame {
   position: relative;
-  min-height: 0;
+  min-height: 12rem;
   flex: 1;
   overflow: hidden;
   border-radius: 1rem;
