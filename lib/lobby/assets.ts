@@ -13,7 +13,11 @@ export const fitdogAssets = {
   serviceOvernight: `${FITDOG_ASSET_BASE}/service-overnight.svg`,
   serviceGrooming: `${FITDOG_ASSET_BASE}/service-grooming.svg`,
   serviceTaxi: `${FITDOG_ASSET_BASE}/service-taxi.svg`,
-  serviceDogHiking: `${FITDOG_ASSET_BASE}/service-dog-hiking.svg`
+  serviceDogHiking: `${FITDOG_ASSET_BASE}/service-dog-hiking.svg`,
+  serviceBeach: `${FITDOG_ASSET_BASE}/service-beach.svg`,
+  servicePuppySocialization: `${FITDOG_ASSET_BASE}/service-puppy-socialization.svg`,
+  serviceObedience: `${FITDOG_ASSET_BASE}/service-obedience.svg`,
+  serviceFitness: `${FITDOG_ASSET_BASE}/service-fitness.svg`
 } as const;
 
 export const lobbyAssets = {
@@ -59,7 +63,11 @@ const fitdogServiceIcons: Record<string, string> = {
   overnight: fitdogAssets.serviceOvernight,
   grooming: fitdogAssets.serviceGrooming,
   taxi: fitdogAssets.serviceTaxi,
-  hiking: fitdogAssets.serviceDogHiking
+  hiking: fitdogAssets.serviceDogHiking,
+  beach: fitdogAssets.serviceBeach,
+  "puppy-socialization": fitdogAssets.servicePuppySocialization,
+  obedience: fitdogAssets.serviceObedience,
+  fitness: fitdogAssets.serviceFitness
 };
 
 export function lobbyServiceIconPath(iconKey: string | null | undefined) {
