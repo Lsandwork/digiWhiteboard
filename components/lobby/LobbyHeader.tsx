@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import { formatBoardDateTime } from "@/lib/board-utils";
 
@@ -15,12 +16,12 @@ export function LobbyHeader({ clock, healthy }: LobbyHeaderProps) {
   return (
     <header className="lobby-header mb-1 grid grid-cols-[200px_1fr_auto] items-center gap-6">
       <div>
-        <Image
-          src={lobbyAssets.logoLockup}
+        <LobbyAssetImage
+          src={lobbyAssets.logoBadge}
           alt="Fitdog Health and Social Club"
-          width={200}
-          height={72}
-          className="h-[3.25rem] w-auto"
+          width={96}
+          height={96}
+          className="h-[3.25rem] w-[3.25rem] rounded-full ring-2 ring-lobby-teal/50"
           priority
         />
       </div>

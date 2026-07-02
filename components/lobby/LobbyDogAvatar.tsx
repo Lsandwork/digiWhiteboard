@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import Image from "next/image";
+import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
 
 type LobbyDogAvatarProps = {
@@ -36,13 +36,13 @@ export function LobbyDogAvatar({ dogName, imageUrl, size = "queue" }: LobbyDogAv
           onError={() => setPhotoFailed(true)}
         />
       ) : showBrandFallback ? (
-        <Image
+        <LobbyAssetImage
           src={lobbyAssets.dogProfileFallback}
           alt={`${dogName} avatar`}
-          fill
-          className="object-cover"
-          sizes={size === "featured" ? "176px" : "80px"}
-          onError={() => setBrandFallbackFailed(true)}
+          width={size === "featured" ? 176 : 80}
+          height={size === "featured" ? 176 : 80}
+          className="h-full w-full object-cover"
+          onFailed={() => setBrandFallbackFailed(true)}
         />
       ) : (
         <div className="grid h-full w-full place-items-center bg-lobby-orange/15 text-2xl font-black text-orange-50 sm:text-3xl">
