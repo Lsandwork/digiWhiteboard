@@ -5,13 +5,24 @@ type AirPlayVideo = HTMLVideoElement & {
   webkitplaybacktargetavailabilitychanged?: Event;
 };
 
+type DisplayMediaConstraints = MediaStreamConstraints & {
+  preferCurrentTab?: boolean;
+  selfBrowserSurface?: "include" | "exclude";
+  monitorTypeSurfaces?: "include" | "exclude";
+  surfaceSwitching?: "include" | "exclude";
+};
+
 let activeAirPlayStream: MediaStream | null = null;
 let activeAirPlayVideo: AirPlayVideo | null = null;
+
+function hasWebkitAirPlayPicker(video: AirPlayVideo) {
+  return typeof video.webkitShowPlaybackTargetPicker === "function";
+}
 
 export function isAirPlayPickerSupported() {
   if (typeof document === "undefined") return false;
   const video = document.createElement("video") as AirPlayVideo;
-  return typeof video.webkitShowPlaybackTargetPicker === "function";
+  return hasWebkitAirPlayPicker(video);
 }
 
 export function isAppleDevice() {
@@ -19,8 +30,21 @@ export function isAppleDevice() {
   return /Mac|iPhone|iPad|iPod/i.test(navigator.platform) || /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
+export function isChromeOnMac() {
+  if (typeof navigator === "undefined") return false;
+  return /Chrome|Chromium|Edg/i.test(navigator.userAgent) && !/OPR|Opera/i.test(navigator.userAgent) && /Mac/i.test(navigator.userAgent);
+}
+
 export function isDisplayMediaSupported() {
   return typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getDisplayMedia);
+}
+
+/** True when this browser can start the tab-capture + AirPlay picker flow. */
+export function isAirPlayCastAvailable() {
+  if (isAirPlayPickerSupported()) return true;
+  if (isAppleDevice() && isDisplayMediaSupported()) return true;
+  if (isChromeOnMac() && isDisplayMediaSupported()) return true;
+  return false;
 }
 
 function cleanupAirPlayPreview() {
@@ -38,6 +62,7 @@ function createAirPlayVideo(stream: MediaStream) {
   video.setAttribute("webkit-playsinline", "true");
   video.setAttribute("x-webkit-airplay", "allow");
   video.setAttribute("airplay", "allow");
+  video.setAttribute("disableRemotePlayback", "false");
   video.style.position = "fixed";
   video.style.width = "1px";
   video.style.height = "1px";
@@ -49,23 +74,48 @@ function createAirPlayVideo(stream: MediaStream) {
   return video;
 }
 
+async function requestTabCaptureStream() {
+  const constraints: DisplayMediaConstraints = {
+    video: {
+      displaySurface: "browser"
+    },
+    audio: false,
+    preferCurrentTab: true,
+    selfBrowserSurface: "include",
+    monitorTypeSurfaces: "exclude",
+    surfaceSwitching: "include"
+  };
+
+  return navigator.mediaDevices.getDisplayMedia(constraints);
+}
+
+function showAirPlayPicker(video: AirPlayVideo) {
+  if (hasWebkitAirPlayPicker(video)) {
+    video.webkitShowPlaybackTargetPicker!();
+    return true;
+  }
+  return false;
+}
+
 export async function startAirPlayCast() {
+  if (!isAirPlayCastAvailable()) {
+    throw new Error("AirPlay is not supported in this browser.");
+  }
+
   if (!isDisplayMediaSupported()) {
     throw new Error("Screen sharing is not supported in this browser.");
   }
 
   cleanupAirPlayPreview();
 
-  const stream = await navigator.mediaDevices.getDisplayMedia({
-    video: {
-      displaySurface: "browser"
-    },
-    audio: false,
-    preferCurrentTab: true
-  } as MediaStreamConstraints & { preferCurrentTab?: boolean });
-
+  const stream = await requestTabCaptureStream();
   const video = createAirPlayVideo(stream);
-  await video.play();
+
+  try {
+    await video.play();
+  } catch {
+    // Some browsers resolve play() after the capture stream is already running.
+  }
 
   activeAirPlayStream = stream;
   activeAirPlayVideo = video;
@@ -74,12 +124,20 @@ export async function startAirPlayCast() {
     cleanupAirPlayPreview();
   });
 
-  if (typeof video.webkitShowPlaybackTargetPicker === "function") {
-    video.webkitShowPlaybackTargetPicker();
+  if (showAirPlayPicker(video)) {
     return;
   }
 
-  throw new Error("AirPlay picker is not available. Use Control Center → Screen Mirroring on this device.");
+  // Chrome on Mac may only expose the picker after the video element is attached and playing.
+  await new Promise((resolve) => window.setTimeout(resolve, 150));
+  if (showAirPlayPicker(video)) {
+    return;
+  }
+
+  cleanupAirPlayPreview();
+  throw new Error(
+    "AirPlay picker did not open. In Chrome, choose “This tab”, then use the AirPlay icon in the address bar or Control Center."
+  );
 }
 
 export function stopAirPlayCast() {

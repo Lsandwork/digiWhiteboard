@@ -132,8 +132,8 @@ export function LobbyCastButton({
               title="AirPlay devices"
               description={
                 canAirPlay
-                  ? "Share this tab, then choose your Apple TV or AirPlay TV."
-                  : "Use Safari on Mac, iPhone, or iPad for AirPlay."
+                  ? "Share this tab, then choose your Apple TV or AirPlay TV from the picker."
+                  : "Use Safari on Mac, iPhone, or iPad, or Chrome on Mac."
               }
               disabled={!canAirPlay}
               onClick={onAirPlay}

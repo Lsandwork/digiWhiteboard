@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   isAirPlayCastActive,
-  isAirPlayPickerSupported,
-  isAppleDevice,
-  isDisplayMediaSupported,
+  isAirPlayCastAvailable,
   stopAirPlayCast
 } from "@/lib/lobby/airplay-cast";
-import { openCastDevicePicker } from "@/lib/lobby/cast-picker";
+import {
+  openAirPlayPicker,
+  openChromecastPicker,
+  openDefaultCastDevicePicker,
+  type CastPickerResult
+} from "@/lib/lobby/cast-picker";
 import {
   getGoogleCastAppId,
   isGoogleCastBrowser,
@@ -31,6 +34,19 @@ import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 export type CastMethod = "chromecast" | "wireless" | "airplay" | "fullscreen" | null;
 
 type CastStatus = "idle" | "casting" | "error";
+
+function applyCastResult(
+  method: CastMethod,
+  setCastMethod: (method: CastMethod) => void,
+  setCastStatus: (status: CastStatus) => void,
+  setMenuOpen: (open: boolean) => void,
+  requestWakeLock: () => void | Promise<void>
+) {
+  setCastMethod(method);
+  setCastStatus("casting");
+  setMenuOpen(false);
+  void requestWakeLock();
+}
 
 export function useLobbyTvCast(initialTvLayout = false) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -112,10 +128,7 @@ export function useLobbyTvCast(initialTvLayout = false) {
     (connection: PresentationConnectionLike) => {
       presentationConnectionRef.current = connection;
       setPresentationConnected(true);
-      setCastMethod("wireless");
-      setCastStatus("casting");
-      setMenuOpen(false);
-      void requestWakeLock();
+      applyCastResult("wireless", setCastMethod, setCastStatus, setMenuOpen, requestWakeLock);
 
       connection.addEventListener("close", () => {
         if (presentationConnectionRef.current === connection) {
@@ -133,28 +146,32 @@ export function useLobbyTvCast(initialTvLayout = false) {
     [requestWakeLock, stopTvCast]
   );
 
+  const handleCastPickerResult = useCallback(
+    async (picker: () => Promise<CastPickerResult>) => {
+      setCastError(null);
+      const result = await picker();
+
+      if (result.method === "wireless") {
+        attachPresentationConnection(result.connection);
+        return;
+      }
+
+      applyCastResult(result.method, setCastMethod, setCastStatus, setMenuOpen, requestWakeLock);
+    },
+    [attachPresentationConnection, requestWakeLock]
+  );
+
   const openCastDevicePickerFlow = useCallback(async () => {
-    setCastError(null);
-    const result = await openCastDevicePicker();
-
-    if (result.method === "wireless") {
-      attachPresentationConnection(result.connection);
-      return;
-    }
-
-    setCastMethod(result.method);
-    setCastStatus("casting");
-    setMenuOpen(false);
-    void requestWakeLock();
-  }, [attachPresentationConnection, requestWakeLock]);
+    await handleCastPickerResult(openDefaultCastDevicePicker);
+  }, [handleCastPickerResult]);
 
   const startChromecast = useCallback(async () => {
-    await openCastDevicePickerFlow();
-  }, [openCastDevicePickerFlow]);
+    await handleCastPickerResult(openChromecastPicker);
+  }, [handleCastPickerResult]);
 
   const startAirPlay = useCallback(async () => {
-    await openCastDevicePickerFlow();
-  }, [openCastDevicePickerFlow]);
+    await handleCastPickerResult(openAirPlayPicker);
+  }, [handleCastPickerResult]);
 
   const startFullscreenKiosk = useCallback(async () => {
     setCastError(null);
@@ -163,10 +180,7 @@ export function useLobbyTvCast(initialTvLayout = false) {
     if (!enteredFullscreen) {
       throw new Error("Fullscreen was blocked by the browser.");
     }
-    setCastMethod("fullscreen");
-    setCastStatus("casting");
-    setMenuOpen(false);
-    await requestWakeLock();
+    applyCastResult("fullscreen", setCastMethod, setCastStatus, setMenuOpen, requestWakeLock);
   }, [requestWakeLock]);
 
   const copyTvLink = useCallback(async () => {
@@ -215,11 +229,10 @@ export function useLobbyTvCast(initialTvLayout = false) {
     castStatus,
     castError,
     castMethod,
-    canCastDevices:
-      isGoogleCastConfigured() || isPresentationCastSupported() || isGoogleCastBrowser(),
+    canCastDevices: isGoogleCastConfigured() || isPresentationCastSupported() || isGoogleCastBrowser() || isAirPlayCastAvailable(),
     canChromecast: isGoogleCastConfigured() || isPresentationCastSupported() || isGoogleCastBrowser(),
     chromecastAppId: getGoogleCastAppId(),
-    canAirPlay: isAirPlayPickerSupported() || (isAppleDevice() && isDisplayMediaSupported()),
+    canAirPlay: isAirPlayCastAvailable(),
     canFullscreen: isFullscreenSupported(),
     openCastMenu,
     closeCastMenu,

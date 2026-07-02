@@ -1,4 +1,4 @@
-import { startAirPlayCast, isAirPlayPickerSupported } from "@/lib/lobby/airplay-cast";
+import { isAirPlayCastAvailable, startAirPlayCast, isAirPlayPickerSupported } from "@/lib/lobby/airplay-cast";
 import {
   isGoogleCastBrowser,
   isGoogleCastFrameworkReady,
@@ -24,11 +24,11 @@ function isCastCancelled(error: unknown) {
 }
 
 export function isCastDevicePickerSupported() {
-  return isAirPlayPickerSupported() || isGoogleCastBrowser() || isPresentationCastSupported();
+  return isAirPlayCastAvailable() || isGoogleCastBrowser() || isPresentationCastSupported();
 }
 
 export async function probeCastDeviceAvailability() {
-  if (isAirPlayPickerSupported()) {
+  if (isAirPlayCastAvailable()) {
     return true;
   }
 
@@ -70,12 +70,7 @@ export async function openPresentationDevicePicker(): Promise<PresentationConnec
   return request.start();
 }
 
-export async function openCastDevicePicker(): Promise<CastPickerResult> {
-  if (isAirPlayPickerSupported()) {
-    await startAirPlayCast();
-    return { method: "airplay" };
-  }
-
+export async function openChromecastPicker(): Promise<CastPickerResult> {
   if (isGoogleCastBrowser()) {
     try {
       await preloadGoogleCast();
@@ -95,5 +90,32 @@ export async function openCastDevicePicker(): Promise<CastPickerResult> {
     return { method: "wireless", connection };
   }
 
-  throw new Error("Casting is not supported in this browser. Use Chrome for Chromecast or Safari for AirPlay.");
+  throw new Error("Chromecast is not available in this browser. Use Chrome on desktop.");
+}
+
+export async function openAirPlayPicker(): Promise<CastPickerResult> {
+  if (!isAirPlayCastAvailable()) {
+    throw new Error("AirPlay is not available in this browser. Use Safari on Mac, iPhone, or iPad.");
+  }
+
+  await startAirPlayCast();
+  return { method: "airplay" };
+}
+
+/** Main cast button: Chromecast on Chrome, AirPlay on Safari / Apple devices. */
+export async function openDefaultCastDevicePicker(): Promise<CastPickerResult> {
+  if (isGoogleCastBrowser() && !isAirPlayPickerSupported()) {
+    return openChromecastPicker();
+  }
+
+  if (isAirPlayCastAvailable()) {
+    return openAirPlayPicker();
+  }
+
+  return openChromecastPicker();
+}
+
+/** @deprecated Use openDefaultCastDevicePicker, openChromecastPicker, or openAirPlayPicker. */
+export async function openCastDevicePicker(): Promise<CastPickerResult> {
+  return openDefaultCastDevicePicker();
 }
