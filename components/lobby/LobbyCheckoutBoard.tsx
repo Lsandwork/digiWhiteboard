@@ -194,8 +194,8 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         </div>
 
         <footer className="lobby-footer mt-4 flex h-14 shrink-0 items-center gap-4 px-8">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10">
-            <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={20} height={20} className="h-5 w-5 opacity-90" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center">
+            <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={20} height={20} className="h-5 w-5 opacity-95" />
           </div>
           <p className="flex-1 text-center text-base font-semibold text-white">{footerMessage}</p>
           <div className="flex shrink-0 items-center gap-1 opacity-30" aria-hidden>

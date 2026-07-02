@@ -9,7 +9,8 @@ export const LOBBY_BRAND_TEAL = "#64B9DC";
 export const fitdogAssets = {
   logoCircleBadge: `${FITDOG_ASSET_BASE}/fitdog-logo-circle-badge.svg`,
   logoWhite: `${FITDOG_ASSET_BASE}/fitdog-logo-white.svg`,
-  pawAccent: `${FITDOG_ASSET_BASE}/paw-accent.svg`,
+  pawAccent: `${FITDOG_ASSET_BASE}/paw-outline-orange.svg`,
+  pawOutlineOrange: `${FITDOG_ASSET_BASE}/paw-outline-orange.svg`,
   serviceDaycare: `${FITDOG_ASSET_BASE}/service-daycare.svg`,
   serviceOvernight: `${FITDOG_ASSET_BASE}/service-overnight.svg`,
   serviceGrooming: `${FITDOG_ASSET_BASE}/service-grooming.svg`,
@@ -39,8 +40,8 @@ export const lobbyAssets = {
   statusGroom: `${LOBBY_ASSET_BASE}/03-ui-components/status-finishing-groom.png`,
   dogProfileFallback: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-logo-circle-badge-512.png`,
   appIcon192: `${LOBBY_ASSET_BASE}/01-brand/logo/fitdog-app-icon-192.png`,
-  pawIcon: `${LOBBY_ASSET_BASE}/04-icons/png/fitdog-icon-paw.png`,
-  pawIconSvg: fitdogAssets.pawAccent,
+  pawIcon: fitdogAssets.pawOutlineOrange,
+  pawIconSvg: fitdogAssets.pawOutlineOrange,
   syncSignalIcon: `${LOBBY_ASSET_BASE}/04-icons/png/fitdog-icon-sync.png`
 } as const;
 
