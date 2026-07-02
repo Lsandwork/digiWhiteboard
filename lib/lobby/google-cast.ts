@@ -150,28 +150,6 @@ export async function preloadGoogleCast() {
   }
 }
 
-async function loadLobbyUrlOnCastSession(session: CastSessionLike, displayToken?: string) {
-  const url = buildLobbyTvCastUrl(undefined, displayToken);
-  const MediaInfoCtor = window.chrome?.cast?.media?.MediaInfo;
-  const LoadRequestCtor = window.chrome?.cast?.media?.LoadRequest;
-  const streamType = window.chrome?.cast?.media?.StreamType?.BUFFERED;
-
-  if (!MediaInfoCtor || !LoadRequestCtor) {
-    throw new Error("Google Cast media APIs are unavailable.");
-  }
-
-  const mediaInfo = new MediaInfoCtor(url, "text/html");
-  if (streamType) {
-    mediaInfo.streamType = streamType;
-  }
-  mediaInfo.metadata = {
-    title: "Fitdog Lobby Board",
-    subtitle: "Lobby checkout display"
-  };
-
-  await session.loadMedia(new LoadRequestCtor(mediaInfo));
-}
-
 export async function requestGoogleCastDevicePicker() {
   const context = await initializeGoogleCast();
   await context.requestSession();
@@ -179,6 +157,10 @@ export async function requestGoogleCastDevicePicker() {
 }
 
 export async function startGoogleCastSession(displayToken?: string) {
+  if (!isGoogleCastConfigured()) {
+    throw new Error("Google Cast custom receiver is not configured.");
+  }
+
   const context = await requestGoogleCastDevicePicker();
   const session = context.getCurrentSession();
   if (!session) {
@@ -186,18 +168,7 @@ export async function startGoogleCastSession(displayToken?: string) {
   }
 
   const url = buildLobbyTvCastUrl(undefined, displayToken);
-
-  if (isGoogleCastConfigured()) {
-    await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
-    return context;
-  }
-
-  try {
-    await loadLobbyUrlOnCastSession(session, displayToken);
-  } catch {
-    await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
-  }
-
+  await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
   return context;
 }
 

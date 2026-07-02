@@ -12,12 +12,23 @@ type PresentationRequestLike = {
 type PresentationRequestConstructor = new (urls: string[]) => PresentationRequestLike;
 
 export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {
-  const base =
-    typeof window !== "undefined" ? window.location.href : (currentHref ?? "http://localhost/lobby/checkouts");
-  const url = new URL(base);
+  if (typeof window !== "undefined") {
+    const url = new URL("/lobby/checkouts", window.location.origin);
+    url.searchParams.set("display", "tv");
+
+    const token =
+      displayToken?.trim() || new URL(window.location.href).searchParams.get("token")?.trim();
+    if (token) {
+      url.searchParams.set("token", token);
+    }
+
+    return url.toString();
+  }
+
+  const url = new URL(currentHref ?? "http://localhost:3000/lobby/checkouts");
   url.searchParams.set("display", "tv");
 
-  const token = displayToken?.trim() || url.searchParams.get("token")?.trim();
+  const token = displayToken?.trim();
   if (token) {
     url.searchParams.set("token", token);
   }

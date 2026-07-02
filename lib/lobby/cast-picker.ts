@@ -1,6 +1,7 @@
-import { isAirPlayCastAvailable, startAirPlayCast, isAirPlayPickerSupported } from "@/lib/lobby/airplay-cast";
+import { isAirPlayCastAvailable, startAirPlayCast } from "@/lib/lobby/airplay-cast";
 import {
   isGoogleCastBrowser,
+  isGoogleCastConfigured,
   isGoogleCastFrameworkReady,
   preloadGoogleCast,
   startGoogleCastSession
@@ -74,7 +75,24 @@ export async function openPresentationDevicePicker(displayToken?: string): Promi
   return request.start();
 }
 
+export function getDefaultCastRoute(): "chromecast" | "airplay" {
+  if (isGoogleCastBrowser()) return "chromecast";
+  if (isAirPlayCastAvailable()) return "airplay";
+  return "chromecast";
+}
+
 export async function openChromecastPicker(displayToken?: string): Promise<CastPickerResult> {
+  if (!isGoogleCastConfigured() && isPresentationCastSupported()) {
+    try {
+      const connection = await openPresentationDevicePicker(displayToken);
+      return { method: "wireless", connection };
+    } catch (error) {
+      if (isCastCancelled(error)) {
+        throw error;
+      }
+    }
+  }
+
   if (isGoogleCastBrowser()) {
     try {
       await preloadGoogleCast();
@@ -108,11 +126,7 @@ export async function openAirPlayPicker(): Promise<CastPickerResult> {
 
 /** Main cast button: Chromecast on Chrome, AirPlay on Safari / Apple devices. */
 export async function openDefaultCastDevicePicker(displayToken?: string): Promise<CastPickerResult> {
-  if (isGoogleCastBrowser() && !isAirPlayPickerSupported()) {
-    return openChromecastPicker(displayToken);
-  }
-
-  if (isAirPlayCastAvailable()) {
+  if (getDefaultCastRoute() === "airplay") {
     return openAirPlayPicker();
   }
 

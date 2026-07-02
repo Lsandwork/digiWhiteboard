@@ -75,7 +75,7 @@ function createAirPlayVideo(stream: MediaStream) {
 }
 
 async function requestTabCaptureStream() {
-  const constraints: DisplayMediaConstraints = {
+  const advanced: DisplayMediaConstraints = {
     video: {
       displaySurface: "browser"
     },
@@ -86,7 +86,19 @@ async function requestTabCaptureStream() {
     surfaceSwitching: "include"
   };
 
-  return navigator.mediaDevices.getDisplayMedia(constraints);
+  try {
+    return await navigator.mediaDevices.getDisplayMedia(advanced);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/cancel|abort|denied|dismiss/i.test(message)) {
+      throw error;
+    }
+
+    return navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false
+    });
+  }
 }
 
 function showAirPlayPicker(video: AirPlayVideo) {
