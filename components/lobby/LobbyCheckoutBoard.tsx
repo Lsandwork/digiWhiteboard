@@ -11,6 +11,7 @@ import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
@@ -34,6 +35,7 @@ export function LobbyCheckoutBoard() {
   const displayToken = searchParams.get("token")?.trim() ?? "";
 
   const [clock, setClock] = useState(() => new Date());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [settings, setSettings] = useState<LobbySettings>(defaultSettings);
   const [checkouts, setCheckouts] = useState<LobbyCheckoutsResponse>(emptyCheckouts);
   const [healthy, setHealthy] = useState(true);
@@ -96,7 +98,10 @@ export function LobbyCheckoutBoard() {
   }, [loadLobbyData]);
 
   useEffect(() => {
-    const clockTimer = window.setInterval(() => setClock(new Date()), 1000);
+    const clockTimer = window.setInterval(() => {
+      setClock(new Date());
+      setNowMs(Date.now());
+    }, 1000);
     return () => window.clearInterval(clockTimer);
   }, []);
 
@@ -122,7 +127,7 @@ export function LobbyCheckoutBoard() {
     };
   }, [loadLobbyData]);
 
-  const hasCheckout = Boolean(checkouts.featured || checkouts.queue.length);
+  const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
 
   return (
@@ -140,8 +145,8 @@ export function LobbyCheckoutBoard() {
 
         <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
           <div className="flex min-h-0 flex-col gap-4">
-            {checkouts.featured ? (
-              <LobbyFeaturedCard dog={checkouts.featured} />
+            {featured ? (
+              <LobbyFeaturedCard dog={featured} />
             ) : (
               <section className="lobby-panel lobby-empty-card relative overflow-hidden rounded-2xl border-l-[6px] border-l-lobby-teal px-6 py-5">
                 <Image
@@ -171,7 +176,7 @@ export function LobbyCheckoutBoard() {
               </section>
             )}
 
-            {hasCheckout ? <LobbyQueueList dogs={checkouts.queue} /> : null}
+            {hasCheckout ? <LobbyQueueList dogs={queue} /> : null}
 
             {settings.show_events ? <LobbyClassSchedule /> : null}
           </div>
