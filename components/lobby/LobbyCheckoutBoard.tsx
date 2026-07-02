@@ -46,7 +46,38 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const searchParams = useSearchParams();
   const tvModeFromUrl = searchParams.get("display") === "tv";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
-  const { isTvLayout, showCastActive, castError, toggleTvCast } = useLobbyTvCast(tvModeFromUrl);
+  const {
+    menuOpen,
+    tvCastUrl,
+    isTvLayout,
+    showCastActive,
+    castError,
+    canChromecast,
+    chromecastAppId,
+    canAirPlay,
+    canFullscreen,
+    closeCastMenu,
+    startChromecast,
+    startAirPlay,
+    startFullscreenKiosk,
+    copyTvLink,
+    openTvLink,
+    stopTvCast,
+    toggleTvCast,
+    setCastError
+  } = useLobbyTvCast(tvModeFromUrl);
+
+  const runCastAction = useCallback(async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to start casting.";
+      const cancelled = /cancel|abort|denied/i.test(message);
+      if (!cancelled) {
+        setCastError(message);
+      }
+    }
+  }, [setCastError]);
 
   const [clock, setClock] = useState(() => new Date());
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -148,7 +179,29 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     <main className={`lobby-shell ${isTvLayout ? "lobby-tv-mode" : ""}`}>
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
 
-      <LobbyCastButton isCasting={showCastActive} castError={castError} onToggle={() => void toggleTvCast()} />
+      <LobbyCastButton
+        menuOpen={menuOpen}
+        isCasting={showCastActive}
+        castError={castError}
+        tvCastUrl={tvCastUrl}
+        canChromecast={canChromecast}
+        chromecastAppId={chromecastAppId}
+        canAirPlay={canAirPlay}
+        canFullscreen={canFullscreen}
+        onToggle={() => void toggleTvCast()}
+        onCloseMenu={closeCastMenu}
+        onChromecast={() => void runCastAction(startChromecast)}
+        onAirPlay={() => void runCastAction(startAirPlay)}
+        onFullscreen={() => void runCastAction(startFullscreenKiosk)}
+        onCopyLink={() => void runCastAction(copyTvLink)}
+        onOpenLink={() => {
+          try {
+            openTvLink();
+          } catch (error) {
+            setCastError(error instanceof Error ? error.message : "Unable to open TV link.");
+          }
+        }}
+      />
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} />
