@@ -459,6 +459,77 @@ body {
   min-height: 140px;
 }
 
+.lobby-cast-control {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 5.5rem;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+  max-width: min(18rem, calc(100vw - 2rem));
+}
+
+.lobby-cast-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(241, 95, 42, 0.55);
+  border-radius: 9999px;
+  background: rgba(23, 30, 36, 0.92);
+  padding: 0.62rem 1rem;
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.lobby-cast-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(241, 95, 42, 0.85);
+  background: rgba(30, 38, 45, 0.96);
+}
+
+.lobby-cast-button--active {
+  border-color: rgba(100, 185, 220, 0.7);
+  background: rgba(15, 45, 58, 0.94);
+}
+
+.lobby-cast-error {
+  margin: 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(23, 30, 36, 0.94);
+  padding: 0.45rem 0.65rem;
+  color: #fde68a;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.lobby-tv-mode .lobby-cast-control {
+  bottom: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .lobby-cast-control {
+    right: 0.75rem;
+    bottom: 4.75rem;
+  }
+
+  .lobby-cast-button span {
+    display: none;
+  }
+
+  .lobby-cast-button {
+    padding: 0.7rem;
+  }
+}
+
 .lobby-background {
   pointer-events: none;
   z-index: 0;

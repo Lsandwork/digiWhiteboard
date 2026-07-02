@@ -8,11 +8,13 @@ import { LobbyFeaturedCard } from "@/components/lobby/LobbyFeaturedCard";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
+import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
+import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
@@ -42,8 +44,9 @@ function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null
 
 export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayToken?: string }) {
   const searchParams = useSearchParams();
-  const tvMode = searchParams.get("display") === "tv";
+  const tvModeFromUrl = searchParams.get("display") === "tv";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
+  const { isTvLayout, showCastActive, castError, toggleTvCast } = useLobbyTvCast(tvModeFromUrl);
 
   const [clock, setClock] = useState(() => new Date());
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -142,8 +145,10 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
 
   return (
-    <main className={`lobby-shell ${tvMode ? "lobby-tv-mode" : ""}`}>
+    <main className={`lobby-shell ${isTvLayout ? "lobby-tv-mode" : ""}`}>
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
+
+      <LobbyCastButton isCasting={showCastActive} castError={castError} onToggle={() => void toggleTvCast()} />
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} />
