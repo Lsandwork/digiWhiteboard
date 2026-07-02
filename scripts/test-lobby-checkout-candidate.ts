@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { isLobbyCheckoutCandidate } from "../lib/lobby/checkout";
+import { isVisibleLobbyCheckoutDog } from "../lib/lobby/checkout";
+import { buildGingrCheckoutKeySet } from "../lib/board-checkout-merge";
 import type { LiveDog } from "../lib/types";
 
 function checkoutDog(raw_payload: Record<string, unknown> | null): LiveDog {
@@ -28,23 +29,29 @@ function checkoutDog(raw_payload: Record<string, unknown> | null): LiveDog {
 
 const gingrBasketDog = checkoutDog({
   source: "gingr_back_of_house",
-  record: { status_string: "Checking Out", animal_id: "animal-1", id: "res-1" }
+  record: { status_string: "Checking Out", animal_id: "animal-1", id: "res-1", type: "Overnight: Petite Suite" }
 });
 
-const webhookDog = checkoutDog({
-  source: "gingr_webhook",
-  webhook_type: "checking_out",
-  entity_data: { reservation_id: "res-1" }
-});
+const keys = buildGingrCheckoutKeySet([gingrBasketDog]);
+const now = new Date("2026-07-02T21:00:00.000Z");
 
-const unpromptedSupabaseDog = checkoutDog({
-  source: "gingr_back_of_house",
-  record: { status_string: "Going Home", end_date: "1782961200" }
-});
+assert.equal(isVisibleLobbyCheckoutDog(gingrBasketDog, now, keys), true);
 
-assert.equal(isLobbyCheckoutCandidate(gingrBasketDog, true), true);
-assert.equal(isLobbyCheckoutCandidate(webhookDog, true), true);
-assert.equal(isLobbyCheckoutCandidate(unpromptedSupabaseDog, false), false);
-assert.equal(isLobbyCheckoutCandidate(gingrBasketDog, false), false);
+const expiredButStillInBasket = {
+  ...gingrBasketDog,
+  status_started_at: "2026-07-02T19:00:00.000Z"
+};
+assert.equal(isVisibleLobbyCheckoutDog(expiredButStillInBasket, now, keys), true);
 
-console.log("lobby checkout candidate tests passed");
+const removedFromBasket = {
+  ...checkoutDog({
+    source: "gingr_webhook",
+    webhook_type: "checking_out",
+    entity_data: { reservation_id: "res-99", animal_id: "animal-99" }
+  }),
+  gingr_reservation_id: "res-99",
+  gingr_animal_id: "animal-99"
+};
+assert.equal(isVisibleLobbyCheckoutDog(removedFromBasket, now, keys), false);
+
+console.log("lobby checkout visibility tests passed");

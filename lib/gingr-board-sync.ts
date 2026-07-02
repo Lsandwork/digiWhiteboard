@@ -99,40 +99,63 @@ async function fetchGingrJson<T>(url: string, endpoint: "back_of_house" | "reser
   }
 }
 
-let cachedTypeIds: string[] | null = null;
-let cachedTypeIdsAt = 0;
+let cachedActiveTypeIds: string[] | null = null;
+let cachedAllTypeIds: string[] | null = null;
+let cachedActiveTypeIdsAt = 0;
+let cachedAllTypeIdsAt = 0;
 
-async function getReservationTypeIds(subdomain: string, apiKey: string, configuredTypeIds?: string[]) {
+async function getReservationTypeIds(
+  subdomain: string,
+  apiKey: string,
+  configuredTypeIds?: string[],
+  options?: { includeInactiveTypes?: boolean }
+) {
   if (configuredTypeIds?.length) return configuredTypeIds;
 
   const now = Date.now();
-  if (cachedTypeIds && now - cachedTypeIdsAt < 10 * 60 * 1000) {
-    return cachedTypeIds;
+  const includeInactiveTypes = Boolean(options?.includeInactiveTypes);
+  const cachedIds = includeInactiveTypes ? cachedAllTypeIds : cachedActiveTypeIds;
+  const cachedAt = includeInactiveTypes ? cachedAllTypeIdsAt : cachedActiveTypeIdsAt;
+
+  if (cachedIds && now - cachedAt < 10 * 60 * 1000) {
+    return cachedIds;
   }
 
-  if (!canCallGingrEndpoint("reservation_types") && cachedTypeIds) {
-    return cachedTypeIds;
+  if (!canCallGingrEndpoint("reservation_types") && cachedIds) {
+    return cachedIds;
   }
 
   const url = gingrUrl(subdomain, "/api/v1/reservation_types", {
     key: apiKey,
-    active_only: "true"
+    active_only: includeInactiveTypes ? "false" : "true"
   });
   const types = await fetchGingrJson<ReservationType[]>(url, "reservation_types");
   const ids = (types ?? [])
     .map((type) => String(type.id))
     .filter(Boolean);
 
-  cachedTypeIds = ids.length ? ids : ["1"];
-  cachedTypeIdsAt = now;
-  return cachedTypeIds;
+  const resolvedIds = ids.length ? ids : ["1"];
+  if (includeInactiveTypes) {
+    cachedAllTypeIds = resolvedIds;
+    cachedAllTypeIdsAt = now;
+  } else {
+    cachedActiveTypeIds = resolvedIds;
+    cachedActiveTypeIdsAt = now;
+  }
+
+  return resolvedIds;
 }
 
 function photoUrlFromRecord(record: GingrBackOfHouseRecord) {
   return record.photo_url ?? extractPhotoUrl(record as UnknownRecord) ?? null;
 }
 
-export async function fetchGingrBackOfHouse() {
+export type FetchGingrBackOfHouseOptions = {
+  /** Lobby board needs every reservation type in the checkout basket, not just active-only types. */
+  allReservationTypes?: boolean;
+};
+
+export async function fetchGingrBackOfHouse(options?: FetchGingrBackOfHouseOptions) {
   const { subdomain, apiKey, locationId, configuredTypeIds } = getGingrConfig();
   if (!apiKey) {
     return { checking_in: [] as GingrBackOfHouseRecord[], checking_out: [] as GingrBackOfHouseRecord[], source: "disabled" as const };
@@ -143,7 +166,9 @@ export async function fetchGingrBackOfHouse() {
     if (cachedBoard) return cachedBoard;
   }
 
-  const typeIds = await getReservationTypeIds(subdomain, apiKey, configuredTypeIds);
+  const typeIds = await getReservationTypeIds(subdomain, apiKey, options?.allReservationTypes ? [] : configuredTypeIds, {
+    includeInactiveTypes: options?.allReservationTypes
+  });
   const url = gingrUrl(subdomain, "/api/v1/back_of_house", {
     key: apiKey,
     location_id: locationId,

@@ -578,6 +578,20 @@ html.lobby-tv-display .lobby-has-checkout .lobby-queue-row p {
   font-size: 1.65rem;
 }
 
+html.lobby-tv-display .lobby-has-checkout .lobby-queue {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+html.lobby-tv-display .lobby-has-checkout .lobby-queue > div {
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
 .lobby-idle-slideshow {
   display: flex;
   min-height: 0;

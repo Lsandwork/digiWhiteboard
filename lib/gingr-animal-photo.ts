@@ -15,6 +15,9 @@ type CachedPhoto = {
   cachedAt: number;
 };
 
+const ANIMAL_PHOTO_MISS_COOLDOWN_MS = 5 * 60 * 1000;
+const GLOBAL_MIN_INTERVAL_MS = Number(process.env.GINGR_GLOBAL_MIN_INTERVAL_MS ?? 2000);
+
 const animalPhotoCache = new Map<string, CachedPhoto>();
 
 function getGingrConfig() {
@@ -32,24 +35,101 @@ function gingrUrl(subdomain: string, path: string, params: Record<string, string
   return url.toString();
 }
 
-function readPhotoFromAnimalBody(body: unknown) {
-  if (!body || typeof body !== "object") return null;
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
-  const data = (body as { data?: unknown }).data;
-  const records = Array.isArray(data) ? data : data ? [data] : [body];
+function readPhotoFromGingrData(data: unknown) {
+  if (!data) return null;
 
+  const records = Array.isArray(data) ? data : [data];
   for (const record of records) {
-    if (record && typeof record === "object") {
-      const photoUrl = extractPhotoUrl(record as UnknownRecord);
-      if (photoUrl) return photoUrl;
-    }
+    if (!record || typeof record !== "object") continue;
+
+    const rec = record as UnknownRecord;
+    const nestedAnimal =
+      rec.animal && typeof rec.animal === "object" && !Array.isArray(rec.animal)
+        ? (rec.animal as UnknownRecord)
+        : Array.isArray(rec.animals) && rec.animals[0] && typeof rec.animals[0] === "object"
+          ? (rec.animals[0] as UnknownRecord)
+          : null;
+
+    const photoUrl = extractPhotoUrl(rec, nestedAnimal ?? {});
+    if (photoUrl) return photoUrl;
   }
 
   return null;
 }
 
+function unwrapGingrBody(body: unknown) {
+  if (!body || typeof body !== "object") return null;
+  const wrapped = body as { success?: boolean; error?: unknown; data?: unknown };
+  if ("data" in wrapped) {
+    if (wrapped.error) return null;
+    return wrapped.data ?? null;
+  }
+  return body;
+}
+
+function readPhotoFromAnimalBody(body: unknown) {
+  const data = unwrapGingrBody(body);
+  return readPhotoFromGingrData(data);
+}
+
+async function fetchGingrJson(url: string, init: RequestInit, signal: AbortSignal) {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.headers ?? {})
+    },
+    cache: "no-store",
+    signal
+  });
+
+  if (!response.ok) return null;
+  const body = (await response.json()) as unknown;
+  return unwrapGingrBody(body);
+}
+
+async function fetchGingrAnimalRecords(
+  animalId: string,
+  subdomain: string,
+  apiKey: string,
+  signal: AbortSignal
+) {
+  const animalsGetUrl = gingrUrl(subdomain, "/api/v1/animals", {
+    key: apiKey,
+    "params[id]": animalId
+  });
+  let data = await fetchGingrJson(animalsGetUrl, { method: "GET" }, signal);
+  if (data) return data;
+
+  const animalsPostUrl = `https://${subdomain}.gingrapp.com/api/v1/animals`;
+  const body = new URLSearchParams();
+  body.set("key", apiKey);
+  body.set("params[id]", animalId);
+  data = await fetchGingrJson(
+    animalsPostUrl,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" },
+      body
+    },
+    signal
+  );
+  if (data) return data;
+
+  const ownerUrl = gingrUrl(subdomain, "/api/v1/owner", {
+    key: apiKey,
+    animal_id: animalId
+  });
+  return fetchGingrJson(ownerUrl, { method: "GET" }, signal);
+}
+
 function isCacheFresh(cached: CachedPhoto, now = Date.now()) {
-  return now - cached.cachedAt <= ANIMAL_PHOTO_COOLDOWN_MS;
+  const ttl = cached.photoUrl ? ANIMAL_PHOTO_COOLDOWN_MS : ANIMAL_PHOTO_MISS_COOLDOWN_MS;
+  return now - cached.cachedAt <= ttl;
 }
 
 export function getCachedGingrAnimalPhotoUrl(animalId: string) {
@@ -74,6 +154,12 @@ type GingrAnimalPhotoOptions = {
   bypassFetchGate?: boolean;
 };
 
+async function waitForGingrAnimalPhotoSlot() {
+  while (!canCallGingrEndpoint("animal_photo")) {
+    await sleep(250);
+  }
+}
+
 export async function getGingrAnimalPhotoUrl(
   animalId: string,
   timeoutMs = 4000,
@@ -86,13 +172,14 @@ export async function getGingrAnimalPhotoUrl(
   if (cached !== undefined) return cached;
 
   if (!options?.bypassFetchGate && !isGingrPhotoFetchEnabled()) {
-    rememberAnimalPhoto(trimmedAnimalId, null);
     return null;
   }
 
-  if (!canFetchAnimalPhoto(trimmedAnimalId, Date.now(), options) || !canCallGingrEndpoint("animal_photo")) {
+  if (!canFetchAnimalPhoto(trimmedAnimalId, Date.now(), options)) {
     return null;
   }
+
+  await waitForGingrAnimalPhotoSlot();
 
   const { subdomain, apiKey } = getGingrConfig();
   if (!apiKey) {
@@ -107,19 +194,8 @@ export async function getGingrAnimalPhotoUrl(
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(gingrUrl(subdomain, `/api/v1/animals/${encodeURIComponent(trimmedAnimalId)}`, { key: apiKey }), {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
-      rememberAnimalPhoto(trimmedAnimalId, null);
-      return null;
-    }
-
-    const body = (await response.json()) as unknown;
-    const photoUrl = readPhotoFromAnimalBody(body);
+    const data = await fetchGingrAnimalRecords(trimmedAnimalId, subdomain, apiKey, controller.signal);
+    const photoUrl = readPhotoFromGingrData(data);
     rememberAnimalPhoto(trimmedAnimalId, photoUrl);
     return photoUrl;
   } catch {
@@ -128,4 +204,34 @@ export async function getGingrAnimalPhotoUrl(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function extractGingrAnimalPhotoFromData(data: unknown) {
+  return readPhotoFromGingrData(data);
+}
+
+export async function getGingrAnimalPhotoUrlMap(
+  animalIds: Array<string | null | undefined>,
+  options?: GingrAnimalPhotoOptions & { timeoutMs?: number }
+) {
+  const map = new Map<string, string | null>();
+  const uniqueIds = [...new Set(animalIds.map((id) => id?.trim()).filter(Boolean) as string[])];
+
+  for (let index = 0; index < uniqueIds.length; index += 1) {
+    const animalId = uniqueIds[index];
+    const cached = getCachedGingrAnimalPhotoUrl(animalId);
+    if (cached !== undefined) {
+      map.set(animalId, cached);
+      continue;
+    }
+
+    const photoUrl = await getGingrAnimalPhotoUrl(animalId, options?.timeoutMs ?? 4000, options);
+    map.set(animalId, photoUrl);
+
+    if (index < uniqueIds.length - 1) {
+      await sleep(GLOBAL_MIN_INTERVAL_MS);
+    }
+  }
+
+  return map;
 }

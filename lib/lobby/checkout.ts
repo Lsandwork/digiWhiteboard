@@ -1,11 +1,13 @@
 import { toIsoTimestamp } from "@/lib/board-dog";
 import {
+  buildGingrCheckoutKeySet,
+  isDogInGingrCheckoutBasket,
   mergeCheckoutDogs,
   reconcileGingrSourcedCheckouts
 } from "@/lib/board-checkout-merge";
 import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
-import { getGingrAnimalPhotoUrl } from "@/lib/gingr-animal-photo";
+import { getGingrAnimalPhotoUrlMap } from "@/lib/gingr-animal-photo";
 import {
   getLobbyCheckoutDisplayUntilIso,
   shouldExpireLobbyCheckoutDog
@@ -18,15 +20,11 @@ import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-function isGingrBackOfHouseDog(dog: LiveDog) {
-  return dog.raw_payload?.source === "gingr_back_of_house";
-}
-
-/** Gingr basket rows are authoritative when live; Supabase rows still require a prompt. */
-export function isLobbyCheckoutCandidate(dog: LiveDog, gingrLive: boolean) {
+/** Keep dogs visible while Gingr still lists them in the live checkout basket. */
+export function isVisibleLobbyCheckoutDog(dog: LiveDog, now: Date, gingrCheckoutKeys: Set<string>) {
   if (dog.display_status !== "checking_out") return false;
-  if (gingrLive && isGingrBackOfHouseDog(dog)) return true;
-  return isPromptedCheckoutDog(dog);
+  if (isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)) return true;
+  return !shouldExpireLobbyCheckoutDog(dog, now);
 }
 
 function enrichDogPhotos(dogs: LiveDog[]) {
@@ -37,30 +35,51 @@ function enrichDogPhotos(dogs: LiveDog[]) {
 }
 
 async function enrichLobbyGingrAnimalPhotos(supabase: SupabaseClient, dogs: LiveDog[]) {
-  const enriched = await Promise.all(
-    dogs.map(async (dog) => {
-      if (!dog.gingr_animal_id) {
-        return { ...dog, photo_url: resolveDogPhotoUrl(dog) };
-      }
+  const withResolvedPayloadPhotos = dogs.map((dog) => ({
+    ...dog,
+    photo_url: dog.photo_url ?? resolveDogPhotoUrl(dog)
+  }));
 
-      const apiPhoto = await getGingrAnimalPhotoUrl(dog.gingr_animal_id, 4000, { bypassFetchGate: true });
+  const missingAnimalIds = [
+    ...new Set(
+      withResolvedPayloadPhotos
+        .filter((dog) => !dog.photo_url && dog.gingr_animal_id)
+        .map((dog) => dog.gingr_animal_id as string)
+    )
+  ];
+
+  if (!missingAnimalIds.length) {
+    return withResolvedPayloadPhotos;
+  }
+
+  const photoMap = await getGingrAnimalPhotoUrlMap(missingAnimalIds, { bypassFetchGate: true, timeoutMs: 5000 });
+
+  return Promise.all(
+    withResolvedPayloadPhotos.map(async (dog) => {
+      if (dog.photo_url) return dog;
+
+      const apiPhoto = dog.gingr_animal_id ? photoMap.get(dog.gingr_animal_id) : null;
       if (apiPhoto) {
         return { ...dog, photo_url: apiPhoto };
       }
 
-      const storedPhoto = await loadStoredAnimalPhotoUrl(supabase, dog.gingr_animal_id);
-      if (storedPhoto) {
-        return { ...dog, photo_url: storedPhoto };
+      if (dog.gingr_animal_id) {
+        const storedPhoto = await loadStoredAnimalPhotoUrl(supabase, dog.gingr_animal_id);
+        if (storedPhoto) {
+          return { ...dog, photo_url: storedPhoto };
+        }
       }
 
-      return { ...dog, photo_url: resolveDogPhotoUrl(dog) };
+      return dog;
     })
   );
-
-  return enriched;
 }
 
-async function loadSupabasePromptedCheckoutDogs(supabase: SupabaseClient, now: Date) {
+async function loadSupabaseCheckoutDogs(
+  supabase: SupabaseClient,
+  now: Date,
+  options: { promptedOnly: boolean }
+) {
   const { data, error } = await supabase
     .from("live_transition_dogs")
     .select("*")
@@ -71,26 +90,30 @@ async function loadSupabasePromptedCheckoutDogs(supabase: SupabaseClient, now: D
   if (error) throw error;
 
   return enrichDogPhotos((data ?? []) as LiveDog[])
-    .filter(isPromptedCheckoutDog)
+    .filter((dog) => (options.promptedOnly ? isPromptedCheckoutDog(dog) : true))
     .filter((dog) => !shouldExpireLobbyCheckoutDog(dog, now));
 }
 
 async function loadGingrCheckoutDogs(now: Date): Promise<{ dogs: LiveDog[]; gingrLive: boolean }> {
   try {
-    const gingrBoard = await fetchGingrBackOfHouse();
+    const gingrBoard = await fetchGingrBackOfHouse({ allReservationTypes: true });
     if (!gingrBoard || gingrBoard.source === "disabled") {
       return { dogs: [], gingrLive: false };
     }
 
     const mapped = enrichDogPhotos(mapGingrBoardToLiveDogs(gingrBoard));
-    const dogs = mapped.filter(
-      (dog) => dog.display_status === "checking_out" && !shouldExpireLobbyCheckoutDog(dog, now)
-    );
+    const gingrCheckoutDogs = mapped.filter((dog) => dog.display_status === "checking_out");
+    const gingrCheckoutKeys = buildGingrCheckoutKeySet(gingrCheckoutDogs);
+    const dogs = gingrCheckoutDogs.filter((dog) => isVisibleLobbyCheckoutDog(dog, now, gingrCheckoutKeys));
 
     return { dogs, gingrLive: true };
   } catch {
     return { dogs: [], gingrLive: false };
   }
+}
+
+function sortLobbyCheckoutDogs(dogs: LiveDog[]) {
+  return [...dogs].sort((a, b) => lobbySortTime(b) - lobbySortTime(a));
 }
 
 function toLobbyCheckoutDog(dog: LiveDog, featured = false): LobbyCheckoutDog {
@@ -116,22 +139,31 @@ function lobbySortTime(dog: LiveDog) {
   return Number.isFinite(ms) ? ms : 0;
 }
 
-export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCount = 6, now = new Date()) {
-  const [{ dogs: gingrDogs, gingrLive }, supabaseDogs] = await Promise.all([
+export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, _maxQueueCount = 6, now = new Date()) {
+  const [{ dogs: gingrDogs, gingrLive }, supabasePromptedDogs, supabaseCheckoutDogs] = await Promise.all([
     loadGingrCheckoutDogs(now),
-    loadSupabasePromptedCheckoutDogs(supabase, now)
+    loadSupabaseCheckoutDogs(supabase, now, { promptedOnly: true }),
+    loadSupabaseCheckoutDogs(supabase, now, { promptedOnly: false })
   ]);
 
-  const merged = mergeCheckoutDogs(gingrDogs, supabaseDogs);
-  const reconciled = gingrLive ? reconcileGingrSourcedCheckouts(merged, gingrDogs) : merged;
-  const candidates = reconciled.filter((dog) => isLobbyCheckoutCandidate(dog, gingrLive));
+  let candidates: LiveDog[];
+
+  if (gingrLive) {
+    const gingrCheckoutKeys = buildGingrCheckoutKeySet(gingrDogs);
+    const merged = mergeCheckoutDogs(gingrDogs, supabasePromptedDogs);
+    candidates = reconcileGingrSourcedCheckouts(merged, gingrDogs).filter((dog) =>
+      isVisibleLobbyCheckoutDog(dog, now, gingrCheckoutKeys)
+    );
+  } else {
+    candidates = supabaseCheckoutDogs;
+  }
 
   const withStoredPhotos = await applyStoredAnimalPhotos(supabase, candidates);
   const enriched = await enrichLobbyGingrAnimalPhotos(supabase, withStoredPhotos);
-  const sorted = enriched.sort((a, b) => lobbySortTime(b) - lobbySortTime(a));
+  const sorted = sortLobbyCheckoutDogs(enriched);
 
   const featuredDog = sorted[0] ?? null;
-  const queueDogs = sorted.slice(1, maxQueueCount + 1);
+  const queueDogs = sorted.slice(1);
 
   return {
     featured: featuredDog ? toLobbyCheckoutDog(featuredDog, true) : null,
