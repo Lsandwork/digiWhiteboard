@@ -1,22 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
-import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
-import { lobbyAssets } from "@/lib/lobby/assets";
+import { useLobbyDogPhoto } from "@/hooks/useLobbyDogPhoto";
 
 type LobbyDogAvatarProps = {
   dogName: string;
+  animalId?: string | null;
   imageUrl?: string | null;
   size?: "featured" | "queue";
 };
 
-export function LobbyDogAvatar({ dogName, imageUrl, size = "queue" }: LobbyDogAvatarProps) {
+export function LobbyDogAvatar({ dogName, animalId, imageUrl, size = "queue" }: LobbyDogAvatarProps) {
+  const resolvedPhotoUrl = useLobbyDogPhoto(animalId, imageUrl);
   const [photoFailed, setPhotoFailed] = useState(false);
-  const [brandFallbackFailed, setBrandFallbackFailed] = useState(false);
   const initial = dogName.trim().slice(0, 1).toUpperCase() || "?";
-  const showPhoto = Boolean(imageUrl) && !photoFailed;
-  const showBrandFallback = !showPhoto && !brandFallbackFailed;
+  const showPhoto = Boolean(resolvedPhotoUrl) && !photoFailed;
+
+  useEffect(() => {
+    setPhotoFailed(false);
+  }, [resolvedPhotoUrl]);
 
   return (
     <div
@@ -28,21 +31,13 @@ export function LobbyDogAvatar({ dogName, imageUrl, size = "queue" }: LobbyDogAv
       {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={imageUrl ?? undefined}
+          key={resolvedPhotoUrl ?? undefined}
+          src={resolvedPhotoUrl ?? undefined}
           alt={`Photo of ${dogName}`}
           className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
           onError={() => setPhotoFailed(true)}
-        />
-      ) : showBrandFallback ? (
-        <LobbyAssetImage
-          src={lobbyAssets.dogProfileFallback}
-          alt={`${dogName} avatar`}
-          width={size === "featured" ? 176 : 80}
-          height={size === "featured" ? 176 : 80}
-          className="h-full w-full object-cover"
-          onFailed={() => setBrandFallbackFailed(true)}
         />
       ) : (
         <div className="grid h-full w-full place-items-center bg-lobby-orange/15 text-2xl font-black text-orange-50 sm:text-3xl">

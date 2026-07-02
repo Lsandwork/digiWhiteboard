@@ -71,8 +71,8 @@ export function setCachedBackOfHouseBoard(board: {
   };
 }
 
-export function canFetchAnimalPhoto(animalId: string, now = Date.now()) {
-  if (!isGingrPhotoFetchEnabled()) return false;
+export function canFetchAnimalPhoto(animalId: string, now = Date.now(), options?: { bypassFetchGate?: boolean }) {
+  if (!options?.bypassFetchGate && !isGingrPhotoFetchEnabled()) return false;
 
   const trimmedAnimalId = animalId.trim();
   if (!trimmedAnimalId) return false;

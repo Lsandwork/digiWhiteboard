@@ -70,19 +70,27 @@ function rememberAnimalPhoto(animalId: string, photoUrl: string | null) {
   animalPhotoCache.set(animalId, { photoUrl, cachedAt: Date.now() });
 }
 
-export async function getGingrAnimalPhotoUrl(animalId: string, timeoutMs = 4000) {
+type GingrAnimalPhotoOptions = {
+  bypassFetchGate?: boolean;
+};
+
+export async function getGingrAnimalPhotoUrl(
+  animalId: string,
+  timeoutMs = 4000,
+  options?: GingrAnimalPhotoOptions
+) {
   const trimmedAnimalId = animalId.trim();
   if (!trimmedAnimalId) return null;
 
   const cached = getCachedGingrAnimalPhotoUrl(trimmedAnimalId);
   if (cached !== undefined) return cached;
 
-  if (!isGingrPhotoFetchEnabled()) {
+  if (!options?.bypassFetchGate && !isGingrPhotoFetchEnabled()) {
     rememberAnimalPhoto(trimmedAnimalId, null);
     return null;
   }
 
-  if (!canFetchAnimalPhoto(trimmedAnimalId) || !canCallGingrEndpoint("animal_photo")) {
+  if (!canFetchAnimalPhoto(trimmedAnimalId, Date.now(), options) || !canCallGingrEndpoint("animal_photo")) {
     return null;
   }
 

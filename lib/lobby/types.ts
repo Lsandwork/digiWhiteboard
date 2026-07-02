@@ -1,5 +1,6 @@
 export type LobbyCheckoutDog = {
   id: string;
+  gingr_animal_id: string | null;
   dog_name: string;
   breed: string | null;
   dog_photo_url: string | null;

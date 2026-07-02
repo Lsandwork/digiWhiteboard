@@ -16,7 +16,7 @@ export function LobbyQueueList({ dogs }: LobbyQueueListProps) {
       <div className="space-y-2">
         {dogs.map((dog) => (
           <article key={dog.id} className="lobby-panel lobby-queue-row flex items-center gap-4 rounded-xl px-4 py-3">
-            <LobbyDogAvatar dogName={dog.dog_name} imageUrl={dog.dog_photo_url} />
+            <LobbyDogAvatar dogName={dog.dog_name} animalId={dog.gingr_animal_id} imageUrl={dog.dog_photo_url} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-2xl font-bold text-white">{dog.dog_name}</p>
               {dog.breed ? <p className="truncate text-sm text-lobby-muted">{dog.breed}</p> : null}
