@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { LOBBY_IDLE_SLIDESHOW, LOBBY_SLIDESHOW_INTERVAL_MS } from "@/lib/lobby/slideshow";
 
-export function LobbyIdleSlideshow() {
+export function LobbyIdleSlideshow({ tvMode = false }: { tvMode?: boolean }) {
   const [index, setIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
 
@@ -29,7 +29,11 @@ export function LobbyIdleSlideshow() {
   const slide = LOBBY_IDLE_SLIDESHOW[index];
 
   return (
-    <section className="lobby-idle-slideshow" aria-label="Fitdog lobby promotions" aria-live="off">
+    <section
+      className={`lobby-idle-slideshow ${tvMode ? "lobby-idle-slideshow--tv" : ""}`}
+      aria-label="Fitdog lobby promotions"
+      aria-live="off"
+    >
       <div className="lobby-idle-slideshow__frame">
         {LOBBY_IDLE_SLIDESHOW.map((item, itemIndex) => (
           <LobbyAssetImage

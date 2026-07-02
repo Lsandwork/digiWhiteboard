@@ -199,12 +199,34 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
 
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
+  const showIdleSlideshow = !hasCheckout;
+  const showIdleEmptyCard = !featured && !isTvLayout;
+
+  useEffect(() => {
+    if (!isTvLayout) return;
+
+    document.documentElement.classList.add("lobby-tv-display");
+
+    const viewportMeta = document.querySelector('meta[name="viewport"]');
+    const previousViewport = viewportMeta?.getAttribute("content") ?? null;
+    viewportMeta?.setAttribute("content", "width=1920, initial-scale=1");
+
+    return () => {
+      document.documentElement.classList.remove("lobby-tv-display");
+      if (previousViewport) {
+        viewportMeta?.setAttribute("content", previousViewport);
+      }
+    };
+  }, [isTvLayout]);
 
   return (
-    <main className={`lobby-shell ${isTvLayout ? "lobby-tv-mode" : ""}`}>
+    <main
+      className={`lobby-shell ${isTvLayout ? "lobby-tv-mode" : ""} ${hasCheckout ? "lobby-has-checkout" : "lobby-idle-state"}`}
+    >
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
 
-      <LobbyCastButton
+      {!isTvLayout ? (
+        <LobbyCastButton
         menuOpen={menuOpen}
         isCasting={showCastActive}
         castError={castError}
@@ -228,6 +250,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
           }
         }}
       />
+      ) : null}
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} />
@@ -242,7 +265,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
           <div className="flex min-h-0 flex-col gap-4">
             {featured ? (
               <LobbyFeaturedCard dog={featured} />
-            ) : (
+            ) : showIdleEmptyCard ? (
               <section className="lobby-panel lobby-empty-card relative overflow-hidden rounded-2xl border-l-[6px] border-l-lobby-teal px-6 py-5">
                 <LobbyAssetImage
                   src={lobbyAssets.pawIcon}
@@ -267,11 +290,11 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
                   </div>
                 </div>
               </section>
-            )}
+            ) : null}
 
             {hasCheckout ? <LobbyQueueList dogs={queue} /> : null}
 
-            {!hasCheckout && !isTvLayout ? <LobbyIdleSlideshow /> : null}
+            {showIdleSlideshow ? <LobbyIdleSlideshow tvMode={isTvLayout} /> : null}
 
             {settings.show_events ? <LobbyClassSchedule /> : null}
           </div>
