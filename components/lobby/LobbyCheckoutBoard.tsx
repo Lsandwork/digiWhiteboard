@@ -62,7 +62,7 @@ function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null
 export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayToken?: string }) {
   const searchParams = useSearchParams();
   const debugBoard = searchParams.get("debugBoard") === "1";
-  const tvModeFromUrl = searchParams.get("display") === "tv";
+  const tvModeFromUrl = searchParams.get("display") !== "desktop";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
   const {
     menuOpen,
