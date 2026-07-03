@@ -822,8 +822,15 @@ html.lobby-tv-display .lobby-has-checkout .lobby-queue > div {
   word-break: break-all;
 }
 
-.lobby-tv-mode .lobby-cast-control {
-  display: none;
+html.lobby-tv-display .lobby-cast-control {
+  right: 2rem;
+  bottom: 6.5rem;
+  z-index: 50;
+}
+
+html.lobby-tv-display .lobby-cast-button {
+  font-size: 1rem;
+  padding: 0.75rem 1.15rem;
 }
 
 @media (max-width: 768px) {

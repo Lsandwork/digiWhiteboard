@@ -225,8 +225,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     >
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
 
-      {!isTvLayout ? (
-        <LobbyCastButton
+      <LobbyCastButton
         menuOpen={menuOpen}
         isCasting={showCastActive}
         castError={castError}
@@ -250,7 +249,6 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
           }
         }}
       />
-      ) : null}
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} />
