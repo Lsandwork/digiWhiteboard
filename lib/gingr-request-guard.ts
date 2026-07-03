@@ -77,6 +77,8 @@ export function canFetchAnimalPhoto(animalId: string, now = Date.now(), options?
   const trimmedAnimalId = animalId.trim();
   if (!trimmedAnimalId) return false;
 
+  if (options?.bypassFetchGate) return true;
+
   const lastFetch = perAnimalLastFetch.get(trimmedAnimalId) ?? 0;
   return now - lastFetch >= ANIMAL_PHOTO_COOLDOWN_MS;
 }

@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { mergeCheckoutDogs } from "@/lib/board-checkout-merge";
+import { enrichStaffBoardAnimalPhotos } from "@/lib/board-animal-photos";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
@@ -303,6 +304,15 @@ export async function GET(request: Request) {
         visible_checking_out_count: checkingOut.length
       };
     }
+
+    const enrichedBoard = await timeoutResult(
+      enrichStaffBoardAnimalPhotos(supabase, [...checkingIn, ...checkingOut]),
+      12000,
+      [...checkingIn, ...checkingOut]
+    );
+    const enrichedById = new Map(enrichedBoard.map((dog) => [dog.id, dog]));
+    checkingIn = checkingIn.map((dog) => enrichedById.get(dog.id) ?? dog);
+    checkingOut = checkingOut.map((dog) => enrichedById.get(dog.id) ?? dog);
 
     const response: LiveBoardResponse = {
       checking_in: checkingIn,

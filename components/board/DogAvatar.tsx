@@ -5,7 +5,6 @@ import clsx from "clsx";
 import { Dog } from "lucide-react";
 import type { LiveDog } from "@/lib/types";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
-import { useLobbyDogPhoto } from "@/hooks/useLobbyDogPhoto";
 
 type DogAvatarProps = {
   dog: LiveDog;
@@ -74,8 +73,7 @@ function DogAvatarContent({
 }
 
 export function DogAvatar({ dog, mode, isAlerting = false, isNew = false }: DogAvatarProps) {
-  const initialPhotoUrl = resolveDogPhotoUrl(dog);
-  const photoUrl = useLobbyDogPhoto(dog.gingr_animal_id, initialPhotoUrl);
+  const photoUrl = resolveDogPhotoUrl(dog);
   const initial = dog.animal_name.trim().slice(0, 1).toUpperCase();
 
   return (

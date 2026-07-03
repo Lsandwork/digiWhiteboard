@@ -29,6 +29,19 @@ assert.equal(
   "https://fitdog.gingrapp.com/uploads/sugar.jpg"
 );
 
+assert.equal(
+  extractGingrAnimalPhotoFromData(
+    {
+      animals: [
+        { system_id: "12", a_first: "Other" },
+        { system_id: "99", a_image: "https://fitdog.gingrapp.com/uploads/maisy.jpg" }
+      ]
+    },
+    "99"
+  ),
+  "https://fitdog.gingrapp.com/uploads/maisy.jpg"
+);
+
 assert.equal(extractGingrAnimalPhotoFromData({ id: "1", a_first: "No Photo" }), null);
 
 console.log("gingr animal photo extraction tests passed");
