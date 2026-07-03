@@ -488,6 +488,13 @@ html.lobby-tv-display .lobby-header .text-4xl {
 html.lobby-tv-display .lobby-section-icon {
   width: 1.75rem;
   height: 1.75rem;
+  object-fit: contain;
+  background: transparent;
+}
+
+.lobby-section-icon {
+  object-fit: contain;
+  background: transparent;
 }
 
 html.lobby-tv-display .lobby-class-schedule h3,

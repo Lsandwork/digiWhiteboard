@@ -17,6 +17,7 @@ export function LobbySectionDogIcon({ className = "lobby-section-icon", size = 2
       className={className}
       loading="eager"
       decoding="async"
+      style={{ background: "transparent" }}
     />
   );
 }
