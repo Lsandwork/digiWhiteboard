@@ -1,7 +1,8 @@
 "use client";
 
+import { LobbySectionDogIcon } from "@/components/lobby/LobbySectionDogIcon";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
-import { lobbyAssets, lobbyServiceIconPath } from "@/lib/lobby/assets";
+import { lobbyServiceIconPath } from "@/lib/lobby/assets";
 import { LOBBY_SERVICES, type LobbyServiceItem } from "@/lib/lobby/services";
 
 function ServiceCard({ service }: { service: LobbyServiceItem }) {
@@ -37,15 +38,7 @@ export function LobbyServicesGrid() {
   return (
     <section className="lobby-panel lobby-services-panel flex h-full flex-col rounded-2xl p-4">
       <div className="mb-4 flex items-center gap-2">
-        <LobbyAssetImage
-          src={lobbyAssets.heartIcon}
-          alt=""
-          width={28}
-          height={28}
-          className="lobby-section-icon"
-          loading="eager"
-          priority
-        />
+        <LobbySectionDogIcon />
         <h3 className="text-lg font-black uppercase tracking-[0.16em] text-white">Services We Love</h3>
       </div>
       <div className="lobby-services-grid grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -23,7 +23,6 @@ import {
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import {
-  getLobbyCheckoutMergeKey,
   mergeStickyLobbyCheckouts,
   stickyLobbyStateToResponse,
   type StickyLobbyCheckoutState
@@ -255,14 +254,19 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     return () => window.clearInterval(clockTimer);
   }, []);
 
+  const debouncedRefreshCheckouts = useDebouncedCallback(() => {
+    void loadFastLobbyCheckouts();
+    void loadLobbyCheckouts();
+  }, BOARD_REALTIME_DEBOUNCE_MS);
+
   useEffect(() => {
-    const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), BOARD_CHECKOUT_POLL_MS);
+    const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), checkoutPollMs);
     const fullPollTimer = window.setInterval(() => void loadLobbyCheckouts(), BOARD_FULL_SYNC_POLL_MS);
     return () => {
       window.clearInterval(fastPollTimer);
       window.clearInterval(fullPollTimer);
     };
-  }, [loadFastLobbyCheckouts, loadLobbyCheckouts]);
+  }, [checkoutPollMs, loadFastLobbyCheckouts, loadLobbyCheckouts]);
 
   useEffect(() => {
     const metaTimer = window.setInterval(() => void loadLobbyMeta(), BOARD_SETTINGS_POLL_MS);
@@ -276,15 +280,14 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     const channel = supabase
       .channel("lobby-live-transition-dogs")
       .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
-        void loadFastLobbyCheckouts();
-        void loadLobbyCheckouts();
+        debouncedRefreshCheckouts();
       })
       .subscribe();
 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadFastLobbyCheckouts, loadLobbyCheckouts]);
+  }, [debouncedRefreshCheckouts]);
 
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
@@ -401,6 +404,20 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
           </div>
         </footer>
       </div>
+
+      {debugBoard ? (
+        <LobbyDebugPanel
+          fastEndpoint={fastCheckoutEndpoint}
+          fullEndpoint={fullCheckoutEndpoint}
+          lastFastFetchAt={lastFastFetchAt}
+          lastFullFetchAt={lastFullFetchAt}
+          fastDebug={fastDebug}
+          fullDebug={fullDebug}
+          checkouts={checkouts}
+          visibleCheckoutCount={(featured ? 1 : 0) + queue.length}
+          checkoutPollMs={checkoutPollMs}
+        />
+      ) : null}
     </main>
   );
 }

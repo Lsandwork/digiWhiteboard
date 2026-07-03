@@ -1,5 +1,6 @@
 "use client";
 
+import { LobbySectionDogIcon } from "@/components/lobby/LobbySectionDogIcon";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
@@ -20,15 +21,7 @@ export function LobbyClassSchedule() {
       />
       <div className="relative z-10">
         <div className="mb-3 flex items-center gap-2">
-          <LobbyAssetImage
-            src={lobbyAssets.calendarIcon}
-            alt=""
-            width={28}
-            height={28}
-            className="lobby-section-icon"
-            loading="eager"
-            priority
-          />
+          <LobbySectionDogIcon />
           <h3 className="text-lg font-black uppercase tracking-[0.16em] text-white">Class Schedule</h3>
         </div>
         <div className="lobby-class-schedule-grid grid grid-cols-5 gap-3">

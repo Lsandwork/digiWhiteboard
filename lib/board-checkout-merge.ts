@@ -2,7 +2,7 @@ import type { LiveDog } from "@/lib/types";
 
 export const BOARD_CHECKOUT_POLL_MIN_MS = 2000;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 5000;
-export const BOARD_CHECKOUT_POLL_MS = 3000;
+export const BOARD_CHECKOUT_POLL_MS = 2000;
 export const BOARD_FULL_SYNC_POLL_MS = 8000;
 export const BOARD_REALTIME_DEBOUNCE_MS = 250;
 
