@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
 import {
   CHECKOUT_ALERT_MS,
   CHECKOUT_REMINDER_DURATION_MS,
   CHECKOUT_REMINDER_INTERVAL_MS,
   getCheckoutDisplayUntilAt,
   getCheckoutDisplayMs,
-  getStableCheckoutKey,
   shouldExpireCheckoutDog
 } from "@/lib/checkout-display";
 import type { LiveDog } from "@/lib/types";
@@ -28,7 +28,11 @@ function getStartedAtMs(dog: LiveDog) {
   return anchor ? new Date(anchor).getTime() : Date.now();
 }
 
-export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number) {
+export function useCheckoutDisplayTimers(
+  checkingOutDogs: LiveDog[],
+  now: number,
+  firstSeenByKey: Map<string, number> = new Map()
+) {
   const [remindingKeys, setRemindingKeys] = useState<Set<string>>(new Set());
   const [manuallyExpired, setManuallyExpired] = useState<Set<string>>(new Set());
 
@@ -36,19 +40,22 @@ export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number
     const entries: CheckoutDisplayEntry[] = [];
 
     for (const dog of checkingOutDogs) {
-      const stableKey = getStableCheckoutKey(dog);
+      const stableKey = getCheckoutMergeKey(dog);
       if (manuallyExpired.has(stableKey)) continue;
-      if (shouldExpireCheckoutDog(dog, new Date(now))) continue;
 
-      const startedAt = getStartedAtMs(dog);
-      const alertUntil = startedAt + CHECKOUT_ALERT_MS;
-      const displayUntil = getCheckoutDisplayUntilAt(dog, undefined, new Date(now))?.getTime() ?? startedAt + getCheckoutDisplayMs();
+      const firstSeenAt = firstSeenByKey.get(stableKey) ?? getStartedAtMs(dog);
+      if (shouldExpireCheckoutDog(dog, new Date(now), firstSeenAt)) continue;
+
+      const alertUntil = firstSeenAt + CHECKOUT_ALERT_MS;
+      const displayUntil =
+        getCheckoutDisplayUntilAt(dog, firstSeenAt, new Date(now))?.getTime() ??
+        firstSeenAt + getCheckoutDisplayMs();
       const msUntilExpiry = displayUntil - now;
 
       entries.push({
         dog,
         stableKey,
-        isNew: now - startedAt < CHECKOUT_ALERT_MS + 500,
+        isNew: now - firstSeenAt < CHECKOUT_ALERT_MS + 500,
         isAlerting: now < alertUntil,
         isReminding: remindingKeys.has(stableKey),
         isExpiringSoon: msUntilExpiry <= 60_000,
@@ -58,7 +65,7 @@ export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number
     }
 
     return entries;
-  }, [checkingOutDogs, manuallyExpired, now, remindingKeys]);
+  }, [checkingOutDogs, firstSeenByKey, manuallyExpired, now, remindingKeys]);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -86,7 +93,7 @@ export function useCheckoutDisplayTimers(checkingOutDogs: LiveDog[], now: number
   }, [now, visibleCheckoutDogs]);
 
   const manuallyExpireCheckout = useCallback((dog: LiveDog) => {
-    setManuallyExpired((current) => new Set(current).add(getStableCheckoutKey(dog)));
+    setManuallyExpired((current) => new Set(current).add(getCheckoutMergeKey(dog)));
   }, []);
 
   return {

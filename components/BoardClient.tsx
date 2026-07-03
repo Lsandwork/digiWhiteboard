@@ -12,6 +12,13 @@ import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
+import {
+  getCheckoutMergeKey,
+  mergeStickyCheckoutDogs,
+  stickyCheckoutFirstSeenByKey,
+  stickyCheckoutStateToDogs,
+  type StickyCheckoutState
+} from "@/lib/board-sticky-checkout";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
@@ -79,6 +86,7 @@ export function BoardClient() {
 
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
   const boardRef = useRef(board);
+  const stickyCheckoutRef = useRef<StickyCheckoutState>(new Map());
   const [connection, setConnection] = useState<ConnectionState>("connecting");
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -91,8 +99,27 @@ export function BoardClient() {
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
 
   const { visibleCheckingInDogs: activeCheckingInDogs } = useCheckinDisplayTimers(board.checking_in, nowMs);
+
+  const stickyCheckoutDogs = useMemo(() => {
+    stickyCheckoutRef.current = mergeStickyCheckoutDogs(
+      stickyCheckoutRef.current,
+      board.checking_out,
+      new Date(nowMs)
+    );
+    return stickyCheckoutStateToDogs(stickyCheckoutRef.current);
+  }, [board.checking_out, nowMs]);
+
+  const checkoutFirstSeenByKey = useMemo(
+    () => stickyCheckoutFirstSeenByKey(stickyCheckoutRef.current),
+    [stickyCheckoutDogs]
+  );
+
   const { visibleCheckingInDogs } = useNewCheckingInAlerts(activeCheckingInDogs);
-  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
+  const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(
+    stickyCheckoutDogs,
+    nowMs,
+    checkoutFirstSeenByKey
+  );
 
   const apiEndpoint = debugBoard ? "/api/live-board?debugBoard=1" : "/api/live-board";
   const fastCheckoutEndpoint = debugBoard ? "/api/board/checkouts?debugBoard=1" : "/api/board/checkouts";
@@ -254,6 +281,7 @@ export function BoardClient() {
       const entry = visibleCheckoutDogs.find((item: { dog: LiveDog }) => item.dog.id === dogId);
       if (entry) {
         manuallyExpireCheckout(entry.dog);
+        stickyCheckoutRef.current.delete(getCheckoutMergeKey(entry.dog));
       }
     },
     [manuallyExpireCheckout, visibleCheckoutDogs]
@@ -266,7 +294,7 @@ export function BoardClient() {
 
   const hasBoardData = board.checking_in.length > 0 || board.checking_out.length > 0;
   const showEmptyState = fetchStatus === "ok" && !fetchError;
-  const expiredCheckoutCount = Math.max(0, board.checking_out.length - visibleCheckoutDogs.length);
+  const expiredCheckoutCount = Math.max(0, stickyCheckoutDogs.length - visibleCheckoutDogs.length);
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
