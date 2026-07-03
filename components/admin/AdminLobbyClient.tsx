@@ -2,14 +2,14 @@
 
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
-import type { LobbyEvent, LobbyPromotion, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
+import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
+import type { LobbyPromotion, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 import type { LobbyCheckoutsResponse } from "@/lib/lobby/types";
 
 type AdminLobbyData = {
   settings: LobbySettings;
   checkouts: LobbyCheckoutsResponse;
   promotions: LobbyPromotion[];
-  events: LobbyEvent[];
   status: LobbyStatusResponse;
 };
 
@@ -35,18 +35,16 @@ export function AdminLobbyClient() {
       setBusy(true);
       setError(null);
       try {
-        const [settingsRes, checkoutsRes, promotionsRes, eventsRes, statusRes] = await Promise.all([
+        const [settingsRes, checkoutsRes, promotionsRes, statusRes] = await Promise.all([
           fetch("/api/lobby/settings", { headers: { "x-admin-password": credential }, cache: "no-store" }),
           fetch("/api/lobby/checkouts", { headers: { "x-admin-password": credential }, cache: "no-store" }),
           fetch("/api/lobby/promotions", { headers: { "x-admin-password": credential }, cache: "no-store" }),
-          fetch("/api/lobby/events", { headers: { "x-admin-password": credential }, cache: "no-store" }),
           fetch("/api/lobby/status", { headers: { "x-admin-password": credential }, cache: "no-store" })
         ]);
 
       const settingsBody = await settingsRes.json();
       const checkoutsBody = await checkoutsRes.json();
       const promotionsBody = await promotionsRes.json();
-      const eventsBody = await eventsRes.json();
       const statusBody = await statusRes.json();
 
       if (!settingsRes.ok) throw new Error(settingsBody.error ?? "Unable to load lobby admin.");
@@ -55,7 +53,6 @@ export function AdminLobbyClient() {
         settings: settingsBody.settings,
         checkouts: checkoutsBody,
         promotions: promotionsBody.promotions ?? [],
-        events: eventsBody.events ?? [],
         status: statusBody
       });
     } catch (loadError) {
@@ -104,22 +101,6 @@ export function AdminLobbyClient() {
     }
   }
 
-  async function toggleEvent(event: LobbyEvent) {
-    setBusy(true);
-    try {
-      const response = await fetch(`/api/lobby/events/${event.id}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ active: !event.active })
-      });
-      if (!response.ok) throw new Error("Unable to update event.");
-      await load();
-    } catch (toggleError) {
-      setError(toggleError instanceof Error ? toggleError.message : "Unable to update event.");
-      setBusy(false);
-    }
-  }
-
   if (!data) {
     return (
       <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-10">
@@ -158,7 +139,7 @@ export function AdminLobbyClient() {
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Lobby Whiteboard Admin</h1>
-          <p className="text-slate-400">Manage promotions, events, and lobby display settings.</p>
+          <p className="text-slate-400">Manage promotions and lobby display settings.</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <a
@@ -243,7 +224,7 @@ export function AdminLobbyClient() {
               defaultChecked={data.settings.show_events}
               onChange={(event) => void saveSettings({ show_events: event.target.checked })}
             />
-            <span>Show events</span>
+            <span>Show class schedule</span>
           </label>
           <label className="block md:col-span-2">
             <span className="text-sm text-slate-400">Lobby message</span>
@@ -293,28 +274,24 @@ export function AdminLobbyClient() {
         <section className="rounded-2xl border border-white/10 bg-ink-900/70 p-5">
           <h2 className="text-xl font-bold">Class Schedule</h2>
           <p className="mt-2 text-sm text-slate-400">
-            The lobby TV displays the fixed weekly Class Schedule (Monday–Friday). Database events below are optional
-            for future admin use.
+            The lobby TV displays this fixed weekly Class Schedule (Monday-Friday).
           </p>
-          <div className="mt-4 space-y-3">
-            {data.events.map((event) => (
-              <div key={event.id} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-3">
-                <div>
-                  <p className="font-semibold">{event.title}</p>
-                  <p className="text-sm text-slate-400">{event.description}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void toggleEvent(event)}
-                  className={`rounded-lg px-3 py-1 text-sm font-semibold ${
-                    event.active ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700 text-slate-300"
-                  }`}
-                >
-                  {event.active ? "Active" : "Hidden"}
-                </button>
+          <div className="mt-4 grid gap-3">
+            {LOBBY_CLASS_SCHEDULE.map((day) => (
+              <div key={day.day} className="rounded-xl border border-white/10 bg-ink-950/60 p-3">
+                <p className="text-sm font-bold uppercase tracking-wide text-fitdog-orange">{day.day}</p>
+                <ul className="mt-2 space-y-1 text-sm text-slate-200">
+                  {day.classes.map((className) => (
+                    <li key={`${day.day}-${className}`} className="flex gap-2">
+                      <span className="text-fitdog-orange">•</span>
+                      <span>{className}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>
+
         </section>
       </div>
     </main>

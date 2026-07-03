@@ -2,41 +2,46 @@ import type { LiveDog } from "@/lib/types";
 
 type UnknownRecord = Record<string, unknown>;
 
-const promptBooleanKeys = ["checkout_prompted", "prompted", "user_prompted"];
-const promptActorKeys = [
-  "prompted_by_user_id",
-  "prompted_by",
-  "prompted_by_name",
-  "checkout_requested_by",
-  "checkout_prompted_by",
-  "user_prompted_by"
+const basketBooleanKeys = [
+  "added_to_basket",
+  "basket_added",
+  "checkout_basket_added",
+  "in_checkout_basket",
+  "in_basket"
 ];
-const promptTimestampKeys = [
-  "checkout_prompted_at",
-  "checkout_requested_at",
-  "checking_out_prompted_at",
-  "prompted_at",
-  "user_prompted_at"
+const basketActorKeys = [
+  "basket_added_by",
+  "basket_added_by_user_id",
+  "checkout_basket_added_by",
+  "checkout_basket_added_by_user_id"
 ];
-const userActionTimestampKeys = ["ready_for_pickup_at"];
+const basketTimestampKeys = [
+  "added_to_basket_at",
+  "basket_added_at",
+  "checkout_basket_added_at",
+  "checkout_basket_at",
+  "basket_event_at"
+];
 
 const promptEventTypes = new Set([
-  "checkout_prompted",
-  "checkout prompted",
-  "checkout requested",
-  "checkout_requested",
-  "ready for pickup",
-  "ready_for_pickup",
-  "send to front",
-  "send_to_front",
-  "pickup requested",
-  "pickup_requested",
-  "handler alert",
-  "handler_alert"
+  "added to basket",
+  "add to basket",
+  "added_to_basket",
+  "add_to_basket",
+  "basket added",
+  "basket_added",
+  "checkout basket",
+  "checkout_basket",
+  "checkout basket added",
+  "checkout_basket_added",
+  "cart added",
+  "cart_added",
+  "add to cart",
+  "add_to_cart"
 ]);
 
-const promptBoardActions = new Set(["checking out prompted", "ready for pickup", "send to front"]);
-const promptSources = new Set(["gingr prompt", "user prompt", "coordinator prompt", "admin prompt"]);
+const promptBoardActions = new Set(["added to basket", "add to basket", "checkout basket added"]);
+const promptSources = new Set(["gingr basket", "checkout basket"]);
 const scheduledOnlyStatuses = new Set([
   "going home",
   "going_home",
@@ -111,10 +116,9 @@ export function isPromptedCheckoutRecord(record: UnknownRecord | null | undefine
   if (!record) return false;
 
   const records = flattenPromptRecords(record);
-  const hasActor = records.some((item) => hasValue(item, promptActorKeys));
-  const hasPromptTimestamp = records.some((item) => hasValue(item, promptTimestampKeys));
-  const hasUserActionTimestamp = records.some((item) => hasValue(item, userActionTimestampKeys));
-  const hasPromptBoolean = records.some((item) => hasTruthy(item, promptBooleanKeys));
+  const hasActor = records.some((item) => hasValue(item, basketActorKeys));
+  const hasPromptTimestamp = records.some((item) => hasValue(item, basketTimestampKeys));
+  const hasPromptBoolean = records.some((item) => hasTruthy(item, basketBooleanKeys));
   const hasPromptEvent = records.some((item) => {
     const eventType = firstToken(item, ["gingr_event_type", "event_type", "webhook_type", "action"]);
     const boardAction = firstToken(item, ["board_action"]);
@@ -123,11 +127,7 @@ export function isPromptedCheckoutRecord(record: UnknownRecord | null | undefine
   });
 
   if (hasPromptBoolean || hasPromptEvent) return true;
-  if (hasActor && (hasPromptTimestamp || hasUserActionTimestamp)) return true;
-
-  const source = firstToken(record, ["source"]);
-  const webhookType = firstToken(record, ["webhook_type"]);
-  if (source === "gingr webhook" && webhookType === "checking out") return true;
+  if (hasActor && hasPromptTimestamp) return true;
 
   return false;
 }
@@ -170,7 +170,7 @@ export function getCheckoutPromptTimestamp(record: UnknownRecord | null | undefi
   if (!record) return null;
   for (const item of flattenPromptRecords(record)) {
     const timestamp =
-      firstValue(item, [...promptTimestampKeys, ...userActionTimestampKeys, "event_timestamp", "event_time", "created_at"]) ??
+      firstValue(item, [...basketTimestampKeys, "event_timestamp", "event_time", "created_at"]) ??
       null;
     if (timestamp) return timestamp;
   }

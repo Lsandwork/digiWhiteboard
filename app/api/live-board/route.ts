@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { enrichStaffBoardAnimalPhotos } from "@/lib/board-animal-photos";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
-import { mergeCheckoutDogs, sortCheckoutDogs } from "@/lib/board-checkout-merge";
+import { buildGingrCheckoutKeySet, isDogInGingrCheckoutBasket, mergeCheckoutDogs, sortCheckoutDogs } from "@/lib/board-checkout-merge";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
@@ -226,9 +226,13 @@ export async function GET(request: Request) {
       const liveDogs = await timeoutResult(applyStoredAnimalPhotos(supabase, mappedLiveDogs), 1500, mappedLiveDogs);
       rawRecordCount = gingrBoard.checking_in.length + gingrBoard.checking_out.length;
       const visible = filterVisibleDogs(liveDogs, now);
+      const gingrCheckoutKeys = buildGingrCheckoutKeySet(visible.checkingOut);
+      const basketMatchedPromptedCheckouts = promptedCheckoutRows.visible.filter((dog) =>
+        isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)
+      );
       checkingIn = visible.checkingIn;
       checkingOut = sortCheckoutDogs(
-        mergeCheckoutDogs(visible.checkingOut, promptedCheckoutRows.visible)
+        mergeCheckoutDogs(visible.checkingOut, basketMatchedPromptedCheckouts)
       );
       checkinDebug = {
         raw_checking_in_candidates: gingrBoard.checking_in.length,
@@ -243,6 +247,8 @@ export async function GET(request: Request) {
         supabase_filtered_unprompted_checkout_rows: promptedCheckoutRows.filteredUnpromptedRows,
         expired_checking_out_count: promptedCheckoutRows.expiredCheckoutRows,
         visible_checking_out_count: checkingOut.length,
+        supabase_prompted_checkout_rows_not_in_gingr_basket:
+          promptedCheckoutRows.visible.length - basketMatchedPromptedCheckouts.length,
         ignored_unprompted_checkout_rows_while_gingr_live: promptedCheckoutRows.filteredUnpromptedRows
       };
       syncSummary = {

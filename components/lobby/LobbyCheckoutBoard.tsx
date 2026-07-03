@@ -9,12 +9,27 @@ import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
+import { LobbyDebugPanel } from "@/components/lobby/LobbyDebugPanel";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, BOARD_SETTINGS_POLL_MS } from "@/lib/board-checkout-merge";
+import {
+  BOARD_CHECKOUT_POLL_MS,
+  BOARD_FAST_FETCH_TIMEOUT_MS,
+  BOARD_FULL_SYNC_POLL_MS,
+  BOARD_REALTIME_DEBOUNCE_MS,
+  BOARD_SETTINGS_POLL_MS,
+  clampCheckoutPollMs
+} from "@/lib/board-checkout-merge";
+import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
+import {
+  getLobbyCheckoutMergeKey,
+  mergeStickyLobbyCheckouts,
+  stickyLobbyStateToResponse,
+  type StickyLobbyCheckoutState
+} from "@/lib/lobby-sticky-checkout";
 import { lobbyAssets } from "@/lib/lobby/assets";
-import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
+import type { LobbyCheckoutDebug, LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
 import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
@@ -47,6 +62,7 @@ function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null
 
 export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayToken?: string }) {
   const searchParams = useSearchParams();
+  const debugBoard = searchParams.get("debugBoard") === "1";
   const tvModeFromUrl = searchParams.get("display") === "tv";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
   const {
@@ -89,8 +105,13 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const [checkouts, setCheckouts] = useState<LobbyCheckoutsResponse>(emptyCheckouts);
   const [healthy, setHealthy] = useState(true);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [lastFastFetchAt, setLastFastFetchAt] = useState<string | null>(null);
+  const [lastFullFetchAt, setLastFullFetchAt] = useState<string | null>(null);
+  const [fastDebug, setFastDebug] = useState<LobbyCheckoutDebug | undefined>();
+  const [fullDebug, setFullDebug] = useState<LobbyCheckoutDebug | undefined>();
 
   const checkoutsRef = useRef(checkouts);
+  const stickyCheckoutRef = useRef<StickyLobbyCheckoutState>(new Map());
 
   useEffect(() => {
     checkoutsRef.current = checkouts;
@@ -105,13 +126,31 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const runFastPoll = useInFlightPoll();
   const runFullPoll = useInFlightPoll();
 
+  const fastCheckoutEndpoint = debugBoard ? "/api/lobby/checkouts?fast=1&debugBoard=1" : "/api/lobby/checkouts?fast=1";
+  const fullCheckoutEndpoint = debugBoard ? "/api/lobby/checkouts?debugBoard=1" : "/api/lobby/checkouts";
+  const checkoutPollMs = clampCheckoutPollMs(settings.refresh_interval_ms || BOARD_CHECKOUT_POLL_MS);
+
+  const applyCheckoutUpdate = useCallback((incoming: LobbyCheckoutsResponse) => {
+    stickyCheckoutRef.current = mergeStickyLobbyCheckouts(
+      stickyCheckoutRef.current,
+      incoming,
+      Date.now()
+    );
+    const stickyResponse = stickyLobbyStateToResponse(
+      stickyCheckoutRef.current,
+      incoming.last_updated || new Date().toISOString()
+    );
+    setCheckouts(stickyResponse);
+    checkoutsRef.current = stickyResponse;
+  }, []);
+
   const loadFastLobbyCheckouts = useCallback(async () => {
     await runFastPoll(async () => {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS);
 
       try {
-        const checkoutsRes = await fetch("/api/lobby/checkouts?fast=1", {
+        const checkoutsRes = await fetch(fastCheckoutEndpoint, {
           cache: "no-store",
           headers: requestHeaders,
           signal: controller.signal
@@ -119,7 +158,9 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
 
         if (checkoutsRes.ok && !checkoutBody.error) {
-          setCheckouts(checkoutBody);
+          applyCheckoutUpdate(checkoutBody);
+          setFastDebug(checkoutBody.debug);
+          setLastFastFetchAt(new Date().toISOString());
           setRefreshMessage(null);
           setHealthy(true);
         }
@@ -129,7 +170,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         window.clearTimeout(timeout);
       }
     });
-  }, [requestHeaders, runFastPoll]);
+  }, [applyCheckoutUpdate, fastCheckoutEndpoint, requestHeaders, runFastPoll]);
 
   const loadLobbyCheckouts = useCallback(async () => {
     await runFullPoll(async () => {
@@ -137,7 +178,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
       const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS * 2);
 
       try {
-        const checkoutsRes = await fetch("/api/lobby/checkouts", {
+        const checkoutsRes = await fetch(fullCheckoutEndpoint, {
           cache: "no-store",
           headers: requestHeaders,
           signal: controller.signal
@@ -145,7 +186,9 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
 
         if (checkoutsRes.ok && !checkoutBody.error) {
-          setCheckouts(checkoutBody);
+          applyCheckoutUpdate(checkoutBody);
+          setFullDebug(checkoutBody.debug);
+          setLastFullFetchAt(new Date().toISOString());
           setRefreshMessage(null);
           setHealthy(true);
         } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
@@ -168,7 +211,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         window.clearTimeout(timeout);
       }
     });
-  }, [requestHeaders, runFullPoll]);
+  }, [applyCheckoutUpdate, fullCheckoutEndpoint, requestHeaders, runFullPoll]);
 
   const loadLobbyMeta = useCallback(async () => {
     try {
@@ -185,9 +228,10 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
       if (statusRes.ok) {
         const body = (await statusRes.json()) as LobbyStatusResponse;
         setHealthy(body.healthy);
-        if (body.refresh_interval_ms >= BOARD_CHECKOUT_POLL_MS) {
-          setSettings((current) => ({ ...current, refresh_interval_ms: body.refresh_interval_ms }));
-        }
+        setSettings((current) => ({
+          ...current,
+          refresh_interval_ms: clampCheckoutPollMs(body.refresh_interval_ms)
+        }));
       }
     } catch {
       // Checkout polling owns the visible error state.

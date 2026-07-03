@@ -25,7 +25,7 @@ export async function loadLobbySettings(supabase: SupabaseClient): Promise<Lobby
     const refreshIntervalMs = Number(data.refresh_interval_ms ?? defaultSettings.refresh_interval_ms);
     return {
       max_queue_count: Math.min(6, Math.max(3, Number(data.max_queue_count ?? defaultSettings.max_queue_count))),
-      refresh_interval_ms: Math.max(3000, refreshIntervalMs),
+      refresh_interval_ms: Math.min(5000, Math.max(2000, refreshIntervalMs)),
       show_promotions: Boolean(data.show_promotions ?? defaultSettings.show_promotions),
       show_events: Boolean(data.show_events ?? defaultSettings.show_events),
       footer_message: data.footer_message ?? defaultSettings.footer_message,

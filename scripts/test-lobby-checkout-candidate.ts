@@ -53,5 +53,13 @@ const removedFromBasket = {
   gingr_animal_id: "animal-99"
 };
 assert.equal(isVisibleLobbyCheckoutDog(removedFromBasket, now, keys), false);
+assert.equal(isVisibleLobbyCheckoutDog(removedFromBasket, now, keys, { requireGingrBasket: true }), false);
+
+const unexpiredButNotInBasket = {
+  ...removedFromBasket,
+  status_started_at: "2026-07-02T20:58:00.000Z"
+};
+assert.equal(isVisibleLobbyCheckoutDog(unexpiredButNotInBasket, now, keys), true);
+assert.equal(isVisibleLobbyCheckoutDog(unexpiredButNotInBasket, now, keys, { requireGingrBasket: true }), false);
 
 console.log("lobby checkout visibility tests passed");

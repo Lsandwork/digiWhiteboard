@@ -1,7 +1,14 @@
 import type { LiveDog } from "@/lib/types";
 
+export const BOARD_CHECKOUT_POLL_MIN_MS = 2000;
+export const BOARD_CHECKOUT_POLL_MAX_MS = 5000;
 export const BOARD_CHECKOUT_POLL_MS = 3000;
 export const BOARD_FULL_SYNC_POLL_MS = 8000;
+export const BOARD_REALTIME_DEBOUNCE_MS = 250;
+
+export function clampCheckoutPollMs(intervalMs: number) {
+  return Math.min(BOARD_CHECKOUT_POLL_MAX_MS, Math.max(BOARD_CHECKOUT_POLL_MIN_MS, intervalMs));
+}
 export const BOARD_SETTINGS_POLL_MS = 60000;
 export const BOARD_FETCH_TIMEOUT_MS = 10000;
 export const BOARD_FAST_FETCH_TIMEOUT_MS = 4000;

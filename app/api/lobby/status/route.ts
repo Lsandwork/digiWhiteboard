@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       healthy: true,
       active_checkout_count: checkout.activeCount,
       last_successful_sync_at: checkout.lastPromptedAt,
-      data_source: "supabase_live_transition_dogs",
+      data_source: checkout.data_source,
       refresh_interval_ms: settings.refresh_interval_ms
     });
   } catch {

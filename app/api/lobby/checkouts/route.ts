@@ -44,7 +44,7 @@ export async function GET(request: Request) {
               data_source: checkout.data_source,
               request_duration_ms: Date.now() - startedAt,
               fetch_completed_at: new Date().toISOString(),
-              used_cached_gingr: false,
+              used_cached_gingr: checkout.used_cached_gingr ?? false,
               newest_checkout_event_at: checkout.lastPromptedAt,
               active_checkout_count: checkout.activeCount
             }

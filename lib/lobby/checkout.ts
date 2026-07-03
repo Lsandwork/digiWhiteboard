@@ -15,6 +15,7 @@ import {
 } from "@/lib/lobby/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
 import { fetchGingrBackOfHouse, mapGingrBoardToLiveDogs } from "@/lib/gingr-board-sync";
+import { canCallGingrEndpoint } from "@/lib/gingr-request-guard";
 import { extractLobbyBreed, getLobbyCheckoutStatus, getLobbyPromptedAt } from "@/lib/lobby/status-label";
 import type { LobbyCheckoutDog } from "@/lib/lobby/types";
 import type { LiveDog } from "@/lib/types";
@@ -22,9 +23,15 @@ import type { LiveDog } from "@/lib/types";
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 /** Keep dogs visible while Gingr still lists them in the live checkout basket. */
-export function isVisibleLobbyCheckoutDog(dog: LiveDog, now: Date, gingrCheckoutKeys: Set<string>) {
+export function isVisibleLobbyCheckoutDog(
+  dog: LiveDog,
+  now: Date,
+  gingrCheckoutKeys: Set<string>,
+  options: { requireGingrBasket?: boolean } = {}
+) {
   if (dog.display_status !== "checking_out") return false;
   if (isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)) return true;
+  if (options.requireGingrBasket) return false;
   return !shouldExpireLobbyCheckoutDog(dog, now);
 }
 
@@ -151,11 +158,12 @@ export async function loadLobbyCheckoutDogsFast(supabase: SupabaseClient, now = 
     queue: queueDogs.map((dog) => toLobbyCheckoutDog(dog, false)),
     activeCount: sorted.length,
     lastPromptedAt: featuredDog ? getLobbyPromptedAt(featuredDog) : sorted[0] ? getLobbyPromptedAt(sorted[0]) : null,
-    data_source: result.data_source
+    data_source: result.data_source,
+    used_cached_gingr: false
   };
 }
 
-export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, _maxQueueCount = 6, now = new Date()) {
+export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCount = 6, now = new Date()) {
   const [{ dogs: gingrDogs, gingrLive }, supabasePromptedDogs, supabaseCheckoutDogs] = await Promise.all([
     loadGingrCheckoutDogs(now),
     loadSupabaseCheckoutDogs(supabase, now, { promptedOnly: true }),
@@ -168,7 +176,7 @@ export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, _maxQueueC
     const gingrCheckoutKeys = buildGingrCheckoutKeySet(gingrDogs);
     const merged = mergeCheckoutDogs(gingrDogs, supabasePromptedDogs);
     candidates = reconcileGingrSourcedCheckouts(merged, gingrDogs).filter((dog) =>
-      isVisibleLobbyCheckoutDog(dog, now, gingrCheckoutKeys)
+      isVisibleLobbyCheckoutDog(dog, now, gingrCheckoutKeys, { requireGingrBasket: true })
     );
   } else {
     candidates = supabaseCheckoutDogs;
@@ -179,13 +187,15 @@ export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, _maxQueueC
   const sorted = sortLobbyCheckoutDogs(enriched);
 
   const featuredDog = sorted[0] ?? null;
-  const queueDogs = sorted.slice(1);
+  const queueDogs = sorted.slice(1, 1 + maxQueueCount);
+  const usedCachedGingr = gingrLive && !canCallGingrEndpoint("back_of_house");
 
   return {
     featured: featuredDog ? toLobbyCheckoutDog(featuredDog, true) : null,
     queue: queueDogs.map((dog) => toLobbyCheckoutDog(dog, false)),
-    activeCount: sorted.length,
+    activeCount: featuredDog ? 1 + queueDogs.length : queueDogs.length,
     lastPromptedAt: featuredDog ? getLobbyPromptedAt(featuredDog) : sorted[0] ? getLobbyPromptedAt(sorted[0]) : null,
-    data_source: gingrLive ? "gingr_and_supabase" : "supabase_live_transition_dogs"
+    data_source: gingrLive ? "gingr_and_supabase" : "supabase_live_transition_dogs",
+    used_cached_gingr: usedCachedGingr
   };
 }

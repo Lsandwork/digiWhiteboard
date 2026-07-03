@@ -41,18 +41,30 @@ export type LobbySettings = {
   lobby_message: string | null;
 };
 
+export type LobbyCheckoutDebug = {
+  endpoint?: string;
+  mode?: string;
+  data_source?: string;
+  request_duration_ms?: number;
+  fetch_completed_at?: string;
+  used_cached_gingr?: boolean;
+  newest_checkout_event_at?: string | null;
+  active_checkout_count?: number;
+};
+
 export type LobbyCheckoutsResponse = {
   featured: LobbyCheckoutDog | null;
   queue: LobbyCheckoutDog[];
   counts: { active: number; queue: number };
   last_updated: string;
   error?: string;
+  debug?: LobbyCheckoutDebug;
 };
 
 export type LobbyStatusResponse = {
   healthy: boolean;
   active_checkout_count: number;
   last_successful_sync_at: string | null;
-  data_source: "supabase_live_transition_dogs";
+  data_source: "supabase_live_transition_dogs" | "gingr_and_supabase";
   refresh_interval_ms: number;
 };
