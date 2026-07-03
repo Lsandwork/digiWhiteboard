@@ -36,6 +36,22 @@ export function BoardDebugPanel({
           <dd>{lastFetchAt ?? "—"}</dd>
         </div>
         <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Data source</dt>
+          <dd className="text-right">{board.debug?.data_source ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Request duration</dt>
+          <dd>{board.debug?.request_duration_ms != null ? `${board.debug.request_duration_ms}ms` : "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Newest checkout</dt>
+          <dd>{board.debug?.newest_checkout_event_at ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Cached Gingr board</dt>
+          <dd>{board.debug?.used_cached_gingr == null ? "—" : board.debug.used_cached_gingr ? "yes" : "no"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Mode</dt>
           <dd>{board.debug?.mode ?? "—"}</dd>
         </div>

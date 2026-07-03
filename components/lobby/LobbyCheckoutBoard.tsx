@@ -11,7 +11,8 @@ import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_SETTINGS_POLL_MS } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, BOARD_SETTINGS_POLL_MS } from "@/lib/board-checkout-merge";
+import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
@@ -20,7 +21,7 @@ import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
-  refresh_interval_ms: 5000,
+  refresh_interval_ms: 3000,
   show_promotions: true,
   show_events: true,
   footer_message: "Thanks for being part of the Fitdog family. We'll take care of the rest.",
@@ -101,33 +102,73 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     return headers;
   }, [displayToken]);
 
-  const loadLobbyCheckouts = useCallback(async () => {
-    try {
-      const checkoutsRes = await fetch("/api/lobby/checkouts", { cache: "no-store", headers: requestHeaders });
-      const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
+  const runFastPoll = useInFlightPoll();
+  const runFullPoll = useInFlightPoll();
 
-      if (checkoutsRes.ok && !checkoutBody.error) {
-        setCheckouts(checkoutBody);
-        setRefreshMessage(null);
-        setHealthy(true);
-      } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
-        setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
-      } else {
-        setCheckouts(checkoutBody);
-        const message =
-          checkoutBody.error === "Unauthorized."
-            ? "Lobby display is unauthorized. Open the board with a valid TV token."
-            : (checkoutBody.error ?? "Live board temporarily refreshing");
-        setRefreshMessage(message);
-        setHealthy(false);
+  const loadFastLobbyCheckouts = useCallback(async () => {
+    await runFastPoll(async () => {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS);
+
+      try {
+        const checkoutsRes = await fetch("/api/lobby/checkouts?fast=1", {
+          cache: "no-store",
+          headers: requestHeaders,
+          signal: controller.signal
+        });
+        const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
+
+        if (checkoutsRes.ok && !checkoutBody.error) {
+          setCheckouts(checkoutBody);
+          setRefreshMessage(null);
+          setHealthy(true);
+        }
+      } catch {
+        // Keep the last good lobby checkout data when a fast refresh fails.
+      } finally {
+        window.clearTimeout(timeout);
       }
-    } catch {
-      if (!checkoutsRef.current.featured && !checkoutsRef.current.queue.length) {
-        setHealthy(false);
+    });
+  }, [requestHeaders, runFastPoll]);
+
+  const loadLobbyCheckouts = useCallback(async () => {
+    await runFullPoll(async () => {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS * 2);
+
+      try {
+        const checkoutsRes = await fetch("/api/lobby/checkouts", {
+          cache: "no-store",
+          headers: requestHeaders,
+          signal: controller.signal
+        });
+        const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
+
+        if (checkoutsRes.ok && !checkoutBody.error) {
+          setCheckouts(checkoutBody);
+          setRefreshMessage(null);
+          setHealthy(true);
+        } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
+          setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
+        } else {
+          setCheckouts(checkoutBody);
+          const message =
+            checkoutBody.error === "Unauthorized."
+              ? "Lobby display is unauthorized. Open the board with a valid TV token."
+              : (checkoutBody.error ?? "Live board temporarily refreshing");
+          setRefreshMessage(message);
+          setHealthy(false);
+        }
+      } catch {
+        if (!checkoutsRef.current.featured && !checkoutsRef.current.queue.length) {
+          setHealthy(false);
+        }
+        setRefreshMessage("Live board temporarily refreshing");
+      } finally {
+        window.clearTimeout(timeout);
       }
-      setRefreshMessage("Live board temporarily refreshing");
-    }
-  }, [requestHeaders]);
+    });
+  }, [requestHeaders, runFullPoll]);
 
   const loadLobbyMeta = useCallback(async () => {
     try {
@@ -154,8 +195,8 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   }, [requestHeaders]);
 
   const loadLobbyData = useCallback(async () => {
-    await Promise.all([loadLobbyCheckouts(), loadLobbyMeta()]);
-  }, [loadLobbyCheckouts, loadLobbyMeta]);
+    await Promise.all([loadLobbyCheckouts(), loadFastLobbyCheckouts(), loadLobbyMeta()]);
+  }, [loadFastLobbyCheckouts, loadLobbyCheckouts, loadLobbyMeta]);
 
   useEffect(() => {
     const initial = window.setTimeout(() => void loadLobbyData(), 0);
@@ -171,10 +212,13 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   }, []);
 
   useEffect(() => {
-    const intervalMs = Math.max(BOARD_CHECKOUT_POLL_MS, settings.refresh_interval_ms);
-    const pollTimer = window.setInterval(() => void loadLobbyCheckouts(), intervalMs);
-    return () => window.clearInterval(pollTimer);
-  }, [loadLobbyCheckouts, settings.refresh_interval_ms]);
+    const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), BOARD_CHECKOUT_POLL_MS);
+    const fullPollTimer = window.setInterval(() => void loadLobbyCheckouts(), BOARD_FULL_SYNC_POLL_MS);
+    return () => {
+      window.clearInterval(fastPollTimer);
+      window.clearInterval(fullPollTimer);
+    };
+  }, [loadFastLobbyCheckouts, loadLobbyCheckouts]);
 
   useEffect(() => {
     const metaTimer = window.setInterval(() => void loadLobbyMeta(), BOARD_SETTINGS_POLL_MS);
@@ -188,6 +232,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     const channel = supabase
       .channel("lobby-live-transition-dogs")
       .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
+        void loadFastLobbyCheckouts();
         void loadLobbyCheckouts();
       })
       .subscribe();
@@ -195,7 +240,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadLobbyCheckouts]);
+  }, [loadFastLobbyCheckouts, loadLobbyCheckouts]);
 
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;

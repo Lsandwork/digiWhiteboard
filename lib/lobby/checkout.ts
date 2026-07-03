@@ -6,6 +6,7 @@ import {
   reconcileGingrSourcedCheckouts
 } from "@/lib/board-checkout-merge";
 import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
+import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { getGingrAnimalPhotoUrlMap } from "@/lib/gingr-animal-photo";
 import {
@@ -137,6 +138,21 @@ function lobbySortTime(dog: LiveDog) {
   if (!iso) return 0;
   const ms = new Date(iso).getTime();
   return Number.isFinite(ms) ? ms : 0;
+}
+
+export async function loadLobbyCheckoutDogsFast(supabase: SupabaseClient, now = new Date()) {
+  const result = await loadFastPromptedCheckouts(supabase, now);
+  const sorted = sortLobbyCheckoutDogs(result.checking_out);
+  const featuredDog = sorted[0] ?? null;
+  const queueDogs = sorted.slice(1);
+
+  return {
+    featured: featuredDog ? toLobbyCheckoutDog(featuredDog, true) : null,
+    queue: queueDogs.map((dog) => toLobbyCheckoutDog(dog, false)),
+    activeCount: sorted.length,
+    lastPromptedAt: featuredDog ? getLobbyPromptedAt(featuredDog) : sorted[0] ? getLobbyPromptedAt(sorted[0]) : null,
+    data_source: result.data_source
+  };
 }
 
 export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, _maxQueueCount = 6, now = new Date()) {

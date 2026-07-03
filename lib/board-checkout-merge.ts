@@ -1,7 +1,16 @@
 import type { LiveDog } from "@/lib/types";
 
-export const BOARD_CHECKOUT_POLL_MS = 5000;
+export const BOARD_CHECKOUT_POLL_MS = 3000;
+export const BOARD_FULL_SYNC_POLL_MS = 8000;
 export const BOARD_SETTINGS_POLL_MS = 60000;
+export const BOARD_FETCH_TIMEOUT_MS = 10000;
+export const BOARD_FAST_FETCH_TIMEOUT_MS = 4000;
+
+export function sortCheckoutDogs(dogs: LiveDog[]) {
+  return [...dogs].sort(
+    (a, b) => new Date(a.status_started_at ?? a.updated_at).getTime() - new Date(b.status_started_at ?? b.updated_at).getTime()
+  );
+}
 
 export function mergeCheckoutDogs(primary: LiveDog[], secondary: LiveDog[]) {
   const dogsByKey = new Map<string, LiveDog>();

@@ -11,7 +11,8 @@ import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
-import { BOARD_CHECKOUT_POLL_MS } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
+import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
@@ -94,16 +95,57 @@ export function BoardClient() {
   const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(board.checking_out, nowMs);
 
   const apiEndpoint = debugBoard ? "/api/live-board?debugBoard=1" : "/api/live-board";
+  const fastCheckoutEndpoint = debugBoard ? "/api/board/checkouts?debugBoard=1" : "/api/board/checkouts";
+  const runFastPoll = useInFlightPoll();
+  const runFullPoll = useInFlightPoll();
 
   useEffect(() => {
     boardRef.current = board;
   }, [board]);
 
+  const loadFastCheckouts = useCallback(async () => {
+    await runFastPoll(async () => {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(fastCheckoutEndpoint, { cache: "no-store", signal: controller.signal });
+        const data = (await response.json()) as LiveBoardResponse & {
+          checking_out: LiveDog[];
+          counts?: { checking_out: number };
+        };
+
+        if (!response.ok || data.error) return;
+
+        setBoard((previous) => ({
+          ...previous,
+          checking_out: data.checking_out,
+          counts: {
+            checking_in: previous.counts.checking_in,
+            checking_out: data.checking_out.length,
+            total: previous.counts.checking_in + data.checking_out.length
+          },
+          last_updated: data.last_updated ?? previous.last_updated,
+          debug: data.debug ?? previous.debug
+        }));
+        setLastFetchAt(new Date().toISOString());
+      } catch {
+        // Keep the last good board data when a fast refresh fails.
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    });
+  }, [fastCheckoutEndpoint, runFastPoll]);
+
   const loadBoard = useCallback(
     async (mode: ConnectionState = "polling") => {
+      await runFullPoll(async () => {
       setFetchStatus("loading");
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), BOARD_FETCH_TIMEOUT_MS);
+
       try {
-        const response = await fetch(apiEndpoint, { cache: "no-store" });
+        const response = await fetch(apiEndpoint, { cache: "no-store", signal: controller.signal });
         const data = (await response.json()) as LiveBoardResponse;
         setLastFetchAt(new Date().toISOString());
 
@@ -139,26 +181,34 @@ export function BoardClient() {
         setFetchError(message);
         setFetchStatus(hasData ? "ok" : "error");
         setConnection(hasData ? (mode === "connecting" ? "polling" : mode) : "offline");
+      } finally {
+        window.clearTimeout(timeout);
       }
+      });
     },
-    [apiEndpoint]
+    [apiEndpoint, runFullPoll]
   );
 
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => void loadBoard("connecting"), 0);
+    const initialLoad = window.setTimeout(() => {
+      void loadBoard("connecting");
+      void loadFastCheckouts();
+    }, 0);
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
     const clockTimer = window.setInterval(() => setClock(new Date()), 1000);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    const pollTimer = window.setInterval(() => void loadBoard("polling"), BOARD_CHECKOUT_POLL_MS);
+    const fastPollTimer = window.setInterval(() => void loadFastCheckouts(), BOARD_CHECKOUT_POLL_MS);
+    const fullPollTimer = window.setInterval(() => void loadBoard("polling"), BOARD_FULL_SYNC_POLL_MS);
 
     return () => {
       window.clearTimeout(initialLoad);
       window.clearTimeout(initialClock);
       window.clearInterval(clockTimer);
       window.clearInterval(nowTimer);
-      window.clearInterval(pollTimer);
+      window.clearInterval(fastPollTimer);
+      window.clearInterval(fullPollTimer);
     };
-  }, [loadBoard]);
+  }, [loadBoard, loadFastCheckouts]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -180,6 +230,7 @@ export function BoardClient() {
           if (dogName && next?.display_status === "checking_out" && !next.hidden) setToast(`${dogName} is checking out.`);
           if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
           if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
+          void loadFastCheckouts();
           void loadBoard("live");
         }
       )
@@ -190,7 +241,7 @@ export function BoardClient() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [loadBoard]);
+  }, [loadBoard, loadFastCheckouts]);
 
   useEffect(() => {
     if (!toast) return;

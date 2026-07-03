@@ -51,7 +51,12 @@ export type LiveBoardResponse = {
     filtered_checkout_reasons?: Array<Record<string, string | null>>;
     gingr_sync?: Record<string, unknown>;
     gingr_error?: string | null;
-    mode: "webhook_only" | "gingr_live";
+    mode: "webhook_only" | "gingr_live" | "fast_internal";
+    data_source?: string;
+    request_duration_ms?: number;
+    fetch_completed_at?: string;
+    used_cached_gingr?: boolean;
+    newest_checkout_event_at?: string | null;
     recommended_env?: string[];
     missing_env?: string[];
     env?: Record<string, boolean>;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { isLobbyAdmin, isLobbyDisplayAuthorized, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
-import { loadLobbyCheckoutDogs } from "@/lib/lobby/checkout";
+import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import { loadLobbySettings } from "@/lib/lobby/settings";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -17,12 +17,16 @@ export async function GET(request: Request) {
     });
   }
 
+  const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
+  const fast = new URL(request.url).searchParams.get("fast") === "1";
+  const startedAt = Date.now();
   const now = new Date();
 
   try {
     const supabase = getServiceSupabase();
-    const settings = await loadLobbySettings(supabase);
-    const checkout = await loadLobbyCheckoutDogs(supabase, settings.max_queue_count, now);
+    const checkout = fast
+      ? await loadLobbyCheckoutDogsFast(supabase, now)
+      : await loadLobbyCheckoutDogs(supabase, (await loadLobbySettings(supabase)).max_queue_count, now);
 
     return NextResponse.json({
       featured: checkout.featured,
@@ -31,7 +35,21 @@ export async function GET(request: Request) {
         active: checkout.activeCount,
         queue: checkout.queue.length
       },
-      last_updated: now.toISOString()
+      last_updated: now.toISOString(),
+      ...(debugBoard
+        ? {
+            debug: {
+              endpoint: "/api/lobby/checkouts",
+              mode: fast ? "fast_internal" : "full_sync",
+              data_source: checkout.data_source,
+              request_duration_ms: Date.now() - startedAt,
+              fetch_completed_at: new Date().toISOString(),
+              used_cached_gingr: false,
+              newest_checkout_event_at: checkout.lastPromptedAt,
+              active_checkout_count: checkout.activeCount
+            }
+          }
+        : {})
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load lobby checkouts.";
