@@ -343,7 +343,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
       />
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
-        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} />
+        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} hasCheckout={hasCheckout} />
 
         {refreshMessage ? (
           <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm text-amber-100">

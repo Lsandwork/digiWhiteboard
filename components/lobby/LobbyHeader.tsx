@@ -8,9 +8,10 @@ import { formatBoardDateTime } from "@/lib/board-utils";
 type LobbyHeaderProps = {
   clock: Date;
   healthy: boolean;
+  hasCheckout?: boolean;
 };
 
-export function LobbyHeader({ clock, healthy }: LobbyHeaderProps) {
+export function LobbyHeader({ clock, healthy, hasCheckout = false }: LobbyHeaderProps) {
   const { time, date } = formatBoardDateTime(clock);
 
   return (
@@ -27,8 +28,10 @@ export function LobbyHeader({ clock, healthy }: LobbyHeaderProps) {
       </div>
 
       <div className="text-center">
-        <h1 className="text-[2.75rem] font-black uppercase leading-none tracking-wide text-white">Now Checking Out</h1>
-        <p className="mt-2 text-base font-bold uppercase tracking-[0.22em] text-lobby-orange">Your Dog&apos;s Best Life</p>
+        {hasCheckout ? (
+          <h1 className="text-[2.75rem] font-black uppercase leading-none tracking-wide text-white">Now Checking Out</h1>
+        ) : null}
+        <p className={`text-base font-bold uppercase tracking-[0.22em] text-lobby-orange ${hasCheckout ? "mt-2" : ""}`}>Your Dog&apos;s Best Life</p>
         <p className="mt-1.5 text-lg text-white">
           Thank you for letting us <span className="font-semibold text-lobby-teal">play, care &amp; connect!</span>
         </p>
