@@ -319,7 +319,10 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
         ) : null}
 
         <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
-          <div className="flex min-h-0 flex-col gap-4">
+          <div
+            className={`flex min-h-0 flex-col gap-4 ${hasCheckout ? "lobby-checkout-column" : ""}`}
+            data-queue-size={hasCheckout ? queue.length : undefined}
+          >
             {featured ? (
               <LobbyFeaturedCard dog={featured} />
             ) : null}
@@ -328,7 +331,9 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
 
             {showIdleSlideshow ? <LobbyIdleSlideshow tvMode={isTvLayout} /> : null}
 
-            {settings.show_events ? <LobbyClassSchedule schedule={settings.class_schedule} /> : null}
+            {settings.show_events ? (
+              <LobbyClassSchedule compact={hasCheckout} schedule={settings.class_schedule} />
+            ) : null}
           </div>
 
           {settings.show_promotions ? <SocialMomentsCarousel /> : null}

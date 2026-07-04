@@ -24,8 +24,8 @@ export function LobbyDogAvatar({ dogName, animalId, imageUrl, size = "queue" }: 
   return (
     <div
       className={clsx(
-        "relative shrink-0 overflow-hidden rounded-full border-2 border-lobby-orange/70 bg-lobby-card shadow-lobbyGlow",
-        size === "featured" ? "h-36 w-36 sm:h-44 sm:w-44" : "h-16 w-16 sm:h-20 sm:w-20"
+        "lobby-dog-avatar relative shrink-0 overflow-hidden rounded-full border-2 border-lobby-orange/70 bg-lobby-card shadow-lobbyGlow",
+        size === "featured" ? "lobby-dog-avatar--featured" : "lobby-dog-avatar--queue"
       )}
     >
       {showPhoto ? (
@@ -40,7 +40,7 @@ export function LobbyDogAvatar({ dogName, animalId, imageUrl, size = "queue" }: 
           onError={() => setPhotoFailed(true)}
         />
       ) : (
-        <div className="grid h-full w-full place-items-center bg-lobby-orange/15 text-2xl font-black text-orange-50 sm:text-3xl">
+        <div className="lobby-dog-avatar__fallback grid h-full w-full place-items-center bg-lobby-orange/15 font-black text-orange-50">
           {initial}
         </div>
       )}

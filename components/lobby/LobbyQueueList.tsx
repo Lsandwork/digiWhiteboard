@@ -11,17 +11,17 @@ export function LobbyQueueList({ dogs }: LobbyQueueListProps) {
   if (!dogs.length) return null;
 
   return (
-    <section className="lobby-queue">
-      <h3 className="mb-3 text-lg font-black uppercase tracking-[0.16em] text-white">Checking Out Next</h3>
-      <div className="space-y-2">
+    <section className="lobby-queue" data-count={dogs.length}>
+      <h3 className="lobby-queue__heading font-black uppercase tracking-[0.16em] text-white">Checking Out Next</h3>
+      <div className="lobby-queue__list">
         {dogs.map((dog) => (
-          <article key={dog.id} className="lobby-panel lobby-queue-row flex items-center gap-4 rounded-xl px-4 py-3">
+          <article key={dog.id} className="lobby-panel lobby-queue-row flex items-center gap-4 rounded-xl">
             <LobbyDogAvatar dogName={dog.dog_name} animalId={dog.gingr_animal_id} imageUrl={dog.dog_photo_url} />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-2xl font-bold text-white">{dog.dog_name}</p>
-              {dog.breed ? <p className="truncate text-sm text-lobby-muted">{dog.breed}</p> : null}
+              <p className="lobby-queue-row__name truncate font-bold text-white">{dog.dog_name}</p>
+              {dog.breed ? <p className="lobby-queue-row__breed truncate text-lobby-muted">{dog.breed}</p> : null}
             </div>
-            <p className="shrink-0 text-sm font-semibold text-lobby-teal">{dog.checkout_status}</p>
+            <p className="lobby-queue-row__status shrink-0 font-semibold text-lobby-teal">{dog.checkout_status}</p>
           </article>
         ))}
       </div>

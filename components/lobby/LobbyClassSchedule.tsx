@@ -7,9 +7,17 @@ import type { LobbyScheduleDay } from "@/lib/lobby/class-schedule";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { LobbyScheduleCard } from "@/components/lobby/LobbyScheduleCard";
 
-export function LobbyClassSchedule({ schedule = LOBBY_CLASS_SCHEDULE }: { schedule?: LobbyScheduleDay[] }) {
+export function LobbyClassSchedule({
+  schedule = LOBBY_CLASS_SCHEDULE,
+  compact = false
+}: {
+  schedule?: LobbyScheduleDay[];
+  compact?: boolean;
+}) {
   return (
-    <section className="lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-4">
+    <section
+      className={`lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-4${compact ? " lobby-class-schedule--compact" : ""}`}
+    >
       <LobbyAssetImage
         src={lobbyAssets.eventsScenery}
         alt=""
