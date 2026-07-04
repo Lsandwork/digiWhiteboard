@@ -7,7 +7,7 @@ import { LobbyClassSchedule } from "@/components/lobby/LobbyClassSchedule";
 import { LobbyFeaturedCard } from "@/components/lobby/LobbyFeaturedCard";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
-import { LobbyServicesGrid } from "@/components/lobby/LobbyServicesGrid";
+import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyDebugPanel } from "@/components/lobby/LobbyDebugPanel";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
@@ -331,7 +331,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
             {settings.show_events ? <LobbyClassSchedule schedule={settings.class_schedule} /> : null}
           </div>
 
-          {settings.show_promotions ? <LobbyServicesGrid /> : null}
+          {settings.show_promotions ? <SocialMomentsCarousel /> : null}
         </div>
 
         <footer className="lobby-footer mt-4 flex h-14 shrink-0 items-center gap-4 px-8">
