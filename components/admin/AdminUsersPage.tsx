@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, UserPlus } from "lucide-react";
 import type { AdminUserPublic, AdminUserRole } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS } from "@/lib/admin/users";
 import { AdminTable } from "@/components/admin/ui/AdminTable";
 import { Modal } from "@/components/admin/ui/Modal";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -13,17 +14,11 @@ type UsersPayload = {
   currentUser: { email: string | null; adminUserId: string | null; role: string };
 };
 
-const roleLabels: Record<string, string> = {
-  owner_admin: "Owner Admin",
-  manager_admin: "Manager Admin",
-  front_desk_coordinator: "Front Desk Coordinator",
-  viewer: "Viewer"
-};
-
 const roleOptions: { value: AdminUserRole; label: string; description: string }[] = [
   { value: "owner_admin", label: "Owner Admin", description: "Full dashboard and user management access." },
   { value: "manager_admin", label: "Manager Admin", description: "Manage day-to-day admin tools and board content." },
-  { value: "front_desk_coordinator", label: "Front Desk Coordinator", description: "Create and push staff notices and staff operations items." },
+  { value: "front_desk_coordinator", label: "Front Desk Coordinator", description: "Staff board Push Notices and staff operations tabs only." },
+  { value: "team_leader", label: "Team Leader", description: "Same staff board access as Front Desk Coordinator." },
   { value: "viewer", label: "Viewer", description: "Read-only dashboard access." }
 ];
 
@@ -95,7 +90,7 @@ export function AdminUsersPage() {
           columns={[
             { key: "name", header: "Name", render: (row) => <span className="font-semibold text-white">{row.full_name}</span> },
             { key: "email", header: "Email / Username", render: (row) => row.email },
-            { key: "role", header: "Role", render: (row) => <span className="admin-badge">{roleLabels[row.role] ?? row.role}</span> },
+            { key: "role", header: "Role", render: (row) => <span className="admin-badge">{ADMIN_USER_ROLE_LABELS[row.role] ?? row.role}</span> },
             { key: "status", header: "Status", render: (row) => (
               <span className={`admin-badge ${row.status === "active" ? "admin-badge--green" : "admin-badge--amber"}`}>
                 {row.status === "active" ? "Active" : "Disabled"}

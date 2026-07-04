@@ -27,6 +27,7 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
+import { isStaffOpsLimitedRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -100,7 +101,7 @@ export function AdminDashboard() {
   useEffect(() => {
     const role = data?.session?.role;
     const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "staff_directory", "help"];
-    if (role === "front_desk_coordinator" && (board !== "staff" || !coordinatorTabs.includes(tab))) {
+    if (isStaffOpsLimitedRole(role) && (board !== "staff" || !coordinatorTabs.includes(tab))) {
       router.replace("/admin?board=staff&tab=push_notices");
     }
   }, [board, data?.session?.role, router, tab]);

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
+import { isStaffOpsLimitedRole } from "@/lib/admin/users";
 import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 
@@ -46,7 +47,7 @@ export function AdminShell({
   const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
   const canManagePushNotices = role !== "viewer";
   const canManageStaffOps = role !== "viewer";
-  const pushNoticesOnly = role === "front_desk_coordinator";
+  const pushNoticesOnly = isStaffOpsLimitedRole(role);
   const staffOpsTabs: AdminTab[] = [
     "push_notices",
     "crossover_communication",

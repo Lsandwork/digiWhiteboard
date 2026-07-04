@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { AdminUserRole } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS } from "@/lib/admin/users";
 import type { StaffActivityLog, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { STAFF_DEPARTMENTS } from "@/lib/staff/admin-ops";
 
@@ -33,16 +34,12 @@ const staffStatusOptions: StaffMemberForm["status"][] = ["Active", "Inactive"];
 const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "viewer", label: "Viewer" },
   { value: "front_desk_coordinator", label: "Front Desk Coordinator" },
+  { value: "team_leader", label: "Team Leader" },
   { value: "manager_admin", label: "Manager Admin" },
   { value: "owner_admin", label: "Owner Admin" }
 ];
 
-const dashboardRoleLabels: Record<AdminUserRole, string> = {
-  owner_admin: "Owner Admin",
-  manager_admin: "Manager Admin",
-  front_desk_coordinator: "Front Desk Coordinator",
-  viewer: "Viewer"
-};
+const dashboardRoleLabels = ADMIN_USER_ROLE_LABELS;
 
 const emptyForm: StaffMemberForm = {
   name: "",

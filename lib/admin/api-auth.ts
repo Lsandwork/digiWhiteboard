@@ -1,4 +1,5 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { isStaffOpsLimitedRole } from "@/lib/admin/users";
 
 export function isAdminRequest(request: Request) {
   if (getAdminSessionFromRequest(request)) return true;
@@ -13,9 +14,9 @@ export function unauthorizedAdminResponse(body: Record<string, unknown> = { erro
 }
 
 export function canManagePushNotices(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || role === "front_desk_coordinator" || !role;
+  return role === "owner_admin" || role === "manager_admin" || isStaffOpsLimitedRole(role) || !role;
 }
 
 export function canManageStaffOperations(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || role === "front_desk_coordinator" || !role;
+  return role === "owner_admin" || role === "manager_admin" || isStaffOpsLimitedRole(role) || !role;
 }

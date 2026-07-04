@@ -1,7 +1,21 @@
 import bcrypt from "bcryptjs";
 
-export type AdminUserRole = "owner_admin" | "manager_admin" | "front_desk_coordinator" | "viewer";
+export type AdminUserRole = "owner_admin" | "manager_admin" | "front_desk_coordinator" | "team_leader" | "viewer";
 export type AdminUserStatus = "active" | "disabled";
+
+export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
+  owner_admin: "Owner Admin",
+  manager_admin: "Manager Admin",
+  front_desk_coordinator: "Front Desk Coordinator",
+  team_leader: "Team Leader",
+  viewer: "Viewer"
+};
+
+export const STAFF_OPS_LIMITED_ROLES: AdminUserRole[] = ["front_desk_coordinator", "team_leader"];
+
+export function isStaffOpsLimitedRole(role?: string | null) {
+  return role === "front_desk_coordinator" || role === "team_leader";
+}
 
 export type AdminUserRecord = {
   id: string;
