@@ -4,6 +4,7 @@ import {
   isGoogleCastConfigured,
   isGoogleCastFrameworkReady,
   preloadGoogleCast,
+  requestGoogleCastDevicePicker,
   startGoogleCastSession
 } from "@/lib/lobby/google-cast";
 import {
@@ -82,37 +83,27 @@ export function getDefaultCastRoute(): "chromecast" | "airplay" {
 }
 
 export async function openChromecastPicker(displayToken?: string): Promise<CastPickerResult> {
-  if (!isGoogleCastConfigured() && isPresentationCastSupported()) {
-    try {
-      const connection = await openPresentationDevicePicker(displayToken);
-      return { method: "wireless", connection };
-    } catch (error) {
-      if (isCastCancelled(error)) {
-        throw error;
-      }
-    }
+  if (!isGoogleCastBrowser()) {
+    throw new Error("Chromecast is not available in this browser. Use Google Chrome on desktop.");
   }
 
-  if (isGoogleCastBrowser()) {
-    try {
-      await preloadGoogleCast();
-      if (isGoogleCastFrameworkReady()) {
+  try {
+    await preloadGoogleCast();
+    if (isGoogleCastFrameworkReady()) {
+      if (isGoogleCastConfigured()) {
         await startGoogleCastSession(displayToken);
-        return { method: "chromecast" };
+      } else {
+        await requestGoogleCastDevicePicker();
       }
-    } catch (error) {
-      if (isCastCancelled(error)) {
-        throw error;
-      }
+      return { method: "chromecast" };
+    }
+  } catch (error) {
+    if (isCastCancelled(error)) {
+      throw error;
     }
   }
 
-  if (isPresentationCastSupported()) {
-    const connection = await openPresentationDevicePicker(displayToken);
-    return { method: "wireless", connection };
-  }
-
-  throw new Error("Chromecast is not available in this browser. Use Chrome on desktop.");
+  throw new Error("Chromecast is not available in this browser. Use Google Chrome on desktop.");
 }
 
 export async function openAirPlayPicker(): Promise<CastPickerResult> {
@@ -124,12 +115,8 @@ export async function openAirPlayPicker(): Promise<CastPickerResult> {
   return { method: "airplay" };
 }
 
-/** Main cast button: Chromecast on Chrome, AirPlay on Safari / Apple devices. */
+/** Chrome Cast only — no AirPlay or Presentation API fallbacks. */
 export async function openDefaultCastDevicePicker(displayToken?: string): Promise<CastPickerResult> {
-  if (getDefaultCastRoute() === "airplay") {
-    return openAirPlayPicker();
-  }
-
   return openChromecastPicker(displayToken);
 }
 

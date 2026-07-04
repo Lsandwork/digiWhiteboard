@@ -10,6 +10,9 @@ export type LobbyCheckoutDog = {
   display_until: string | null;
 };
 
+import type { LobbyScheduleDay } from "@/lib/lobby/class-schedule";
+import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
+
 export type LobbyPromotion = {
   id: string;
   title: string;
@@ -39,6 +42,10 @@ export type LobbySettings = {
   show_events: boolean;
   footer_message: string | null;
   lobby_message: string | null;
+  class_schedule?: LobbyScheduleDay[];
+  published_version?: string;
+  published_at?: string | null;
+  published_by?: string | null;
 };
 
 export type LobbyCheckoutDebug = {

@@ -1,6 +1,7 @@
 "use client";
 
-import Image from "next/image";
+import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
 import { formatBoardDateTime } from "@/lib/board-utils";
@@ -17,60 +18,45 @@ export function LobbyHeader({ clock, healthy, hasCheckout = false }: LobbyHeader
   return (
     <header className="lobby-header mb-1 grid grid-cols-[200px_1fr_auto] items-center gap-6">
       <div>
-        <LobbyAssetImage
-          src={lobbyAssets.logoBadge}
-          alt="Fitdog Health and Social Club"
-          width={96}
-          height={96}
-          className="h-[3.25rem] w-[3.25rem] rounded-full ring-2 ring-lobby-teal/50"
-          priority
-        />
+        <Link href="/admin" aria-label="Open Fitdog admin" title="Fitdog Admin" className="inline-block rounded-full transition hover:ring-2 hover:ring-lobby-orange/70">
+          <LobbyAssetImage
+            src={lobbyAssets.logoBadge}
+            alt="Fitdog Health and Social Club"
+            width={96}
+            height={96}
+            className="h-[3.25rem] w-[3.25rem] rounded-full ring-2 ring-lobby-teal/50"
+            priority
+          />
+        </Link>
       </div>
 
       <div className="text-center">
         {hasCheckout ? (
           <h1 className="text-[2.75rem] font-black uppercase leading-none tracking-wide text-white">Now Checking Out</h1>
         ) : null}
-        <p className={`text-base font-bold uppercase tracking-[0.22em] text-lobby-orange ${hasCheckout ? "mt-2" : ""}`}>Your Dog&apos;s Best Life</p>
-        <p className="mt-1.5 text-lg text-white">
+
+        <div
+          className={`lobby-header-tagline ${hasCheckout ? "lobby-header-tagline--compact mt-2" : "lobby-header-tagline--idle"}`}
+        >
+          <span className="lobby-header-tagline__line" aria-hidden />
+          <p className="lobby-header-tagline__text">Your Dog&apos;s Best Life</p>
+          <span className="lobby-header-tagline__line" aria-hidden />
+        </div>
+
+        <p className={`lobby-header-subtitle ${hasCheckout ? "mt-1.5 text-lg" : "mt-2 text-xl"}`}>
           Thank you for letting us <span className="font-semibold text-lobby-teal">play, care &amp; connect!</span>
         </p>
       </div>
 
       <div className="flex flex-col items-end gap-2">
         <div className="flex items-center gap-2">
-          <div
-            className="lobby-gingr-badge inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-lobby-orange/55 bg-[#171E24] px-3"
-            aria-label="Live with Gingr"
-          >
-            <Image
-              src={lobbyAssets.syncSignalIcon}
-              alt=""
-              width={16}
-              height={16}
-              className="h-4 w-4 shrink-0 brightness-0 invert"
-              unoptimized
-            />
-            <span className="text-sm font-extrabold leading-none text-white">Live with</span>
-            <Image
-              src={lobbyAssets.gingrLogoRed}
-              alt="Gingr"
-              width={72}
-              height={24}
-              className="h-5 w-auto shrink-0 object-contain"
-              unoptimized
-            />
+          <div className="lobby-checkout-sync-btn" aria-label="Live checkout sync status">
+            <RefreshCw className="h-4 w-4 shrink-0 text-lobby-teal" strokeWidth={2.5} />
+            <span>Live Checkout Sync</span>
           </div>
-          <span className={`lobby-sync-pill inline-flex items-center ${healthy ? "lobby-sync-pill--live" : "lobby-sync-pill--refresh"}`}>
-            <Image
-              src={lobbyAssets.syncSignalIcon}
-              alt=""
-              width={14}
-              height={14}
-              className="mr-1.5 inline-block h-3.5 w-3.5"
-              unoptimized
-            />
-            {healthy ? "LIVE CHECKOUT SYNC" : "REFRESHING"}
+          <span className={`lobby-live-indicator ${healthy ? "lobby-live-indicator--on" : "lobby-live-indicator--refresh"}`}>
+            <span className="lobby-live-indicator__dot" aria-hidden />
+            {healthy ? "Live" : "Refreshing"}
           </span>
         </div>
         <div className="text-right">

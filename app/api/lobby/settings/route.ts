@@ -30,6 +30,7 @@ export async function PATCH(request: Request) {
     if ("show_events" in body) patch.show_events = Boolean(body.show_events);
     if ("footer_message" in body) patch.footer_message = body.footer_message == null ? null : String(body.footer_message);
     if ("lobby_message" in body) patch.lobby_message = body.lobby_message == null ? null : String(body.lobby_message);
+    if ("class_schedule" in body) patch.class_schedule = body.class_schedule;
 
     const settings = await updateLobbySettings(getServiceSupabase(), patch);
     return NextResponse.json({ settings });

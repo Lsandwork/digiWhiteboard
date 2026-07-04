@@ -1,5 +1,7 @@
+import { isAdminRequest } from "@/lib/admin/api-auth";
+
 export function isLobbyAdmin(request: Request) {
-  return Boolean(process.env.ADMIN_PASSWORD) && request.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
+  return isAdminRequest(request);
 }
 
 export function getLobbyDisplayToken() {

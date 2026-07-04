@@ -1,4 +1,5 @@
 import type { LobbyEvent, LobbyPromotion, LobbySettings } from "@/lib/lobby/types";
+import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -8,7 +9,11 @@ const defaultSettings: LobbySettings = {
   show_promotions: true,
   show_events: true,
   footer_message: "Thanks for being part of the Fitdog family. We'll take care of the rest.",
-  lobby_message: "Thank you for letting us play, care & connect!"
+  lobby_message: "Thank you for letting us play, care & connect!",
+  class_schedule: LOBBY_CLASS_SCHEDULE,
+  published_version: "v1.0.0",
+  published_at: null,
+  published_by: null
 };
 
 export async function loadLobbySettings(supabase: SupabaseClient): Promise<LobbySettings> {
@@ -29,7 +34,11 @@ export async function loadLobbySettings(supabase: SupabaseClient): Promise<Lobby
       show_promotions: Boolean(data.show_promotions ?? defaultSettings.show_promotions),
       show_events: Boolean(data.show_events ?? defaultSettings.show_events),
       footer_message: data.footer_message ?? defaultSettings.footer_message,
-      lobby_message: data.lobby_message ?? defaultSettings.lobby_message
+      lobby_message: data.lobby_message ?? defaultSettings.lobby_message,
+      class_schedule: Array.isArray(data.class_schedule) ? (data.class_schedule as LobbySettings["class_schedule"]) : LOBBY_CLASS_SCHEDULE,
+      published_version: data.published_version ?? defaultSettings.published_version,
+      published_at: data.published_at ?? null,
+      published_by: data.published_by ?? null
     };
   } catch {
     return defaultSettings;
@@ -71,7 +80,13 @@ export async function loadLobbyEvents(supabase: SupabaseClient, now = new Date()
 
 export async function updateLobbySettings(
   supabase: SupabaseClient,
-  patch: Partial<LobbySettings> & { refresh_interval_ms?: number }
+  patch: Partial<LobbySettings> & {
+    refresh_interval_ms?: number;
+    class_schedule?: LobbySettings["class_schedule"];
+    published_version?: string;
+    published_at?: string | null;
+    published_by?: string | null;
+  }
 ) {
   const refreshIntervalMs = patch.refresh_interval_ms
     ? Math.max(3000, patch.refresh_interval_ms)

@@ -1,5 +1,5 @@
-import { AdminLobbyClient } from "@/components/admin/AdminLobbyClient";
+import { redirect } from "next/navigation";
 
-export default function AdminLobbyPage() {
-  return <AdminLobbyClient />;
+export default function AdminLobbyRedirectPage() {
+  redirect("/admin?board=lobby");
 }

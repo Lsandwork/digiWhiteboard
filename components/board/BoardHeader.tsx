@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { ClockDate } from "@/components/board/ClockDate";
 import { LiveStatus } from "@/components/board/LiveStatus";
@@ -32,7 +33,12 @@ export function BoardHeader({
   return (
     <header className="mb-5 grid gap-5 lg:mb-6 lg:grid-cols-[1fr_auto] lg:items-start">
       <div className="flex min-w-0 items-start gap-4 sm:gap-5 lg:gap-6">
-        <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue sm:h-24 sm:w-24 lg:h-28 lg:w-28">
+        <Link
+          href="/admin"
+          className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue transition hover:ring-2 hover:ring-fitdog-orange/60 sm:h-24 sm:w-24 lg:h-28 lg:w-28"
+          aria-label="Open Fitdog admin"
+          title="Fitdog Admin"
+        >
           {logoFailed ? (
             <span className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-3xl font-black text-white sm:text-4xl">
               F
@@ -49,7 +55,7 @@ export function BoardHeader({
               onError={() => setLogoFailed(true)}
             />
           )}
-        </div>
+        </Link>
         <div className="min-w-0">
           <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
             Fitdog Health & Social Club

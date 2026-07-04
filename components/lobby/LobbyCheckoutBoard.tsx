@@ -65,23 +65,10 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const tvModeFromUrl = searchParams.get("display") !== "desktop";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
   const {
-    menuOpen,
-    tvCastUrl,
     isTvLayout,
     showCastActive,
     castError,
     canChromecast,
-    chromecastAppId,
-    canAirPlay,
-    canFullscreen,
-    closeCastMenu,
-    openCastMenu,
-    startChromecast,
-    startAirPlay,
-    startFullscreenKiosk,
-    copyTvLink,
-    openTvLink,
-    stopTvCast,
     toggleTvCast,
     setCastError
   } = useLobbyTvCast(tvModeFromUrl, displayToken);
@@ -256,7 +243,6 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
 
   const debouncedRefreshCheckouts = useDebouncedCallback(() => {
     void loadFastLobbyCheckouts();
-    void loadLobbyCheckouts();
   }, BOARD_REALTIME_DEBOUNCE_MS);
 
   useEffect(() => {
@@ -292,7 +278,6 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
   const showIdleSlideshow = !hasCheckout;
-  const showIdleEmptyCard = !featured && !isTvLayout;
 
   useEffect(() => {
     if (!isTvLayout) return;
@@ -318,28 +303,10 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
 
       <LobbyCastButton
-        menuOpen={menuOpen}
         isCasting={showCastActive}
         castError={castError}
-        tvCastUrl={tvCastUrl}
         canChromecast={canChromecast}
-        chromecastAppId={chromecastAppId}
-        canAirPlay={canAirPlay}
-        canFullscreen={canFullscreen}
-        onToggle={() => void toggleTvCast()}
-        onOpenMenu={openCastMenu}
-        onCloseMenu={closeCastMenu}
-        onChromecast={() => void runCastAction(startChromecast)}
-        onAirPlay={() => void runCastAction(startAirPlay)}
-        onFullscreen={() => void runCastAction(startFullscreenKiosk)}
-        onCopyLink={() => void runCastAction(copyTvLink)}
-        onOpenLink={() => {
-          try {
-            openTvLink();
-          } catch (error) {
-            setCastError(error instanceof Error ? error.message : "Unable to open TV link.");
-          }
-        }}
+        onToggle={() => void runCastAction(toggleTvCast)}
       />
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
@@ -355,38 +322,13 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
           <div className="flex min-h-0 flex-col gap-4">
             {featured ? (
               <LobbyFeaturedCard dog={featured} />
-            ) : showIdleEmptyCard ? (
-              <section className="lobby-panel lobby-empty-card relative overflow-hidden rounded-2xl border-l-[6px] border-l-lobby-teal px-6 py-5">
-                <LobbyAssetImage
-                  src={lobbyAssets.pawIcon}
-                  alt=""
-                  width={160}
-                  height={160}
-                  className="pointer-events-none absolute bottom-2 right-8 h-36 w-36 opacity-[0.12]"
-                />
-                <div className="relative z-10 flex items-center gap-6">
-                  <LobbyAssetImage
-                    src={lobbyAssets.logoBadge}
-                    alt=""
-                    width={96}
-                    height={96}
-                    className="h-24 w-24 shrink-0 rounded-full ring-2 ring-lobby-teal/60"
-                  />
-                  <div>
-                    <h2 className="text-4xl font-black leading-tight text-white">No dogs currently checking out</h2>
-                    <p className="mt-2 text-lg text-white/85">
-                      We&apos;ll update this screen as soon as a pup is on the way.
-                    </p>
-                  </div>
-                </div>
-              </section>
             ) : null}
 
             {hasCheckout ? <LobbyQueueList dogs={queue} /> : null}
 
             {showIdleSlideshow ? <LobbyIdleSlideshow tvMode={isTvLayout} /> : null}
 
-            {settings.show_events ? <LobbyClassSchedule /> : null}
+            {settings.show_events ? <LobbyClassSchedule schedule={settings.class_schedule} /> : null}
           </div>
 
           {settings.show_promotions ? <LobbyServicesGrid /> : null}
@@ -397,10 +339,10 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
             <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={20} height={20} className="h-5 w-5 opacity-95" />
           </div>
           <p className="flex-1 text-center text-base font-semibold text-white">{footerMessage}</p>
-          <div className="flex shrink-0 items-center gap-1 opacity-30" aria-hidden>
-            <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={18} height={18} className="h-4 w-4" />
-            <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={14} height={14} className="h-3.5 w-3.5" />
-            <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={12} height={12} className="h-3 w-3" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden>
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-white/90" fill="currentColor">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
           </div>
         </footer>
       </div>

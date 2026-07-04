@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/admin/api-auth";
 import { getBoardEnvCheck, getGingrWebhookSignatureKey } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -6,7 +7,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 function isAdmin(request: Request) {
-  return Boolean(process.env.ADMIN_PASSWORD) && request.headers.get("x-admin-password") === process.env.ADMIN_PASSWORD;
+  return isAdminRequest(request);
 }
 
 export async function GET(request: Request) {

@@ -258,7 +258,6 @@ export function BoardClient() {
           if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
           if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
           void loadFastCheckouts();
-          void loadBoard("live");
         }
       )
       .subscribe((status) => {

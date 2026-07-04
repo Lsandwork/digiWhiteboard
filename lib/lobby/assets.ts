@@ -35,6 +35,7 @@ export const lobbyAssets = {
   heartIcon: `${LOBBY_ASSET_BASE}/icons/png/fitdog-dog-profile.png`,
   calendarIcon: `${LOBBY_ASSET_BASE}/icons/png/fitdog-dog-profile.png`,
   eventsScenery: `${LOBBY_ASSET_BASE}/03-ui-components/card-events-dark.png`,
+  servicesScenery: `${LOBBY_ASSET_BASE}/03-ui-components/card-services-dark.png`,
   statusReady: `${LOBBY_ASSET_BASE}/03-ui-components/status-now-ready-for-pickup.png`,
   statusFrontDesk: `${LOBBY_ASSET_BASE}/03-ui-components/status-ready-at-front-desk.png`,
   statusWayOut: `${LOBBY_ASSET_BASE}/03-ui-components/status-on-the-way-out.png`,

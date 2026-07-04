@@ -3,10 +3,11 @@
 import { LobbySectionDogIcon } from "@/components/lobby/LobbySectionDogIcon";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { lobbyAssets } from "@/lib/lobby/assets";
+import type { LobbyScheduleDay } from "@/lib/lobby/class-schedule";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { LobbyScheduleCard } from "@/components/lobby/LobbyScheduleCard";
 
-export function LobbyClassSchedule() {
+export function LobbyClassSchedule({ schedule = LOBBY_CLASS_SCHEDULE }: { schedule?: LobbyScheduleDay[] }) {
   return (
     <section className="lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-4">
       <LobbyAssetImage
@@ -25,7 +26,7 @@ export function LobbyClassSchedule() {
           <h3 className="text-lg font-black uppercase tracking-[0.16em] text-white">Class Schedule</h3>
         </div>
         <div className="lobby-class-schedule-grid grid grid-cols-5 gap-3">
-          {LOBBY_CLASS_SCHEDULE.map((entry) => (
+          {schedule.map((entry) => (
             <LobbyScheduleCard key={entry.day} day={entry.day} classes={entry.classes} />
           ))}
         </div>
