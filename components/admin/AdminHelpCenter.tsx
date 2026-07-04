@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ArrowRight, BookOpen, ExternalLink, Search, Shield } from "lucide-react";
+import { HelpArticleWalkthrough } from "@/components/admin/help/HelpArticleWalkthrough";
+import { HelpVisualMedia } from "@/components/admin/help/HelpVisualMedia";
 import {
   filterHelpCategoriesForRole,
   getHelpRoleLabel,
@@ -205,27 +206,28 @@ function HelpArticleCard({
         ))}
       </ol>
 
-      {article.visualSteps?.length ? (
+      {article.visualSteps?.length || article.walkthrough ? (
         <div className="admin-help-visual-guide">
           <p className="admin-help-visual-guide-title">Visual guide</p>
-          <div className="admin-help-visual-steps">
-            {article.visualSteps.map((step) => (
-              <figure key={step.title} className="admin-help-visual-step">
-                <Image
-                  src={step.image}
-                  alt={step.title}
-                  width={640}
-                  height={360}
-                  className="admin-help-visual-step-image"
-                  unoptimized
-                />
-                <figcaption>
-                  <strong>{step.title}</strong>
-                  <span>{step.caption}</span>
-                </figcaption>
-              </figure>
-            ))}
-          </div>
+
+          {article.walkthrough ? <HelpArticleWalkthrough walkthrough={article.walkthrough} /> : null}
+
+          {article.visualSteps?.length ? (
+            <div className={`admin-help-visual-steps ${article.walkthrough ? "admin-help-visual-steps--with-demo" : ""}`}>
+              {article.visualSteps.map((step) => (
+                <figure key={step.title} className="admin-help-visual-step">
+                  <HelpVisualMedia
+                    step={step}
+                    variant={article.walkthrough === "staff-cast" ? "staff" : "lobby"}
+                  />
+                  <figcaption>
+                    <strong>{step.title}</strong>
+                    <span>{step.caption}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

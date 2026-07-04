@@ -5,7 +5,10 @@ import { ADMIN_USER_ROLE_LABELS, isFullAdminRole, isStaffOpsLimitedRole } from "
 export type HelpAudience = "admin" | "staff_ops" | "viewer";
 
 export type HelpVisualStep = {
-  image: string;
+  image?: string;
+  illustration?: "cast-chrome" | "cast-button" | "cast-picker";
+  video?: string;
+  poster?: string;
   title: string;
   caption: string;
 };
@@ -29,6 +32,7 @@ export type HelpArticle = {
   links?: HelpLink[];
   audiences?: HelpAudience[];
   visualSteps?: HelpVisualStep[];
+  walkthrough?: "lobby-cast" | "staff-cast" | "push-notices";
 };
 
 export type HelpCategory =
@@ -193,19 +197,20 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Computer and Chromecast must be on the same Wi‑Fi.",
       "Use the step-by-step pictures below if you are unsure."
     ],
+    walkthrough: "lobby-cast",
     visualSteps: [
       {
-        image: "/assets/fitdog/help/cast-step-1-chrome.svg",
+        illustration: "cast-chrome",
         title: "Step 1 — Open Chrome",
         caption: "Start Google Chrome on the front-desk computer before anything else."
       },
       {
-        image: "/assets/fitdog/help/cast-step-2-button.svg",
+        illustration: "cast-button",
         title: "Step 2 — Cast to TV",
         caption: "On the lobby whiteboard, click the Cast to TV button."
       },
       {
-        image: "/assets/fitdog/help/cast-step-3-monitor.svg",
+        illustration: "cast-picker",
         title: "Step 3 — Select monitor",
         caption: "Choose the device that matches your lobby TV."
       }
@@ -227,19 +232,20 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Keep the tab open for the whole shift."
     ],
     tips: ["Lobby and staff TVs often have different names in the picker — double-check before selecting."],
+    walkthrough: "staff-cast",
     visualSteps: [
       {
-        image: "/assets/fitdog/help/cast-step-1-chrome.svg",
+        illustration: "cast-chrome",
         title: "Step 1 — Open Chrome",
         caption: "Use Chrome on the computer hooked up near the staff display."
       },
       {
-        image: "/assets/fitdog/help/cast-step-2-button.svg",
+        illustration: "cast-button",
         title: "Step 2 — Cast to TV",
         caption: "Click Cast to TV on the staff whiteboard page."
       },
       {
-        image: "/assets/fitdog/help/cast-step-3-monitor.svg",
+        illustration: "cast-picker",
         title: "Step 3 — Select monitor",
         caption: "Pick the staff-area TV, not the lobby TV."
       }
@@ -313,6 +319,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     adminTab: "push_notices",
     adminBoard: "staff",
+    walkthrough: "push-notices",
     links: [{ label: "Open Staff Whiteboard", href: "/" }]
   },
   {

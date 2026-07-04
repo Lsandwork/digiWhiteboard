@@ -2419,23 +2419,147 @@ html.lobby-tv-display .social-video-shell {
     margin-bottom: 0.75rem;
   }
 
+  .admin-help-walkthrough {
+    margin-bottom: 1rem;
+    border-radius: 14px;
+    border: 1px solid rgba(241, 95, 42, 0.35);
+    background: linear-gradient(180deg, rgba(241, 95, 42, 0.12), rgba(0, 0, 0, 0.2));
+    overflow: hidden;
+  }
+
+  .admin-help-walkthrough-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-help-walkthrough-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fbbf24;
+  }
+
+  .admin-help-walkthrough-title {
+    margin-top: 0.15rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .admin-help-walkthrough-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    padding: 0.45rem 0.8rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .admin-help-walkthrough-stage {
+    padding: 0.75rem;
+    background: #f8fafc;
+    animation: adminHelpWalkthroughFade 0.35s ease;
+  }
+
+  .admin-help-walkthrough-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    padding: 0.65rem;
+  }
+
+  .admin-help-walkthrough-step {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--admin-muted);
+    padding: 0.45rem 0.55rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .admin-help-walkthrough-step span {
+    display: grid;
+    place-items: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 0.72rem;
+    flex-shrink: 0;
+  }
+
+  .admin-help-walkthrough-step--active {
+    border-color: rgba(241, 95, 42, 0.55);
+    background: rgba(241, 95, 42, 0.14);
+    color: #fff;
+  }
+
+  @keyframes adminHelpWalkthroughFade {
+    from {
+      opacity: 0.35;
+      transform: scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   .admin-help-visual-steps {
     display: grid;
     gap: 1rem;
+  }
+
+  .admin-help-visual-steps--with-demo {
+    margin-top: 0.75rem;
   }
 
   .admin-help-visual-step {
     margin: 0;
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     background: rgba(0, 0, 0, 0.25);
   }
 
-  .admin-help-visual-step-image {
+  .admin-help-visual-step-media {
+    background: #f8fafc;
+    padding: 0.5rem;
+  }
+
+  .admin-help-visual-step-image,
+  .admin-help-visual-step-video,
+  .admin-help-visual-step-illustration {
     display: block;
     width: 100%;
     height: auto;
+    border-radius: 8px;
+  }
+
+  .admin-help-visual-step-video {
+    aspect-ratio: 16 / 9;
+    background: #000;
+    object-fit: contain;
+  }
+
+  .admin-help-visual-step-image {
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
   }
 
   .admin-help-visual-step figcaption {
