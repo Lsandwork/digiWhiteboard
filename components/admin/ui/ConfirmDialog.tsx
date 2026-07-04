@@ -31,6 +31,8 @@ export function ConfirmDialog({
       title={title}
       description={description}
       onClose={onCancel}
+      closeOnBackdrop={!busy}
+      closeOnEscape={!busy}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
           <button type="button" className="admin-btn-secondary" onClick={onCancel} disabled={busy}>
@@ -47,7 +49,7 @@ export function ConfirmDialog({
         </div>
       }
     >
-      <p className="text-sm text-admin-muted">{description}</p>
+      <span className="sr-only">{description}</span>
     </Modal>
   );
 }

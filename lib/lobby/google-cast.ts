@@ -156,7 +156,7 @@ export async function requestGoogleCastDevicePicker() {
   return context;
 }
 
-export async function startGoogleCastSession(displayToken?: string) {
+export async function startGoogleCastSession(displayToken?: string, castUrl?: string) {
   if (!isGoogleCastConfigured()) {
     throw new Error("Google Cast custom receiver is not configured.");
   }
@@ -167,7 +167,7 @@ export async function startGoogleCastSession(displayToken?: string) {
     throw new Error("No cast session was created.");
   }
 
-  const url = buildLobbyTvCastUrl(undefined, displayToken);
+  const url = castUrl ?? buildLobbyTvCastUrl(undefined, displayToken);
   await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
   return context;
 }

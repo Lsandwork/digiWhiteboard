@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       ok: true,
       username: auth.email,
       role: auth.role,
+      adminUserId: auth.adminUserId ?? null,
       forcePasswordChange: auth.forcePasswordChange ?? false
     });
     response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());

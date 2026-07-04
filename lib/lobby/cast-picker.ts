@@ -25,15 +25,15 @@ function isCastCancelled(error: unknown) {
   return /cancel|abort|denied|dismiss/i.test(message);
 }
 
-function tvUrl(displayToken?: string) {
-  return buildLobbyTvCastUrl(undefined, displayToken);
+function tvUrl(displayToken?: string, castUrl?: string) {
+  return castUrl ?? buildLobbyTvCastUrl(undefined, displayToken);
 }
 
 export function isCastDevicePickerSupported() {
   return isAirPlayCastAvailable() || isGoogleCastBrowser() || isPresentationCastSupported();
 }
 
-export async function probeCastDeviceAvailability(displayToken?: string) {
+export async function probeCastDeviceAvailability(displayToken?: string, castUrl?: string) {
   if (isAirPlayCastAvailable()) {
     return true;
   }
@@ -52,7 +52,7 @@ export async function probeCastDeviceAvailability(displayToken?: string) {
     if (!PresentationRequestCtor) return false;
 
     try {
-      const request = new PresentationRequestCtor([tvUrl(displayToken)]);
+      const request = new PresentationRequestCtor([tvUrl(displayToken, castUrl)]);
       if (request.getAvailability) {
         const availability = await request.getAvailability();
         return availability.value;
@@ -66,13 +66,13 @@ export async function probeCastDeviceAvailability(displayToken?: string) {
   return false;
 }
 
-export async function openPresentationDevicePicker(displayToken?: string): Promise<PresentationConnectionLike> {
+export async function openPresentationDevicePicker(displayToken?: string, castUrl?: string): Promise<PresentationConnectionLike> {
   const PresentationRequestCtor = getPresentationRequestConstructor();
   if (!PresentationRequestCtor) {
     throw new Error("Wireless display is not supported in this browser. Use Chrome on desktop.");
   }
 
-  const request = new PresentationRequestCtor([tvUrl(displayToken)]);
+  const request = new PresentationRequestCtor([tvUrl(displayToken, castUrl)]);
   return request.start();
 }
 
@@ -82,7 +82,7 @@ export function getDefaultCastRoute(): "chromecast" | "airplay" {
   return "chromecast";
 }
 
-export async function openChromecastPicker(displayToken?: string): Promise<CastPickerResult> {
+export async function openChromecastPicker(displayToken?: string, castUrl?: string): Promise<CastPickerResult> {
   if (!isGoogleCastBrowser()) {
     throw new Error("Chromecast is not available in this browser. Use Google Chrome on desktop.");
   }
@@ -91,7 +91,7 @@ export async function openChromecastPicker(displayToken?: string): Promise<CastP
     await preloadGoogleCast();
     if (isGoogleCastFrameworkReady()) {
       if (isGoogleCastConfigured()) {
-        await startGoogleCastSession(displayToken);
+        await startGoogleCastSession(displayToken, castUrl);
       } else {
         await requestGoogleCastDevicePicker();
       }
@@ -116,11 +116,11 @@ export async function openAirPlayPicker(): Promise<CastPickerResult> {
 }
 
 /** Chrome Cast only — no AirPlay or Presentation API fallbacks. */
-export async function openDefaultCastDevicePicker(displayToken?: string): Promise<CastPickerResult> {
-  return openChromecastPicker(displayToken);
+export async function openDefaultCastDevicePicker(displayToken?: string, castUrl?: string): Promise<CastPickerResult> {
+  return openChromecastPicker(displayToken, castUrl);
 }
 
 /** @deprecated Use openDefaultCastDevicePicker, openChromecastPicker, or openAirPlayPicker. */
-export async function openCastDevicePicker(displayToken?: string): Promise<CastPickerResult> {
-  return openDefaultCastDevicePicker(displayToken);
+export async function openCastDevicePicker(displayToken?: string, castUrl?: string): Promise<CastPickerResult> {
+  return openDefaultCastDevicePicker(displayToken, castUrl);
 }

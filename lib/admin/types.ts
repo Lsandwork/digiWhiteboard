@@ -47,6 +47,14 @@ export type AdminTab =
   | "promotions"
   | "schedule"
   | "display"
+  | "push_notices"
+  | "crossover_communication"
+  | "owner_follow_up"
+  | "active_issues"
+  | "whiteboard_preview"
+  | "analytics"
+  | "templates"
+  | "staff_directory"
   | "users"
   | "settings"
   | "logs"
@@ -59,6 +67,14 @@ export const ADMIN_TABS: AdminTab[] = [
   "promotions",
   "schedule",
   "display",
+  "push_notices",
+  "crossover_communication",
+  "owner_follow_up",
+  "active_issues",
+  "whiteboard_preview",
+  "analytics",
+  "templates",
+  "staff_directory",
   "users",
   "settings",
   "logs",

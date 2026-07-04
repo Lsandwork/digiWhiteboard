@@ -11,9 +11,9 @@ type PresentationRequestLike = {
 
 type PresentationRequestConstructor = new (urls: string[]) => PresentationRequestLike;
 
-export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {
+function buildTvCastUrl(pathname: string, currentHref?: string, displayToken?: string) {
   if (typeof window !== "undefined") {
-    const url = new URL("/lobby/checkouts", window.location.origin);
+    const url = new URL(pathname, window.location.origin);
     url.searchParams.set("display", "tv");
 
     const token =
@@ -25,7 +25,7 @@ export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string)
     return url.toString();
   }
 
-  const url = new URL(currentHref ?? "http://localhost:3000/lobby/checkouts");
+  const url = new URL(currentHref ?? `http://localhost:3000${pathname}`);
   url.searchParams.set("display", "tv");
 
   const token = displayToken?.trim();
@@ -34,6 +34,14 @@ export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string)
   }
 
   return url.toString();
+}
+
+export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {
+  return buildTvCastUrl("/lobby/checkouts", currentHref, displayToken);
+}
+
+export function buildStaffTvCastUrl(currentHref?: string, displayToken?: string) {
+  return buildTvCastUrl("/", currentHref, displayToken);
 }
 
 export function isPresentationCastSupported() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, UserPlus } from "lucide-react";
 import type { AdminUserPublic, AdminUserRole } from "@/lib/admin/users";
 import { AdminTable } from "@/components/admin/ui/AdminTable";
@@ -16,8 +16,16 @@ type UsersPayload = {
 const roleLabels: Record<string, string> = {
   owner_admin: "Owner Admin",
   manager_admin: "Manager Admin",
+  front_desk_coordinator: "Front Desk Coordinator",
   viewer: "Viewer"
 };
+
+const roleOptions: { value: AdminUserRole; label: string; description: string }[] = [
+  { value: "owner_admin", label: "Owner Admin", description: "Full dashboard and user management access." },
+  { value: "manager_admin", label: "Manager Admin", description: "Manage day-to-day admin tools and board content." },
+  { value: "front_desk_coordinator", label: "Front Desk Coordinator", description: "Create and push staff notices and staff operations items." },
+  { value: "viewer", label: "Viewer", description: "Read-only dashboard access." }
+];
 
 export function AdminUsersPage() {
   const { showToast } = useToast();
@@ -29,6 +37,7 @@ export function AdminUsersPage() {
   const [deleteUser, setDeleteUser] = useState<AdminUserPublic | null>(null);
   const [menuUserId, setMenuUserId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,8 +54,20 @@ export function AdminUsersPage() {
   }, [showToast]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (!menuUserId) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!actionMenuRef.current?.contains(event.target as Node)) {
+        setMenuUserId(null);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [menuUserId]);
 
   const canManage = data?.currentUser.role !== "viewer";
 
@@ -85,7 +106,7 @@ export function AdminUsersPage() {
           ]}
           actions={(row) =>
             canManage ? (
-              <div className="relative flex justify-end gap-1">
+              <div ref={menuUserId === row.id ? actionMenuRef : undefined} className="relative flex justify-end gap-1">
                 <button type="button" className="admin-icon-btn" aria-label={`Edit ${row.full_name}`} onClick={() => setEditUser(row)}>
                   <Pencil className="h-4 w-4" />
                 </button>
@@ -228,14 +249,25 @@ export function AdminUsersPage() {
 }
 
 function AddUserModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: boolean; onClose: () => void; onSubmit: (payload: Record<string, unknown>) => Promise<void> }) {
-  const [form, setForm] = useState({ full_name: "", email: "", role: "manager_admin", password: "", confirm_password: "", force_password_change: true });
+  const [form, setForm] = useState<{ full_name: string; email: string; role: AdminUserRole; password: string; confirm_password: string; force_password_change: boolean }>({
+    full_name: "",
+    email: "",
+    role: "manager_admin",
+    password: "",
+    confirm_password: "",
+    force_password_change: true
+  });
 
   useEffect(() => {
-    if (open) setForm({ full_name: "", email: "", role: "manager_admin", password: "", confirm_password: "", force_password_change: true });
+    if (!open) return;
+    const timer = window.setTimeout(() => {
+      setForm({ full_name: "", email: "", role: "manager_admin", password: "", confirm_password: "", force_password_change: true });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open]);
 
   return (
-    <Modal open={open} title="Add Admin User" description="Create a new dashboard account with a temporary password." onClose={onClose} footer={
+    <Modal open={open} title="Add Admin User" description="Create a new dashboard account with a temporary password." onClose={onClose} closeOnBackdrop={false} closeOnEscape={!busy} footer={
       <div className="flex justify-end gap-2">
         <button type="button" className="admin-btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className="admin-btn-primary inline-flex items-center gap-2" disabled={busy} onClick={() => void onSubmit(form)}>
@@ -246,13 +278,7 @@ function AddUserModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: 
       <div className="grid gap-4">
         <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
         <Field label="Email / username"><input className="admin-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-        <Field label="Role">
-          <select className="admin-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminUserRole })}>
-            <option value="owner_admin">Owner Admin</option>
-            <option value="manager_admin">Manager Admin</option>
-            <option value="viewer">Viewer</option>
-          </select>
-        </Field>
+        <RoleChoiceGroup value={form.role} onChange={(role) => setForm({ ...form, role })} />
         <Field label="Temporary password"><input className="admin-input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
         <Field label="Confirm password"><input className="admin-input" type="password" value={form.confirm_password} onChange={(e) => setForm({ ...form, confirm_password: e.target.value })} /></Field>
         <label className="admin-toggle-row">
@@ -273,8 +299,19 @@ function EditUserModal({ user, busy, onClose, onSubmit }: { user: AdminUserPubli
     role: user.role
   });
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setForm({
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [user.email, user.full_name, user.role]);
+
   return (
-    <Modal open title="Edit Admin User" onClose={onClose} footer={
+    <Modal open title="Edit Admin User" onClose={onClose} closeOnBackdrop={false} closeOnEscape={!busy} footer={
       <div className="flex justify-end gap-2">
         <button type="button" className="admin-btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className="admin-btn-primary" disabled={busy} onClick={() => void onSubmit(form)}>{busy ? "Saving…" : "Save changes"}</button>
@@ -283,13 +320,7 @@ function EditUserModal({ user, busy, onClose, onSubmit }: { user: AdminUserPubli
       <div className="grid gap-4">
         <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
         <Field label="Email / username"><input className="admin-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-        <Field label="Role">
-          <select className="admin-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as AdminUserRole })}>
-            <option value="owner_admin">Owner Admin</option>
-            <option value="manager_admin">Manager Admin</option>
-            <option value="viewer">Viewer</option>
-          </select>
-        </Field>
+        <RoleChoiceGroup value={form.role} onChange={(role) => setForm({ ...form, role })} />
       </div>
     </Modal>
   );
@@ -301,7 +332,7 @@ function ChangePasswordModal({ user, busy, onClose, onSubmit }: { user: AdminUse
   const [force, setForce] = useState(false);
 
   return (
-    <Modal open title={`Change password — ${user.full_name}`} onClose={onClose} footer={
+    <Modal open title={`Change password — ${user.full_name}`} onClose={onClose} closeOnBackdrop={false} closeOnEscape={!busy} footer={
       <div className="flex justify-end gap-2">
         <button type="button" className="admin-btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
         <button type="button" className="admin-btn-primary" disabled={busy} onClick={() => void onSubmit({ password, confirm_password: confirm, force_password_change: force })}>{busy ? "Updating…" : "Update password"}</button>
@@ -323,4 +354,34 @@ function ChangePasswordModal({ user, busy, onClose, onSubmit }: { user: AdminUse
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="block"><span className="admin-label">{label}</span>{children}</label>;
+}
+
+function RoleChoiceGroup({ value, onChange }: { value: AdminUserRole; onChange: (role: AdminUserRole) => void }) {
+  return (
+    <div>
+      <span className="admin-label">Role</span>
+      <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Admin user role">
+        {roleOptions.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`rounded-xl border p-3 text-left transition ${
+                selected
+                  ? "border-fitdog-orange bg-fitdog-orange/15 text-white shadow-[0_0_0_1px_rgba(241,95,42,0.25)]"
+                  : "border-admin-border bg-white/[0.03] text-admin-muted hover:border-fitdog-orange/60 hover:text-white"
+              }`}
+              onClick={() => onChange(option.value)}
+            >
+              <span className="block text-sm font-black">{option.label}</span>
+              <span className="mt-1 block text-xs leading-snug text-admin-muted">{option.description}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

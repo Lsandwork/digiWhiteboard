@@ -211,6 +211,69 @@ export const HELP_ARTICLES: HelpArticle[] = [
     links: [{ label: "View Staff Board", href: "/" }]
   },
   {
+    id: "push-notices",
+    title: "How do I push notices to the Staff Whiteboard?",
+    summary: "Use Push Notices to send live handler reminders, save custom notices, and clear the active alert.",
+    category: "Staff Board",
+    keywords: ["push notices", "notice", "alert", "handler", "staff", "front desk", "owner complaint"],
+    steps: [
+      "Select Staff Digital Whiteboard at the top.",
+      "Open Push Notices.",
+      "Use Quick Push for the default owner complaint notices, or fill in Create Custom Notice.",
+      "Choose priority and display mode. Urgent notices use stronger visual treatment on the Staff Whiteboard.",
+      "Click Push Notice to show it immediately. Click Clear Active Notice when it should come down.",
+      "Recent Notice History lets you push a previous notice again or edit/delete custom notices."
+    ],
+    tips: [
+      "Push Notices only appear on the Staff Digital Whiteboard. They never appear on the Lobby Whiteboard.",
+      "This feature is separate from Gingr and does not add Gingr API calls."
+    ],
+    adminTab: "push_notices",
+    adminBoard: "staff",
+    links: [{ label: "Open Staff Whiteboard", href: "/" }]
+  },
+  {
+    id: "schedule-push-notices",
+    title: "How do scheduled and recurring Push Notices work?",
+    summary: "Schedule a notice for later, or repeat it every day, week, or month at the selected time.",
+    category: "Staff Board",
+    keywords: ["schedule", "scheduled notice", "recurring", "repeat", "day", "week", "month", "time"],
+    steps: [
+      "Open Push Notices on the Staff Digital Whiteboard admin.",
+      "Create a custom notice with title, message, priority, and display mode.",
+      "Turn on Schedule for later and choose the scheduled date and time.",
+      "For a one-time notice, leave Recurring set to Does not repeat.",
+      "For a recurring notice, choose Every day, Every week, or Every month.",
+      "Click Schedule Notice. The notice activates automatically when the Staff Whiteboard checks for notices."
+    ],
+    tips: [
+      "Recurring notices reschedule themselves after each run.",
+      "A scheduled notice stays separate from dog check-in/check-out syncing."
+    ],
+    adminTab: "push_notices",
+    adminBoard: "staff"
+  },
+  {
+    id: "staff-ops-pages",
+    title: "How do Crossover, Owner Follow Up, and Active Issues work?",
+    summary: "Use the new Staff Admin tabs to track handoffs, client follow-ups, and urgent operational issues.",
+    category: "Staff Board",
+    keywords: ["crossover", "owner follow up", "active issues", "urgent", "staff admin", "handoff"],
+    steps: [
+      "Open Crossover Communication to send department handoffs and operational notes.",
+      "Open Owner Follow Up to assign client follow-up tasks with due dates and statuses.",
+      "Open Active Issues to manage urgent or critical items from front desk, crossover messages, and owner follow-ups.",
+      "High, Critical, or urgent Crossover and Owner Follow Up records automatically create an Active Issue.",
+      "Use Push to Staff Whiteboard only when an internal item should become a temporary Push Notice."
+    ],
+    tips: [
+      "These pages are internal admin tools and do not automatically display on the Staff Digital Whiteboard.",
+      "They do not call Gingr or change Staff Whiteboard polling."
+    ],
+    adminTab: "active_issues",
+    adminBoard: "staff"
+  },
+  {
     id: "add-admin-user",
     title: "How do I add another admin user?",
     summary: "Go to Users → Add Admin User and set a temporary password.",
@@ -220,11 +283,26 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Open the Users tab.",
       "Click Add Admin User.",
       "Enter full name, email, role, and a temporary password.",
-      "Owner Admin — full access. Manager Admin — can manage content and users. Viewer — read-only style access.",
+      "Owner Admin — full access. Manager Admin — can manage content and users. Front Desk Coordinator — Push Notices only. Viewer — read-only style access.",
       "The new user logs in with their email and temporary password."
     ],
     adminTab: "users",
     tips: ["Run Supabase migration 007 first if the Users tab shows no data or errors."]
+  },
+  {
+    id: "front-desk-coordinator",
+    title: "What can a Front Desk Coordinator do?",
+    summary: "Front Desk Coordinator accounts can only create, schedule, and push notices to the Staff Digital Whiteboard.",
+    category: "Users & Login",
+    keywords: ["front desk coordinator", "role", "permissions", "push notices", "limited user"],
+    steps: [
+      "Front Desk Coordinator users log in with their assigned email and password.",
+      "After login, they are routed to Staff Digital Whiteboard → Push Notices.",
+      "They can quick-push default notices, create custom notices, schedule notices, and clear the active notice.",
+      "They cannot access Lobby content, settings, logs, integrations, users, Gingr setup, or other admin areas."
+    ],
+    adminTab: "users",
+    tips: ["Use this role for front desk staff who only need live handler reminders."]
   },
   {
     id: "change-password",

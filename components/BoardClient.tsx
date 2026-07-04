@@ -7,10 +7,14 @@ import { BoardDebugPanel } from "@/components/board/BoardDebugPanel";
 import { BoardErrorBanner } from "@/components/board/BoardErrorBanner";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPanel } from "@/components/board/BoardPanel";
+import { StaffCastButton } from "@/components/board/StaffCastButton";
+import { StaffPushNoticeFullscreen, StaffPushNoticePanel } from "@/components/board/StaffPushNotice";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
+import { useStaffPushNotice } from "@/hooks/useStaffPushNotice";
+import { useStaffTvCast } from "@/hooks/useStaffTvCast";
 import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
 import {
   getCheckoutMergeKey,
@@ -83,6 +87,7 @@ export function BoardClient() {
   const searchParams = useSearchParams();
   const staffMode = searchParams.get("staff") === "1";
   const debugBoard = searchParams.get("debugBoard") === "1";
+  const displayToken = searchParams.get("token")?.trim() ?? "";
 
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
   const boardRef = useRef(board);
@@ -97,6 +102,26 @@ export function BoardClient() {
   const [toast, setToast] = useState<string | null>(null);
   const [useDevDemo, setUseDevDemo] = useState(false);
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
+  const activePushNotice = useStaffPushNotice();
+  const {
+    isCasting,
+    castError,
+    canChromecast,
+    toggleTvCast,
+    setCastError
+  } = useStaffTvCast(displayToken);
+
+  const runCastAction = useCallback(async (action: () => Promise<void>) => {
+    try {
+      await action();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to start casting.";
+      const cancelled = /cancel|abort|denied/i.test(message);
+      if (!cancelled) {
+        setCastError(message);
+      }
+    }
+  }, [setCastError]);
 
   const { visibleCheckingInDogs: activeCheckingInDogs } = useCheckinDisplayTimers(board.checking_in, nowMs);
 
@@ -292,11 +317,19 @@ export function BoardClient() {
   );
 
   const hasBoardData = board.checking_in.length > 0 || board.checking_out.length > 0;
+  const hasVisibleDogs = visibleCheckingInDogs.length > 0 || visibleCheckoutDogs.length > 0;
   const showEmptyState = fetchStatus === "ok" && !fetchError;
   const expiredCheckoutCount = Math.max(0, stickyCheckoutDogs.length - visibleCheckoutDogs.length);
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
+      <StaffCastButton
+        isCasting={isCasting}
+        castError={castError}
+        canChromecast={canChromecast}
+        onToggle={() => void runCastAction(toggleTvCast)}
+      />
+
       <div className="mx-auto flex h-full w-full max-w-[1920px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
         <BoardHeader
           connection={connection}
@@ -316,26 +349,33 @@ export function BoardClient() {
           />
         ) : null}
 
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
-          <BoardPanel
-            title="Checking In"
-            subtitle="Dogs Arriving Today"
-            mode="in"
-            checkingInEntries={visibleCheckingInDogs}
-            nowMs={nowMs}
-            showEmptyState={showEmptyState}
-          />
-          <BoardPanel
-            title="Checking Out"
-            subtitle="Dogs Heading Home"
-            mode="out"
-            checkingOutEntries={visibleCheckoutDogs}
-            nowMs={nowMs}
-            showStaffClear={staffMode}
-            onClearCheckout={handleClearCheckout}
-            showEmptyState={showEmptyState}
-          />
-        </div>
+        {activePushNotice && !hasVisibleDogs ? (
+          <StaffPushNoticeFullscreen notice={activePushNotice} />
+        ) : (
+          <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
+            <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
+              <BoardPanel
+                title="Checking In"
+                subtitle="Dogs Arriving Today"
+                mode="in"
+                checkingInEntries={visibleCheckingInDogs}
+                nowMs={nowMs}
+                showEmptyState={showEmptyState}
+              />
+              <BoardPanel
+                title="Checking Out"
+                subtitle="Dogs Heading Home"
+                mode="out"
+                checkingOutEntries={visibleCheckoutDogs}
+                nowMs={nowMs}
+                showStaffClear={staffMode}
+                onClearCheckout={handleClearCheckout}
+                showEmptyState={showEmptyState}
+              />
+            </div>
+            {activePushNotice ? <StaffPushNoticePanel notice={activePushNotice} /> : null}
+          </div>
+        )}
 
         <footer className="mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
           <PawPrint className="h-4 w-4 text-fitdog-blue/80" />

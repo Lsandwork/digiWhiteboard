@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "description": "Local Fitdog Social Moments videos for Lobby Digital Whiteboard. No Instagram API or live Instagram dependency. Includes 9 uploaded clips.",
+  "version": 4,
+  "description": "Local Fitdog Social Moments videos for Lobby Digital Whiteboard. No Instagram API or live Instagram dependency. Includes 10 uploaded clips.",
   "autoplay": true,
   "muted": true,
   "loopPlaylist": true,
@@ -135,9 +135,25 @@
       "playbackMode": "local-mp4-only",
       "isAdditionalUploadedVideo": true,
       "note": "Added per user request: \u201cMUST INCLUDE THIS VIDEO AS WELL.\u201d Use this local MP4 for playback; do not hotlink or embed Instagram."
+    },
+    {
+      "id": "social-moment-10",
+      "title": "Firefly Fitdog Funny Video",
+      "src": "/assets/fitdog/social-moments/clips/social-moment-10.mp4",
+      "poster": "/assets/fitdog/social-moments/posters/social-moment-10.jpg",
+      "width": 1280,
+      "height": 720,
+      "durationSeconds": 8,
+      "sizeBytes": 5253702,
+      "source": "Uploaded Firefly-generated Fitdog funny video, local asset only",
+      "sourceUrl": null,
+      "sourceType": "uploaded-video",
+      "playbackMode": "local-mp4-only",
+      "isAdditionalUploadedVideo": true,
+      "note": "Added per user request from Downloads: Firefly create funny video for www.fitdog.com must be like this link -https---www.facebook.com-jasmi.mp4. Use this local MP4 for playback; do not hotlink or embed social media."
     }
   ],
-  "updatedFor": "Adds the newly uploaded video as social-moment-09.mp4 while keeping DRAmCDqEv2K explicitly mapped as social-moment-06.mp4.",
+  "updatedFor": "Adds the newly uploaded Firefly Fitdog video as social-moment-10.mp4 while keeping DRAmCDqEv2K explicitly mapped as social-moment-06.mp4.",
   "instagramPolicy": "Source URLs are stored for traceability only. Playback must use local MP4 files in /clips and local poster JPGs in /posters. Do not use Instagram API, scraping, embeds, iframe, or hotlinks.",
-  "clipCount": 9
+  "clipCount": 10
 }

@@ -2,7 +2,10 @@
 
 import Image from "next/image";
 import {
+  BellRing,
   Calendar,
+  ChartNoAxesColumn,
+  ClipboardList,
   FileText,
   HelpCircle,
   LayoutDashboard,
@@ -12,6 +15,7 @@ import {
   Plug,
   ScrollText,
   Settings,
+  ShieldAlert,
   Users,
   X
 } from "lucide-react";
@@ -24,6 +28,14 @@ const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "promotions", label: "Promotions", icon: <Megaphone className="h-4 w-4" /> },
   { id: "schedule", label: "Class Schedule", icon: <Calendar className="h-4 w-4" /> },
   { id: "display", label: "Display Settings", icon: <Settings className="h-4 w-4" /> },
+  { id: "push_notices", label: "Push Notices", icon: <BellRing className="h-4 w-4" /> },
+  { id: "crossover_communication", label: "Crossover Communication", icon: <MessageIcon /> },
+  { id: "owner_follow_up", label: "Owner Follow Up", icon: <Users className="h-4 w-4" /> },
+  { id: "active_issues", label: "Active Issues", icon: <ShieldAlert className="h-4 w-4" /> },
+  { id: "whiteboard_preview", label: "Whiteboard Preview", icon: <ClipboardList className="h-4 w-4" /> },
+  { id: "analytics", label: "Analytics", icon: <ChartNoAxesColumn className="h-4 w-4" /> },
+  { id: "templates", label: "Templates", icon: <FileText className="h-4 w-4" /> },
+  { id: "staff_directory", label: "Staff Directory", icon: <Users className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
   { id: "logs", label: "Logs", icon: <ScrollText className="h-4 w-4" /> },
@@ -37,6 +49,14 @@ const tabLabels: Record<AdminTab, string> = {
   promotions: "Promotions",
   schedule: "Class Schedule",
   display: "Display Settings",
+  push_notices: "Push Notices",
+  crossover_communication: "Crossover Communication",
+  owner_follow_up: "Owner Follow Up",
+  active_issues: "Active Issues",
+  whiteboard_preview: "Whiteboard Preview",
+  analytics: "Analytics",
+  templates: "Templates",
+  staff_directory: "Staff Directory",
   users: "Users",
   settings: "Settings",
   logs: "Logs",
@@ -44,18 +64,24 @@ const tabLabels: Record<AdminTab, string> = {
   help: "Help Center"
 };
 
+function MessageIcon() {
+  return <ScrollText className="h-4 w-4" />;
+}
+
 type SidebarProps = {
   activeTab: AdminTab;
   username: string;
-  helpLink?: string;
   mobileOpen: boolean;
   onMobileClose: () => void;
   onTabChange: (tab: AdminTab) => void;
   onLogout: () => void;
   onOpenHelp?: () => void;
+  visibleTabs?: AdminTab[];
 };
 
-export function Sidebar({ activeTab, username, helpLink, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp }: SidebarProps) {
+export function Sidebar({ activeTab, username, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
+  const visibleNavItems = navItems.filter((item) => visibleTabs.includes(item.id));
+
   return (
     <>
       {mobileOpen ? <button type="button" className="admin-mobile-backdrop" aria-label="Close menu" onClick={onMobileClose} /> : null}
@@ -71,7 +97,7 @@ export function Sidebar({ activeTab, username, helpLink, mobileOpen, onMobileClo
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -97,11 +123,6 @@ export function Sidebar({ activeTab, username, helpLink, mobileOpen, onMobileClo
             <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : onTabChange("help"))}>
               Open Help Center
             </button>
-            {helpLink ? (
-              <a href={helpLink} target="_blank" rel="noopener noreferrer" className="admin-btn-ghost mt-2 block text-xs opacity-80">
-                Fitdog website help
-              </a>
-            ) : null}
           </div>
 
           <div className="flex items-center justify-between rounded-xl border border-admin-border px-3 py-2">

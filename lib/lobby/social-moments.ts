@@ -119,5 +119,17 @@ export const SOCIAL_MOMENTS: readonly SocialMoment[] = [
     width: 720,
     height: 1280,
     playbackMode: "local-mp4-only"
+  },
+  {
+    id: "social-moment-10",
+    title: "Firefly Fitdog Funny Video",
+    src: "/assets/fitdog/social-moments/clips/social-moment-10.mp4",
+    poster: "/assets/fitdog/social-moments/posters/social-moment-10.jpg",
+    sourceUrl: null,
+    sourceType: "uploaded-video",
+    durationSeconds: 8,
+    width: 1280,
+    height: 720,
+    playbackMode: "local-mp4-only"
   }
 ] as const;

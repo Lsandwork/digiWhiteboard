@@ -116,6 +116,7 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
         <div className="admin-help-quick-links mt-4">
           <QuickLink href="/lobby/checkouts" label="Lobby Whiteboard" />
           <QuickLink href="/" label="Staff Whiteboard" />
+          <QuickLink href="/admin?board=staff&tab=push_notices" label="Push Notices" />
           <QuickLink href="/admin?tab=integrations" label="Integrations" />
           <QuickLink href="/admin?tab=users" label="Admin Users" />
           <QuickLink href="/admin?tab=settings" label="Settings" />

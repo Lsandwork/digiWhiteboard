@@ -9,8 +9,8 @@ type AdminShellProps = {
   board: AdminBoardType;
   tab: AdminTab;
   username: string;
+  role?: string | null;
   savedLabel: string;
-  helpLink?: string;
   refreshing?: boolean;
   onBoardChange: (board: AdminBoardType) => void;
   onTabChange: (tab: AdminTab) => void;
@@ -28,8 +28,8 @@ export function AdminShell({
   board,
   tab,
   username,
+  role,
   savedLabel,
-  helpLink,
   refreshing,
   onBoardChange,
   onTabChange,
@@ -44,9 +44,28 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
+  const canManagePushNotices = role !== "viewer";
+  const canManageStaffOps = role !== "viewer";
+  const pushNoticesOnly = role === "front_desk_coordinator";
+  const staffOpsTabs: AdminTab[] = [
+    "push_notices",
+    "crossover_communication",
+    "owner_follow_up",
+    "active_issues",
+    "whiteboard_preview",
+    "analytics",
+    "templates",
+    "staff_directory",
+    "settings",
+    "help"
+  ];
 
   const visibleTabs = ADMIN_TABS.filter((item) => {
+    if (pushNoticesOnly) return staffOpsTabs.includes(item) && item !== "settings";
     if (board === "staff" && (item === "promotions" || item === "schedule")) return false;
+    if (board === "staff" && item === "users") return false;
+    if (item === "push_notices" && !canManagePushNotices) return false;
+    if (["crossover_communication", "owner_follow_up", "active_issues"].includes(item) && !canManageStaffOps) return false;
     return true;
   });
 
@@ -56,7 +75,7 @@ export function AdminShell({
         <Sidebar
           activeTab={tab}
           username={username}
-          helpLink={helpLink}
+          visibleTabs={visibleTabs}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
           onTabChange={onTabChange}
@@ -70,7 +89,7 @@ export function AdminShell({
               <div className="min-w-0">
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                   <MobileMenuButton onClick={() => setMobileOpen(true)} />
-                  <BoardSwitcher board={board} onChange={onBoardChange} />
+                  {pushNoticesOnly ? null : <BoardSwitcher board={board} onChange={onBoardChange} />}
                   <span className="admin-status-dot" aria-hidden />
                   <span className="text-xs font-semibold text-emerald-400">Online</span>
                 </div>
@@ -83,7 +102,7 @@ export function AdminShell({
               <div className="flex flex-col items-start gap-2 lg:items-end">
                 <p className="text-xs text-admin-muted">{savedLabel}</p>
                 <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
-                  <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>Preview Live</button>
+                  {pushNoticesOnly ? null : <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>Preview Live</button>}
                   <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onRefresh} disabled={refreshing}>
                     {refreshing ? "Refreshing…" : "Refresh"}
                   </button>

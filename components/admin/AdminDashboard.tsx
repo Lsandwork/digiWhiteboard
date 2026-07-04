@@ -14,6 +14,9 @@ import { SystemInfoPanel } from "@/components/admin/SystemInfoPanel";
 import { AdminLogsPanel } from "@/components/admin/AdminLogsPanel";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage";
+import { PushNoticesPanel } from "@/components/admin/PushNoticesPanel";
+import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
+import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
 import { PreviewModal } from "@/components/admin/PreviewModal";
@@ -47,6 +50,7 @@ export function AdminDashboard() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmResetBoard, setConfirmResetBoard] = useState(false);
@@ -80,14 +84,38 @@ export function AdminDashboard() {
   }, [board]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    const initial = window.setTimeout(() => setCurrentTimeMs(Date.now()), 0);
+    const timer = window.setInterval(() => setCurrentTimeMs(Date.now()), 1000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const role = data?.session?.role;
+    const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "staff_directory", "help"];
+    if (role === "front_desk_coordinator" && (board !== "staff" || !coordinatorTabs.includes(tab))) {
+      router.replace("/admin?board=staff&tab=push_notices");
+    }
+  }, [board, data?.session?.role, router, tab]);
+
+  useEffect(() => {
+    if (board === "staff" && tab === "users") {
+      router.replace("/admin?board=staff&tab=staff_directory");
+    }
+  }, [board, router, tab]);
 
   const savedLabel = useMemo(() => {
     if (!lastSavedAt) return "All changes saved";
-    const seconds = Math.max(1, Math.round((Date.now() - lastSavedAt.getTime()) / 1000));
+    const seconds = Math.max(1, Math.round(((currentTimeMs || lastSavedAt.getTime()) - lastSavedAt.getTime()) / 1000));
     return `All changes saved • Last saved ${seconds}s ago`;
-  }, [lastSavedAt]);
+  }, [currentTimeMs, lastSavedAt]);
 
   function setBoard(nextBoard: AdminBoardType) {
     if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", nextBoard);
@@ -95,6 +123,10 @@ export function AdminDashboard() {
   }
 
   function setActiveTab(nextTab: AdminTab) {
+    if (board === "staff" && nextTab === "users") {
+      router.replace("/admin?board=staff&tab=staff_directory");
+      return;
+    }
     router.replace(`/admin?board=${board}&tab=${nextTab}`);
   }
 
@@ -175,7 +207,8 @@ export function AdminDashboard() {
   const adminSettings = data.admin_settings ?? DEFAULT_ADMIN_SETTINGS;
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
-  const showPreview = !["settings", "users", "logs", "integrations", "help"].includes(tab);
+  const currentRole = data.session?.role ?? "owner_admin";
+  const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
     <div className="space-y-4">
@@ -207,8 +240,8 @@ export function AdminDashboard() {
         board={board}
         tab={tab}
         username={data.username ?? "admin"}
+        role={currentRole}
         savedLabel={savedLabel}
-        helpLink={adminSettings.support_help_link}
         refreshing={refreshing}
         onBoardChange={setBoard}
         onTabChange={setActiveTab}
@@ -275,6 +308,52 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "users" ? <AdminUsersPage /> : null}
+
+        {tab === "push_notices" ? <PushNoticesPanel /> : null}
+
+        {tab === "crossover_communication" ? <StaffOperationsPanel tab="crossover" /> : null}
+
+        {tab === "owner_follow_up" ? <StaffOperationsPanel tab="follow_up" /> : null}
+
+        {tab === "active_issues" ? <StaffOperationsPanel tab="issues" /> : null}
+
+        {tab === "whiteboard_preview" ? (
+          <div className="space-y-4">
+            <LivePreviewPanel
+              board="staff"
+              lobbySettings={lobbySettings}
+              staffSettings={staffSettings}
+              promotions={data.promotions}
+              staffDogs={data.staff_dogs}
+              activeCheckouts={data.active_checkouts}
+              onFullscreen={() => setPreviewOpen(true)}
+            />
+          </div>
+        ) : null}
+
+        {tab === "analytics" ? (
+          <section className="admin-card p-5">
+            <h2 className="admin-page-title">Analytics</h2>
+            <p className="admin-page-subtitle mb-5">Operational summary for the Staff Digital Whiteboard Admin.</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-2xl border border-admin-border p-4"><p className="text-2xl font-black text-white">{data.staff_dogs.length}</p><p className="text-sm text-admin-muted">Staff board dogs loaded</p></div>
+              <div className="rounded-2xl border border-admin-border p-4"><p className="text-2xl font-black text-white">{data.active_checkouts}</p><p className="text-sm text-admin-muted">Active checkouts</p></div>
+              <div className="rounded-2xl border border-admin-border p-4"><p className="text-2xl font-black text-white">{data.failed_events.length}</p><p className="text-sm text-admin-muted">Failed webhook events</p></div>
+            </div>
+          </section>
+        ) : null}
+
+        {tab === "templates" ? (
+          <section className="admin-card p-5">
+            <h2 className="admin-page-title">Templates</h2>
+            <p className="admin-page-subtitle">Reusable communication templates are available inside Crossover Communication when composing a new message.</p>
+            <button type="button" className="admin-btn-primary mt-4" onClick={() => setActiveTab("crossover_communication")}>Open Crossover Templates</button>
+          </section>
+        ) : null}
+
+        {tab === "staff_directory" ? (
+          <StaffDirectoryPanel />
+        ) : null}
 
         {tab === "settings" ? (
           <AdminSettingsPage
