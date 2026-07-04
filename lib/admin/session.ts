@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
 
-export const ADMIN_SESSION_COOKIE = "fitdog_admin_session";
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+export { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 
 export type SessionPayload = {
   sub: string;
@@ -16,14 +16,6 @@ export type AdminSession = {
   adminUserId?: string;
   role?: string;
 };
-
-function getSessionSecret() {
-  return (
-    process.env.ADMIN_SESSION_SECRET?.trim() ||
-    process.env.ADMIN_PASSWORD?.trim() ||
-    "fitdog-dev-session-secret-change-me"
-  );
-}
 
 function signPayload(encoded: string) {
   return createHmac("sha256", getSessionSecret()).update(encoded).digest("base64url");
