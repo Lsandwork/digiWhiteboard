@@ -13,6 +13,11 @@ exception
     null;
 end $$;
 
+-- Ensure login columns exist (014 may not have been applied yet)
+alter table public.staff_directory
+  add column if not exists admin_user_id uuid,
+  add column if not exists dashboard_role text;
+
 do $$
 begin
   alter table public.staff_directory
@@ -28,3 +33,5 @@ exception
   when undefined_table then
     null;
 end $$;
+
+create index if not exists staff_directory_admin_user_id_idx on public.staff_directory(admin_user_id);
