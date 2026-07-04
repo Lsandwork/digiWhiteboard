@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isLobbyAdmin, isLobbyDisplayAuthorized, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbyPromotions } from "@/lib/lobby/settings";
+import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
+    await bumpDisplayContentRevision(getServiceSupabase());
     return NextResponse.json({ promotion: data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to create promotion.";

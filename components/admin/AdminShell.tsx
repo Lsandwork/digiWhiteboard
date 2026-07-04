@@ -13,9 +13,11 @@ type AdminShellProps = {
   role?: string | null;
   savedLabel: string;
   refreshing?: boolean;
+  castRefreshing?: boolean;
   onBoardChange: (board: AdminBoardType) => void;
   onTabChange: (tab: AdminTab) => void;
   onRefresh: () => void;
+  onCastRefresh?: () => void;
   onPreviewLive: () => void;
   onOpenBoard: () => void;
   onLogout: () => void;
@@ -32,9 +34,11 @@ export function AdminShell({
   role,
   savedLabel,
   refreshing,
+  castRefreshing,
   onBoardChange,
   onTabChange,
   onRefresh,
+  onCastRefresh,
   onPreviewLive,
   onOpenBoard,
   onLogout,
@@ -108,6 +112,17 @@ export function AdminShell({
                   <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onRefresh} disabled={refreshing}>
                     {refreshing ? "Refreshing…" : "Refresh"}
                   </button>
+                  {pushNoticesOnly ? null : (
+                    <button
+                      type="button"
+                      className="admin-btn-secondary flex-1 sm:flex-none"
+                      onClick={onCastRefresh}
+                      disabled={castRefreshing || !onCastRefresh}
+                      title="Force a hard reload on every active Chromecast and TV display"
+                    >
+                      {castRefreshing ? "Refreshing TVs…" : "Hard Refresh Cast TVs"}
+                    </button>
+                  )}
                   <button type="button" className="admin-btn-primary flex-1 sm:flex-none" onClick={onOpenBoard}>
                     {board === "staff" ? "Open Staff Whiteboard" : "Open Lobby Whiteboard"}
                   </button>

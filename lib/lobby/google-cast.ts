@@ -191,6 +191,25 @@ export async function stopGoogleCastSession() {
   context.endCurrentSession(true);
 }
 
+export async function broadcastCastHardReload() {
+  if (!isGoogleCastBrowser()) return false;
+
+  try {
+    await initializeGoogleCast();
+    const context = getCastContext();
+    const session = context?.getCurrentSession();
+    if (!session) return false;
+
+    await session.sendMessage(
+      LOBBY_CAST_NAMESPACE,
+      JSON.stringify({ action: "reload", hard: true })
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function isGoogleCastSessionActive() {
   if (isPresentationCastActive()) return true;
   const context = getCastContext();

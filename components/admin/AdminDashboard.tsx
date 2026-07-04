@@ -28,6 +28,7 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
+import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
 import { isStaffOpsLimitedRole, isFullAdminRole, type AdminUserRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
@@ -51,6 +52,7 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [castRefreshing, setCastRefreshing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -188,6 +190,18 @@ export function AdminDashboard() {
     }
   }
 
+  async function hardRefreshCastDisplays() {
+    setCastRefreshing(true);
+    try {
+      const nonce = await requestCastHardRefreshAllDisplays();
+      showToast(`Cast displays will hard refresh now (signal #${nonce}).`, "success");
+    } catch (castError) {
+      showToast(castError instanceof Error ? castError.message : "Cast refresh failed.", "error");
+    } finally {
+      setCastRefreshing(false);
+    }
+  }
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/admin/login");
@@ -248,9 +262,11 @@ export function AdminDashboard() {
         role={currentRole}
         savedLabel={savedLabel}
         refreshing={refreshing}
+        castRefreshing={castRefreshing}
         onBoardChange={setBoard}
         onTabChange={setActiveTab}
         onRefresh={() => void refreshDashboard()}
+        onCastRefresh={() => void hardRefreshCastDisplays()}
         onPreviewLive={() => setPreviewOpen(true)}
         onOpenBoard={openBoard}
         onLogout={() => void logout()}

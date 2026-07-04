@@ -15,6 +15,7 @@ import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useStaffPushNotice } from "@/hooks/useStaffPushNotice";
 import { useStaffTvCast } from "@/hooks/useStaffTvCast";
+import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
 import {
   getCheckoutMergeKey,
@@ -251,6 +252,12 @@ export function BoardClient() {
     },
     [apiEndpoint, runFullPoll]
   );
+
+  useDisplaySync({
+    onContentUpdate: () => {
+      void loadBoard("polling");
+    }
+  });
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {

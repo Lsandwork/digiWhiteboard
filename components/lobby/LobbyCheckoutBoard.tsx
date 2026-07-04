@@ -32,6 +32,7 @@ import type { LobbyCheckoutDebug, LobbyCheckoutsResponse, LobbySettings, LobbySt
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
 import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
+import { useDisplaySync } from "@/hooks/useDisplaySync";
 
 const defaultSettings: LobbySettings = {
   max_queue_count: 6,
@@ -278,6 +279,12 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
   const showIdleSlideshow = !hasCheckout;
+
+  useDisplaySync({
+    onContentUpdate: () => {
+      void loadLobbyMeta();
+    }
+  });
 
   useEffect(() => {
     if (!isTvLayout) return;

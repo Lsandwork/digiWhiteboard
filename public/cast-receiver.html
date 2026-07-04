@@ -56,6 +56,15 @@
 
       context.addCustomMessageListener(CAST_NAMESPACE, (event) => {
         const payload = parseCastPayload(event.data);
+        if (payload?.action === "reload") {
+          if (payload.url) {
+            navigateToBoard(payload.url);
+            return;
+          }
+          statusEl.textContent = "Refreshing digital whiteboard...";
+          window.location.reload();
+          return;
+        }
         navigateToBoard(payload && payload.url);
       });
 

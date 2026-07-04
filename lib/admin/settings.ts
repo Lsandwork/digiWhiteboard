@@ -22,6 +22,8 @@ export type AdminGlobalSettings = {
   admin_alert_email: string;
   enable_publish_reminders: boolean;
   public_display_disabled: boolean;
+  display_content_revision: number;
+  cast_hard_reload_nonce: number;
 };
 
 export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
@@ -45,7 +47,9 @@ export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
   stale_data_warning_minutes: 5,
   admin_alert_email: "",
   enable_publish_reminders: true,
-  public_display_disabled: false
+  public_display_disabled: false,
+  display_content_revision: 0,
+  cast_hard_reload_nonce: 0
 };
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;

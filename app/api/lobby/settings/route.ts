@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isLobbyAdmin, isLobbyDisplayAuthorized, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbySettings, updateLobbySettings } from "@/lib/lobby/settings";
+import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,9 @@ export async function PATCH(request: Request) {
     if ("lobby_message" in body) patch.lobby_message = body.lobby_message == null ? null : String(body.lobby_message);
     if ("class_schedule" in body) patch.class_schedule = body.class_schedule;
 
-    const settings = await updateLobbySettings(getServiceSupabase(), patch);
+    const supabase = getServiceSupabase();
+    const settings = await updateLobbySettings(supabase, patch);
+    await bumpDisplayContentRevision(supabase);
     return NextResponse.json({ settings });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to update lobby settings.";

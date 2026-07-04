@@ -5,6 +5,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { updateLobbySettings } from "@/lib/lobby/settings";
 import { updateStaffBoardSettings } from "@/lib/staff/settings";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
+import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       targetId: "staff",
       details: { version }
     });
+    await bumpDisplayContentRevision(supabase);
     return NextResponse.json({ board, version, published_at: now, published_by: username });
   }
 
@@ -62,5 +64,6 @@ export async function POST(request: Request) {
     targetId: "lobby",
     details: { version }
   });
+  await bumpDisplayContentRevision(supabase);
   return NextResponse.json({ board, version, published_at: now, published_by: username });
 }

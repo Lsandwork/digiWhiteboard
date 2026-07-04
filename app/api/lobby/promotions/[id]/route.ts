@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isLobbyAdmin, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
+import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       .single();
 
     if (error) throw error;
+    await bumpDisplayContentRevision(getServiceSupabase());
     return NextResponse.json({ promotion: data });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to update promotion.";
@@ -42,6 +44,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   try {
     const { error } = await getServiceSupabase().from("lobby_promotions").delete().eq("id", id);
     if (error) throw error;
+    await bumpDisplayContentRevision(getServiceSupabase());
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to delete promotion.";

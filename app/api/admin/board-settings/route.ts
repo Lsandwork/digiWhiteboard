@@ -5,6 +5,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { loadLobbySettings, updateLobbySettings } from "@/lib/lobby/settings";
 import { loadStaffBoardSettings, updateStaffBoardSettings } from "@/lib/staff/settings";
+import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,7 @@ export async function PATCH(request: Request) {
       show_team_reminders: body.show_team_reminders != null ? Boolean(body.show_team_reminders) : undefined,
       footer_message: body.footer_message != null ? String(body.footer_message) : undefined
     });
+    await bumpDisplayContentRevision(supabase);
     return NextResponse.json({ board, settings });
   }
 
@@ -57,6 +59,7 @@ export async function PATCH(request: Request) {
     class_schedule: Array.isArray(body.class_schedule) ? body.class_schedule : undefined
   });
 
+  await bumpDisplayContentRevision(supabase);
   return NextResponse.json({ board, settings });
 }
 
@@ -74,6 +77,7 @@ export async function DELETE(request: Request) {
       show_team_reminders: true,
       footer_message: null
     });
+    await bumpDisplayContentRevision(supabase);
     return NextResponse.json({ board, settings });
   }
 
@@ -87,5 +91,6 @@ export async function DELETE(request: Request) {
     class_schedule: LOBBY_CLASS_SCHEDULE
   });
 
+  await bumpDisplayContentRevision(supabase);
   return NextResponse.json({ board, settings });
 }
