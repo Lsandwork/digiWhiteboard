@@ -40,6 +40,16 @@ import {
   STAFF_STATUSES,
   TEAM_LEAD_DEPARTMENT
 } from "@/lib/staff/admin-ops";
+import {
+  buildMessageFromTemplate,
+  crossoverFieldsFromMessage,
+  extractCustomPlaceholdersFromEdit,
+  findCrossoverTemplate,
+  hasBracketPlaceholders,
+  messageMatchesTemplateStructure,
+  resolveCrossoverMessage,
+  type CrossoverTemplateFields
+} from "@/lib/staff/crossover-templates";
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
 
@@ -67,6 +77,8 @@ type Filters = {
 type CrossoverForm = {
   subject: string;
   message: string;
+  active_template: string | null;
+  custom_placeholders: Record<string, string>;
   from_department: string;
   to_department: string;
   priority: StaffOpsPriority;
@@ -115,6 +127,8 @@ const emptyFilters: Filters = {
 const emptyCrossoverForm: CrossoverForm = {
   subject: "",
   message: "",
+  active_template: null,
+  custom_placeholders: {},
   from_department: "Front Desk",
   to_department: "Daycare",
   priority: "Normal",
@@ -124,6 +138,54 @@ const emptyCrossoverForm: CrossoverForm = {
   assigned_to: "",
   urgent: false
 };
+
+function crossoverFieldsFromForm(form: CrossoverForm): CrossoverTemplateFields {
+  return {
+    dog: form.related_dog_name.trim(),
+    owner: form.related_owner_name.trim(),
+    route: form.related_route.trim(),
+    assignedTo: form.assigned_to.trim(),
+    toDepartment: form.to_department,
+    fromDepartment: form.from_department
+  };
+}
+
+function resolveCrossoverFormMessage(form: CrossoverForm): CrossoverForm {
+  const fields = crossoverFieldsFromForm(form);
+  const template = form.active_template ?? findCrossoverTemplate(form.message, form.subject)?.message ?? null;
+  if (!template && !hasBracketPlaceholders(form.message)) return form;
+  const source = template ?? form.message;
+  return {
+    ...form,
+    active_template: template ?? form.active_template,
+    message: buildMessageFromTemplate(source, fields, form.custom_placeholders)
+  };
+}
+
+function patchCrossoverForm(form: CrossoverForm, patch: Partial<CrossoverForm>, options?: { manualMessage?: string }): CrossoverForm {
+  const next = { ...form, ...patch };
+  if (options?.manualMessage !== undefined) {
+    next.message = options.manualMessage;
+    const template = next.active_template ?? findCrossoverTemplate(options.manualMessage, next.subject)?.message ?? null;
+    if (template) {
+      next.active_template = template;
+      if (!messageMatchesTemplateStructure(template, options.manualMessage)) {
+        return { ...next, active_template: null, custom_placeholders: {} };
+      }
+      next.custom_placeholders = extractCustomPlaceholdersFromEdit(
+        template,
+        options.manualMessage,
+        crossoverFieldsFromForm(next)
+      );
+      return next;
+    }
+    if (hasBracketPlaceholders(options.manualMessage)) {
+      return { ...next, active_template: null };
+    }
+    return next;
+  }
+  return resolveCrossoverFormMessage(next);
+}
 
 const emptyFollowUpForm: FollowUpForm = {
   subject: "",
@@ -230,6 +292,10 @@ function paginate<T>(items: T[], page: number) {
     maxPage,
     rows: items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   };
+}
+
+function displayCrossoverMessage(item: CrossoverMessage) {
+  return resolveCrossoverMessage(item.message, crossoverFieldsFromMessage(item), item.subject);
 }
 
 export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
@@ -471,8 +537,23 @@ function CrossoverPage(props: {
   useEffect(() => {
     if (!props.data) return;
     const fromDepartment = homeDepartmentForUser(props.data.staff_directory, props.data.currentUser);
-    setForm((current) => ({ ...current, from_department: fromDepartment }));
+    setForm((current) => resolveCrossoverFormMessage({ ...current, from_department: fromDepartment }));
   }, [props.data?.currentUser.adminUserId, props.data?.currentUser.email, props.data?.currentUser.role, props.data?.staff_directory]);
+
+  const patchForm = useCallback((patch: Partial<CrossoverForm>, options?: { manualMessage?: string }) => {
+    setForm((current) => patchCrossoverForm(current, patch, options));
+  }, []);
+
+  const pickTemplate = useCallback((template: { title: string; message: string }) => {
+    setForm((current) =>
+      resolveCrossoverFormMessage({
+        ...current,
+        subject: template.title,
+        active_template: template.message,
+        custom_placeholders: {}
+      })
+    );
+  }, []);
 
   const rows = useMemo(() => {
     return (props.data?.crossover_messages ?? []).filter((item) => {
@@ -487,8 +568,13 @@ function CrossoverPage(props: {
   const resolvedThisWeek = (props.data?.crossover_messages ?? []).filter((item) => item.status === "Resolved" && item.resolved_at && new Date(item.resolved_at).getTime() > props.nowMs - 7 * 86400000).length;
 
   async function submit() {
-    await props.onMutate("Unable to send crossover message.", { ...form, action: "create_crossover" }, "Crossover message sent.");
-    setForm(emptyCrossoverForm);
+    const synced = resolveCrossoverFormMessage(form);
+    const { active_template: _activeTemplate, custom_placeholders: _customPlaceholders, ...payload } = synced;
+    await props.onMutate("Unable to send crossover message.", { ...payload, action: "create_crossover" }, "Crossover message sent.");
+    const fromDepartment = props.data
+      ? homeDepartmentForUser(props.data.staff_directory, props.data.currentUser)
+      : emptyCrossoverForm.from_department;
+    setForm({ ...emptyCrossoverForm, from_department: fromDepartment });
   }
 
   return (
@@ -519,10 +605,10 @@ function CrossoverPage(props: {
             )} />
             <Pager page={paged.page} maxPage={paged.maxPage} total={rows.length} onPage={props.setPage} />
           </section>
-          <CrossoverFormCard form={form} setForm={setForm} busy={props.busy} staffOptions={props.staffOptions} onSubmit={submit} />
+          <CrossoverFormCard form={form} patchForm={patchForm} busy={props.busy} staffOptions={props.staffOptions} onSubmit={submit} />
         </div>
         <div className="space-y-5">
-          <TemplatesPanel onPick={(template) => setForm({ ...form, subject: template.title, message: template.message })} />
+          <TemplatesPanel onPick={pickTemplate} />
           <RecentActivityPanel items={props.recentActivity} />
         </div>
       </section>
@@ -541,7 +627,7 @@ function DesktopCrossoverTable({ rows, busy, onMutate, onDetail }: { rows: Cross
         <tbody className="divide-y divide-admin-border">
           {rows.map((item) => (
             <tr key={item.id} className="text-admin-muted">
-              <td className="max-w-xs px-4 py-3"><p className="font-bold text-white">{item.subject}</p><p className="truncate">{item.message}</p></td>
+              <td className="max-w-xs px-4 py-3"><p className="font-bold text-white">{item.subject}</p><p className="truncate">{displayCrossoverMessage(item)}</p></td>
               <td className="px-4 py-3">{item.from_department} to {item.to_department}</td>
               <td className="px-4 py-3"><Badge type="priority" value={item.priority} /></td>
               <td className="px-4 py-3">{formatDateTime(item.updated_at)}</td>
@@ -562,7 +648,7 @@ function CrossoverCard({ item, busy, onMutate, onDetail }: { item: CrossoverMess
       <p className="font-bold text-white">{item.subject}</p>
       <p className="mt-1 text-sm text-admin-muted">{item.from_department} to {item.to_department}</p>
       <div className="mt-3 flex flex-wrap gap-2"><Badge type="priority" value={item.priority} /><Badge type="status" value={item.status} /></div>
-      <p className="mt-3 text-sm text-admin-muted">{item.message}</p>
+      <p className="mt-3 text-sm text-admin-muted">{displayCrossoverMessage(item)}</p>
       <RowActions busy={busy} compact onDetail={() => onDetail(item)} onResolve={() => onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Conversation resolved.")} onReopen={() => onMutate("Unable to reopen.", { action: "update_crossover", id: item.id, status: "Active" }, "Conversation reopened.")} onArchive={() => onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Conversation archived.")} onEscalate={() => onMutate("Unable to escalate.", { action: "update_crossover", id: item.id, urgent: true, priority: "High" }, "Escalated to Active Issues.")} onPush={() => onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.subject, message: item.message, priority: item.priority }, "Pushed to Staff Whiteboard.")} />
     </article>
   );
@@ -731,9 +817,70 @@ function Field({ label, children, required = false }: { label: string; children:
   return <label className="grid gap-2"><span className="text-xs font-bold uppercase tracking-wide text-admin-muted">{label}{required ? " *" : ""}</span>{children}</label>;
 }
 
-function CrossoverFormCard({ form, setForm, busy, staffOptions, onSubmit }: { form: CrossoverForm; setForm: (form: CrossoverForm) => void; busy: boolean; staffOptions: string[]; onSubmit: () => Promise<void> }) {
+function CrossoverFormCard({
+  form,
+  patchForm,
+  busy,
+  staffOptions,
+  onSubmit
+}: {
+  form: CrossoverForm;
+  patchForm: (patch: Partial<CrossoverForm>, options?: { manualMessage?: string }) => void;
+  busy: boolean;
+  staffOptions: string[];
+  onSubmit: () => Promise<void>;
+}) {
   return (
-    <section className="admin-card p-5"><h3 className="text-xl font-black text-white">Create New Crossover Message</h3><p className="mb-4 text-sm text-admin-muted">Send a message or update to another department or team. Type @Name to notify a staff member (for example @Brian).</p><div className="grid gap-4"><div className="grid gap-4 md:grid-cols-3"><SelectField label="From" value={form.from_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => setForm({ ...form, from_department: value })} /><SelectField label="To" value={form.to_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => setForm({ ...form, to_department: value })} /><PrioritySelect value={form.priority} onChange={(priority) => setForm({ ...form, priority })} /></div><Field label="Subject" required><input className="admin-input" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} /></Field><Field label="Message" required><textarea className="admin-input min-h-[96px]" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} /></Field><div className="grid gap-4 md:grid-cols-4"><Field label="Dog"><input className="admin-input" value={form.related_dog_name} onChange={(event) => setForm({ ...form, related_dog_name: event.target.value })} /></Field><Field label="Owner"><input className="admin-input" value={form.related_owner_name} onChange={(event) => setForm({ ...form, related_owner_name: event.target.value })} /></Field><Field label="Route"><input className="admin-input" value={form.related_route} onChange={(event) => setForm({ ...form, related_route: event.target.value })} /></Field><SelectField label="Assigned To" value={form.assigned_to} options={["", ...staffOptions]} onChange={(value) => setForm({ ...form, assigned_to: value })} /></div><label className="admin-toggle-row"><span className="text-sm font-bold text-white">Urgent Alert</span><button type="button" role="switch" aria-checked={form.urgent} className={`admin-toggle ${form.urgent ? "admin-toggle--on" : ""}`} onClick={() => setForm({ ...form, urgent: !form.urgent })}><span className="admin-toggle__knob" /></button></label><div className="flex flex-wrap justify-between gap-2"><button type="button" className="admin-btn-secondary" disabled>Attach File</button><button type="button" className="admin-btn-primary inline-flex items-center gap-2" disabled={busy} onClick={() => void onSubmit()}><Send className="h-4 w-4" /> Send Message</button></div><p className="text-xs text-admin-muted">File upload is safely disabled until project storage is configured.</p></div></section>
+    <section className="admin-card p-5">
+      <h3 className="text-xl font-black text-white">Create New Crossover Message</h3>
+      <p className="mb-4 text-sm text-admin-muted">
+        Pick a template, fill Dog / Owner / Route / Assigned To to replace bracketed placeholders in the message, then edit the message if needed. Type @Name to notify a staff member (for example @Brian).
+      </p>
+      <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <SelectField label="From" value={form.from_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => patchForm({ from_department: value })} />
+          <SelectField label="To" value={form.to_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => patchForm({ to_department: value })} />
+          <PrioritySelect value={form.priority} onChange={(priority) => patchForm({ priority })} />
+        </div>
+        <Field label="Subject" required>
+          <input className="admin-input" value={form.subject} onChange={(event) => patchForm({ subject: event.target.value })} />
+        </Field>
+        <div className="grid gap-4 md:grid-cols-4">
+          <Field label="Dog">
+            <input className="admin-input" value={form.related_dog_name} onChange={(event) => patchForm({ related_dog_name: event.target.value })} />
+          </Field>
+          <Field label="Owner">
+            <input className="admin-input" value={form.related_owner_name} onChange={(event) => patchForm({ related_owner_name: event.target.value })} />
+          </Field>
+          <Field label="Route">
+            <input className="admin-input" value={form.related_route} onChange={(event) => patchForm({ related_route: event.target.value })} />
+          </Field>
+          <SelectField label="Assigned To" value={form.assigned_to} options={["", ...staffOptions]} onChange={(value) => patchForm({ assigned_to: value })} />
+        </div>
+        <Field label="Message" required>
+          <textarea
+            className="admin-input min-h-[96px]"
+            value={form.message}
+            onChange={(event) => patchForm({}, { manualMessage: event.target.value })}
+          />
+        </Field>
+        <label className="admin-toggle-row">
+          <span className="text-sm font-bold text-white">Urgent Alert</span>
+          <button type="button" role="switch" aria-checked={form.urgent} className={`admin-toggle ${form.urgent ? "admin-toggle--on" : ""}`} onClick={() => patchForm({ urgent: !form.urgent })}>
+            <span className="admin-toggle__knob" />
+          </button>
+        </label>
+        <div className="flex flex-wrap justify-between gap-2">
+          <button type="button" className="admin-btn-secondary" disabled>
+            Attach File
+          </button>
+          <button type="button" className="admin-btn-primary inline-flex items-center gap-2" disabled={busy} onClick={() => void onSubmit()}>
+            <Send className="h-4 w-4" /> Send Message
+          </button>
+        </div>
+        <p className="text-xs text-admin-muted">File upload is safely disabled until project storage is configured.</p>
+      </div>
+    </section>
   );
 }
 
@@ -788,7 +935,12 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
   if (!detail) return null;
   const item = resolveDetailItem(data, detail) ?? detail.item;
   const title = "subject" in item ? item.subject : item.title;
-  const description = "message" in item ? item.message : "follow_up_notes" in item ? item.follow_up_notes : item.notes;
+  const description =
+    "message" in item
+      ? displayCrossoverMessage(item as CrossoverMessage)
+      : "follow_up_notes" in item
+        ? item.follow_up_notes
+        : item.notes;
   const replies = detail.type === "crossover" ? (data?.crossover_message_replies ?? []).filter((entry) => entry.crossover_message_id === item.id) : [];
   return (
     <Modal open={Boolean(detail)} title={title} description="View details and update this record without leaving the page." onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2"><button className="admin-btn-secondary" type="button" onClick={onClose}>Close</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark in progress.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "In Progress" }, "Marked in progress.")}>Mark In Progress</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark pending review.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Pending Review" }, "Marked pending review.")}>Pending Review</button><button className="admin-btn-primary" type="button" disabled={busy} onClick={() => void onMutate("Unable to resolve.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Resolved", resolution_notes: resolution }, "Record resolved.")}>Resolve</button></div>}>

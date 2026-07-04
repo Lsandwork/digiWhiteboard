@@ -1,4 +1,5 @@
 import type { AdminUserRole } from "@/lib/admin/users";
+import { crossoverFieldsFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
   dispatchStaffOpsNotifications,
@@ -571,11 +572,27 @@ function markLinkedIssuePendingReview(state: StaffOpsState, sourceTable: "crosso
 
 export async function createCrossoverMessage(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {
   const subject = cleanString(input.subject);
-  const message = cleanString(input.message);
+  const rawMessage = cleanString(input.message);
   const from = cleanString(input.from_department);
   const to = cleanString(input.to_department);
-  if (!subject || !message || !from || !to) throw new Error("Subject, message, from department, and to department are required.");
+  if (!subject || !rawMessage || !from || !to) throw new Error("Subject, message, from department, and to department are required.");
   const now = nowIso();
+  const related_dog_name = optionalString(input.related_dog_name);
+  const related_owner_name = optionalString(input.related_owner_name);
+  const related_route = optionalString(input.related_route);
+  const assigned_to = optionalString(input.assigned_to);
+  const message = resolveCrossoverMessage(
+    rawMessage,
+    crossoverFieldsFromMessage({
+      related_dog_name,
+      related_owner_name,
+      related_route,
+      assigned_to,
+      to_department: to,
+      from_department: from
+    }),
+    subject
+  );
   const record: CrossoverMessage = {
     id: newId(),
     subject,
@@ -584,11 +601,11 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     to_department: to,
     priority: normalizePriority(input.priority),
     status: "Active",
-    related_dog_name: optionalString(input.related_dog_name),
-    related_owner_name: optionalString(input.related_owner_name),
-    related_route: optionalString(input.related_route),
+    related_dog_name,
+    related_owner_name,
+    related_route,
     created_by: actor,
-    assigned_to: optionalString(input.assigned_to),
+    assigned_to,
     urgent: Boolean(input.urgent),
     created_at: now,
     updated_at: now,
