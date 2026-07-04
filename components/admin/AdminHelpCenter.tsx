@@ -14,7 +14,7 @@ import {
   type HelpCategory
 } from "@/lib/admin/help-content";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { isCrossoverStaffRole, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
 
 type QuickLinkItem = {
@@ -27,7 +27,7 @@ const QUICK_LINKS: QuickLinkItem[] = [
   { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer"] },
   { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer"] },
   { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
-  { href: "/admin?board=staff&tab=staff_directory", label: "Staff Directory", roles: ["admin"] },
+  { href: "/admin?board=staff&tab=staff_directory", label: "Staff Directory", roles: ["admin", "staff_ops"] },
   { href: "/admin?tab=integrations", label: "Integrations", roles: ["admin"] },
   { href: "/admin?tab=users", label: "Admin Users", roles: ["admin"] },
   { href: "/admin?tab=settings", label: "Settings", roles: ["admin"] }
@@ -172,6 +172,7 @@ function canOpenAdminTab(role: AdminUserRole, tab?: AdminTab): boolean {
       "crossover_communication",
       "owner_follow_up",
       "active_issues",
+      "staff_directory",
       "whiteboard_preview",
       "analytics",
       "templates",
@@ -179,6 +180,9 @@ function canOpenAdminTab(role: AdminUserRole, tab?: AdminTab): boolean {
       "help"
     ];
     return staffTabs.includes(tab);
+  }
+  if (isCrossoverStaffRole(role)) {
+    return (["crossover_communication", "notifications", "help"] as AdminTab[]).includes(tab);
   }
   return false;
 }

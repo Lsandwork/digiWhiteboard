@@ -86,6 +86,7 @@ type CrossoverForm = {
   to_department: string;
   priority: StaffOpsPriority;
   assigned_to: string;
+  reported_to: string;
   urgent: boolean;
 };
 
@@ -135,6 +136,7 @@ const emptyCrossoverForm: CrossoverForm = {
   to_department: "Daycare",
   priority: "Normal",
   assigned_to: "",
+  reported_to: "",
   urgent: false
 };
 
@@ -290,7 +292,24 @@ function homeDepartmentForUser(
   if (member?.department) return member.department;
   if (currentUser.role === "team_leader") return TEAM_LEAD_DEPARTMENT;
   if (currentUser.role === "front_desk_coordinator") return FRONT_DESK_DEPARTMENT;
+  if (currentUser.role === "groomer") return "Grooming";
+  if (currentUser.role === "trainer") return "Training";
   return FRONT_DESK_DEPARTMENT;
+}
+
+function crossoverReportedTo(item: CrossoverMessage) {
+  return item.reported_to ?? item.assigned_to ?? item.to_department;
+}
+
+function crossoverCreatedByLabel(
+  directory: StaffDirectoryMember[] | undefined,
+  createdBy: string | null | undefined
+) {
+  if (!createdBy) return "Staff";
+  const member =
+    directory?.find((entry) => entry.email?.trim().toLowerCase() === createdBy.trim().toLowerCase()) ??
+    directory?.find((entry) => entry.admin_user_id === createdBy);
+  return member?.name ?? createdBy;
 }
 
 function paginate<T>(items: T[], page: number) {
@@ -604,12 +623,16 @@ function CrossoverPage(props: {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Crossover Communication" subtitle="Manage crossover communication between departments and team members." loading={props.loading} />
+      <PageHeader
+        title="Crossover Communication"
+        subtitle="Main staff communication log between departments. Every entry is timestamped with the sender and who it was reported to. Urgent or high-priority items trigger alerts with full message details."
+        loading={props.loading}
+      />
       <StatGrid cards={[
         { label: "Active Threads", value: rows.filter((item) => item.status !== "Resolved" && item.status !== "Archived").length, helper: "Require attention", icon: <MessageSquare className="h-5 w-5" /> },
         { label: "Messages Sent Today", value: (props.data?.crossover_messages ?? []).filter((item) => isToday(item.created_at)).length, helper: "Today", icon: <Send className="h-5 w-5" /> },
         { label: "Resolved This Week", value: resolvedThisWeek, helper: "This week", icon: <CheckCircle2 className="h-5 w-5" /> },
-        { label: "Avg Response Time", value: "2.1h", helper: "Based on replies", icon: <RotateCcw className="h-5 w-5" /> }
+        { label: "Urgent / High Alerts", value: rows.filter((item) => item.urgent || item.priority === "High" || item.priority === "Critical").length, helper: "Active log entries", icon: <AlertTriangle className="h-5 w-5" /> }
       ]} />
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
@@ -624,9 +647,9 @@ function CrossoverPage(props: {
               </div>
               <FilterBar filters={props.filters} setFilters={props.setFilters} type="crossover" staffOptions={props.staffOptions} />
             </div>
-            <DesktopCrossoverTable rows={paged.rows} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />
+            <DesktopCrossoverTable rows={paged.rows} busy={props.busy} directory={props.data?.staff_directory} onMutate={props.onMutate} onDetail={props.onDetail} />
             <MobileCards rows={paged.rows} render={(item) => (
-              <CrossoverCard item={item} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />
+              <CrossoverCard item={item} busy={props.busy} directory={props.data?.staff_directory} onMutate={props.onMutate} onDetail={props.onDetail} />
             )} />
             <Pager page={paged.page} maxPage={paged.maxPage} total={rows.length} onPage={props.setPage} />
           </section>
@@ -642,36 +665,50 @@ function CrossoverPage(props: {
   );
 }
 
-function DesktopCrossoverTable({ rows, busy, onMutate, onDetail }: { rows: CrossoverMessage[]; busy: boolean; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: CrossoverMessage) => void }) {
+function DesktopCrossoverTable({ rows, busy, directory, onMutate, onDetail }: { rows: CrossoverMessage[]; busy: boolean; directory?: StaffDirectoryMember[]; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: CrossoverMessage) => void }) {
   return (
     <div className="hidden overflow-x-auto md:block">
       <table className="min-w-full divide-y divide-admin-border text-sm">
         <thead className="bg-white/[0.03] text-left text-xs uppercase tracking-wide text-admin-muted">
-          <tr><th className="px-4 py-3">Thread / Subject</th><th className="px-4 py-3">From to To</th><th className="px-4 py-3">Priority</th><th className="px-4 py-3">Last Message</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr>
+          <tr>
+            <th className="px-4 py-3">Thread / Subject</th>
+            <th className="px-4 py-3">From → To</th>
+            <th className="px-4 py-3">Reported By</th>
+            <th className="px-4 py-3">Reported To</th>
+            <th className="px-4 py-3">Logged</th>
+            <th className="px-4 py-3">Priority</th>
+            <th className="px-4 py-3">Status</th>
+            <th className="px-4 py-3 text-right">Actions</th>
+          </tr>
         </thead>
         <tbody className="divide-y divide-admin-border">
           {rows.map((item) => (
             <tr key={item.id} className="text-admin-muted">
               <td className="max-w-xs px-4 py-3"><p className="font-bold text-white">{item.subject}</p><p className="truncate">{displayCrossoverMessage(item)}</p></td>
-              <td className="px-4 py-3">{item.from_department} to {item.to_department}</td>
+              <td className="px-4 py-3">{item.from_department} → {item.to_department}</td>
+              <td className="px-4 py-3">{crossoverCreatedByLabel(directory, item.created_by)}</td>
+              <td className="px-4 py-3 font-semibold text-white">{crossoverReportedTo(item)}</td>
+              <td className="px-4 py-3">{formatDateTime(item.created_at)}</td>
               <td className="px-4 py-3"><Badge type="priority" value={item.priority} /></td>
-              <td className="px-4 py-3">{formatDateTime(item.updated_at)}</td>
               <td className="px-4 py-3"><Badge type="status" value={item.status} /></td>
               <td className="px-4 py-3"><RowActions busy={busy} onDetail={() => onDetail(item)} onResolve={() => onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Conversation resolved.")} onReopen={() => onMutate("Unable to reopen.", { action: "update_crossover", id: item.id, status: "Active" }, "Conversation reopened.")} onArchive={() => onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Conversation archived.")} onEscalate={() => onMutate("Unable to escalate.", { action: "update_crossover", id: item.id, urgent: true, priority: item.priority === "Critical" ? "Critical" : "High" }, "Escalated to Active Issues.")} onPush={() => onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.subject, message: item.message, priority: item.priority }, "Pushed to Staff Whiteboard.")} /></td>
             </tr>
           ))}
-          {!rows.length ? <tr><td className="px-4 py-8 text-center text-admin-muted" colSpan={6}>No conversations found.</td></tr> : null}
+          {!rows.length ? <tr><td className="px-4 py-8 text-center text-admin-muted" colSpan={8}>No conversations found.</td></tr> : null}
         </tbody>
       </table>
     </div>
   );
 }
 
-function CrossoverCard({ item, busy, onMutate, onDetail }: { item: CrossoverMessage; busy: boolean; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: CrossoverMessage) => void }) {
+function CrossoverCard({ item, busy, directory, onMutate, onDetail }: { item: CrossoverMessage; busy: boolean; directory?: StaffDirectoryMember[]; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: CrossoverMessage) => void }) {
   return (
     <article className="rounded-2xl border border-admin-border bg-white/[0.03] p-4">
       <p className="font-bold text-white">{item.subject}</p>
-      <p className="mt-1 text-sm text-admin-muted">{item.from_department} to {item.to_department}</p>
+      <p className="mt-1 text-sm text-admin-muted">{item.from_department} → {item.to_department}</p>
+      <p className="mt-1 text-xs text-admin-muted">
+        {crossoverCreatedByLabel(directory, item.created_by)} • {formatDateTime(item.created_at)} • Reported to {crossoverReportedTo(item)}
+      </p>
       <div className="mt-3 flex flex-wrap gap-2"><Badge type="priority" value={item.priority} /><Badge type="status" value={item.status} /></div>
       <p className="mt-3 text-sm text-admin-muted">{displayCrossoverMessage(item)}</p>
       <RowActions busy={busy} compact onDetail={() => onDetail(item)} onResolve={() => onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Conversation resolved.")} onReopen={() => onMutate("Unable to reopen.", { action: "update_crossover", id: item.id, status: "Active" }, "Conversation reopened.")} onArchive={() => onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Conversation archived.")} onEscalate={() => onMutate("Unable to escalate.", { action: "update_crossover", id: item.id, urgent: true, priority: "High" }, "Escalated to Active Issues.")} onPush={() => onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.subject, message: item.message, priority: item.priority }, "Pushed to Staff Whiteboard.")} />
@@ -862,13 +899,17 @@ function CrossoverFormCard({
     <section className="admin-card p-5">
       <h3 className="text-xl font-black text-white">Create New Crossover Message</h3>
       <p className="mb-4 text-sm text-admin-muted">
-        Pick a template on the right — the fill fields below adapt to that topic. Type @Name to notify a staff member (for example @Brian).
+        Log handoffs in the main communication record. Timestamp, sender, and report-to are saved automatically. Urgent or high priority sends an alert with the full message.
       </p>
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-3">
           <SelectField label="From" value={form.from_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => patchForm({ from_department: value })} />
-          <SelectField label="To" value={form.to_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => patchForm({ to_department: value })} />
+          <SelectField label="To" value={form.to_department} options={[...STAFF_DEPARTMENTS]} onChange={(value) => patchForm({ to_department: value, reported_to: form.reported_to || value })} />
           <PrioritySelect value={form.priority} onChange={(priority) => patchForm({ priority })} />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <SelectField label="Report To (Staff or Department)" value={form.reported_to} options={["", ...staffOptions, ...STAFF_DEPARTMENTS]} onChange={(value) => patchForm({ reported_to: value, assigned_to: staffOptions.includes(value) ? value : form.assigned_to })} />
+          <SelectField label="Assign To (optional)" value={form.assigned_to} options={["", ...staffOptions]} onChange={(value) => patchForm({ assigned_to: value, reported_to: form.reported_to || value })} />
         </div>
         <Field label="Subject" required>
           <input className="admin-input" value={form.subject} onChange={(event) => patchForm({ subject: event.target.value })} />
@@ -1022,6 +1063,16 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
   return (
     <Modal open={Boolean(detail)} title={title} description="View details and update this record without leaving the page." onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2"><button className="admin-btn-secondary" type="button" onClick={onClose}>Close</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark in progress.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "In Progress" }, "Marked in progress.")}>Mark In Progress</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark pending review.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Pending Review" }, "Marked pending review.")}>Pending Review</button><button className="admin-btn-primary" type="button" disabled={busy} onClick={() => void onMutate("Unable to resolve.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Resolved", resolution_notes: resolution }, "Record resolved.")}>Resolve</button></div>}>
       <div className="grid gap-4">
+        {detail.type === "crossover" && "from_department" in item ? (
+          <div className="grid gap-2 rounded-2xl border border-admin-border bg-white/[0.03] p-4 text-sm text-admin-muted md:grid-cols-2">
+            <p><span className="font-bold text-white">Logged:</span> {formatDateTime(item.created_at)}</p>
+            <p><span className="font-bold text-white">Updated:</span> {formatDateTime(item.updated_at)}</p>
+            <p><span className="font-bold text-white">Reported by:</span> {crossoverCreatedByLabel(data?.staff_directory, item.created_by)}</p>
+            <p><span className="font-bold text-white">Reported to:</span> {crossoverReportedTo(item as CrossoverMessage)}</p>
+            <p><span className="font-bold text-white">From → To:</span> {item.from_department} → {item.to_department}</p>
+            {item.assigned_to ? <p><span className="font-bold text-white">Assigned to:</span> {item.assigned_to}</p> : null}
+          </div>
+        ) : null}
         <div className="rounded-2xl border border-admin-border bg-white/[0.03] p-4"><div className="mb-3 flex flex-wrap gap-2"><Badge type="priority" value={item.priority} /><Badge type="status" value={item.status} /></div><p className="whitespace-pre-wrap text-sm text-admin-muted">{description || "No notes provided."}</p></div>
         {"assigned_to" in item ? <SelectField label="Assign / Reassign" value={item.assigned_to ?? ""} options={["", ...staffOptions]} onChange={(value) => void onMutate("Unable to assign.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, assigned_to: value }, "Assignment updated.")} /> : null}
         <PrioritySelect value={item.priority} onChange={(priority) => void onMutate("Unable to change priority.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, priority }, "Priority updated.")} />

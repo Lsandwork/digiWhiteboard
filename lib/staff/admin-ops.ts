@@ -42,6 +42,7 @@ export type CrossoverMessage = {
   template_field_values: Record<string, string> | null;
   created_by: string | null;
   assigned_to: string | null;
+  reported_to: string | null;
   urgent: boolean;
   created_at: string;
   updated_at: string;
@@ -163,6 +164,8 @@ export const TEAM_LEAD_DEPARTMENT = "Team Lead";
 export function departmentForDashboardRole(role?: AdminUserRole | null) {
   if (role === "team_leader") return TEAM_LEAD_DEPARTMENT;
   if (role === "front_desk_coordinator") return FRONT_DESK_DEPARTMENT;
+  if (role === "groomer") return "Grooming";
+  if (role === "trainer") return "Training";
   return null;
 }
 
@@ -612,6 +615,11 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     template_field_values: legacy.template_field_values,
     created_by: actor,
     assigned_to: optionalString(input.assigned_to) ?? legacy.assigned_to,
+    reported_to:
+      optionalString(input.reported_to) ??
+      optionalString(input.assigned_to) ??
+      legacy.assigned_to ??
+      to,
     urgent: Boolean(input.urgent),
     created_at: now,
     updated_at: now,
@@ -621,7 +629,7 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
   state = createActivityLog({ ...state, crossover_messages: sortNewest([record, ...state.crossover_messages]) }, {
     activity_type: "crossover.created",
     title: `New message: ${record.subject}`,
-    description: `${record.from_department} to ${record.to_department}`,
+    description: `${record.from_department} → ${record.to_department} • Reported to ${record.reported_to ?? record.to_department} • By ${actor ?? "Staff"}`,
     source_table: "crossover_messages",
     source_id: record.id,
     created_by: actor
@@ -632,11 +640,14 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     sourceTable: "crossover_messages",
     sourceId: record.id,
     sourceTab: crossoverTab(),
-    title: `New crossover: ${record.subject}`,
+    title: isUrgent(record.priority, record.urgent)
+      ? `Urgent crossover: ${record.subject}`
+      : `New crossover: ${record.subject}`,
     body: record.message,
     priority: record.priority,
     urgent: record.urgent,
     assignedTo: record.assigned_to,
+    toDepartment: record.to_department,
     mentionText: record.message,
     actor
   });
@@ -648,13 +659,14 @@ export async function replyToCrossoverMessage(supabase: SupabaseClient, id: stri
   const text = cleanString(message);
   if (!text) throw new Error("Reply message is required.");
   const state = await loadState(supabase);
-  if (!state.crossover_messages.some((item) => item.id === id)) throw new Error("Crossover message not found.");
+  const parent = state.crossover_messages.find((item) => item.id === id);
+  if (!parent) throw new Error("Crossover message not found.");
   const reply: CrossoverReply = { id: newId(), crossover_message_id: id, message: text, created_by: actor, created_at: nowIso() };
   const next = notifyState(
     createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
       activity_type: "crossover.reply",
       title: "Reply added to crossover message",
-      description: text,
+      description: `${actor ?? "Staff"} replied: ${text}`,
       source_table: "crossover_messages",
       source_id: id,
       created_by: actor
@@ -664,9 +676,12 @@ export async function replyToCrossoverMessage(supabase: SupabaseClient, id: stri
       sourceTable: "crossover_messages",
       sourceId: id,
       sourceTab: crossoverTab(),
-      title: "New crossover reply",
+      title: `Reply on crossover: ${parent.subject}`,
       body: text,
-      priority: "Medium",
+      priority: parent.priority,
+      urgent: parent.urgent,
+      toDepartment: parent.to_department,
+      assignedTo: parent.assigned_to,
       mentionText: text,
       actor
     }
@@ -703,6 +718,7 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
             ? (patch.field_values as Record<string, string>)
             : item.template_field_values ?? null,
         assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
+        reported_to: patch.reported_to !== undefined ? optionalString(patch.reported_to) : item.reported_to,
         urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
         updated_at: now,
         resolved_at: status === "Resolved" ? item.resolved_at ?? now : status === "Archived" ? item.resolved_at : null
@@ -727,11 +743,14 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
     sourceTable: "crossover_messages",
     sourceId: updatedRecord.id,
     sourceTab: crossoverTab(),
-    title: `Crossover updated: ${updatedRecord.subject}`,
+    title: isUrgent(updatedRecord.priority, updatedRecord.urgent)
+      ? `Urgent crossover updated: ${updatedRecord.subject}`
+      : `Crossover updated: ${updatedRecord.subject}`,
     body: updatedRecord.message,
     priority: updatedRecord.priority,
     urgent: updatedRecord.urgent,
     assignedTo: updatedRecord.assigned_to,
+    toDepartment: updatedRecord.to_department,
     mentionText: updatedRecord.message,
     actor
   });

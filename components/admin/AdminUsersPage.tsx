@@ -17,8 +17,10 @@ type UsersPayload = {
 const roleOptions: { value: AdminUserRole; label: string; description: string }[] = [
   { value: "owner_admin", label: "Owner Admin", description: "Full dashboard and user management access." },
   { value: "manager_admin", label: "Manager Admin", description: "Manage day-to-day admin tools and board content." },
-  { value: "front_desk_coordinator", label: "Front Desk - Coordinator", description: "Staff board Push Notices and staff operations tabs only." },
-  { value: "team_leader", label: "Team Lead", description: "Team Lead department with the same staff board access as Front Desk Coordinator." },
+  { value: "front_desk_coordinator", label: "Front Desk - Coordinator", description: "Staff board Push Notices, staff operations tabs, and read-only Staff Directory." },
+  { value: "team_leader", label: "Team Lead", description: "Team Lead department with staff operations tabs and read-only Staff Directory." },
+  { value: "groomer", label: "Groomer", description: "Crossover Communication and notifications for Grooming department handoffs." },
+  { value: "trainer", label: "Trainer", description: "Crossover Communication and notifications for Training department handoffs." },
   { value: "viewer", label: "Viewer", description: "Read-only dashboard access." }
 ];
 

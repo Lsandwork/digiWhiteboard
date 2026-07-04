@@ -4,9 +4,10 @@ import { FormEvent, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
-import { isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { isCrossoverStaffRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 
 function defaultAdminRoute(role?: string) {
+  if (isCrossoverStaffRole(role)) return "/admin?board=staff&tab=crossover_communication";
   if (isStaffOpsLimitedRole(role)) return "/admin?board=staff&tab=push_notices";
   return "/admin";
 }

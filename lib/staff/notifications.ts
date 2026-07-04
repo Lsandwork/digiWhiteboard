@@ -1,5 +1,10 @@
 import type { AdminUserRole } from "@/lib/admin/users";
-import { isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import {
+  canAccessCrossoverCommunication,
+  isCrossoverStaffRole,
+  isFullAdminRole,
+  isStaffOpsLimitedRole
+} from "@/lib/admin/users";
 import type { StaffDirectoryMember, StaffOpsPriority, StaffOpsState } from "@/lib/staff/admin-ops";
 
 export type StaffNotificationType = "assignment" | "mention" | "update" | "reply" | "escalation" | "auto_issue";
@@ -8,7 +13,8 @@ export type StaffNotificationTarget =
   | { kind: "staff_name"; name: string }
   | { kind: "staff_email"; email: string }
   | { kind: "coordinator_pool" }
-  | { kind: "admin_pool" };
+  | { kind: "admin_pool" }
+  | { kind: "department_pool"; department: string };
 
 export type StaffNotificationSourceTab =
   | "crossover_communication"
@@ -42,6 +48,7 @@ export type StaffOpsNotificationEvent = {
   priority: StaffOpsPriority;
   urgent?: boolean;
   assignedTo?: string | null;
+  toDepartment?: string | null;
   mentionText?: string | null;
   actor: string | null;
 };
@@ -105,6 +112,26 @@ function matchesStaffNameTarget(
   return false;
 }
 
+function homeDepartmentForRole(role?: string | null) {
+  if (role === "team_leader") return "Team Lead";
+  if (role === "front_desk_coordinator") return "Front Desk";
+  if (role === "groomer") return "Grooming";
+  if (role === "trainer") return "Training";
+  return null;
+}
+
+function matchesDepartmentTarget(
+  target: Extract<StaffNotificationTarget, { kind: "department_pool" }>,
+  directory: StaffDirectoryMember[],
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  const member = findMemberForSession(directory, session.email, session.adminUserId);
+  if (member?.department === target.department) return true;
+  const homeDepartment = homeDepartmentForRole(session.role);
+  if (homeDepartment === target.department) return true;
+  return isFullAdminRole(session.role) || isStaffOpsLimitedRole(session.role);
+}
+
 export function notificationVisibleToUser(
   notification: StaffNotification,
   directory: StaffDirectoryMember[],
@@ -119,6 +146,8 @@ export function notificationVisibleToUser(
       return isStaffOpsLimitedRole(session.role);
     case "admin_pool":
       return isFullAdminRole(session.role);
+    case "department_pool":
+      return matchesDepartmentTarget(notification.target, directory, session);
     default:
       return false;
   }
@@ -161,28 +190,36 @@ function buildNotification(event: StaffOpsNotificationEvent, target: StaffNotifi
 export function dispatchStaffOpsNotifications(state: StaffOpsState, event: StaffOpsNotificationEvent): StaffOpsState {
   const staffNames = state.staff_directory.filter((member) => member.status === "Active").map((member) => member.name);
   const created: StaffNotification[] = [];
+  const isCrossover = event.sourceTab === "crossover_communication";
+  const shouldAlert = isHighOrUrgentPriority(event.priority, event.urgent);
+
+  if (isCrossover && (event.eventType === "created" || event.eventType === "updated") && !shouldAlert) {
+    return state;
+  }
 
   const baseType: StaffNotificationType =
     event.eventType === "reply" ? "reply" : event.eventType === "auto_issue" ? "auto_issue" : event.eventType === "created" ? "update" : "update";
 
-  created.push(
-    buildNotification(event, { kind: "coordinator_pool" }, baseType)
-  );
+  if (!isCrossover || shouldAlert) {
+    created.push(buildNotification(event, { kind: "coordinator_pool" }, shouldAlert ? "escalation" : baseType));
+  }
 
   if (event.assignedTo) {
-    created.push(
-      buildNotification(event, { kind: "staff_name", name: event.assignedTo }, "assignment")
-    );
+    created.push(buildNotification(event, { kind: "staff_name", name: event.assignedTo }, "assignment"));
   }
 
   for (const name of extractAtMentions(event.mentionText ?? "", staffNames)) {
     if (name === event.assignedTo) continue;
+    created.push(buildNotification(event, { kind: "staff_name", name }, "mention"));
+  }
+
+  if (shouldAlert && event.toDepartment) {
     created.push(
-      buildNotification(event, { kind: "staff_name", name }, "mention")
+      buildNotification(event, { kind: "department_pool", department: event.toDepartment }, "escalation")
     );
   }
 
-  if (isHighOrUrgentPriority(event.priority, event.urgent)) {
+  if (shouldAlert) {
     created.push(
       buildNotification(event, { kind: "admin_pool" }, event.eventType === "auto_issue" ? "auto_issue" : "escalation")
     );
@@ -231,5 +268,14 @@ export function coordinatorRolesInDirectory(directory: StaffDirectoryMember[]) {
 export function adminRolesInDirectory(directory: StaffDirectoryMember[]) {
   return directory.filter(
     (member) => member.status === "Active" && member.dashboard_role && ADMIN_ROLES.includes(member.dashboard_role)
+  );
+}
+
+export function crossoverAccessRolesInDirectory(directory: StaffDirectoryMember[]) {
+  return directory.filter(
+    (member) =>
+      member.status === "Active" &&
+      member.dashboard_role &&
+      (canAccessCrossoverCommunication(member.dashboard_role) || isCrossoverStaffRole(member.dashboard_role))
   );
 }

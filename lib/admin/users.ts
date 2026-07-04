@@ -11,7 +11,14 @@ export function normalizeAdminUserId(value?: string | null) {
   return isAdminUserUuid(value) ? value! : null;
 }
 
-export type AdminUserRole = "owner_admin" | "manager_admin" | "front_desk_coordinator" | "team_leader" | "viewer";
+export type AdminUserRole =
+  | "owner_admin"
+  | "manager_admin"
+  | "front_desk_coordinator"
+  | "team_leader"
+  | "groomer"
+  | "trainer"
+  | "viewer";
 export type AdminUserStatus = "active" | "disabled";
 
 export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
@@ -19,6 +26,8 @@ export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   manager_admin: "Manager Admin",
   front_desk_coordinator: "Front Desk Coordinator",
   team_leader: "Team Lead",
+  groomer: "Groomer",
+  trainer: "Trainer",
   viewer: "Viewer"
 };
 
@@ -28,6 +37,8 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
   manager_admin: "Manager Admin",
   front_desk_coordinator: "Front Desk - Coordinator",
   team_leader: "Team Lead",
+  groomer: "Groomer",
+  trainer: "Trainer",
   viewer: "Viewer"
 };
 
@@ -42,6 +53,7 @@ export function getAdminSidebarRoleLabel(role?: string | null, email?: string | 
 }
 
 export const STAFF_OPS_LIMITED_ROLES: AdminUserRole[] = ["front_desk_coordinator", "team_leader"];
+export const CROSSOVER_STAFF_ROLES: AdminUserRole[] = ["groomer", "trainer"];
 
 /** Front Desk Coordinator and Team Leader share the same staff admin access. */
 export const COORDINATOR_LIKE_ROLES = STAFF_OPS_LIMITED_ROLES;
@@ -50,13 +62,35 @@ export function isStaffOpsLimitedRole(role?: string | null) {
   return role === "front_desk_coordinator" || role === "team_leader";
 }
 
+export function isCrossoverStaffRole(role?: string | null) {
+  return role === "groomer" || role === "trainer";
+}
+
 /** Alias: true for Front Desk Coordinator and Team Leader. */
 export function hasCoordinatorAccess(role?: string | null) {
   return isStaffOpsLimitedRole(role);
 }
 
+/** Crossover Communication tab — coordinators, management, admins, groomers, trainers. */
+export function canAccessCrossoverCommunication(role?: string | null) {
+  return isFullAdminRole(role) || hasCoordinatorAccess(role) || isCrossoverStaffRole(role);
+}
+
+export function isStaffPanelLimitedRole(role?: string | null) {
+  return isStaffOpsLimitedRole(role) || isCrossoverStaffRole(role);
+}
+
 export function isFullAdminRole(role?: string | null) {
   return role === "owner_admin" || role === "manager_admin" || !role;
+}
+
+/** View Staff Directory — coordinators and full admins; mutations remain full-admin only. */
+export function canViewStaffDirectory(role?: string | null) {
+  return isFullAdminRole(role) || hasCoordinatorAccess(role);
+}
+
+export function canManageStaffDirectory(role?: string | null) {
+  return isFullAdminRole(role);
 }
 
 export type AdminUserRecord = {

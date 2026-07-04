@@ -29,7 +29,7 @@ import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
-import { isStaffOpsLimitedRole, isFullAdminRole, type AdminUserRole } from "@/lib/admin/users";
+import { isCrossoverStaffRole, isStaffOpsLimitedRole, isFullAdminRole, type AdminUserRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -103,11 +103,26 @@ export function AdminDashboard() {
 
   useEffect(() => {
     const role = data?.session?.role;
-    const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "notifications", "help"];
+    const coordinatorTabs: AdminTab[] = [
+      "push_notices",
+      "crossover_communication",
+      "owner_follow_up",
+      "active_issues",
+      "staff_directory",
+      "whiteboard_preview",
+      "analytics",
+      "templates",
+      "notifications",
+      "help"
+    ];
+    const crossoverStaffTabs: AdminTab[] = ["crossover_communication", "notifications", "help"];
+    if (isCrossoverStaffRole(role) && (board !== "staff" || !crossoverStaffTabs.includes(tab))) {
+      router.replace("/admin?board=staff&tab=crossover_communication");
+    }
     if (isStaffOpsLimitedRole(role) && (board !== "staff" || !coordinatorTabs.includes(tab))) {
       router.replace("/admin?board=staff&tab=push_notices");
     }
-    if (!isFullAdminRole(role) && tab === "staff_directory") {
+    if (!isFullAdminRole(role) && tab === "users") {
       router.replace(isStaffOpsLimitedRole(role) ? "/admin?board=staff&tab=push_notices" : "/admin?tab=help");
     }
   }, [board, data?.session?.role, router, tab]);

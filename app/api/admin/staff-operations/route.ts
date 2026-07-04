@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeAdminUserId } from "@/lib/admin/users";
-import { canManageStaffDirectory, canManageStaffOperations, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canAccessCrossoverCommunication, canManageStaffDirectory, canManageStaffOperations, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { createAndPushStaffNotice } from "@/lib/staff/push-notices";
@@ -24,9 +24,16 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-function forbiddenResponse() {
+function crossoverForbiddenResponse() {
+  return NextResponse.json({ error: "You do not have permission to access Crossover Communication." }, { status: 403 });
+}
+
+function staffOpsForbiddenResponse() {
   return NextResponse.json({ error: "You do not have permission to manage Staff Admin records." }, { status: 403 });
 }
+
+const CROSSOVER_ACTIONS = new Set(["create_crossover", "update_crossover", "reply_crossover"]);
+const NOTIFICATION_ACTIONS = new Set(["mark_notification_read", "mark_all_notifications_read"]);
 
 function actorFromRequest(request: Request) {
   const session = getAdminSessionFromRequest(request);
@@ -40,7 +47,9 @@ function actorFromRequest(request: Request) {
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   const { session } = actorFromRequest(request);
-  if (!canManageStaffOperations(session?.role)) return forbiddenResponse();
+  if (!canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
+    return staffOpsForbiddenResponse();
+  }
 
   try {
     const state = await listStaffOps(getServiceSupabase());
@@ -61,12 +70,32 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   const { session, actor, actorAdminId } = actorFromRequest(request);
-  if (!canManageStaffOperations(session?.role)) return forbiddenResponse();
+  if (!canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
+    return staffOpsForbiddenResponse();
+  }
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action ?? "");
     const supabase = getServiceSupabase();
+
+    if (CROSSOVER_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role)) {
+      return crossoverForbiddenResponse();
+    }
+    if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
+      return staffOpsForbiddenResponse();
+    }
+    if (
+      !CROSSOVER_ACTIONS.has(action) &&
+      !NOTIFICATION_ACTIONS.has(action) &&
+      action !== "create_staff_member" &&
+      action !== "update_staff_member" &&
+      action !== "delete_staff_member" &&
+      !canManageStaffOperations(session?.role)
+    ) {
+      return staffOpsForbiddenResponse();
+    }
+
     let result: unknown;
     let auditAction = "staff.ops.action";
 
@@ -96,16 +125,16 @@ export async function POST(request: Request) {
       result = await updateActiveIssue(supabase, id, body, actor);
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
-      if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
+      if (!canManageStaffDirectory(session?.role)) return staffOpsForbiddenResponse();
       result = await createStaffDirectoryMember(supabase, body, actor, actorAdminId);
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
-      if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
+      if (!canManageStaffDirectory(session?.role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
       result = await updateStaffDirectoryMember(supabase, id, body, actor, actorAdminId);
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
-      if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
+      if (!canManageStaffDirectory(session?.role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
       await deleteStaffDirectoryMember(supabase, id, actor);
       result = { id };

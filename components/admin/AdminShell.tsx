@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
-import { isStaffOpsLimitedRole, isFullAdminRole } from "@/lib/admin/users";
+import { canViewStaffDirectory, isCrossoverStaffRole, isStaffOpsLimitedRole, isStaffPanelLimitedRole } from "@/lib/admin/users";
 import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 
@@ -49,24 +49,28 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
-  const canManagePushNotices = role !== "viewer";
-  const canManageStaffOps = role !== "viewer";
-  const pushNoticesOnly = isStaffOpsLimitedRole(role);
+  const canManagePushNotices = role !== "viewer" && !isCrossoverStaffRole(role);
+  const canManageStaffOps = role !== "viewer" && !isCrossoverStaffRole(role);
+  const staffPanelLimited = isStaffPanelLimitedRole(role);
+  const crossoverStaffOnly = isCrossoverStaffRole(role);
   const staffOpsTabs: AdminTab[] = [
     "push_notices",
     "crossover_communication",
     "owner_follow_up",
     "active_issues",
+    "staff_directory",
     "whiteboard_preview",
     "analytics",
     "templates",
     "notifications",
     "help"
   ];
+  const crossoverStaffTabs: AdminTab[] = ["crossover_communication", "notifications", "help"];
 
   const visibleTabs = ADMIN_TABS.filter((item) => {
-    if (item === "staff_directory" && !isFullAdminRole(role)) return false;
-    if (pushNoticesOnly) return staffOpsTabs.includes(item) && item !== "settings";
+    if (item === "staff_directory" && !canViewStaffDirectory(role)) return false;
+    if (crossoverStaffOnly) return crossoverStaffTabs.includes(item);
+    if (staffPanelLimited && !crossoverStaffOnly) return staffOpsTabs.includes(item) && item !== "settings";
     if (board === "staff" && (item === "promotions" || item === "schedule")) return false;
     if (board === "staff" && item === "users") return false;
     if (item === "push_notices" && !canManagePushNotices) return false;
@@ -95,7 +99,7 @@ export function AdminShell({
               <div className="min-w-0">
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                   <MobileMenuButton onClick={() => setMobileOpen(true)} />
-                  {pushNoticesOnly ? null : <BoardSwitcher board={board} onChange={onBoardChange} />}
+                  {staffPanelLimited ? null : <BoardSwitcher board={board} onChange={onBoardChange} />}
                   <span className="admin-status-dot" aria-hidden />
                   <span className="text-xs font-semibold text-emerald-400">Online</span>
                 </div>
@@ -108,11 +112,11 @@ export function AdminShell({
               <div className="flex flex-col items-start gap-2 lg:items-end">
                 <p className="text-xs text-admin-muted">{savedLabel}</p>
                 <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
-                  {pushNoticesOnly ? null : <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>Preview Live</button>}
+                  {staffPanelLimited ? null : <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>Preview Live</button>}
                   <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onRefresh} disabled={refreshing}>
                     {refreshing ? "Refreshing…" : "Refresh"}
                   </button>
-                  {pushNoticesOnly ? null : (
+                  {staffPanelLimited ? null : (
                     <button
                       type="button"
                       className="admin-btn-secondary flex-1 sm:flex-none"

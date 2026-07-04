@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { ADMIN_USER_ROLE_LABELS } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS, isFullAdminRole } from "@/lib/admin/users";
 import type { StaffActivityLog, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { STAFF_DEPARTMENTS, departmentForDashboardRole } from "@/lib/staff/admin-ops";
 
@@ -33,6 +33,8 @@ const staffStatusOptions: StaffMemberForm["status"][] = ["Active", "Inactive"];
 
 const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "viewer", label: "Viewer" },
+  { value: "groomer", label: "Groomer" },
+  { value: "trainer", label: "Trainer" },
   { value: "front_desk_coordinator", label: "Front Desk - Coordinator" },
   { value: "team_leader", label: "Team Lead" },
   { value: "manager_admin", label: "Manager Admin" },
@@ -167,19 +169,26 @@ export function StaffDirectoryPanel() {
 
   const activeCount = (data?.staff_directory ?? []).filter((member) => member.status === "Active").length;
   const inactiveCount = (data?.staff_directory ?? []).filter((member) => member.status === "Inactive").length;
+  const canManageDirectory = isFullAdminRole(data?.currentUser.role);
 
   return (
     <div className="space-y-5">
       <header className="admin-page-header">
         <div>
           <h2 className="admin-page-title">Staff Directory</h2>
-          <p className="admin-page-subtitle">Manage staff assignments, contact details, and dashboard login access in one place.</p>
+          <p className="admin-page-subtitle">
+            {canManageDirectory
+              ? "Manage staff assignments, contact details, and dashboard login access in one place."
+              : "View staff assignments, contact details, and dashboard roles. Only full admins can add or edit entries."}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {loading || refreshing ? <span className="admin-badge">{loading ? "Loading..." : "Refreshing..."}</span> : null}
-          <button type="button" className="admin-btn-primary inline-flex items-center gap-2" onClick={() => setAddOpen(true)} disabled={busy}>
-            <Plus className="h-4 w-4" /> Add Staff Member
-          </button>
+          {canManageDirectory ? (
+            <button type="button" className="admin-btn-primary inline-flex items-center gap-2" onClick={() => setAddOpen(true)} disabled={busy}>
+              <Plus className="h-4 w-4" /> Add Staff Member
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -204,7 +213,9 @@ export function StaffDirectoryPanel() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-black text-white">Directory</h3>
-                <p className="text-sm text-admin-muted">Search, edit, activate, deactivate, or delete staff entries.</p>
+                <p className="text-sm text-admin-muted">
+                  {canManageDirectory ? "Search, edit, activate, deactivate, or delete staff entries." : "Search and review staff directory records."}
+                </p>
               </div>
               <button type="button" className="admin-btn-secondary" onClick={() => void load(true)} disabled={loading || refreshing}>
                 Refresh
@@ -235,7 +246,7 @@ export function StaffDirectoryPanel() {
                   <th className="px-4 py-3">Contact</th>
                   <th className="px-4 py-3">Dashboard</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  {canManageDirectory ? <th className="px-4 py-3 text-right">Actions</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-admin-border">
@@ -258,30 +269,32 @@ export function StaffDirectoryPanel() {
                     <td className="px-4 py-3">
                       <span className={member.status === "Active" ? "admin-badge admin-badge--green" : "admin-badge opacity-70"}>{member.status}</span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-1">
-                        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={`Edit ${member.name}`} onClick={() => setEditing(member)}>
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-icon-btn"
-                          disabled={busy}
-                          aria-label={member.status === "Active" ? `Deactivate ${member.name}` : `Activate ${member.name}`}
-                          onClick={() => void mutate("Unable to update status.", { action: "update_staff_member", id: member.id, status: member.status === "Active" ? "Inactive" : "Active" }, "Staff status updated.")}
-                        >
-                          {member.status === "Active" ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                        </button>
-                        <button type="button" className="admin-icon-btn" disabled={busy} aria-label={`Delete ${member.name}`} onClick={() => setDeleteMember(member)}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
+                    {canManageDirectory ? (
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-1">
+                          <button type="button" className="admin-icon-btn" disabled={busy} aria-label={`Edit ${member.name}`} onClick={() => setEditing(member)}>
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-icon-btn"
+                            disabled={busy}
+                            aria-label={member.status === "Active" ? `Deactivate ${member.name}` : `Activate ${member.name}`}
+                            onClick={() => void mutate("Unable to update status.", { action: "update_staff_member", id: member.id, status: member.status === "Active" ? "Inactive" : "Active" }, "Staff status updated.")}
+                          >
+                            {member.status === "Active" ? <XCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                          </button>
+                          <button type="button" className="admin-icon-btn" disabled={busy} aria-label={`Delete ${member.name}`} onClick={() => setDeleteMember(member)}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
                 {!members.length ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-admin-muted" colSpan={7}>No staff members found.</td>
+                    <td className="px-4 py-8 text-center text-admin-muted" colSpan={canManageDirectory ? 7 : 6}>No staff members found.</td>
                   </tr>
                 ) : null}
               </tbody>
@@ -302,11 +315,13 @@ export function StaffDirectoryPanel() {
                     <p className="mt-2 text-xs text-admin-muted">
                       Dashboard: {member.admin_user_id ? dashboardRoleLabels[member.dashboard_role ?? "viewer"] : "No login"}
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => setEditing(member)}>Edit</button>
-                      <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => void mutate("Unable to update status.", { action: "update_staff_member", id: member.id, status: member.status === "Active" ? "Inactive" : "Active" }, "Staff status updated.")}>{member.status === "Active" ? "Deactivate" : "Activate"}</button>
-                      <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => setDeleteMember(member)}>Delete</button>
-                    </div>
+                    {canManageDirectory ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => setEditing(member)}>Edit</button>
+                        <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => void mutate("Unable to update status.", { action: "update_staff_member", id: member.id, status: member.status === "Active" ? "Inactive" : "Active" }, "Staff status updated.")}>{member.status === "Active" ? "Deactivate" : "Activate"}</button>
+                        <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => setDeleteMember(member)}>Delete</button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </article>
@@ -333,55 +348,59 @@ export function StaffDirectoryPanel() {
         </section>
       </section>
 
-      <StaffMemberModal
-        open={addOpen}
-        mode="add"
-        title="Add Staff Member"
-        description="Create a staff directory entry and optionally grant dashboard login access."
-        busy={busy}
-        onClose={() => setAddOpen(false)}
-        onSubmit={async (form) => {
-          const ok = await mutate("Unable to add staff member.", { ...payloadFromForm(form, true), action: "create_staff_member" }, "Staff member added.");
-          if (ok) setAddOpen(false);
-        }}
-      />
+      {canManageDirectory ? (
+        <>
+          <StaffMemberModal
+            open={addOpen}
+            mode="add"
+            title="Add Staff Member"
+            description="Create a staff directory entry and optionally grant dashboard login access."
+            busy={busy}
+            onClose={() => setAddOpen(false)}
+            onSubmit={async (form) => {
+              const ok = await mutate("Unable to add staff member.", { ...payloadFromForm(form, true), action: "create_staff_member" }, "Staff member added.");
+              if (ok) setAddOpen(false);
+            }}
+          />
 
-      {editing ? (
-        <StaffMemberModal
-          key={editing.id}
-          open
-          mode="edit"
-          member={editing}
-          title={`Edit ${editing.name}`}
-          description="Update staff details, dashboard role, or set a new temporary password."
-          busy={busy}
-          hasLogin={Boolean(editing.admin_user_id)}
-          onClose={() => setEditing(null)}
-          onSubmit={async (form) => {
-            const ok = await mutate(
-              "Unable to update staff member.",
-              { ...payloadFromForm(form, true), id: editing.id, action: "update_staff_member" },
-              "Staff member updated."
-            );
-            if (ok) setEditing(null);
-          }}
-        />
+          {editing ? (
+            <StaffMemberModal
+              key={editing.id}
+              open
+              mode="edit"
+              member={editing}
+              title={`Edit ${editing.name}`}
+              description="Update staff details, dashboard role, or set a new temporary password."
+              busy={busy}
+              hasLogin={Boolean(editing.admin_user_id)}
+              onClose={() => setEditing(null)}
+              onSubmit={async (form) => {
+                const ok = await mutate(
+                  "Unable to update staff member.",
+                  { ...payloadFromForm(form, true), id: editing.id, action: "update_staff_member" },
+                  "Staff member updated."
+                );
+                if (ok) setEditing(null);
+              }}
+            />
+          ) : null}
+
+          <ConfirmDialog
+            open={Boolean(deleteMember)}
+            title="Delete staff member?"
+            description={`This removes ${deleteMember?.name ?? "this staff member"} from assignment dropdowns. Existing records will keep their saved assignment text.`}
+            confirmLabel="Delete staff member"
+            danger
+            busy={busy}
+            onCancel={() => setDeleteMember(null)}
+            onConfirm={async () => {
+              if (!deleteMember) return;
+              const ok = await mutate("Unable to delete staff member.", { action: "delete_staff_member", id: deleteMember.id }, "Staff member deleted.");
+              if (ok) setDeleteMember(null);
+            }}
+          />
+        </>
       ) : null}
-
-      <ConfirmDialog
-        open={Boolean(deleteMember)}
-        title="Delete staff member?"
-        description={`This removes ${deleteMember?.name ?? "this staff member"} from assignment dropdowns. Existing records will keep their saved assignment text.`}
-        confirmLabel="Delete staff member"
-        danger
-        busy={busy}
-        onCancel={() => setDeleteMember(null)}
-        onConfirm={async () => {
-          if (!deleteMember) return;
-          const ok = await mutate("Unable to delete staff member.", { action: "delete_staff_member", id: deleteMember.id }, "Staff member deleted.");
-          if (ok) setDeleteMember(null);
-        }}
-      />
     </div>
   );
 }

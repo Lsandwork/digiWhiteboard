@@ -1,5 +1,10 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { hasCoordinatorAccess, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import {
+  canAccessCrossoverCommunication,
+  canManageStaffDirectory,
+  canViewStaffDirectory,
+  hasCoordinatorAccess
+} from "@/lib/admin/users";
 
 export function isAdminRequest(request: Request) {
   if (getAdminSessionFromRequest(request)) return true;
@@ -30,7 +35,7 @@ export function canCreatePushNotice(role?: string | null) {
 }
 
 export function canManageCrossover(role?: string | null) {
-  return canManageStaffOperations(role);
+  return canAccessCrossoverCommunication(role);
 }
 
 export function canManageOwnerFollowUp(role?: string | null) {
@@ -41,6 +46,4 @@ export function canManageActiveIssues(role?: string | null) {
   return canManageStaffOperations(role);
 }
 
-export function canManageStaffDirectory(role?: string | null) {
-  return isFullAdminRole(role);
-}
+export { canAccessCrossoverCommunication, canViewStaffDirectory, canManageStaffDirectory };

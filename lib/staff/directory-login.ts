@@ -27,7 +27,15 @@ export type StaffDirectoryLoginSyncResult = {
   dashboard_role: AdminUserRole | null;
 };
 
-const dashboardRoles: AdminUserRole[] = ["owner_admin", "manager_admin", "front_desk_coordinator", "team_leader", "viewer"];
+const dashboardRoles: AdminUserRole[] = [
+  "owner_admin",
+  "manager_admin",
+  "front_desk_coordinator",
+  "team_leader",
+  "groomer",
+  "trainer",
+  "viewer"
+];
 
 function normalizeDashboardRole(value: unknown): AdminUserRole {
   return dashboardRoles.includes(value as AdminUserRole) ? (value as AdminUserRole) : "viewer";

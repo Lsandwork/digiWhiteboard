@@ -1,6 +1,6 @@
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { ADMIN_USER_ROLE_LABELS, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS, isCrossoverStaffRole, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 
 export type HelpAudience = "admin" | "staff_ops" | "viewer";
 
@@ -382,17 +382,38 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "front-desk-coordinator",
     title: "What can a Front Desk Coordinator or Team Lead do?",
-    summary: "Front Desk Coordinator and Team Lead accounts share the same staff board access: Push Notices, Crossover Communication, Owner Follow Up, Active Issues, and related staff tabs.",
+    summary: "Front Desk Coordinator and Team Lead accounts share staff board access including read-only Staff Directory, Push Notices, and staff operations tabs.",
     category: "Users & Login",
-    keywords: ["front desk coordinator", "team leader", "role", "permissions", "push notices", "limited user"],
+    keywords: ["front desk coordinator", "team leader", "role", "permissions", "push notices", "staff directory", "limited user"],
     steps: [
       "Front Desk Coordinator and Team Lead users log in with their assigned email and password.",
       "After login, they are routed to Staff Digital Whiteboard → Push Notices.",
-      "They can use Push Notices, Crossover Communication, Owner Follow Up, Active Issues, and related staff tabs.",
-      "They cannot access Staff Directory, Lobby content, settings, logs, integrations, users, Gingr setup, or other admin areas."
+      "They can use Push Notices, Crossover Communication (main staff log), Owner Follow Up, Active Issues, and view the Staff Directory.",
+      "Crossover Communication auto-records date, time, sender, and who each message was reported to. Urgent or high priority sends alerts with full message details.",
+      "Staff Directory is view-only for coordinators — they can search and review staff records but cannot add, edit, or delete entries.",
+      "They cannot access Lobby content, settings, logs, integrations, admin Users, Gingr setup, or other full admin areas."
     ],
-    adminTab: "users",
+    adminTab: "staff_directory",
+    adminBoard: "staff",
     tips: ["Use these roles for front desk or team lead staff who need live handler tools without full admin access."]
+  },
+  {
+    id: "groomer-trainer-crossover",
+    title: "What can a Groomer or Trainer do?",
+    summary: "Groomer and Trainer accounts access Crossover Communication as the main department handoff log, plus notifications for urgent alerts.",
+    category: "Users & Login",
+    keywords: ["groomer", "trainer", "crossover", "grooming", "training", "handoff", "communication log"],
+    steps: [
+      "Groomer and Trainer users log in with their assigned email and password.",
+      "After login, they land on Staff Digital Whiteboard → Crossover Communication.",
+      "They can create, view, reply to, and update crossover messages for department handoffs.",
+      "Every entry is timestamped with the sender and who it was reported to.",
+      "Urgent or high-priority crossover messages send in-app alerts with the full message to the destination department, coordinators, and management.",
+      "They also have access to Notifications and Help Center tabs."
+    ],
+    adminTab: "crossover_communication",
+    adminBoard: "staff",
+    tips: ["Assign the Groomer or Trainer dashboard role in Admin Users or Staff Directory when creating a login."]
   },
   {
     id: "change-password",
@@ -565,6 +586,7 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "staff-ops-pages": STAFF_OPS_AND_ADMIN,
   "add-admin-user": ADMIN_ONLY,
   "front-desk-coordinator": STAFF_OPS_AND_ADMIN,
+  "groomer-trainer-crossover": STAFF_OPS_AND_ADMIN,
   "change-password": ADMIN_ONLY,
   "board-switcher": ADMIN_ONLY,
   "preview-and-refresh": ADMIN_ONLY,
@@ -585,6 +607,9 @@ export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole):
   const audiences = getArticleAudiences(article);
   if (role === "viewer") return audiences.includes("viewer");
   if (isStaffOpsLimitedRole(role)) return audiences.includes("staff_ops");
+  if (isCrossoverStaffRole(role)) {
+    return article.id === "groomer-trainer-crossover" || article.id === "troubleshoot-login" || article.id === "change-password";
+  }
   return false;
 }
 
