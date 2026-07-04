@@ -174,6 +174,7 @@ function canOpenAdminTab(role: AdminUserRole, tab?: AdminTab): boolean {
       "whiteboard_preview",
       "analytics",
       "templates",
+      "notifications",
       "help"
     ];
     return staffTabs.includes(tab);

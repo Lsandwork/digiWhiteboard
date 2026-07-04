@@ -1,5 +1,12 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
+import {
+  dispatchStaffOpsNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  type StaffNotification,
+  type StaffOpsNotificationEvent
+} from "@/lib/staff/notifications";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -120,6 +127,7 @@ export type StaffOpsState = {
   active_issues: ActiveIssue[];
   activity_logs: StaffActivityLog[];
   staff_directory: StaffDirectoryMember[];
+  notifications: StaffNotification[];
 };
 
 export type StaffOpsEntity = "crossover" | "follow_up" | "issue";
@@ -248,7 +256,8 @@ function emptyState(): StaffOpsState {
     owner_follow_ups: [],
     active_issues: [],
     activity_logs: [],
-    staff_directory: DEFAULT_STAFF_DIRECTORY
+    staff_directory: DEFAULT_STAFF_DIRECTORY,
+    notifications: []
   };
 }
 
@@ -315,7 +324,8 @@ function parseState(value: unknown): StaffOpsState {
     owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
     active_issues: sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
     activity_logs: sortNewest(Array.isArray(state.activity_logs) ? state.activity_logs : []).slice(0, 100),
-    staff_directory: directory
+    staff_directory: directory,
+    notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : [])
   };
 }
 
@@ -407,6 +417,22 @@ export function createActivityLog(state: StaffOpsState, input: Omit<StaffActivit
   };
 }
 
+function notifyState(state: StaffOpsState, event: StaffOpsNotificationEvent) {
+  return dispatchStaffOpsNotifications(state, event);
+}
+
+function crossoverTab(): StaffOpsNotificationEvent["sourceTab"] {
+  return "crossover_communication";
+}
+
+function followUpTab(): StaffOpsNotificationEvent["sourceTab"] {
+  return "owner_follow_up";
+}
+
+function issueTab(): StaffOpsNotificationEvent["sourceTab"] {
+  return "active_issues";
+}
+
 function maybeCreateActiveIssueFromCrossover(state: StaffOpsState, message: CrossoverMessage, actor: string | null) {
   if (!isUrgent(message.priority, message.urgent)) return state;
   if (state.active_issues.some((issue) => issue.source_table === "crossover_messages" && issue.source_id === message.id && issue.status !== "Archived")) return state;
@@ -432,7 +458,7 @@ function maybeCreateActiveIssueFromCrossover(state: StaffOpsState, message: Cros
     updated_at: now,
     resolved_at: null
   };
-  return createActivityLog(
+  let next = createActivityLog(
     { ...state, active_issues: sortNewest([issue, ...state.active_issues]) },
     {
       activity_type: "issue.auto_created",
@@ -443,6 +469,19 @@ function maybeCreateActiveIssueFromCrossover(state: StaffOpsState, message: Cros
       created_by: actor
     }
   );
+  return notifyState(next, {
+    eventType: "auto_issue",
+    sourceTable: "active_issues",
+    sourceId: issue.id,
+    sourceTab: issueTab(),
+    title: `Urgent issue opened: ${issue.title}`,
+    body: issue.notes,
+    priority: issue.priority,
+    urgent: true,
+    assignedTo: issue.assigned_to,
+    mentionText: issue.notes,
+    actor
+  });
 }
 
 function maybeCreateActiveIssueFromOwnerFollowUp(state: StaffOpsState, followUp: OwnerFollowUp, actor: string | null) {
@@ -470,7 +509,7 @@ function maybeCreateActiveIssueFromOwnerFollowUp(state: StaffOpsState, followUp:
     updated_at: now,
     resolved_at: null
   };
-  return createActivityLog(
+  let next = createActivityLog(
     { ...state, active_issues: sortNewest([issue, ...state.active_issues]) },
     {
       activity_type: "issue.auto_created",
@@ -481,6 +520,19 @@ function maybeCreateActiveIssueFromOwnerFollowUp(state: StaffOpsState, followUp:
       created_by: actor
     }
   );
+  return notifyState(next, {
+    eventType: "auto_issue",
+    sourceTable: "active_issues",
+    sourceId: issue.id,
+    sourceTab: issueTab(),
+    title: `Urgent issue opened: ${issue.title}`,
+    body: issue.notes,
+    priority: issue.priority,
+    urgent: true,
+    assignedTo: issue.assigned_to,
+    mentionText: issue.notes,
+    actor
+  });
 }
 
 function markLinkedIssuePendingReview(state: StaffOpsState, sourceTable: "crossover_messages" | "owner_follow_ups", sourceId: string, actor: string | null) {
@@ -542,6 +594,19 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     created_by: actor
   });
   state = maybeCreateActiveIssueFromCrossover(state, record, actor);
+  state = notifyState(state, {
+    eventType: "created",
+    sourceTable: "crossover_messages",
+    sourceId: record.id,
+    sourceTab: crossoverTab(),
+    title: `New crossover: ${record.subject}`,
+    body: record.message,
+    priority: record.priority,
+    urgent: record.urgent,
+    assignedTo: record.assigned_to,
+    mentionText: record.message,
+    actor
+  });
   await saveState(supabase, state);
   return record;
 }
@@ -552,14 +617,27 @@ export async function replyToCrossoverMessage(supabase: SupabaseClient, id: stri
   const state = await loadState(supabase);
   if (!state.crossover_messages.some((item) => item.id === id)) throw new Error("Crossover message not found.");
   const reply: CrossoverReply = { id: newId(), crossover_message_id: id, message: text, created_by: actor, created_at: nowIso() };
-  const next = createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
-    activity_type: "crossover.reply",
-    title: "Reply added to crossover message",
-    description: text,
-    source_table: "crossover_messages",
-    source_id: id,
-    created_by: actor
-  });
+  const next = notifyState(
+    createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
+      activity_type: "crossover.reply",
+      title: "Reply added to crossover message",
+      description: text,
+      source_table: "crossover_messages",
+      source_id: id,
+      created_by: actor
+    }),
+    {
+      eventType: "reply",
+      sourceTable: "crossover_messages",
+      sourceId: id,
+      sourceTab: crossoverTab(),
+      title: "New crossover reply",
+      body: text,
+      priority: "Medium",
+      mentionText: text,
+      actor
+    }
+  );
   await saveState(supabase, next);
   return reply;
 }
@@ -604,6 +682,19 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
     source_id: updatedRecord.id,
     created_by: actor
   });
+  next = notifyState(next, {
+    eventType: "updated",
+    sourceTable: "crossover_messages",
+    sourceId: updatedRecord.id,
+    sourceTab: crossoverTab(),
+    title: `Crossover updated: ${updatedRecord.subject}`,
+    body: updatedRecord.message,
+    priority: updatedRecord.priority,
+    urgent: updatedRecord.urgent,
+    assignedTo: updatedRecord.assigned_to,
+    mentionText: updatedRecord.message,
+    actor
+  });
   await saveState(supabase, next);
   return updatedRecord;
 }
@@ -643,6 +734,19 @@ export async function createOwnerFollowUp(supabase: SupabaseClient, input: Recor
     created_by: actor
   });
   state = maybeCreateActiveIssueFromOwnerFollowUp(state, record, actor);
+  state = notifyState(state, {
+    eventType: "created",
+    sourceTable: "owner_follow_ups",
+    sourceId: record.id,
+    sourceTab: followUpTab(),
+    title: `New follow-up: ${record.subject}`,
+    body: record.follow_up_notes,
+    priority: record.priority,
+    urgent: record.urgent,
+    assignedTo: record.assigned_to,
+    mentionText: record.follow_up_notes,
+    actor
+  });
   await saveState(supabase, state);
   return record;
 }
@@ -687,6 +791,19 @@ export async function updateOwnerFollowUp(supabase: SupabaseClient, id: string, 
     source_id: updatedRecord.id,
     created_by: actor
   });
+  next = notifyState(next, {
+    eventType: "updated",
+    sourceTable: "owner_follow_ups",
+    sourceId: updatedRecord.id,
+    sourceTab: followUpTab(),
+    title: `Follow-up updated: ${updatedRecord.subject}`,
+    body: updatedRecord.follow_up_notes,
+    priority: updatedRecord.priority,
+    urgent: updatedRecord.urgent,
+    assignedTo: updatedRecord.assigned_to,
+    mentionText: updatedRecord.follow_up_notes,
+    actor
+  });
   await saveState(supabase, next);
   return updatedRecord;
 }
@@ -717,14 +834,28 @@ export async function createActiveIssue(supabase: SupabaseClient, input: Record<
     resolved_at: null
   };
   const state = await loadState(supabase);
-  const next = createActivityLog({ ...state, active_issues: sortNewest([record, ...state.active_issues]) }, {
-    activity_type: "issue.created",
-    title: `New issue: ${record.title}`,
-    description: `${record.category} • ${record.priority}`,
-    source_table: "active_issues",
-    source_id: record.id,
-    created_by: actor
-  });
+  const next = notifyState(
+    createActivityLog({ ...state, active_issues: sortNewest([record, ...state.active_issues]) }, {
+      activity_type: "issue.created",
+      title: `New issue: ${record.title}`,
+      description: `${record.category} • ${record.priority}`,
+      source_table: "active_issues",
+      source_id: record.id,
+      created_by: actor
+    }),
+    {
+      eventType: "created",
+      sourceTable: "active_issues",
+      sourceId: record.id,
+      sourceTab: issueTab(),
+      title: `New active issue: ${record.title}`,
+      body: record.notes,
+      priority: record.priority,
+      assignedTo: record.assigned_to,
+      mentionText: record.notes,
+      actor
+    }
+  );
   await saveState(supabase, next);
   return record;
 }
@@ -759,14 +890,28 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
   };
   if (!updated) throw new Error("Active issue not found.");
   const updatedRecord = updated as ActiveIssue;
-  const next = createActivityLog(updatedState, {
-    activity_type: "issue.updated",
-    title: `Updated issue: ${updatedRecord.title}`,
-    description: `Status: ${updatedRecord.status}`,
-    source_table: "active_issues",
-    source_id: id,
-    created_by: actor
-  });
+  const next = notifyState(
+    createActivityLog(updatedState, {
+      activity_type: "issue.updated",
+      title: `Updated issue: ${updatedRecord.title}`,
+      description: `Status: ${updatedRecord.status}`,
+      source_table: "active_issues",
+      source_id: id,
+      created_by: actor
+    }),
+    {
+      eventType: "updated",
+      sourceTable: "active_issues",
+      sourceId: id,
+      sourceTab: issueTab(),
+      title: `Active issue updated: ${updatedRecord.title}`,
+      body: updatedRecord.notes,
+      priority: updatedRecord.priority,
+      assignedTo: updatedRecord.assigned_to,
+      mentionText: updatedRecord.notes,
+      actor
+    }
+  );
   await saveState(supabase, next);
   return updatedRecord;
 }
@@ -887,4 +1032,26 @@ export async function deleteStaffDirectoryMember(supabase: SupabaseClient, id: s
     created_by: actor
   });
   await saveState(supabase, next);
+}
+
+export async function markStaffNotificationRead(
+  supabase: SupabaseClient,
+  notificationId: string,
+  readerKey: string
+) {
+  const state = await loadState(supabase);
+  const next = markNotificationRead(state, notificationId, readerKey);
+  await saveState(supabase, next);
+  return next.notifications.find((notification) => notification.id === notificationId) ?? null;
+}
+
+export async function markAllStaffNotificationsRead(
+  supabase: SupabaseClient,
+  readerKey: string,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  const state = await loadState(supabase);
+  const next = markAllNotificationsRead(state, readerKey, session);
+  await saveState(supabase, next);
+  return next;
 }

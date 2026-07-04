@@ -2117,6 +2117,71 @@ html.lobby-tv-display .social-video-shell {
     font-weight: 700;
   }
 
+  .admin-notif-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #f15f2a;
+    display: inline-block;
+  }
+
+  .admin-notif-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(241, 95, 42, 0.2);
+    border: 1px solid rgba(241, 95, 42, 0.45);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+  }
+
+  .admin-notif-card {
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+    padding: 1rem 1.1rem;
+  }
+
+  .admin-notif-card--unread {
+    border-color: rgba(241, 95, 42, 0.35);
+    background: rgba(241, 95, 42, 0.06);
+  }
+
+  .admin-notif-priority {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 0.15rem 0.5rem;
+  }
+
+  .admin-notif-priority--urgent {
+    color: #fecaca;
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+  }
+
+  .admin-notif-priority--medium {
+    color: #fde68a;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+
+  .admin-notif-priority--low {
+    color: #d1d5db;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .admin-notif-type {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--admin-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
   @media (min-width: 768px) {
     .admin-help-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));

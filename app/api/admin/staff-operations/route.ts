@@ -10,12 +10,15 @@ import {
   deleteStaffDirectoryMember,
   createOwnerFollowUp,
   listStaffOps,
+  markAllStaffNotificationsRead,
+  markStaffNotificationRead,
   replyToCrossoverMessage,
   updateActiveIssue,
   updateCrossoverMessage,
   updateStaffDirectoryMember,
   updateOwnerFollowUp
 } from "@/lib/staff/admin-ops";
+import { notificationReaderKey } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -121,6 +124,20 @@ export async function POST(request: Request) {
         actor
       );
       auditAction = "staff.ops.push_to_whiteboard";
+    } else if (action === "mark_notification_read") {
+      const notificationId = String(body.notification_id ?? "");
+      if (!notificationId) return NextResponse.json({ error: "notification_id is required." }, { status: 400 });
+      const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
+      result = await markStaffNotificationRead(supabase, notificationId, readerKey);
+      auditAction = "staff.notification.read";
+    } else if (action === "mark_all_notifications_read") {
+      const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
+      result = await markAllStaffNotificationsRead(supabase, readerKey, {
+        email: session?.email ?? null,
+        adminUserId: session?.adminUserId ?? null,
+        role: session?.role ?? null
+      });
+      auditAction = "staff.notification.read_all";
     } else {
       return NextResponse.json({ error: "Unsupported Staff Admin action." }, { status: 400 });
     }

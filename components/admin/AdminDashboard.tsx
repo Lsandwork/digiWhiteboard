@@ -18,6 +18,7 @@ import { PushNoticesPanel } from "@/components/admin/PushNoticesPanel";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
+import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
 import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
@@ -100,7 +101,7 @@ export function AdminDashboard() {
 
   useEffect(() => {
     const role = data?.session?.role;
-    const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "help"];
+    const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "notifications", "help"];
     if (isStaffOpsLimitedRole(role) && (board !== "staff" || !coordinatorTabs.includes(tab))) {
       router.replace("/admin?board=staff&tab=push_notices");
     }
@@ -212,7 +213,7 @@ export function AdminDashboard() {
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
   const currentRole = (data.session?.role ?? "owner_admin") as AdminUserRole;
-  const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
+  const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
     <div className="space-y-4">
@@ -353,6 +354,10 @@ export function AdminDashboard() {
             <p className="admin-page-subtitle">Reusable communication templates are available inside Crossover Communication when composing a new message.</p>
             <button type="button" className="admin-btn-primary mt-4" onClick={() => setActiveTab("crossover_communication")}>Open Crossover Templates</button>
           </section>
+        ) : null}
+
+        {tab === "notifications" ? (
+          <NotificationsPanel onOpenTab={(nextTab) => setActiveTab(nextTab)} />
         ) : null}
 
         {tab === "staff_directory" ? (

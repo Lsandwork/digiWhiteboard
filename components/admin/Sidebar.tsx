@@ -36,6 +36,7 @@ const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "whiteboard_preview", label: "Whiteboard Preview", icon: <ClipboardList className="h-4 w-4" /> },
   { id: "analytics", label: "Analytics", icon: <ChartNoAxesColumn className="h-4 w-4" /> },
   { id: "templates", label: "Templates", icon: <FileText className="h-4 w-4" /> },
+  { id: "notifications", label: "Notifications", icon: <InboxIcon /> },
   { id: "staff_directory", label: "Staff Directory", icon: <Users className="h-4 w-4" /> },
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
@@ -57,6 +58,7 @@ const tabLabels: Record<AdminTab, string> = {
   whiteboard_preview: "Whiteboard Preview",
   analytics: "Analytics",
   templates: "Templates",
+  notifications: "Notifications",
   staff_directory: "Staff Directory",
   users: "Users",
   settings: "Settings",
@@ -67,6 +69,10 @@ const tabLabels: Record<AdminTab, string> = {
 
 function MessageIcon() {
   return <ScrollText className="h-4 w-4" />;
+}
+
+function InboxIcon() {
+  return <BellRing className="h-4 w-4" />;
 }
 
 type SidebarProps = {

@@ -54,6 +54,7 @@ export type AdminTab =
   | "whiteboard_preview"
   | "analytics"
   | "templates"
+  | "notifications"
   | "staff_directory"
   | "users"
   | "settings"
@@ -74,6 +75,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "whiteboard_preview",
   "analytics",
   "templates",
+  "notifications",
   "staff_directory",
   "users",
   "settings",

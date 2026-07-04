@@ -56,6 +56,7 @@ export function AdminShell({
     "whiteboard_preview",
     "analytics",
     "templates",
+    "notifications",
     "help"
   ];
 
