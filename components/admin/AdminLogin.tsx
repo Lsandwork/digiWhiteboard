@@ -4,6 +4,12 @@ import { FormEvent, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
+import { isStaffOpsLimitedRole } from "@/lib/admin/users";
+
+function defaultAdminRoute(role?: string) {
+  if (isStaffOpsLimitedRole(role)) return "/admin?board=staff&tab=push_notices";
+  return "/admin";
+}
 
 export function AdminLogin() {
   const router = useRouter();
@@ -37,7 +43,7 @@ export function AdminLogin() {
         return;
       }
 
-      const next = searchParams.get("next") || "/admin";
+      const next = searchParams.get("next") || defaultAdminRoute(body.role);
       router.replace(next);
       router.refresh();
     } catch (loginError) {
@@ -67,7 +73,7 @@ export function AdminLogin() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to update password.");
 
-      const next = searchParams.get("next") || "/admin";
+      const next = searchParams.get("next") || defaultAdminRoute(body.role);
       router.replace(next);
       router.refresh();
     } catch (changeError) {

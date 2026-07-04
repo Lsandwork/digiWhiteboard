@@ -75,6 +75,7 @@ export function AdminShell({
         <Sidebar
           activeTab={tab}
           username={username}
+          role={role}
           visibleTabs={visibleTabs}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}

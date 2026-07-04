@@ -33,7 +33,7 @@ const staffStatusOptions: StaffMemberForm["status"][] = ["Active", "Inactive"];
 
 const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "viewer", label: "Viewer" },
-  { value: "front_desk_coordinator", label: "Front Desk Coordinator" },
+  { value: "front_desk_coordinator", label: "Front Desk - Coordinator" },
   { value: "team_leader", label: "Team Leader" },
   { value: "manager_admin", label: "Manager Admin" },
   { value: "owner_admin", label: "Owner Admin" }

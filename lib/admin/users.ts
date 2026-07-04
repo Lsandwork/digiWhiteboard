@@ -11,10 +11,37 @@ export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   viewer: "Viewer"
 };
 
+/** Sidebar user card — uses hyphenated front desk label per staff admin UX. */
+export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
+  owner_admin: "Owner Admin",
+  manager_admin: "Manager Admin",
+  front_desk_coordinator: "Front Desk - Coordinator",
+  team_leader: "Team Leader",
+  viewer: "Viewer"
+};
+
+export function getAdminSidebarRoleLabel(role?: string | null, email?: string | null): string {
+  if (role && role in ADMIN_SIDEBAR_ROLE_LABELS) {
+    return ADMIN_SIDEBAR_ROLE_LABELS[role as AdminUserRole];
+  }
+  if (email?.trim().toLowerCase() === "contact@fitdog.com") {
+    return ADMIN_SIDEBAR_ROLE_LABELS.front_desk_coordinator;
+  }
+  return "Admin";
+}
+
 export const STAFF_OPS_LIMITED_ROLES: AdminUserRole[] = ["front_desk_coordinator", "team_leader"];
+
+/** Front Desk Coordinator and Team Leader share the same staff admin access. */
+export const COORDINATOR_LIKE_ROLES = STAFF_OPS_LIMITED_ROLES;
 
 export function isStaffOpsLimitedRole(role?: string | null) {
   return role === "front_desk_coordinator" || role === "team_leader";
+}
+
+/** Alias: true for Front Desk Coordinator and Team Leader. */
+export function hasCoordinatorAccess(role?: string | null) {
+  return isStaffOpsLimitedRole(role);
 }
 
 export function isFullAdminRole(role?: string | null) {

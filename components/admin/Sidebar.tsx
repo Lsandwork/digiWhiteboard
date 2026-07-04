@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
+import { getAdminSidebarRoleLabel } from "@/lib/admin/users";
 
 const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -71,6 +72,7 @@ function MessageIcon() {
 type SidebarProps = {
   activeTab: AdminTab;
   username: string;
+  role?: string | null;
   mobileOpen: boolean;
   onMobileClose: () => void;
   onTabChange: (tab: AdminTab) => void;
@@ -79,8 +81,9 @@ type SidebarProps = {
   visibleTabs?: AdminTab[];
 };
 
-export function Sidebar({ activeTab, username, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
+export function Sidebar({ activeTab, username, role, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
   const visibleNavItems = navItems.filter((item) => visibleTabs.includes(item.id));
+  const roleLabel = getAdminSidebarRoleLabel(role, username);
 
   return (
     <>
@@ -128,7 +131,7 @@ export function Sidebar({ activeTab, username, mobileOpen, onMobileClose, onTabC
           <div className="flex items-center justify-between rounded-xl border border-admin-border px-3 py-2">
             <div>
               <p className="text-sm font-bold text-white">{username}</p>
-              <p className="text-xs text-admin-muted">Admin</p>
+              <p className="text-xs text-admin-muted">{roleLabel}</p>
             </div>
             <button type="button" className="admin-icon-btn" onClick={onLogout} aria-label="Log out">
               <LogOut className="h-4 w-4" />

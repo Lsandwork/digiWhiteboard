@@ -1,5 +1,5 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { isStaffOpsLimitedRole, isFullAdminRole } from "@/lib/admin/users";
+import { hasCoordinatorAccess, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 
 export function isAdminRequest(request: Request) {
   if (getAdminSessionFromRequest(request)) return true;
@@ -14,11 +14,31 @@ export function unauthorizedAdminResponse(body: Record<string, unknown> = { erro
 }
 
 export function canManagePushNotices(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || isStaffOpsLimitedRole(role) || !role;
+  return role === "owner_admin" || role === "manager_admin" || hasCoordinatorAccess(role) || !role;
 }
 
 export function canManageStaffOperations(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || isStaffOpsLimitedRole(role) || !role;
+  return role === "owner_admin" || role === "manager_admin" || hasCoordinatorAccess(role) || !role;
+}
+
+export function canManageWhiteboardAdmin(role?: string | null) {
+  return canManageStaffOperations(role);
+}
+
+export function canCreatePushNotice(role?: string | null) {
+  return canManagePushNotices(role);
+}
+
+export function canManageCrossover(role?: string | null) {
+  return canManageStaffOperations(role);
+}
+
+export function canManageOwnerFollowUp(role?: string | null) {
+  return canManageStaffOperations(role);
+}
+
+export function canManageActiveIssues(role?: string | null) {
+  return canManageStaffOperations(role);
 }
 
 export function canManageStaffDirectory(role?: string | null) {
