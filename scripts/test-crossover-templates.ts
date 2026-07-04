@@ -3,78 +3,80 @@ import { CROSSOVER_TEMPLATES } from "../lib/staff/admin-ops";
 import {
   buildMessageFromTemplate,
   extractCustomPlaceholdersFromEdit,
-  resolveCrossoverMessage,
-  type CrossoverTemplateFields
+  getTemplateFields,
+  resolveCrossoverMessage
 } from "../lib/staff/crossover-templates";
 
-const routeLateTemplate = CROSSOVER_TEMPLATES[0].message;
-const emptyFields: CrossoverTemplateFields = {
-  dog: "",
-  trafficWeatherIssue: "",
-  route: "",
-  assignedTo: "",
+const routeLate = CROSSOVER_TEMPLATES[0];
+const dogEyes = CROSSOVER_TEMPLATES[1];
+const healthWatch = CROSSOVER_TEMPLATES[3];
+
+assert.equal(getTemplateFields("Route Running Late").length, 5);
+assert.equal(getTemplateFields("Dog Needs Extra Eyes").find((field) => field.key === "demeanor")?.type, "select");
+assert.equal(getTemplateFields("Health Watch").find((field) => field.key === "owner_status")?.type, "select");
+
+const routeValues = {
+  route: "Route 3",
+  minutes: "15",
+  delay_reason: "traffic",
+  pickups_done: "Cooper",
+  still_out: "Atlas, Brody"
+};
+
+const routeMessage = buildMessageFromTemplate(routeLate.message, routeLate.title, routeValues, {
   toDepartment: "Daycare",
   fromDepartment: "Front Desk"
+});
+
+assert.match(routeMessage, /Route 3 is about 15 min behind because of traffic/);
+assert.match(routeMessage, /Pickups done: Cooper/);
+assert.match(routeMessage, /Still out: Atlas, Brody/);
+assert.doesNotMatch(routeMessage, /\[/);
+
+const dogValues = {
+  dog: "Milo",
+  demeanor: "overstimulated",
+  time: "2:15 PM",
+  trigger: "fence line barking",
+  handling_tip: "give space, slow leash work"
 };
 
-assert.equal(
-  buildMessageFromTemplate(routeLateTemplate, emptyFields),
-  routeLateTemplate
-);
-
-const filledFields: CrossoverTemplateFields = {
-  dog: "Cooper",
-  trafficWeatherIssue: "heavy traffic",
-  route: "Route 3",
-  assignedTo: "Brian",
+const dogMessage = buildMessageFromTemplate(dogEyes.message, dogEyes.title, dogValues, {
   toDepartment: "Daycare",
-  fromDepartment: "Transportation"
+  fromDepartment: "Front Desk"
+});
+assert.match(dogMessage, /Milo had a overstimulated moment on yard at 2:15 PM/);
+
+const healthValues = {
+  dog: "Nova",
+  symptom: "loose stool",
+  time: "11:00 AM",
+  owner_status: "not called yet",
+  escalation: "vomiting or lethargy"
 };
 
-assert.match(
-  buildMessageFromTemplate(routeLateTemplate, filledFields),
-  /because of heavy traffic/
-);
-
-assert.match(
-  buildMessageFromTemplate(routeLateTemplate, filledFields),
-  /Heads up — Route 3 is about \[X\] min behind/
-);
-
-const dogTemplate = CROSSOVER_TEMPLATES[1].message;
-assert.equal(
-  buildMessageFromTemplate(dogTemplate, { ...emptyFields, dog: "Atlas" }),
-  dogTemplate.replace("[Dog]", "Atlas")
-);
-
-const departmentTemplate = CROSSOVER_TEMPLATES[8].message;
-assert.match(
-  buildMessageFromTemplate(departmentTemplate, { ...filledFields, route: "Route 2" }),
-  /Route 2 is \[X\] min out with Cooper/
-);
+const healthMessage = buildMessageFromTemplate(healthWatch.message, healthWatch.title, healthValues, {
+  toDepartment: "Daycare",
+  fromDepartment: "Front Desk"
+});
+assert.match(healthMessage, /Flagging Nova for the shift: loose stool noticed at 11:00 AM/);
+assert.match(healthMessage, /Owner not called yet/);
 
 const custom = extractCustomPlaceholdersFromEdit(
-  routeLateTemplate,
-  "Heads up — Route 3 is about 15 min behind because of [traffic/weather/issue]. Pickups done: [list or none]. Still out: [list]. Yard + front desk — adjust timing and flag any owners we might cut close on.",
-  { ...filledFields, route: "Route 3" }
+  routeLate.message,
+  "Heads up — Route 3 is about 15 min behind because of traffic. Pickups done: none. Still out: [list]. Yard + front desk — adjust timing and flag any owners we might cut close on.",
+  routeLate.title,
+  { route: "Route 3", minutes: "15", delay_reason: "traffic", pickups_done: "none" },
+  { toDepartment: "Daycare", fromDepartment: "Front Desk" }
 );
-assert.equal(custom.X, "15");
+assert.equal(custom.list, undefined);
 
-const rebuilt = buildMessageFromTemplate(routeLateTemplate, { ...filledFields, route: "Route 3" }, custom);
-assert.match(rebuilt, /about 15 min behind/);
-assert.match(rebuilt, /Route 3 is about 15/);
+const resolved = resolveCrossoverMessage(
+  routeLate.message,
+  routeLate.title,
+  { route: "", minutes: "10", delay_reason: "weather", pickups_done: "none", still_out: "none" },
+  { toDepartment: "Daycare", fromDepartment: "Front Desk" }
+);
+assert.match(resolved, /because of weather/);
 
-const resolved = resolveCrossoverMessage(routeLateTemplate, {
-  dog: "Cooper",
-  trafficWeatherIssue: "rain",
-  route: "",
-  assignedTo: "Lonnie",
-  toDepartment: "Daycare",
-  fromDepartment: "Front Desk"
-}, "Route Running Late");
-assert.match(resolved, /Heads up — Lonnie is about/);
-assert.match(resolved, /because of rain/);
-assert.doesNotMatch(resolved, /\[Route\/Handler\]/);
-assert.doesNotMatch(resolved, /\[traffic\/weather\/issue\]/);
-
-console.log("crossover template autofill tests passed");
+console.log("smart crossover template tests passed");

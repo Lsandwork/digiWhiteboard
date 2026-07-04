@@ -42,13 +42,14 @@ import {
 } from "@/lib/staff/admin-ops";
 import {
   buildMessageFromTemplate,
-  crossoverFieldsFromMessage,
   extractCustomPlaceholdersFromEdit,
   findCrossoverTemplate,
+  getTemplateFields,
   hasBracketPlaceholders,
+  legacyFieldValuesFromMessage,
   messageMatchesTemplateStructure,
   resolveCrossoverMessage,
-  type CrossoverTemplateFields
+  type CrossoverTemplateField
 } from "@/lib/staff/crossover-templates";
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
@@ -78,13 +79,12 @@ type CrossoverForm = {
   subject: string;
   message: string;
   active_template: string | null;
+  template_title: string | null;
   custom_placeholders: Record<string, string>;
+  field_values: Record<string, string>;
   from_department: string;
   to_department: string;
   priority: StaffOpsPriority;
-  related_dog_name: string;
-  traffic_weather_issue: string;
-  related_route: string;
   assigned_to: string;
   urgent: boolean;
 };
@@ -128,37 +128,30 @@ const emptyCrossoverForm: CrossoverForm = {
   subject: "",
   message: "",
   active_template: null,
+  template_title: null,
   custom_placeholders: {},
+  field_values: {},
   from_department: "Front Desk",
   to_department: "Daycare",
   priority: "Normal",
-  related_dog_name: "",
-  traffic_weather_issue: "",
-  related_route: "",
   assigned_to: "",
   urgent: false
 };
 
-function crossoverFieldsFromForm(form: CrossoverForm): CrossoverTemplateFields {
-  return {
-    dog: form.related_dog_name.trim(),
-    trafficWeatherIssue: form.traffic_weather_issue.trim(),
-    route: form.related_route.trim(),
-    assignedTo: form.assigned_to.trim(),
-    toDepartment: form.to_department,
-    fromDepartment: form.from_department
-  };
+function crossoverContextFromForm(form: CrossoverForm) {
+  return { toDepartment: form.to_department, fromDepartment: form.from_department };
 }
 
 function resolveCrossoverFormMessage(form: CrossoverForm): CrossoverForm {
-  const fields = crossoverFieldsFromForm(form);
   const template = form.active_template ?? findCrossoverTemplate(form.message, form.subject)?.message ?? null;
+  const templateTitle = form.template_title ?? findCrossoverTemplate(form.message, form.subject)?.title ?? null;
   if (!template && !hasBracketPlaceholders(form.message)) return form;
   const source = template ?? form.message;
   return {
     ...form,
     active_template: template ?? form.active_template,
-    message: buildMessageFromTemplate(source, fields, form.custom_placeholders)
+    template_title: templateTitle ?? form.template_title,
+    message: buildMessageFromTemplate(source, templateTitle, form.field_values, crossoverContextFromForm(form), form.custom_placeholders)
   };
 }
 
@@ -167,24 +160,40 @@ function patchCrossoverForm(form: CrossoverForm, patch: Partial<CrossoverForm>, 
   if (options?.manualMessage !== undefined) {
     next.message = options.manualMessage;
     const template = next.active_template ?? findCrossoverTemplate(options.manualMessage, next.subject)?.message ?? null;
+    const templateTitle = next.template_title ?? findCrossoverTemplate(options.manualMessage, next.subject)?.title ?? null;
     if (template) {
       next.active_template = template;
+      next.template_title = templateTitle;
       if (!messageMatchesTemplateStructure(template, options.manualMessage)) {
-        return { ...next, active_template: null, custom_placeholders: {} };
+        return { ...next, active_template: null, template_title: null, custom_placeholders: {} };
       }
       next.custom_placeholders = extractCustomPlaceholdersFromEdit(
         template,
         options.manualMessage,
-        crossoverFieldsFromForm(next)
+        templateTitle,
+        next.field_values,
+        crossoverContextFromForm(next)
       );
       return next;
     }
     if (hasBracketPlaceholders(options.manualMessage)) {
-      return { ...next, active_template: null };
+      return { ...next, active_template: null, template_title: null };
     }
     return next;
   }
   return resolveCrossoverFormMessage(next);
+}
+
+function patchCrossoverFieldValue(form: CrossoverForm, key: string, value: string, field?: CrossoverTemplateField): Partial<CrossoverForm> {
+  const field_values = { ...form.field_values, [key]: value };
+  const patch: Partial<CrossoverForm> = { field_values };
+  if (field?.type === "department" && value) {
+    patch.to_department = value;
+  }
+  if (field?.type === "staff" && value) {
+    patch.assigned_to = value;
+  }
+  return patch;
 }
 
 const emptyFollowUpForm: FollowUpForm = {
@@ -295,7 +304,12 @@ function paginate<T>(items: T[], page: number) {
 }
 
 function displayCrossoverMessage(item: CrossoverMessage) {
-  return resolveCrossoverMessage(item.message, crossoverFieldsFromMessage(item), item.subject);
+  const templateTitle = item.template_title ?? findCrossoverTemplate(item.message, item.subject)?.title ?? null;
+  const fieldValues = legacyFieldValuesFromMessage(item);
+  return resolveCrossoverMessage(item.message, templateTitle, fieldValues, {
+    toDepartment: item.to_department,
+    fromDepartment: item.from_department
+  });
 }
 
 export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
@@ -549,7 +563,9 @@ function CrossoverPage(props: {
       resolveCrossoverFormMessage({
         ...current,
         subject: template.title,
+        template_title: template.title,
         active_template: template.message,
+        field_values: {},
         custom_placeholders: {}
       })
     );
@@ -569,8 +585,17 @@ function CrossoverPage(props: {
 
   async function submit() {
     const synced = resolveCrossoverFormMessage(form);
-    const { active_template: _activeTemplate, custom_placeholders: _customPlaceholders, ...payload } = synced;
-    await props.onMutate("Unable to send crossover message.", { ...payload, action: "create_crossover" }, "Crossover message sent.");
+    const {
+      active_template: _activeTemplate,
+      template_title: _templateTitle,
+      custom_placeholders: _customPlaceholders,
+      ...payload
+    } = synced;
+    await props.onMutate(
+      "Unable to send crossover message.",
+      { ...payload, action: "create_crossover", template_title: synced.template_title, field_values: synced.field_values },
+      "Crossover message sent."
+    );
     const fromDepartment = props.data
       ? homeDepartmentForUser(props.data.staff_directory, props.data.currentUser)
       : emptyCrossoverForm.from_department;
@@ -830,11 +855,14 @@ function CrossoverFormCard({
   staffOptions: string[];
   onSubmit: () => Promise<void>;
 }) {
+  const templateFields = getTemplateFields(form.template_title);
+  const hasTemplate = Boolean(form.template_title && templateFields.length);
+
   return (
     <section className="admin-card p-5">
       <h3 className="text-xl font-black text-white">Create New Crossover Message</h3>
       <p className="mb-4 text-sm text-admin-muted">
-        Pick a template, fill Dog / Traffic-Weather-Issue / Route / Assigned To to replace bracketed placeholders in the message, then edit the message if needed. Type @Name to notify a staff member (for example @Brian).
+        Pick a template on the right — the fill fields below adapt to that topic. Type @Name to notify a staff member (for example @Brian).
       </p>
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-3">
@@ -845,21 +873,31 @@ function CrossoverFormCard({
         <Field label="Subject" required>
           <input className="admin-input" value={form.subject} onChange={(event) => patchForm({ subject: event.target.value })} />
         </Field>
-        <div className="grid gap-4 md:grid-cols-4">
-          <Field label="Dog">
-            <input className="admin-input" value={form.related_dog_name} onChange={(event) => patchForm({ related_dog_name: event.target.value })} />
-          </Field>
-          <Field label="Traffic / Weather / Issue">
-            <input className="admin-input" value={form.traffic_weather_issue} onChange={(event) => patchForm({ traffic_weather_issue: event.target.value })} />
-          </Field>
-          <Field label="Route">
-            <input className="admin-input" value={form.related_route} onChange={(event) => patchForm({ related_route: event.target.value })} />
-          </Field>
-          <SelectField label="Assigned To" value={form.assigned_to} options={["", ...staffOptions]} onChange={(value) => patchForm({ assigned_to: value })} />
-        </div>
+        {hasTemplate ? (
+          <div className="rounded-2xl border border-fitdog-orange/30 bg-fitdog-orange/5 p-4">
+            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-fitdog-orange">
+              {form.template_title} — fill these in
+            </p>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {templateFields.map((field) => (
+                <TemplateFieldInput
+                  key={field.key}
+                  field={field}
+                  value={form.field_values[field.key] ?? (field.type === "department" ? form.to_department : "")}
+                  staffOptions={staffOptions}
+                  onChange={(value) => patchForm(patchCrossoverFieldValue(form, field.key, value, field))}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="rounded-xl border border-dashed border-admin-border px-4 py-3 text-sm text-admin-muted">
+            Select a communication template to show smart fill fields for that topic.
+          </p>
+        )}
         <Field label="Message" required>
           <textarea
-            className="admin-input min-h-[96px]"
+            className="admin-input min-h-[120px]"
             value={form.message}
             onChange={(event) => patchForm({}, { manualMessage: event.target.value })}
           />
@@ -881,6 +919,45 @@ function CrossoverFormCard({
         <p className="text-xs text-admin-muted">File upload is safely disabled until project storage is configured.</p>
       </div>
     </section>
+  );
+}
+
+function TemplateFieldInput({
+  field,
+  value,
+  staffOptions,
+  onChange
+}: {
+  field: CrossoverTemplateField;
+  value: string;
+  staffOptions: string[];
+  onChange: (value: string) => void;
+}) {
+  if (field.type === "select" && field.options?.length) {
+    return (
+      <SelectField
+        label={field.label}
+        value={value}
+        options={["", ...field.options]}
+        onChange={onChange}
+      />
+    );
+  }
+  if (field.type === "staff") {
+    return <SelectField label={field.label} value={value} options={["", ...staffOptions]} onChange={onChange} />;
+  }
+  if (field.type === "department") {
+    return <SelectField label={field.label} value={value} options={[...STAFF_DEPARTMENTS]} onChange={onChange} />;
+  }
+  return (
+    <Field label={field.label}>
+      <input
+        className="admin-input"
+        value={value}
+        placeholder={field.hint}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </Field>
   );
 }
 

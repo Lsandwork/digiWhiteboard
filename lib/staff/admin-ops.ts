@@ -1,5 +1,5 @@
 import type { AdminUserRole } from "@/lib/admin/users";
-import { crossoverFieldsFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
+import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
   dispatchStaffOpsNotifications,
@@ -38,6 +38,8 @@ export type CrossoverMessage = {
   related_owner_name: string | null;
   related_route: string | null;
   traffic_weather_issue: string | null;
+  template_title: string | null;
+  template_field_values: Record<string, string> | null;
   created_by: string | null;
   assigned_to: string | null;
   urgent: boolean;
@@ -578,22 +580,21 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
   const to = cleanString(input.to_department);
   if (!subject || !rawMessage || !from || !to) throw new Error("Subject, message, from department, and to department are required.");
   const now = nowIso();
-  const related_dog_name = optionalString(input.related_dog_name);
-  const related_owner_name = optionalString(input.related_owner_name);
-  const related_route = optionalString(input.related_route);
-  const traffic_weather_issue = optionalString(input.traffic_weather_issue);
-  const assigned_to = optionalString(input.assigned_to);
+  const template_title = optionalString(input.template_title);
+  const field_values =
+    input.field_values && typeof input.field_values === "object" && !Array.isArray(input.field_values)
+      ? Object.fromEntries(
+          Object.entries(input.field_values as Record<string, unknown>)
+            .map(([key, value]) => [key, String(value ?? "").trim()])
+            .filter(([, value]) => value.length > 0)
+        )
+      : {};
+  const legacy = deriveLegacyCrossoverFields(template_title, field_values);
   const message = resolveCrossoverMessage(
     rawMessage,
-    crossoverFieldsFromMessage({
-      related_dog_name,
-      related_route,
-      traffic_weather_issue,
-      assigned_to,
-      to_department: to,
-      from_department: from
-    }),
-    subject
+    template_title,
+    field_values,
+    { toDepartment: to, fromDepartment: from }
   );
   const record: CrossoverMessage = {
     id: newId(),
@@ -603,12 +604,14 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     to_department: to,
     priority: normalizePriority(input.priority),
     status: "Active",
-    related_dog_name,
-    related_owner_name,
-    related_route,
-    traffic_weather_issue,
+    related_dog_name: legacy.related_dog_name,
+    related_owner_name: legacy.related_owner_name,
+    related_route: legacy.related_route,
+    traffic_weather_issue: legacy.traffic_weather_issue,
+    template_title: legacy.template_title,
+    template_field_values: legacy.template_field_values,
     created_by: actor,
-    assigned_to,
+    assigned_to: optionalString(input.assigned_to) ?? legacy.assigned_to,
     urgent: Boolean(input.urgent),
     created_at: now,
     updated_at: now,
@@ -694,6 +697,11 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
         related_route: patch.related_route !== undefined ? optionalString(patch.related_route) : item.related_route,
         traffic_weather_issue:
           patch.traffic_weather_issue !== undefined ? optionalString(patch.traffic_weather_issue) : item.traffic_weather_issue ?? null,
+        template_title: patch.template_title !== undefined ? optionalString(patch.template_title) : item.template_title ?? null,
+        template_field_values:
+          patch.field_values && typeof patch.field_values === "object"
+            ? (patch.field_values as Record<string, string>)
+            : item.template_field_values ?? null,
         assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
         urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
         updated_at: now,
