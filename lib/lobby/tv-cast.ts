@@ -11,29 +11,82 @@ type PresentationRequestLike = {
 
 type PresentationRequestConstructor = new (urls: string[]) => PresentationRequestLike;
 
-function buildTvCastUrl(pathname: string, currentHref?: string, displayToken?: string) {
+let activePresentationConnection: PresentationConnectionLike | null = null;
+
+export function getCastSiteOrigin(currentHref?: string) {
   if (typeof window !== "undefined") {
-    const url = new URL(pathname, window.location.origin);
-    url.searchParams.set("display", "tv");
-
-    const token =
-      displayToken?.trim() || new URL(window.location.href).searchParams.get("token")?.trim();
-    if (token) {
-      url.searchParams.set("token", token);
-    }
-
-    return url.toString();
+    return window.location.origin;
   }
 
-  const url = new URL(currentHref ?? `http://localhost:3000${pathname}`);
+  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (site) {
+    try {
+      return new URL(site).origin;
+    } catch {
+      // Fall through.
+    }
+  }
+
+  if (currentHref) {
+    try {
+      return new URL(currentHref).origin;
+    } catch {
+      // Fall through.
+    }
+  }
+
+  return "http://localhost:3000";
+}
+
+function buildTvCastUrl(pathname: string, currentHref?: string, displayToken?: string) {
+  const origin = getCastSiteOrigin(currentHref);
+  const url = new URL(pathname, origin);
   url.searchParams.set("display", "tv");
 
-  const token = displayToken?.trim();
+  const token =
+    displayToken?.trim() ||
+    (typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("token")?.trim() : "");
   if (token) {
     url.searchParams.set("token", token);
   }
 
   return url.toString();
+}
+
+export function setActivePresentationConnection(connection: PresentationConnectionLike | null) {
+  if (activePresentationConnection && activePresentationConnection !== connection) {
+    try {
+      activePresentationConnection.close();
+    } catch {
+      // Ignore stale connection cleanup errors.
+    }
+  }
+
+  activePresentationConnection = connection;
+  if (!connection) return;
+
+  const clearConnection = () => {
+    if (activePresentationConnection === connection) {
+      activePresentationConnection = null;
+    }
+  };
+
+  connection.addEventListener("close", clearConnection);
+  connection.addEventListener("terminate", clearConnection);
+}
+
+export function isPresentationCastActive() {
+  return activePresentationConnection?.state === "connected";
+}
+
+export async function stopPresentationCast() {
+  if (!activePresentationConnection) return;
+  try {
+    activePresentationConnection.close();
+  } catch {
+    // Ignore close failures when the receiver already disconnected.
+  }
+  activePresentationConnection = null;
 }
 
 export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {

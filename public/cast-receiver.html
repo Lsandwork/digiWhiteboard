@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Fitdog Lobby Cast Receiver</title>
+    <title>Fitdog Cast Receiver</title>
     <style>
       html,
       body {
@@ -21,29 +21,47 @@
         height: 100%;
         text-align: center;
         padding: 2rem;
+        font-size: 1.25rem;
+        line-height: 1.5;
       }
     </style>
     <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   </head>
   <body>
-    <div class="status" id="status">Connecting Fitdog lobby board...</div>
+    <div class="status" id="status">Connecting Fitdog digital whiteboard...</div>
     <script>
-      const LOBBY_NAMESPACE = "urn:x-cast:com.fitdog.lobby";
+      const CAST_NAMESPACE = "urn:x-cast:com.fitdog.lobby";
       const statusEl = document.getElementById("status");
       const context = cast.framework.CastReceiverContext.getInstance();
+      let pendingUrl = "";
 
-      function navigateToLobby(url) {
+      function navigateToBoard(url) {
         if (!url || typeof url !== "string") return;
-        statusEl.textContent = "Opening lobby board...";
+        pendingUrl = url;
+        statusEl.textContent = "Opening digital whiteboard...";
         window.location.replace(url);
       }
 
-      context.addCustomMessageListener(LOBBY_NAMESPACE, (event) => {
-        try {
-          const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-          navigateToLobby(data && data.url);
-        } catch (error) {
-          statusEl.textContent = "Unable to open lobby board.";
+      function parseCastPayload(data) {
+        if (!data) return null;
+        if (typeof data === "string") {
+          try {
+            return JSON.parse(data);
+          } catch (error) {
+            return { url: data };
+          }
+        }
+        return data;
+      }
+
+      context.addCustomMessageListener(CAST_NAMESPACE, (event) => {
+        const payload = parseCastPayload(event.data);
+        navigateToBoard(payload && payload.url);
+      });
+
+      context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, () => {
+        if (pendingUrl) {
+          navigateToBoard(pendingUrl);
         }
       });
 

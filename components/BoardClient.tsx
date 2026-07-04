@@ -86,6 +86,7 @@ function getDevDemoBoard(): LiveBoardResponse | null {
 export function BoardClient() {
   const searchParams = useSearchParams();
   const staffMode = searchParams.get("staff") === "1";
+  const tvMode = searchParams.get("display") === "tv";
   const debugBoard = searchParams.get("debugBoard") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? "";
 
@@ -110,6 +111,16 @@ export function BoardClient() {
     toggleTvCast,
     setCastError
   } = useStaffTvCast(displayToken);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("staff-tv-display", tvMode);
+    return () => document.documentElement.classList.remove("staff-tv-display");
+  }, [tvMode]);
+
+  useEffect(() => {
+    if (!tvMode) return;
+    void requestWakeLock();
+  }, [tvMode, requestWakeLock]);
 
   const runCastAction = useCallback(async (action: () => Promise<void>) => {
     try {
@@ -323,12 +334,14 @@ export function BoardClient() {
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
-      <StaffCastButton
-        isCasting={isCasting}
-        castError={castError}
-        canChromecast={canChromecast}
-        onToggle={() => void runCastAction(toggleTvCast)}
-      />
+      {!tvMode ? (
+        <StaffCastButton
+          isCasting={isCasting}
+          castError={castError}
+          canChromecast={canChromecast}
+          onToggle={() => void runCastAction(toggleTvCast)}
+        />
+      ) : null}
 
       <div className="mx-auto flex h-full w-full max-w-[1920px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
         <BoardHeader

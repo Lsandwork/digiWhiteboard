@@ -1,4 +1,8 @@
-import { buildLobbyTvCastUrl } from "@/lib/lobby/tv-cast";
+import {
+  buildLobbyTvCastUrl,
+  isPresentationCastActive,
+  stopPresentationCast
+} from "@/lib/lobby/tv-cast";
 
 export const LOBBY_CAST_NAMESPACE = "urn:x-cast:com.fitdog.lobby";
 export const DEFAULT_MEDIA_RECEIVER_APP_ID = "CC1AD845";
@@ -157,10 +161,6 @@ export async function requestGoogleCastDevicePicker() {
 }
 
 export async function startGoogleCastSession(displayToken?: string, castUrl?: string) {
-  if (!isGoogleCastConfigured()) {
-    throw new Error("Google Cast custom receiver is not configured.");
-  }
-
   const context = await requestGoogleCastDevicePicker();
   const session = context.getCurrentSession();
   if (!session) {
@@ -168,17 +168,31 @@ export async function startGoogleCastSession(displayToken?: string, castUrl?: st
   }
 
   const url = castUrl ?? buildLobbyTvCastUrl(undefined, displayToken);
-  await session.sendMessage(LOBBY_CAST_NAMESPACE, { url });
-  return context;
+  const payload = JSON.stringify({ url });
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await session.sendMessage(LOBBY_CAST_NAMESPACE, payload);
+      return context;
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => window.setTimeout(resolve, 400));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to load the whiteboard on the TV.");
 }
 
 export async function stopGoogleCastSession() {
+  await stopPresentationCast();
   const context = getCastContext();
   if (!context) return;
   context.endCurrentSession(true);
 }
 
 export function isGoogleCastSessionActive() {
+  if (isPresentationCastActive()) return true;
   const context = getCastContext();
   if (!context) return false;
   return context.getCastState() === "CONNECTED";

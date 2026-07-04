@@ -983,6 +983,14 @@ html.lobby-tv-display .lobby-cast-button {
   max-width: min(22rem, calc(100vw - 2rem));
 }
 
+html.staff-tv-display .staff-cast-control {
+  display: none !important;
+}
+
+html.staff-tv-display .board-shell {
+  min-height: 100vh;
+}
+
 .staff-cast-button {
   display: inline-flex;
   align-items: center;

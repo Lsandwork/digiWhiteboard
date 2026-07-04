@@ -4,13 +4,13 @@ import {
   isGoogleCastConfigured,
   isGoogleCastFrameworkReady,
   preloadGoogleCast,
-  requestGoogleCastDevicePicker,
   startGoogleCastSession
 } from "@/lib/lobby/google-cast";
 import {
   buildLobbyTvCastUrl,
   getPresentationRequestConstructor,
   isPresentationCastSupported,
+  setActivePresentationConnection,
   type PresentationConnectionLike
 } from "@/lib/lobby/tv-cast";
 
@@ -73,7 +73,9 @@ export async function openPresentationDevicePicker(displayToken?: string, castUr
   }
 
   const request = new PresentationRequestCtor([tvUrl(displayToken, castUrl)]);
-  return request.start();
+  const connection = await request.start();
+  setActivePresentationConnection(connection);
+  return connection;
 }
 
 export function getDefaultCastRoute(): "chromecast" | "airplay" {
@@ -87,14 +89,31 @@ export async function openChromecastPicker(displayToken?: string, castUrl?: stri
     throw new Error("Chromecast is not available in this browser. Use Google Chrome on desktop.");
   }
 
+  const url = tvUrl(displayToken, castUrl);
+
+  if (isGoogleCastConfigured()) {
+    try {
+      await preloadGoogleCast();
+      if (isGoogleCastFrameworkReady()) {
+        await startGoogleCastSession(displayToken, url);
+        return { method: "chromecast" };
+      }
+    } catch (error) {
+      if (isCastCancelled(error)) {
+        throw error;
+      }
+    }
+  }
+
+  if (isPresentationCastSupported()) {
+    const connection = await openPresentationDevicePicker(displayToken, url);
+    return { method: "wireless", connection };
+  }
+
   try {
     await preloadGoogleCast();
     if (isGoogleCastFrameworkReady()) {
-      if (isGoogleCastConfigured()) {
-        await startGoogleCastSession(displayToken, castUrl);
-      } else {
-        await requestGoogleCastDevicePicker();
-      }
+      await startGoogleCastSession(displayToken, url);
       return { method: "chromecast" };
     }
   } catch (error) {
@@ -103,7 +122,7 @@ export async function openChromecastPicker(displayToken?: string, castUrl?: stri
     }
   }
 
-  throw new Error("Chromecast is not available in this browser. Use Google Chrome on desktop.");
+  throw new Error("Unable to cast the whiteboard. Use Google Chrome on desktop on the same Wi‑Fi as the TV.");
 }
 
 export async function openAirPlayPicker(): Promise<CastPickerResult> {
