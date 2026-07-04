@@ -8,7 +8,11 @@ import { BoardErrorBanner } from "@/components/board/BoardErrorBanner";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPanel } from "@/components/board/BoardPanel";
 import { StaffCastButton } from "@/components/board/StaffCastButton";
-import { StaffPushNoticeFullscreen, StaffPushNoticePanel } from "@/components/board/StaffPushNotice";
+import {
+  StaffPushNoticeFullscreen,
+  StaffPushNoticePanel,
+  StaffPushNoticeTvOverlay
+} from "@/components/board/StaffPushNotice";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
@@ -346,6 +350,8 @@ export function BoardClient() {
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
+      <StaffPushNoticeTvOverlay active={Boolean(activePushNotice)} />
+
       {!tvMode ? (
         <StaffCastButton
           isCasting={isCasting}

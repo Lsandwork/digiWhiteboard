@@ -1,7 +1,10 @@
-const ALARM_REPEAT_MS = 45000;
+const ALARM_REPEAT_MS = 30000;
+const BURST_ROUNDS = 3;
+const BURST_ROUND_GAP_MS = 900;
 
 let audioContext: AudioContext | null = null;
 let repeatTimer: number | null = null;
+let burstTimer: number | null = null;
 let unlocked = false;
 
 function getAudioContext() {
@@ -12,7 +15,7 @@ function getAudioContext() {
   return audioContext;
 }
 
-function playBeep(ctx: AudioContext, startTime: number, frequency: number, durationSec: number, volume = 0.32) {
+function playBeep(ctx: AudioContext, startTime: number, frequency: number, durationSec: number, volume = 0.42) {
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
 
@@ -20,7 +23,7 @@ function playBeep(ctx: AudioContext, startTime: number, frequency: number, durat
   oscillator.frequency.setValueAtTime(frequency, startTime);
 
   gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.015);
+  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
 
   oscillator.connect(gain);
@@ -29,12 +32,28 @@ function playBeep(ctx: AudioContext, startTime: number, frequency: number, durat
   oscillator.stop(startTime + durationSec + 0.02);
 }
 
+function playAlarmRound(ctx: AudioContext, startTime: number) {
+  playBeep(ctx, startTime, 920, 0.16, 0.44);
+  playBeep(ctx, startTime + 0.17, 920, 0.16, 0.44);
+  playBeep(ctx, startTime + 0.34, 780, 0.2, 0.4);
+  playBeep(ctx, startTime + 0.56, 780, 0.2, 0.38);
+  playBeep(ctx, startTime + 0.78, 1040, 0.24, 0.42);
+  playBeep(ctx, startTime + 1.04, 1040, 0.24, 0.4);
+}
+
 export async function unlockStaffPushNoticeAudio() {
   const ctx = getAudioContext();
-  if (!ctx || unlocked) return;
+  if (!ctx) return;
   try {
     await ctx.resume();
-    unlocked = true;
+    if (!unlocked) {
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.start(0);
+      unlocked = true;
+    }
   } catch {
     // Ignore unlock failures; alarm may still work on some displays.
   }
@@ -42,27 +61,41 @@ export async function unlockStaffPushNoticeAudio() {
 
 export function playStaffPushNoticeAlarm() {
   if (typeof window === "undefined") return;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
   const ctx = getAudioContext();
   if (!ctx) return;
 
   void ctx.resume().then(() => {
-    const now = ctx.currentTime;
-    playBeep(ctx, now, 880, 0.14, 0.34);
-    playBeep(ctx, now + 0.18, 880, 0.14, 0.34);
-    playBeep(ctx, now + 0.36, 740, 0.22, 0.3);
-    playBeep(ctx, now + 0.62, 740, 0.22, 0.28);
+    playAlarmRound(ctx, ctx.currentTime);
   });
 }
 
-export function startStaffPushNoticeAlarmLoop(noticeId: string | null, onRepeat?: () => void) {
+export function playStaffPushNoticeAlarmBurst() {
+  if (typeof window === "undefined") return;
+
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  if (burstTimer != null) {
+    window.clearTimeout(burstTimer);
+    burstTimer = null;
+  }
+
+  void ctx.resume().then(() => {
+    for (let round = 0; round < BURST_ROUNDS; round += 1) {
+      window.setTimeout(() => {
+        playAlarmRound(ctx, ctx.currentTime);
+      }, round * BURST_ROUND_GAP_MS);
+    }
+  });
+}
+
+export function startStaffPushNoticeAlarmLoop(noticeId: string | null) {
   stopStaffPushNoticeAlarmLoop();
   if (!noticeId) return;
 
   repeatTimer = window.setInterval(() => {
-    playStaffPushNoticeAlarm();
-    onRepeat?.();
+    playStaffPushNoticeAlarmBurst();
   }, ALARM_REPEAT_MS);
 }
 
@@ -70,5 +103,9 @@ export function stopStaffPushNoticeAlarmLoop() {
   if (repeatTimer != null) {
     window.clearInterval(repeatTimer);
     repeatTimer = null;
+  }
+  if (burstTimer != null) {
+    window.clearTimeout(burstTimer);
+    burstTimer = null;
   }
 }

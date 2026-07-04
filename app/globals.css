@@ -1615,7 +1615,41 @@ html.lobby-tv-display .social-video-shell {
 
 .staff-push-notice-panel--alert,
 .staff-push-notice-fullscreen--alert {
-  animation: staffNoticePanelPulse 1.1s ease-in-out infinite;
+  animation: staffNoticePanelPulse 0.55s ease-in-out infinite;
+}
+
+.staff-push-notice-tv-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.92);
+  opacity: 0;
+  animation: staffNoticeTvStrobe 0.65s linear infinite;
+}
+
+.staff-push-notice-tv-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 81;
+  display: flex;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  background: linear-gradient(90deg, #b91c1c, #ea580c, #b91c1c);
+  background-size: 200% 100%;
+  color: #fff7ed;
+  font-size: clamp(0.95rem, 1.6vw, 1.35rem);
+  font-weight: 1000;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  animation: staffNoticeTvBarSlide 1.2s linear infinite, staffNoticeTvBarFlash 0.45s step-end infinite;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.staff-push-notice-tv-bar span {
+  animation: staffNoticeTvBarText 0.9s ease-in-out infinite;
 }
 
 .staff-push-notice-fullscreen {
@@ -1648,8 +1682,16 @@ html.lobby-tv-display .social-video-shell {
   text-align: center;
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeAlertFlash 0.95s ease-in-out infinite,
-    staffNoticeShake 2.4s ease-in-out infinite;
+    staffNoticeMultiFlash 0.55s step-end infinite,
+    staffNoticeShake 1.8s ease-in-out infinite;
+}
+
+.staff-push-notice--burst {
+  animation:
+    staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    staffNoticeBurstFlash 0.35s step-end infinite,
+    staffNoticeShake 0.85s ease-in-out infinite;
+  border-width: 4px;
 }
 
 .staff-push-notice::before {
@@ -1667,10 +1709,27 @@ html.lobby-tv-display .social-video-shell {
   position: absolute;
   inset: 0;
   z-index: -2;
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.22), transparent 62%);
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.35), transparent 62%);
   opacity: 0;
   pointer-events: none;
-  animation: staffNoticeScreenFlash 1.1s ease-in-out infinite;
+  animation: staffNoticeScreenFlash 0.55s step-end infinite;
+}
+
+.staff-push-notice__flash--secondary {
+  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.55), transparent 70%);
+  animation: staffNoticeScreenFlash 0.55s step-end infinite reverse;
+  animation-delay: -0.275s;
+}
+
+.staff-push-notice__strobe-ring {
+  position: absolute;
+  inset: -8px;
+  z-index: -4;
+  border-radius: 38px;
+  border: 4px solid rgba(254, 240, 138, 0.95);
+  opacity: 0;
+  pointer-events: none;
+  animation: staffNoticeStrobeRing 0.55s step-end infinite;
 }
 
 .staff-push-notice__stripes {
@@ -1689,10 +1748,14 @@ html.lobby-tv-display .social-video-shell {
 .staff-push-notice--urgent,
 .staff-push-notice--alert {
   border-color: rgba(248, 113, 113, 0.95);
+}
+
+.staff-push-notice--urgent.staff-push-notice--burst,
+.staff-push-notice--alert.staff-push-notice--burst {
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeAlertFlash 0.85s ease-in-out infinite,
-    staffNoticeShake 2.2s ease-in-out infinite;
+    staffNoticeBurstFlash 0.35s step-end infinite,
+    staffNoticeShake 0.85s ease-in-out infinite;
 }
 
 .staff-push-notice--fullscreen {
@@ -1714,7 +1777,7 @@ html.lobby-tv-display .social-video-shell {
     0 18px 45px rgba(0, 0, 0, 0.34),
     0 0 0 4px rgba(255, 255, 255, 0.18),
     0 0 28px rgba(248, 113, 113, 0.55);
-  animation: staffNoticeIconPulse 0.95s ease-in-out infinite;
+  animation: staffNoticeIconPulse 0.55s step-end infinite;
 }
 
 .staff-push-notice__icon svg {
@@ -1730,7 +1793,7 @@ html.lobby-tv-display .social-video-shell {
   font-weight: 950;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  animation: staffNoticeEyebrowFlash 1.1s ease-in-out infinite;
+  animation: staffNoticeEyebrowFlash 0.55s step-end infinite;
 }
 
 .staff-push-notice--urgent .staff-push-notice__eyebrow,
@@ -1748,7 +1811,7 @@ html.lobby-tv-display .social-video-shell {
   text-transform: uppercase;
   text-wrap: balance;
   text-shadow: 0 0 24px rgba(248, 113, 113, 0.45);
-  animation: staffNoticeTitlePulse 1.15s ease-in-out infinite;
+  animation: staffNoticeTitlePulse 0.65s step-end infinite;
 }
 
 .staff-push-notice-panel .staff-push-notice__title {
@@ -1811,6 +1874,122 @@ html.lobby-tv-display .social-video-shell {
   }
 }
 
+@keyframes staffNoticeMultiFlash {
+  0%,
+  49% {
+    filter: saturate(1) brightness(1);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 42px rgba(248, 113, 113, 0.28);
+  }
+  50%,
+  100% {
+    filter: saturate(1.45) brightness(1.18);
+    box-shadow:
+      0 0 0 3px rgba(255, 237, 213, 0.55) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 88px rgba(251, 146, 60, 0.72);
+  }
+}
+
+@keyframes staffNoticeBurstFlash {
+  0%,
+  24% {
+    filter: saturate(1.5) brightness(1.25);
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.65) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 110px rgba(248, 113, 113, 0.85);
+  }
+  25%,
+  49% {
+    filter: saturate(1) brightness(0.92);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 36px rgba(248, 113, 113, 0.22);
+  }
+  50%,
+  74% {
+    filter: saturate(1.5) brightness(1.25);
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.65) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 110px rgba(251, 146, 60, 0.85);
+  }
+  75%,
+  100% {
+    filter: saturate(1) brightness(0.92);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 36px rgba(248, 113, 113, 0.22);
+  }
+}
+
+@keyframes staffNoticeTvStrobe {
+  0%,
+  24% {
+    opacity: 0;
+  }
+  25%,
+  49% {
+    opacity: 0.28;
+  }
+  50%,
+  74% {
+    opacity: 0;
+  }
+  75%,
+  100% {
+    opacity: 0.22;
+  }
+}
+
+@keyframes staffNoticeTvBarSlide {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes staffNoticeTvBarFlash {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0.72;
+  }
+}
+
+@keyframes staffNoticeTvBarText {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+@keyframes staffNoticeStrobeRing {
+  0%,
+  49% {
+    opacity: 0;
+    transform: scale(0.995);
+  }
+  50%,
+  100% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
 @keyframes staffNoticeAlertFlash {
   0%,
   100% {
@@ -1841,11 +2020,12 @@ html.lobby-tv-display .social-video-shell {
 
 @keyframes staffNoticeScreenFlash {
   0%,
-  100% {
+  49% {
     opacity: 0;
   }
-  50% {
-    opacity: 0.55;
+  50%,
+  100% {
+    opacity: 0.75;
   }
 }
 
@@ -1879,31 +2059,34 @@ html.lobby-tv-display .social-video-shell {
 
 @keyframes staffNoticeIconPulse {
   0%,
-  100% {
+  49% {
     transform: scale(1);
   }
-  50% {
-    transform: scale(1.08);
+  50%,
+  100% {
+    transform: scale(1.12);
   }
 }
 
 @keyframes staffNoticeEyebrowFlash {
   0%,
-  100% {
+  49% {
     opacity: 1;
   }
-  50% {
-    opacity: 0.72;
+  50%,
+  100% {
+    opacity: 0.55;
   }
 }
 
 @keyframes staffNoticeTitlePulse {
   0%,
-  100% {
+  49% {
     transform: scale(1);
   }
-  50% {
-    transform: scale(1.015);
+  50%,
+  100% {
+    transform: scale(1.03);
   }
 }
 
@@ -1981,11 +2164,19 @@ html.lobby-tv-display .social-video-shell {
   .staff-push-notice__paw,
   .staff-push-notice__flash,
   .staff-push-notice__stripes,
+  .staff-push-notice__strobe-ring,
   .staff-push-notice__title,
   .staff-push-notice__eyebrow,
   .staff-push-notice-panel--alert,
-  .staff-push-notice-fullscreen--alert {
+  .staff-push-notice-fullscreen--alert,
+  .staff-push-notice-tv-flash,
+  .staff-push-notice-tv-bar,
+  .staff-push-notice-tv-bar span {
     animation: none !important;
+  }
+
+  .staff-push-notice-tv-bar {
+    opacity: 1;
   }
 }
 

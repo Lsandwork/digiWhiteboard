@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 
-const STAFF_PUSH_NOTICE_POLL_MS = 5000;
+const STAFF_PUSH_NOTICE_POLL_MS = 3000;
 const STAFF_PUSH_NOTICE_TIMEOUT_MS = 3000;
 
 type StaffPushNoticeResponse = {

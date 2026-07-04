@@ -12,16 +12,18 @@ function NoticeIcon({ notice }: { notice: StaffPushNotice }) {
 }
 
 function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice; fullscreen?: boolean }) {
-  useStaffPushNoticeAlarm(notice);
+  const isBursting = useStaffPushNoticeAlarm(notice);
 
   return (
     <article
-      className={`staff-push-notice staff-push-notice--alert ${fullscreen ? "staff-push-notice--fullscreen" : ""}`}
+      className={`staff-push-notice staff-push-notice--alert ${isBursting ? "staff-push-notice--burst" : ""} ${fullscreen ? "staff-push-notice--fullscreen" : ""}`}
       role="alert"
       aria-live="assertive"
     >
       <div className="staff-push-notice__flash" aria-hidden="true" />
+      <div className="staff-push-notice__flash staff-push-notice__flash--secondary" aria-hidden="true" />
       <div className="staff-push-notice__stripes" aria-hidden="true" />
+      <div className="staff-push-notice__strobe-ring" aria-hidden="true" />
 
       <div className="staff-push-notice__paw staff-push-notice__paw--one" aria-hidden="true">
         <PawPrint />
@@ -46,6 +48,18 @@ function expiresLabel(notice: StaffPushNotice) {
   const date = new Date(notice.expires_at);
   if (Number.isNaN(date.getTime())) return null;
   return `Expires ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+
+export function StaffPushNoticeTvOverlay({ active }: { active: boolean }) {
+  if (!active) return null;
+  return (
+    <>
+      <div className="staff-push-notice-tv-flash" aria-hidden="true" />
+      <div className="staff-push-notice-tv-bar" aria-hidden="true">
+        <span>Handler Alert Active</span>
+      </div>
+    </>
+  );
 }
 
 export function StaffPushNoticePanel({ notice }: { notice: StaffPushNotice }) {
