@@ -14,6 +14,7 @@ import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useStaffPushNotice } from "@/hooks/useStaffPushNotice";
+import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useStaffTvCast } from "@/hooks/useStaffTvCast";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
@@ -117,6 +118,10 @@ export function BoardClient() {
     document.documentElement.classList.toggle("staff-tv-display", tvMode);
     return () => document.documentElement.classList.remove("staff-tv-display");
   }, [tvMode]);
+
+  useEffect(() => {
+    void unlockStaffPushNoticeAudio();
+  }, []);
 
   useEffect(() => {
     if (!tvMode) return;

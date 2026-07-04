@@ -1,34 +1,28 @@
 "use client";
 
 import { AlertTriangle, MapPinOff, PawPrint, PhoneOff } from "lucide-react";
+import { useStaffPushNoticeAlarm } from "@/hooks/useStaffPushNoticeAlarm";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 
 function NoticeIcon({ notice }: { notice: StaffPushNotice }) {
   const title = notice.title.toLowerCase();
   if (title.includes("phone")) return <PhoneOff />;
   if (title.includes("yard")) return <MapPinOff />;
-  if (notice.priority === "urgent" || notice.display_mode === "urgent") return <AlertTriangle />;
-  return <PawPrint />;
-}
-
-function priorityLabel(notice: StaffPushNotice) {
-  if (notice.priority === "urgent" || notice.display_mode === "urgent") return "Urgent Handler Notice";
-  if (notice.priority === "important") return "Important Handler Notice";
-  return "Handler Notice";
-}
-
-function expiresLabel(notice: StaffPushNotice) {
-  if (!notice.expires_at) return null;
-  const date = new Date(notice.expires_at);
-  if (Number.isNaN(date.getTime())) return null;
-  return `Expires ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+  return <AlertTriangle />;
 }
 
 function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice; fullscreen?: boolean }) {
-  const urgent = notice.priority === "urgent" || notice.display_mode === "urgent";
+  useStaffPushNoticeAlarm(notice);
 
   return (
-    <article className={`staff-push-notice ${urgent ? "staff-push-notice--urgent" : ""} ${fullscreen ? "staff-push-notice--fullscreen" : ""}`}>
+    <article
+      className={`staff-push-notice staff-push-notice--alert ${fullscreen ? "staff-push-notice--fullscreen" : ""}`}
+      role="alert"
+      aria-live="assertive"
+    >
+      <div className="staff-push-notice__flash" aria-hidden="true" />
+      <div className="staff-push-notice__stripes" aria-hidden="true" />
+
       <div className="staff-push-notice__paw staff-push-notice__paw--one" aria-hidden="true">
         <PawPrint />
       </div>
@@ -39,7 +33,7 @@ function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice
       <div className="staff-push-notice__icon" aria-hidden="true">
         <NoticeIcon notice={notice} />
       </div>
-      <p className="staff-push-notice__eyebrow">{priorityLabel(notice)}</p>
+      <p className="staff-push-notice__eyebrow">Yard Handler Alert</p>
       <h2 className="staff-push-notice__title">{notice.title}</h2>
       {notice.message ? <p className="staff-push-notice__message">{notice.message}</p> : null}
       {expiresLabel(notice) ? <p className="staff-push-notice__expires">{expiresLabel(notice)}</p> : null}
@@ -47,9 +41,16 @@ function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice
   );
 }
 
+function expiresLabel(notice: StaffPushNotice) {
+  if (!notice.expires_at) return null;
+  const date = new Date(notice.expires_at);
+  if (Number.isNaN(date.getTime())) return null;
+  return `Expires ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+}
+
 export function StaffPushNoticePanel({ notice }: { notice: StaffPushNotice }) {
   return (
-    <aside className="staff-push-notice-panel" aria-label="Active Push Notice">
+    <aside className="staff-push-notice-panel staff-push-notice-panel--alert" aria-label="Active yard handler alert">
       <NoticeContent notice={notice} />
     </aside>
   );
@@ -57,7 +58,7 @@ export function StaffPushNoticePanel({ notice }: { notice: StaffPushNotice }) {
 
 export function StaffPushNoticeFullscreen({ notice }: { notice: StaffPushNotice }) {
   return (
-    <section className="staff-push-notice-fullscreen" aria-label="Active Push Notice">
+    <section className="staff-push-notice-fullscreen staff-push-notice-fullscreen--alert" aria-label="Active yard handler alert">
       <NoticeContent notice={notice} fullscreen />
     </section>
   );
