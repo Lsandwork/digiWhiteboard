@@ -83,7 +83,7 @@ type CrossoverForm = {
   to_department: string;
   priority: StaffOpsPriority;
   related_dog_name: string;
-  related_owner_name: string;
+  traffic_weather_issue: string;
   related_route: string;
   assigned_to: string;
   urgent: boolean;
@@ -133,7 +133,7 @@ const emptyCrossoverForm: CrossoverForm = {
   to_department: "Daycare",
   priority: "Normal",
   related_dog_name: "",
-  related_owner_name: "",
+  traffic_weather_issue: "",
   related_route: "",
   assigned_to: "",
   urgent: false
@@ -142,7 +142,7 @@ const emptyCrossoverForm: CrossoverForm = {
 function crossoverFieldsFromForm(form: CrossoverForm): CrossoverTemplateFields {
   return {
     dog: form.related_dog_name.trim(),
-    owner: form.related_owner_name.trim(),
+    trafficWeatherIssue: form.traffic_weather_issue.trim(),
     route: form.related_route.trim(),
     assignedTo: form.assigned_to.trim(),
     toDepartment: form.to_department,
@@ -561,7 +561,7 @@ function CrossoverPage(props: {
       if (props.filters.status && item.status !== props.filters.status) return false;
       if (props.filters.department && item.from_department !== props.filters.department && item.to_department !== props.filters.department) return false;
       if (props.filters.urgentOnly && !item.urgent && item.priority !== "High" && item.priority !== "Critical") return false;
-      return includesQuery([item.subject, item.message, item.related_dog_name, item.related_owner_name, item.created_by], props.filters.query);
+      return includesQuery([item.subject, item.message, item.related_dog_name, item.traffic_weather_issue, item.created_by], props.filters.query);
     });
   }, [props.data?.crossover_messages, props.filters]);
   const paged = paginate(rows, props.page);
@@ -834,7 +834,7 @@ function CrossoverFormCard({
     <section className="admin-card p-5">
       <h3 className="text-xl font-black text-white">Create New Crossover Message</h3>
       <p className="mb-4 text-sm text-admin-muted">
-        Pick a template, fill Dog / Owner / Route / Assigned To to replace bracketed placeholders in the message, then edit the message if needed. Type @Name to notify a staff member (for example @Brian).
+        Pick a template, fill Dog / Traffic-Weather-Issue / Route / Assigned To to replace bracketed placeholders in the message, then edit the message if needed. Type @Name to notify a staff member (for example @Brian).
       </p>
       <div className="grid gap-4">
         <div className="grid gap-4 md:grid-cols-3">
@@ -849,8 +849,8 @@ function CrossoverFormCard({
           <Field label="Dog">
             <input className="admin-input" value={form.related_dog_name} onChange={(event) => patchForm({ related_dog_name: event.target.value })} />
           </Field>
-          <Field label="Owner">
-            <input className="admin-input" value={form.related_owner_name} onChange={(event) => patchForm({ related_owner_name: event.target.value })} />
+          <Field label="Traffic / Weather / Issue">
+            <input className="admin-input" value={form.traffic_weather_issue} onChange={(event) => patchForm({ traffic_weather_issue: event.target.value })} />
           </Field>
           <Field label="Route">
             <input className="admin-input" value={form.related_route} onChange={(event) => patchForm({ related_route: event.target.value })} />

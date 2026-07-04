@@ -10,7 +10,7 @@ import {
 const routeLateTemplate = CROSSOVER_TEMPLATES[0].message;
 const emptyFields: CrossoverTemplateFields = {
   dog: "",
-  owner: "",
+  trafficWeatherIssue: "",
   route: "",
   assignedTo: "",
   toDepartment: "Daycare",
@@ -24,12 +24,17 @@ assert.equal(
 
 const filledFields: CrossoverTemplateFields = {
   dog: "Cooper",
-  owner: "Martinez",
+  trafficWeatherIssue: "heavy traffic",
   route: "Route 3",
   assignedTo: "Brian",
   toDepartment: "Daycare",
   fromDepartment: "Transportation"
 };
+
+assert.match(
+  buildMessageFromTemplate(routeLateTemplate, filledFields),
+  /because of heavy traffic/
+);
 
 assert.match(
   buildMessageFromTemplate(routeLateTemplate, filledFields),
@@ -61,13 +66,15 @@ assert.match(rebuilt, /Route 3 is about 15/);
 
 const resolved = resolveCrossoverMessage(routeLateTemplate, {
   dog: "Cooper",
-  owner: "Martinez",
+  trafficWeatherIssue: "rain",
   route: "",
   assignedTo: "Lonnie",
   toDepartment: "Daycare",
   fromDepartment: "Front Desk"
 }, "Route Running Late");
 assert.match(resolved, /Heads up — Lonnie is about/);
+assert.match(resolved, /because of rain/);
 assert.doesNotMatch(resolved, /\[Route\/Handler\]/);
+assert.doesNotMatch(resolved, /\[traffic\/weather\/issue\]/);
 
 console.log("crossover template autofill tests passed");

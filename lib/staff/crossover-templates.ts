@@ -3,7 +3,7 @@ import type { CrossoverMessage } from "@/lib/staff/admin-ops";
 
 export type CrossoverTemplateFields = {
   dog: string;
-  owner: string;
+  trafficWeatherIssue: string;
   route: string;
   assignedTo: string;
   toDepartment: string;
@@ -31,13 +31,12 @@ function mappedValueForPlaceholder(label: string, fields: CrossoverTemplateField
     return fields.dog || null;
   }
 
-  if (lower === "owner") {
-    return fields.owner || null;
+  if (lower === "traffic/weather/issue") {
+    return fields.trafficWeatherIssue || null;
   }
 
   if (lower === "dog/owner") {
-    if (fields.dog && fields.owner) return `${fields.dog}/${fields.owner}`;
-    return fields.dog || fields.owner || null;
+    return fields.dog || null;
   }
 
   if (lower.includes("route") || lower.includes("handler")) {
@@ -126,11 +125,11 @@ export function extractCustomPlaceholdersFromEdit(
 
 export function crossoverFieldsFromMessage(item: Pick<
   CrossoverMessage,
-  "related_dog_name" | "related_owner_name" | "related_route" | "assigned_to" | "to_department" | "from_department"
+  "related_dog_name" | "related_route" | "traffic_weather_issue" | "assigned_to" | "to_department" | "from_department"
 >): CrossoverTemplateFields {
   return {
     dog: item.related_dog_name?.trim() ?? "",
-    owner: item.related_owner_name?.trim() ?? "",
+    trafficWeatherIssue: item.traffic_weather_issue?.trim() ?? "",
     route: item.related_route?.trim() ?? "",
     assignedTo: item.assigned_to?.trim() ?? "",
     toDepartment: item.to_department,

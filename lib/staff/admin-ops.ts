@@ -37,6 +37,7 @@ export type CrossoverMessage = {
   related_dog_name: string | null;
   related_owner_name: string | null;
   related_route: string | null;
+  traffic_weather_issue: string | null;
   created_by: string | null;
   assigned_to: string | null;
   urgent: boolean;
@@ -580,13 +581,14 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
   const related_dog_name = optionalString(input.related_dog_name);
   const related_owner_name = optionalString(input.related_owner_name);
   const related_route = optionalString(input.related_route);
+  const traffic_weather_issue = optionalString(input.traffic_weather_issue);
   const assigned_to = optionalString(input.assigned_to);
   const message = resolveCrossoverMessage(
     rawMessage,
     crossoverFieldsFromMessage({
       related_dog_name,
-      related_owner_name,
       related_route,
+      traffic_weather_issue,
       assigned_to,
       to_department: to,
       from_department: from
@@ -604,6 +606,7 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     related_dog_name,
     related_owner_name,
     related_route,
+    traffic_weather_issue,
     created_by: actor,
     assigned_to,
     urgent: Boolean(input.urgent),
@@ -689,6 +692,8 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
         related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name) : item.related_dog_name,
         related_owner_name: patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name) : item.related_owner_name,
         related_route: patch.related_route !== undefined ? optionalString(patch.related_route) : item.related_route,
+        traffic_weather_issue:
+          patch.traffic_weather_issue !== undefined ? optionalString(patch.traffic_weather_issue) : item.traffic_weather_issue ?? null,
         assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
         urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
         updated_at: now,
