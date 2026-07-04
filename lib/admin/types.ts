@@ -50,7 +50,8 @@ export type AdminTab =
   | "users"
   | "settings"
   | "logs"
-  | "integrations";
+  | "integrations"
+  | "help";
 
 export const ADMIN_TABS: AdminTab[] = [
   "overview",
@@ -61,7 +62,8 @@ export const ADMIN_TABS: AdminTab[] = [
   "users",
   "settings",
   "logs",
-  "integrations"
+  "integrations",
+  "help"
 ];
 
 export function parseAdminTab(value: string | null): AdminTab {

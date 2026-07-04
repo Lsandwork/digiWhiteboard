@@ -18,6 +18,7 @@ type AdminShellProps = {
   onPreviewLive: () => void;
   onOpenBoard: () => void;
   onLogout: () => void;
+  onOpenHelp?: () => void;
   children: React.ReactNode;
   preview?: React.ReactNode;
   showPreview?: boolean;
@@ -36,6 +37,7 @@ export function AdminShell({
   onPreviewLive,
   onOpenBoard,
   onLogout,
+  onOpenHelp,
   children,
   preview,
   showPreview = true
@@ -59,6 +61,7 @@ export function AdminShell({
           onMobileClose={() => setMobileOpen(false)}
           onTabChange={onTabChange}
           onLogout={onLogout}
+          onOpenHelp={onOpenHelp}
         />
 
         <div className="admin-main">

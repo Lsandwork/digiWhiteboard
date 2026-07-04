@@ -15,6 +15,7 @@ import { AdminLogsPanel } from "@/components/admin/AdminLogsPanel";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
+import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
 import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -174,7 +175,7 @@ export function AdminDashboard() {
   const adminSettings = data.admin_settings ?? DEFAULT_ADMIN_SETTINGS;
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
-  const showPreview = !["settings", "users", "logs", "integrations"].includes(tab);
+  const showPreview = !["settings", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
     <div className="space-y-4">
@@ -215,6 +216,7 @@ export function AdminDashboard() {
         onPreviewLive={() => setPreviewOpen(true)}
         onOpenBoard={openBoard}
         onLogout={() => void logout()}
+        onOpenHelp={() => setActiveTab("help")}
         preview={preview}
         showPreview={showPreview}
       >
@@ -296,6 +298,15 @@ export function AdminDashboard() {
             webhookUrl={data.webhook_url}
             syncStatus={data.sync_status}
             failedEventsCount={data.failed_events.length}
+          />
+        ) : null}
+
+        {tab === "help" ? (
+          <AdminHelpCenter
+            onGoToTab={(nextTab, nextBoard) => {
+              if (nextBoard) setBoard(nextBoard);
+              setActiveTab(nextTab);
+            }}
           />
         ) : null}
       </AdminShell>

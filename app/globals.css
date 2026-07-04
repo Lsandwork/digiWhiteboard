@@ -1171,10 +1171,171 @@ html.lobby-tv-display .lobby-cast-button {
   min-width: 0;
 }
 
-.admin-preview-column {
-  position: sticky;
-  top: 1rem;
-}
+  .admin-preview-column {
+    position: sticky;
+    top: 1rem;
+  }
+
+  .admin-help-center {
+    max-width: 960px;
+  }
+
+  .admin-help-hero {
+    border: 1px solid var(--admin-border);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, rgba(36, 25, 18, 0.96), rgba(26, 18, 13, 0.98));
+    padding: 1.25rem;
+  }
+
+  .admin-help-hero-icon {
+    display: grid;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 0.85rem;
+    background: rgba(241, 95, 42, 0.16);
+    color: #f15f2a;
+  }
+
+  .admin-help-search-input {
+    min-height: 3rem;
+    font-size: 1rem;
+  }
+
+  .admin-help-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .admin-help-category {
+    border: 1px solid var(--admin-border);
+    border-radius: 9999px;
+    padding: 0.45rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--admin-muted);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .admin-help-category--active {
+    border-color: rgba(241, 95, 42, 0.45);
+    background: rgba(241, 95, 42, 0.16);
+    color: #fff;
+  }
+
+  .admin-help-group-title {
+    margin-bottom: 0.85rem;
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  .admin-help-grid {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-help-card {
+    border: 1px solid var(--admin-border);
+    border-radius: 1rem;
+    background: rgba(0, 0, 0, 0.15);
+    padding: 1.1rem;
+  }
+
+  .admin-help-card-category {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #f15f2a;
+  }
+
+  .admin-help-card-title {
+    margin-top: 0.35rem;
+    font-size: 1.05rem;
+    font-weight: 900;
+    color: #fff;
+  }
+
+  .admin-help-card-summary {
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--admin-muted);
+  }
+
+  .admin-help-steps {
+    margin: 0.85rem 0 0;
+    padding-left: 1.15rem;
+    color: #fff8ef;
+    font-size: 0.92rem;
+    line-height: 1.55;
+  }
+
+  .admin-help-steps li + li {
+    margin-top: 0.45rem;
+  }
+
+  .admin-help-tips {
+    margin-top: 0.85rem;
+    border-left: 3px solid rgba(100, 185, 220, 0.55);
+    padding-left: 0.75rem;
+  }
+
+  .admin-help-tips-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #93c5fd;
+  }
+
+  .admin-help-tips ul {
+    margin: 0.25rem 0 0;
+    padding-left: 1rem;
+    font-size: 0.88rem;
+    color: var(--admin-muted);
+  }
+
+  .admin-help-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .admin-help-quick-links {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .admin-help-quick-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border: 1px solid var(--admin-border);
+    border-radius: 0.85rem;
+    padding: 0.85rem 1rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .admin-help-quick-link:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  @media (min-width: 768px) {
+    .admin-help-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .admin-help-quick-links {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
 
 .admin-page-title {
   font-size: clamp(1.5rem, 2.4vw, 2rem);
@@ -1442,7 +1603,7 @@ html.lobby-tv-display .lobby-cast-button {
   background: linear-gradient(180deg, #05101b, #0a1724);
 }
 
-.admin-help-card {
+.admin-sidebar-help-card {
   border: 1px solid var(--admin-border);
   background: rgba(255, 255, 255, 0.03);
 }

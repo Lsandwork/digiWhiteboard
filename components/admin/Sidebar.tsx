@@ -27,7 +27,8 @@ const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "users", label: "Users", icon: <Users className="h-4 w-4" /> },
   { id: "settings", label: "Settings", icon: <Settings className="h-4 w-4" /> },
   { id: "logs", label: "Logs", icon: <ScrollText className="h-4 w-4" /> },
-  { id: "integrations", label: "Integrations", icon: <Plug className="h-4 w-4" /> }
+  { id: "integrations", label: "Integrations", icon: <Plug className="h-4 w-4" /> },
+  { id: "help", label: "Help Center", icon: <HelpCircle className="h-4 w-4" /> }
 ];
 
 const tabLabels: Record<AdminTab, string> = {
@@ -39,7 +40,8 @@ const tabLabels: Record<AdminTab, string> = {
   users: "Users",
   settings: "Settings",
   logs: "Logs",
-  integrations: "Integrations"
+  integrations: "Integrations",
+  help: "Help Center"
 };
 
 type SidebarProps = {
@@ -50,9 +52,10 @@ type SidebarProps = {
   onMobileClose: () => void;
   onTabChange: (tab: AdminTab) => void;
   onLogout: () => void;
+  onOpenHelp?: () => void;
 };
 
-export function Sidebar({ activeTab, username, helpLink, mobileOpen, onMobileClose, onTabChange, onLogout }: SidebarProps) {
+export function Sidebar({ activeTab, username, helpLink, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp }: SidebarProps) {
   return (
     <>
       {mobileOpen ? <button type="button" className="admin-mobile-backdrop" aria-label="Close menu" onClick={onMobileClose} /> : null}
@@ -85,15 +88,18 @@ export function Sidebar({ activeTab, username, helpLink, mobileOpen, onMobileClo
         </nav>
 
         <div className="space-y-3 p-4">
-          <div className="admin-help-card rounded-xl p-4">
+          <div className="admin-sidebar-help-card rounded-xl p-4">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
               <HelpCircle className="h-4 w-4 text-fitdog-orange" />
               Need help?
             </div>
-            <p className="text-xs text-admin-muted">Visit the Fitdog Help Center for whiteboard setup guides.</p>
+            <p className="text-xs text-admin-muted">Search setup guides for lobby board, staff board, and admin tools.</p>
+            <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : onTabChange("help"))}>
+              Open Help Center
+            </button>
             {helpLink ? (
-              <a href={helpLink} target="_blank" rel="noopener noreferrer" className="admin-btn-ghost mt-2 inline-block text-xs">
-                Open Help Center
+              <a href={helpLink} target="_blank" rel="noopener noreferrer" className="admin-btn-ghost mt-2 block text-xs opacity-80">
+                Fitdog website help
               </a>
             ) : null}
           </div>
