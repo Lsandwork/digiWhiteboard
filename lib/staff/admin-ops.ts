@@ -916,7 +916,12 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
   return updatedRecord;
 }
 
-export async function createStaffDirectoryMember(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {
+export async function createStaffDirectoryMember(
+  supabase: SupabaseClient,
+  input: Record<string, unknown>,
+  actor: string | null,
+  actorAdminId?: string | null
+) {
   const name = cleanString(input.name);
   if (!name) throw new Error("Staff member name is required.");
   const now = nowIso();
@@ -930,7 +935,7 @@ export async function createStaffDirectoryMember(supabase: SupabaseClient, input
       temp_password: optionalString(input.temp_password),
       confirm_password: optionalString(input.confirm_password)
     },
-    actor
+    actorAdminId ?? null
   );
   const member: StaffDirectoryMember = {
     id: newId(),
@@ -959,7 +964,13 @@ export async function createStaffDirectoryMember(supabase: SupabaseClient, input
   return member;
 }
 
-export async function updateStaffDirectoryMember(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
+export async function updateStaffDirectoryMember(
+  supabase: SupabaseClient,
+  id: string,
+  patch: Record<string, unknown>,
+  actor: string | null,
+  actorAdminId?: string | null
+) {
   const now = nowIso();
   const state = await loadState(supabase);
   const existing = state.staff_directory.find((member) => member.id === id);
@@ -980,7 +991,7 @@ export async function updateStaffDirectoryMember(supabase: SupabaseClient, id: s
       temp_password: optionalString(patch.temp_password),
       confirm_password: optionalString(patch.confirm_password)
     },
-    actor
+    actorAdminId ?? null
   );
 
   let updated: StaffDirectoryMember | null = null;

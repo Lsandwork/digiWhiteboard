@@ -4,6 +4,8 @@ import {
   createAdminUser,
   findAdminUserByEmail,
   getAdminUserById,
+  isAdminUserUuid,
+  normalizeAdminUserId,
   updateAdminUser
 } from "@/lib/admin/users";
 import { loadAdminSettings } from "@/lib/admin/settings";
@@ -48,7 +50,7 @@ async function validateTempPassword(supabase: SupabaseClient, password: string, 
 export async function syncStaffDirectoryLoginAccount(
   supabase: SupabaseClient,
   input: StaffDirectoryLoginSyncInput,
-  createdBy: string | null
+  createdByAdminId: string | null
 ): Promise<StaffDirectoryLoginSyncResult> {
   const email = normalizeEmail(input.email);
   const role = normalizeDashboardRole(input.dashboard_role);
@@ -62,7 +64,7 @@ export async function syncStaffDirectoryLoginAccount(
   }
 
   let linkedUser =
-    (input.admin_user_id ? await getAdminUserById(supabase, input.admin_user_id) : null) ??
+    (input.admin_user_id && isAdminUserUuid(input.admin_user_id) ? await getAdminUserById(supabase, input.admin_user_id) : null) ??
     (email ? await findAdminUserByEmail(supabase, email) : null);
 
   if (hasTempPassword && email) {
@@ -83,7 +85,7 @@ export async function syncStaffDirectoryLoginAccount(
       password: tempPassword,
       role,
       force_password_change: true,
-      created_by: createdBy
+      created_by: normalizeAdminUserId(createdByAdminId)
     });
     return { admin_user_id: user.id, dashboard_role: role };
   }
@@ -98,7 +100,7 @@ export async function syncStaffDirectoryLoginAccount(
   }
 
   return {
-    admin_user_id: linkedUser?.id ?? input.admin_user_id ?? null,
+    admin_user_id: linkedUser?.id ?? (isAdminUserUuid(input.admin_user_id) ? input.admin_user_id! : null),
     dashboard_role: linkedUser ? role : input.dashboard_role ?? null
   };
 }

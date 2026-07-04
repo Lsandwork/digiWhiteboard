@@ -1,4 +1,5 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { normalizeAdminUserId } from "@/lib/admin/users";
 
 type AuditInput = {
   actorAdminId?: string | null;
@@ -13,7 +14,7 @@ export async function writeAdminAuditLog(input: AuditInput) {
   try {
     const supabase = getServiceSupabase();
     await supabase.from("admin_audit_logs").insert({
-      actor_admin_id: input.actorAdminId ?? null,
+      actor_admin_id: normalizeAdminUserId(input.actorAdminId),
       actor_email: input.actorEmail ?? null,
       action: input.action,
       target_type: input.targetType ?? null,

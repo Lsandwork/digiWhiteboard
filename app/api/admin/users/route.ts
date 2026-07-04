@@ -8,7 +8,8 @@ import {
   AdminUserRole,
   changeAdminUserPassword,
   createAdminUser,
-  listAdminUsers
+  listAdminUsers,
+  normalizeAdminUserId
 } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
       password,
       role,
       force_password_change: body.force_password_change ?? true,
-      created_by: session?.adminUserId ?? null
+      created_by: normalizeAdminUserId(session?.adminUserId)
     });
 
     await writeAdminAuditLog({

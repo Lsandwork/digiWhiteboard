@@ -1,5 +1,16 @@
 import bcrypt from "bcryptjs";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** admin_users.created_by is a UUID FK — never pass emails or labels like "admin". */
+export function isAdminUserUuid(value?: string | null) {
+  return Boolean(value && UUID_RE.test(value));
+}
+
+export function normalizeAdminUserId(value?: string | null) {
+  return isAdminUserUuid(value) ? value! : null;
+}
+
 export type AdminUserRole = "owner_admin" | "manager_admin" | "front_desk_coordinator" | "team_leader" | "viewer";
 export type AdminUserStatus = "active" | "disabled";
 
@@ -214,7 +225,7 @@ export async function createAdminUser(
       password_hash,
       role: input.role,
       force_password_change: input.force_password_change ?? false,
-      created_by: input.created_by ?? null
+      created_by: normalizeAdminUserId(input.created_by)
     })
     .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
     .single();
@@ -237,7 +248,7 @@ export async function createAdminUser(
         last_login_at: null,
         created_at: now,
         updated_at: now,
-        created_by: input.created_by ?? null
+        created_by: normalizeAdminUserId(input.created_by)
       };
       await saveFallbackAdminUsersState(supabase, { users: [...state.users, user] });
       return sanitizeAdminUser(user);

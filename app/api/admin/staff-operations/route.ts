@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeAdminUserId } from "@/lib/admin/users";
 import { canManageStaffDirectory, canManageStaffOperations, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
@@ -31,7 +32,8 @@ function actorFromRequest(request: Request) {
   const session = getAdminSessionFromRequest(request);
   return {
     session,
-    actor: session?.email ?? session?.adminUserId ?? "admin"
+    actor: session?.email ?? session?.adminUserId ?? "admin",
+    actorAdminId: normalizeAdminUserId(session?.adminUserId)
   };
 }
 
@@ -58,7 +60,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, actor } = actorFromRequest(request);
+  const { session, actor, actorAdminId } = actorFromRequest(request);
   if (!canManageStaffOperations(session?.role)) return forbiddenResponse();
 
   try {
@@ -95,12 +97,12 @@ export async function POST(request: Request) {
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
       if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
-      result = await createStaffDirectoryMember(supabase, body, actor);
+      result = await createStaffDirectoryMember(supabase, body, actor, actorAdminId);
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
       if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
       const id = String(body.id ?? "");
-      result = await updateStaffDirectoryMember(supabase, id, body, actor);
+      result = await updateStaffDirectoryMember(supabase, id, body, actor, actorAdminId);
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
       if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
