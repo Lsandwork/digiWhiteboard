@@ -2055,6 +2055,68 @@ html.lobby-tv-display .social-video-shell {
     background: rgba(255, 255, 255, 0.06);
   }
 
+  .admin-help-role-badge {
+    font-size: 0.82rem;
+    color: var(--admin-muted);
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(241, 95, 42, 0.12);
+    border: 1px solid rgba(241, 95, 42, 0.35);
+  }
+
+  .admin-help-role-badge strong {
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .admin-help-visual-guide {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-help-visual-guide-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #f15f2a;
+    margin-bottom: 0.75rem;
+  }
+
+  .admin-help-visual-steps {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-help-visual-step {
+    margin: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.25);
+  }
+
+  .admin-help-visual-step-image {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .admin-help-visual-step figcaption {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.85rem;
+    color: var(--admin-muted);
+  }
+
+  .admin-help-visual-step figcaption strong {
+    color: #fff;
+    font-weight: 700;
+  }
+
   @media (min-width: 768px) {
     .admin-help-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));

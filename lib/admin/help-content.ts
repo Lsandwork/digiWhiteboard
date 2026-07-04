@@ -1,4 +1,14 @@
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
+import type { AdminUserRole } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+
+export type HelpAudience = "admin" | "staff_ops" | "viewer";
+
+export type HelpVisualStep = {
+  image: string;
+  title: string;
+  caption: string;
+};
 
 export type HelpLink = {
   label: string;
@@ -17,6 +27,8 @@ export type HelpArticle = {
   adminTab?: AdminTab;
   adminBoard?: AdminBoardType;
   links?: HelpLink[];
+  audiences?: HelpAudience[];
+  visualSteps?: HelpVisualStep[];
 };
 
 export type HelpCategory =
@@ -70,8 +82,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "After 5 wrong attempts, login locks for 15 minutes.",
       "Your session stays active for about 12 hours, then you log in again."
     ],
-    links: [{ label: "Admin Login", href: "/admin/login" }],
-    adminTab: "users"
+    links: [{ label: "Admin Login", href: "/admin/login" }]
   },
   {
     id: "how-data-flows",
@@ -167,16 +178,88 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "lobby-tv-cast",
     title: "How do I put the lobby board on a TV?",
-    summary: "Open the lobby board in Chrome and use the Cast button for Chromecast.",
+    summary: "Open Google Chrome first, then click Cast to TV, then pick the correct lobby monitor.",
     category: "TV Setup",
-    keywords: ["tv", "chromecast", "cast", "display", "lobby tv", "screen"],
+    keywords: ["tv", "chromecast", "cast", "display", "lobby tv", "screen", "chrome", "monitor"],
+    audiences: ["admin", "viewer"],
     steps: [
-      "On the lobby TV device, open Chrome browser.",
+      "On the computer connected to the lobby TV, open Google Chrome first (Safari and Firefox will not work for casting).",
       "Go to the Lobby Whiteboard URL (link below).",
-      "Click the Cast button on the board to send it to your Chromecast.",
-      "Leave the browser tab open — the board refreshes automatically."
+      "On the whiteboard page, click the orange Cast to TV button.",
+      "In Chrome’s device list, select the lobby TV or monitor — read the name carefully so you do not cast to the wrong screen.",
+      "Leave the Chrome tab open. Closing the tab stops the cast."
+    ],
+    tips: [
+      "Computer and Chromecast must be on the same Wi‑Fi.",
+      "Use the step-by-step pictures below if you are unsure."
+    ],
+    visualSteps: [
+      {
+        image: "/assets/fitdog/help/cast-step-1-chrome.svg",
+        title: "Step 1 — Open Chrome",
+        caption: "Start Google Chrome on the front-desk computer before anything else."
+      },
+      {
+        image: "/assets/fitdog/help/cast-step-2-button.svg",
+        title: "Step 2 — Cast to TV",
+        caption: "On the lobby whiteboard, click the Cast to TV button."
+      },
+      {
+        image: "/assets/fitdog/help/cast-step-3-monitor.svg",
+        title: "Step 3 — Select monitor",
+        caption: "Choose the device that matches your lobby TV."
+      }
     ],
     links: [{ label: "Lobby Whiteboard URL", href: "/lobby/checkouts" }]
+  },
+  {
+    id: "staff-tv-cast",
+    title: "How do I put the staff board on a TV?",
+    summary: "Same steps as lobby: Chrome first, Cast to TV, then pick the staff-area monitor.",
+    category: "TV Setup",
+    keywords: ["tv", "chromecast", "cast", "staff tv", "staff board", "chrome", "monitor"],
+    audiences: ["admin", "staff_ops"],
+    steps: [
+      "On the computer near the staff display, open Google Chrome first.",
+      "Open the Staff Digital Whiteboard page (link below).",
+      "Click Cast to TV on the staff board.",
+      "In Chrome’s picker, select the staff TV or monitor — not the lobby TV.",
+      "Keep the tab open for the whole shift."
+    ],
+    tips: ["Lobby and staff TVs often have different names in the picker — double-check before selecting."],
+    visualSteps: [
+      {
+        image: "/assets/fitdog/help/cast-step-1-chrome.svg",
+        title: "Step 1 — Open Chrome",
+        caption: "Use Chrome on the computer hooked up near the staff display."
+      },
+      {
+        image: "/assets/fitdog/help/cast-step-2-button.svg",
+        title: "Step 2 — Cast to TV",
+        caption: "Click Cast to TV on the staff whiteboard page."
+      },
+      {
+        image: "/assets/fitdog/help/cast-step-3-monitor.svg",
+        title: "Step 3 — Select monitor",
+        caption: "Pick the staff-area TV, not the lobby TV."
+      }
+    ],
+    links: [{ label: "Staff Whiteboard URL", href: "/" }]
+  },
+  {
+    id: "troubleshoot-cast",
+    title: "Casting is not working",
+    summary: "Fix Chromecast and browser issues when Cast to TV fails.",
+    category: "Troubleshooting",
+    keywords: ["cast failed", "chromecast", "no devices", "tv not showing", "chrome"],
+    audiences: ["admin", "staff_ops", "viewer"],
+    steps: [
+      "Confirm you opened Google Chrome — other browsers cannot use Cast to TV.",
+      "Make sure the computer and Chromecast are on the same Wi‑Fi network.",
+      "Refresh the whiteboard page and click Cast to TV again.",
+      "Restart the TV or Chromecast if no devices appear in the list.",
+      "Ask an admin to verify you are on the correct board URL."
+    ]
   },
   {
     id: "staff-reminders",
@@ -453,10 +536,72 @@ export const HELP_ARTICLES: HelpArticle[] = [
   }
 ];
 
-export function searchHelpArticles(query: string, category: HelpCategory | "All" = "All") {
+const EVERYONE: HelpAudience[] = ["admin", "staff_ops", "viewer"];
+const ADMIN_ONLY: HelpAudience[] = ["admin"];
+const STAFF_OPS_AND_ADMIN: HelpAudience[] = ["admin", "staff_ops"];
+const LOBBY_VIEWERS: HelpAudience[] = ["admin", "viewer"];
+
+const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
+  "what-is-this": EVERYONE,
+  "first-login": EVERYONE,
+  "env-vars": ADMIN_ONLY,
+  "how-data-flows": ADMIN_ONLY,
+  "publish-changes": ADMIN_ONLY,
+  "lobby-messages": LOBBY_VIEWERS,
+  "lobby-promotions": LOBBY_VIEWERS,
+  "lobby-schedule": LOBBY_VIEWERS,
+  "lobby-display-settings": ADMIN_ONLY,
+  "staff-reminders": EVERYONE,
+  "staff-display": STAFF_OPS_AND_ADMIN,
+  "push-notices": STAFF_OPS_AND_ADMIN,
+  "schedule-push-notices": STAFF_OPS_AND_ADMIN,
+  "staff-ops-pages": STAFF_OPS_AND_ADMIN,
+  "add-admin-user": ADMIN_ONLY,
+  "front-desk-coordinator": STAFF_OPS_AND_ADMIN,
+  "change-password": ADMIN_ONLY,
+  "board-switcher": ADMIN_ONLY,
+  "preview-and-refresh": ADMIN_ONLY,
+  "integrations-check": ADMIN_ONLY,
+  "view-logs": ADMIN_ONLY,
+  "global-settings": ADMIN_ONLY,
+  "troubleshoot-login": EVERYONE,
+  "troubleshoot-no-checkouts": EVERYONE,
+  "troubleshoot-users-tab": ADMIN_ONLY
+};
+
+function getArticleAudiences(article: HelpArticle): HelpAudience[] {
+  return article.audiences ?? ARTICLE_AUDIENCES[article.id] ?? ADMIN_ONLY;
+}
+
+export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole): boolean {
+  if (isFullAdminRole(role)) return true;
+  const audiences = getArticleAudiences(article);
+  if (role === "viewer") return audiences.includes("viewer");
+  if (isStaffOpsLimitedRole(role)) return audiences.includes("staff_ops");
+  return false;
+}
+
+export function filterHelpArticlesForRole(role: AdminUserRole): HelpArticle[] {
+  return HELP_ARTICLES.filter((article) => articleVisibleToRole(article, role));
+}
+
+export function filterHelpCategoriesForRole(role: AdminUserRole): HelpCategory[] {
+  const visible = new Set(filterHelpArticlesForRole(role).map((article) => article.category));
+  return HELP_CATEGORIES.filter((category) => visible.has(category));
+}
+
+export function getHelpRoleLabel(role: AdminUserRole): string {
+  return ADMIN_USER_ROLE_LABELS[role] ?? role;
+}
+
+export function searchHelpArticles(
+  query: string,
+  category: HelpCategory | "All" = "All",
+  role: AdminUserRole = "owner_admin"
+) {
   const normalized = query.trim().toLowerCase();
 
-  return HELP_ARTICLES.filter((article) => {
+  return filterHelpArticlesForRole(role).filter((article) => {
     if (category !== "All" && article.category !== category) return false;
     if (!normalized) return true;
 

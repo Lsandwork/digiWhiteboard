@@ -27,7 +27,7 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
-import { isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { isStaffOpsLimitedRole, type AdminUserRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -208,7 +208,7 @@ export function AdminDashboard() {
   const adminSettings = data.admin_settings ?? DEFAULT_ADMIN_SETTINGS;
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
-  const currentRole = data.session?.role ?? "owner_admin";
+  const currentRole = (data.session?.role ?? "owner_admin") as AdminUserRole;
   const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
@@ -383,6 +383,7 @@ export function AdminDashboard() {
 
         {tab === "help" ? (
           <AdminHelpCenter
+            role={currentRole}
             onGoToTab={(nextTab, nextBoard) => {
               if (nextBoard) setBoard(nextBoard);
               setActiveTab(nextTab);

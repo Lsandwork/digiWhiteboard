@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-label="Step 2: Click Cast to TV">
+  <rect width="640" height="360" rx="16" fill="#1a1410"/>
+  <rect x="24" y="24" width="592" height="312" rx="12" fill="#2a211c" stroke="#f15f2a" stroke-width="2"/>
+  <rect x="40" y="88" width="560" height="180" rx="10" fill="#120f0d"/>
+  <rect x="430" y="108" width="150" height="42" rx="10" fill="#f15f2a" stroke="#fff" stroke-width="3"/>
+  <text x="505" y="135" fill="#fff" font-family="Arial, sans-serif" font-size="15" font-weight="700" text-anchor="middle">Cast to TV</text>
+  <path d="M390 129 L430 129 L430 115 L455 135 L430 155 L430 141 L390 141 Z" fill="#f15f2a"/>
+  <text x="370" y="112" fill="#fff" font-family="Arial, sans-serif" font-size="12" font-weight="700">2</text>
+  <text x="320" y="200" fill="#9ca3af" font-family="Arial, sans-serif" font-size="14" text-anchor="middle">The Cast to TV button is in the top corner of the whiteboard page</text>
+  <text x="48" y="340" fill="#f15f2a" font-family="Arial, sans-serif" font-size="16" font-weight="700">Step 2  Click Cast to TV</text>
+</svg>

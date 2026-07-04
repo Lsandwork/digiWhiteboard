@@ -17,6 +17,10 @@ export function isStaffOpsLimitedRole(role?: string | null) {
   return role === "front_desk_coordinator" || role === "team_leader";
 }
 
+export function isFullAdminRole(role?: string | null) {
+  return role === "owner_admin" || role === "manager_admin" || !role;
+}
+
 export type AdminUserRecord = {
   id: string;
   full_name: string;

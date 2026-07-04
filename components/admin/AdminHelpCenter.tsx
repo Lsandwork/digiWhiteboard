@@ -2,33 +2,66 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, BookOpen, ExternalLink, Search } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight, BookOpen, ExternalLink, Search, Shield } from "lucide-react";
 import {
-  HELP_CATEGORIES,
-  HELP_ARTICLES,
+  filterHelpCategoriesForRole,
+  getHelpRoleLabel,
   searchHelpArticles,
   buildAdminTabHref,
+  type HelpArticle,
   type HelpCategory
 } from "@/lib/admin/help-content";
+import type { AdminUserRole } from "@/lib/admin/users";
+import { isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
 
+type QuickLinkItem = {
+  href: string;
+  label: string;
+  roles: ("admin" | "staff_ops" | "viewer")[];
+};
+
+const QUICK_LINKS: QuickLinkItem[] = [
+  { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer"] },
+  { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer"] },
+  { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
+  { href: "/admin?board=staff&tab=staff_directory", label: "Staff Directory", roles: ["admin", "staff_ops"] },
+  { href: "/admin?tab=integrations", label: "Integrations", roles: ["admin"] },
+  { href: "/admin?tab=users", label: "Admin Users", roles: ["admin"] },
+  { href: "/admin?tab=settings", label: "Settings", roles: ["admin"] }
+];
+
 type AdminHelpCenterProps = {
+  role: AdminUserRole;
   onGoToTab?: (tab: AdminTab, board?: AdminBoardType) => void;
 };
 
-export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
+function quickLinkVisible(link: QuickLinkItem, role: AdminUserRole) {
+  if (isFullAdminRole(role)) return true;
+  if (role === "viewer") return link.roles.includes("viewer");
+  if (isStaffOpsLimitedRole(role)) return link.roles.includes("staff_ops");
+  return false;
+}
+
+export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<HelpCategory | "All">("All");
 
-  const results = useMemo(() => searchHelpArticles(query, category), [query, category]);
+  const visibleCategories = useMemo(() => filterHelpCategoriesForRole(role), [role]);
+  const results = useMemo(() => searchHelpArticles(query, category, role), [query, category, role]);
+  const roleLabel = getHelpRoleLabel(role);
+  const isAdmin = isFullAdminRole(role);
 
   const grouped = useMemo(() => {
     if (query.trim() || category !== "All") return null;
-    return HELP_CATEGORIES.map((cat) => ({
+    return visibleCategories.map((cat) => ({
       category: cat,
-      articles: HELP_ARTICLES.filter((article) => article.category === cat)
+      articles: results.filter((article) => article.category === cat)
     })).filter((group) => group.articles.length > 0);
-  }, [query, category]);
+  }, [query, category, results, visibleCategories]);
+
+  const visibleQuickLinks = QUICK_LINKS.filter((link) => quickLinkVisible(link, role));
 
   return (
     <div className="admin-help-center space-y-6">
@@ -40,7 +73,13 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
           <div>
             <h2 className="admin-page-title">Fitdog Help Center</h2>
             <p className="admin-page-subtitle mt-1 max-w-2xl">
-              Plain-English guides for your lobby board, staff board, and admin dashboard. Search below or browse by topic.
+              {isAdmin
+                ? "Plain-English guides for lobby board, staff board, and admin dashboard. You see all topics as an admin."
+                : `Guides for your role (${roleLabel}). Only topics you can use are shown below.`}
+            </p>
+            <p className="admin-help-role-badge mt-2 inline-flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5" aria-hidden />
+              Showing help for: <strong>{roleLabel}</strong>
             </p>
           </div>
         </div>
@@ -49,7 +88,7 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-admin-muted" aria-hidden />
           <input
             className="admin-input admin-help-search-input pl-12"
-            placeholder="Search help… e.g. promotions, login, TV, checkout"
+            placeholder="Search help… e.g. cast, login, push notices, TV"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             aria-label="Search help articles"
@@ -64,7 +103,7 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
           >
             All topics
           </button>
-          {HELP_CATEGORIES.map((item) => (
+          {visibleCategories.map((item) => (
             <button
               key={item}
               type="button"
@@ -87,7 +126,7 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
       {results.length === 0 ? (
         <section className="admin-empty-state">
           <p className="admin-empty-state-title">No guides found</p>
-          <p className="admin-empty-state-text">Try a simpler word like “login”, “promotions”, or “TV”.</p>
+          <p className="admin-empty-state-text">Try a simpler word like “login”, “cast”, or “push notices”.</p>
         </section>
       ) : grouped && !query.trim() && category === "All" ? (
         <div className="space-y-8">
@@ -96,7 +135,7 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
               <h3 className="admin-help-group-title">{group.category}</h3>
               <div className="admin-help-grid">
                 {group.articles.map((article) => (
-                  <HelpArticleCard key={article.id} article={article} onGoToTab={onGoToTab} />
+                  <HelpArticleCard key={article.id} article={article} onGoToTab={onGoToTab} role={role} />
                 ))}
               </div>
             </section>
@@ -105,34 +144,55 @@ export function AdminHelpCenter({ onGoToTab }: AdminHelpCenterProps) {
       ) : (
         <div className="admin-help-grid">
           {results.map((article) => (
-            <HelpArticleCard key={article.id} article={article} onGoToTab={onGoToTab} />
+            <HelpArticleCard key={article.id} article={article} onGoToTab={onGoToTab} role={role} />
           ))}
         </div>
       )}
 
       <section className="admin-card p-5">
         <h3 className="admin-section-title">Quick links</h3>
-        <p className="admin-section-helper">Jump straight to the live boards or admin areas.</p>
+        <p className="admin-section-helper">Jump straight to boards and tools available for your role.</p>
         <div className="admin-help-quick-links mt-4">
-          <QuickLink href="/lobby/checkouts" label="Lobby Whiteboard" />
-          <QuickLink href="/" label="Staff Whiteboard" />
-          <QuickLink href="/admin?board=staff&tab=push_notices" label="Push Notices" />
-          <QuickLink href="/admin?tab=integrations" label="Integrations" />
-          <QuickLink href="/admin?tab=users" label="Admin Users" />
-          <QuickLink href="/admin?tab=settings" label="Settings" />
+          {visibleQuickLinks.map((link) => (
+            <QuickLink key={link.href} href={link.href} label={link.label} />
+          ))}
         </div>
       </section>
     </div>
   );
 }
 
+function canOpenAdminTab(role: AdminUserRole, tab?: AdminTab): boolean {
+  if (!tab) return false;
+  if (isFullAdminRole(role)) return true;
+  if (isStaffOpsLimitedRole(role)) {
+    const staffTabs: AdminTab[] = [
+      "push_notices",
+      "crossover_communication",
+      "owner_follow_up",
+      "active_issues",
+      "whiteboard_preview",
+      "analytics",
+      "templates",
+      "staff_directory",
+      "help"
+    ];
+    return staffTabs.includes(tab);
+  }
+  return false;
+}
+
 function HelpArticleCard({
   article,
-  onGoToTab
+  onGoToTab,
+  role
 }: {
-  article: (typeof HELP_ARTICLES)[number];
+  article: HelpArticle;
   onGoToTab?: (tab: AdminTab, board?: AdminBoardType) => void;
+  role: AdminUserRole;
 }) {
+  const showAdminTab = canOpenAdminTab(role, article.adminTab);
+
   return (
     <article className="admin-help-card">
       <p className="admin-help-card-category">{article.category}</p>
@@ -144,6 +204,30 @@ function HelpArticleCard({
           <li key={index}>{step}</li>
         ))}
       </ol>
+
+      {article.visualSteps?.length ? (
+        <div className="admin-help-visual-guide">
+          <p className="admin-help-visual-guide-title">Visual guide</p>
+          <div className="admin-help-visual-steps">
+            {article.visualSteps.map((step) => (
+              <figure key={step.title} className="admin-help-visual-step">
+                <Image
+                  src={step.image}
+                  alt={step.title}
+                  width={640}
+                  height={360}
+                  className="admin-help-visual-step-image"
+                  unoptimized
+                />
+                <figcaption>
+                  <strong>{step.title}</strong>
+                  <span>{step.caption}</span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {article.tips?.length ? (
         <div className="admin-help-tips">
@@ -157,7 +241,7 @@ function HelpArticleCard({
       ) : null}
 
       <div className="admin-help-card-actions">
-        {article.adminTab && onGoToTab ? (
+        {showAdminTab && onGoToTab ? (
           <button
             type="button"
             className="admin-btn-primary inline-flex items-center gap-2"
@@ -165,8 +249,8 @@ function HelpArticleCard({
           >
             Open in Admin <ArrowRight className="h-4 w-4" />
           </button>
-        ) : article.adminTab ? (
-          <Link href={buildAdminTabHref(article.adminTab, article.adminBoard)} className="admin-btn-primary inline-flex items-center gap-2">
+        ) : showAdminTab ? (
+          <Link href={buildAdminTabHref(article.adminTab!, article.adminBoard)} className="admin-btn-primary inline-flex items-center gap-2">
             Open in Admin <ArrowRight className="h-4 w-4" />
           </Link>
         ) : null}
