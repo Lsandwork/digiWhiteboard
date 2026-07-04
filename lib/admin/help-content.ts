@@ -381,8 +381,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Front Desk Coordinator and Team Leader users log in with their assigned email and password.",
       "After login, they are routed to Staff Digital Whiteboard → Push Notices.",
-      "They can use Push Notices, Crossover Communication, Owner Follow Up, Active Issues, Staff Directory, and related staff tabs.",
-      "They cannot access Lobby content, settings, logs, integrations, users, Gingr setup, or other admin areas."
+      "They can use Push Notices, Crossover Communication, Owner Follow Up, Active Issues, and related staff tabs.",
+      "They cannot access Staff Directory, Lobby content, settings, logs, integrations, users, Gingr setup, or other admin areas."
     ],
     adminTab: "users",
     tips: ["Use these roles for front desk or team lead staff who need live handler tools without full admin access."]

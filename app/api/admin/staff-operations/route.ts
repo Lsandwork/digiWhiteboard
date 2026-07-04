@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManageStaffOperations, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canManageStaffDirectory, canManageStaffOperations, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { createAndPushStaffNotice } from "@/lib/staff/push-notices";
@@ -91,13 +91,16 @@ export async function POST(request: Request) {
       result = await updateActiveIssue(supabase, id, body, actor);
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
+      if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
       result = await createStaffDirectoryMember(supabase, body, actor);
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
+      if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
       const id = String(body.id ?? "");
       result = await updateStaffDirectoryMember(supabase, id, body, actor);
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
+      if (!canManageStaffDirectory(session?.role)) return forbiddenResponse();
       const id = String(body.id ?? "");
       await deleteStaffDirectoryMember(supabase, id, actor);
       result = { id };

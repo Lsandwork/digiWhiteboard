@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
-import { isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { isStaffOpsLimitedRole, isFullAdminRole } from "@/lib/admin/users";
 import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 
@@ -56,12 +56,11 @@ export function AdminShell({
     "whiteboard_preview",
     "analytics",
     "templates",
-    "staff_directory",
-    "settings",
     "help"
   ];
 
   const visibleTabs = ADMIN_TABS.filter((item) => {
+    if (item === "staff_directory" && !isFullAdminRole(role)) return false;
     if (pushNoticesOnly) return staffOpsTabs.includes(item) && item !== "settings";
     if (board === "staff" && (item === "promotions" || item === "schedule")) return false;
     if (board === "staff" && item === "users") return false;

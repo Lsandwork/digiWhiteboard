@@ -1,5 +1,5 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { isStaffOpsLimitedRole, isFullAdminRole } from "@/lib/admin/users";
 
 export function isAdminRequest(request: Request) {
   if (getAdminSessionFromRequest(request)) return true;
@@ -19,4 +19,8 @@ export function canManagePushNotices(role?: string | null) {
 
 export function canManageStaffOperations(role?: string | null) {
   return role === "owner_admin" || role === "manager_admin" || isStaffOpsLimitedRole(role) || !role;
+}
+
+export function canManageStaffDirectory(role?: string | null) {
+  return isFullAdminRole(role);
 }

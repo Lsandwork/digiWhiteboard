@@ -27,7 +27,7 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
-import { isStaffOpsLimitedRole, type AdminUserRole } from "@/lib/admin/users";
+import { isStaffOpsLimitedRole, isFullAdminRole, type AdminUserRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -100,15 +100,18 @@ export function AdminDashboard() {
 
   useEffect(() => {
     const role = data?.session?.role;
-    const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "staff_directory", "help"];
+    const coordinatorTabs: AdminTab[] = ["push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "help"];
     if (isStaffOpsLimitedRole(role) && (board !== "staff" || !coordinatorTabs.includes(tab))) {
       router.replace("/admin?board=staff&tab=push_notices");
+    }
+    if (!isFullAdminRole(role) && tab === "staff_directory") {
+      router.replace(isStaffOpsLimitedRole(role) ? "/admin?board=staff&tab=push_notices" : "/admin?tab=help");
     }
   }, [board, data?.session?.role, router, tab]);
 
   useEffect(() => {
     if (board === "staff" && tab === "users") {
-      router.replace("/admin?board=staff&tab=staff_directory");
+      router.replace("/admin?tab=users");
     }
   }, [board, router, tab]);
 
@@ -125,7 +128,7 @@ export function AdminDashboard() {
 
   function setActiveTab(nextTab: AdminTab) {
     if (board === "staff" && nextTab === "users") {
-      router.replace("/admin?board=staff&tab=staff_directory");
+      router.replace("/admin?tab=users");
       return;
     }
     router.replace(`/admin?board=${board}&tab=${nextTab}`);
