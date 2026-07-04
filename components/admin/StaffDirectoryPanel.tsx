@@ -8,7 +8,7 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { AdminUserRole } from "@/lib/admin/users";
 import { ADMIN_USER_ROLE_LABELS } from "@/lib/admin/users";
 import type { StaffActivityLog, StaffDirectoryMember } from "@/lib/staff/admin-ops";
-import { STAFF_DEPARTMENTS } from "@/lib/staff/admin-ops";
+import { STAFF_DEPARTMENTS, departmentForDashboardRole } from "@/lib/staff/admin-ops";
 
 type StaffDirectoryPayload = {
   staff_directory: StaffDirectoryMember[];
@@ -34,7 +34,7 @@ const staffStatusOptions: StaffMemberForm["status"][] = ["Active", "Inactive"];
 const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "viewer", label: "Viewer" },
   { value: "front_desk_coordinator", label: "Front Desk - Coordinator" },
-  { value: "team_leader", label: "Team Leader" },
+  { value: "team_leader", label: "Team Lead" },
   { value: "manager_admin", label: "Manager Admin" },
   { value: "owner_admin", label: "Owner Admin" }
 ];
@@ -512,7 +512,13 @@ function StaffMemberFields({
               value={form.dashboard_role}
               options={dashboardRoleOptions.map((option) => option.value)}
               optionLabels={Object.fromEntries(dashboardRoleOptions.map((option) => [option.value, option.label]))}
-              onChange={(dashboard_role) => onChange({ ...form, dashboard_role: dashboard_role as AdminUserRole })}
+              onChange={(dashboard_role) => {
+                const role = dashboard_role as AdminUserRole;
+                const next = { ...form, dashboard_role: role };
+                const linkedDepartment = departmentForDashboardRole(role);
+                if (linkedDepartment) next.department = linkedDepartment;
+                onChange(next);
+              }}
             />
             <label className="admin-toggle-row">
               <span className="text-sm font-bold text-white">Set temporary password</span>

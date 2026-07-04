@@ -366,7 +366,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Open the Users tab.",
       "Click Add Admin User.",
       "Enter full name, email, role, and a temporary password.",
-      "Owner Admin — full access. Manager Admin — can manage content and users. Front Desk Coordinator and Team Leader — staff board Push Notices and operations tabs only. Viewer — read-only style access.",
+      "Owner Admin — full access. Manager Admin — can manage content and users. Front Desk Coordinator and Team Lead — staff board Push Notices and operations tabs only. Viewer — read-only style access.",
       "The new user logs in with their email and temporary password."
     ],
     adminTab: "users",
@@ -374,12 +374,12 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: "front-desk-coordinator",
-    title: "What can a Front Desk Coordinator or Team Leader do?",
-    summary: "Front Desk Coordinator and Team Leader accounts share the same staff board access: Push Notices, Crossover Communication, Owner Follow Up, Active Issues, and related staff tabs.",
+    title: "What can a Front Desk Coordinator or Team Lead do?",
+    summary: "Front Desk Coordinator and Team Lead accounts share the same staff board access: Push Notices, Crossover Communication, Owner Follow Up, Active Issues, and related staff tabs.",
     category: "Users & Login",
     keywords: ["front desk coordinator", "team leader", "role", "permissions", "push notices", "limited user"],
     steps: [
-      "Front Desk Coordinator and Team Leader users log in with their assigned email and password.",
+      "Front Desk Coordinator and Team Lead users log in with their assigned email and password.",
       "After login, they are routed to Staff Digital Whiteboard → Push Notices.",
       "They can use Push Notices, Crossover Communication, Owner Follow Up, Active Issues, and related staff tabs.",
       "They cannot access Staff Directory, Lobby content, settings, logs, integrations, users, Gingr setup, or other admin areas."

@@ -32,11 +32,13 @@ import type {
 } from "@/lib/staff/admin-ops";
 import {
   CROSSOVER_TEMPLATES,
+  FRONT_DESK_DEPARTMENT,
   ISSUE_CATEGORIES,
   ISSUE_SOURCES,
   STAFF_DEPARTMENTS,
   STAFF_PRIORITIES,
-  STAFF_STATUSES
+  STAFF_STATUSES,
+  TEAM_LEAD_DEPARTMENT
 } from "@/lib/staff/admin-ops";
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
@@ -205,6 +207,19 @@ function activeStaffOptions(directory: StaffDirectoryMember[] | undefined) {
     .map((member) => member.name)
     .filter(Boolean);
   return names.length ? names : FALLBACK_STAFF_OPTIONS;
+}
+
+function homeDepartmentForUser(
+  directory: StaffDirectoryMember[] | undefined,
+  currentUser: StaffOpsPayload["currentUser"]
+) {
+  const member =
+    directory?.find((entry) => entry.admin_user_id === currentUser.adminUserId) ??
+    directory?.find((entry) => entry.email?.trim().toLowerCase() === currentUser.email?.trim().toLowerCase());
+  if (member?.department) return member.department;
+  if (currentUser.role === "team_leader") return TEAM_LEAD_DEPARTMENT;
+  if (currentUser.role === "front_desk_coordinator") return FRONT_DESK_DEPARTMENT;
+  return FRONT_DESK_DEPARTMENT;
 }
 
 function paginate<T>(items: T[], page: number) {
@@ -452,6 +467,13 @@ function CrossoverPage(props: {
   onCloseDetail: () => void;
 }) {
   const [form, setForm] = useState<CrossoverForm>(emptyCrossoverForm);
+
+  useEffect(() => {
+    if (!props.data) return;
+    const fromDepartment = homeDepartmentForUser(props.data.staff_directory, props.data.currentUser);
+    setForm((current) => ({ ...current, from_department: fromDepartment }));
+  }, [props.data?.currentUser.adminUserId, props.data?.currentUser.email, props.data?.currentUser.role, props.data?.staff_directory]);
+
   const rows = useMemo(() => {
     return (props.data?.crossover_messages ?? []).filter((item) => {
       if (props.filters.priority && item.priority !== props.filters.priority) return false;
@@ -550,6 +572,13 @@ function FollowUpPage(props: {
   data: StaffOpsPayload | null; loading: boolean; busy: boolean; filters: Filters; setFilters: (filters: Filters) => void; page: number; setPage: (page: number) => void; recentActivity: StaffActivityLog[]; nowMs: number; staffOptions: string[]; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onRefresh: () => Promise<void>; onDetail: (item: OwnerFollowUp) => void; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; onCloseDetail: () => void;
 }) {
   const [form, setForm] = useState<FollowUpForm>(emptyFollowUpForm);
+
+  useEffect(() => {
+    if (!props.data) return;
+    const department = homeDepartmentForUser(props.data.staff_directory, props.data.currentUser);
+    setForm((current) => ({ ...current, department }));
+  }, [props.data?.currentUser.adminUserId, props.data?.currentUser.email, props.data?.currentUser.role, props.data?.staff_directory]);
+
   const rows = useMemo(() => (props.data?.owner_follow_ups ?? []).filter((item) => {
     if (props.filters.priority && item.priority !== props.filters.priority) return false;
     if (props.filters.status && item.status !== props.filters.status) return false;

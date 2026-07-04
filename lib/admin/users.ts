@@ -18,7 +18,7 @@ export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   owner_admin: "Owner Admin",
   manager_admin: "Manager Admin",
   front_desk_coordinator: "Front Desk Coordinator",
-  team_leader: "Team Leader",
+  team_leader: "Team Lead",
   viewer: "Viewer"
 };
 
@@ -27,7 +27,7 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
   owner_admin: "Owner Admin",
   manager_admin: "Manager Admin",
   front_desk_coordinator: "Front Desk - Coordinator",
-  team_leader: "Team Leader",
+  team_leader: "Team Lead",
   viewer: "Viewer"
 };
 

@@ -31,7 +31,7 @@ function targetLabel(notification: StaffNotification) {
     case "staff_email":
       return `For ${notification.target.email}`;
     case "coordinator_pool":
-      return "Coordinators & Team Leads";
+      return "Coordinators & Team Lead";
     case "admin_pool":
       return "Admin alert";
     default:
@@ -137,7 +137,7 @@ export function NotificationsPanel({ onOpenTab }: NotificationsPanelProps) {
               {unreadCount > 0 ? <span className="admin-notif-badge">{unreadCount} unread</span> : null}
             </div>
             <p className="admin-page-subtitle max-w-2xl">
-              Alerts for crossover updates, assignments, @mentions, and urgent escalations. Coordinators and Team Leads see all staff updates; High and Urgent items also alert Admins.
+              Alerts for crossover updates, assignments, @mentions, and urgent escalations. Front Desk Coordinators and Team Lead staff see all staff updates; High and Urgent items also alert Admins.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

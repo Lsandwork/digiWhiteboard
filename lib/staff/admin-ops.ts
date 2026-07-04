@@ -143,6 +143,7 @@ const MAX_TEXT = 1200;
 
 export const STAFF_DEPARTMENTS = [
   "Front Desk",
+  "Team Lead",
   "Daycare",
   "Hikers",
   "Grooming",
@@ -151,6 +152,15 @@ export const STAFF_DEPARTMENTS = [
   "Maintenance",
   "Transportation"
 ] as const;
+
+export const FRONT_DESK_DEPARTMENT = "Front Desk";
+export const TEAM_LEAD_DEPARTMENT = "Team Lead";
+
+export function departmentForDashboardRole(role?: AdminUserRole | null) {
+  if (role === "team_leader") return TEAM_LEAD_DEPARTMENT;
+  if (role === "front_desk_coordinator") return FRONT_DESK_DEPARTMENT;
+  return null;
+}
 
 export const STAFF_MEMBERS = [
   "Front Desk Team",
@@ -926,12 +936,17 @@ export async function createStaffDirectoryMember(
   if (!name) throw new Error("Staff member name is required.");
   const now = nowIso();
   const email = optionalString(input.email);
+  const dashboardRole = (input.dashboard_role as AdminUserRole | null | undefined) ?? null;
+  const department =
+    cleanString(input.department, departmentForDashboardRole(dashboardRole) ?? FRONT_DESK_DEPARTMENT) ||
+    departmentForDashboardRole(dashboardRole) ||
+    FRONT_DESK_DEPARTMENT;
   const login = await syncStaffDirectoryLoginAccount(
     supabase,
     {
       name,
       email,
-      dashboard_role: (input.dashboard_role as AdminUserRole | null | undefined) ?? null,
+      dashboard_role: dashboardRole,
       temp_password: optionalString(input.temp_password),
       confirm_password: optionalString(input.confirm_password)
     },
@@ -941,7 +956,7 @@ export async function createStaffDirectoryMember(
     id: newId(),
     name,
     role: optionalString(input.role),
-    department: cleanString(input.department, "Front Desk") || "Front Desk",
+    department,
     email,
     phone: optionalString(input.phone),
     status: input.status === "Inactive" ? "Inactive" : "Active",
@@ -980,6 +995,10 @@ export async function updateStaffDirectoryMember(
   const nextEmail = patch.email !== undefined ? optionalString(patch.email) : existing.email;
   const nextDashboardRole =
     patch.dashboard_role !== undefined ? ((patch.dashboard_role as AdminUserRole | null) ?? null) : existing.dashboard_role;
+  const nextDepartment =
+    patch.department !== undefined
+      ? cleanString(patch.department, departmentForDashboardRole(nextDashboardRole) ?? existing.department)
+      : departmentForDashboardRole(nextDashboardRole) ?? existing.department;
 
   const login = await syncStaffDirectoryLoginAccount(
     supabase,
@@ -1003,7 +1022,7 @@ export async function updateStaffDirectoryMember(
         ...member,
         name: nextName,
         role: patch.role !== undefined ? optionalString(patch.role) : member.role,
-        department: patch.department !== undefined ? cleanString(patch.department, "Front Desk") : member.department,
+        department: nextDepartment,
         email: nextEmail,
         phone: patch.phone !== undefined ? optionalString(patch.phone) : member.phone,
         status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : member.status,
