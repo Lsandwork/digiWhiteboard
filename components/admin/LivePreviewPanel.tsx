@@ -15,9 +15,10 @@ type LivePreviewPanelProps = {
   promotions: LobbyPromotion[];
   staffDogs: LiveDog[];
   activeCheckouts: number;
+  onFullscreen?: () => void;
 };
 
-export function LivePreviewPanel({ board, lobbySettings, staffSettings, promotions, staffDogs, activeCheckouts }: LivePreviewPanelProps) {
+export function LivePreviewPanel({ board, lobbySettings, staffSettings, promotions, staffDogs, activeCheckouts, onFullscreen }: LivePreviewPanelProps) {
   const featuredPromotion = promotions.find((p) => p.active) ?? promotions[0];
   const checkoutDogs = staffDogs.filter((d) => d.display_status === "checking_out").slice(0, 3);
 
@@ -65,11 +66,13 @@ export function LivePreviewPanel({ board, lobbySettings, staffSettings, promotio
         </div>
 
         <div className="mt-3 flex items-center justify-between text-xs text-admin-muted">
-          <select className="admin-select py-1 text-xs" aria-label="Display selector">
-            <option>{board === "lobby" ? "Lobby TV 1" : "Staff Display 1"}</option>
-          </select>
+          <span>{board === "lobby" ? "Lobby TV 1" : "Staff Display 1"}</span>
           <span>1920 × 1080</span>
-          <button type="button" className="admin-icon-btn" aria-label="Fullscreen preview"><Maximize2 className="h-4 w-4" /></button>
+          {onFullscreen ? (
+            <button type="button" className="admin-icon-btn" aria-label="Open fullscreen preview" onClick={onFullscreen}>
+              <Maximize2 className="h-4 w-4" />
+            </button>
+          ) : null}
         </div>
       </div>
     </section>

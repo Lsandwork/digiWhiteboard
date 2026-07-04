@@ -1,5 +1,8 @@
 import bcrypt from "bcryptjs";
 import { timingSafeEqual } from "crypto";
+import { getServiceSupabase } from "@/lib/supabase/server";
+import { findAdminUserByEmail, verifyAdminUserPassword } from "@/lib/admin/users";
+import { loadAdminSettings } from "@/lib/admin/settings";
 
 export function getAdminUsername() {
   return process.env.ADMIN_USERNAME?.trim() || "admin";
@@ -12,18 +15,66 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(aBuf, bBuf);
 }
 
-export async function verifyAdminPassword(username: string, password: string) {
-  const expectedUsername = getAdminUsername();
-  if (!safeEqual(username.trim(), expectedUsername)) {
-    return false;
+export type AdminAuthResult = {
+  ok: boolean;
+  email: string;
+  adminUserId?: string;
+  role?: string;
+  forcePasswordChange?: boolean;
+  source: "database" | "env";
+};
+
+export async function verifyAdminCredentials(username: string, password: string): Promise<AdminAuthResult> {
+  const normalized = username.trim().toLowerCase();
+
+  try {
+    const supabase = getServiceSupabase();
+    const dbUser = await findAdminUserByEmail(supabase, normalized);
+    if (dbUser && dbUser.status === "active") {
+      const valid = await verifyAdminUserPassword(dbUser, password);
+      if (valid) {
+        return {
+          ok: true,
+          email: dbUser.email,
+          adminUserId: dbUser.id,
+          role: dbUser.role,
+          forcePasswordChange: dbUser.force_password_change,
+          source: "database"
+        };
+      }
+    }
+  } catch {
+    // Fall through to env auth if DB unavailable.
+  }
+
+  const settings = await loadAdminSettings(getServiceSupabase()).catch(() => null);
+  if (settings && !settings.allow_env_admin_login) {
+    return { ok: false, email: normalized, source: "env" };
+  }
+
+  const expectedUsername = getAdminUsername().toLowerCase();
+  if (!safeEqual(normalized, expectedUsername)) {
+    return { ok: false, email: normalized, source: "env" };
   }
 
   const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
   if (hash) {
-    return bcrypt.compare(password, hash);
+    const valid = await bcrypt.compare(password, hash);
+    return valid
+      ? { ok: true, email: expectedUsername, role: "owner_admin", source: "env" }
+      : { ok: false, email: normalized, source: "env" };
   }
 
   const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
-  if (!legacyPassword) return false;
-  return safeEqual(password, legacyPassword);
+  if (!legacyPassword) return { ok: false, email: normalized, source: "env" };
+  const valid = safeEqual(password, legacyPassword);
+  return valid
+    ? { ok: true, email: expectedUsername, role: "owner_admin", source: "env" }
+    : { ok: false, email: normalized, source: "env" };
+}
+
+/** @deprecated Use verifyAdminCredentials */
+export async function verifyAdminPassword(username: string, password: string) {
+  const result = await verifyAdminCredentials(username, password);
+  return result.ok;
 }

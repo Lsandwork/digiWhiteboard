@@ -5,7 +5,8 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
-import { loadLobbySettings, updateLobbySettings } from "@/lib/lobby/settings";
+import { loadAdminSettings } from "@/lib/admin/settings";
+import { loadLobbySettings } from "@/lib/lobby/settings";
 import { loadStaffBoardSettings } from "@/lib/staff/settings";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -22,9 +23,10 @@ export async function GET(request: Request) {
   const board = parseBoardType(url.searchParams.get("board"));
   const supabase = getServiceSupabase();
 
-  const [lobbySettings, staffSettings, promotions, checkouts, dogs, events, failedEvents] = await Promise.all([
+  const [lobbySettings, staffSettings, adminSettings, promotions, checkouts, dogs, events, failedEvents] = await Promise.all([
     loadLobbySettings(supabase),
     loadStaffBoardSettings(supabase),
+    loadAdminSettings(supabase),
     loadAllPromotions(supabase),
     loadFastPromptedCheckouts(supabase),
     supabase
@@ -51,7 +53,9 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     board,
-    username: getAdminSessionFromRequest(request),
+    username: getAdminSessionFromRequest(request)?.email ?? "admin",
+    session: getAdminSessionFromRequest(request),
+    admin_settings: adminSettings,
     lobby_settings: lobbySettings,
     staff_settings: staffSettings,
     promotions: promotions ?? [],

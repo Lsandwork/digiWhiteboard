@@ -4,6 +4,7 @@ import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth"
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { updateLobbySettings } from "@/lib/lobby/settings";
 import { updateStaffBoardSettings } from "@/lib/staff/settings";
+import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,8 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as { board?: AdminBoardType };
   const board: AdminBoardType = body.board === "staff" ? "staff" : "lobby";
-  const username = getAdminSessionFromRequest(request) ?? "admin";
+  const session = getAdminSessionFromRequest(request);
+  const username = session?.email ?? "admin";
   const supabase = getServiceSupabase();
   const now = new Date().toISOString();
 
@@ -33,6 +35,14 @@ export async function POST(request: Request) {
       published_by: username
     });
     await supabase.from("admin_publish_log").insert({ board_type: "staff", version, published_by: username });
+    await writeAdminAuditLog({
+      actorAdminId: session?.adminUserId,
+      actorEmail: session?.email,
+      action: "admin.publish",
+      targetType: "board",
+      targetId: "staff",
+      details: { version }
+    });
     return NextResponse.json({ board, version, published_at: now, published_by: username });
   }
 
@@ -44,5 +54,13 @@ export async function POST(request: Request) {
     published_by: username
   });
   await supabase.from("admin_publish_log").insert({ board_type: "lobby", version, published_by: username });
+  await writeAdminAuditLog({
+    actorAdminId: session?.adminUserId,
+    actorEmail: session?.email,
+    action: "admin.publish",
+    targetType: "board",
+    targetId: "lobby",
+    details: { version }
+  });
   return NextResponse.json({ board, version, published_at: now, published_by: username });
 }

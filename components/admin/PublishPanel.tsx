@@ -9,15 +9,28 @@ type PublishPanelProps = {
   publishedAt: string | null;
   publishedBy: string | null;
   onPublish: () => void;
+  onViewHistory: () => void;
   busy?: boolean;
+  hasUnpublishedChanges?: boolean;
 };
 
-export function PublishPanel({ board, version, publishedAt, publishedBy, onPublish, busy }: PublishPanelProps) {
+export function PublishPanel({
+  board,
+  version,
+  publishedAt,
+  publishedBy,
+  onPublish,
+  onViewHistory,
+  busy,
+  hasUnpublishedChanges
+}: PublishPanelProps) {
   return (
     <section className="admin-card p-4">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-black text-white">Publish & Version</h2>
-        <span className="admin-badge admin-badge--green">Published</span>
+        <span className={`admin-badge ${hasUnpublishedChanges ? "admin-badge--amber" : "admin-badge--green"}`}>
+          {hasUnpublishedChanges ? "Draft changes" : "Published"}
+        </span>
       </div>
       <dl className="space-y-2 text-sm">
         <div className="flex justify-between gap-4"><dt className="text-admin-muted">Version</dt><dd className="font-semibold text-white">{version}</dd></div>
@@ -26,9 +39,9 @@ export function PublishPanel({ board, version, publishedAt, publishedBy, onPubli
         <div className="flex justify-between gap-4"><dt className="text-admin-muted">Board</dt><dd className="text-white">{board === "lobby" ? "Lobby Whiteboard" : "Staff Digital Whiteboard"}</dd></div>
       </dl>
       <button type="button" className="admin-btn-primary mt-4 inline-flex w-full items-center justify-center gap-2" onClick={onPublish} disabled={busy}>
-        <Upload className="h-4 w-4" /> Publish Changes
+        <Upload className="h-4 w-4" /> {busy ? "Publishing…" : "Publish Changes"}
       </button>
-      <button type="button" className="admin-btn-ghost mt-2 w-full">View Change History</button>
+      <button type="button" className="admin-btn-secondary mt-2 w-full" onClick={onViewHistory}>View Change History</button>
     </section>
   );
 }

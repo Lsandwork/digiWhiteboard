@@ -33,3 +33,18 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+
+  const { id } = await context.params;
+
+  try {
+    const { error } = await getServiceSupabase().from("lobby_promotions").delete().eq("id", id);
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to delete promotion.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
