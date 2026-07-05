@@ -20,6 +20,7 @@ import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
+import { YardLinksPanel } from "@/components/admin/YardLinksPanel";
 import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -237,7 +238,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
+  const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
     <div className="space-y-4">
@@ -363,6 +364,8 @@ export function AdminDashboard() {
             />
           </div>
         ) : null}
+
+        {tab === "yard_links" ? <YardLinksPanel /> : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">

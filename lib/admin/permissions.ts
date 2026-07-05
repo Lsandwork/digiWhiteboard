@@ -430,6 +430,7 @@ export function firstAccessibleAdminTab(
           "active_issues",
           "staff_directory",
           "whiteboard_preview",
+          "yard_links",
           "templates",
           "notifications",
           "help"

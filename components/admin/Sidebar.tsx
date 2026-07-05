@@ -17,6 +17,7 @@ import {
   Settings,
   ShieldAlert,
   Users,
+  Video,
   X
 } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
@@ -34,6 +35,7 @@ const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "owner_follow_up", label: "Owner Follow Up", icon: <Users className="h-4 w-4" /> },
   { id: "active_issues", label: "Active Issues", icon: <ShieldAlert className="h-4 w-4" /> },
   { id: "whiteboard_preview", label: "Whiteboard Preview", icon: <ClipboardList className="h-4 w-4" /> },
+  { id: "yard_links", label: "Yard Links", icon: <Video className="h-4 w-4" /> },
   { id: "analytics", label: "Analytics", icon: <ChartNoAxesColumn className="h-4 w-4" /> },
   { id: "templates", label: "Templates", icon: <FileText className="h-4 w-4" /> },
   { id: "notifications", label: "Notifications", icon: <InboxIcon /> },
@@ -56,6 +58,7 @@ const tabLabels: Record<AdminTab, string> = {
   owner_follow_up: "Owner Follow Up",
   active_issues: "Active Issues",
   whiteboard_preview: "Whiteboard Preview",
+  yard_links: "Yard Links",
   analytics: "Analytics",
   templates: "Templates",
   notifications: "Notifications",

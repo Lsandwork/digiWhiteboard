@@ -52,6 +52,7 @@ export type AdminTab =
   | "owner_follow_up"
   | "active_issues"
   | "whiteboard_preview"
+  | "yard_links"
   | "analytics"
   | "templates"
   | "notifications"
@@ -73,6 +74,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "owner_follow_up",
   "active_issues",
   "whiteboard_preview",
+  "yard_links",
   "analytics",
   "templates",
   "notifications",

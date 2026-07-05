@@ -14,7 +14,8 @@
     "test:checkin-display": "tsx scripts/test-checkin-display.ts",
     "test:board-dog": "tsx scripts/test-board-dog.ts",
     "test:webhook": "tsx scripts/test-webhook.ts",
-    "test:bad-signature": "tsx scripts/test-bad-signature.ts"
+    "test:bad-signature": "tsx scripts/test-bad-signature.ts",
+    "test:yard-links": "tsx scripts/test-yard-links.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
