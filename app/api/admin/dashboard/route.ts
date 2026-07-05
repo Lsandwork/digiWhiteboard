@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { AdminBoardType } from "@/lib/admin/types";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
 import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
@@ -51,10 +52,16 @@ export async function GET(request: Request) {
   const siteUrl = publicOrigin(request);
   const webhookUrl = `${siteUrl}/api/gingr/webhook`;
 
+  const session = getAdminSessionFromRequest(request);
+  await migrateLegacyUserAccess(supabase).catch(() => undefined);
+  const access = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    : null;
+
   return NextResponse.json({
     board,
-    username: getAdminSessionFromRequest(request)?.email ?? "admin",
-    session: getAdminSessionFromRequest(request),
+    username: session?.email ?? "admin",
+    session: session ? { ...session, access } : null,
     admin_settings: adminSettings,
     lobby_settings: lobbySettings,
     staff_settings: staffSettings,

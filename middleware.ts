@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
   const session = await verifyAdminSessionTokenEdge(token);
 
   if (pathname.startsWith("/admin/login")) {
-    if (session) {
+    if (session && !session.mustChangePassword) {
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     return NextResponse.next();
@@ -17,6 +17,11 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (!session) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (session.mustChangePassword) {
       const loginUrl = new URL("/admin/login", request.url);
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);

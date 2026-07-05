@@ -3,13 +3,10 @@
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
 import {
-  canAccessPushNotices,
-  canViewStaffDirectory,
-  hasCoordinatorAccess,
-  isCrossoverStaffRole,
-  isFullAdminRole,
-  isStaffPanelLimitedRole
-} from "@/lib/admin/users";
+  canAccessAdminTab,
+  isStaffPanelLimitedAccess,
+  type UserAccess
+} from "@/lib/admin/permissions";
 import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 
@@ -18,6 +15,8 @@ type AdminShellProps = {
   tab: AdminTab;
   username: string;
   role?: string | null;
+  access?: UserAccess | null;
+  displayLabel?: string | null;
   savedLabel: string;
   refreshing?: boolean;
   castRefreshing?: boolean;
@@ -39,6 +38,8 @@ export function AdminShell({
   tab,
   username,
   role,
+  access,
+  displayLabel,
   savedLabel,
   refreshing,
   castRefreshing,
@@ -56,30 +57,9 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
-  const staffPanelLimited = isStaffPanelLimitedRole(role);
-  const coordinatorTabs: AdminTab[] = [
-    "push_notices",
-    "crossover_communication",
-    "owner_follow_up",
-    "active_issues",
-    "staff_directory",
-    "whiteboard_preview",
-    "templates",
-    "notifications",
-    "help"
-  ];
-  const crossoverStaffTabs: AdminTab[] = ["notifications", "help"];
+  const staffPanelLimited = isStaffPanelLimitedAccess(access, role);
 
-  const visibleTabs = ADMIN_TABS.filter((item) => {
-    if (hasCoordinatorAccess(role)) return coordinatorTabs.includes(item);
-    if (isCrossoverStaffRole(role)) return crossoverStaffTabs.includes(item);
-    if (item === "staff_directory" && !canViewStaffDirectory(role)) return false;
-    if (board === "staff" && (item === "promotions" || item === "schedule")) return false;
-    if (board === "staff" && item === "users") return false;
-    if (item === "push_notices" && !canAccessPushNotices(role)) return false;
-    if (["crossover_communication", "owner_follow_up", "active_issues"].includes(item) && !(isFullAdminRole(role) || hasCoordinatorAccess(role))) return false;
-    return true;
-  });
+  const visibleTabs = ADMIN_TABS.filter((item) => canAccessAdminTab(access, item, role, board));
 
   return (
     <div className="admin-theme">
@@ -88,6 +68,7 @@ export function AdminShell({
           activeTab={tab}
           username={username}
           role={role}
+          displayLabel={displayLabel}
           visibleTabs={visibleTabs}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}

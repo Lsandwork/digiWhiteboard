@@ -1,34 +1,31 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
-import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import {
+  ADMIN_SESSION_COOKIE,
+  createAdminSessionToken,
+  getAdminSessionCookieOptions,
+  getAdminSessionFromRequest
+} from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { validatePasswordStrength } from "@/lib/admin/password";
-import { canChangeAdminUserPassword } from "@/lib/admin/permissions";
 import { loadAdminSettings } from "@/lib/admin/settings";
-import { getUserAccess } from "@/lib/admin/user-access";
 import { changeAdminUserPassword, getAdminUserById } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+/** Authenticated users may always change their own password (temp password flow). */
+export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  const { id } = await context.params;
-  const supabase = getServiceSupabase();
-  const actorAccess = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
-
-  if (!canChangeAdminUserPassword(actorAccess, session?.role, id, session?.adminUserId)) {
-    return NextResponse.json({ error: "You do not have permission to change this password." }, { status: 403 });
+  if (!session?.adminUserId) {
+    return NextResponse.json({ error: "You must be signed in with a managed account to change your password." }, { status: 403 });
   }
 
   const body = (await request.json()) as {
     password?: string;
     confirm_password?: string;
-    force_password_change?: boolean;
   };
 
   const password = String(body.password ?? "");
@@ -37,26 +34,35 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "Passwords must match." }, { status: 400 });
   }
 
-  const adminSettings = await loadAdminSettings(supabase);
+  const adminSettings = await loadAdminSettings(getServiceSupabase());
   const validation = validatePasswordStrength(password, adminSettings.require_strong_passwords);
   if (!validation.valid) {
     return NextResponse.json({ error: validation.errors.join(" ") }, { status: 400 });
   }
 
-  const existing = await getAdminUserById(supabase, id);
+  const supabase = getServiceSupabase();
+  const existing = await getAdminUserById(supabase, session.adminUserId);
   if (!existing) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
-  const isSelf = session?.adminUserId === id;
-  await changeAdminUserPassword(supabase, id, password, isSelf ? false : (body.force_password_change ?? false));
+  await changeAdminUserPassword(supabase, session.adminUserId, password, false);
 
   await writeAdminAuditLog({
-    actorAdminId: session?.adminUserId,
-    actorEmail: session?.email,
-    action: isSelf ? "admin.user.password_change_self" : "admin.user.password_change",
+    actorAdminId: session.adminUserId,
+    actorEmail: session.email,
+    action: "admin.user.password_change_self",
     targetType: "admin_user",
-    targetId: id,
+    targetId: session.adminUserId,
     details: { email: existing.email }
   });
 
-  return NextResponse.json({ ok: true, role: existing.role });
+  const token = createAdminSessionToken({
+    email: session.email,
+    adminUserId: session.adminUserId,
+    role: existing.role,
+    mustChangePassword: false
+  });
+
+  const response = NextResponse.json({ ok: true, role: existing.role });
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+  return response;
 }

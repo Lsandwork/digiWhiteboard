@@ -79,6 +79,7 @@ type SidebarProps = {
   activeTab: AdminTab;
   username: string;
   role?: string | null;
+  displayLabel?: string | null;
   mobileOpen: boolean;
   onMobileClose: () => void;
   onTabChange: (tab: AdminTab) => void;
@@ -87,9 +88,9 @@ type SidebarProps = {
   visibleTabs?: AdminTab[];
 };
 
-export function Sidebar({ activeTab, username, role, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
+export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
   const visibleNavItems = navItems.filter((item) => visibleTabs.includes(item.id));
-  const roleLabel = getAdminSidebarRoleLabel(role, username);
+  const roleLabel = displayLabel ?? getAdminSidebarRoleLabel(role, username);
 
   return (
     <>

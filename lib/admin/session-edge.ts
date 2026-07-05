@@ -4,6 +4,7 @@ export type SessionPayload = {
   sub: string;
   id?: string;
   role?: string;
+  mustChangePassword?: boolean;
   exp: number;
 };
 
@@ -11,6 +12,7 @@ export type AdminSession = {
   email: string;
   adminUserId?: string;
   role?: string;
+  mustChangePassword?: boolean;
 };
 
 function base64UrlToBytes(value: string) {
@@ -64,7 +66,8 @@ export async function verifyAdminSessionTokenEdge(token: string | undefined | nu
     return {
       email: payload.sub,
       adminUserId: payload.id,
-      role: payload.role
+      role: payload.role,
+      mustChangePassword: payload.mustChangePassword ?? false
     };
   } catch {
     return null;

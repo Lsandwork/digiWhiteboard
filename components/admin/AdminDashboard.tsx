@@ -29,7 +29,13 @@ import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
-import { isCrossoverStaffRole, isStaffOpsLimitedRole, isFullAdminRole, type AdminUserRole } from "@/lib/admin/users";
+import {
+  accessFromLegacyRole,
+  canAccessAdminTab,
+  firstAccessibleAdminTab,
+  type UserAccess
+} from "@/lib/admin/permissions";
+import type { AdminUserRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -103,28 +109,15 @@ export function AdminDashboard() {
 
   useEffect(() => {
     const role = data?.session?.role;
-    const coordinatorTabs: AdminTab[] = [
-      "push_notices",
-      "crossover_communication",
-      "owner_follow_up",
-      "active_issues",
-      "staff_directory",
-      "whiteboard_preview",
-      "templates",
-      "notifications",
-      "help"
-    ];
-    const crossoverStaffTabs: AdminTab[] = ["notifications", "help"];
-    if (isCrossoverStaffRole(role) && (board !== "staff" || !crossoverStaffTabs.includes(tab))) {
-      router.replace("/admin?board=staff&tab=notifications");
+    const access = (data?.session as { access?: UserAccess | null } | undefined)?.access
+      ?? accessFromLegacyRole(data?.session?.adminUserId ?? null, data?.username ?? null, role);
+
+    if (!canAccessAdminTab(access, tab, role, board)) {
+      const fallbackTab = firstAccessibleAdminTab(access, role, board) as AdminTab;
+      const fallbackBoard = board === "staff" && fallbackTab === "users" ? "lobby" : board;
+      router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
     }
-    if (isStaffOpsLimitedRole(role) && (board !== "staff" || !coordinatorTabs.includes(tab))) {
-      router.replace("/admin?board=staff&tab=push_notices");
-    }
-    if (!isFullAdminRole(role) && tab === "users") {
-      router.replace(isStaffOpsLimitedRole(role) ? "/admin?board=staff&tab=push_notices" : "/admin?tab=help");
-    }
-  }, [board, data?.session?.role, router, tab]);
+  }, [board, data?.session, data?.username, router, tab]);
 
   useEffect(() => {
     if (board === "staff" && tab === "users") {
@@ -241,6 +234,9 @@ export function AdminDashboard() {
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
   const currentRole = (data.session?.role ?? "owner_admin") as AdminUserRole;
+  const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
+    ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
+  const displayLabel = userAccess.displayLabel;
   const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
@@ -274,6 +270,8 @@ export function AdminDashboard() {
         tab={tab}
         username={data.username ?? "admin"}
         role={currentRole}
+        access={userAccess}
+        displayLabel={displayLabel}
         savedLabel={savedLabel}
         refreshing={refreshing}
         castRefreshing={castRefreshing}

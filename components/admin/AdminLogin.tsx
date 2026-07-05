@@ -1,14 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
-import { isCrossoverStaffRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
 
 function defaultAdminRoute(role?: string) {
-  if (isCrossoverStaffRole(role)) return "/admin?board=staff&tab=notifications";
-  if (isStaffOpsLimitedRole(role)) return "/admin?board=staff&tab=push_notices";
+  const access = accessFromLegacyRole(null, null, role);
+  if (canAccessTab(access, "push_notices", role)) return "/admin?board=staff&tab=push_notices";
+  if (canAccessTab(access, "notifications", role)) return "/admin?board=staff&tab=notifications";
   return "/admin";
 }
 
@@ -54,6 +55,27 @@ export function AdminLogin() {
     }
   }
 
+  useEffect(() => {
+    let cancelled = false;
+    async function checkSession() {
+      try {
+        const response = await fetch("/api/admin/session", { cache: "no-store" });
+        if (!response.ok) return;
+        const body = await response.json();
+        if (cancelled) return;
+        if (body.mustChangePassword && body.adminUserId) {
+          setMustChangePassword(true);
+          setAdminUserId(body.adminUserId);
+          if (body.username) setUsername(body.username);
+        }
+      } catch {
+        // ignore
+      }
+    }
+    void checkSession();
+    return () => { cancelled = true; };
+  }, []);
+
   async function submitPasswordChange(event: FormEvent) {
     event.preventDefault();
     if (!adminUserId) return;
@@ -62,13 +84,12 @@ export function AdminLogin() {
     setError(null);
 
     try {
-      const response = await fetch(`/api/admin/users/${adminUserId}/change-password`, {
+      const response = await fetch("/api/admin/change-own-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           password: newPassword,
-          confirm_password: confirmPassword,
-          force_password_change: false
+          confirm_password: confirmPassword
         })
       });
       const body = await response.json();

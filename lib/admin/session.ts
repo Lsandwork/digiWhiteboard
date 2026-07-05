@@ -8,6 +8,7 @@ export type SessionPayload = {
   sub: string;
   id?: string;
   role?: string;
+  mustChangePassword?: boolean;
   exp: number;
 };
 
@@ -15,6 +16,7 @@ export type AdminSession = {
   email: string;
   adminUserId?: string;
   role?: string;
+  mustChangePassword?: boolean;
 };
 
 function signPayload(encoded: string) {
@@ -26,6 +28,7 @@ export function createAdminSessionToken(session: AdminSession, ttlMs = SESSION_T
     sub: session.email,
     id: session.adminUserId,
     role: session.role,
+    mustChangePassword: session.mustChangePassword ?? false,
     exp: Date.now() + ttlMs
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -49,7 +52,8 @@ export function verifyAdminSessionToken(token: string | undefined | null): Admin
     return {
       email: payload.sub,
       adminUserId: payload.id,
-      role: payload.role
+      role: payload.role,
+      mustChangePassword: payload.mustChangePassword ?? false
     };
   } catch {
     return null;

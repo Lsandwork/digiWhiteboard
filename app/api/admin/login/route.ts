@@ -54,7 +54,8 @@ export async function POST(request: Request) {
     const token = createAdminSessionToken({
       email: auth.email,
       adminUserId: auth.adminUserId,
-      role: auth.role
+      role: auth.role,
+      mustChangePassword: auth.forcePasswordChange ?? false
     });
     const response = NextResponse.json({
       ok: true,
