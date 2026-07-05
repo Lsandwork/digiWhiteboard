@@ -38,9 +38,18 @@ export const FITDOG_UI = {
 export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   push_notices: FITDOG_UI.pushNotices,
   grooming_push: FITDOG_UI.groomingPush,
+  trainer_push: FITDOG_UI.groomingPush,
+  trainer_entry: FITDOG_UI.frontDeskLog,
   crossover_communication: FITDOG_UI.frontDeskLog,
   yard_links: FITDOG_UI.videoLinks,
   management_support: FITDOG_UI.managementSupport,
+  ms_hub: FITDOG_UI.managementSupport,
+  ms_groomer_complaints: FITDOG_UI.managementSupport,
+  ms_groomer_requests: FITDOG_UI.managementSupport,
+  ms_trainer_complaints: FITDOG_UI.managementSupport,
+  ms_trainer_requests: FITDOG_UI.managementSupport,
+  admin_trainer_entries: FITDOG_UI.frontDeskLog,
+  package_commissions: FITDOG_UI.managementSupport,
   notifications: FITDOG_UI.notifications,
   settings: FITDOG_UI.settings
 };

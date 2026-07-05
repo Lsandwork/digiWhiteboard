@@ -19,8 +19,8 @@ for (const role of ALL_ROLES) {
   );
   assert.equal(
     canAccessAdminTab(access, "yard_links", role, "lobby"),
-    true,
-    `${role} should access Yard Links on lobby board`
+    role !== "groomer" && role !== "team_leader",
+    `${role} lobby yard_links access`
   );
 }
 

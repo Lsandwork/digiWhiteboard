@@ -16,6 +16,9 @@ import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage";
 import { PushNoticesPanel } from "@/components/admin/PushNoticesPanel";
 import { GroomingPushPanel } from "@/components/admin/GroomingPushPanel";
+import { TrainerPushPanel } from "@/components/admin/TrainerPushPanel";
+import { TrainerEntryPanel } from "@/components/admin/TrainerEntryPanel";
+import { PackageCommissionsPanel } from "@/components/admin/PackageCommissionsPanel";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
@@ -23,6 +26,14 @@ import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
 import { YardLinksPanel } from "@/components/admin/YardLinksPanel";
 import { ManagementSupportPanel } from "@/components/admin/ManagementSupportPanel";
+import {
+  AdminTrainerEntriesPanel,
+  GroomerComplaintsAdminPanel,
+  GroomerRequestsAdminPanel,
+  ManagementSupportHubPanel,
+  TrainerComplaintsAdminPanel,
+  TrainerRequestsAdminPanel
+} from "@/components/admin/ManagementSupportHubPanels";
 import { AdminProfilePage } from "@/components/admin/AdminProfilePage";
 import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
@@ -40,7 +51,7 @@ import {
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { isTeamLeaderRole } from "@/lib/admin/users";
+import { isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -114,7 +125,7 @@ export function AdminDashboard() {
 
   useEffect(() => {
     const role = data?.session?.role;
-    if (isTeamLeaderRole(role) && board !== "staff") {
+    if ((isTeamLeaderRole(role) || isGroomerRole(role) || isTrainerRole(role)) && board !== "staff") {
       router.replace(`/admin?board=staff&tab=${tab}`);
     }
   }, [board, data?.session?.role, router, tab]);
@@ -249,8 +260,11 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "grooming_push", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
+  const showPreview = !["settings", "push_notices", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
   const isTeamLeadPanel = isTeamLeaderRole(currentRole);
+  const isGroomerPanel = isGroomerRole(currentRole);
+  const isTrainerPanel = isTrainerRole(currentRole);
+  const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel;
 
   const preview = (
     <div className="space-y-4">
@@ -359,6 +373,10 @@ export function AdminDashboard() {
 
         {tab === "grooming_push" ? <GroomingPushPanel /> : null}
 
+        {tab === "trainer_push" ? <TrainerPushPanel /> : null}
+
+        {tab === "trainer_entry" ? <TrainerEntryPanel /> : null}
+
         {tab === "crossover_communication" ? <StaffOperationsPanel tab="crossover" /> : null}
 
         {tab === "owner_follow_up" ? <StaffOperationsPanel tab="follow_up" /> : null}
@@ -381,7 +399,18 @@ export function AdminDashboard() {
 
         {tab === "yard_links" ? <YardLinksPanel /> : null}
 
-        {tab === "management_support" ? <ManagementSupportPanel /> : null}
+        {tab === "management_support" ? (
+          <ManagementSupportPanel mode={isGroomerPanel ? "groomer" : isTrainerPanel ? "trainer" : "team_leader"} />
+        ) : null}
+
+        {tab === "ms_hub" ? <ManagementSupportHubPanel /> : null}
+        {tab === "ms_groomer_complaints" ? <GroomerComplaintsAdminPanel /> : null}
+        {tab === "ms_groomer_requests" ? <GroomerRequestsAdminPanel /> : null}
+        {tab === "ms_trainer_complaints" ? <TrainerComplaintsAdminPanel /> : null}
+        {tab === "ms_trainer_requests" ? <TrainerRequestsAdminPanel /> : null}
+        {tab === "admin_trainer_entries" ? <AdminTrainerEntriesPanel /> : null}
+
+        {tab === "package_commissions" ? <PackageCommissionsPanel /> : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">
@@ -404,7 +433,7 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "notifications" ? (
-          <NotificationsPanel personalOnly={isTeamLeadPanel} onOpenTab={(nextTab) => setActiveTab(nextTab)} />
+          <NotificationsPanel personalOnly={isLimitedStaffPanel} onOpenTab={(nextTab) => setActiveTab(nextTab)} />
         ) : null}
 
         {tab === "staff_directory" ? (
@@ -412,7 +441,7 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "settings" ? (
-          isTeamLeadPanel ? (
+          isLimitedStaffPanel ? (
             <AdminProfilePage username={data.username} role={currentRole} displayLabel={displayLabel} />
           ) : (
             <AdminSettingsPage

@@ -3,6 +3,7 @@ import { normalizeAdminUserId } from "@/lib/admin/users";
 import {
   canAccessCrossoverCommunication,
   canCreateFrontDeskLog,
+  canCreateTrainerEntry,
   canManageStaffDirectory,
   canManageStaffOperations,
   isAdminRequest,
@@ -47,7 +48,7 @@ const STAFF_OPS_VIEW_PERMISSIONS = ["view_front_desk_log", "view_owner_follow_up
 function canViewStaffOps(session: ReturnType<typeof getAdminSessionFromRequest>) {
   const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
   return (
-    hasAnyPermission(access, [...STAFF_OPS_VIEW_PERMISSIONS]) ||
+    hasAnyPermission(access, [...STAFF_OPS_VIEW_PERMISSIONS, "create_trainer_entry"]) ||
     canManageStaffOperations(session?.role)
   );
 }
@@ -55,6 +56,10 @@ function canViewStaffOps(session: ReturnType<typeof getAdminSessionFromRequest>)
 function canUseFrontDeskLog(session: ReturnType<typeof getAdminSessionFromRequest>) {
   const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
   return hasPermission(access, "view_front_desk_log") || canAccessCrossoverCommunication(session?.role);
+}
+
+function canCreateShiftLogEntry(session: ReturnType<typeof getAdminSessionFromRequest>) {
+  return canCreateFrontDeskLog(session?.role) || canCreateTrainerEntry(session?.role);
 }
 
 function actorFromRequest(request: Request) {
@@ -101,10 +106,10 @@ export async function POST(request: Request) {
     const action = String(body.action ?? "");
     const supabase = getServiceSupabase();
 
-    if (action === "create_crossover" && !canCreateFrontDeskLog(session?.role)) {
+    if (action === "create_crossover" && !canCreateShiftLogEntry(session)) {
       return crossoverForbiddenResponse();
     }
-    if (CROSSOVER_ACTIONS.has(action) && !canUseFrontDeskLog(session)) {
+    if ((action === "update_crossover" || action === "reply_crossover") && !canUseFrontDeskLog(session)) {
       return crossoverForbiddenResponse();
     }
     if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {

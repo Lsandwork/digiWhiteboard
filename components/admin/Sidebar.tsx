@@ -6,7 +6,7 @@ import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
-import { getAdminSidebarRoleLabel, isTeamLeaderRole } from "@/lib/admin/users";
+import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
 
 const navItems: { id: AdminTab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -16,12 +16,21 @@ const navItems: { id: AdminTab; label: string }[] = [
   { id: "display", label: "Display Settings" },
   { id: "push_notices", label: "Push Notices" },
   { id: "grooming_push", label: "Grooming Push" },
+  { id: "trainer_push", label: "Trainer Push" },
+  { id: "trainer_entry", label: "Trainer's Entry" },
   { id: "crossover_communication", label: "Front Desk Log" },
   { id: "owner_follow_up", label: "Owner Follow Up" },
   { id: "active_issues", label: "Active Issues" },
   { id: "whiteboard_preview", label: "Whiteboard Preview" },
   { id: "yard_links", label: "Video Links" },
   { id: "management_support", label: "Management Support" },
+  { id: "ms_hub", label: "Support Overview" },
+  { id: "ms_groomer_complaints", label: "Groomer Complaints" },
+  { id: "ms_groomer_requests", label: "Groomer Requests" },
+  { id: "ms_trainer_complaints", label: "Trainer Complaints" },
+  { id: "ms_trainer_requests", label: "Trainer Requests" },
+  { id: "admin_trainer_entries", label: "Trainer Entries" },
+  { id: "package_commissions", label: "Package Commissions" },
   { id: "analytics", label: "Analytics" },
   { id: "templates", label: "Templates" },
   { id: "notifications", label: "Notifications" },
@@ -37,11 +46,15 @@ const tabLabels: Record<AdminTab, string> = Object.fromEntries(navItems.map((ite
 
 function sidebarPanelTitle(role?: string | null) {
   if (isTeamLeaderRole(role)) return "Team Lead Panel";
+  if (isGroomerRole(role)) return "Groomer Panel";
+  if (isTrainerRole(role)) return "Trainer Panel";
   return "Fitdog Admin";
 }
 
 function sidebarPanelSubtitle(role?: string | null) {
   if (isTeamLeaderRole(role)) return "Front Desk";
+  if (isGroomerRole(role)) return "Grooming";
+  if (isTrainerRole(role)) return "Training";
   return "Admin Center";
 }
 
@@ -111,7 +124,7 @@ export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, o
         </nav>
 
         <div className="space-y-3 p-4">
-          {!isTeamLeaderRole(role) ? (
+          {!isTeamLeaderRole(role) && !isGroomerRole(role) && !isTrainerRole(role) ? (
             <div className="admin-sidebar-help-card rounded-xl p-4">
               <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
                 <HelpCircle className="h-4 w-4 text-fitdog-orange" />

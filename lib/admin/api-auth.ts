@@ -7,7 +7,15 @@ import {
   canCreateDogHandlerComplaintNotice,
   canManageStaffDirectory,
   canSubmitWriteUp as userCanSubmitWriteUp,
+  canSubmitGroomerComplaint as userCanSubmitGroomerComplaint,
+  canSubmitTrainerComplaint as userCanSubmitTrainerComplaint,
+  canCreateTrainerEntry as userCanCreateTrainerEntry,
   canViewManagementReports,
+  canViewOwnGroomerSubmissions as userCanViewOwnGroomerSubmissions,
+  canViewOwnTrainerSubmissions as userCanViewOwnTrainerSubmissions,
+  canManagePackageCommissions as userCanManagePackageCommissions,
+  canReviewManagementSupport as userCanReviewManagementSupport,
+  canViewPackageCommissions as userCanViewPackageCommissions,
   canViewOwnWriteUps as userCanViewOwnWriteUps,
   canViewStaffDirectory,
   hasCoordinatorAccess
@@ -79,6 +87,38 @@ export function canSubmitWriteUp(role?: string | null) {
 
 export function canViewOwnWriteUps(role?: string | null) {
   return userCanViewOwnWriteUps(role) || !role;
+}
+
+export function canSubmitGroomerComplaint(role?: string | null) {
+  return userCanSubmitGroomerComplaint(role) || !role;
+}
+
+export function canViewOwnGroomerSubmissions(role?: string | null) {
+  return userCanViewOwnGroomerSubmissions(role) || !role;
+}
+
+export function canCreateTrainerEntry(role?: string | null) {
+  return userCanCreateTrainerEntry(role) || !role;
+}
+
+export function canSubmitTrainerComplaint(role?: string | null) {
+  return userCanSubmitTrainerComplaint(role) || !role;
+}
+
+export function canViewOwnTrainerSubmissions(role?: string | null) {
+  return userCanViewOwnTrainerSubmissions(role) || !role;
+}
+
+export function canManagePackageCommissions(role?: string | null) {
+  return userCanManagePackageCommissions(role) || !role;
+}
+
+export function canViewPackageCommissions(role?: string | null) {
+  return userCanViewPackageCommissions(role) || !role;
+}
+
+export function canReviewManagementSupport(role?: string | null) {
+  return userCanReviewManagementSupport(role) || !role;
 }
 
 export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

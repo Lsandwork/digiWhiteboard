@@ -6,6 +6,7 @@ import {
   dispatchStaffOpsNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  appendStaffEmailNotification,
   type StaffNotification,
   type StaffOpsNotificationEvent
 } from "@/lib/staff/notifications";
@@ -474,6 +475,16 @@ export async function dispatchStaffOpsNotificationEvent(
 ) {
   let state = await loadState(supabase);
   state = notifyState(state, event);
+  await saveState(supabase, state);
+}
+
+export async function dispatchPersonalStaffEmailNotification(
+  supabase: SupabaseClient,
+  event: StaffOpsNotificationEvent,
+  email: string
+) {
+  let state = await loadState(supabase);
+  state = appendStaffEmailNotification(state, event, email);
   await saveState(supabase, state);
 }
 

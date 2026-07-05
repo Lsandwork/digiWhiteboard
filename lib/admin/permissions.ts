@@ -35,7 +35,20 @@ export type PermissionKey =
   | "manage_staff_directory"
   | "submit_write_up"
   | "view_own_write_ups"
-  | "review_write_ups";
+  | "review_write_ups"
+  | "submit_groomer_complaint"
+  | "submit_groomer_request"
+  | "view_own_groomer_submissions"
+  | "push_trainer_request"
+  | "clear_trainer_request"
+  | "create_trainer_entry"
+  | "submit_trainer_complaint"
+  | "submit_trainer_request"
+  | "view_own_trainer_submissions"
+  | "view_package_commissions"
+  | "comment_package_commissions"
+  | "manage_package_commissions"
+  | "review_management_support";
 
 export type RoleKey =
   | "super_admin"
@@ -138,7 +151,20 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_staff_directory",
   "submit_write_up",
   "view_own_write_ups",
-  "review_write_ups"
+  "review_write_ups",
+  "submit_groomer_complaint",
+  "submit_groomer_request",
+  "view_own_groomer_submissions",
+  "push_trainer_request",
+  "clear_trainer_request",
+  "create_trainer_entry",
+  "submit_trainer_complaint",
+  "submit_trainer_request",
+  "view_own_trainer_submissions",
+  "view_package_commissions",
+  "comment_package_commissions",
+  "manage_package_commissions",
+  "review_management_support"
 ] as const satisfies readonly PermissionKey[]);
 
 const COORDINATOR_PERMISSIONS: PermissionKey[] = [
@@ -186,14 +212,32 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "receive_admin_alerts"
 ];
 
-const GROOMER_TRAINER_PERMISSIONS: PermissionKey[] = [
+/** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
+const TRAINER_PERMISSIONS: PermissionKey[] = [
+  "view_admin_panel",
+  "view_staff_whiteboard",
+  "push_trainer_request",
+  "clear_trainer_request",
+  "create_trainer_entry",
+  "submit_trainer_complaint",
+  "submit_trainer_request",
+  "view_own_trainer_submissions",
+  "view_package_commissions",
+  "comment_package_commissions"
+];
+
+/** Groomer DigiBoard panel — grooming push, front desk log, video links, notifications, complaints/requests, profile. */
+const GROOMER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
   "push_grooming_request",
-  "clear_grooming_request"
+  "clear_grooming_request",
+  "submit_groomer_complaint",
+  "submit_groomer_request",
+  "view_own_groomer_submissions"
 ];
 
 const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
@@ -227,14 +271,32 @@ export const TEAM_LEADER_TABS = [
   "settings"
 ] as const;
 
+export const GROOMER_TABS = [
+  "grooming_push",
+  "crossover_communication",
+  "yard_links",
+  "notifications",
+  "management_support",
+  "settings"
+] as const;
+
+export const TRAINER_TABS = [
+  "trainer_push",
+  "trainer_entry",
+  "yard_links",
+  "notifications",
+  "management_support",
+  "settings"
+] as const;
+
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: [...ALL_PERMISSIONS],
-  management: [...MANAGEMENT_PERMISSIONS, "review_write_ups"],
+  management: [...MANAGEMENT_PERMISSIONS, "review_write_ups", "manage_package_commissions", "review_management_support"],
   front_desk_coordinator: COORDINATOR_PERMISSIONS,
   team_leader: TEAM_LEADER_PERMISSIONS,
-  groomer: GROOMER_TRAINER_PERMISSIONS,
-  trainer: GROOMER_TRAINER_PERMISSIONS,
+  groomer: GROOMER_PERMISSIONS,
+  trainer: TRAINER_PERMISSIONS,
   daycare: STAFF_VIEWER_PERMISSIONS,
   driver: STAFF_VIEWER_PERMISSIONS,
   hiker: STAFF_VIEWER_PERMISSIONS,
@@ -354,6 +416,8 @@ export function hasAnyRole(access: UserAccess | null | undefined, roles: RoleKey
 export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   push_notices: "manage_push_notices",
   grooming_push: "push_grooming_request",
+  trainer_push: "push_trainer_request",
+  trainer_entry: "create_trainer_entry",
   crossover_communication: "view_front_desk_log",
   owner_follow_up: "view_owner_follow_up",
   active_issues: "view_active_issues",
@@ -364,6 +428,13 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   users: "manage_staff_users",
   integrations: "view_integration_status",
   management_support: "submit_write_up",
+  package_commissions: "manage_package_commissions",
+  ms_hub: "review_management_support",
+  ms_groomer_complaints: "review_management_support",
+  ms_groomer_requests: "review_management_support",
+  ms_trainer_complaints: "review_management_support",
+  ms_trainer_requests: "review_management_support",
+  admin_trainer_entries: "review_management_support",
   settings: "view_admin_panel",
   help: "view_admin_panel"
 };
@@ -435,8 +506,25 @@ const LOBBY_ONLY_TABS = new Set([
   "logs"
 ]);
 
+const ADMIN_SUPPORT_TAB_SET = new Set([
+  "ms_hub",
+  "ms_groomer_complaints",
+  "ms_groomer_requests",
+  "ms_trainer_complaints",
+  "ms_trainer_requests",
+  "admin_trainer_entries"
+]);
+
 export function isTeamLeaderLegacyRole(legacyRole?: string | null) {
   return legacyRole === "team_leader";
+}
+
+export function isGroomerLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "groomer";
+}
+
+export function isTrainerLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "trainer";
 }
 
 export function canAccessAdminTab(
@@ -450,6 +538,37 @@ export function canAccessAdminTab(
   if (isTeamLeaderLegacyRole(legacyRole)) {
     if (board !== "staff") return false;
     return (TEAM_LEADER_TABS as readonly string[]).includes(tab);
+  }
+
+  if (isGroomerLegacyRole(legacyRole)) {
+    if (board !== "staff") return false;
+    return (GROOMER_TABS as readonly string[]).includes(tab);
+  }
+
+  if (isTrainerLegacyRole(legacyRole)) {
+    if (board !== "staff") return false;
+    if (tab === "management_support") return hasAnyPermission(effective, ["submit_trainer_complaint", "view_own_trainer_submissions", "view_package_commissions"]);
+    return (TRAINER_TABS as readonly string[]).includes(tab);
+  }
+
+  if (ADMIN_SUPPORT_TAB_SET.has(tab)) {
+    if (board !== "staff") return false;
+    if (isGroomerLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole) || isTrainerLegacyRole(legacyRole)) return false;
+    return hasPermission(effective, "review_management_support");
+  }
+
+  if (
+    tab === "management_support" &&
+    hasPermission(effective, "review_management_support") &&
+    !isTeamLeaderLegacyRole(legacyRole) &&
+    !isGroomerLegacyRole(legacyRole) &&
+    !isTrainerLegacyRole(legacyRole)
+  ) {
+    return false;
+  }
+
+  if (hasPermission(effective, "manage_package_commissions") && tab === "package_commissions") {
+    return board === "staff";
   }
 
   if (board === "staff" && (tab === "promotions" || tab === "schedule" || tab === "users")) {
@@ -466,6 +585,9 @@ export function canAccessAdminTab(
 
   const required = TAB_PERMISSIONS[tab];
   if (!required) return hasPermission(effective, "view_admin_panel");
+  if (tab === "management_support" && hasAnyPermission(effective, ["submit_trainer_complaint", "view_own_trainer_submissions", "view_package_commissions"])) {
+    return true;
+  }
   return hasPermission(effective, required);
 }
 
@@ -493,6 +615,20 @@ export function firstAccessibleAdminTab(
     return "push_notices";
   }
 
+  if (isGroomerLegacyRole(legacyRole) && board === "staff") {
+    for (const tab of GROOMER_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+    }
+    return "grooming_push";
+  }
+
+  if (isTrainerLegacyRole(legacyRole) && board === "staff") {
+    for (const tab of TRAINER_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+    }
+    return "trainer_push";
+  }
+
   const tabs =
     board === "staff"
       ? [
@@ -506,6 +642,8 @@ export function firstAccessibleAdminTab(
           "yard_links",
           "templates",
           "notifications",
+          "package_commissions",
+          "ms_hub",
           "help"
         ]
       : ["overview", "content", "users", "settings", "integrations", "help"];

@@ -14,8 +14,10 @@ import {
   StaffPushNoticeTvOverlay
 } from "@/components/board/StaffPushNotice";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
+import { TrainerPushNoticeOverlay } from "@/components/board/TrainerPushNoticeOverlay";
 import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
 import { useGroomingPushNotices } from "@/hooks/useGroomingPushNotices";
+import { useTrainerPushNotices } from "@/hooks/useTrainerPushNotices";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
@@ -114,7 +116,8 @@ export function BoardClient() {
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
   const activePushNotice = useStaffPushNotice();
   const { activeNotice: activeGroomingNotice, queue: groomingQueue } = useGroomingPushNotices();
-  const activeAlertKey = activeGroomingNotice?.id ?? activePushNotice?.id ?? null;
+  const { activeNotice: activeTrainerNotice, queue: trainerQueue } = useTrainerPushNotices();
+  const activeAlertKey = activeGroomingNotice?.id ?? activeTrainerNotice?.id ?? activePushNotice?.id ?? null;
   useFitdogAlertSound(activeAlertKey);
   const {
     isCasting,
@@ -358,7 +361,7 @@ export function BoardClient() {
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
-      <StaffPushNoticeTvOverlay active={Boolean(activePushNotice) && !activeGroomingNotice} />
+      <StaffPushNoticeTvOverlay active={Boolean(activePushNotice) && !activeGroomingNotice && !activeTrainerNotice} />
 
       {!tvMode ? (
         <StaffCastButton
@@ -392,6 +395,14 @@ export function BoardClient() {
           <GroomingPushNoticeOverlay
             notice={activeGroomingNotice}
             queue={groomingQueue}
+            nowMs={nowMs}
+            clockTime={groomingClock.clockTime}
+            clockDate={groomingClock.clockDate}
+          />
+        ) : activeTrainerNotice ? (
+          <TrainerPushNoticeOverlay
+            notice={activeTrainerNotice}
+            queue={trainerQueue}
             nowMs={nowMs}
             clockTime={groomingClock.clockTime}
             clockDate={groomingClock.clockDate}

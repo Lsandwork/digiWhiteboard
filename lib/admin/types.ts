@@ -49,12 +49,21 @@ export type AdminTab =
   | "display"
   | "push_notices"
   | "grooming_push"
+  | "trainer_push"
+  | "trainer_entry"
   | "crossover_communication"
   | "owner_follow_up"
   | "active_issues"
   | "whiteboard_preview"
   | "yard_links"
   | "management_support"
+  | "ms_hub"
+  | "ms_groomer_complaints"
+  | "ms_groomer_requests"
+  | "ms_trainer_complaints"
+  | "ms_trainer_requests"
+  | "admin_trainer_entries"
+  | "package_commissions"
   | "analytics"
   | "templates"
   | "notifications"
@@ -73,12 +82,21 @@ export const ADMIN_TABS: AdminTab[] = [
   "display",
   "push_notices",
   "grooming_push",
+  "trainer_push",
+  "trainer_entry",
   "crossover_communication",
   "owner_follow_up",
   "active_issues",
   "whiteboard_preview",
   "yard_links",
   "management_support",
+  "ms_hub",
+  "ms_groomer_complaints",
+  "ms_groomer_requests",
+  "ms_trainer_complaints",
+  "ms_trainer_requests",
+  "admin_trainer_entries",
+  "package_commissions",
   "analytics",
   "templates",
   "notifications",
@@ -89,6 +107,16 @@ export const ADMIN_TABS: AdminTab[] = [
   "integrations",
   "help"
 ];
+
+export const ADMIN_SUPPORT_TABS = [
+  "ms_hub",
+  "ms_groomer_complaints",
+  "ms_groomer_requests",
+  "ms_trainer_complaints",
+  "ms_trainer_requests",
+  "admin_trainer_entries",
+  "package_commissions"
+] as const;
 
 export function parseAdminTab(value: string | null): AdminTab {
   if (value && ADMIN_TABS.includes(value as AdminTab)) return value as AdminTab;

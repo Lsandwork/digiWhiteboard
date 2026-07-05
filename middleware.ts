@@ -26,6 +26,20 @@ export async function middleware(request: NextRequest) {
       loginUrl.searchParams.set("next", pathname);
       return NextResponse.redirect(loginUrl);
     }
+
+    const adminSupportPaths = [
+      "/admin/management-support",
+      "/admin/trainer-entries",
+      "/admin/package-commissions"
+    ];
+    const isAdminSupportRoute = adminSupportPaths.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+    );
+    const role = session.role ?? "";
+    const isFullAdmin = role === "owner_admin" || role === "manager_admin";
+    if (isAdminSupportRoute && !isFullAdmin) {
+      return NextResponse.redirect(new URL("/admin?board=staff", request.url));
+    }
   }
 
   return NextResponse.next();

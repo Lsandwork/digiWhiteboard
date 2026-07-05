@@ -125,6 +125,14 @@ export function canViewManagementReports(role?: string | null) {
   return isFullAdminRole(role);
 }
 
+export function isGroomerRole(role?: string | null) {
+  return role === "groomer";
+}
+
+export function isTrainerRole(role?: string | null) {
+  return role === "trainer";
+}
+
 /** Team leads can submit employee write-ups for management review. */
 export function canSubmitWriteUp(role?: string | null) {
   return role === "team_leader";
@@ -133,6 +141,61 @@ export function canSubmitWriteUp(role?: string | null) {
 /** Team leads can review status of their own submitted write-ups. */
 export function canViewOwnWriteUps(role?: string | null) {
   return role === "team_leader";
+}
+
+/** Groomers can file complaints for admin and management review. */
+export function canSubmitGroomerComplaint(role?: string | null) {
+  return role === "groomer";
+}
+
+/** Groomers can file requests for admin and management review. */
+export function canSubmitGroomerRequest(role?: string | null) {
+  return role === "groomer";
+}
+
+/** Groomers can review their own filed complaints and requests. */
+export function canViewOwnGroomerSubmissions(role?: string | null) {
+  return role === "groomer";
+}
+
+/** Trainers can file complaints for admin and management review. */
+export function canSubmitTrainerComplaint(role?: string | null) {
+  return role === "trainer";
+}
+
+/** Trainers can file requests for admin and management review. */
+export function canSubmitTrainerRequest(role?: string | null) {
+  return role === "trainer";
+}
+
+/** Trainers can review their own filed complaints and requests. */
+export function canViewOwnTrainerSubmissions(role?: string | null) {
+  return role === "trainer";
+}
+
+/** Trainers can view package commission records. */
+export function canViewPackageCommissions(role?: string | null) {
+  return role === "trainer" || isFullAdminRole(role);
+}
+
+/** Trainers can comment on package commission rows. */
+export function canCommentPackageCommissions(role?: string | null) {
+  return role === "trainer";
+}
+
+/** Trainers can submit trainer shift log entries. */
+export function canCreateTrainerEntry(role?: string | null) {
+  return role === "trainer";
+}
+
+/** Admin and management can manage package commission CSV data. */
+export function canManagePackageCommissions(role?: string | null) {
+  return isFullAdminRole(role);
+}
+
+/** Admin and management can review all management support submissions. */
+export function canReviewManagementSupport(role?: string | null) {
+  return isFullAdminRole(role);
 }
 
 export function isStaffPanelLimitedRole(role?: string | null) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, Pencil, Plus, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
+import { BellRing, Download, Pencil, Plus, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -407,12 +407,40 @@ export function PushNoticesPanel() {
                     <p className="mt-1 text-sm text-admin-muted">
                       Employee: <span className="font-bold text-white">{report.employee_name ?? report.write_up_details?.employee_name}</span>
                       {report.write_up_details?.employee_department ? ` (${report.write_up_details.employee_department})` : ""}
+                      {report.write_up_details?.hr_tracked ? " • HR tracked" : ""}
                     </p>
-                    {report.write_up_details?.incident_description ? (
-                      <p className="mt-2 text-sm text-admin-muted">{report.write_up_details.incident_description}</p>
+                    {report.write_up_details?.violation_types?.length ? (
+                      <p className="mt-1 text-sm text-admin-muted">
+                        Violation: <span className="font-bold text-white">{report.write_up_details.violation_types.join(", ")}</span>
+                      </p>
+                    ) : null}
+                    {report.write_up_details?.statement_of_violation ?? report.write_up_details?.incident_description ? (
+                      <p className="mt-2 text-sm text-admin-muted">{report.write_up_details.statement_of_violation ?? report.write_up_details.incident_description}</p>
                     ) : (
                       <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
                     )}
+                    {report.write_up_details?.text_report ? (
+                      <pre className="warning-notice-text-report">{report.write_up_details.text_report}</pre>
+                    ) : null}
+                    {report.write_up_details?.pdf_filename ? (
+                      <a
+                        className="crossover-btn crossover-btn--ghost mt-2 inline-flex items-center gap-2 text-sm"
+                        href={`/api/admin/write-ups/${report.id}/pdf`}
+                        download={report.write_up_details.pdf_filename}
+                      >
+                        <Download className="h-4 w-4" aria-hidden />
+                        Download Warning Notice PDF
+                      </a>
+                    ) : null}
+                  </>
+                ) : report.report_type === "groomer_complaint" || report.report_type === "groomer_request" || report.report_type === "trainer_complaint" || report.report_type === "trainer_request" ? (
+                  <>
+                    <p className="mt-1 text-sm text-admin-muted">
+                      Submitted by: <span className="font-bold text-white">{report.created_by ?? "groomer"}</span>
+                    </p>
+                    <p className="mt-2 text-sm text-admin-muted">
+                      {report.groomer_submission_details?.description ?? report.summary}
+                    </p>
                   </>
                 ) : (
                   <>

@@ -3,6 +3,8 @@ import {
   canAccessCrossoverCommunication,
   isCrossoverStaffRole,
   isFullAdminRole,
+  isGroomerRole,
+  isTrainerRole,
   isStaffOpsLimitedRole,
   isTeamLeaderRole
 } from "@/lib/admin/users";
@@ -165,7 +167,7 @@ export function filterNotificationsForUser(
   );
 }
 
-/** Team leads only see notifications directly assigned to them (not coordinator or department pools). */
+/** Team leads and groomers only see notifications directly assigned to them. */
 export function filterPersonalNotificationsForUser(
   state: StaffOpsState,
   session: { email?: string | null; adminUserId?: string | null; role?: string | null }
@@ -175,22 +177,6 @@ export function filterPersonalNotificationsForUser(
     if (notification.target.kind === "admin_pool" && isFullAdminRole(session.role)) return true;
     return false;
   });
-}
-
-export function notificationsForSession(
-  state: StaffOpsState,
-  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
-) {
-  if (isTeamLeaderRole(session.role)) return filterPersonalNotificationsForUser(state, session);
-  return filterNotificationsForUser(state, session);
-}
-
-export function countUnreadNotifications(
-  state: StaffOpsState,
-  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
-) {
-  const readerKey = notificationReaderKey(session.email, session.adminUserId);
-  return notificationsForSession(state, session).filter((notification) => !notification.read_by.includes(readerKey)).length;
 }
 
 function buildNotification(event: StaffOpsNotificationEvent, target: StaffNotificationTarget, type: StaffNotificationType): StaffNotification {
@@ -249,6 +235,36 @@ export function dispatchStaffOpsNotifications(state: StaffOpsState, event: Staff
     ...state,
     notifications: [...created, ...existing].slice(0, MAX_NOTIFICATIONS)
   };
+}
+
+export function appendStaffEmailNotification(
+  state: StaffOpsState,
+  event: StaffOpsNotificationEvent,
+  email: string
+): StaffOpsState {
+  const notification = buildNotification(event, { kind: "staff_email", email: email.trim().toLowerCase() }, "update");
+  return {
+    ...state,
+    notifications: [notification, ...(state.notifications ?? [])].slice(0, MAX_NOTIFICATIONS)
+  };
+}
+
+export function notificationsForSession(
+  state: StaffOpsState,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  if (isTeamLeaderRole(session.role) || isGroomerRole(session.role) || isTrainerRole(session.role)) {
+    return filterPersonalNotificationsForUser(state, session);
+  }
+  return filterNotificationsForUser(state, session);
+}
+
+export function countUnreadNotifications(
+  state: StaffOpsState,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  const readerKey = notificationReaderKey(session.email, session.adminUserId);
+  return notificationsForSession(state, session).filter((notification) => !notification.read_by.includes(readerKey)).length;
 }
 
 export function markNotificationRead(state: StaffOpsState, notificationId: string, readerKey: string) {
