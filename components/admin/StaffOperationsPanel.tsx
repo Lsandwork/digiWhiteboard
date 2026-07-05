@@ -42,15 +42,17 @@ import {
   AddShiftLogEntryCard,
   filterShiftLogRows,
   QuickLogTemplatesSidebar,
-  ShiftHandoffSummary,
   ShiftLogFilterBar,
   ShiftLogRecentActivitySidebar,
   type ShiftLogFilters,
   type ShiftLogFormShape
 } from "@/components/admin/front-desk/FrontDeskLogUI";
+import { KpiSummaryCards, shiftLogKpiCards } from "@/components/admin/ui/KpiSummaryCards";
+import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { canPushCrossoverToWhiteboard } from "@/lib/admin/users";
 import {
   formatShiftLogDayLabel,
+  isDueToday,
   isLoggedToday,
   isOpenShiftLogStatus,
   shiftLogDetails,
@@ -557,6 +559,14 @@ function CrossoverPage(props: {
 
   const pagedDaily = paginate(dailyRows, dailyPage);
   const pagedOpen = paginate(openRows, openPage);
+  const allMessages = props.data?.crossover_messages ?? [];
+  const openMessages = allMessages.filter((item) => isOpenShiftLogStatus(item.status));
+  const kpiCards = shiftLogKpiCards({
+    openCount: openMessages.length,
+    needsReviewCount: openMessages.filter((item) => item.needs_management_review || item.status === "Needs Management Review").length,
+    dueTodayCount: openMessages.filter((item) => isDueToday(item.due_at) || isDueToday(item.reminder_at)).length,
+    urgentCount: openMessages.filter((item) => item.urgent || item.priority === "High" || item.priority === "Urgent" || item.priority === "Critical").length
+  });
   const assignOptions = useMemo(() => [...new Set([...props.staffOptions, ...(props.data?.crossover_messages ?? []).map((item) => item.assigned_to).filter(Boolean) as string[]])], [props.data?.crossover_messages, props.staffOptions]);
 
   async function submit(extra: Partial<ShiftLogFormShape> = {}) {
@@ -599,8 +609,10 @@ function CrossoverPage(props: {
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
 
+      <KpiSummaryCards cards={kpiCards} />
+
       <div className="crossover-dashboard__log-section">
-        <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} />
+        <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} onClear={() => setFilters(emptyShiftLogFilters)} />
         <div className="crossover-dashboard__log-stack">
           <ActiveShiftLogCard
             rows={pagedDaily.rows}
@@ -658,13 +670,12 @@ function CrossoverPage(props: {
           />
         </div>
         <div className="mt-3 flex justify-end">
-          <button type="button" className="crossover-btn crossover-btn--outline" disabled={props.loading} onClick={() => void props.onRefresh()}>
+          <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={props.loading} onClick={() => void props.onRefresh()}>
+            <FitdogDashboardIcon src="/assets/fitdog/ui/refresh-64.png" size={18} alt="" />
             Refresh logs
           </button>
         </div>
       </div>
-
-      <ShiftHandoffSummary rows={props.data?.crossover_messages ?? []} />
 
       <div className="crossover-dashboard__workspace">
         <div className="crossover-dashboard__workspace-form">

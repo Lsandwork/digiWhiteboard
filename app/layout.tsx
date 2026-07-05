@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import "./globals.css";
+import "../lib/fitdog-dashboard/theme.css";
 
 export const metadata: Metadata = {
   title: "Fitdog Health & Social Club",

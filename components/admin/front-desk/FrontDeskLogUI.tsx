@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { CheckCircle2, ClipboardList, Eye, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import { ClipboardList, Pencil, Plus } from "lucide-react";
 import type { CrossoverMessage, CrossoverReply, StaffActivityLog, StaffDirectoryMember, StaffOpsPriority, StaffOpsStatus } from "@/lib/staff/admin-ops";
 import { STAFF_PRIORITIES } from "@/lib/staff/admin-ops";
 import { CROSSOVER_ASSETS } from "@/lib/admin/crossover-assets";
+import { FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
+import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import {
   ASSIGNMENT_TEAMS,
   isDueToday,
@@ -126,18 +128,19 @@ function ShiftLogRowMenu({
 
   return (
     <div className="crossover-row-actions" ref={ref}>
-      <button type="button" className="crossover-icon-btn" disabled={busy} aria-label="View details" title="View details" onClick={onDetail}>
-        <Eye aria-hidden className="crossover-icon-btn__lucide" />
+      <button type="button" className="fitdog-action-icon-btn" disabled={busy} aria-label="View details" title="View details" onClick={onDetail}>
+        <FitdogDashboardIcon src={FITDOG_UI.view} size={18} alt="" />
       </button>
-      <button type="button" className="crossover-icon-btn crossover-icon-btn--resolve" disabled={busy} aria-label="Mark resolved" title="Mark resolved" onClick={onResolve}>
-        <CheckCircle2 aria-hidden className="crossover-icon-btn__lucide" />
+      <button type="button" className="fitdog-action-icon-btn" disabled={busy} aria-label="Edit entry" title="Edit entry" onClick={onEdit}>
+        <FitdogDashboardIcon src={FITDOG_UI.edit} size={18} alt="" />
       </button>
       <div className="crossover-more-menu">
-        <button type="button" className="crossover-icon-btn" disabled={busy} aria-label="More actions" onClick={() => setOpen((v) => !v)}>
-          <MoreHorizontal aria-hidden className="crossover-icon-btn__lucide" />
+        <button type="button" className="fitdog-action-icon-btn" disabled={busy} aria-label="More actions" onClick={() => setOpen((v) => !v)}>
+          <FitdogDashboardIcon src={FITDOG_UI.more} size={18} alt="" />
         </button>
         {open ? (
           <div className="crossover-more-menu__panel" role="menu">
+            <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onResolve(); }}>Mark Resolved</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onEdit(); }}>Edit</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onInProgress(); }}>Mark In Progress</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onFollowUp(); }}>Create Owner Follow Up</button>
@@ -150,12 +153,22 @@ function ShiftLogRowMenu({
   );
 }
 
-export function ShiftLogFilterBar({ filters, setFilters, assignOptions }: { filters: ShiftLogFilters; setFilters: (filters: ShiftLogFilters) => void; assignOptions: string[] }) {
+export function ShiftLogFilterBar({
+  filters,
+  setFilters,
+  assignOptions,
+  onClear
+}: {
+  filters: ShiftLogFilters;
+  setFilters: (filters: ShiftLogFilters) => void;
+  assignOptions: string[];
+  onClear?: () => void;
+}) {
   return (
     <div className="crossover-filters shift-log-filters">
       <label className="crossover-search">
         <Image src={CROSSOVER_ASSETS.search} alt="" width={22} height={22} aria-hidden className="crossover-search__icon" />
-        <input className="crossover-input crossover-search__input" placeholder="Search shift log..." value={filters.query} onChange={(e) => setFilters({ ...filters, query: e.target.value })} />
+        <input className="crossover-input crossover-search__input" placeholder="Search logs, notes, dog or owner..." value={filters.query} onChange={(e) => setFilters({ ...filters, query: e.target.value })} aria-label="Search logs" />
       </label>
       <select className="crossover-input crossover-select" value={filters.logType} onChange={(e) => setFilters({ ...filters, logType: e.target.value })} aria-label="Filter by log type">
         <option value="">All log types</option>
@@ -173,9 +186,15 @@ export function ShiftLogFilterBar({ filters, setFilters, assignOptions }: { filt
         <option value="">All assignments</option>
         {assignOptions.map((name) => <option key={name} value={name}>{name}</option>)}
       </select>
-      <button type="button" role="switch" aria-checked={filters.urgentOnly} className={`crossover-urgent-pill ${filters.urgentOnly ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilters({ ...filters, urgentOnly: !filters.urgentOnly })}>Urgent only</button>
-      <button type="button" role="switch" aria-checked={filters.needsReview} className={`crossover-urgent-pill ${filters.needsReview ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilters({ ...filters, needsReview: !filters.needsReview })}>Needs review</button>
-      <button type="button" role="switch" aria-checked={filters.dueToday} className={`crossover-urgent-pill ${filters.dueToday ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilters({ ...filters, dueToday: !filters.dueToday })}>Due today</button>
+      <button type="button" role="switch" aria-checked={filters.urgentOnly} className={`crossover-urgent-pill ${filters.urgentOnly ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilters({ ...filters, urgentOnly: !filters.urgentOnly })}>Urgent Only</button>
+      <button type="button" role="switch" aria-checked={filters.needsReview} className={`crossover-urgent-pill ${filters.needsReview ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilters({ ...filters, needsReview: !filters.needsReview })}>Review Needed</button>
+      <button type="button" role="switch" aria-checked={filters.dueToday} className={`crossover-urgent-pill ${filters.dueToday ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilters({ ...filters, dueToday: !filters.dueToday })}>Due Today</button>
+      {onClear ? (
+        <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" onClick={onClear}>
+          <Image src={FITDOG_UI.clearFilters} alt="" width={18} height={18} aria-hidden />
+          Clear filters
+        </button>
+      ) : null}
     </div>
   );
 }

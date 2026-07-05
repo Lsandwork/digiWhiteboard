@@ -1,0 +1,15 @@
+{
+  "background": "#0B1118",
+  "surface": "#111B26",
+  "surfaceElevated": "#152232",
+  "border": "#263445",
+  "textPrimary": "#F8FAFC",
+  "textSecondary": "#B7C1CE",
+  "fitdogOrange": "#FF6F26",
+  "fitdogAmber": "#FFA612",
+  "success": "#29CD62",
+  "warning": "#FFBE36",
+  "danger": "#FF5252",
+  "info": "#45A6FF",
+  "teal": "#30D2BE"
+}

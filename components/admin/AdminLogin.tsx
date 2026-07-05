@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
+import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
 import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
 
 function defaultAdminRoute(role?: string) {
@@ -111,7 +112,7 @@ export function AdminLogin() {
     <main className="admin-theme grid min-h-screen place-items-center p-6">
       <form onSubmit={mustChangePassword ? submitPasswordChange : submit} className="admin-card w-full max-w-md rounded-2xl p-8">
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
-          <Image src="/assets/fitdog-lobby-whiteboard/01-brand/logo/fitdog-logo-circle-badge-512.png" alt="Fitdog" width={72} height={72} className="rounded-full ring-2 ring-fitdog-orange/40" />
+          <Image src={FITDOG_BRAND.logoBadge256} alt="Fitdog" width={72} height={72} className="rounded-full ring-2 ring-fitdog-orange/40" />
           <div>
             <h1 className="text-2xl font-black text-white">{mustChangePassword ? "Set New Password" : "Fitdog Admin"}</h1>
             <p className="mt-1 text-sm text-admin-muted">

@@ -1,0 +1,305 @@
+/* Fitdog dark dashboard design tokens — imported after base admin-theme vars */
+
+.admin-theme {
+  --fitdog-bg: #0b1118;
+  --fitdog-sidebar: #0a1017;
+  --fitdog-surface: #111b26;
+  --fitdog-surface-elevated: #152232;
+  --fitdog-border: #263445;
+  --fitdog-text: #f8fafc;
+  --fitdog-text-secondary: #b7c1ce;
+  --fitdog-orange: #ff6f26;
+  --fitdog-amber: #ffa612;
+  --fitdog-success: #29cd62;
+  --fitdog-warning: #ffbe36;
+  --fitdog-danger: #ff5252;
+  --fitdog-info: #45a6ff;
+  --fitdog-teal: #30d2be;
+
+  --admin-bg: var(--fitdog-bg);
+  --admin-card: var(--fitdog-surface);
+  --admin-card-alt: var(--fitdog-surface-elevated);
+  --admin-border: var(--fitdog-border);
+  --admin-muted: var(--fitdog-text-secondary);
+  --crossover-bg: var(--fitdog-bg);
+  --crossover-card: var(--fitdog-surface);
+  --crossover-card-alt: var(--fitdog-surface-elevated);
+  --crossover-border: var(--fitdog-border);
+  --crossover-amber: var(--fitdog-amber);
+  --crossover-gold: var(--fitdog-orange);
+  --crossover-text: var(--fitdog-text);
+  --crossover-muted: var(--fitdog-text-secondary);
+  --crossover-green: var(--fitdog-success);
+  --crossover-red: var(--fitdog-danger);
+
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 111, 38, 0.08), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(69, 166, 255, 0.06), transparent 28%),
+    var(--fitdog-bg);
+  color: var(--fitdog-text);
+}
+
+.admin-sidebar {
+  border-right: 1px solid var(--fitdog-border);
+  background: var(--fitdog-sidebar);
+}
+
+.admin-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.admin-sidebar-brand__text {
+  min-width: 0;
+}
+
+.admin-sidebar-brand__title {
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+  color: var(--fitdog-text);
+}
+
+.admin-sidebar-brand__subtitle {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--fitdog-text-secondary);
+}
+
+.admin-nav-item {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 0.85rem;
+  padding: 0.72rem 0.85rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--fitdog-text-secondary);
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-nav-item:hover {
+  color: var(--fitdog-text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-nav-item--active {
+  color: var(--fitdog-text);
+  background: linear-gradient(90deg, rgba(255, 111, 38, 0.14), rgba(21, 34, 50, 0.9));
+  border-color: rgba(255, 111, 38, 0.35);
+  box-shadow:
+    inset 3px 0 0 var(--fitdog-orange),
+    0 0 24px rgba(255, 166, 18, 0.12);
+}
+
+.admin-nav-item__icon {
+  flex-shrink: 0;
+}
+
+.admin-user-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid var(--fitdog-border);
+  border-radius: 1rem;
+  background: var(--fitdog-surface-elevated);
+  padding: 0.75rem;
+}
+
+.admin-user-card__avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 111, 38, 0.35), rgba(255, 166, 18, 0.2));
+  font-size: 0.95rem;
+  font-weight: 900;
+  color: var(--fitdog-text);
+}
+
+.admin-user-card__name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--fitdog-text);
+}
+
+.admin-user-card__meta {
+  font-size: 0.72rem;
+  color: var(--fitdog-text-secondary);
+}
+
+.admin-header-brand {
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (min-width: 1024px) {
+  .admin-header-brand {
+    display: flex;
+  }
+}
+
+.admin-header-brand__label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--fitdog-orange);
+}
+
+.admin-btn-primary {
+  border: 1px solid rgba(255, 111, 38, 0.55);
+  background: linear-gradient(180deg, #ff8a4c, var(--fitdog-orange) 58%, #e85a12);
+  color: #0b1118;
+  box-shadow: 0 10px 24px rgba(255, 111, 38, 0.28);
+}
+
+.admin-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 12px 28px rgba(255, 111, 38, 0.34);
+}
+
+.admin-btn-secondary {
+  border: 1px solid var(--fitdog-border);
+  background: rgba(17, 27, 38, 0.85);
+  color: var(--fitdog-text);
+}
+
+.admin-btn-secondary:hover:not(:disabled) {
+  border-color: rgba(255, 111, 38, 0.35);
+  background: rgba(21, 34, 50, 0.95);
+}
+
+.admin-tab--active {
+  border-bottom-color: var(--fitdog-orange);
+  color: var(--fitdog-text);
+}
+
+.admin-status-dot {
+  background: var(--fitdog-success);
+  box-shadow: 0 0 0 4px rgba(41, 205, 98, 0.18);
+}
+
+.admin-card,
+.crossover-card {
+  border: 1px solid var(--fitdog-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%), var(--fitdog-surface);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
+}
+
+.fitdog-kpi-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .fitdog-kpi-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.fitdog-kpi-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  border: 1px solid var(--fitdog-border);
+  border-radius: 1rem;
+  background: var(--fitdog-surface-elevated);
+  padding: 1rem;
+}
+
+.fitdog-kpi-card--danger {
+  border-color: rgba(255, 82, 82, 0.35);
+}
+
+.fitdog-kpi-card--warning {
+  border-color: rgba(255, 190, 54, 0.35);
+}
+
+.fitdog-kpi-card--info {
+  border-color: rgba(69, 166, 255, 0.35);
+}
+
+.fitdog-kpi-card__value {
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--fitdog-text);
+}
+
+.fitdog-kpi-card__label {
+  margin-top: 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--fitdog-text);
+}
+
+.fitdog-kpi-card__helper {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--fitdog-text-secondary);
+}
+
+.fitdog-dash-icon {
+  display: block;
+  object-fit: contain;
+}
+
+.fitdog-action-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--fitdog-border);
+  border-radius: 999px;
+  background: rgba(21, 34, 50, 0.9);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.fitdog-action-icon-btn:hover:not(:disabled) {
+  border-color: rgba(255, 111, 38, 0.45);
+  background: rgba(255, 111, 38, 0.12);
+}
+
+.fitdog-action-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.crossover-table th {
+  padding: 0.85rem 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: var(--fitdog-text-secondary);
+  border-bottom: 1px solid var(--fitdog-border);
+}
+
+.crossover-table td {
+  padding: 1rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(38, 52, 69, 0.65);
+}
+
+.crossover-input,
+.crossover-select,
+.admin-input,
+.admin-select {
+  border-color: var(--fitdog-border);
+  background: rgba(10, 16, 23, 0.72);
+}
+
+.crossover-btn--primary {
+  border-color: rgba(255, 111, 38, 0.55);
+  background: linear-gradient(180deg, #ff8a4c, var(--fitdog-orange) 58%, #e85a12);
+  color: #0b1118;
+}
+
+.crossover-btn--outline,
+.crossover-btn--ghost {
+  border-color: var(--fitdog-border);
+  color: var(--fitdog-text);
+}

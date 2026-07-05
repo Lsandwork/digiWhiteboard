@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320" viewBox="0 0 520 320">
+<defs><radialGradient id="g" cx=".22" cy=".18" r=".7"><stop stop-color="#EF4444" stop-opacity=".45"/><stop offset="1" stop-color="#EF4444" stop-opacity="0"/></radialGradient></defs>
+<rect width="520" height="320" rx="30" fill="#0E131B"/><rect width="520" height="320" rx="30" fill="url(#g)"/><rect x="1" y="1" width="518" height="318" rx="30" fill="none" stroke="#263241" stroke-width="2"/>
+<circle cx="94" cy="92" r="70" fill="#EF4444" opacity=".82"/>
+<g transform="translate(14 20) scale(.8)"><path d="M105 32a38 38 0 0 0-48 48L28 109l23 23 30-30a38 38 0 0 0 48-48l-27 27-24-24z" fill="#fff" opacity=".9"/></g>
+<text x="48" y="218" font-family="Inter, Arial" font-size="31" font-weight="900" fill="#F8FAFC">Maintenance Issues</text>
+<text x="48" y="258" font-family="Inter, Arial" font-size="19" fill="#A6B0BE">Track bugs and fixes</text>
+<path d="M454 246h28M472 236l12 12-12 12" stroke="#F8FAFC" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

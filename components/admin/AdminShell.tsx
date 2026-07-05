@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
 import {
@@ -7,8 +8,10 @@ import {
   isStaffPanelLimitedAccess,
   type UserAccess
 } from "@/lib/admin/permissions";
+import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
+import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 
 type AdminShellProps = {
   board: AdminBoardType;
@@ -94,10 +97,18 @@ export function AdminShell({
               </div>
 
               <div className="flex flex-col items-start gap-2 lg:items-end">
+                <div className="admin-header-brand">
+                  <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
+                  <div>
+                    <p className="admin-header-brand__label">FITDOG</p>
+                    <p className="text-xs font-bold text-white">Admin Center</p>
+                  </div>
+                </div>
                 <p className="text-xs text-admin-muted">{savedLabel}</p>
                 <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
                   {staffPanelLimited ? null : <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>Preview Live</button>}
-                  <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onRefresh} disabled={refreshing}>
+                  <button type="button" className="admin-btn-secondary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none" onClick={onRefresh} disabled={refreshing}>
+                    <FitdogDashboardIcon src={FITDOG_UI.refresh} size={18} alt="" />
                     {refreshing ? "Refreshing…" : "Refresh"}
                   </button>
                   {staffPanelLimited ? null : (
@@ -111,7 +122,8 @@ export function AdminShell({
                       {castRefreshing ? "Refreshing TVs…" : "Hard Refresh Cast TVs"}
                     </button>
                   )}
-                  <button type="button" className="admin-btn-primary flex-1 sm:flex-none" onClick={onOpenBoard}>
+                  <button type="button" className="admin-btn-primary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none" onClick={onOpenBoard}>
+                    <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
                     {board === "staff" ? "Open Staff Whiteboard" : "Open Lobby Whiteboard"}
                   </button>
                 </div>
