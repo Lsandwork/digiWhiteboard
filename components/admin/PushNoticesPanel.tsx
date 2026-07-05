@@ -432,32 +432,32 @@ export function PushNoticesPanel() {
             <p className="crossover-card__subtitle">Push previous notices again, or edit and delete custom notices.</p>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-admin-border text-sm">
-            <thead className="bg-white/[0.03] text-left text-xs uppercase tracking-wide text-admin-muted">
+        <div className="crossover-table-wrap">
+          <table className="crossover-table">
+            <thead>
               <tr>
-                <th className="px-4 py-3">Notice title</th>
-                <th className="px-4 py-3">Priority</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Created by</th>
-                <th className="px-4 py-3">Created time</th>
-                <th className="px-4 py-3">Cleared / expires</th>
-                <th className="px-4 py-3">Schedule</th>
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th>Notice title</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Created by</th>
+                <th>Created time</th>
+                <th>Cleared / expires</th>
+                <th>Schedule</th>
+                <th className="crossover-table__actions-col">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-admin-border">
+            <tbody>
               {history.length ? history.map((notice) => (
-                <tr key={notice.id} className="text-admin-muted">
-                  <td className="max-w-xs px-4 py-3 font-semibold text-white">{noticeHistoryTitle(notice)}</td>
-                  <td className="px-4 py-3"><PriorityBadge priority={notice.priority} /></td>
-                  <td className="px-4 py-3">{noticeStatus(notice)}</td>
-                  <td className="px-4 py-3">{notice.created_by ?? "admin"}</td>
-                  <td className="px-4 py-3">{formatDateTime(notice.created_at)}</td>
-                  <td className="px-4 py-3">{notice.cleared_at ? formatDateTime(notice.cleared_at) : formatDateTime(notice.expires_at)}</td>
-                  <td className="px-4 py-3">{scheduleLabel(notice)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
+                <tr key={notice.id}>
+                  <td className="max-w-xs crossover-table__emphasis">{noticeHistoryTitle(notice)}</td>
+                  <td><PriorityBadge priority={notice.priority} /></td>
+                  <td>{noticeStatus(notice)}</td>
+                  <td>{notice.created_by ?? "admin"}</td>
+                  <td>{formatDateTime(notice.created_at)}</td>
+                  <td>{notice.cleared_at ? formatDateTime(notice.cleared_at) : formatDateTime(notice.expires_at)}</td>
+                  <td>{scheduleLabel(notice)}</td>
+                  <td>
+                    <div className="crossover-row-actions">
                       <button type="button" className="admin-icon-btn" disabled={busy || !canManage} aria-label={`Push ${notice.title} again`} onClick={() => void pushAgain(notice)}>
                         <RotateCcw className="h-4 w-4" />
                       </button>
@@ -476,7 +476,7 @@ export function PushNoticesPanel() {
                 </tr>
               )) : (
                 <tr>
-                  <td className="px-4 py-8 text-center text-admin-muted" colSpan={8}>
+                  <td className="crossover-table__empty-row text-admin-muted" colSpan={8}>
                     No Push Notices have been created yet.
                   </td>
                 </tr>

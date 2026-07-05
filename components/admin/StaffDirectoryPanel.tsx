@@ -301,7 +301,7 @@ export function StaffDirectoryPanel() {
                 ))}
                 {!members.length ? (
                   <tr>
-                    <td className="px-4 py-8 text-center text-admin-muted" colSpan={canManageDirectory ? 7 : 6}>No staff members found.</td>
+                    <td className="crossover-table__empty-row text-admin-muted" colSpan={canManageDirectory ? 7 : 6}>No staff members found.</td>
                   </tr>
                 ) : null}
               </tbody>

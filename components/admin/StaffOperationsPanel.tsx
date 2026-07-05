@@ -717,7 +717,7 @@ function DesktopFollowUpTable({ rows, busy, onMutate, onDetail }: { rows: OwnerF
               </td>
             </tr>
           ))}
-          {!rows.length ? <tr><td className="crossover-table__muted px-4 py-8 text-center" colSpan={8}>No follow-ups found.</td></tr> : null}
+          {!rows.length ? <tr><td className="crossover-table__empty-row crossover-table__muted" colSpan={8}>No follow-ups found.</td></tr> : null}
         </tbody>
       </table>
     </div>
@@ -830,7 +830,7 @@ function DesktopIssuesTable({ rows, busy, onMutate, onDetail }: { rows: ActiveIs
               </td>
             </tr>
           ))}
-          {!rows.length ? <tr><td className="crossover-table__muted px-4 py-8 text-center" colSpan={9}>No active issues found.</td></tr> : null}
+          {!rows.length ? <tr><td className="crossover-table__empty-row crossover-table__muted" colSpan={9}>No active issues found.</td></tr> : null}
         </tbody>
       </table>
     </div>
