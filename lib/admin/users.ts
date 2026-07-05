@@ -115,9 +115,9 @@ export function canAccessPushNotices(role?: string | null) {
   return isFullAdminRole(role) || hasCoordinatorAccess(role);
 }
 
-/** Dog handler owner complaint push notice — admin and management only. */
+/** Owner complaint push notice — anyone with Push Notices access. */
 export function canCreateDogHandlerComplaintNotice(role?: string | null) {
-  return isFullAdminRole(role);
+  return canAccessPushNotices(role);
 }
 
 /** Management write-up reports — admin and management only. */

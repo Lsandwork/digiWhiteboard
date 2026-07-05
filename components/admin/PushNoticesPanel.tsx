@@ -5,11 +5,14 @@ import { BellRing, Pencil, Plus, RotateCcw, Send, ShieldAlert, Trash2, UserRound
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import { canAccessPushNotices, canCreateDogHandlerComplaintNotice, canViewManagementReports } from "@/lib/admin/users";
+import { canAccessPushNotices, canViewManagementReports } from "@/lib/admin/users";
 import type { ManagementReport } from "@/lib/staff/management-reports";
 import {
   DOG_HANDLER_COMPLAINT_NOTICE_LABEL,
+  getOwnerComplaintCategoryLabel,
   isDogHandlerComplaintNotice,
+  OWNER_COMPLAINT_CATEGORY_OPTIONS,
+  type OwnerComplaintCategory,
   type StaffPushNotice,
   type StaffPushNoticeDisplayMode,
   type StaffPushNoticePriority,
@@ -87,9 +90,11 @@ function scheduleLabel(notice: StaffPushNotice) {
 
 function noticeHistoryTitle(notice: StaffPushNotice) {
   if (isDogHandlerComplaintNotice(notice)) {
-    return notice.dog_handler_name
-      ? `${DOG_HANDLER_COMPLAINT_NOTICE_LABEL} — ${notice.dog_handler_name}`
-      : DOG_HANDLER_COMPLAINT_NOTICE_LABEL;
+    const category = getOwnerComplaintCategoryLabel(notice.complaint_category ?? null);
+    const handler = notice.dog_handler_name;
+    if (category && handler) return `${DOG_HANDLER_COMPLAINT_NOTICE_LABEL} — ${category} — ${handler}`;
+    if (handler) return `${DOG_HANDLER_COMPLAINT_NOTICE_LABEL} — ${handler}`;
+    return DOG_HANDLER_COMPLAINT_NOTICE_LABEL;
   }
   return notice.title;
 }
@@ -101,8 +106,10 @@ export function PushNoticesPanel() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
   const [quickPushDurationMinutes, setQuickPushDurationMinutes] = useState("5");
+  const [complaintCategory, setComplaintCategory] = useState<OwnerComplaintCategory>("on_phone");
   const [dogHandlerName, setDogHandlerName] = useState("");
   const [dogHandlerError, setDogHandlerError] = useState("");
+  const [complaintCategoryError, setComplaintCategoryError] = useState("");
   const [editingNotice, setEditingNotice] = useState<StaffPushNotice | null>(null);
   const [deleteNotice, setDeleteNotice] = useState<StaffPushNotice | null>(null);
 
@@ -126,7 +133,6 @@ export function PushNoticesPanel() {
   }, [load]);
 
   const canManage = canAccessPushNotices(data?.currentUser.role);
-  const canPushDogHandler = canCreateDogHandlerComplaintNotice(data?.currentUser.role);
   const canViewReports = canViewManagementReports(data?.currentUser.role);
   const history = useMemo(() => data?.notices ?? [], [data?.notices]);
   const managementReports = useMemo(() => data?.managementReports ?? [], [data?.managementReports]);
@@ -150,25 +156,31 @@ export function PushNoticesPanel() {
     }
   }
 
-  async function pushDogHandlerComplaint() {
+  async function pushOwnerComplaint() {
+    if (!complaintCategory) {
+      setComplaintCategoryError("Please select an owner complaint reason.");
+      return;
+    }
     const trimmed = dogHandlerName.trim();
     if (!trimmed) {
       setDogHandlerError("Please enter the dog handler name before pushing this notice.");
       return;
     }
     setDogHandlerError("");
+    setComplaintCategoryError("");
     await mutate(
-      "Unable to push dog handler complaint notice.",
+      "Unable to push owner complaint notice.",
       () => fetch("/api/admin/push-notices", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          action: "push_dog_handler_complaint",
+          action: "push_owner_complaint",
+          complaint_category: complaintCategory,
           dog_handler_name: trimmed,
           display_duration_minutes: quickPushDurationMinutes
         })
       }),
-      "Dog handler owner complaint notice pushed successfully."
+      "Owner complaint notice pushed to the Staff Digital Whiteboard."
     );
     setDogHandlerName("");
   }
@@ -305,7 +317,7 @@ export function PushNoticesPanel() {
         </div>
       </section>
 
-      {canPushDogHandler ? (
+      {canManage ? (
         <section className="push-notice-dog-handler-card crossover-card crossover-card--create p-5">
           <div className="crossover-card__header crossover-card__header--compact">
             <div className="crossover-card__header-main">
@@ -318,13 +330,30 @@ export function PushNoticesPanel() {
                   <span className="crossover-badge crossover-badge--urgent">Urgent</span>
                 </div>
                 <p className="crossover-card__subtitle">
-                  Sends a notice to the Staff Digital Whiteboard and creates a management write-up report.
+                  Push a handler-specific owner complaint to the Staff Digital Whiteboard and automatically notify management and admins.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+            <label className="grid gap-2">
+              <span className="admin-label">Complaint Reason</span>
+              <select
+                className={`crossover-input ${complaintCategoryError ? "push-notice-dog-handler-card__input--error" : ""}`}
+                value={complaintCategory}
+                disabled={busy}
+                onChange={(event) => {
+                  setComplaintCategory(event.target.value as OwnerComplaintCategory);
+                  if (complaintCategoryError) setComplaintCategoryError("");
+                }}
+              >
+                {OWNER_COMPLAINT_CATEGORY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              {complaintCategoryError ? <span className="push-notice-dog-handler-card__error">{complaintCategoryError}</span> : null}
+            </label>
             <label className="grid gap-2">
               <span className="admin-label">Dog Handler Name</span>
               <input
@@ -339,18 +368,20 @@ export function PushNoticesPanel() {
                 }}
               />
               {dogHandlerError ? <span className="push-notice-dog-handler-card__error">{dogHandlerError}</span> : null}
-              <span className="text-xs text-admin-muted">This creates an internal report for admin and management users.</span>
             </label>
             <button
               type="button"
               className="crossover-btn crossover-btn--primary inline-flex min-h-[3rem] items-center justify-center gap-2 px-6"
               disabled={busy}
-              onClick={() => void pushDogHandlerComplaint()}
+              onClick={() => void pushOwnerComplaint()}
             >
               <Send className="h-4 w-4" aria-hidden />
               {busy ? "Pushing…" : "Push Notice"}
             </button>
           </div>
+          <p className="mt-3 text-xs text-admin-muted">
+            Creates an automatic management report and sends an admin notification for review.
+          </p>
         </section>
       ) : null}
 
@@ -387,6 +418,9 @@ export function PushNoticesPanel() {
                   <>
                     <p className="mt-1 text-sm text-admin-muted">
                       Dog Handler: <span className="font-bold text-white">{report.dog_handler_name}</span>
+                      {report.complaint_category ? (
+                        <> • Reason: <span className="font-bold text-white">{getOwnerComplaintCategoryLabel(report.complaint_category)}</span></>
+                      ) : null}
                     </p>
                     <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
                   </>
@@ -619,6 +653,11 @@ function ActiveNoticePreview({ notice }: { notice: StaffPushNotice }) {
       <h4 className="text-2xl font-black uppercase leading-tight text-white">
         {isDogHandlerComplaintNotice(notice) ? DOG_HANDLER_COMPLAINT_NOTICE_LABEL : notice.title}
       </h4>
+      {isDogHandlerComplaintNotice(notice) && notice.complaint_category ? (
+        <p className="mt-2 text-lg font-bold text-amber-200">
+          Reason: {getOwnerComplaintCategoryLabel(notice.complaint_category)}
+        </p>
+      ) : null}
       {isDogHandlerComplaintNotice(notice) && notice.dog_handler_name ? (
         <p className="mt-2 text-lg font-bold text-amber-200">Dog Handler: {notice.dog_handler_name}</p>
       ) : null}

@@ -2,10 +2,14 @@
 
 import { AlertTriangle, MapPinOff, PawPrint, PhoneOff, UserRound } from "lucide-react";
 import { useStaffPushNoticeAlarm } from "@/hooks/useStaffPushNoticeAlarm";
-import { isDogHandlerComplaintNotice, type StaffPushNotice } from "@/lib/staff/push-notices";
+import { isDogHandlerComplaintNotice, getOwnerComplaintCategoryLabel, type StaffPushNotice } from "@/lib/staff/push-notices";
 
 function NoticeIcon({ notice }: { notice: StaffPushNotice }) {
-  if (isDogHandlerComplaintNotice(notice)) return <UserRound />;
+  if (isDogHandlerComplaintNotice(notice)) {
+    if (notice.complaint_category === "on_phone") return <PhoneOff />;
+    if (notice.complaint_category === "yard_dirty") return <MapPinOff />;
+    return <UserRound />;
+  }
   const title = notice.title.toLowerCase();
   if (title.includes("phone")) return <PhoneOff />;
   if (title.includes("yard")) return <MapPinOff />;
@@ -47,6 +51,11 @@ function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice
       </div>
       <p className="staff-push-notice__eyebrow">{isDogHandler ? "Owner Complaint Alert" : "Yard Handler Alert"}</p>
       <h2 className="staff-push-notice__title">{notice.title}</h2>
+      {isDogHandler && notice.complaint_category ? (
+        <p className="staff-push-notice__handler-name">
+          Reason: <span>{getOwnerComplaintCategoryLabel(notice.complaint_category)}</span>
+        </p>
+      ) : null}
       {isDogHandler && notice.dog_handler_name ? (
         <p className="staff-push-notice__handler-name">
           Dog Handler: <span>{notice.dog_handler_name}</span>

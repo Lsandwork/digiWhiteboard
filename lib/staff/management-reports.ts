@@ -1,5 +1,8 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import type { OwnerComplaintCategory } from "@/lib/staff/push-notices";
+import { getOwnerComplaintCategoryLabel } from "@/lib/staff/push-notices";
+
 export type ManagementReportStatus = "Open" | "Needs Review" | "Reviewed" | "Closed";
 
 export type ManagementReportType = "owner_complaint_dog_handler" | "employee_write_up";
@@ -23,6 +26,7 @@ export type ManagementReport = {
   report_type: ManagementReportType;
   title: string;
   dog_handler_name: string | null;
+  complaint_category: OwnerComplaintCategory | null;
   employee_name: string | null;
   summary: string;
   write_up_details: EmployeeWriteUpDetails | null;
@@ -68,6 +72,7 @@ function normalizeReport(report: ManagementReport): ManagementReport {
   return {
     ...report,
     dog_handler_name: report.dog_handler_name ?? null,
+    complaint_category: report.complaint_category ?? null,
     employee_name: report.employee_name ?? (report.write_up_details?.employee_name ?? null),
     write_up_details: report.write_up_details ?? null
   };
@@ -146,6 +151,7 @@ export async function createDogHandlerComplaintReport(
   supabase: SupabaseClient,
   input: {
     dogHandlerName: string;
+    complaintCategory: OwnerComplaintCategory;
     summary: string;
     pushNoticeId: string;
     actor: string | null;
@@ -153,14 +159,16 @@ export async function createDogHandlerComplaintReport(
 ): Promise<ManagementReport> {
   const dog_handler_name = input.dogHandlerName.trim().slice(0, MAX_NAME_LENGTH);
   const summary = input.summary.trim().slice(0, MAX_SUMMARY_LENGTH);
+  const categoryLabel = getOwnerComplaintCategoryLabel(input.complaintCategory) ?? "Owner Complaint";
   if (!dog_handler_name) throw new Error("Dog handler name is required.");
 
   const now = new Date().toISOString();
   const report: ManagementReport = {
     id: newId(),
     report_type: "owner_complaint_dog_handler",
-    title: "Owner Complaint - Dog Handler",
+    title: `Owner Complaint — ${categoryLabel}`,
     dog_handler_name,
+    complaint_category: input.complaintCategory,
     employee_name: null,
     summary,
     write_up_details: null,
@@ -231,6 +239,7 @@ export async function createEmployeeWriteUpReport(
     report_type: "employee_write_up",
     title: `Employee Write-Up — ${employee_name}`,
     dog_handler_name: null,
+    complaint_category: null,
     employee_name,
     summary: summary.slice(0, MAX_SUMMARY_LENGTH),
     write_up_details,

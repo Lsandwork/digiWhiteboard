@@ -468,6 +468,15 @@ export async function appendStaffOpsActivityEntries(
   await saveState(supabase, state);
 }
 
+export async function dispatchStaffOpsNotificationEvent(
+  supabase: SupabaseClient,
+  event: StaffOpsNotificationEvent
+) {
+  let state = await loadState(supabase);
+  state = notifyState(state, event);
+  await saveState(supabase, state);
+}
+
 export function createActivityLog(state: StaffOpsState, input: Omit<StaffActivityLog, "id" | "created_at">) {
   return {
     ...state,

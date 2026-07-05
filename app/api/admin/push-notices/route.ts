@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
-import { canAccessManagementReports, canManagePushNotices, canPushDogHandlerComplaintNotice, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canAccessManagementReports, canManagePushNotices, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { appendStaffOpsActivityEntries } from "@/lib/staff/admin-ops";
+import { appendStaffOpsActivityEntries, dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
 import { createDogHandlerComplaintReport, listManagementReports } from "@/lib/staff/management-reports";
 import {
-  buildDogHandlerComplaintNoticeInput,
+  buildOwnerComplaintNoticeInput,
   clearActiveStaffPushNotice,
   createAndPushStaffNotice,
   createStaffPushNotice,
   DEFAULT_STAFF_PUSH_NOTICES,
-  DOG_HANDLER_COMPLAINT_MESSAGE,
+  getOwnerComplaintCategoryLabel,
   listStaffPushNotices,
   loadActiveStaffPushNotice,
+  normalizeOwnerComplaintCategory,
+  OWNER_COMPLAINT_CATEGORIES,
   pushStaffNoticeById,
   sanitizeDogHandlerName
 } from "@/lib/staff/push-notices";
@@ -86,9 +88,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, activeNotice: null });
     }
 
-    if (action === "push_dog_handler_complaint") {
-      if (!canPushDogHandlerComplaintNotice(session?.role)) {
-        return NextResponse.json({ error: "You do not have permission to push this notice." }, { status: 403 });
+    if (action === "push_dog_handler_complaint" || action === "push_owner_complaint") {
+      const complaintCategory = normalizeOwnerComplaintCategory(body.complaint_category);
+      if (!complaintCategory) {
+        return NextResponse.json({ error: "Please select an owner complaint reason before pushing this notice." }, { status: 400 });
       }
 
       const dogHandlerName = sanitizeDogHandlerName(body.dog_handler_name);
@@ -96,45 +99,65 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Please enter the dog handler name before pushing this notice." }, { status: 400 });
       }
 
+      const category = OWNER_COMPLAINT_CATEGORIES[complaintCategory];
       const notice = await createAndPushStaffNotice(
         supabase,
-        buildDogHandlerComplaintNoticeInput(dogHandlerName, body.display_duration_minutes),
+        buildOwnerComplaintNoticeInput(complaintCategory, dogHandlerName, body.display_duration_minutes),
         actor
       );
 
+      const reportSummary = `${category.label}: ${category.message} Handler: ${dogHandlerName}. Management review required.`;
       const report = await createDogHandlerComplaintReport(supabase, {
         dogHandlerName,
-        summary: DOG_HANDLER_COMPLAINT_MESSAGE,
+        complaintCategory,
+        summary: reportSummary,
         pushNoticeId: notice.id,
         actor
       });
 
       await appendStaffOpsActivityEntries(supabase, [
         {
-          activity_type: "push_notice.dog_handler",
-          title: `Owner Complaint - Dog Handler notice pushed for ${dogHandlerName}.`,
-          description: DOG_HANDLER_COMPLAINT_MESSAGE,
+          activity_type: "push_notice.owner_complaint",
+          title: `Owner Complaint (${category.label}) pushed for ${dogHandlerName}.`,
+          description: reportSummary,
           source_table: "staff_push_notices",
           source_id: notice.id,
           created_by: actor
         },
         {
           activity_type: "management_report.created",
-          title: `Management report created for Owner Complaint - Dog Handler: ${dogHandlerName}.`,
-          description: "Employee write-up documentation report opened for admin review.",
+          title: `Management report created for Owner Complaint (${category.label}): ${dogHandlerName}.`,
+          description: "Owner complaint report opened for admin and management review.",
           source_table: "management_reports",
           source_id: report.id,
           created_by: actor
         }
       ]);
 
+      await dispatchStaffOpsNotificationEvent(supabase, {
+        eventType: "auto_issue",
+        sourceTable: "management_reports",
+        sourceId: report.id,
+        sourceTab: "push_notices",
+        title: `Owner Complaint — ${category.label}: ${dogHandlerName}`,
+        body: reportSummary,
+        priority: "Urgent",
+        urgent: true,
+        needsManagementReview: true,
+        actor
+      });
+
       await writeAdminAuditLog({
         actorAdminId: session?.adminUserId,
         actorEmail: session?.email,
-        action: "staff.push_notice.push_dog_handler_complaint",
+        action: "staff.push_notice.push_owner_complaint",
         targetType: "staff_push_notice",
         targetId: notice.id,
-        details: { dog_handler_name: dogHandlerName, report_id: report.id }
+        details: {
+          dog_handler_name: dogHandlerName,
+          complaint_category: complaintCategory,
+          report_id: report.id
+        }
       });
 
       return NextResponse.json({ notice, report });

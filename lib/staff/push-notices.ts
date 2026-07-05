@@ -5,6 +5,34 @@ export type StaffPushNoticeDisplayMode = "normal" | "urgent";
 export type StaffPushNoticeRecurrence = "none" | "day" | "week" | "month";
 export type StaffPushNoticeType = "standard" | "owner_complaint_dog_handler";
 
+export type OwnerComplaintCategory = "on_phone" | "yard_dirty" | "not_engaged" | "handling_concern";
+
+export const OWNER_COMPLAINT_CATEGORIES: Record<
+  OwnerComplaintCategory,
+  { label: string; message: string }
+> = {
+  on_phone: {
+    label: "On Phone",
+    message: "Keep phones away while supervising dogs unless required for work."
+  },
+  yard_dirty: {
+    label: "Yard Dirty",
+    message: "Confirm the yard is clean, safe, and ready for dogs."
+  },
+  not_engaged: {
+    label: "Not Engaged",
+    message: "Please actively engage with dogs and keep the yard attentive."
+  },
+  handling_concern: {
+    label: "Handling Concern",
+    message: "Review dog handling practices with management."
+  }
+};
+
+export const OWNER_COMPLAINT_CATEGORY_OPTIONS = Object.entries(OWNER_COMPLAINT_CATEGORIES).map(
+  ([value, meta]) => ({ value: value as OwnerComplaintCategory, label: meta.label })
+);
+
 export type StaffPushNotice = {
   id: string;
   title: string;
@@ -14,6 +42,7 @@ export type StaffPushNotice = {
   is_active: boolean;
   is_default: boolean;
   notice_type?: StaffPushNoticeType;
+  complaint_category?: OwnerComplaintCategory | null;
   dog_handler_name?: string | null;
   created_by: string | null;
   updated_by: string | null;
@@ -38,16 +67,29 @@ export type StaffPushNoticeInput = {
   display_duration_minutes?: unknown;
   is_default?: unknown;
   notice_type?: unknown;
+  complaint_category?: unknown;
   dog_handler_name?: unknown;
   schedule_enabled?: unknown;
   scheduled_at?: unknown;
   recurrence?: unknown;
 };
 
-export const DOG_HANDLER_COMPLAINT_NOTICE_LABEL = "OWNER COMPLAINT - Dog Handler";
+export const DOG_HANDLER_COMPLAINT_NOTICE_LABEL = "Owner Complaint";
 export const DOG_HANDLER_COMPLAINT_WHITEBOARD_TITLE = "OWNER COMPLAINT";
 export const DOG_HANDLER_COMPLAINT_MESSAGE =
   "Owner complaint involving dog handler. Management review required.";
+
+export function getOwnerComplaintCategoryLabel(category?: OwnerComplaintCategory | null) {
+  if (!category) return null;
+  return OWNER_COMPLAINT_CATEGORIES[category]?.label ?? null;
+}
+
+export function normalizeOwnerComplaintCategory(value: unknown): OwnerComplaintCategory | null {
+  if (value === "on_phone" || value === "yard_dirty" || value === "not_engaged" || value === "handling_concern") {
+    return value;
+  }
+  return null;
+}
 
 const MAX_DOG_HANDLER_NAME_LENGTH = 80;
 
@@ -63,20 +105,31 @@ export function isDogHandlerComplaintNotice(notice: Pick<StaffPushNotice, "notic
   return notice.notice_type === "owner_complaint_dog_handler";
 }
 
-export function buildDogHandlerComplaintNoticeInput(
+export function buildOwnerComplaintNoticeInput(
+  complaintCategory: OwnerComplaintCategory,
   dogHandlerName: string,
   displayDurationMinutes?: unknown
 ): StaffPushNoticeInput {
+  const category = OWNER_COMPLAINT_CATEGORIES[complaintCategory];
   return {
     title: DOG_HANDLER_COMPLAINT_WHITEBOARD_TITLE,
-    message: DOG_HANDLER_COMPLAINT_MESSAGE,
+    message: `${category.label}: ${category.message}`,
     priority: "urgent",
     display_mode: "urgent",
     notice_type: "owner_complaint_dog_handler",
+    complaint_category: complaintCategory,
     dog_handler_name: dogHandlerName,
     display_duration_minutes: displayDurationMinutes,
     is_default: false
   };
+}
+
+export function buildDogHandlerComplaintNoticeInput(
+  dogHandlerName: string,
+  displayDurationMinutes?: unknown,
+  complaintCategory: OwnerComplaintCategory = "handling_concern"
+): StaffPushNoticeInput {
+  return buildOwnerComplaintNoticeInput(complaintCategory, dogHandlerName, displayDurationMinutes);
 }
 
 export const DEFAULT_STAFF_PUSH_NOTICES: readonly Pick<
@@ -202,7 +255,12 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
   }
 
   const notice_type = normalizeNoticeType(input.notice_type);
+  const complaint_category = normalizeOwnerComplaintCategory(input.complaint_category);
   const dog_handler_name = normalizeDogHandlerName(input.dog_handler_name);
+
+  if (notice_type === "owner_complaint_dog_handler" && !complaint_category) {
+    throw new Error("Please select an owner complaint reason before pushing this notice.");
+  }
 
   if (notice_type === "owner_complaint_dog_handler" && !dog_handler_name) {
     throw new Error("Please enter the dog handler name before pushing this notice.");
@@ -217,6 +275,7 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
     display_duration_minutes,
     is_default: Boolean(input.is_default),
     notice_type,
+    complaint_category,
     dog_handler_name,
     schedule_enabled,
     scheduled_at,
