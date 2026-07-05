@@ -6,6 +6,7 @@ import type { AdminTab } from "@/lib/admin/types";
 import {
   filterNotificationsForUser,
   notificationReaderKey,
+  notificationsForSession,
   type StaffNotification
 } from "@/lib/staff/notifications";
 import type { StaffOpsState } from "@/lib/staff/admin-ops";
@@ -16,6 +17,7 @@ type NotificationsPayload = StaffOpsState & {
 
 type NotificationsPanelProps = {
   onOpenTab?: (tab: AdminTab) => void;
+  personalOnly?: boolean;
 };
 
 function priorityClass(priority: StaffNotification["priority"]) {
@@ -56,7 +58,7 @@ function typeLabel(type: StaffNotification["type"]) {
   }
 }
 
-export function NotificationsPanel({ onOpenTab }: NotificationsPanelProps) {
+export function NotificationsPanel({ onOpenTab, personalOnly = false }: NotificationsPanelProps) {
   const [data, setData] = useState<NotificationsPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -86,17 +88,22 @@ export function NotificationsPanel({ onOpenTab }: NotificationsPanelProps) {
 
   const visible = useMemo(() => {
     if (!data) return [];
-    const items = filterNotificationsForUser(data, data.currentUser);
+    const items = personalOnly
+      ? notificationsForSession(data, data.currentUser)
+      : filterNotificationsForUser(data, data.currentUser);
     if (filter === "unread") {
       return items.filter((notification) => !notification.read_by.includes(readerKey));
     }
     return items;
-  }, [data, filter, readerKey]);
+  }, [data, filter, personalOnly, readerKey]);
 
   const unreadCount = useMemo(() => {
     if (!data) return 0;
-    return filterNotificationsForUser(data, data.currentUser).filter((notification) => !notification.read_by.includes(readerKey)).length;
-  }, [data, readerKey]);
+    const items = personalOnly
+      ? notificationsForSession(data, data.currentUser)
+      : filterNotificationsForUser(data, data.currentUser);
+    return items.filter((notification) => !notification.read_by.includes(readerKey)).length;
+  }, [data, personalOnly, readerKey]);
 
   async function mutate(action: string, payload: Record<string, unknown> = {}) {
     setBusy(true);
@@ -137,7 +144,9 @@ export function NotificationsPanel({ onOpenTab }: NotificationsPanelProps) {
               {unreadCount > 0 ? <span className="crossover-badge crossover-badge--urgent">{unreadCount} unread</span> : null}
             </div>
             <p className="crossover-dashboard__page-subtitle max-w-2xl">
-              Alerts for crossover updates, assignments, @mentions, and urgent escalations. Front Desk Coordinators and Team Lead staff see all staff updates; High and Urgent items also alert Admins.
+              {personalOnly
+                ? "Personal alerts assigned directly to you, including @mentions and individual assignments."
+                : "Alerts for crossover updates, assignments, @mentions, and urgent escalations. Front Desk Coordinators and Team Lead staff see all staff updates; High and Urgent items also alert Admins."}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">

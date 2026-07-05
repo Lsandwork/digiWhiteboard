@@ -13,7 +13,7 @@ export function YardLinksPanel() {
             <Video className="h-6 w-6" aria-hidden />
           </div>
           <div>
-            <h2 className="crossover-dashboard__page-title">Yard Links</h2>
+            <h2 className="crossover-dashboard__page-title">Video Links</h2>
             <p className="crossover-dashboard__page-subtitle">Quick access to live yard video links.</p>
           </div>
         </div>

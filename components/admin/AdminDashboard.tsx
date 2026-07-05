@@ -22,6 +22,8 @@ import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
 import { YardLinksPanel } from "@/components/admin/YardLinksPanel";
+import { ManagementSupportPanel } from "@/components/admin/ManagementSupportPanel";
+import { AdminProfilePage } from "@/components/admin/AdminProfilePage";
 import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -38,6 +40,7 @@ import {
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
+import { isTeamLeaderRole } from "@/lib/admin/users";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 
 const defaultStaff: StaffBoardSettings = {
@@ -108,6 +111,13 @@ export function AdminDashboard() {
       window.clearInterval(timer);
     };
   }, []);
+
+  useEffect(() => {
+    const role = data?.session?.role;
+    if (isTeamLeaderRole(role) && board !== "staff") {
+      router.replace(`/admin?board=staff&tab=${tab}`);
+    }
+  }, [board, data?.session?.role, router, tab]);
 
   useEffect(() => {
     const role = data?.session?.role;
@@ -239,7 +249,8 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "grooming_push", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
+  const showPreview = !["settings", "push_notices", "grooming_push", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
+  const isTeamLeadPanel = isTeamLeaderRole(currentRole);
 
   const preview = (
     <div className="space-y-4">
@@ -370,6 +381,8 @@ export function AdminDashboard() {
 
         {tab === "yard_links" ? <YardLinksPanel /> : null}
 
+        {tab === "management_support" ? <ManagementSupportPanel /> : null}
+
         {tab === "analytics" ? (
           <section className="admin-card p-5">
             <h2 className="admin-page-title">Analytics</h2>
@@ -391,7 +404,7 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "notifications" ? (
-          <NotificationsPanel onOpenTab={(nextTab) => setActiveTab(nextTab)} />
+          <NotificationsPanel personalOnly={isTeamLeadPanel} onOpenTab={(nextTab) => setActiveTab(nextTab)} />
         ) : null}
 
         {tab === "staff_directory" ? (
@@ -399,14 +412,18 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "settings" ? (
-          <AdminSettingsPage
-            settings={adminSettings}
-            lastSyncedAt={data.last_synced_at}
-            dataSource={data.data_source}
-            onSaved={(settings) => setData({ ...data, admin_settings: settings })}
-            onRefresh={() => load(true)}
-            onResetBoard={() => resetSettings()}
-          />
+          isTeamLeadPanel ? (
+            <AdminProfilePage username={data.username} role={currentRole} displayLabel={displayLabel} />
+          ) : (
+            <AdminSettingsPage
+              settings={adminSettings}
+              lastSyncedAt={data.last_synced_at}
+              dataSource={data.data_source}
+              onSaved={(settings) => setData({ ...data, admin_settings: settings })}
+              onRefresh={() => load(true)}
+              onResetBoard={() => resetSettings()}
+            />
+          )
         ) : null}
 
         {tab === "logs" ? (

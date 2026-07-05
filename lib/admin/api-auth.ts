@@ -6,7 +6,9 @@ import {
   canAccessPushNotices,
   canCreateDogHandlerComplaintNotice,
   canManageStaffDirectory,
+  canSubmitWriteUp as userCanSubmitWriteUp,
   canViewManagementReports,
+  canViewOwnWriteUps as userCanViewOwnWriteUps,
   canViewStaffDirectory,
   hasCoordinatorAccess
 } from "@/lib/admin/users";
@@ -69,6 +71,14 @@ export function canClearGroomingRequest(role?: string | null) {
 
 export function canAccessManagementReports(role?: string | null) {
   return canViewManagementReports(role) || !role;
+}
+
+export function canSubmitWriteUp(role?: string | null) {
+  return userCanSubmitWriteUp(role) || !role;
+}
+
+export function canViewOwnWriteUps(role?: string | null) {
+  return userCanViewOwnWriteUps(role) || !role;
 }
 
 export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

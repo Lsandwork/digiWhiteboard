@@ -63,6 +63,14 @@ export function isStaffOpsLimitedRole(role?: string | null) {
   return role === "front_desk_coordinator" || role === "team_leader";
 }
 
+export function isTeamLeaderRole(role?: string | null) {
+  return role === "team_leader";
+}
+
+export function isFrontDeskCoordinatorRole(role?: string | null) {
+  return role === "front_desk_coordinator";
+}
+
 export function isCrossoverStaffRole(role?: string | null) {
   return role === "groomer" || role === "trainer";
 }
@@ -115,6 +123,16 @@ export function canCreateDogHandlerComplaintNotice(role?: string | null) {
 /** Management write-up reports — admin and management only. */
 export function canViewManagementReports(role?: string | null) {
   return isFullAdminRole(role);
+}
+
+/** Team leads can submit employee write-ups for management review. */
+export function canSubmitWriteUp(role?: string | null) {
+  return role === "team_leader";
+}
+
+/** Team leads can review status of their own submitted write-ups. */
+export function canViewOwnWriteUps(role?: string | null) {
+  return role === "team_leader";
 }
 
 export function isStaffPanelLimitedRole(role?: string | null) {

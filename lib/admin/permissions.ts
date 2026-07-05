@@ -32,7 +32,10 @@ export type PermissionKey =
   | "view_integration_status"
   | "manage_templates"
   | "receive_admin_alerts"
-  | "manage_staff_directory";
+  | "manage_staff_directory"
+  | "submit_write_up"
+  | "view_own_write_ups"
+  | "review_write_ups";
 
 export type RoleKey =
   | "super_admin"
@@ -132,7 +135,10 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_integration_status",
   "manage_templates",
   "receive_admin_alerts",
-  "manage_staff_directory"
+  "manage_staff_directory",
+  "submit_write_up",
+  "view_own_write_ups",
+  "review_write_ups"
 ] as const satisfies readonly PermissionKey[]);
 
 const COORDINATOR_PERMISSIONS: PermissionKey[] = [
@@ -198,12 +204,35 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   "edit_front_desk_log"
 ];
 
+/** Team Lead DigiBoard panel — push, grooming, front desk log, video links, notifications, write-ups, profile. */
+const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
+  "view_admin_panel",
+  "manage_push_notices",
+  "push_grooming_request",
+  "clear_grooming_request",
+  "view_front_desk_log",
+  "create_front_desk_log",
+  "edit_front_desk_log",
+  "submit_write_up",
+  "view_own_write_ups"
+];
+
+export const TEAM_LEADER_TABS = [
+  "push_notices",
+  "grooming_push",
+  "crossover_communication",
+  "yard_links",
+  "notifications",
+  "management_support",
+  "settings"
+] as const;
+
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: [...ALL_PERMISSIONS],
-  management: MANAGEMENT_PERMISSIONS,
+  management: [...MANAGEMENT_PERMISSIONS, "review_write_ups"],
   front_desk_coordinator: COORDINATOR_PERMISSIONS,
-  team_leader: COORDINATOR_PERMISSIONS,
+  team_leader: TEAM_LEADER_PERMISSIONS,
   groomer: GROOMER_TRAINER_PERMISSIONS,
   trainer: GROOMER_TRAINER_PERMISSIONS,
   daycare: STAFF_VIEWER_PERMISSIONS,
@@ -334,6 +363,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   staff_directory: "view_staff_directory",
   users: "manage_staff_users",
   integrations: "view_integration_status",
+  management_support: "submit_write_up",
   settings: "view_admin_panel",
   help: "view_admin_panel"
 };
@@ -405,6 +435,10 @@ const LOBBY_ONLY_TABS = new Set([
   "logs"
 ]);
 
+export function isTeamLeaderLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "team_leader";
+}
+
 export function canAccessAdminTab(
   access: UserAccess | null | undefined,
   tab: string,
@@ -412,6 +446,11 @@ export function canAccessAdminTab(
   board: "lobby" | "staff" = "lobby"
 ): boolean {
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+
+  if (isTeamLeaderLegacyRole(legacyRole)) {
+    if (board !== "staff") return false;
+    return (TEAM_LEADER_TABS as readonly string[]).includes(tab);
+  }
 
   if (board === "staff" && (tab === "promotions" || tab === "schedule" || tab === "users")) {
     return false;
@@ -447,6 +486,13 @@ export function firstAccessibleAdminTab(
   legacyRole?: string | null,
   board: "lobby" | "staff" = "staff"
 ): string {
+  if (isTeamLeaderLegacyRole(legacyRole) && board === "staff") {
+    for (const tab of TEAM_LEADER_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+    }
+    return "push_notices";
+  }
+
   const tabs =
     board === "staff"
       ? [

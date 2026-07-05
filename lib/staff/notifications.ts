@@ -3,7 +3,8 @@ import {
   canAccessCrossoverCommunication,
   isCrossoverStaffRole,
   isFullAdminRole,
-  isStaffOpsLimitedRole
+  isStaffOpsLimitedRole,
+  isTeamLeaderRole
 } from "@/lib/admin/users";
 import type { StaffDirectoryMember, StaffOpsPriority, StaffOpsState } from "@/lib/staff/admin-ops";
 
@@ -164,12 +165,32 @@ export function filterNotificationsForUser(
   );
 }
 
+/** Team leads only see notifications directly assigned to them (not coordinator or department pools). */
+export function filterPersonalNotificationsForUser(
+  state: StaffOpsState,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  return filterNotificationsForUser(state, session).filter((notification) => {
+    if (notification.target.kind === "staff_email" || notification.target.kind === "staff_name") return true;
+    if (notification.target.kind === "admin_pool" && isFullAdminRole(session.role)) return true;
+    return false;
+  });
+}
+
+export function notificationsForSession(
+  state: StaffOpsState,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  if (isTeamLeaderRole(session.role)) return filterPersonalNotificationsForUser(state, session);
+  return filterNotificationsForUser(state, session);
+}
+
 export function countUnreadNotifications(
   state: StaffOpsState,
   session: { email?: string | null; adminUserId?: string | null; role?: string | null }
 ) {
   const readerKey = notificationReaderKey(session.email, session.adminUserId);
-  return filterNotificationsForUser(state, session).filter((notification) => !notification.read_by.includes(readerKey)).length;
+  return notificationsForSession(state, session).filter((notification) => !notification.read_by.includes(readerKey)).length;
 }
 
 function buildNotification(event: StaffOpsNotificationEvent, target: StaffNotificationTarget, type: StaffNotificationType): StaffNotification {

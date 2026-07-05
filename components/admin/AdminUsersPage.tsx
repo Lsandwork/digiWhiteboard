@@ -36,7 +36,7 @@ const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "admin", description: "Manage users, integrations, and day-to-day admin tools." },
   { value: "management", description: "View and assign staff operations; receive management alerts." },
   { value: "front_desk_coordinator", description: "Push Notices, Front Desk Log, Owner Follow Up, Active Issues." },
-  { value: "team_leader", description: "Same operational access as Front Desk Coordinator." },
+  { value: "team_leader", description: "Team Lead DigiBoard panel: push notices, grooming push, front desk log, video links, personal notifications, write-ups, and profile settings." },
   { value: "groomer", description: "Grooming department crossover notifications." },
   { value: "trainer", description: "Training department crossover notifications." },
   { value: "daycare", description: "Daycare staff board access." },

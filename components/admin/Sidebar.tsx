@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
-import { getAdminSidebarRoleLabel } from "@/lib/admin/users";
+import { getAdminSidebarRoleLabel, isTeamLeaderRole } from "@/lib/admin/users";
 
 const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -37,7 +37,8 @@ const navItems: { id: AdminTab; label: string; icon: React.ReactNode }[] = [
   { id: "owner_follow_up", label: "Owner Follow Up", icon: <Users className="h-4 w-4" /> },
   { id: "active_issues", label: "Active Issues", icon: <ShieldAlert className="h-4 w-4" /> },
   { id: "whiteboard_preview", label: "Whiteboard Preview", icon: <ClipboardList className="h-4 w-4" /> },
-  { id: "yard_links", label: "Yard Links", icon: <Video className="h-4 w-4" /> },
+  { id: "yard_links", label: "Video Links", icon: <Video className="h-4 w-4" /> },
+  { id: "management_support", label: "Management Support", icon: <ClipboardList className="h-4 w-4" /> },
   { id: "analytics", label: "Analytics", icon: <ChartNoAxesColumn className="h-4 w-4" /> },
   { id: "templates", label: "Templates", icon: <FileText className="h-4 w-4" /> },
   { id: "notifications", label: "Notifications", icon: <InboxIcon /> },
@@ -61,7 +62,8 @@ const tabLabels: Record<AdminTab, string> = {
   owner_follow_up: "Owner Follow Up",
   active_issues: "Active Issues",
   whiteboard_preview: "Whiteboard Preview",
-  yard_links: "Yard Links",
+  yard_links: "Video Links",
+  management_support: "Management Support",
   analytics: "Analytics",
   templates: "Templates",
   notifications: "Notifications",
@@ -97,6 +99,7 @@ type SidebarProps = {
 export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
   const visibleNavItems = navItems.filter((item) => visibleTabs.includes(item.id));
   const roleLabel = displayLabel ?? getAdminSidebarRoleLabel(role, username);
+  const panelTitle = isTeamLeaderRole(role) ? "Team Lead Panel" : "fitdog";
 
   return (
     <>
@@ -105,7 +108,7 @@ export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, o
         <div className="flex items-center justify-between gap-3 px-4 py-5">
           <div className="flex items-center gap-3">
             <Image src="/assets/fitdog-lobby-whiteboard/01-brand/logo/fitdog-logo-circle-badge-512.png" alt="Fitdog" width={40} height={40} className="rounded-full" />
-            <span className="text-lg font-black tracking-wide text-white">fitdog</span>
+            <span className="text-lg font-black tracking-wide text-white">{panelTitle}</span>
           </div>
           <button type="button" className="admin-icon-btn admin-sidebar-close" onClick={onMobileClose} aria-label="Close navigation">
             <X className="h-4 w-4" />
@@ -130,16 +133,18 @@ export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, o
         </nav>
 
         <div className="space-y-3 p-4">
-          <div className="admin-sidebar-help-card rounded-xl p-4">
-            <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
-              <HelpCircle className="h-4 w-4 text-fitdog-orange" />
-              Need help?
+          {!isTeamLeaderRole(role) ? (
+            <div className="admin-sidebar-help-card rounded-xl p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
+                <HelpCircle className="h-4 w-4 text-fitdog-orange" />
+                Need help?
+              </div>
+              <p className="text-xs text-admin-muted">Search setup guides for lobby board, staff board, and admin tools.</p>
+              <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : onTabChange("help"))}>
+                Open Help Center
+              </button>
             </div>
-            <p className="text-xs text-admin-muted">Search setup guides for lobby board, staff board, and admin tools.</p>
-            <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : onTabChange("help"))}>
-              Open Help Center
-            </button>
-          </div>
+          ) : null}
 
           <div className="flex items-center justify-between rounded-xl border border-admin-border px-3 py-2">
             <div>

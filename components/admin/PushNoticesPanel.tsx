@@ -371,12 +371,28 @@ export function PushNoticesPanel() {
                   <span className="text-xs text-admin-muted">{formatDateTime(report.created_at)}</span>
                 </div>
                 <h4 className="mt-2 font-black text-white">{report.title}</h4>
-                <p className="mt-1 text-sm text-admin-muted">
-                  Dog Handler: <span className="font-bold text-white">{report.dog_handler_name}</span>
-                </p>
-                <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
+                {report.report_type === "employee_write_up" ? (
+                  <>
+                    <p className="mt-1 text-sm text-admin-muted">
+                      Employee: <span className="font-bold text-white">{report.employee_name ?? report.write_up_details?.employee_name}</span>
+                      {report.write_up_details?.employee_department ? ` (${report.write_up_details.employee_department})` : ""}
+                    </p>
+                    {report.write_up_details?.incident_description ? (
+                      <p className="mt-2 text-sm text-admin-muted">{report.write_up_details.incident_description}</p>
+                    ) : (
+                      <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm text-admin-muted">
+                      Dog Handler: <span className="font-bold text-white">{report.dog_handler_name}</span>
+                    </p>
+                    <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
+                  </>
+                )}
                 <p className="mt-2 text-xs text-admin-muted">
-                  Created by {report.created_by ?? "admin"} • Source: {report.source.replace("_", " ")}
+                  Created by {report.created_by ?? "admin"} • Source: {report.source.replace(/_/g, " ")}
                 </p>
               </article>
             )) : (
