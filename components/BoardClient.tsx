@@ -14,6 +14,7 @@ import {
   StaffPushNoticeTvOverlay
 } from "@/components/board/StaffPushNotice";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
+import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
 import { useGroomingPushNotices } from "@/hooks/useGroomingPushNotices";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
@@ -113,6 +114,8 @@ export function BoardClient() {
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
   const activePushNotice = useStaffPushNotice();
   const { activeNotice: activeGroomingNotice, queue: groomingQueue } = useGroomingPushNotices();
+  const activeAlertKey = activeGroomingNotice?.id ?? activePushNotice?.id ?? null;
+  useFitdogAlertSound(activeAlertKey);
   const {
     isCasting,
     castError,

@@ -1,99 +1,58 @@
-const REPEAT_MS = 120000;
+export const FITDOG_ALERT_SOUND_URL = "/assets/fitdog/audio/fitdog-alert.wav";
 
-const DOT_MS = 90;
-const DOT_GAP_MS = 140;
-const GROUP_GAP_MS = 520;
-
-let audioContext: AudioContext | null = null;
-let repeatTimer: number | null = null;
+let audio: HTMLAudioElement | null = null;
 let unlocked = false;
 
-function getAudioContext() {
+function getAlertAudio() {
   if (typeof window === "undefined") return null;
-  const Ctx = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!Ctx) return null;
-  if (!audioContext) audioContext = new Ctx();
-  return audioContext;
-}
-
-/** Short soft tone — one "dot" in the alert pattern. */
-function playDot(ctx: AudioContext, startTime: number) {
-  const oscillator = ctx.createOscillator();
-  const gain = ctx.createGain();
-
-  oscillator.type = "sine";
-  oscillator.frequency.setValueAtTime(880, startTime);
-
-  const durationSec = DOT_MS / 1000;
-  gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.14, startTime + 0.008);
-  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
-
-  oscillator.connect(gain);
-  gain.connect(ctx.destination);
-  oscillator.start(startTime);
-  oscillator.stop(startTime + durationSec + 0.02);
-}
-
-/** Three dots, pause, three dots — minimal attention cue. */
-function playDotDotDotTwice(ctx: AudioContext, startTime: number) {
-  const dotStep = (DOT_MS + DOT_GAP_MS) / 1000;
-  const groupOffset = (3 * dotStep + GROUP_GAP_MS / 1000);
-
-  for (let group = 0; group < 2; group += 1) {
-    const groupStart = startTime + group * groupOffset;
-    for (let dot = 0; dot < 3; dot += 1) {
-      playDot(ctx, groupStart + dot * dotStep);
-    }
+  if (!audio) {
+    audio = new Audio(FITDOG_ALERT_SOUND_URL);
+    audio.preload = "auto";
+    audio.loop = false;
   }
+  return audio;
 }
 
 export async function unlockStaffPushNoticeAudio() {
-  const ctx = getAudioContext();
-  if (!ctx) return;
+  const el = getAlertAudio();
+  if (!el || unlocked) return;
+
   try {
-    await ctx.resume();
-    if (!unlocked) {
-      const buffer = ctx.createBuffer(1, 1, 22050);
-      const source = ctx.createBufferSource();
-      source.buffer = buffer;
-      source.connect(ctx.destination);
-      source.start(0);
-      unlocked = true;
-    }
+    const previousVolume = el.volume;
+    el.volume = 0.001;
+    el.currentTime = 0;
+    await el.play();
+    el.pause();
+    el.currentTime = 0;
+    el.volume = previousVolume;
+    unlocked = true;
   } catch {
-    // Ignore unlock failures; alarm may still work on some displays.
+    // Ignore unlock failures; alarm may still work after user interaction.
   }
 }
 
 export function playStaffPushNoticeAlarm() {
   if (typeof window === "undefined") return;
 
-  const ctx = getAudioContext();
-  if (!ctx) return;
+  const el = getAlertAudio();
+  if (!el) return;
 
-  void ctx.resume().then(() => {
-    playDotDotDotTwice(ctx, ctx.currentTime);
+  el.loop = false;
+  el.currentTime = 0;
+  void unlockStaffPushNoticeAudio().finally(() => {
+    void el.play().catch(() => {
+      // Autoplay may be blocked until the display receives a gesture.
+    });
   });
 }
 
-/** @deprecated Use playStaffPushNoticeAlarm — same minimal dot-dot-dot pattern. */
+/** @deprecated Same as playStaffPushNoticeAlarm — plays the Fitdog alert once. */
 export function playStaffPushNoticeAlarmBurst() {
   playStaffPushNoticeAlarm();
 }
 
-export function startStaffPushNoticeAlarmLoop(noticeId: string | null) {
-  stopStaffPushNoticeAlarmLoop();
-  if (!noticeId) return;
+/** @deprecated Alerts play once; looping is disabled. */
+export function startStaffPushNoticeAlarmLoop(_noticeId: string | null) {}
 
-  repeatTimer = window.setInterval(() => {
-    playStaffPushNoticeAlarm();
-  }, REPEAT_MS);
-}
-
-export function stopStaffPushNoticeAlarmLoop() {
-  if (repeatTimer != null) {
-    window.clearInterval(repeatTimer);
-    repeatTimer = null;
-  }
-}
+/** @deprecated Alerts play once; looping is disabled. */
+export function stopStaffPushNoticeAlarmLoop() {}
