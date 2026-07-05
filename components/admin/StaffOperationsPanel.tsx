@@ -43,12 +43,20 @@ import {
   filterShiftLogRows,
   QuickLogTemplatesSidebar,
   ShiftHandoffSummary,
+  ShiftLogFilterBar,
   ShiftLogRecentActivitySidebar,
   type ShiftLogFilters,
   type ShiftLogFormShape
 } from "@/components/admin/front-desk/FrontDeskLogUI";
 import { canPushCrossoverToWhiteboard } from "@/lib/admin/users";
-import { shiftLogDetails, shiftLogSubmittedBy, shiftLogType } from "@/lib/staff/front-desk-log";
+import {
+  formatShiftLogDayLabel,
+  isLoggedToday,
+  isOpenShiftLogStatus,
+  shiftLogDetails,
+  shiftLogSubmittedBy,
+  shiftLogType
+} from "@/lib/staff/front-desk-log";
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
 
@@ -137,7 +145,7 @@ const emptyShiftLogFilters: ShiftLogFilters = {
   dueToday: false,
   urgentOnly: false,
   needsReview: false,
-  openOnly: true
+  openOnly: false
 };
 
 const emptyFollowUpForm: FollowUpForm = {
@@ -341,8 +349,6 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
         data={data}
         loading={loading}
         busy={busy}
-        page={page}
-        setPage={setPage}
         recentActivity={recentActivity}
         staffOptions={staffOptions}
         onMutate={mutate}
@@ -485,8 +491,6 @@ function CrossoverPage(props: {
   data: StaffOpsPayload | null;
   loading: boolean;
   busy: boolean;
-  page: number;
-  setPage: (page: number) => void;
   recentActivity: StaffActivityLog[];
   staffOptions: string[];
   onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>;
@@ -498,6 +502,14 @@ function CrossoverPage(props: {
 }) {
   const [form, setForm] = useState<ShiftLogFormShape>(emptyShiftLogForm);
   const [filters, setFilters] = useState<ShiftLogFilters>(emptyShiftLogFilters);
+  const [dailyPage, setDailyPage] = useState(1);
+  const [openPage, setOpenPage] = useState(1);
+  const todayLabel = useMemo(() => formatShiftLogDayLabel(), []);
+
+  useEffect(() => {
+    setDailyPage(1);
+    setOpenPage(1);
+  }, [filters]);
 
   const pickTemplate = useCallback((template: (typeof import("@/lib/staff/front-desk-log").SHIFT_LOG_TEMPLATES)[number]) => {
     setForm({
@@ -514,9 +526,8 @@ function CrossoverPage(props: {
     });
   }, []);
 
-  const rows = useMemo(() => {
-    const all = props.data?.crossover_messages ?? [];
-    return filterShiftLogRows(all, filters, (item) => [
+  const queryFields = useCallback(
+    (item: CrossoverMessage) => [
       item.subject,
       shiftLogDetails(item),
       shiftLogType(item),
@@ -525,9 +536,27 @@ function CrossoverPage(props: {
       shiftLogSubmittedBy(item),
       item.assigned_to ?? "",
       item.assigned_team ?? ""
-    ]);
-  }, [props.data?.crossover_messages, filters]);
-  const paged = paginate(rows, props.page);
+    ],
+    []
+  );
+
+  const filteredRows = useMemo(() => {
+    const all = props.data?.crossover_messages ?? [];
+    return filterShiftLogRows(all, filters, queryFields);
+  }, [filters, props.data?.crossover_messages, queryFields]);
+
+  const dailyRows = useMemo(
+    () => filteredRows.filter((item) => isLoggedToday(item.created_at)),
+    [filteredRows]
+  );
+
+  const openRows = useMemo(
+    () => filteredRows.filter((item) => isOpenShiftLogStatus(item.status)),
+    [filteredRows]
+  );
+
+  const pagedDaily = paginate(dailyRows, dailyPage);
+  const pagedOpen = paginate(openRows, openPage);
   const assignOptions = useMemo(() => [...new Set([...props.staffOptions, ...(props.data?.crossover_messages ?? []).map((item) => item.assigned_to).filter(Boolean) as string[]])], [props.data?.crossover_messages, props.staffOptions]);
 
   async function submit(extra: Partial<ShiftLogFormShape> = {}) {
@@ -565,32 +594,74 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Track shift notes, owner issues, dog updates, assessments, reminders, and follow-ups in one shared log.
+          Today&apos;s daily log and unresolved open items stay visible side by side for quick shift handoffs.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
 
       <div className="crossover-dashboard__log-section">
-        <ActiveShiftLogCard
-          rows={paged.rows}
-          total={rows.length}
-          page={paged.page}
-          maxPage={paged.maxPage}
-          pageSize={PAGE_SIZE}
-          busy={props.busy}
-          loading={props.loading}
-          canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
-          directory={props.data?.staff_directory}
-          filters={filters}
-          setFilters={setFilters}
-          assignOptions={assignOptions}
-          onPage={props.setPage}
-          onRefresh={props.onRefresh}
-          onMutate={props.onMutate}
-          onDetail={props.onDetail}
-          onEdit={props.onEdit}
-          formatDateTime={formatDateTime}
-        />
+        <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} />
+        <div className="crossover-dashboard__log-split">
+          <ActiveShiftLogCard
+            rows={pagedDaily.rows}
+            total={dailyRows.length}
+            page={pagedDaily.page}
+            maxPage={pagedDaily.maxPage}
+            pageSize={PAGE_SIZE}
+            busy={props.busy}
+            loading={props.loading}
+            canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
+            directory={props.data?.staff_directory}
+            filters={filters}
+            setFilters={setFilters}
+            assignOptions={assignOptions}
+            onPage={setDailyPage}
+            onRefresh={props.onRefresh}
+            onMutate={props.onMutate}
+            onDetail={props.onDetail}
+            onEdit={props.onEdit}
+            formatDateTime={formatDateTime}
+            title={`Daily Log — ${todayLabel}`}
+            subtitle="All entries logged today, including resolved items from the current shift."
+            headingId="shift-log-daily-heading"
+            emptyTitle="No entries logged today"
+            emptyText="New shift log entries for today will appear here."
+            showFilterBar={false}
+            showRefresh={false}
+          />
+          <ActiveShiftLogCard
+            rows={pagedOpen.rows}
+            total={openRows.length}
+            page={pagedOpen.page}
+            maxPage={pagedOpen.maxPage}
+            pageSize={PAGE_SIZE}
+            busy={props.busy}
+            loading={props.loading}
+            canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
+            directory={props.data?.staff_directory}
+            filters={filters}
+            setFilters={setFilters}
+            assignOptions={assignOptions}
+            onPage={setOpenPage}
+            onRefresh={props.onRefresh}
+            onMutate={props.onMutate}
+            onDetail={props.onDetail}
+            onEdit={props.onEdit}
+            formatDateTime={formatDateTime}
+            title="Open Log"
+            subtitle="Unresolved items from today or earlier shifts that still need follow-up."
+            headingId="shift-log-open-heading"
+            emptyTitle="No open log entries"
+            emptyText="Resolved and archived items are hidden here."
+            showFilterBar={false}
+            showRefresh={false}
+          />
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button type="button" className="crossover-btn crossover-btn--outline" disabled={props.loading} onClick={() => void props.onRefresh()}>
+            Refresh logs
+          </button>
+        </div>
       </div>
 
       <ShiftHandoffSummary rows={props.data?.crossover_messages ?? []} />

@@ -318,6 +318,14 @@ export function isDueToday(value: string | null | undefined) {
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
 
+export function isLoggedToday(value: string | null | undefined) {
+  return isDueToday(value);
+}
+
+export function formatShiftLogDayLabel(date = new Date()) {
+  return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
 export function normalizeShiftLogRecord(item: CrossoverMessage): CrossoverMessage {
   return {
     ...item,

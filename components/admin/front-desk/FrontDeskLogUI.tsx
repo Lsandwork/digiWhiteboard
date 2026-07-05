@@ -223,7 +223,14 @@ export function ActiveShiftLogCard({
   onMutate,
   onDetail,
   onEdit,
-  formatDateTime
+  formatDateTime,
+  title = "Active Shift Log",
+  subtitle = "Open items, assignments, reminders, and follow-ups for the current and next shift.",
+  headingId = "shift-log-active-heading",
+  emptyTitle = "No shift log entries",
+  emptyText = "Add a shift log entry below or adjust your filters.",
+  showFilterBar = true,
+  showRefresh = true
 }: {
   rows: CrossoverMessage[];
   total: number;
@@ -243,6 +250,13 @@ export function ActiveShiftLogCard({
   onDetail: (item: CrossoverMessage) => void;
   onEdit: (item: CrossoverMessage) => void;
   formatDateTime: (value: string | null) => string;
+  title?: string;
+  subtitle?: string;
+  headingId?: string;
+  emptyTitle?: string;
+  emptyText?: string;
+  showFilterBar?: boolean;
+  showRefresh?: boolean;
 }) {
   const reminderLabel = (item: CrossoverMessage) => {
     if (item.due_at) return formatDateTime(item.due_at);
@@ -251,22 +265,24 @@ export function ActiveShiftLogCard({
   };
 
   return (
-    <section className="crossover-card crossover-card--conversations" aria-labelledby="shift-log-active-heading">
+    <section className="crossover-card crossover-card--conversations" aria-labelledby={headingId}>
       <header className="crossover-card__header">
         <div className="crossover-card__header-main">
-          <IconTile src={CROSSOVER_ASSETS.chat} alt="Active shift log" />
+          <IconTile src={CROSSOVER_ASSETS.chat} alt={title} />
           <div>
-            <h3 id="shift-log-active-heading" className="crossover-card__title">Active Shift Log</h3>
-            <p className="crossover-card__subtitle">Open items, assignments, reminders, and follow-ups for the current and next shift.</p>
+            <h3 id={headingId} className="crossover-card__title">{title}</h3>
+            <p className="crossover-card__subtitle">{subtitle}</p>
           </div>
         </div>
-        <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void onRefresh()}>
-          <Image src={CROSSOVER_ASSETS.refresh} alt="" width={22} height={22} aria-hidden />
-          Refresh
-        </button>
+        {showRefresh ? (
+          <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void onRefresh()}>
+            <Image src={CROSSOVER_ASSETS.refresh} alt="" width={22} height={22} aria-hidden />
+            Refresh
+          </button>
+        ) : null}
       </header>
 
-      <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} />
+      {showFilterBar ? <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} /> : null}
 
       <div className="crossover-table-wrap hidden md:block">
         {rows.length ? (
@@ -329,8 +345,8 @@ export function ActiveShiftLogCard({
         ) : (
           <div className="crossover-empty">
             <IconTile src={CROSSOVER_ASSETS.chat} alt="" size={64} />
-            <p className="crossover-empty__title">No shift log entries</p>
-            <p className="crossover-empty__text">Add a shift log entry below or adjust your filters.</p>
+            <p className="crossover-empty__title">{emptyTitle}</p>
+            <p className="crossover-empty__text">{emptyText}</p>
           </div>
         )}
       </div>
@@ -354,7 +370,7 @@ export function ActiveShiftLogCard({
           </article>
         )) : (
           <div className="crossover-empty crossover-empty--compact">
-            <p className="crossover-empty__title">No shift log entries</p>
+            <p className="crossover-empty__title">{emptyTitle}</p>
           </div>
         )}
       </div>
