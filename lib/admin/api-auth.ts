@@ -1,4 +1,5 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { canCreateFrontDeskLogForRole } from "@/lib/admin/permissions";
 import {
   canAccessCrossoverCommunication,
   canAccessFrontDeskLog,
@@ -52,6 +53,10 @@ export function canManageActiveIssues(role?: string | null) {
 
 export function canPushDogHandlerComplaintNotice(role?: string | null) {
   return canCreateDogHandlerComplaintNotice(role) || !role;
+}
+
+export function canCreateFrontDeskLog(role?: string | null) {
+  return canCreateFrontDeskLogForRole(role) || !role;
 }
 
 export function canPushGroomingRequest(role?: string | null) {

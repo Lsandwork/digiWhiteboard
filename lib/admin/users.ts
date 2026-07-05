@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { canAccessFrontDeskLogForRole, canCreateFrontDeskLogForRole } from "@/lib/admin/permissions";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -71,9 +72,14 @@ export function hasCoordinatorAccess(role?: string | null) {
   return isStaffOpsLimitedRole(role);
 }
 
-/** Front Desk Shift Log — coordinators, team leads, management, admins. */
+/** Front Desk Shift Log — all authenticated dashboard users. */
 export function canAccessFrontDeskLog(role?: string | null) {
-  return isFullAdminRole(role) || hasCoordinatorAccess(role);
+  return canAccessFrontDeskLogForRole(role);
+}
+
+/** Submit new Front Desk log entries — all authenticated dashboard users. */
+export function canCreateFrontDeskLog(role?: string | null) {
+  return canCreateFrontDeskLogForRole(role);
 }
 
 /** Alias: coordinator-like roles share identical staff panel permissions. */

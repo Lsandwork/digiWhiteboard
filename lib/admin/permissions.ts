@@ -165,6 +165,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
   "view_front_desk_log",
+  "create_front_desk_log",
+  "edit_front_desk_log",
   "assign_front_desk_log",
   "resolve_front_desk_log",
   "view_owner_follow_up",
@@ -181,11 +183,20 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
 const GROOMER_TRAINER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
+  "view_front_desk_log",
+  "create_front_desk_log",
+  "edit_front_desk_log",
   "push_grooming_request",
   "clear_grooming_request"
 ];
 
-const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = ["view_admin_panel", "view_staff_whiteboard"];
+const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
+  "view_admin_panel",
+  "view_staff_whiteboard",
+  "view_front_desk_log",
+  "create_front_desk_log",
+  "edit_front_desk_log"
+];
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: [...ALL_PERMISSIONS],
@@ -417,6 +428,18 @@ export function canAccessAdminTab(
   const required = TAB_PERMISSIONS[tab];
   if (!required) return hasPermission(effective, "view_admin_panel");
   return hasPermission(effective, required);
+}
+
+/** Every authenticated dashboard user can open the Front Desk Communications Log. */
+export function canAccessFrontDeskLogForRole(role?: string | null) {
+  const access = accessFromLegacyRole(null, null, role);
+  return hasPermission(access, "view_front_desk_log");
+}
+
+/** Every authenticated dashboard user can submit new Front Desk log entries. */
+export function canCreateFrontDeskLogForRole(role?: string | null) {
+  const access = accessFromLegacyRole(null, null, role);
+  return hasPermission(access, "create_front_desk_log");
 }
 
 export function firstAccessibleAdminTab(

@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 import { normalizeAdminUserId } from "@/lib/admin/users";
-import { canAccessCrossoverCommunication, canManageStaffDirectory, canManageStaffOperations, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import {
+  canAccessCrossoverCommunication,
+  canCreateFrontDeskLog,
+  canManageStaffDirectory,
+  canManageStaffOperations,
+  isAdminRequest,
+  unauthorizedAdminResponse
+} from "@/lib/admin/api-auth";
+import { accessFromLegacyRole, hasAnyPermission, hasPermission } from "@/lib/admin/permissions";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { createAndPushStaffNotice } from "@/lib/staff/push-notices";
@@ -34,6 +42,20 @@ function staffOpsForbiddenResponse() {
 
 const CROSSOVER_ACTIONS = new Set(["create_crossover", "update_crossover", "reply_crossover"]);
 const NOTIFICATION_ACTIONS = new Set(["mark_notification_read", "mark_all_notifications_read"]);
+const STAFF_OPS_VIEW_PERMISSIONS = ["view_front_desk_log", "view_owner_follow_up", "view_active_issues"] as const;
+
+function canViewStaffOps(session: ReturnType<typeof getAdminSessionFromRequest>) {
+  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
+  return (
+    hasAnyPermission(access, [...STAFF_OPS_VIEW_PERMISSIONS]) ||
+    canManageStaffOperations(session?.role)
+  );
+}
+
+function canUseFrontDeskLog(session: ReturnType<typeof getAdminSessionFromRequest>) {
+  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
+  return hasPermission(access, "view_front_desk_log") || canAccessCrossoverCommunication(session?.role);
+}
 
 function actorFromRequest(request: Request) {
   const session = getAdminSessionFromRequest(request);
@@ -47,7 +69,7 @@ function actorFromRequest(request: Request) {
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   const { session } = actorFromRequest(request);
-  if (!canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
+  if (!canViewStaffOps(session)) {
     return staffOpsForbiddenResponse();
   }
 
@@ -70,7 +92,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   const { session, actor, actorAdminId } = actorFromRequest(request);
-  if (!canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
+  if (!canViewStaffOps(session)) {
     return staffOpsForbiddenResponse();
   }
 
@@ -79,7 +101,10 @@ export async function POST(request: Request) {
     const action = String(body.action ?? "");
     const supabase = getServiceSupabase();
 
-    if (CROSSOVER_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role)) {
+    if (action === "create_crossover" && !canCreateFrontDeskLog(session?.role)) {
+      return crossoverForbiddenResponse();
+    }
+    if (CROSSOVER_ACTIONS.has(action) && !canUseFrontDeskLog(session)) {
       return crossoverForbiddenResponse();
     }
     if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {

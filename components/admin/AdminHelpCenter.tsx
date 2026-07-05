@@ -13,6 +13,7 @@ import {
   type HelpArticle,
   type HelpCategory
 } from "@/lib/admin/help-content";
+import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
 import { isCrossoverStaffRole, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
@@ -26,6 +27,7 @@ type QuickLinkItem = {
 const QUICK_LINKS: QuickLinkItem[] = [
   { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer"] },
   { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer"] },
+  { href: "/admin?board=staff&tab=crossover_communication", label: "Front Desk Log", roles: ["admin", "staff_ops", "viewer"] },
   { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=staff_directory", label: "Staff Directory", roles: ["admin", "staff_ops"] },
   { href: "/admin?tab=integrations", label: "Integrations", roles: ["admin"] },
@@ -42,6 +44,7 @@ function quickLinkVisible(link: QuickLinkItem, role: AdminUserRole) {
   if (isFullAdminRole(role)) return true;
   if (role === "viewer") return link.roles.includes("viewer");
   if (isStaffOpsLimitedRole(role)) return link.roles.includes("staff_ops");
+  if (isCrossoverStaffRole(role)) return link.roles.includes("viewer") || link.roles.includes("staff_ops");
   return false;
 }
 
@@ -165,26 +168,8 @@ export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
 
 function canOpenAdminTab(role: AdminUserRole, tab?: AdminTab): boolean {
   if (!tab) return false;
-  if (isFullAdminRole(role)) return true;
-  if (isStaffOpsLimitedRole(role)) {
-    const staffTabs: AdminTab[] = [
-      "push_notices",
-      "crossover_communication",
-      "owner_follow_up",
-      "active_issues",
-      "staff_directory",
-      "whiteboard_preview",
-      "analytics",
-      "templates",
-      "notifications",
-      "help"
-    ];
-    return staffTabs.includes(tab);
-  }
-  if (isCrossoverStaffRole(role)) {
-    return (["crossover_communication", "notifications", "help"] as AdminTab[]).includes(tab);
-  }
-  return false;
+  const access = accessFromLegacyRole(null, null, role);
+  return canAccessTab(access, tab, role);
 }
 
 function HelpArticleCard({
