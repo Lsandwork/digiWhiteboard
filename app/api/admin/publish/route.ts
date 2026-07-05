@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { AdminBoardType } from "@/lib/admin/types";
-import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { isAdminRequest, blockDemoWrite, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { updateLobbySettings } from "@/lib/lobby/settings";
 import { updateStaffBoardSettings } from "@/lib/staff/settings";
@@ -19,6 +19,8 @@ function nextVersion(current: string) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
+  const blocked = blockDemoWrite(request);
+  if (blocked) return blocked;
 
   const body = (await request.json()) as { board?: AdminBoardType };
   const board: AdminBoardType = body.board === "staff" ? "staff" : "lobby";

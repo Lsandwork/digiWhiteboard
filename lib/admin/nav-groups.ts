@@ -39,6 +39,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   ms_trainer_requests: "Trainer Requests",
   admin_trainer_entries: "Trainer Entries",
   package_commissions: "Package Commissions",
+  demo_push: "DEMO Push",
   analytics: "Analytics",
   templates: "Templates",
   notifications: "Notifications",
@@ -80,6 +81,8 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
   if (lobbyContent) entries.push(lobbyContent);
 
   if (visible.has("overview")) entries.push(leaf("overview"));
+
+  if (visible.has("demo_push")) entries.push(leaf("demo_push"));
 
   const pushAlerts = group("push_alerts", "Push & Alerts", PUSH_ALERT_TABS, visible);
   if (pushAlerts) entries.push(pushAlerts);

@@ -10,7 +10,8 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith("/admin/login")) {
     if (session && !session.mustChangePassword) {
-      return NextResponse.redirect(new URL("/admin", request.url));
+      const dest = session.isDemo ? "/admin?board=staff&tab=demo_push" : "/admin";
+      return NextResponse.redirect(new URL(dest, request.url));
     }
     return NextResponse.next();
   }

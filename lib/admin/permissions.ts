@@ -531,8 +531,11 @@ export function canAccessAdminTab(
   access: UserAccess | null | undefined,
   tab: string,
   legacyRole?: string | null,
-  board: "lobby" | "staff" = "lobby"
+  board: "lobby" | "staff" = "lobby",
+  options?: { isDemo?: boolean }
 ): boolean {
+  if (tab === "demo_push") return options?.isDemo === true && board === "staff";
+
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
 
   if (isTeamLeaderLegacyRole(legacyRole)) {
@@ -606,25 +609,28 @@ export function canCreateFrontDeskLogForRole(role?: string | null) {
 export function firstAccessibleAdminTab(
   access: UserAccess | null | undefined,
   legacyRole?: string | null,
-  board: "lobby" | "staff" = "staff"
+  board: "lobby" | "staff" = "staff",
+  options?: { isDemo?: boolean }
 ): string {
+  if (options?.isDemo && board === "staff") return "demo_push";
+
   if (isTeamLeaderLegacyRole(legacyRole) && board === "staff") {
     for (const tab of TEAM_LEADER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
     }
     return "push_notices";
   }
 
   if (isGroomerLegacyRole(legacyRole) && board === "staff") {
     for (const tab of GROOMER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
     }
     return "grooming_push";
   }
 
   if (isTrainerLegacyRole(legacyRole) && board === "staff") {
     for (const tab of TRAINER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
     }
     return "trainer_push";
   }
@@ -649,7 +655,7 @@ export function firstAccessibleAdminTab(
       : ["overview", "content", "users", "settings", "integrations", "help"];
 
   for (const tab of tabs) {
-    if (canAccessAdminTab(access, tab, legacyRole, board)) return tab;
+    if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
   }
   return "help";
 }

@@ -55,14 +55,17 @@ export async function POST(request: Request) {
       email: auth.email,
       adminUserId: auth.adminUserId,
       role: auth.role,
-      mustChangePassword: auth.forcePasswordChange ?? false
+      mustChangePassword: auth.forcePasswordChange ?? false,
+      isDemo: auth.isDemo ?? false,
+      demoRole: auth.isDemo ? auth.role ?? "owner_admin" : undefined
     });
     const response = NextResponse.json({
       ok: true,
       username: auth.email,
       role: auth.role,
       adminUserId: auth.adminUserId ?? null,
-      forcePasswordChange: auth.forcePasswordChange ?? false
+      forcePasswordChange: auth.forcePasswordChange ?? false,
+      isDemo: auth.isDemo ?? false
     });
     response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
     return response;

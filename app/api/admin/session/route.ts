@@ -26,6 +26,8 @@ export async function GET(request: Request) {
     username: session.email,
     adminUserId: session.adminUserId ?? null,
     role: session.role ?? null,
+    isDemo: session.isDemo ?? false,
+    demoRole: session.demoRole ?? null,
     mustChangePassword,
     access
   });

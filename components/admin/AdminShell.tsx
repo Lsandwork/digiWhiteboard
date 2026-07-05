@@ -13,13 +13,17 @@ import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
 import { getTabLabel } from "@/lib/admin/nav-groups";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
+import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
+import { getEffectiveDemoRole } from "@/lib/demo/session";
 
 type AdminShellProps = {
   board: AdminBoardType;
   tab: AdminTab;
   username: string;
   role?: string | null;
+  isDemo?: boolean;
+  demoRole?: string | null;
   access?: UserAccess | null;
   displayLabel?: string | null;
   savedLabel: string;
@@ -33,6 +37,7 @@ type AdminShellProps = {
   onOpenBoard: () => void;
   onLogout: () => void;
   onOpenHelp?: () => void;
+  onDemoRoleSwitched?: () => void;
   children: React.ReactNode;
   preview?: React.ReactNode;
   showPreview?: boolean;
@@ -43,6 +48,8 @@ export function AdminShell({
   tab,
   username,
   role,
+  isDemo,
+  demoRole,
   access,
   displayLabel,
   savedLabel,
@@ -56,15 +63,19 @@ export function AdminShell({
   onOpenBoard,
   onLogout,
   onOpenHelp,
+  onDemoRoleSwitched,
   children,
   preview,
   showPreview = true
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
-  const staffPanelLimited = isStaffPanelLimitedAccess(access, role);
+  const staffPanelLimited = isStaffPanelLimitedAccess(access, role) && !isDemo;
+  const effectiveRole = isDemo ? (demoRole ?? role) : role;
 
-  const visibleTabs = ADMIN_TABS.filter((item) => canAccessAdminTab(access, item, role, board));
+  const visibleTabs = ADMIN_TABS.filter((item) =>
+    canAccessAdminTab(access, item, effectiveRole, board, { isDemo })
+  );
   const pageLabel = getTabLabel(tab);
 
   return (
@@ -74,7 +85,7 @@ export function AdminShell({
           activeTab={tab}
           board={board}
           username={username}
-          role={role}
+          role={effectiveRole}
           displayLabel={displayLabel}
           visibleTabs={visibleTabs}
           mobileOpen={mobileOpen}
@@ -129,7 +140,7 @@ export function AdminShell({
                   )}
                   <button type="button" className="admin-btn-primary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none" onClick={onOpenBoard}>
                     <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
-                    {board === "staff" ? "Open Staff Whiteboard" : "Open Lobby Whiteboard"}
+                    {isDemo ? "Open Demo Whiteboard" : board === "staff" ? "Open Staff Whiteboard" : "Open Lobby Whiteboard"}
                   </button>
                 </div>
               </div>
@@ -142,6 +153,16 @@ export function AdminShell({
           </div>
         </div>
       </div>
+
+      {isDemo ? (
+        <DemoRoleSwitcher
+          currentRole={getEffectiveDemoRole({ email: username, role: role ?? undefined, isDemo: true, demoRole: demoRole ?? undefined })}
+          onSwitched={() => {
+        onDemoRoleSwitched?.();
+        window.location.reload();
+      }}
+        />
+      ) : null}
     </div>
   );
 }

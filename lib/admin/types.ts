@@ -72,7 +72,8 @@ export type AdminTab =
   | "settings"
   | "logs"
   | "integrations"
-  | "help";
+  | "help"
+  | "demo_push";
 
 export const ADMIN_TABS: AdminTab[] = [
   "overview",
@@ -105,7 +106,8 @@ export const ADMIN_TABS: AdminTab[] = [
   "settings",
   "logs",
   "integrations",
-  "help"
+  "help",
+  "demo_push"
 ];
 
 export const ADMIN_SUPPORT_TABS = [

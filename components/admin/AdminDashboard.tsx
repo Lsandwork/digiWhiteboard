@@ -41,7 +41,7 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
-import type { AdminBoardType, AdminTab, DashboardPayload } from "@/lib/admin/types";
+import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
 import { parseAdminTab } from "@/lib/admin/types";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
 import {
@@ -52,7 +52,8 @@ import {
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
 import { isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
-import type { StaffBoardSettings } from "@/lib/admin/types";
+import { DemoPushPanel } from "@/components/demo/DemoPushPanel";
+import { getEffectiveDemoRole } from "@/lib/demo/session";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -124,19 +125,23 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const role = data?.session?.role;
-    if ((isTeamLeaderRole(role) || isGroomerRole(role) || isTrainerRole(role)) && board !== "staff") {
+    const session = data?.session as { role?: string; isDemo?: boolean; demoRole?: string } | undefined;
+    const isDemo = Boolean(session?.isDemo);
+    const effectiveRole = isDemo ? getEffectiveDemoRole({ email: data?.username ?? "", ...session }) : session?.role;
+    if (!isDemo && (isTeamLeaderRole(effectiveRole) || isGroomerRole(effectiveRole) || isTrainerRole(effectiveRole)) && board !== "staff") {
       router.replace(`/admin?board=staff&tab=${tab}`);
     }
-  }, [board, data?.session?.role, router, tab]);
+  }, [board, data?.session, router, tab]);
 
   useEffect(() => {
-    const role = data?.session?.role;
-    const access = (data?.session as { access?: UserAccess | null } | undefined)?.access
-      ?? accessFromLegacyRole(data?.session?.adminUserId ?? null, data?.username ?? null, role);
+    const session = data?.session as { role?: string; isDemo?: boolean; demoRole?: string; access?: UserAccess | null; adminUserId?: string } | undefined;
+    const isDemo = Boolean(session?.isDemo);
+    const effectiveRole = isDemo ? getEffectiveDemoRole({ email: data?.username ?? "", ...session }) : session?.role;
+    const access = session?.access
+      ?? accessFromLegacyRole(session?.adminUserId ?? null, data?.username ?? null, effectiveRole);
 
-    if (!canAccessAdminTab(access, tab, role, board)) {
-      const fallbackTab = firstAccessibleAdminTab(access, role, board) as AdminTab;
+    if (!canAccessAdminTab(access, tab, effectiveRole, board, { isDemo })) {
+      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, board, { isDemo }) as AdminTab;
       const fallbackBoard = board === "staff" && fallbackTab === "users" ? "lobby" : board;
       router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
     }
@@ -239,7 +244,8 @@ export function AdminDashboard() {
   }
 
   function openBoard() {
-    const url = board === "staff" ? "/" : "/lobby/checkouts";
+    const isDemo = Boolean((data?.session as { isDemo?: boolean } | undefined)?.isDemo);
+    const url = isDemo ? "/demo/board" : board === "staff" ? "/" : "/lobby/checkouts";
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -256,14 +262,17 @@ export function AdminDashboard() {
   const adminSettings = data.admin_settings ?? DEFAULT_ADMIN_SETTINGS;
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
-  const currentRole = (data.session?.role ?? "owner_admin") as AdminUserRole;
+  const isDemo = Boolean((data.session as { isDemo?: boolean } | undefined)?.isDemo);
+  const demoRole = (data.session as { demoRole?: string } | undefined)?.demoRole ?? null;
+  const baseRole = (data.session?.role ?? "owner_admin") as AdminUserRole;
+  const currentRole = (isDemo ? getEffectiveDemoRole(data.session ?? null) : baseRole) as AdminUserRole;
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
-  const displayLabel = userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
-  const isTeamLeadPanel = isTeamLeaderRole(currentRole);
-  const isGroomerPanel = isGroomerRole(currentRole);
-  const isTrainerPanel = isTrainerRole(currentRole);
+  const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
+  const showPreview = !["settings", "push_notices", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help", "demo_push"].includes(tab);
+  const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
+  const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
+  const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
   const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel;
 
   const preview = (
@@ -296,10 +305,12 @@ export function AdminDashboard() {
         board={board}
         tab={tab}
         username={data.username ?? "admin"}
-        role={currentRole}
+        role={baseRole}
+        isDemo={isDemo}
+        demoRole={demoRole}
         access={userAccess}
         displayLabel={displayLabel}
-        savedLabel={savedLabel}
+        savedLabel={isDemo ? "Demo mode — changes are preview-only" : savedLabel}
         refreshing={refreshing}
         castRefreshing={castRefreshing}
         onBoardChange={setBoard}
@@ -310,10 +321,16 @@ export function AdminDashboard() {
         onOpenBoard={openBoard}
         onLogout={() => void logout()}
         onOpenHelp={() => setActiveTab("help")}
+        onDemoRoleSwitched={() => {
+          void load(true);
+          router.refresh();
+        }}
         preview={preview}
-        showPreview={showPreview}
+        showPreview={showPreview && !isDemo}
       >
         {error ? <p className="admin-error">{error}</p> : null}
+
+        {tab === "demo_push" ? <DemoPushPanel /> : null}
 
         {tab === "overview" ? (
           <>

@@ -50,6 +50,7 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   ms_trainer_requests: FITDOG_UI.managementSupport,
   admin_trainer_entries: FITDOG_UI.frontDeskLog,
   package_commissions: FITDOG_UI.managementSupport,
+  demo_push: FITDOG_UI.pushNotices,
   notifications: FITDOG_UI.notifications,
   settings: FITDOG_UI.settings
 };

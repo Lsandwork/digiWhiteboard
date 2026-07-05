@@ -7,7 +7,8 @@ import { ShieldCheck } from "lucide-react";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
 import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
 
-function defaultAdminRoute(role?: string) {
+function defaultAdminRoute(role?: string, isDemo?: boolean) {
+  if (isDemo) return "/admin?board=staff&tab=demo_push";
   const access = accessFromLegacyRole(null, null, role);
   if (canAccessTab(access, "push_notices", role)) return "/admin?board=staff&tab=push_notices";
   if (canAccessTab(access, "grooming_push", role)) return "/admin?board=staff&tab=grooming_push";
@@ -48,7 +49,7 @@ export function AdminLogin() {
         return;
       }
 
-      const next = searchParams.get("next") || defaultAdminRoute(body.role);
+      const next = searchParams.get("next") || defaultAdminRoute(body.role, body.isDemo);
       router.replace(next);
       router.refresh();
     } catch (loginError) {

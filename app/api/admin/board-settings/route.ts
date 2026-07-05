@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { AdminBoardType } from "@/lib/admin/types";
-import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { isAdminRequest, blockDemoWrite, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { loadLobbySettings, updateLobbySettings } from "@/lib/lobby/settings";
@@ -31,6 +31,8 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
+  const blocked = blockDemoWrite(request);
+  if (blocked) return blocked;
 
   const url = new URL(request.url);
   const board = parseBoard(url.searchParams.get("board"));

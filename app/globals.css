@@ -5478,3 +5478,119 @@ html.lobby-tv-display .social-video-shell {
     color: #000;
   }
 }
+
+.demo-board-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1rem;
+  background: linear-gradient(90deg, rgba(241, 95, 42, 0.25), rgba(153, 27, 27, 0.35));
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff7ed;
+}
+
+.demo-push-card {
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.demo-push-card__photo-wrap {
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 2px solid rgba(255, 166, 0, 0.25);
+  background: #fff;
+}
+
+.demo-push-card__photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.demo-role-switcher {
+  position: fixed;
+  left: 50%;
+  bottom: 1rem;
+  z-index: 80;
+  transform: translateX(-50%);
+}
+
+.demo-role-switcher__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 166, 0, 0.35);
+  background: rgba(28, 18, 13, 0.95);
+  padding: 0.65rem 1.25rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.demo-role-switcher__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+  background: transparent;
+  border: 0;
+}
+
+.demo-role-switcher__menu {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.5rem);
+  z-index: 81;
+  width: min(18rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 166, 0, 0.25);
+  background: rgba(28, 18, 13, 0.98);
+  padding: 0.75rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.demo-role-switcher__menu-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--crossover-gold);
+}
+
+.demo-role-switcher__menu-copy {
+  margin: 0.25rem 0 0.65rem;
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+}
+
+.demo-role-switcher__item {
+  display: block;
+  width: 100%;
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.demo-role-switcher__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.demo-role-switcher__item--active {
+  background: rgba(153, 27, 27, 0.45);
+  color: #fff;
+}
+
+.admin-main {
+  padding-bottom: 4.5rem;
+}

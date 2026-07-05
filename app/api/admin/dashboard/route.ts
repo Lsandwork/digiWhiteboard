@@ -10,6 +10,9 @@ import { loadAdminSettings } from "@/lib/admin/settings";
 import { loadLobbySettings } from "@/lib/lobby/settings";
 import { loadStaffBoardSettings } from "@/lib/staff/settings";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { DEMO_EMAIL } from "@/lib/demo/constants";
+import { isDemoSession } from "@/lib/demo/session";
+import { demoSandboxToBoard, getDemoSandbox } from "@/lib/demo/store";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +60,31 @@ export async function GET(request: Request) {
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
+
+  if (isDemoSession(session)) {
+    const sandbox = await getDemoSandbox(supabase);
+    const demoBoard = demoSandboxToBoard(sandbox);
+    return NextResponse.json({
+      board,
+      username: session?.email ?? DEMO_EMAIL,
+      session: session ? { ...session, access } : null,
+      admin_settings: adminSettings,
+      lobby_settings: lobbySettings,
+      staff_settings: staffSettings,
+      promotions: promotions ?? [],
+      active_checkouts: demoBoard.checking_out.length,
+      lobby_checkouts_count: 0,
+      sync_status: "healthy",
+      last_synced_at: sandbox.last_updated,
+      data_source: "Demo Sandbox (isolated)",
+      webhook_url: webhookUrl,
+      events: [],
+      failed_events: [],
+      staff_dogs: demoBoard.checking_in,
+      demo_stats: sandbox.stats,
+      env: getBoardEnvCheck()
+    });
+  }
 
   return NextResponse.json({
     board,

@@ -1,4 +1,6 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { demoWriteBlockedMessage, isDemoSession } from "@/lib/demo/session";
+import { NextResponse } from "next/server";
 import { canCreateFrontDeskLogForRole } from "@/lib/admin/permissions";
 import {
   canAccessCrossoverCommunication,
@@ -31,6 +33,13 @@ export function isAdminRequest(request: Request) {
 
 export function unauthorizedAdminResponse(body: Record<string, unknown> = { error: "Unauthorized." }) {
   return Response.json(body, { status: 401 });
+}
+
+/** Demo sessions can browse admin UI but must not mutate production settings. */
+export function blockDemoWrite(request: Request) {
+  const session = getAdminSessionFromRequest(request);
+  if (!isDemoSession(session)) return null;
+  return NextResponse.json({ ok: true, demo: true, message: demoWriteBlockedMessage() });
 }
 
 export function canManagePushNotices(role?: string | null) {

@@ -15,17 +15,31 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(aBuf, bBuf);
 }
 
+import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo/constants";
+
 export type AdminAuthResult = {
   ok: boolean;
   email: string;
   adminUserId?: string;
   role?: string;
   forcePasswordChange?: boolean;
-  source: "database" | "env";
+  isDemo?: boolean;
+  source: "database" | "env" | "demo";
 };
 
 export async function verifyAdminCredentials(username: string, password: string): Promise<AdminAuthResult> {
   const normalized = username.trim().toLowerCase();
+
+  if (normalized === DEMO_EMAIL && password === DEMO_PASSWORD) {
+    return {
+      ok: true,
+      email: DEMO_EMAIL,
+      role: "owner_admin",
+      forcePasswordChange: false,
+      isDemo: true,
+      source: "demo"
+    };
+  }
 
   try {
     const supabase = getServiceSupabase();
