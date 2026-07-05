@@ -594,14 +594,14 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Today&apos;s daily log and unresolved open items stay visible side by side for quick shift handoffs.
+          Daily log entries for today appear on top, with all unresolved open items in the full-width table below.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
 
       <div className="crossover-dashboard__log-section">
         <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} />
-        <div className="crossover-dashboard__log-split">
+        <div className="crossover-dashboard__log-stack">
           <ActiveShiftLogCard
             rows={pagedDaily.rows}
             total={dailyRows.length}

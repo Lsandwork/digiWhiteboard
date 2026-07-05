@@ -3587,18 +3587,15 @@ html.lobby-tv-display .social-video-shell {
   min-width: 0;
 }
 
-.crossover-dashboard__log-split {
+.crossover-dashboard__log-stack {
   display: grid;
   gap: 1.25rem;
   width: 100%;
   min-width: 0;
 }
 
-@media (min-width: 1280px) {
-  .crossover-dashboard__log-split {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
+.crossover-dashboard__log-stack .crossover-card--conversations {
+  width: 100%;
 }
 
 .crossover-dashboard__workspace {
