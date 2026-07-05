@@ -3056,6 +3056,42 @@ html.lobby-tv-display .social-video-shell {
   box-shadow: inset 0 0 0 1px rgba(127, 29, 29, 0.45);
 }
 
+.admin-nav-item--active-parent {
+  color: #fff;
+}
+
+.admin-nav-item--nested {
+  padding-left: 2.35rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.admin-nav-group__toggle {
+  justify-content: flex-start;
+}
+
+.admin-nav-group__chevron {
+  opacity: 0.65;
+  transition: transform 0.15s ease;
+}
+
+.admin-nav-group__chevron--open {
+  transform: rotate(180deg);
+}
+
+.admin-nav-group__children {
+  margin-bottom: 0.15rem;
+}
+
+.admin-section-kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+}
+
 .admin-tabs {
   display: flex;
   flex-wrap: wrap;

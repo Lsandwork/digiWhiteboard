@@ -1,48 +1,17 @@
 "use client";
 
 import Image from "next/image";
-import { HelpCircle, Menu, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, HelpCircle, Menu, X } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
+import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
+import { buildAdminNav, findNavGroupForTab, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
 
-const navItems: { id: AdminTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "content", label: "Content" },
-  { id: "promotions", label: "Promotions" },
-  { id: "schedule", label: "Class Schedule" },
-  { id: "display", label: "Display Settings" },
-  { id: "push_notices", label: "Push Notices" },
-  { id: "grooming_push", label: "Grooming Push" },
-  { id: "trainer_push", label: "Trainer Push" },
-  { id: "trainer_entry", label: "Trainer's Entry" },
-  { id: "crossover_communication", label: "Front Desk Log" },
-  { id: "owner_follow_up", label: "Owner Follow Up" },
-  { id: "active_issues", label: "Active Issues" },
-  { id: "whiteboard_preview", label: "Whiteboard Preview" },
-  { id: "yard_links", label: "Video Links" },
-  { id: "management_support", label: "Management Support" },
-  { id: "ms_hub", label: "Support Overview" },
-  { id: "ms_groomer_complaints", label: "Groomer Complaints" },
-  { id: "ms_groomer_requests", label: "Groomer Requests" },
-  { id: "ms_trainer_complaints", label: "Trainer Complaints" },
-  { id: "ms_trainer_requests", label: "Trainer Requests" },
-  { id: "admin_trainer_entries", label: "Trainer Entries" },
-  { id: "package_commissions", label: "Package Commissions" },
-  { id: "analytics", label: "Analytics" },
-  { id: "templates", label: "Templates" },
-  { id: "notifications", label: "Notifications" },
-  { id: "staff_directory", label: "Staff Directory" },
-  { id: "users", label: "Users" },
-  { id: "settings", label: "Settings" },
-  { id: "logs", label: "Logs" },
-  { id: "integrations", label: "Integrations" },
-  { id: "help", label: "Help Center" }
-];
-
-const tabLabels: Record<AdminTab, string> = Object.fromEntries(navItems.map((item) => [item.id, item.label])) as Record<AdminTab, string>;
+const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
 function sidebarPanelTitle(role?: string | null) {
   if (isTeamLeaderRole(role)) return "Team Lead Panel";
@@ -65,8 +34,90 @@ function userInitials(username: string) {
   return base.slice(0, 2).toUpperCase();
 }
 
+function NavIcon({ tab }: { tab: AdminTab }) {
+  const iconSrc = FITDOG_TAB_ICONS[tab];
+  if (iconSrc) return <FitdogDashboardIcon src={iconSrc} size={20} className="admin-nav-item__icon shrink-0" />;
+  return <span className="admin-nav-item__icon inline-block h-5 w-5 shrink-0 rounded bg-white/10" aria-hidden />;
+}
+
+function SidebarNavItem({
+  tab,
+  label,
+  active,
+  nested,
+  onSelect
+}: {
+  tab: AdminTab;
+  label: string;
+  active: boolean;
+  nested?: boolean;
+  onSelect: (tab: AdminTab) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`admin-nav-item ${nested ? "admin-nav-item--nested" : ""} ${active ? "admin-nav-item--active" : ""}`}
+      onClick={() => onSelect(tab)}
+    >
+      {!nested ? <NavIcon tab={tab} /> : null}
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function SidebarNavGroup({
+  entry,
+  activeTab,
+  expanded,
+  onToggle,
+  onSelect
+}: {
+  entry: Extract<NavEntry, { type: "group" }>;
+  activeTab: AdminTab;
+  expanded: boolean;
+  onToggle: () => void;
+  onSelect: (tab: AdminTab) => void;
+}) {
+  const childActive = entry.children.some((child) => child.tab === activeTab);
+  const groupIcon = FITDOG_TAB_ICONS[entry.children[0]?.tab];
+
+  return (
+    <div className={`admin-nav-group ${expanded || childActive ? "admin-nav-group--open" : ""}`}>
+      <button
+        type="button"
+        className={`admin-nav-item admin-nav-group__toggle ${childActive ? "admin-nav-item--active-parent" : ""}`}
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        {groupIcon ? (
+          <FitdogDashboardIcon src={groupIcon} size={20} className="admin-nav-item__icon shrink-0" />
+        ) : (
+          <span className="admin-nav-item__icon inline-block h-5 w-5 shrink-0 rounded bg-white/10" aria-hidden />
+        )}
+        <span className="flex-1 text-left">{entry.label}</span>
+        <ChevronDown className={`admin-nav-group__chevron h-4 w-4 shrink-0 ${expanded ? "admin-nav-group__chevron--open" : ""}`} aria-hidden />
+      </button>
+      {expanded ? (
+        <div className="admin-nav-group__children">
+          {entry.children.map((child) => (
+            <SidebarNavItem
+              key={child.tab}
+              tab={child.tab}
+              label={child.label}
+              active={activeTab === child.tab}
+              nested
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type SidebarProps = {
   activeTab: AdminTab;
+  board: AdminBoardType;
   username: string;
   role?: string | null;
   displayLabel?: string | null;
@@ -78,9 +129,48 @@ type SidebarProps = {
   visibleTabs?: AdminTab[];
 };
 
-export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, onMobileClose, onTabChange, onLogout, onOpenHelp, visibleTabs = ADMIN_TABS }: SidebarProps) {
-  const visibleNavItems = navItems.filter((item) => visibleTabs.includes(item.id));
+export function Sidebar({
+  activeTab,
+  board,
+  username,
+  role,
+  displayLabel,
+  mobileOpen,
+  onMobileClose,
+  onTabChange,
+  onLogout,
+  onOpenHelp,
+  visibleTabs = ADMIN_TABS
+}: SidebarProps) {
+  const navEntries = useMemo(() => buildAdminNav(visibleTabs, board), [visibleTabs, board]);
+  const activeGroupId = useMemo(() => findNavGroupForTab(navEntries, activeTab), [navEntries, activeTab]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(activeGroupId ? [activeGroupId] : []));
+
+  useEffect(() => {
+    if (!activeGroupId) return;
+    setExpandedGroups((current) => {
+      if (current.has(activeGroupId)) return current;
+      const next = new Set(current);
+      next.add(activeGroupId);
+      return next;
+    });
+  }, [activeGroupId]);
+
   const roleLabel = displayLabel ?? getAdminSidebarRoleLabel(role, username);
+
+  function handleSelect(tab: AdminTab) {
+    onTabChange(tab);
+    onMobileClose();
+  }
+
+  function toggleGroup(id: string) {
+    setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <>
@@ -99,28 +189,27 @@ export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, o
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-          {visibleNavItems.map((item) => {
-            const iconSrc = FITDOG_TAB_ICONS[item.id];
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={`admin-nav-item ${activeTab === item.id ? "admin-nav-item--active" : ""}`}
-                onClick={() => {
-                  onTabChange(item.id);
-                  onMobileClose();
-                }}
-              >
-                {iconSrc ? (
-                  <FitdogDashboardIcon src={iconSrc} size={22} className="admin-nav-item__icon" />
-                ) : (
-                  <span className="admin-nav-item__icon inline-block h-[22px] w-[22px] rounded bg-white/10" aria-hidden />
-                )}
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
+          {navEntries.map((entry) =>
+            entry.type === "group" ? (
+              <SidebarNavGroup
+                key={entry.id}
+                entry={entry}
+                activeTab={activeTab}
+                expanded={expandedGroups.has(entry.id)}
+                onToggle={() => toggleGroup(entry.id)}
+                onSelect={handleSelect}
+              />
+            ) : (
+              <SidebarNavItem
+                key={entry.tab}
+                tab={entry.tab}
+                label={entry.label}
+                active={activeTab === entry.tab}
+                onSelect={handleSelect}
+              />
+            )
+          )}
         </nav>
 
         <div className="space-y-3 p-4">
@@ -131,7 +220,7 @@ export function Sidebar({ activeTab, username, role, displayLabel, mobileOpen, o
                 Need help?
               </div>
               <p className="text-xs text-admin-muted">Search setup guides for lobby board, staff board, and admin tools.</p>
-              <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : onTabChange("help"))}>
+              <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : handleSelect("help"))}>
                 Open Help Center
               </button>
             </div>

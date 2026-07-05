@@ -3,13 +3,15 @@
 import Image from "next/image";
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
+import { ADMIN_TABS } from "@/lib/admin/types";
 import {
   canAccessAdminTab,
   isStaffPanelLimitedAccess,
   type UserAccess
 } from "@/lib/admin/permissions";
 import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
-import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
+import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
+import { getTabLabel } from "@/lib/admin/nav-groups";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 
@@ -63,12 +65,14 @@ export function AdminShell({
   const staffPanelLimited = isStaffPanelLimitedAccess(access, role);
 
   const visibleTabs = ADMIN_TABS.filter((item) => canAccessAdminTab(access, item, role, board));
+  const pageLabel = getTabLabel(tab);
 
   return (
     <div className="admin-theme">
       <div className="admin-layout">
         <Sidebar
           activeTab={tab}
+          board={board}
           username={username}
           role={role}
           displayLabel={displayLabel}
@@ -90,7 +94,8 @@ export function AdminShell({
                   <span className="admin-status-dot" aria-hidden />
                   <span className="text-xs font-semibold text-emerald-400">Online</span>
                 </div>
-                <h1 className="admin-page-title">{title}</h1>
+                <p className="admin-section-kicker">{title}</p>
+                <h1 className="admin-page-title">{pageLabel}</h1>
                 <p className="admin-page-subtitle mt-1 max-w-2xl">
                   Manage what your {board === "staff" ? "staff board" : "lobby"} displays, content, and live preview.
                 </p>
@@ -129,19 +134,6 @@ export function AdminShell({
                 </div>
               </div>
             </div>
-
-            <nav className="admin-tabs" aria-label="Admin sections">
-              {visibleTabs.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  className={`admin-tab ${tab === item ? "admin-tab--active" : ""}`}
-                  onClick={() => onTabChange(item)}
-                >
-                  {tabLabels[item]}
-                </button>
-              ))}
-            </nav>
           </header>
 
           <div className={`admin-content-grid ${showPreview ? "" : "admin-content-grid--single"}`}>
