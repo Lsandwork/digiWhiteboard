@@ -236,7 +236,10 @@ export async function findAdminUserByEmail(supabase: SupabaseClient, email: stri
     }
     throwAdminUserError(error);
   }
-  return (data as AdminUserRecord | null) ?? null;
+  if (data) return data as AdminUserRecord;
+
+  const state = await loadFallbackAdminUsersState(supabase);
+  return state.users.find((user) => user.email === normalized) ?? null;
 }
 
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
@@ -263,7 +266,10 @@ export async function getAdminUserById(supabase: SupabaseClient, id: string) {
     }
     throwAdminUserError(error);
   }
-  return (data as AdminUserRecord | null) ?? null;
+  if (data) return data as AdminUserRecord;
+
+  const state = await loadFallbackAdminUsersState(supabase);
+  return state.users.find((user) => user.id === id) ?? null;
 }
 
 export async function hashAdminPassword(password: string) {
@@ -332,24 +338,34 @@ export async function updateAdminUser(
   id: string,
   patch: Partial<Pick<AdminUserRecord, "full_name" | "email" | "role" | "status" | "force_password_change">>
 ) {
+  const normalizedPatch = { ...patch };
+  if (normalizedPatch.email) {
+    const nextEmail = normalizedPatch.email.trim().toLowerCase();
+    const conflict = await findAdminUserByEmail(supabase, nextEmail);
+    if (conflict && conflict.id !== id) {
+      throw new Error("That email is already in use.");
+    }
+    normalizedPatch.email = nextEmail;
+  }
+
   const { data, error } = await supabase
     .from("admin_users")
-    .update({ ...patch, updated_at: new Date().toISOString() })
+    .update({ ...normalizedPatch, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
-    .single();
+    .maybeSingle();
   if (error) {
     if (isMissingAdminUsersTable(error)) {
       const state = await loadFallbackAdminUsersState(supabase);
       const existing = state.users.find((user) => user.id === id);
       if (!existing) throw new Error("Admin user not found.");
-      const nextEmail = patch.email ? patch.email.trim().toLowerCase() : existing.email;
-      if (nextEmail !== existing.email && state.users.some((user) => user.email === nextEmail)) {
+      const nextEmail = normalizedPatch.email ? normalizedPatch.email.trim().toLowerCase() : existing.email;
+      if (state.users.some((user) => user.id !== id && user.email === nextEmail)) {
         throw new Error("That email is already in use.");
       }
       const updated: AdminUserRecord = {
         ...existing,
-        ...patch,
+        ...normalizedPatch,
         email: nextEmail,
         updated_at: new Date().toISOString()
       };
@@ -360,6 +376,27 @@ export async function updateAdminUser(
     }
     throwAdminUserError(error);
   }
+
+  if (!data) {
+    const state = await loadFallbackAdminUsersState(supabase);
+    const existing = state.users.find((user) => user.id === id);
+    if (!existing) throw new Error("Admin user not found.");
+    const nextEmail = normalizedPatch.email ? normalizedPatch.email.trim().toLowerCase() : existing.email;
+    if (state.users.some((user) => user.id !== id && user.email === nextEmail)) {
+      throw new Error("That email is already in use.");
+    }
+    const updated: AdminUserRecord = {
+      ...existing,
+      ...normalizedPatch,
+      email: nextEmail,
+      updated_at: new Date().toISOString()
+    };
+    await saveFallbackAdminUsersState(supabase, {
+      users: state.users.map((user) => (user.id === id ? updated : user))
+    });
+    return sanitizeAdminUser(updated);
+  }
+
   return data as AdminUserPublic;
 }
 
@@ -370,14 +407,16 @@ export async function changeAdminUserPassword(
   forcePasswordChange?: boolean
 ) {
   const password_hash = await hashAdminPassword(password);
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("admin_users")
     .update({
       password_hash,
       force_password_change: forcePasswordChange ?? false,
       updated_at: new Date().toISOString()
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) {
     if (isMissingAdminUsersTable(error)) {
       const state = await loadFallbackAdminUsersState(supabase);
@@ -395,6 +434,21 @@ export async function changeAdminUserPassword(
       return;
     }
     throwAdminUserError(error);
+  }
+
+  if (!data) {
+    const state = await loadFallbackAdminUsersState(supabase);
+    const existing = state.users.find((user) => user.id === id);
+    if (!existing) throw new Error("Admin user not found.");
+    const updated: AdminUserRecord = {
+      ...existing,
+      password_hash,
+      force_password_change: forcePasswordChange ?? false,
+      updated_at: new Date().toISOString()
+    };
+    await saveFallbackAdminUsersState(supabase, {
+      users: state.users.map((user) => (user.id === id ? updated : user))
+    });
   }
 }
 
