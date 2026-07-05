@@ -1,11 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, Pencil, Plus, RotateCcw, Send, Trash2, XCircle } from "lucide-react";
+import { BellRing, Pencil, Plus, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import type { StaffPushNotice, StaffPushNoticeDisplayMode, StaffPushNoticePriority, StaffPushNoticeRecurrence } from "@/lib/staff/push-notices";
+import { canAccessPushNotices, canCreateDogHandlerComplaintNotice, canViewManagementReports } from "@/lib/admin/users";
+import type { ManagementReport } from "@/lib/staff/management-reports";
+import {
+  DOG_HANDLER_COMPLAINT_NOTICE_LABEL,
+  isDogHandlerComplaintNotice,
+  type StaffPushNotice,
+  type StaffPushNoticeDisplayMode,
+  type StaffPushNoticePriority,
+  type StaffPushNoticeRecurrence
+} from "@/lib/staff/push-notices";
 
 type DefaultNotice = Pick<StaffPushNotice, "title" | "message" | "priority" | "display_mode" | "is_default">;
 
@@ -13,6 +22,7 @@ type PushNoticesPayload = {
   activeNotice: StaffPushNotice | null;
   notices: StaffPushNotice[];
   defaultNotices: DefaultNotice[];
+  managementReports?: ManagementReport[];
   currentUser: { email: string | null; adminUserId: string | null; role: string };
 };
 
@@ -75,6 +85,15 @@ function scheduleLabel(notice: StaffPushNotice) {
   return `${formatDateTime(notice.next_scheduled_at ?? notice.scheduled_at ?? null)}${recurrence}`;
 }
 
+function noticeHistoryTitle(notice: StaffPushNotice) {
+  if (isDogHandlerComplaintNotice(notice)) {
+    return notice.dog_handler_name
+      ? `${DOG_HANDLER_COMPLAINT_NOTICE_LABEL} — ${notice.dog_handler_name}`
+      : DOG_HANDLER_COMPLAINT_NOTICE_LABEL;
+  }
+  return notice.title;
+}
+
 export function PushNoticesPanel() {
   const { showToast } = useToast();
   const [data, setData] = useState<PushNoticesPayload | null>(null);
@@ -82,6 +101,8 @@ export function PushNoticesPanel() {
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
   const [quickPushDurationMinutes, setQuickPushDurationMinutes] = useState("5");
+  const [dogHandlerName, setDogHandlerName] = useState("");
+  const [dogHandlerError, setDogHandlerError] = useState("");
   const [editingNotice, setEditingNotice] = useState<StaffPushNotice | null>(null);
   const [deleteNotice, setDeleteNotice] = useState<StaffPushNotice | null>(null);
 
@@ -104,8 +125,11 @@ export function PushNoticesPanel() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const canManage = data?.currentUser.role !== "viewer";
+  const canManage = canAccessPushNotices(data?.currentUser.role);
+  const canPushDogHandler = canCreateDogHandlerComplaintNotice(data?.currentUser.role);
+  const canViewReports = canViewManagementReports(data?.currentUser.role);
   const history = useMemo(() => data?.notices ?? [], [data?.notices]);
+  const managementReports = useMemo(() => data?.managementReports ?? [], [data?.managementReports]);
 
   async function mutate(
     label: string,
@@ -124,6 +148,29 @@ export function PushNoticesPanel() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function pushDogHandlerComplaint() {
+    const trimmed = dogHandlerName.trim();
+    if (!trimmed) {
+      setDogHandlerError("Please enter the dog handler name before pushing this notice.");
+      return;
+    }
+    setDogHandlerError("");
+    await mutate(
+      "Unable to push dog handler complaint notice.",
+      () => fetch("/api/admin/push-notices", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "push_dog_handler_complaint",
+          dog_handler_name: trimmed,
+          display_duration_minutes: quickPushDurationMinutes
+        })
+      }),
+      "Dog handler owner complaint notice pushed successfully."
+    );
+    setDogHandlerName("");
   }
 
   async function pushDefault(notice: DefaultNotice) {
@@ -203,11 +250,11 @@ export function PushNoticesPanel() {
   }
 
   return (
-    <div className="space-y-5">
-      <header className="admin-page-header">
+    <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
+      <header className="crossover-dashboard__page-header">
         <div>
-          <h2 className="admin-page-title">Push Notices</h2>
-          <p className="admin-page-subtitle">Send live reminders to the Staff Digital Whiteboard.</p>
+          <h2 className="crossover-dashboard__page-title">Push Notices</h2>
+          <p className="crossover-dashboard__page-subtitle">Send live reminders to the Staff Digital Whiteboard.</p>
         </div>
       </header>
 
@@ -217,11 +264,11 @@ export function PushNoticesPanel() {
         </section>
       ) : null}
 
-      <section className="admin-card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <section className="crossover-card crossover-card--sidebar p-5">
+        <div className="crossover-card__header crossover-card__header--compact">
           <div>
-            <h3 className="text-xl font-black text-white">Quick Push</h3>
-            <p className="text-sm text-admin-muted">Default owner complaint reminders for fast handler alerts.</p>
+            <h3 className="crossover-card__title">Quick Push</h3>
+            <p className="crossover-card__subtitle">Default owner complaint reminders for fast handler alerts.</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <label className="grid gap-1 text-xs font-bold uppercase tracking-wide text-admin-muted">
@@ -258,27 +305,108 @@ export function PushNoticesPanel() {
         </div>
       </section>
 
+      {canPushDogHandler ? (
+        <section className="push-notice-dog-handler-card crossover-card crossover-card--create p-5">
+          <div className="crossover-card__header crossover-card__header--compact">
+            <div className="crossover-card__header-main">
+              <div className="crossover-icon-tile h-12 w-12 text-red-300">
+                <UserRound className="h-6 w-6" aria-hidden />
+              </div>
+              <div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <h3 className="crossover-card__title">{DOG_HANDLER_COMPLAINT_NOTICE_LABEL}</h3>
+                  <span className="crossover-badge crossover-badge--urgent">Urgent</span>
+                </div>
+                <p className="crossover-card__subtitle">
+                  Sends a notice to the Staff Digital Whiteboard and creates a management write-up report.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <label className="grid gap-2">
+              <span className="admin-label">Dog Handler Name</span>
+              <input
+                className={`crossover-input ${dogHandlerError ? "push-notice-dog-handler-card__input--error" : ""}`}
+                placeholder="Enter dog handler name..."
+                value={dogHandlerName}
+                maxLength={80}
+                disabled={busy}
+                onChange={(event) => {
+                  setDogHandlerName(event.target.value);
+                  if (dogHandlerError) setDogHandlerError("");
+                }}
+              />
+              {dogHandlerError ? <span className="push-notice-dog-handler-card__error">{dogHandlerError}</span> : null}
+              <span className="text-xs text-admin-muted">This creates an internal report for admin and management users.</span>
+            </label>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--primary inline-flex min-h-[3rem] items-center justify-center gap-2 px-6"
+              disabled={busy}
+              onClick={() => void pushDogHandlerComplaint()}
+            >
+              <Send className="h-4 w-4" aria-hidden />
+              {busy ? "Pushing…" : "Push Notice"}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
+      {canViewReports ? (
+        <section className="crossover-card crossover-card--sidebar p-5">
+          <div className="crossover-card__header crossover-card__header--compact">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
+              <h3 className="crossover-card__title">Management Write-Up Reports</h3>
+            </div>
+            <span className="crossover-link-btn">Admin &amp; Management only</span>
+          </div>
+          <div className="grid gap-3">
+            {managementReports.length ? managementReports.slice(0, 8).map((report) => (
+              <article key={report.id} className="push-notice-management-report">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="crossover-badge crossover-badge--urgent">{report.status.toUpperCase()}</span>
+                  <span className="text-xs text-admin-muted">{formatDateTime(report.created_at)}</span>
+                </div>
+                <h4 className="mt-2 font-black text-white">{report.title}</h4>
+                <p className="mt-1 text-sm text-admin-muted">
+                  Dog Handler: <span className="font-bold text-white">{report.dog_handler_name}</span>
+                </p>
+                <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
+                <p className="mt-2 text-xs text-admin-muted">
+                  Created by {report.created_by ?? "admin"} • Source: {report.source.replace("_", " ")}
+                </p>
+              </article>
+            )) : (
+              <p className="text-sm text-admin-muted">No management write-up reports yet.</p>
+            )}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="admin-card p-5">
-          <h3 className="text-xl font-black text-white">Create Custom Notice</h3>
-          <p className="mb-4 text-sm text-admin-muted">Create a staff-only alert and push it live immediately or save it for later.</p>
+        <div className="crossover-card p-5">
+          <h3 className="crossover-card__title">Create Custom Notice</h3>
+          <p className="crossover-card__subtitle mb-4">Create a staff-only alert and push it live immediately or save it for later.</p>
           <NoticeForm form={form} onChange={setForm} />
           <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button type="button" className="admin-btn-secondary inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void saveCustom()}>
+            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void saveCustom()}>
               <Plus className="h-4 w-4" /> Save Custom
             </button>
-            <button type="button" className="admin-btn-secondary inline-flex items-center gap-2" disabled={busy || !canManage || !form.scheduled_at} onClick={() => void scheduleCustom()}>
+            <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy || !canManage || !form.scheduled_at} onClick={() => void scheduleCustom()}>
               <BellRing className="h-4 w-4" /> Schedule Notice
             </button>
-            <button type="button" className="admin-btn-primary inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void pushCustom()}>
+            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void pushCustom()}>
               <Send className="h-4 w-4" /> Push Notice
             </button>
           </div>
         </div>
 
-        <div className="admin-card p-5">
-          <h3 className="text-xl font-black text-white">Active Notice</h3>
-          <p className="mb-4 text-sm text-admin-muted">Currently showing on the Staff Digital Whiteboard.</p>
+        <div className="crossover-card crossover-card--sidebar p-5">
+          <h3 className="crossover-card__title">Active Notice</h3>
+          <p className="crossover-card__subtitle mb-4">Currently showing on the Staff Digital Whiteboard.</p>
           {data?.activeNotice ? (
             <ActiveNoticePreview notice={data.activeNotice} />
           ) : (
@@ -288,7 +416,7 @@ export function PushNoticesPanel() {
           )}
           <button
             type="button"
-            className="admin-btn-secondary mt-4 inline-flex w-full items-center justify-center gap-2"
+            className="crossover-btn crossover-btn--outline mt-4 inline-flex w-full items-center justify-center gap-2"
             disabled={busy || !canManage || !data?.activeNotice}
             onClick={() => void clearActive()}
           >
@@ -297,10 +425,12 @@ export function PushNoticesPanel() {
         </div>
       </section>
 
-      <section className="admin-card overflow-hidden">
-        <div className="border-b border-admin-border p-5">
-          <h3 className="text-xl font-black text-white">Recent Notice History</h3>
-          <p className="text-sm text-admin-muted">Push previous notices again, or edit and delete custom notices.</p>
+      <section className="crossover-card crossover-card--conversations">
+        <div className="crossover-card__header">
+          <div>
+            <h3 className="crossover-card__title">Recent Notice History</h3>
+            <p className="crossover-card__subtitle">Push previous notices again, or edit and delete custom notices.</p>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-admin-border text-sm">
@@ -319,7 +449,7 @@ export function PushNoticesPanel() {
             <tbody className="divide-y divide-admin-border">
               {history.length ? history.map((notice) => (
                 <tr key={notice.id} className="text-admin-muted">
-                  <td className="max-w-xs px-4 py-3 font-semibold text-white">{notice.title}</td>
+                  <td className="max-w-xs px-4 py-3 font-semibold text-white">{noticeHistoryTitle(notice)}</td>
                   <td className="px-4 py-3"><PriorityBadge priority={notice.priority} /></td>
                   <td className="px-4 py-3">{noticeStatus(notice)}</td>
                   <td className="px-4 py-3">{notice.created_by ?? "admin"}</td>
@@ -470,7 +600,12 @@ function ActiveNoticePreview({ notice }: { notice: StaffPushNotice }) {
           Duration: {notice.display_duration_minutes ?? 5} min • Expires: {formatDateTime(notice.expires_at)}
         </span>
       </div>
-      <h4 className="text-2xl font-black uppercase leading-tight text-white">{notice.title}</h4>
+      <h4 className="text-2xl font-black uppercase leading-tight text-white">
+        {isDogHandlerComplaintNotice(notice) ? DOG_HANDLER_COMPLAINT_NOTICE_LABEL : notice.title}
+      </h4>
+      {isDogHandlerComplaintNotice(notice) && notice.dog_handler_name ? (
+        <p className="mt-2 text-lg font-bold text-amber-200">Dog Handler: {notice.dog_handler_name}</p>
+      ) : null}
       {notice.message ? <p className="mt-3 text-sm text-admin-muted">{notice.message}</p> : null}
     </div>
   );

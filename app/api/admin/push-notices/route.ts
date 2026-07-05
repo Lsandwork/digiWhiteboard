@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
-import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canAccessManagementReports, canManagePushNotices, canPushDogHandlerComplaintNotice, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { appendStaffOpsActivityEntries } from "@/lib/staff/admin-ops";
+import { createDogHandlerComplaintReport, listManagementReports } from "@/lib/staff/management-reports";
 import {
+  buildDogHandlerComplaintNoticeInput,
   clearActiveStaffPushNotice,
   createAndPushStaffNotice,
   createStaffPushNotice,
   DEFAULT_STAFF_PUSH_NOTICES,
+  DOG_HANDLER_COMPLAINT_MESSAGE,
   listStaffPushNotices,
   loadActiveStaffPushNotice,
-  pushStaffNoticeById
+  pushStaffNoticeById,
+  sanitizeDogHandlerName
 } from "@/lib/staff/push-notices";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -35,15 +40,17 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
-    const [activeNotice, notices] = await Promise.all([
+    const [activeNotice, notices, managementReports] = await Promise.all([
       loadActiveStaffPushNotice(supabase),
-      listStaffPushNotices(supabase)
+      listStaffPushNotices(supabase),
+      canAccessManagementReports(session?.role) ? listManagementReports(supabase) : Promise.resolve([])
     ]);
 
     return NextResponse.json({
       activeNotice,
       notices,
       defaultNotices: DEFAULT_STAFF_PUSH_NOTICES,
+      managementReports: canAccessManagementReports(session?.role) ? managementReports : undefined,
       currentUser: {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
@@ -77,6 +84,60 @@ export async function POST(request: Request) {
         details: {}
       });
       return NextResponse.json({ ok: true, activeNotice: null });
+    }
+
+    if (action === "push_dog_handler_complaint") {
+      if (!canPushDogHandlerComplaintNotice(session?.role)) {
+        return NextResponse.json({ error: "You do not have permission to push this notice." }, { status: 403 });
+      }
+
+      const dogHandlerName = sanitizeDogHandlerName(body.dog_handler_name);
+      if (!dogHandlerName) {
+        return NextResponse.json({ error: "Please enter the dog handler name before pushing this notice." }, { status: 400 });
+      }
+
+      const notice = await createAndPushStaffNotice(
+        supabase,
+        buildDogHandlerComplaintNoticeInput(dogHandlerName, body.display_duration_minutes),
+        actor
+      );
+
+      const report = await createDogHandlerComplaintReport(supabase, {
+        dogHandlerName,
+        summary: DOG_HANDLER_COMPLAINT_MESSAGE,
+        pushNoticeId: notice.id,
+        actor
+      });
+
+      await appendStaffOpsActivityEntries(supabase, [
+        {
+          activity_type: "push_notice.dog_handler",
+          title: `Owner Complaint - Dog Handler notice pushed for ${dogHandlerName}.`,
+          description: DOG_HANDLER_COMPLAINT_MESSAGE,
+          source_table: "staff_push_notices",
+          source_id: notice.id,
+          created_by: actor
+        },
+        {
+          activity_type: "management_report.created",
+          title: `Management report created for Owner Complaint - Dog Handler: ${dogHandlerName}.`,
+          description: "Employee write-up documentation report opened for admin review.",
+          source_table: "management_reports",
+          source_id: report.id,
+          created_by: actor
+        }
+      ]);
+
+      await writeAdminAuditLog({
+        actorAdminId: session?.adminUserId,
+        actorEmail: session?.email,
+        action: "staff.push_notice.push_dog_handler_complaint",
+        targetType: "staff_push_notice",
+        targetId: notice.id,
+        details: { dog_handler_name: dogHandlerName, report_id: report.id }
+      });
+
+      return NextResponse.json({ notice, report });
     }
 
     if (action === "push_default") {

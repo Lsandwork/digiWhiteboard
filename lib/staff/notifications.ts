@@ -47,6 +47,7 @@ export type StaffOpsNotificationEvent = {
   body: string | null;
   priority: StaffOpsPriority;
   urgent?: boolean;
+  needsManagementReview?: boolean;
   assignedTo?: string | null;
   toDepartment?: string | null;
   mentionText?: string | null;
@@ -70,8 +71,9 @@ export function notificationReaderKey(email?: string | null, adminUserId?: strin
   return (email?.trim().toLowerCase() || adminUserId || "anonymous").toLowerCase();
 }
 
-export function isHighOrUrgentPriority(priority: StaffOpsPriority, urgent?: boolean) {
-  return urgent === true || priority === "High" || priority === "Critical";
+export function isHighOrUrgentPriority(priority: StaffOpsPriority, urgent?: boolean, needsReview?: boolean) {
+  if (needsReview) return true;
+  return urgent === true || priority === "High" || priority === "Urgent" || priority === "Critical";
 }
 
 export function extractAtMentions(text: string, staffNames: string[]) {
@@ -191,7 +193,7 @@ export function dispatchStaffOpsNotifications(state: StaffOpsState, event: Staff
   const staffNames = state.staff_directory.filter((member) => member.status === "Active").map((member) => member.name);
   const created: StaffNotification[] = [];
   const isCrossover = event.sourceTab === "crossover_communication";
-  const shouldAlert = isHighOrUrgentPriority(event.priority, event.urgent);
+  const shouldAlert = isHighOrUrgentPriority(event.priority, event.urgent, event.needsManagementReview);
 
   if (isCrossover && (event.eventType === "created" || event.eventType === "updated") && !shouldAlert) {
     return state;
@@ -200,8 +202,8 @@ export function dispatchStaffOpsNotifications(state: StaffOpsState, event: Staff
   const baseType: StaffNotificationType =
     event.eventType === "reply" ? "reply" : event.eventType === "auto_issue" ? "auto_issue" : event.eventType === "created" ? "update" : "update";
 
-  if (!isCrossover || shouldAlert) {
-    created.push(buildNotification(event, { kind: "coordinator_pool" }, shouldAlert ? "escalation" : baseType));
+  if (shouldAlert) {
+    created.push(buildNotification(event, { kind: "admin_pool" }, event.eventType === "auto_issue" ? "auto_issue" : "escalation"));
   }
 
   if (event.assignedTo) {
@@ -213,16 +215,12 @@ export function dispatchStaffOpsNotifications(state: StaffOpsState, event: Staff
     created.push(buildNotification(event, { kind: "staff_name", name }, "mention"));
   }
 
-  if (shouldAlert && event.toDepartment) {
-    created.push(
-      buildNotification(event, { kind: "department_pool", department: event.toDepartment }, "escalation")
-    );
+  if (!isCrossover || shouldAlert) {
+    created.push(buildNotification(event, { kind: "coordinator_pool" }, shouldAlert ? "escalation" : baseType));
   }
 
-  if (shouldAlert) {
-    created.push(
-      buildNotification(event, { kind: "admin_pool" }, event.eventType === "auto_issue" ? "auto_issue" : "escalation")
-    );
+  if (shouldAlert && event.toDepartment) {
+    created.push(buildNotification(event, { kind: "department_pool", department: event.toDepartment }, "escalation"));
   }
 
   const existing = state.notifications ?? [];

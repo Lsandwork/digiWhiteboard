@@ -1,4 +1,5 @@
 import type { AdminUserRole } from "@/lib/admin/users";
+import { priorityRank, shouldAlertManagement, shiftLogDetails } from "@/lib/staff/front-desk-log";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
@@ -11,8 +12,19 @@ import {
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-export type StaffOpsPriority = "Low" | "Normal" | "Medium" | "High" | "Critical";
-export type StaffOpsStatus = "Active" | "Open" | "In Progress" | "Scheduled" | "Pending Review" | "Resolved" | "Archived";
+export type StaffOpsPriority = "Low" | "Normal" | "Medium" | "High" | "Urgent" | "Critical";
+export type StaffOpsStatus =
+  | "Open"
+  | "In Progress"
+  | "Waiting on Owner"
+  | "Waiting on Staff"
+  | "Needs Management Review"
+  | "Scheduled"
+  | "Completed"
+  | "Resolved"
+  | "Archived"
+  | "Active"
+  | "Pending Review";
 export type IssueCategory =
   | "Lost Belongings"
   | "Facility Issue"
@@ -24,12 +36,14 @@ export type IssueCategory =
   | "Grooming"
   | "Daycare"
   | "General";
-export type IssueSource = "Front Desk" | "Crossover Communication" | "Owner Follow Up" | "Push Notice" | "Manual" | "Other";
+export type IssueSource = "Front Desk" | "Front Desk Log" | "Crossover Communication" | "Owner Follow Up" | "Push Notice" | "Manual" | "Other";
 
 export type CrossoverMessage = {
   id: string;
   subject: string;
   message: string;
+  details?: string | null;
+  log_type?: string | null;
   from_department: string;
   to_department: string;
   priority: StaffOpsPriority;
@@ -41,18 +55,29 @@ export type CrossoverMessage = {
   template_title: string | null;
   template_field_values: Record<string, string> | null;
   created_by: string | null;
+  submitted_by?: string | null;
   assigned_to: string | null;
+  assigned_team?: string | null;
   reported_to: string | null;
+  department_area?: string | null;
+  due_at?: string | null;
+  reminder_at?: string | null;
+  needs_management_review?: boolean;
+  linked_owner_follow_up_id?: string | null;
+  linked_active_issue_id?: string | null;
+  management_alerted_at?: string | null;
   urgent: boolean;
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
+  archived_at?: string | null;
 };
 
 export type CrossoverReply = {
   id: string;
   crossover_message_id: string;
   message: string;
+  update_type?: string | null;
   created_by: string | null;
   created_at: string;
 };
@@ -262,9 +287,21 @@ export const ISSUE_CATEGORIES: IssueCategory[] = [
   "General"
 ];
 
-export const ISSUE_SOURCES: IssueSource[] = ["Front Desk", "Crossover Communication", "Owner Follow Up", "Push Notice", "Manual", "Other"];
-export const STAFF_PRIORITIES: StaffOpsPriority[] = ["Low", "Normal", "Medium", "High", "Critical"];
-export const STAFF_STATUSES: StaffOpsStatus[] = ["Active", "Open", "In Progress", "Scheduled", "Pending Review", "Resolved", "Archived"];
+export const ISSUE_SOURCES: IssueSource[] = ["Front Desk", "Front Desk Log", "Crossover Communication", "Owner Follow Up", "Push Notice", "Manual", "Other"];
+export const STAFF_PRIORITIES: StaffOpsPriority[] = ["Low", "Normal", "Medium", "High", "Urgent", "Critical"];
+export const STAFF_STATUSES: StaffOpsStatus[] = [
+  "Open",
+  "In Progress",
+  "Waiting on Owner",
+  "Waiting on Staff",
+  "Needs Management Review",
+  "Scheduled",
+  "Completed",
+  "Resolved",
+  "Archived",
+  "Active",
+  "Pending Review"
+];
 
 function emptyState(): StaffOpsState {
   return {
@@ -319,8 +356,8 @@ function normalizeDate(value: unknown) {
   return date.toISOString();
 }
 
-function isUrgent(priority: StaffOpsPriority, urgent?: boolean) {
-  return urgent || priority === "High" || priority === "Critical";
+function isUrgent(priority: StaffOpsPriority, urgent?: boolean, needsReview?: boolean) {
+  return shouldAlertManagement(priority, urgent, needsReview);
 }
 
 function isMissingRelation(error: { code?: string; message?: string } | null) {
@@ -420,6 +457,17 @@ export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsSt
   return parseState(await loadState(supabase));
 }
 
+export async function appendStaffOpsActivityEntries(
+  supabase: SupabaseClient,
+  entries: Omit<StaffActivityLog, "id" | "created_at">[]
+) {
+  let state = await loadState(supabase);
+  for (const entry of entries) {
+    state = createActivityLog(state, entry);
+  }
+  await saveState(supabase, state);
+}
+
 export function createActivityLog(state: StaffOpsState, input: Omit<StaffActivityLog, "id" | "created_at">) {
   return {
     ...state,
@@ -451,23 +499,24 @@ function issueTab(): StaffOpsNotificationEvent["sourceTab"] {
 }
 
 function maybeCreateActiveIssueFromCrossover(state: StaffOpsState, message: CrossoverMessage, actor: string | null) {
-  if (!isUrgent(message.priority, message.urgent)) return state;
+  if (!isUrgent(message.priority, message.urgent, message.needs_management_review)) return state;
+  if (message.linked_active_issue_id) return state;
   if (state.active_issues.some((issue) => issue.source_table === "crossover_messages" && issue.source_id === message.id && issue.status !== "Archived")) return state;
   const now = nowIso();
   const issue: ActiveIssue = {
     id: newId(),
     title: message.subject,
-    category: message.related_dog_name ? "Dog Issue" : "General",
-    source: "Crossover Communication",
+    category: message.log_type === "Medical / Health Note" ? "Medical / Health" : message.related_dog_name ? "Dog Issue" : "General",
+    source: "Front Desk Log",
     source_id: message.id,
     source_table: "crossover_messages",
     reported_by: actor,
-    assigned_to: message.assigned_to,
+    assigned_to: message.assigned_to ?? message.assigned_team ?? null,
     priority: message.priority,
     reported_at: now,
-    due_at: null,
+    due_at: message.due_at ?? null,
     status: "Open",
-    notes: message.message,
+    notes: shiftLogDetails(message),
     resolution_notes: null,
     related_owner_name: message.related_owner_name,
     related_dog_name: message.related_dog_name,
@@ -578,114 +627,191 @@ function markLinkedIssuePendingReview(state: StaffOpsState, sourceTable: "crosso
 
 export async function createCrossoverMessage(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {
   const subject = cleanString(input.subject);
-  const rawMessage = cleanString(input.message);
-  const from = cleanString(input.from_department);
-  const to = cleanString(input.to_department);
-  if (!subject || !rawMessage || !from || !to) throw new Error("Subject, message, from department, and to department are required.");
+  const rawDetails = cleanString(input.details ?? input.message);
+  const logType = cleanString(input.log_type, "General Shift Note") || "General Shift Note";
+  const assignedTo = optionalString(input.assigned_to) ?? optionalString(input.assigned_team);
+  const needsReview = Boolean(input.needs_management_review) || cleanString(input.status) === "Needs Management Review";
+  if (!subject || !rawDetails) throw new Error("Subject and details are required.");
   const now = nowIso();
-  const template_title = optionalString(input.template_title);
-  const field_values =
-    input.field_values && typeof input.field_values === "object" && !Array.isArray(input.field_values)
-      ? Object.fromEntries(
-          Object.entries(input.field_values as Record<string, unknown>)
-            .map(([key, value]) => [key, String(value ?? "").trim()])
-            .filter(([, value]) => value.length > 0)
-        )
-      : {};
-  const legacy = deriveLegacyCrossoverFields(template_title, field_values);
-  const message = resolveCrossoverMessage(
-    rawMessage,
-    template_title,
-    field_values,
-    { toDepartment: to, fromDepartment: from }
-  );
+  const priority = normalizePriority(input.priority);
+  const status = normalizeStatus(input.status, needsReview ? "Needs Management Review" : "Open");
+  const urgent = Boolean(input.urgent);
+  const from = optionalString(input.from_department) ?? "Front Desk";
+  const to = optionalString(input.to_department) ?? optionalString(input.assigned_team) ?? assignedTo ?? "Front Desk Team";
+  const details = rawDetails;
   const record: CrossoverMessage = {
     id: newId(),
     subject,
-    message,
+    message: details,
+    details,
+    log_type: logType,
     from_department: from,
     to_department: to,
-    priority: normalizePriority(input.priority),
-    status: "Active",
-    related_dog_name: legacy.related_dog_name,
-    related_owner_name: legacy.related_owner_name,
-    related_route: legacy.related_route,
-    traffic_weather_issue: legacy.traffic_weather_issue,
-    template_title: legacy.template_title,
-    template_field_values: legacy.template_field_values,
+    priority,
+    status,
+    related_dog_name: optionalString(input.related_dog_name ?? input.dog_name),
+    related_owner_name: optionalString(input.related_owner_name ?? input.owner_name),
+    related_route: optionalString(input.related_route),
+    traffic_weather_issue: optionalString(input.traffic_weather_issue),
+    template_title: optionalString(input.template_title),
+    template_field_values: null,
     created_by: actor,
-    assigned_to: optionalString(input.assigned_to) ?? legacy.assigned_to,
-    reported_to:
-      optionalString(input.reported_to) ??
-      optionalString(input.assigned_to) ??
-      legacy.assigned_to ??
-      to,
-    urgent: Boolean(input.urgent),
+    submitted_by: actor,
+    assigned_to: assignedTo,
+    assigned_team: optionalString(input.assigned_team) ?? (assignedTo && assignedTo.includes("Team") ? assignedTo : null),
+    reported_to: assignedTo ?? to,
+    department_area: optionalString(input.department_area),
+    due_at: normalizeDate(input.due_at),
+    reminder_at: normalizeDate(input.reminder_at),
+    needs_management_review: needsReview,
+    linked_owner_follow_up_id: null,
+    linked_active_issue_id: null,
+    management_alerted_at: null,
+    urgent,
     created_at: now,
     updated_at: now,
-    resolved_at: null
+    resolved_at: null,
+    archived_at: null
   };
   let state = await loadState(supabase);
   state = createActivityLog({ ...state, crossover_messages: sortNewest([record, ...state.crossover_messages]) }, {
-    activity_type: "crossover.created",
-    title: `New message: ${record.subject}`,
-    description: `${record.from_department} → ${record.to_department} • Reported to ${record.reported_to ?? record.to_department} • By ${actor ?? "Staff"}`,
+    activity_type: "shift_log.created",
+    title: `Log created: ${record.subject}`,
+    description: `${record.log_type} • ${shiftLogAssignedLabel(record)} • By ${actor ?? "Staff"}`,
     source_table: "crossover_messages",
     source_id: record.id,
     created_by: actor
   });
-  state = maybeCreateActiveIssueFromCrossover(state, record, actor);
-  state = notifyState(state, {
-    eventType: "created",
-    sourceTable: "crossover_messages",
-    sourceId: record.id,
-    sourceTab: crossoverTab(),
-    title: isUrgent(record.priority, record.urgent)
-      ? `Urgent crossover: ${record.subject}`
-      : `New crossover: ${record.subject}`,
-    body: record.message,
-    priority: record.priority,
-    urgent: record.urgent,
-    assignedTo: record.assigned_to,
-    toDepartment: record.to_department,
-    mentionText: record.message,
-    actor
+
+  if (Boolean(input.create_owner_follow_up)) {
+    const followUpResult = appendOwnerFollowUpFromLogState(state, record, actor);
+    state = followUpResult.state;
+    record.linked_owner_follow_up_id = followUpResult.followUpId;
+  }
+  if (Boolean(input.create_active_issue) || (record.log_type === "Owner Complaint" && isUrgent(record.priority, record.urgent, record.needs_management_review))) {
+    state = maybeCreateActiveIssueFromCrossover(state, record, actor);
+    const linked = state.active_issues.find((issue) => issue.source_table === "crossover_messages" && issue.source_id === record.id);
+    if (linked) record.linked_active_issue_id = linked.id;
+  }
+
+  const alertNow = isUrgent(record.priority, record.urgent, record.needs_management_review);
+  if (alertNow) {
+    state = notifyState(state, {
+      eventType: "created",
+      sourceTable: "crossover_messages",
+      sourceId: record.id,
+      sourceTab: crossoverTab(),
+      title: `Management alert: ${record.subject}`,
+      body: buildShiftLogAlertBody(record),
+      priority: record.priority,
+      urgent: record.urgent,
+      needsManagementReview: record.needs_management_review,
+      assignedTo: record.assigned_to ?? record.assigned_team,
+      actor
+    });
+    record.management_alerted_at = now;
+    state = {
+      ...state,
+      crossover_messages: state.crossover_messages.map((item) => (item.id === record.id ? { ...record, management_alerted_at: now } : item))
+    };
+    state = createActivityLog(state, {
+      activity_type: "shift_log.management_alerted",
+      title: "Management alerted",
+      description: record.subject,
+      source_table: "crossover_messages",
+      source_id: record.id,
+      created_by: actor
+    });
+  }
+
+  await saveState(supabase, {
+    ...state,
+    crossover_messages: state.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item))
   });
-  await saveState(supabase, state);
   return record;
 }
 
-export async function replyToCrossoverMessage(supabase: SupabaseClient, id: string, message: unknown, actor: string | null) {
+function shiftLogAssignedLabel(record: CrossoverMessage) {
+  return record.assigned_to ?? record.assigned_team ?? "Unassigned";
+}
+
+function buildShiftLogAlertBody(record: CrossoverMessage) {
+  return [
+    `Type: ${record.log_type ?? "General Shift Note"}`,
+    `Priority: ${record.priority}${record.urgent ? " (Urgent)" : ""}`,
+    `Submitted by: ${record.submitted_by ?? record.created_by ?? "Staff"}`,
+    record.assigned_to || record.assigned_team ? `Assigned to: ${record.assigned_to ?? record.assigned_team}` : null,
+    record.related_dog_name ? `Dog: ${record.related_dog_name}` : null,
+    record.related_owner_name ? `Owner: ${record.related_owner_name}` : null,
+    "",
+    shiftLogDetails(record)
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function appendOwnerFollowUpFromLogState(state: StaffOpsState, record: CrossoverMessage, actor: string | null) {
+  const now = nowIso();
+  const followUp: OwnerFollowUp = {
+    id: newId(),
+    subject: record.subject,
+    owner_name: record.related_owner_name ?? "Owner follow-up",
+    dog_name: record.related_dog_name,
+    logged_by: actor,
+    assigned_to: record.assigned_to ?? record.assigned_team ?? "Front Desk Team",
+    department: record.department_area ?? null,
+    priority: record.priority,
+    due_date: record.due_at ?? null,
+    status: "Open",
+    follow_up_notes: shiftLogDetails(record),
+    source: "Front Desk Log",
+    source_id: record.id,
+    urgent: record.urgent,
+    created_at: now,
+    updated_at: now,
+    resolved_at: null
+  };
+  return {
+    followUpId: followUp.id,
+    state: createActivityLog({ ...state, owner_follow_ups: sortNewest([followUp, ...state.owner_follow_ups]) }, {
+      activity_type: "follow_up.created_from_log",
+      title: `Owner Follow Up created from log: ${record.subject}`,
+      description: `Assigned to ${followUp.assigned_to}`,
+      source_table: "owner_follow_ups",
+      source_id: followUp.id,
+      created_by: actor
+    })
+  };
+}
+
+export async function replyToCrossoverMessage(
+  supabase: SupabaseClient,
+  id: string,
+  message: unknown,
+  actor: string | null,
+  updateType = "Internal Note"
+) {
   const text = cleanString(message);
-  if (!text) throw new Error("Reply message is required.");
+  if (!text) throw new Error("Update text is required.");
   const state = await loadState(supabase);
   const parent = state.crossover_messages.find((item) => item.id === id);
-  if (!parent) throw new Error("Crossover message not found.");
-  const reply: CrossoverReply = { id: newId(), crossover_message_id: id, message: text, created_by: actor, created_at: nowIso() };
-  const next = notifyState(
-    createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
-      activity_type: "crossover.reply",
-      title: "Reply added to crossover message",
-      description: `${actor ?? "Staff"} replied: ${text}`,
-      source_table: "crossover_messages",
-      source_id: id,
-      created_by: actor
-    }),
-    {
-      eventType: "reply",
-      sourceTable: "crossover_messages",
-      sourceId: id,
-      sourceTab: crossoverTab(),
-      title: `Reply on crossover: ${parent.subject}`,
-      body: text,
-      priority: parent.priority,
-      urgent: parent.urgent,
-      toDepartment: parent.to_department,
-      assignedTo: parent.assigned_to,
-      mentionText: text,
-      actor
-    }
-  );
+  if (!parent) throw new Error("Shift log entry not found.");
+  const reply: CrossoverReply = {
+    id: newId(),
+    crossover_message_id: id,
+    message: text,
+    update_type: cleanString(updateType, "Internal Note") || "Internal Note",
+    created_by: actor,
+    created_at: nowIso()
+  };
+  const next = createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
+    activity_type: "shift_log.update_added",
+    title: "Update added to shift log",
+    description: `${actor ?? "Staff"}: ${text}`,
+    source_table: "crossover_messages",
+    source_id: id,
+    created_by: actor
+  });
   await saveState(supabase, next);
   return reply;
 }
@@ -693,67 +819,116 @@ export async function replyToCrossoverMessage(supabase: SupabaseClient, id: stri
 export async function updateCrossoverMessage(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
   const now = nowIso();
   const state = await loadState(supabase);
+  const previous = state.crossover_messages.find((item) => item.id === id);
+  if (!previous) throw new Error("Shift log entry not found.");
   let updated: CrossoverMessage | null = null;
   let next: StaffOpsState = {
     ...state,
     crossover_messages: state.crossover_messages.map((item) => {
       if (item.id !== id) return item;
+      const needsReview =
+        patch.needs_management_review !== undefined ? Boolean(patch.needs_management_review) : item.needs_management_review ?? false;
       const status = normalizeStatus(patch.status, item.status);
+      const details =
+        patch.details !== undefined
+          ? cleanString(patch.details)
+          : patch.message !== undefined
+            ? cleanString(patch.message)
+            : item.details ?? item.message;
       updated = {
         ...item,
         subject: patch.subject !== undefined ? cleanString(patch.subject) : item.subject,
-        message: patch.message !== undefined ? cleanString(patch.message) : item.message,
-        from_department: patch.from_department !== undefined ? cleanString(patch.from_department) : item.from_department,
-        to_department: patch.to_department !== undefined ? cleanString(patch.to_department) : item.to_department,
+        message: details,
+        details,
+        log_type: patch.log_type !== undefined ? cleanString(patch.log_type, "General Shift Note") : item.log_type ?? "General Shift Note",
         priority: patch.priority !== undefined ? normalizePriority(patch.priority) : item.priority,
         status,
-        related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name) : item.related_dog_name,
-        related_owner_name: patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name) : item.related_owner_name,
-        related_route: patch.related_route !== undefined ? optionalString(patch.related_route) : item.related_route,
-        traffic_weather_issue:
-          patch.traffic_weather_issue !== undefined ? optionalString(patch.traffic_weather_issue) : item.traffic_weather_issue ?? null,
-        template_title: patch.template_title !== undefined ? optionalString(patch.template_title) : item.template_title ?? null,
-        template_field_values:
-          patch.field_values && typeof patch.field_values === "object"
-            ? (patch.field_values as Record<string, string>)
-            : item.template_field_values ?? null,
+        related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name ?? patch.dog_name) : item.related_dog_name,
+        related_owner_name:
+          patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name ?? patch.owner_name) : item.related_owner_name,
         assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
-        reported_to: patch.reported_to !== undefined ? optionalString(patch.reported_to) : item.reported_to,
+        assigned_team: patch.assigned_team !== undefined ? optionalString(patch.assigned_team) : item.assigned_team,
+        reported_to: patch.reported_to !== undefined ? optionalString(patch.reported_to) : item.reported_to ?? item.assigned_to,
+        department_area: patch.department_area !== undefined ? optionalString(patch.department_area) : item.department_area,
+        due_at: patch.due_at !== undefined ? normalizeDate(patch.due_at) : item.due_at ?? null,
+        reminder_at: patch.reminder_at !== undefined ? normalizeDate(patch.reminder_at) : item.reminder_at ?? null,
+        needs_management_review: needsReview || status === "Needs Management Review",
         urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
+        linked_owner_follow_up_id:
+          patch.linked_owner_follow_up_id !== undefined ? optionalString(patch.linked_owner_follow_up_id) : item.linked_owner_follow_up_id ?? null,
+        linked_active_issue_id:
+          patch.linked_active_issue_id !== undefined ? optionalString(patch.linked_active_issue_id) : item.linked_active_issue_id ?? null,
         updated_at: now,
-        resolved_at: status === "Resolved" ? item.resolved_at ?? now : status === "Archived" ? item.resolved_at : null
+        resolved_at:
+          status === "Resolved" || status === "Completed" ? item.resolved_at ?? now : status === "Archived" ? item.resolved_at : null,
+        archived_at: status === "Archived" ? item.archived_at ?? now : item.archived_at ?? null
       };
       return updated;
     })
   };
-  if (!updated) throw new Error("Crossover message not found.");
+  if (!updated) throw new Error("Shift log entry not found.");
   const updatedRecord = updated as CrossoverMessage;
-  if (updatedRecord.status === "Resolved") next = markLinkedIssuePendingReview(next, "crossover_messages", updatedRecord.id, actor);
-  next = maybeCreateActiveIssueFromCrossover(next, updatedRecord, actor);
+  if (updatedRecord.status === "Resolved" || updatedRecord.status === "Completed") {
+    next = markLinkedIssuePendingReview(next, "crossover_messages", updatedRecord.id, actor);
+  }
+  if (Boolean(patch.create_active_issue)) next = maybeCreateActiveIssueFromCrossover(next, updatedRecord, actor);
+  if (Boolean(patch.create_owner_follow_up)) {
+    const followUpResult = appendOwnerFollowUpFromLogState(next, updatedRecord, actor);
+    next = followUpResult.state;
+    updatedRecord.linked_owner_follow_up_id = followUpResult.followUpId;
+    next = {
+      ...next,
+      crossover_messages: next.crossover_messages.map((item) =>
+        item.id === updatedRecord.id ? { ...updatedRecord, linked_owner_follow_up_id: followUpResult.followUpId } : item
+      )
+    };
+  }
+
   next = createActivityLog(next, {
-    activity_type: "crossover.updated",
-    title: `Updated message: ${updatedRecord.subject}`,
+    activity_type: "shift_log.updated",
+    title: `Log updated: ${updatedRecord.subject}`,
     description: `Status: ${updatedRecord.status}`,
     source_table: "crossover_messages",
     source_id: updatedRecord.id,
     created_by: actor
   });
-  next = notifyState(next, {
-    eventType: "updated",
-    sourceTable: "crossover_messages",
-    sourceId: updatedRecord.id,
-    sourceTab: crossoverTab(),
-    title: isUrgent(updatedRecord.priority, updatedRecord.urgent)
-      ? `Urgent crossover updated: ${updatedRecord.subject}`
-      : `Crossover updated: ${updatedRecord.subject}`,
-    body: updatedRecord.message,
-    priority: updatedRecord.priority,
-    urgent: updatedRecord.urgent,
-    assignedTo: updatedRecord.assigned_to,
-    toDepartment: updatedRecord.to_department,
-    mentionText: updatedRecord.message,
-    actor
-  });
+
+  const wasAlerting = isUrgent(previous.priority, previous.urgent, previous.needs_management_review);
+  const shouldAlert = isUrgent(updatedRecord.priority, updatedRecord.urgent, updatedRecord.needs_management_review);
+  const priorityIncreased = priorityRank(updatedRecord.priority) > priorityRank(previous.priority);
+  const reviewTurnedOn = !previous.needs_management_review && updatedRecord.needs_management_review;
+  const shouldSendAlert = shouldAlert && (!wasAlerting || priorityIncreased || reviewTurnedOn || !previous.management_alerted_at);
+
+  if (shouldSendAlert) {
+    next = notifyState(next, {
+      eventType: "updated",
+      sourceTable: "crossover_messages",
+      sourceId: updatedRecord.id,
+      sourceTab: crossoverTab(),
+      title: `Management alert: ${updatedRecord.subject}`,
+      body: buildShiftLogAlertBody(updatedRecord),
+      priority: updatedRecord.priority,
+      urgent: updatedRecord.urgent,
+      needsManagementReview: updatedRecord.needs_management_review,
+      assignedTo: updatedRecord.assigned_to ?? updatedRecord.assigned_team,
+      actor
+    });
+    next = {
+      ...next,
+      crossover_messages: next.crossover_messages.map((item) =>
+        item.id === updatedRecord.id ? { ...item, management_alerted_at: now } : item
+      )
+    };
+    next = createActivityLog(next, {
+      activity_type: "shift_log.management_alerted",
+      title: "Management alerted",
+      description: updatedRecord.subject,
+      source_table: "crossover_messages",
+      source_id: updatedRecord.id,
+      created_by: actor
+    });
+  }
+
   await saveState(supabase, next);
   return updatedRecord;
 }

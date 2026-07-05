@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, MapPinOff, PawPrint, PhoneOff } from "lucide-react";
+import { AlertTriangle, MapPinOff, PawPrint, PhoneOff, UserRound } from "lucide-react";
 import { useStaffPushNoticeAlarm } from "@/hooks/useStaffPushNoticeAlarm";
-import type { StaffPushNotice } from "@/lib/staff/push-notices";
+import { isDogHandlerComplaintNotice, type StaffPushNotice } from "@/lib/staff/push-notices";
 
 function NoticeIcon({ notice }: { notice: StaffPushNotice }) {
+  if (isDogHandlerComplaintNotice(notice)) return <UserRound />;
   const title = notice.title.toLowerCase();
   if (title.includes("phone")) return <PhoneOff />;
   if (title.includes("yard")) return <MapPinOff />;
@@ -13,10 +14,11 @@ function NoticeIcon({ notice }: { notice: StaffPushNotice }) {
 
 function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice; fullscreen?: boolean }) {
   const isBursting = useStaffPushNoticeAlarm(notice);
+  const isDogHandler = isDogHandlerComplaintNotice(notice);
 
   return (
     <article
-      className={`staff-push-notice staff-push-notice--alert ${isBursting ? "staff-push-notice--burst" : ""} ${fullscreen ? "staff-push-notice--fullscreen" : ""}`}
+      className={`staff-push-notice staff-push-notice--alert ${isDogHandler ? "staff-push-notice--dog-handler" : ""} ${isBursting ? "staff-push-notice--burst" : ""} ${fullscreen ? "staff-push-notice--fullscreen" : ""}`}
       role="alert"
       aria-live="assertive"
     >
@@ -35,9 +37,20 @@ function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice
       <div className="staff-push-notice__icon" aria-hidden="true">
         <NoticeIcon notice={notice} />
       </div>
-      <p className="staff-push-notice__eyebrow">Yard Handler Alert</p>
+      <p className="staff-push-notice__eyebrow">{isDogHandler ? "Owner Complaint Alert" : "Yard Handler Alert"}</p>
       <h2 className="staff-push-notice__title">{notice.title}</h2>
-      {notice.message ? <p className="staff-push-notice__message">{notice.message}</p> : null}
+      {isDogHandler && notice.dog_handler_name ? (
+        <p className="staff-push-notice__handler-name">
+          Dog Handler: <span>{notice.dog_handler_name}</span>
+        </p>
+      ) : null}
+      {notice.message ? (
+        <div className="staff-push-notice__message-block">
+          {isDogHandler ? <p className="staff-push-notice__message-label">Message:</p> : null}
+          <p className="staff-push-notice__message">{notice.message}</p>
+        </div>
+      ) : null}
+      {isDogHandler ? <p className="staff-push-notice__management-note">Management review required.</p> : null}
       {expiresLabel(notice) ? <p className="staff-push-notice__expires">{expiresLabel(notice)}</p> : null}
     </article>
   );

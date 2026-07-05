@@ -3,6 +3,7 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 export type StaffPushNoticePriority = "normal" | "important" | "urgent";
 export type StaffPushNoticeDisplayMode = "normal" | "urgent";
 export type StaffPushNoticeRecurrence = "none" | "day" | "week" | "month";
+export type StaffPushNoticeType = "standard" | "owner_complaint_dog_handler";
 
 export type StaffPushNotice = {
   id: string;
@@ -12,6 +13,8 @@ export type StaffPushNotice = {
   display_mode: StaffPushNoticeDisplayMode;
   is_active: boolean;
   is_default: boolean;
+  notice_type?: StaffPushNoticeType;
+  dog_handler_name?: string | null;
   created_by: string | null;
   updated_by: string | null;
   pushed_at: string | null;
@@ -34,10 +37,47 @@ export type StaffPushNoticeInput = {
   expires_at?: unknown;
   display_duration_minutes?: unknown;
   is_default?: unknown;
+  notice_type?: unknown;
+  dog_handler_name?: unknown;
   schedule_enabled?: unknown;
   scheduled_at?: unknown;
   recurrence?: unknown;
 };
+
+export const DOG_HANDLER_COMPLAINT_NOTICE_LABEL = "OWNER COMPLAINT - Dog Handler";
+export const DOG_HANDLER_COMPLAINT_WHITEBOARD_TITLE = "OWNER COMPLAINT";
+export const DOG_HANDLER_COMPLAINT_MESSAGE =
+  "Owner complaint involving dog handler. Management review required.";
+
+const MAX_DOG_HANDLER_NAME_LENGTH = 80;
+
+export function sanitizeDogHandlerName(value: unknown) {
+  return String(value ?? "")
+    .replace(/[<>&"'`/\\]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_DOG_HANDLER_NAME_LENGTH);
+}
+
+export function isDogHandlerComplaintNotice(notice: Pick<StaffPushNotice, "notice_type" | "title">) {
+  return notice.notice_type === "owner_complaint_dog_handler";
+}
+
+export function buildDogHandlerComplaintNoticeInput(
+  dogHandlerName: string,
+  displayDurationMinutes?: unknown
+): StaffPushNoticeInput {
+  return {
+    title: DOG_HANDLER_COMPLAINT_WHITEBOARD_TITLE,
+    message: DOG_HANDLER_COMPLAINT_MESSAGE,
+    priority: "urgent",
+    display_mode: "urgent",
+    notice_type: "owner_complaint_dog_handler",
+    dog_handler_name: dogHandlerName,
+    display_duration_minutes: displayDurationMinutes,
+    is_default: false
+  };
+}
 
 export const DEFAULT_STAFF_PUSH_NOTICES: readonly Pick<
   StaffPushNotice,
@@ -96,6 +136,17 @@ function normalizeRecurrence(value: unknown): StaffPushNoticeRecurrence {
   return "none";
 }
 
+function normalizeNoticeType(value: unknown): StaffPushNoticeType | undefined {
+  if (value === "owner_complaint_dog_handler") return value;
+  return undefined;
+}
+
+function normalizeDogHandlerName(value: unknown) {
+  if (value == null || value === "") return null;
+  const cleaned = sanitizeDogHandlerName(value);
+  return cleaned || null;
+}
+
 function normalizeOptionalDate(value: unknown) {
   if (value == null || value === "") return null;
   const parsed = new Date(String(value));
@@ -150,6 +201,13 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
     throw new Error("Notice title is required.");
   }
 
+  const notice_type = normalizeNoticeType(input.notice_type);
+  const dog_handler_name = normalizeDogHandlerName(input.dog_handler_name);
+
+  if (notice_type === "owner_complaint_dog_handler" && !dog_handler_name) {
+    throw new Error("Please enter the dog handler name before pushing this notice.");
+  }
+
   return {
     title,
     message: message || null,
@@ -158,6 +216,8 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
     expires_at: normalizeOptionalDate(input.expires_at),
     display_duration_minutes,
     is_default: Boolean(input.is_default),
+    notice_type,
+    dog_handler_name,
     schedule_enabled,
     scheduled_at,
     recurrence,

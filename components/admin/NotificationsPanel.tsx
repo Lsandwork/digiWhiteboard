@@ -127,31 +127,31 @@ export function NotificationsPanel({ onOpenTab }: NotificationsPanelProps) {
   }
 
   return (
-    <div className="space-y-5">
-      <header className="admin-card p-5">
+    <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
+      <header className="crossover-card crossover-card--sidebar p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="mb-2 flex items-center gap-2">
-              <BellRing className="h-5 w-5 text-fitdog-orange" aria-hidden />
-              <h2 className="admin-page-title">Notifications</h2>
-              {unreadCount > 0 ? <span className="admin-notif-badge">{unreadCount} unread</span> : null}
+              <BellRing className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
+              <h2 className="crossover-dashboard__page-title">Notifications</h2>
+              {unreadCount > 0 ? <span className="crossover-badge crossover-badge--urgent">{unreadCount} unread</span> : null}
             </div>
-            <p className="admin-page-subtitle max-w-2xl">
+            <p className="crossover-dashboard__page-subtitle max-w-2xl">
               Alerts for crossover updates, assignments, @mentions, and urgent escalations. Front Desk Coordinators and Team Lead staff see all staff updates; High and Urgent items also alert Admins.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={`admin-help-category ${filter === "all" ? "admin-help-category--active" : ""}`} onClick={() => setFilter("all")}>
+            <button type="button" className={`crossover-urgent-pill ${filter === "all" ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilter("all")}>
               All
             </button>
-            <button type="button" className={`admin-help-category ${filter === "unread" ? "admin-help-category--active" : ""}`} onClick={() => setFilter("unread")}>
+            <button type="button" className={`crossover-urgent-pill ${filter === "unread" ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilter("unread")}>
               Unread
             </button>
-            <button type="button" className="admin-btn-secondary" disabled={busy || unreadCount === 0} onClick={() => void mutate("mark_all_notifications_read")}>
+            <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy || unreadCount === 0} onClick={() => void mutate("mark_all_notifications_read")}>
               <CheckCheck className="mr-2 inline h-4 w-4" />
               Mark all read
             </button>
-            <button type="button" className="admin-btn-secondary" disabled={loading} onClick={() => void load()}>
+            <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void load()}>
               Refresh
             </button>
           </div>

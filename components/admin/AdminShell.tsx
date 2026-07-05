@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
-import { canViewStaffDirectory, isCrossoverStaffRole, isStaffOpsLimitedRole, isStaffPanelLimitedRole } from "@/lib/admin/users";
+import {
+  canAccessPushNotices,
+  canViewStaffDirectory,
+  hasCoordinatorAccess,
+  isCrossoverStaffRole,
+  isFullAdminRole,
+  isStaffPanelLimitedRole
+} from "@/lib/admin/users";
 import { Sidebar, MobileMenuButton, tabLabels, ADMIN_TABS } from "@/components/admin/Sidebar";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 
@@ -49,32 +56,28 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
-  const canManagePushNotices = role !== "viewer" && !isCrossoverStaffRole(role);
-  const canManageStaffOps = role !== "viewer" && !isCrossoverStaffRole(role);
   const staffPanelLimited = isStaffPanelLimitedRole(role);
-  const crossoverStaffOnly = isCrossoverStaffRole(role);
-  const staffOpsTabs: AdminTab[] = [
+  const coordinatorTabs: AdminTab[] = [
     "push_notices",
     "crossover_communication",
     "owner_follow_up",
     "active_issues",
     "staff_directory",
     "whiteboard_preview",
-    "analytics",
     "templates",
     "notifications",
     "help"
   ];
-  const crossoverStaffTabs: AdminTab[] = ["crossover_communication", "notifications", "help"];
+  const crossoverStaffTabs: AdminTab[] = ["notifications", "help"];
 
   const visibleTabs = ADMIN_TABS.filter((item) => {
+    if (hasCoordinatorAccess(role)) return coordinatorTabs.includes(item);
+    if (isCrossoverStaffRole(role)) return crossoverStaffTabs.includes(item);
     if (item === "staff_directory" && !canViewStaffDirectory(role)) return false;
-    if (crossoverStaffOnly) return crossoverStaffTabs.includes(item);
-    if (staffPanelLimited && !crossoverStaffOnly) return staffOpsTabs.includes(item) && item !== "settings";
     if (board === "staff" && (item === "promotions" || item === "schedule")) return false;
     if (board === "staff" && item === "users") return false;
-    if (item === "push_notices" && !canManagePushNotices) return false;
-    if (["crossover_communication", "owner_follow_up", "active_issues"].includes(item) && !canManageStaffOps) return false;
+    if (item === "push_notices" && !canAccessPushNotices(role)) return false;
+    if (["crossover_communication", "owner_follow_up", "active_issues"].includes(item) && !(isFullAdminRole(role) || hasCoordinatorAccess(role))) return false;
     return true;
   });
 
@@ -149,7 +152,7 @@ export function AdminShell({
           </header>
 
           <div className={`admin-content-grid ${showPreview ? "" : "admin-content-grid--single"}`}>
-            <div className="admin-content-main min-w-0 space-y-5">{children}</div>
+            <div className="admin-content-main crossover-dashboard min-w-0 space-y-5">{children}</div>
             {showPreview && preview ? <aside className="admin-preview-column">{preview}</aside> : null}
           </div>
         </div>

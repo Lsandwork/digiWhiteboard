@@ -71,9 +71,44 @@ export function hasCoordinatorAccess(role?: string | null) {
   return isStaffOpsLimitedRole(role);
 }
 
-/** Crossover Communication tab — coordinators, management, admins, groomers, trainers. */
+/** Front Desk Shift Log — coordinators, team leads, management, admins. */
+export function canAccessFrontDeskLog(role?: string | null) {
+  return isFullAdminRole(role) || hasCoordinatorAccess(role);
+}
+
+/** Alias: coordinator-like roles share identical staff panel permissions. */
+export function isCoordinatorLikeRole(role?: string | null) {
+  return hasCoordinatorAccess(role);
+}
+
+/** Crossover Communication tab — coordinators, management, admins (legacy tab id). */
 export function canAccessCrossoverCommunication(role?: string | null) {
-  return isFullAdminRole(role) || hasCoordinatorAccess(role) || isCrossoverStaffRole(role);
+  return canAccessFrontDeskLog(role);
+}
+
+/** Crossover row actions (view, resolve, more) for anyone with crossover access. */
+export function canUseCrossoverConversationActions(role?: string | null) {
+  return canAccessCrossoverCommunication(role);
+}
+
+/** Push crossover alerts to the staff whiteboard — coordinators and admins only. */
+export function canPushCrossoverToWhiteboard(role?: string | null) {
+  return isFullAdminRole(role) || hasCoordinatorAccess(role);
+}
+
+/** Push Notices tab — front desk coordinators, team leads, and admins. */
+export function canAccessPushNotices(role?: string | null) {
+  return isFullAdminRole(role) || hasCoordinatorAccess(role);
+}
+
+/** Dog handler owner complaint push notice — admin and management only. */
+export function canCreateDogHandlerComplaintNotice(role?: string | null) {
+  return isFullAdminRole(role);
+}
+
+/** Management write-up reports — admin and management only. */
+export function canViewManagementReports(role?: string | null) {
+  return isFullAdminRole(role);
 }
 
 export function isStaffPanelLimitedRole(role?: string | null) {

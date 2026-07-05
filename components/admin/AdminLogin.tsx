@@ -7,7 +7,7 @@ import { ShieldCheck } from "lucide-react";
 import { isCrossoverStaffRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 
 function defaultAdminRoute(role?: string) {
-  if (isCrossoverStaffRole(role)) return "/admin?board=staff&tab=crossover_communication";
+  if (isCrossoverStaffRole(role)) return "/admin?board=staff&tab=notifications";
   if (isStaffOpsLimitedRole(role)) return "/admin?board=staff&tab=push_notices";
   return "/admin";
 }

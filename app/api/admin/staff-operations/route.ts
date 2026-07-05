@@ -108,8 +108,8 @@ export async function POST(request: Request) {
       auditAction = "staff.crossover.update";
     } else if (action === "reply_crossover") {
       const id = String(body.id ?? "");
-      result = await replyToCrossoverMessage(supabase, id, body.message, actor);
-      auditAction = "staff.crossover.reply";
+      result = await replyToCrossoverMessage(supabase, id, body.message, actor, String(body.update_type ?? "Internal Note"));
+      auditAction = "staff.shift_log.update";
     } else if (action === "create_follow_up") {
       result = await createOwnerFollowUp(supabase, body, actor);
       auditAction = "staff.follow_up.create";

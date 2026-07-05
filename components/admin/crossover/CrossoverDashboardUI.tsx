@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Pencil } from "lucide-react";
+import { CheckCircle2, Pencil } from "lucide-react";
 import type {
   CrossoverMessage,
   StaffActivityLog,
@@ -88,14 +88,37 @@ function CrossoverIconButton({
   );
 }
 
+function CrossoverResolveButton({
+  disabled,
+  onClick
+}: {
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="crossover-icon-btn crossover-icon-btn--resolve"
+      disabled={disabled}
+      aria-label="Mark resolved"
+      title="Mark resolved"
+      onClick={onClick}
+    >
+      <CheckCircle2 aria-hidden className="crossover-icon-btn__lucide" />
+    </button>
+  );
+}
+
 function CrossoverMoreMenu({
   busy,
+  canPushToWhiteboard,
   onReopen,
   onArchive,
   onEscalate,
   onPush
 }: {
   busy: boolean;
+  canPushToWhiteboard: boolean;
   onReopen: () => void;
   onArchive: () => void;
   onEscalate: () => void;
@@ -120,7 +143,9 @@ function CrossoverMoreMenu({
         <div className="crossover-more-menu__panel" role="menu">
           <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onReopen(); }}>Reopen</button>
           <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onEscalate(); }}>Escalate</button>
-          <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onPush(); }}>Push to Whiteboard</button>
+          {canPushToWhiteboard ? (
+            <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onPush(); }}>Push to Whiteboard</button>
+          ) : null}
           <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onArchive(); }}>Archive</button>
         </div>
       ) : null}
@@ -130,6 +155,7 @@ function CrossoverMoreMenu({
 
 function CrossoverRowActions({
   busy,
+  canPushToWhiteboard,
   onDetail,
   onResolve,
   onReopen,
@@ -138,6 +164,7 @@ function CrossoverRowActions({
   onPush
 }: {
   busy: boolean;
+  canPushToWhiteboard: boolean;
   onDetail: () => void;
   onResolve: () => void;
   onReopen: () => void;
@@ -148,8 +175,15 @@ function CrossoverRowActions({
   return (
     <div className="crossover-row-actions">
       <CrossoverIconButton src={CROSSOVER_ASSETS.eye} alt="View" label="View conversation" disabled={busy} onClick={onDetail} />
-      <CrossoverIconButton src={CROSSOVER_ASSETS.check} alt="Complete" label="Mark resolved" disabled={busy} onClick={onResolve} />
-      <CrossoverMoreMenu busy={busy} onReopen={onReopen} onArchive={onArchive} onEscalate={onEscalate} onPush={onPush} />
+      <CrossoverResolveButton disabled={busy} onClick={onResolve} />
+      <CrossoverMoreMenu
+        busy={busy}
+        canPushToWhiteboard={canPushToWhiteboard}
+        onReopen={onReopen}
+        onArchive={onArchive}
+        onEscalate={onEscalate}
+        onPush={onPush}
+      />
     </div>
   );
 }
@@ -245,6 +279,7 @@ export function ActiveConversationsCard({
   pageSize,
   busy,
   loading,
+  canPushToWhiteboard,
   directory,
   filters,
   setFilters,
@@ -264,6 +299,7 @@ export function ActiveConversationsCard({
   pageSize: number;
   busy: boolean;
   loading: boolean;
+  canPushToWhiteboard: boolean;
   directory?: StaffDirectoryMember[];
   filters: CrossoverFilters;
   setFilters: (filters: CrossoverFilters) => void;
@@ -329,6 +365,7 @@ export function ActiveConversationsCard({
                   <td>
                     <CrossoverRowActions
                       busy={busy}
+                      canPushToWhiteboard={canPushToWhiteboard}
                       onDetail={() => onDetail(item)}
                       onResolve={() => void onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Conversation resolved.")}
                       onReopen={() => void onMutate("Unable to reopen.", { action: "update_crossover", id: item.id, status: "Active" }, "Conversation reopened.")}
@@ -368,6 +405,7 @@ export function ActiveConversationsCard({
               <CrossoverStatusBadge status={item.status} />
               <CrossoverRowActions
                 busy={busy}
+                canPushToWhiteboard={canPushToWhiteboard}
                 onDetail={() => onDetail(item)}
                 onResolve={() => void onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Conversation resolved.")}
                 onReopen={() => void onMutate("Unable to reopen.", { action: "update_crossover", id: item.id, status: "Active" }, "Conversation reopened.")}

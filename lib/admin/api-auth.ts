@@ -1,7 +1,11 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import {
   canAccessCrossoverCommunication,
+  canAccessFrontDeskLog,
+  canAccessPushNotices,
+  canCreateDogHandlerComplaintNotice,
   canManageStaffDirectory,
+  canViewManagementReports,
   canViewStaffDirectory,
   hasCoordinatorAccess
 } from "@/lib/admin/users";
@@ -19,7 +23,7 @@ export function unauthorizedAdminResponse(body: Record<string, unknown> = { erro
 }
 
 export function canManagePushNotices(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || hasCoordinatorAccess(role) || !role;
+  return canAccessPushNotices(role) || !role;
 }
 
 export function canManageStaffOperations(role?: string | null) {
@@ -35,7 +39,7 @@ export function canCreatePushNotice(role?: string | null) {
 }
 
 export function canManageCrossover(role?: string | null) {
-  return canAccessCrossoverCommunication(role);
+  return canAccessFrontDeskLog(role);
 }
 
 export function canManageOwnerFollowUp(role?: string | null) {
@@ -46,4 +50,12 @@ export function canManageActiveIssues(role?: string | null) {
   return canManageStaffOperations(role);
 }
 
-export { canAccessCrossoverCommunication, canViewStaffDirectory, canManageStaffDirectory };
+export function canPushDogHandlerComplaintNotice(role?: string | null) {
+  return canCreateDogHandlerComplaintNotice(role) || !role;
+}
+
+export function canAccessManagementReports(role?: string | null) {
+  return canViewManagementReports(role) || !role;
+}
+
+export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

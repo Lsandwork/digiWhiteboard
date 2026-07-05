@@ -110,14 +110,13 @@ export function AdminDashboard() {
       "active_issues",
       "staff_directory",
       "whiteboard_preview",
-      "analytics",
       "templates",
       "notifications",
       "help"
     ];
-    const crossoverStaffTabs: AdminTab[] = ["crossover_communication", "notifications", "help"];
+    const crossoverStaffTabs: AdminTab[] = ["notifications", "help"];
     if (isCrossoverStaffRole(role) && (board !== "staff" || !crossoverStaffTabs.includes(tab))) {
-      router.replace("/admin?board=staff&tab=crossover_communication");
+      router.replace("/admin?board=staff&tab=notifications");
     }
     if (isStaffOpsLimitedRole(role) && (board !== "staff" || !coordinatorTabs.includes(tab))) {
       router.replace("/admin?board=staff&tab=push_notices");
@@ -382,8 +381,8 @@ export function AdminDashboard() {
         {tab === "templates" ? (
           <section className="admin-card p-5">
             <h2 className="admin-page-title">Templates</h2>
-            <p className="admin-page-subtitle">Reusable communication templates are available inside Crossover Communication when composing a new message.</p>
-            <button type="button" className="admin-btn-primary mt-4" onClick={() => setActiveTab("crossover_communication")}>Open Crossover Templates</button>
+            <p className="admin-page-subtitle">Quick Log Templates for the Front Desk Tracking Log are available when adding a shift log entry.</p>
+            <button type="button" className="admin-btn-primary mt-4" onClick={() => setActiveTab("crossover_communication")}>Open Front Desk Log</button>
           </section>
         ) : null}
 

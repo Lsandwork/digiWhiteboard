@@ -172,87 +172,94 @@ export function StaffDirectoryPanel() {
   const canManageDirectory = isFullAdminRole(data?.currentUser.role);
 
   return (
-    <div className="space-y-5">
-      <header className="admin-page-header">
+    <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
+      <header className="crossover-dashboard__page-header">
         <div>
-          <h2 className="admin-page-title">Staff Directory</h2>
-          <p className="admin-page-subtitle">
+          <h2 className="crossover-dashboard__page-title">Staff Directory</h2>
+          <p className="crossover-dashboard__page-subtitle">
             {canManageDirectory
               ? "Manage staff assignments, contact details, and dashboard login access in one place."
               : "View staff assignments, contact details, and dashboard roles. Only full admins can add or edit entries."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {loading || refreshing ? <span className="admin-badge">{loading ? "Loading..." : "Refreshing..."}</span> : null}
+          {loading || refreshing ? <span className="crossover-badge crossover-badge--status-pending">{loading ? "Loading..." : "Refreshing..."}</span> : null}
           {canManageDirectory ? (
-            <button type="button" className="admin-btn-primary inline-flex items-center gap-2" onClick={() => setAddOpen(true)} disabled={busy}>
+            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" onClick={() => setAddOpen(true)} disabled={busy}>
               <Plus className="h-4 w-4" /> Add Staff Member
             </button>
           ) : null}
         </div>
       </header>
 
-      <section className="grid gap-3 md:grid-cols-3">
-        <div className="admin-card p-4">
-          <p className="text-2xl font-black text-white">{data?.staff_directory.length ?? 0}</p>
-          <p className="text-sm text-admin-muted">Total directory entries</p>
+      <section className="crossover-stat-grid md:grid-cols-3">
+        <div className="crossover-stat-card">
+          <div className="crossover-stat-card__icon"><UserRound className="h-5 w-5" /></div>
+          <div>
+            <p className="crossover-stat-card__value">{data?.staff_directory.length ?? 0}</p>
+            <p className="crossover-stat-card__label">Total directory entries</p>
+          </div>
         </div>
-        <div className="admin-card p-4">
-          <p className="text-2xl font-black text-white">{activeCount}</p>
-          <p className="text-sm text-admin-muted">Active assignment options</p>
+        <div className="crossover-stat-card">
+          <div className="crossover-stat-card__icon"><CheckCircle2 className="h-5 w-5" /></div>
+          <div>
+            <p className="crossover-stat-card__value">{activeCount}</p>
+            <p className="crossover-stat-card__label">Active assignment options</p>
+          </div>
         </div>
-        <div className="admin-card p-4">
-          <p className="text-2xl font-black text-white">{inactiveCount}</p>
-          <p className="text-sm text-admin-muted">Inactive entries</p>
+        <div className="crossover-stat-card">
+          <div className="crossover-stat-card__icon"><XCircle className="h-5 w-5" /></div>
+          <div>
+            <p className="crossover-stat-card__value">{inactiveCount}</p>
+            <p className="crossover-stat-card__label">Inactive entries</p>
+          </div>
         </div>
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="admin-card overflow-hidden">
-          <div className="space-y-4 border-b border-admin-border p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-black text-white">Directory</h3>
-                <p className="text-sm text-admin-muted">
-                  {canManageDirectory ? "Search, edit, activate, deactivate, or delete staff entries." : "Search and review staff directory records."}
-                </p>
-              </div>
-              <button type="button" className="admin-btn-secondary" onClick={() => void load(true)} disabled={loading || refreshing}>
-                Refresh
-              </button>
+        <div className="crossover-card crossover-card--conversations">
+          <div className="crossover-card__header">
+            <div>
+              <h3 className="crossover-card__title">Directory</h3>
+              <p className="crossover-card__subtitle">
+                {canManageDirectory ? "Search, edit, activate, deactivate, or delete staff entries." : "Search and review staff directory records."}
+              </p>
             </div>
-            <div className="grid gap-3">
-              <label className="relative block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-muted" />
-                <input
-                  className="admin-input pl-9"
-                  placeholder="Search name, department, email, notes..."
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <FilterButtonGroup label="Department" value={department} options={["", ...STAFF_DEPARTMENTS]} allLabel="All departments" onChange={setDepartment} />
-              <FilterButtonGroup label="Status" value={status} options={["", ...staffStatusOptions]} allLabel="All statuses" onChange={setStatus} />
-            </div>
+            <button type="button" className="crossover-btn crossover-btn--outline" onClick={() => void load(true)} disabled={loading || refreshing}>
+              Refresh
+            </button>
+          </div>
+          <div className="space-y-4 border-b border-[rgba(255,166,0,0.12)] px-5 pb-5">
+            <label className="crossover-search">
+              <Search className="crossover-search__icon-lucide" aria-hidden />
+              <input
+                className="crossover-input crossover-search__input"
+                placeholder="Search name, department, email, notes..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+            <FilterButtonGroup label="Department" value={department} options={["", ...STAFF_DEPARTMENTS]} allLabel="All departments" onChange={setDepartment} />
+            <FilterButtonGroup label="Status" value={status} options={["", ...staffStatusOptions]} allLabel="All statuses" onChange={setStatus} />
           </div>
 
-          <div className="hidden overflow-x-auto md:block">
-            <table className="min-w-full divide-y divide-admin-border text-sm">
-              <thead className="bg-white/[0.03] text-left text-xs uppercase tracking-wide text-admin-muted">
+          <div className="crossover-table-wrap hidden md:block">
+            <table className="crossover-table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3">Name</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Department</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3">Dashboard</th>
-                  <th className="px-4 py-3">Status</th>
-                  {canManageDirectory ? <th className="px-4 py-3 text-right">Actions</th> : null}
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th>Contact</th>
+                  <th>Dashboard</th>
+                  <th>Status</th>
+                  {canManageDirectory ? <th className="crossover-table__actions-col">Actions</th> : null}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-admin-border">
+              <tbody>
                 {members.map((member) => (
-                  <tr key={member.id} className="text-admin-muted">
-                    <td className="px-4 py-3 font-bold text-white">{member.name}</td>
+                  <tr key={member.id}>
+                    <td className="crossover-table__emphasis">{member.name}</td>
                     <td className="px-4 py-3">{member.role ?? "Staff Member"}</td>
                     <td className="px-4 py-3">{member.department}</td>
                     <td className="px-4 py-3">
