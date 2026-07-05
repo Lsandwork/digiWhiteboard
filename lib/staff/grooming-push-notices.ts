@@ -203,6 +203,27 @@ export function ownerDisplayLabel(notice: Pick<GroomingPushNotice, "owner_name" 
   return null;
 }
 
+/** "Jasper Sandoval" → dog Jasper, owner last name Sandoval */
+export function parseDogAndOwnerLastName(input: string) {
+  const trimmed = String(input ?? "").trim();
+  if (!trimmed) return { dog_name: "", owner_name: null as string | null, owner_initial: null as string | null };
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return {
+      dog_name: parts[0]!,
+      owner_name: null,
+      owner_initial: null
+    };
+  }
+  const owner_name = parts[parts.length - 1]!;
+  const dog_name = parts.slice(0, -1).join(" ");
+  return {
+    dog_name,
+    owner_name,
+    owner_initial: owner_name.charAt(0).toUpperCase()
+  };
+}
+
 export async function expireStaleGroomingPushNotices(supabase: SupabaseClient) {
   const nowIso = new Date().toISOString();
   const { error } = await supabase

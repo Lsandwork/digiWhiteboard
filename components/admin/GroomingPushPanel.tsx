@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Clock3, PawPrint, Scissors, Send, XCircle } from "lucide-react";
+import { AlertTriangle, Clock3, Scissors, Send, XCircle } from "lucide-react";
 import {
   GROOMING_SAFETY_TAG_OPTIONS,
   GROOMING_SERVICE_OPTIONS,
-  type GroomingDogOption,
+  parseDogAndOwnerLastName,
   type GroomingPushNotice
 } from "@/lib/staff/grooming-push-notices";
 import { groomingInstruction } from "@/lib/staff/grooming-push-notices";
@@ -16,7 +16,6 @@ type GroomingPayload = {
   activeNotice: GroomingPushNotice | null;
   queue: GroomingPushNotice[];
   recent: GroomingPushNotice[];
-  dogs: GroomingDogOption[];
   currentUser: {
     email: string | null;
     role: string | null;
@@ -25,11 +24,7 @@ type GroomingPayload = {
 };
 
 const emptyForm = {
-  dog_id: "",
-  dog_name: "",
-  dog_photo_url: "",
-  owner_name: "",
-  owner_initial: "",
+  dog_and_owner: "",
   service: "Bath + Brush",
   groomer_name: "",
   notes: "",
@@ -76,21 +71,7 @@ export function GroomingPushPanel() {
       || ["owner_admin", "manager_admin", "front_desk_coordinator", "team_leader", "groomer"].includes(data.currentUser.role ?? "");
   }, [data]);
 
-  const selectedDog = useMemo(
-    () => data?.dogs.find((dog) => dog.id === form.dog_id) ?? null,
-    [data?.dogs, form.dog_id]
-  );
-
-  function selectDog(dog: GroomingDogOption) {
-    setForm((current) => ({
-      ...current,
-      dog_id: dog.id,
-      dog_name: dog.dog_name,
-      dog_photo_url: dog.photo_url ?? "",
-      owner_name: dog.owner_name ?? "",
-      owner_initial: dog.owner_name?.trim().charAt(0).toUpperCase() ?? ""
-    }));
-  }
+  const parsedDog = useMemo(() => parseDogAndOwnerLastName(form.dog_and_owner), [form.dog_and_owner]);
 
   function toggleTag(tag: string) {
     setForm((current) => ({
@@ -104,6 +85,8 @@ export function GroomingPushPanel() {
   async function pushNotice() {
     setBusy(true);
     try {
+      const { dog_name, owner_name, owner_initial } = parsedDog;
+      if (!dog_name) throw new Error("Enter the dog name and owner last name.");
       const service = form.service === "Custom" ? form.custom_service.trim() : form.service;
       const safety_tags = [
         ...form.safety_tags,
@@ -113,11 +96,9 @@ export function GroomingPushPanel() {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          dog_id: form.dog_id || null,
-          dog_name: form.dog_name,
-          dog_photo_url: form.dog_photo_url || null,
-          owner_name: form.owner_name || null,
-          owner_initial: form.owner_initial || null,
+          dog_name,
+          owner_name,
+          owner_initial,
           service,
           groomer_name: form.groomer_name,
           notes: form.notes || null,
@@ -126,8 +107,9 @@ export function GroomingPushPanel() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to push grooming notice.");
-      showToast(`Grooming request pushed for ${body.notice?.dog_name ?? form.dog_name}.`, "success");
+      showToast(`Grooming request pushed for ${dog_name}.`, "success");
       setData((current) => current ? { ...current, activeNotice: body.activeNotice ?? body.notice, queue: body.queue ?? [] } : current);
+      setForm({ ...emptyForm, groomer_name: form.groomer_name, service: form.service, safety_tags: form.safety_tags });
       await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to push grooming notice.", "error");
@@ -173,33 +155,14 @@ export function GroomingPushPanel() {
 
           <div className="grid gap-4">
             <label className="block">
-              <span className="admin-label">Dog on property</span>
-              <select
+              <span className="admin-label">Dog name &amp; owner last name</span>
+              <input
                 className="admin-input"
-                value={form.dog_id}
-                onChange={(event) => {
-                  const dog = data?.dogs.find((item) => item.id === event.target.value);
-                  if (dog) selectDog(dog);
-                  else setForm((current) => ({ ...current, dog_id: "", dog_name: "", dog_photo_url: "", owner_name: "", owner_initial: "" }));
-                }}
-              >
-                <option value="">Select a checked-in dog…</option>
-                {(data?.dogs ?? []).map((dog) => (
-                  <option key={dog.id} value={dog.id}>{dog.dog_name}{dog.owner_name ? ` — ${dog.owner_name}` : ""}</option>
-                ))}
-              </select>
+                value={form.dog_and_owner}
+                onChange={(e) => setForm({ ...form, dog_and_owner: e.target.value })}
+                placeholder="e.g. Jasper Sandoval"
+              />
             </label>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="block">
-                <span className="admin-label">Dog name</span>
-                <input className="admin-input" value={form.dog_name} onChange={(e) => setForm({ ...form, dog_name: e.target.value })} />
-              </label>
-              <label className="block">
-                <span className="admin-label">Owner name / initial</span>
-                <input className="admin-input" value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value, owner_initial: e.target.value.trim().charAt(0).toUpperCase() })} />
-              </label>
-            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
@@ -252,17 +215,20 @@ export function GroomingPushPanel() {
               <textarea className="admin-input min-h-24" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </label>
 
-            {form.dog_name ? (
+            {parsedDog.dog_name ? (
               <div className="rounded-xl border border-[rgba(245,158,11,0.22)] bg-black/20 p-4 text-sm text-admin-muted">
                 <p className="font-bold text-white">Preview message</p>
-                <p className="mt-2 text-white">{groomingInstruction({ dog_name: form.dog_name })}</p>
+                <p className="mt-2 text-white">{groomingInstruction({ dog_name: parsedDog.dog_name })}</p>
+                {parsedDog.owner_name ? (
+                  <p className="mt-1 text-xs text-admin-muted">Owner last name: {parsedDog.owner_name}</p>
+                ) : null}
               </div>
             ) : null}
 
             <button
               type="button"
               className="crossover-btn crossover-btn--primary inline-flex items-center justify-center gap-2"
-              disabled={busy || !canPush || !form.dog_name.trim() || !form.groomer_name.trim()}
+              disabled={busy || !canPush || !parsedDog.dog_name || !form.groomer_name.trim()}
               onClick={() => void pushNotice()}
             >
               <Send className="h-4 w-4" /> Push to Staff Whiteboard
@@ -291,29 +257,6 @@ export function GroomingPushPanel() {
                 No active grooming push notice.
               </div>
             )}
-          </section>
-
-          <section className="crossover-card crossover-card--sidebar p-5">
-            <h3 className="crossover-card__title">Checked-In Dogs</h3>
-            <p className="crossover-card__subtitle mb-4">Loaded from cached live board data — no extra Gingr polling.</p>
-            <div className="max-h-72 space-y-2 overflow-y-auto">
-              {(data?.dogs ?? []).length ? data!.dogs.map((dog) => (
-                <button
-                  key={dog.id}
-                  type="button"
-                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left ${form.dog_id === dog.id ? "border-fitdog-orange bg-fitdog-orange/10" : "border-admin-border"}`}
-                  onClick={() => selectDog(dog)}
-                >
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-fitdog-orange/15 text-sm font-black text-white">{dog.dog_name.charAt(0)}</span>
-                  <span>
-                    <span className="block font-bold text-white">{dog.dog_name}</span>
-                    <span className="block text-xs text-admin-muted">{dog.owner_name ?? "Owner unknown"}</span>
-                  </span>
-                </button>
-              )) : (
-                <p className="text-sm text-admin-muted">No checked-in dogs found on the live board cache.</p>
-              )}
-            </div>
           </section>
         </div>
       </section>

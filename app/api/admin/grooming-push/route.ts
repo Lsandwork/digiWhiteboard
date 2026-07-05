@@ -6,7 +6,6 @@ import { hasPermission } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import {
   createGroomingPushNotice,
-  loadGroomingDogOptions,
   loadGroomingPushBoardState,
   listRecentGroomingPushNotices
 } from "@/lib/staff/grooming-push-notices";
@@ -38,16 +37,14 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
-    const [boardState, recent, dogs] = await Promise.all([
+    const [boardState, recent] = await Promise.all([
       loadGroomingPushBoardState(supabase),
-      listRecentGroomingPushNotices(supabase),
-      loadGroomingDogOptions(supabase)
+      listRecentGroomingPushNotices(supabase)
     ]);
 
     return NextResponse.json({
       ...boardState,
       recent,
-      dogs,
       currentUser: {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
