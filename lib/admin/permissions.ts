@@ -180,7 +180,9 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
 
 const GROOMER_TRAINER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
-  "view_staff_whiteboard"
+  "view_staff_whiteboard",
+  "push_grooming_request",
+  "clear_grooming_request"
 ];
 
 const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = ["view_admin_panel", "view_staff_whiteboard"];
@@ -311,6 +313,7 @@ export function hasAnyRole(access: UserAccess | null | undefined, roles: RoleKey
 
 export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   push_notices: "manage_push_notices",
+  grooming_push: "push_grooming_request",
   crossover_communication: "view_front_desk_log",
   owner_follow_up: "view_owner_follow_up",
   active_issues: "view_active_issues",
@@ -425,6 +428,7 @@ export function firstAccessibleAdminTab(
     board === "staff"
       ? [
           "push_notices",
+          "grooming_push",
           "crossover_communication",
           "owner_follow_up",
           "active_issues",

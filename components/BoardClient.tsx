@@ -13,6 +13,8 @@ import {
   StaffPushNoticePanel,
   StaffPushNoticeTvOverlay
 } from "@/components/board/StaffPushNotice";
+import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
+import { useGroomingPushNotices } from "@/hooks/useGroomingPushNotices";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
@@ -110,6 +112,7 @@ export function BoardClient() {
   const [useDevDemo, setUseDevDemo] = useState(false);
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
   const activePushNotice = useStaffPushNotice();
+  const { activeNotice: activeGroomingNotice, queue: groomingQueue } = useGroomingPushNotices();
   const {
     isCasting,
     castError,
@@ -343,6 +346,8 @@ export function BoardClient() {
     [clock]
   );
 
+  const groomingClock = groomingClockFromMs(nowMs);
+
   const hasBoardData = board.checking_in.length > 0 || board.checking_out.length > 0;
   const hasVisibleDogs = visibleCheckingInDogs.length > 0 || visibleCheckoutDogs.length > 0;
   const showEmptyState = fetchStatus === "ok" && !fetchError;
@@ -350,7 +355,7 @@ export function BoardClient() {
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
-      <StaffPushNoticeTvOverlay active={Boolean(activePushNotice)} />
+      <StaffPushNoticeTvOverlay active={Boolean(activePushNotice) && !activeGroomingNotice} />
 
       {!tvMode ? (
         <StaffCastButton
@@ -380,7 +385,15 @@ export function BoardClient() {
           />
         ) : null}
 
-        {activePushNotice && !hasVisibleDogs ? (
+        {activeGroomingNotice ? (
+          <GroomingPushNoticeOverlay
+            notice={activeGroomingNotice}
+            queue={groomingQueue}
+            nowMs={nowMs}
+            clockTime={groomingClock.clockTime}
+            clockDate={groomingClock.clockDate}
+          />
+        ) : activePushNotice && !hasVisibleDogs ? (
           <StaffPushNoticeFullscreen notice={activePushNotice} />
         ) : (
           <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>

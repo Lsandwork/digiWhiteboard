@@ -9,6 +9,7 @@ import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
 function defaultAdminRoute(role?: string) {
   const access = accessFromLegacyRole(null, null, role);
   if (canAccessTab(access, "push_notices", role)) return "/admin?board=staff&tab=push_notices";
+  if (canAccessTab(access, "grooming_push", role)) return "/admin?board=staff&tab=grooming_push";
   if (canAccessTab(access, "notifications", role)) return "/admin?board=staff&tab=notifications";
   return "/admin";
 }

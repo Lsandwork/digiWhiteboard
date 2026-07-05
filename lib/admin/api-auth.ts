@@ -54,6 +54,14 @@ export function canPushDogHandlerComplaintNotice(role?: string | null) {
   return canCreateDogHandlerComplaintNotice(role) || !role;
 }
 
+export function canPushGroomingRequest(role?: string | null) {
+  return role === "owner_admin" || role === "manager_admin" || role === "front_desk_coordinator" || role === "team_leader" || role === "groomer" || !role;
+}
+
+export function canClearGroomingRequest(role?: string | null) {
+  return canPushGroomingRequest(role);
+}
+
 export function canAccessManagementReports(role?: string | null) {
   return canViewManagementReports(role) || !role;
 }

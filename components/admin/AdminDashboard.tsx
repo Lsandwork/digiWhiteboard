@@ -15,6 +15,7 @@ import { AdminLogsPanel } from "@/components/admin/AdminLogsPanel";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage";
 import { PushNoticesPanel } from "@/components/admin/PushNoticesPanel";
+import { GroomingPushPanel } from "@/components/admin/GroomingPushPanel";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
@@ -238,7 +239,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
+  const showPreview = !["settings", "push_notices", "grooming_push", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help"].includes(tab);
 
   const preview = (
     <div className="space-y-4">
@@ -344,6 +345,8 @@ export function AdminDashboard() {
         {tab === "users" ? <AdminUsersPage /> : null}
 
         {tab === "push_notices" ? <PushNoticesPanel /> : null}
+
+        {tab === "grooming_push" ? <GroomingPushPanel /> : null}
 
         {tab === "crossover_communication" ? <StaffOperationsPanel tab="crossover" /> : null}
 
