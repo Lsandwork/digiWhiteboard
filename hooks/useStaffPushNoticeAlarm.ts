@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 import {
-  playStaffPushNoticeAlarmBurst,
+  playStaffPushNoticeAlarm,
   startStaffPushNoticeAlarmLoop,
   stopStaffPushNoticeAlarmLoop,
   unlockStaffPushNoticeAudio
 } from "@/lib/staff/push-notice-alarm";
 
-const BURST_FLASH_MS = 6000;
+const BURST_FLASH_MS = 8000;
 
 export function useStaffPushNoticeAlarm(notice: StaffPushNotice | null) {
   const lastNoticeIdRef = useRef<string | null>(null);
@@ -53,7 +53,7 @@ export function useStaffPushNoticeAlarm(notice: StaffPushNotice | null) {
     if (isNewNotice) {
       lastNoticeIdRef.current = notice.id;
       setIsBursting(true);
-      playStaffPushNoticeAlarmBurst();
+      playStaffPushNoticeAlarm();
 
       if (burstTimerRef.current != null) {
         window.clearTimeout(burstTimerRef.current);

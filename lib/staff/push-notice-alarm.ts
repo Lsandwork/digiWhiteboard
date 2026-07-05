@@ -1,10 +1,11 @@
-const ALARM_REPEAT_MS = 30000;
-const BURST_ROUNDS = 3;
-const BURST_ROUND_GAP_MS = 900;
+const REPEAT_MS = 120000;
+
+const DOT_MS = 90;
+const DOT_GAP_MS = 140;
+const GROUP_GAP_MS = 520;
 
 let audioContext: AudioContext | null = null;
 let repeatTimer: number | null = null;
-let burstTimer: number | null = null;
 let unlocked = false;
 
 function getAudioContext() {
@@ -15,15 +16,17 @@ function getAudioContext() {
   return audioContext;
 }
 
-function playBeep(ctx: AudioContext, startTime: number, frequency: number, durationSec: number, volume = 0.42) {
+/** Short soft tone — one "dot" in the alert pattern. */
+function playDot(ctx: AudioContext, startTime: number) {
   const oscillator = ctx.createOscillator();
   const gain = ctx.createGain();
 
-  oscillator.type = "square";
-  oscillator.frequency.setValueAtTime(frequency, startTime);
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(880, startTime);
 
+  const durationSec = DOT_MS / 1000;
   gain.gain.setValueAtTime(0.0001, startTime);
-  gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.14, startTime + 0.008);
   gain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
 
   oscillator.connect(gain);
@@ -32,13 +35,17 @@ function playBeep(ctx: AudioContext, startTime: number, frequency: number, durat
   oscillator.stop(startTime + durationSec + 0.02);
 }
 
-function playAlarmRound(ctx: AudioContext, startTime: number) {
-  playBeep(ctx, startTime, 920, 0.16, 0.44);
-  playBeep(ctx, startTime + 0.17, 920, 0.16, 0.44);
-  playBeep(ctx, startTime + 0.34, 780, 0.2, 0.4);
-  playBeep(ctx, startTime + 0.56, 780, 0.2, 0.38);
-  playBeep(ctx, startTime + 0.78, 1040, 0.24, 0.42);
-  playBeep(ctx, startTime + 1.04, 1040, 0.24, 0.4);
+/** Three dots, pause, three dots — minimal attention cue. */
+function playDotDotDotTwice(ctx: AudioContext, startTime: number) {
+  const dotStep = (DOT_MS + DOT_GAP_MS) / 1000;
+  const groupOffset = (3 * dotStep + GROUP_GAP_MS / 1000);
+
+  for (let group = 0; group < 2; group += 1) {
+    const groupStart = startTime + group * groupOffset;
+    for (let dot = 0; dot < 3; dot += 1) {
+      playDot(ctx, groupStart + dot * dotStep);
+    }
+  }
 }
 
 export async function unlockStaffPushNoticeAudio() {
@@ -66,28 +73,13 @@ export function playStaffPushNoticeAlarm() {
   if (!ctx) return;
 
   void ctx.resume().then(() => {
-    playAlarmRound(ctx, ctx.currentTime);
+    playDotDotDotTwice(ctx, ctx.currentTime);
   });
 }
 
+/** @deprecated Use playStaffPushNoticeAlarm — same minimal dot-dot-dot pattern. */
 export function playStaffPushNoticeAlarmBurst() {
-  if (typeof window === "undefined") return;
-
-  const ctx = getAudioContext();
-  if (!ctx) return;
-
-  if (burstTimer != null) {
-    window.clearTimeout(burstTimer);
-    burstTimer = null;
-  }
-
-  void ctx.resume().then(() => {
-    for (let round = 0; round < BURST_ROUNDS; round += 1) {
-      window.setTimeout(() => {
-        playAlarmRound(ctx, ctx.currentTime);
-      }, round * BURST_ROUND_GAP_MS);
-    }
-  });
+  playStaffPushNoticeAlarm();
 }
 
 export function startStaffPushNoticeAlarmLoop(noticeId: string | null) {
@@ -95,17 +87,13 @@ export function startStaffPushNoticeAlarmLoop(noticeId: string | null) {
   if (!noticeId) return;
 
   repeatTimer = window.setInterval(() => {
-    playStaffPushNoticeAlarmBurst();
-  }, ALARM_REPEAT_MS);
+    playStaffPushNoticeAlarm();
+  }, REPEAT_MS);
 }
 
 export function stopStaffPushNoticeAlarmLoop() {
   if (repeatTimer != null) {
     window.clearInterval(repeatTimer);
     repeatTimer = null;
-  }
-  if (burstTimer != null) {
-    window.clearTimeout(burstTimer);
-    burstTimer = null;
   }
 }

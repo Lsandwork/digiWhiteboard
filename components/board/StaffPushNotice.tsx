@@ -24,8 +24,16 @@ function NoticeContent({ notice, fullscreen = false }: { notice: StaffPushNotice
     >
       <div className="staff-push-notice__flash" aria-hidden="true" />
       <div className="staff-push-notice__flash staff-push-notice__flash--secondary" aria-hidden="true" />
+      <div className="staff-push-notice__flash staff-push-notice__flash--tertiary" aria-hidden="true" />
+      <div className="staff-push-notice__edge-flash" aria-hidden="true" />
+      <div className="staff-push-notice__scanlines" aria-hidden="true" />
       <div className="staff-push-notice__stripes" aria-hidden="true" />
       <div className="staff-push-notice__strobe-ring" aria-hidden="true" />
+      <div className="staff-push-notice__strobe-ring staff-push-notice__strobe-ring--outer" aria-hidden="true" />
+      <span className="staff-push-notice__beacon staff-push-notice__beacon--tl" aria-hidden="true" />
+      <span className="staff-push-notice__beacon staff-push-notice__beacon--tr" aria-hidden="true" />
+      <span className="staff-push-notice__beacon staff-push-notice__beacon--bl" aria-hidden="true" />
+      <span className="staff-push-notice__beacon staff-push-notice__beacon--br" aria-hidden="true" />
 
       <div className="staff-push-notice__paw staff-push-notice__paw--one" aria-hidden="true">
         <PawPrint />
@@ -68,6 +76,8 @@ export function StaffPushNoticeTvOverlay({ active }: { active: boolean }) {
   return (
     <>
       <div className="staff-push-notice-tv-flash" aria-hidden="true" />
+      <div className="staff-push-notice-tv-flash staff-push-notice-tv-flash--secondary" aria-hidden="true" />
+      <div className="staff-push-notice-tv-vignette" aria-hidden="true" />
       <div className="staff-push-notice-tv-bar" aria-hidden="true">
         <span>Handler Alert Active</span>
       </div>

@@ -1615,7 +1615,7 @@ html.lobby-tv-display .social-video-shell {
 
 .staff-push-notice-panel--alert,
 .staff-push-notice-fullscreen--alert {
-  animation: staffNoticePanelPulse 0.55s ease-in-out infinite;
+  animation: staffNoticePanelPulse 2.4s ease-in-out infinite;
 }
 
 .staff-push-notice-tv-flash {
@@ -1623,9 +1623,26 @@ html.lobby-tv-display .social-video-shell {
   inset: 0;
   z-index: 80;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.92);
+  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.18), transparent 68%);
   opacity: 0;
-  animation: staffNoticeTvStrobe 0.65s linear infinite;
+  animation: staffNoticeTvGlow 2.8s ease-in-out infinite;
+}
+
+.staff-push-notice-tv-flash--secondary {
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.12), transparent 72%);
+  animation: staffNoticeTvGlow 2.8s ease-in-out infinite;
+  animation-delay: -1.4s;
+}
+
+.staff-push-notice-tv-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 79;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 120px rgba(239, 68, 68, 0.28),
+    inset 0 0 240px rgba(127, 29, 29, 0.22);
+  animation: staffNoticeTvVignette 3.2s ease-in-out infinite;
 }
 
 .staff-push-notice-tv-bar {
@@ -1644,8 +1661,10 @@ html.lobby-tv-display .social-video-shell {
   font-weight: 1000;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  animation: staffNoticeTvBarSlide 1.2s linear infinite, staffNoticeTvBarFlash 0.45s step-end infinite;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  animation: staffNoticeTvBarSlide 4s linear infinite;
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.35),
+    0 0 40px rgba(239, 68, 68, 0.45);
 }
 
 .staff-push-notice-tv-bar span {
@@ -1682,15 +1701,13 @@ html.lobby-tv-display .social-video-shell {
   text-align: center;
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeMultiFlash 0.55s step-end infinite,
-    staffNoticeShake 1.8s ease-in-out infinite;
+    staffNoticeAlertFlash 2.4s ease-in-out infinite;
 }
 
 .staff-push-notice--burst {
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeBurstFlash 0.35s step-end infinite,
-    staffNoticeShake 0.85s ease-in-out infinite;
+    staffNoticeBurstFlash 1.8s ease-in-out infinite;
   border-width: 4px;
 }
 
@@ -1702,47 +1719,103 @@ html.lobby-tv-display .social-video-shell {
   border-radius: 28px;
   border: 2px solid rgba(255, 237, 213, 0.45);
   background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.14), transparent);
-  animation: staffNoticeBorderSweep 1.2s linear infinite;
+  animation: staffNoticeBorderSweep 3.6s linear infinite;
 }
 
 .staff-push-notice__flash {
   position: absolute;
   inset: 0;
   z-index: -2;
-  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.35), transparent 62%);
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.22), transparent 62%);
   opacity: 0;
   pointer-events: none;
-  animation: staffNoticeScreenFlash 0.55s step-end infinite;
+  animation: staffNoticeScreenFlash 2.4s ease-in-out infinite;
 }
 
 .staff-push-notice__flash--secondary {
-  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.55), transparent 70%);
-  animation: staffNoticeScreenFlash 0.55s step-end infinite reverse;
-  animation-delay: -0.275s;
+  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.28), transparent 70%);
+  animation: staffNoticeScreenFlash 2.4s ease-in-out infinite;
+  animation-delay: -1.2s;
 }
+
+.staff-push-notice__flash--tertiary {
+  background: linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.12) 48%, transparent 100%);
+  animation: staffNoticeFlashSweep 4.8s linear infinite;
+}
+
+.staff-push-notice__edge-flash {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.12),
+    inset 0 0 36px rgba(248, 113, 113, 0.22);
+  animation: staffNoticeEdgeFlash 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.staff-push-notice__scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.08;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.7) 0 2px,
+    transparent 2px 6px
+  );
+  animation: staffNoticeScanDrift 2.4s linear infinite;
+  mix-blend-mode: overlay;
+}
+
+.staff-push-notice__beacon {
+  position: absolute;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fef08a;
+  box-shadow: 0 0 18px rgba(254, 240, 138, 0.95), 0 0 36px rgba(248, 113, 113, 0.75);
+  animation: staffNoticeBeacon 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.staff-push-notice__beacon--tl { top: 14px; left: 14px; }
+.staff-push-notice__beacon--tr { top: 14px; right: 14px; animation-delay: -0.6s; }
+.staff-push-notice__beacon--bl { bottom: 14px; left: 14px; animation-delay: -1.2s; }
+.staff-push-notice__beacon--br { bottom: 14px; right: 14px; animation-delay: -1.8s; }
 
 .staff-push-notice__strobe-ring {
   position: absolute;
   inset: -8px;
   z-index: -4;
   border-radius: 38px;
-  border: 4px solid rgba(254, 240, 138, 0.95);
+  border: 3px solid rgba(254, 240, 138, 0.55);
   opacity: 0;
   pointer-events: none;
-  animation: staffNoticeStrobeRing 0.55s step-end infinite;
+  animation: staffNoticeStrobeRing 2.4s ease-in-out infinite;
+}
+
+.staff-push-notice__strobe-ring--outer {
+  inset: -16px;
+  border-width: 2px;
+  border-color: rgba(248, 113, 113, 0.45);
+  animation-delay: -1.2s;
 }
 
 .staff-push-notice__stripes {
   position: absolute;
   inset: -40%;
   z-index: -3;
-  opacity: 0.12;
+  opacity: 0.18;
   background: repeating-linear-gradient(
     -45deg,
     rgba(251, 191, 36, 0.95) 0 18px,
     rgba(127, 29, 29, 0.95) 18px 36px
   );
-  animation: staffNoticeStripeSlide 2.8s linear infinite;
+  animation: staffNoticeStripeSlide 4s linear infinite;
 }
 
 .staff-push-notice--urgent,
@@ -1754,8 +1827,7 @@ html.lobby-tv-display .social-video-shell {
 .staff-push-notice--alert.staff-push-notice--burst {
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeBurstFlash 0.35s step-end infinite,
-    staffNoticeShake 0.85s ease-in-out infinite;
+    staffNoticeBurstFlash 1.8s ease-in-out infinite;
 }
 
 .staff-push-notice--fullscreen {
@@ -1765,6 +1837,8 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice__icon {
+  position: relative;
+  z-index: 3;
   width: clamp(78px, 7vw, 128px);
   height: clamp(78px, 7vw, 128px);
   margin: 0 auto clamp(1rem, 2vw, 1.75rem);
@@ -1777,7 +1851,7 @@ html.lobby-tv-display .social-video-shell {
     0 18px 45px rgba(0, 0, 0, 0.34),
     0 0 0 4px rgba(255, 255, 255, 0.18),
     0 0 28px rgba(248, 113, 113, 0.55);
-  animation: staffNoticeIconPulse 0.55s step-end infinite;
+  animation: staffNoticeIconPulse 2.4s ease-in-out infinite;
 }
 
 .staff-push-notice__icon svg {
@@ -1787,13 +1861,15 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice__eyebrow {
+  position: relative;
+  z-index: 3;
   margin: 0 0 0.7rem;
   color: #fed7aa;
   font-size: clamp(0.95rem, 1.5vw, 1.45rem);
   font-weight: 950;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  animation: staffNoticeEyebrowFlash 0.55s step-end infinite;
+  animation: staffNoticeEyebrowFlash 2.4s ease-in-out infinite;
 }
 
 .staff-push-notice--urgent .staff-push-notice__eyebrow,
@@ -1802,6 +1878,8 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice__title {
+  position: relative;
+  z-index: 3;
   margin: 0;
   color: white;
   font-size: clamp(2rem, 4.2vw, 5.8rem);
@@ -1811,7 +1889,7 @@ html.lobby-tv-display .social-video-shell {
   text-transform: uppercase;
   text-wrap: balance;
   text-shadow: 0 0 24px rgba(248, 113, 113, 0.45);
-  animation: staffNoticeTitlePulse 0.65s step-end infinite;
+  animation: staffNoticeTitlePulse 2.4s ease-in-out infinite, staffNoticeTitleGlow 3.2s ease-in-out infinite;
 }
 
 .staff-push-notice-panel .staff-push-notice__title {
@@ -1825,6 +1903,7 @@ html.lobby-tv-display .social-video-shell {
   font-size: clamp(1.15rem, 1.8vw, 2rem);
   font-weight: 800;
   line-height: 1.25;
+  animation: staffNoticeMessageFlash 2.8s ease-in-out infinite;
 }
 
 .staff-push-notice-panel .staff-push-notice__message {
@@ -1852,7 +1931,7 @@ html.lobby-tv-display .social-video-shell {
   font-weight: 1000;
   text-transform: uppercase;
   text-shadow: 0 0 22px rgba(251, 191, 36, 0.55);
-  animation: staffNoticeTitlePulse 0.65s step-end infinite;
+  animation: staffNoticeTitlePulse 2.4s ease-in-out infinite;
 }
 
 .staff-push-notice-panel .staff-push-notice__handler-name {
@@ -1860,6 +1939,8 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice__message-block {
+  position: relative;
+  z-index: 3;
   margin-top: clamp(0.85rem, 1.5vw, 1.25rem);
 }
 
@@ -1901,8 +1982,8 @@ html.lobby-tv-display .social-video-shell {
 .staff-push-notice__paw {
   position: absolute;
   z-index: -1;
-  color: rgba(255, 255, 255, 0.1);
-  animation: staffNoticeFloat 4s ease-in-out infinite;
+  color: rgba(255, 255, 255, 0.14);
+  animation: staffNoticeFloat 3s ease-in-out infinite;
 }
 
 .staff-push-notice__paw svg {
@@ -1953,55 +2034,39 @@ html.lobby-tv-display .social-video-shell {
 
 @keyframes staffNoticeBurstFlash {
   0%,
-  24% {
-    filter: saturate(1.5) brightness(1.25);
-    box-shadow:
-      0 0 0 4px rgba(255, 255, 255, 0.65) inset,
-      0 28px 80px rgba(0, 0, 0, 0.44),
-      0 0 110px rgba(248, 113, 113, 0.85);
-  }
-  25%,
-  49% {
-    filter: saturate(1) brightness(0.92);
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.14) inset,
-      0 28px 80px rgba(0, 0, 0, 0.44),
-      0 0 36px rgba(248, 113, 113, 0.22);
-  }
-  50%,
-  74% {
-    filter: saturate(1.5) brightness(1.25);
-    box-shadow:
-      0 0 0 4px rgba(255, 255, 255, 0.65) inset,
-      0 28px 80px rgba(0, 0, 0, 0.44),
-      0 0 110px rgba(251, 146, 60, 0.85);
-  }
-  75%,
   100% {
-    filter: saturate(1) brightness(0.92);
+    filter: saturate(1.05) brightness(1.02);
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.14) inset,
+      0 0 0 2px rgba(255, 237, 213, 0.25) inset,
       0 28px 80px rgba(0, 0, 0, 0.44),
-      0 0 36px rgba(248, 113, 113, 0.22);
+      0 0 64px rgba(248, 113, 113, 0.45);
+  }
+  50% {
+    filter: saturate(1.2) brightness(1.08);
+    box-shadow:
+      0 0 0 3px rgba(255, 237, 213, 0.4) inset,
+      0 28px 80px rgba(0, 0, 0, 0.44),
+      0 0 88px rgba(251, 146, 60, 0.55);
   }
 }
 
-@keyframes staffNoticeTvStrobe {
+@keyframes staffNoticeTvGlow {
   0%,
-  24% {
+  100% {
     opacity: 0;
   }
-  25%,
-  49% {
+  50% {
     opacity: 0.28;
   }
-  50%,
-  74% {
-    opacity: 0;
-  }
-  75%,
+}
+
+@keyframes staffNoticeTvVignette {
+  0%,
   100% {
-    opacity: 0.22;
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
@@ -2037,14 +2102,13 @@ html.lobby-tv-display .social-video-shell {
 
 @keyframes staffNoticeStrobeRing {
   0%,
-  49% {
+  100% {
     opacity: 0;
     transform: scale(0.995);
   }
-  50%,
-  100% {
-    opacity: 1;
-    transform: scale(1.015);
+  50% {
+    opacity: 0.65;
+    transform: scale(1.01);
   }
 }
 
@@ -2072,18 +2136,106 @@ html.lobby-tv-display .social-video-shell {
     filter: none;
   }
   50% {
-    filter: drop-shadow(0 0 18px rgba(248, 113, 113, 0.45));
+    filter: drop-shadow(0 0 28px rgba(248, 113, 113, 0.72)) drop-shadow(0 0 12px rgba(251, 146, 60, 0.55));
   }
 }
 
 @keyframes staffNoticeScreenFlash {
   0%,
-  49% {
+  100% {
     opacity: 0;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes staffNoticeFlashSweep {
+  from {
+    transform: translateX(-120%) skewX(-12deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.75;
+  }
+  to {
+    transform: translateX(120%) skewX(-12deg);
+    opacity: 0;
+  }
+}
+
+@keyframes staffNoticeEdgeFlash {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes staffNoticeScanDrift {
+  from {
+    transform: translateY(-8%);
+  }
+  to {
+    transform: translateY(8%);
+  }
+}
+
+@keyframes staffNoticeBeacon {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes staffNoticeMessageFlash {
+  0%,
+  100% {
+    color: rgba(255, 255, 255, 0.92);
+    text-shadow: none;
+  }
+  50% {
+    color: #fff7ed;
+    text-shadow: 0 0 12px rgba(251, 146, 60, 0.35);
+  }
+}
+
+@keyframes staffNoticeTitleGlow {
+  0%,
+  100% {
+    text-shadow: 0 0 24px rgba(248, 113, 113, 0.45);
+  }
+  50% {
+    text-shadow:
+      0 0 36px rgba(248, 113, 113, 0.85),
+      0 0 64px rgba(251, 146, 60, 0.55);
+  }
+}
+
+@keyframes staffNoticeIconSpin {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes staffNoticePawFlash {
+  0%,
+  49% {
+    opacity: 0.14;
   }
   50%,
   100% {
-    opacity: 0.75;
+    opacity: 0.32;
   }
 }
 
@@ -2099,52 +2251,55 @@ html.lobby-tv-display .social-video-shell {
 @keyframes staffNoticeShake {
   0%,
   100% {
-    transform: translateX(0);
+    transform: translateX(0) rotate(0deg);
   }
-  20% {
-    transform: translateX(-4px);
+  15% {
+    transform: translateX(-6px) rotate(-0.4deg);
   }
-  40% {
-    transform: translateX(4px);
+  30% {
+    transform: translateX(6px) rotate(0.4deg);
+  }
+  45% {
+    transform: translateX(-5px) rotate(-0.3deg);
   }
   60% {
-    transform: translateX(-3px);
+    transform: translateX(5px) rotate(0.3deg);
   }
-  80% {
-    transform: translateX(3px);
+  75% {
+    transform: translateX(-3px) rotate(-0.2deg);
+  }
+  90% {
+    transform: translateX(3px) rotate(0.2deg);
   }
 }
 
 @keyframes staffNoticeIconPulse {
   0%,
-  49% {
+  100% {
     transform: scale(1);
   }
-  50%,
-  100% {
-    transform: scale(1.12);
+  50% {
+    transform: scale(1.06);
   }
 }
 
 @keyframes staffNoticeEyebrowFlash {
   0%,
-  49% {
+  100% {
     opacity: 1;
   }
-  50%,
-  100% {
-    opacity: 0.55;
+  50% {
+    opacity: 0.75;
   }
 }
 
 @keyframes staffNoticeTitlePulse {
   0%,
-  49% {
+  100% {
     transform: scale(1);
   }
-  50%,
-  100% {
-    transform: scale(1.03);
+  50% {
+    transform: scale(1.015);
   }
 }
 
@@ -2221,13 +2376,18 @@ html.lobby-tv-display .social-video-shell {
   .staff-push-notice__icon,
   .staff-push-notice__paw,
   .staff-push-notice__flash,
+  .staff-push-notice__edge-flash,
+  .staff-push-notice__scanlines,
+  .staff-push-notice__beacon,
   .staff-push-notice__stripes,
   .staff-push-notice__strobe-ring,
   .staff-push-notice__title,
+  .staff-push-notice__message,
   .staff-push-notice__eyebrow,
   .staff-push-notice-panel--alert,
   .staff-push-notice-fullscreen--alert,
   .staff-push-notice-tv-flash,
+  .staff-push-notice-tv-vignette,
   .staff-push-notice-tv-bar,
   .staff-push-notice-tv-bar span {
     animation: none !important;
@@ -4545,4 +4705,446 @@ html.lobby-tv-display .social-video-shell {
   border-radius: 0.95rem;
   background: rgba(0, 0, 0, 0.22);
   padding: 0.9rem 1rem;
+}
+
+/* Grooming push notice — Staff Digital Whiteboard overlay */
+.grooming-push {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(241, 95, 42, 0.12), transparent 35%),
+    linear-gradient(180deg, rgba(15, 10, 8, 0.98), rgba(8, 6, 10, 0.98));
+  padding: 1rem;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.08), 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.grooming-push__pulse,
+.grooming-push__glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.grooming-push__pulse {
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  animation: grooming-push-pulse 2.4s ease-in-out infinite;
+}
+
+.grooming-push__glow {
+  box-shadow: inset 0 0 40px rgba(241, 95, 42, 0.08);
+}
+
+@keyframes grooming-push-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.002); }
+}
+
+.grooming-push__header,
+.grooming-push__layout,
+.grooming-push__queue {
+  position: relative;
+  z-index: 1;
+}
+
+.grooming-push__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.grooming-push__brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.grooming-push__logo {
+  height: 4.5rem;
+  width: 4.5rem;
+  border-radius: 9999px;
+  border: 2px solid rgba(59, 130, 246, 0.55);
+  background: #fff;
+  object-fit: contain;
+  padding: 0.35rem;
+}
+
+.grooming-push__brand-name {
+  font-size: 1.1rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: #fff;
+}
+
+.grooming-push__title {
+  font-size: clamp(1.5rem, 2vw, 2rem);
+  font-weight: 900;
+  color: #fff;
+}
+
+.grooming-push__subtitle {
+  margin-top: 0.15rem;
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.grooming-push__clock {
+  text-align: right;
+}
+
+.grooming-push__clock-time {
+  font-size: clamp(1.5rem, 2vw, 2.2rem);
+  font-weight: 900;
+  color: #fff;
+}
+
+.grooming-push__clock-date {
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.grooming-push__live-pill {
+  display: inline-flex;
+  margin-top: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #bbf7d0;
+}
+
+.grooming-push__layout {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+.grooming-push__main-card {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1rem;
+}
+
+.grooming-push__card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 180px minmax(0, 1fr) 180px;
+  align-items: center;
+}
+
+.grooming-push__photo-wrap,
+.grooming-push__photo-img,
+.grooming-push__photo-fallback {
+  height: 180px;
+  width: 180px;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.grooming-push__photo-img {
+  object-fit: cover;
+}
+
+.grooming-push__photo-fallback {
+  display: grid;
+  place-items: center;
+  background: rgba(241, 95, 42, 0.18);
+  font-size: 4rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.grooming-push__eyebrow {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fdba74;
+}
+
+.grooming-push__dog-name {
+  margin-top: 0.25rem;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.grooming-push__owner {
+  margin-top: 0.35rem;
+  font-size: 1.1rem;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.grooming-push__meta-grid {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  font-size: 1rem;
+  color: rgba(226, 232, 240, 0.88);
+}
+
+.grooming-push__notes {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.grooming-push__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.grooming-push__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.12);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fecaca;
+}
+
+.grooming-push__countdown-wrap {
+  text-align: center;
+}
+
+.grooming-push__countdown-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fdba74;
+}
+
+.grooming-push__countdown {
+  margin-top: 0.35rem;
+  border-radius: 1rem;
+  border: 2px solid rgba(245, 158, 11, 0.45);
+  background: rgba(241, 95, 42, 0.14);
+  padding: 0.75rem 0.5rem;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 900;
+  line-height: 1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.grooming-push__countdown-note {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: rgba(226, 232, 240, 0.65);
+}
+
+.grooming-push__banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  background: rgba(241, 95, 42, 0.12);
+  padding: 0.85rem 1rem;
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+  font-weight: 700;
+  line-height: 1.45;
+  color: #fff;
+}
+
+.grooming-push__status-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1rem;
+}
+
+.grooming-push__status-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.grooming-push__status-step {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  opacity: 0.55;
+}
+
+.grooming-push__status-step--active,
+.grooming-push__status-step--complete {
+  opacity: 1;
+}
+
+.grooming-push__status-dot {
+  margin-top: 0.35rem;
+  height: 0.75rem;
+  width: 0.75rem;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.8);
+}
+
+.grooming-push__status-step--active .grooming-push__status-dot,
+.grooming-push__status-step--complete .grooming-push__status-dot {
+  background: #f97316;
+  box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.18);
+}
+
+.grooming-push__status-label {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.grooming-push__status-detail {
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.68);
+}
+
+.grooming-push__status-callout {
+  margin-top: 0.35rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(241, 95, 42, 0.12);
+  padding: 0.85rem;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fdba74;
+}
+
+.grooming-push__status-footnote {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.grooming-push__queue {
+  border-top: 1px solid rgba(245, 158, 11, 0.15);
+  padding-top: 0.85rem;
+}
+
+.grooming-push__queue-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.grooming-push__queue-head h3 {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(226, 232, 240, 0.82);
+}
+
+.grooming-push__queue-list {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.grooming-push__queue-card {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(245, 158, 11, 0.14);
+  background: rgba(0, 0, 0, 0.22);
+  padding: 0.65rem;
+}
+
+.grooming-push__queue-photo {
+  height: 56px;
+  width: 56px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgba(241, 95, 42, 0.15);
+  display: grid;
+  place-items: center;
+  font-weight: 900;
+  color: #fff;
+}
+
+.grooming-push__queue-name {
+  font-weight: 800;
+  color: #fff;
+}
+
+.grooming-push__queue-meta,
+.grooming-push__queue-time,
+.grooming-push__queue-empty {
+  font-size: 0.82rem;
+  color: rgba(226, 232, 240, 0.68);
+}
+
+@media (max-width: 1200px) {
+  .grooming-push__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .grooming-push__card-grid {
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
+
+  .grooming-push__countdown-wrap {
+    grid-column: 1 / -1;
+  }
+
+  .grooming-push__queue-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .grooming-push__card-grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .grooming-push__meta-grid {
+    justify-items: center;
+  }
+
+  .grooming-push__tags {
+    justify-content: center;
+  }
 }
