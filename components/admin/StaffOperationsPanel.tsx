@@ -51,6 +51,12 @@ import {
   resolveCrossoverMessage,
   type CrossoverTemplateField
 } from "@/lib/staff/crossover-templates";
+import {
+  ActiveConversationsCard,
+  CreateCrossoverMessageCard,
+  CrossoverRecentActivitySidebar,
+  CrossoverTemplatesSidebar
+} from "@/components/admin/crossover/CrossoverDashboardUI";
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
 
@@ -600,7 +606,6 @@ function CrossoverPage(props: {
     });
   }, [props.data?.crossover_messages, props.filters]);
   const paged = paginate(rows, props.page);
-  const resolvedThisWeek = (props.data?.crossover_messages ?? []).filter((item) => item.status === "Resolved" && item.resolved_at && new Date(item.resolved_at).getTime() > props.nowMs - 7 * 86400000).length;
 
   async function submit() {
     const synced = resolveCrossoverFormMessage(form);
@@ -622,44 +627,59 @@ function CrossoverPage(props: {
   }
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="Crossover Communication"
-        subtitle="Main staff communication log between departments. Every entry is timestamped with the sender and who it was reported to. Urgent or high-priority items trigger alerts with full message details."
-        loading={props.loading}
-      />
-      <StatGrid cards={[
-        { label: "Active Threads", value: rows.filter((item) => item.status !== "Resolved" && item.status !== "Archived").length, helper: "Require attention", icon: <MessageSquare className="h-5 w-5" /> },
-        { label: "Messages Sent Today", value: (props.data?.crossover_messages ?? []).filter((item) => isToday(item.created_at)).length, helper: "Today", icon: <Send className="h-5 w-5" /> },
-        { label: "Resolved This Week", value: resolvedThisWeek, helper: "This week", icon: <CheckCircle2 className="h-5 w-5" /> },
-        { label: "Urgent / High Alerts", value: rows.filter((item) => item.urgent || item.priority === "High" || item.priority === "Critical").length, helper: "Active log entries", icon: <AlertTriangle className="h-5 w-5" /> }
-      ]} />
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-5">
-          <section className="admin-card overflow-hidden">
-            <div className="space-y-4 border-b border-admin-border p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-xl font-black text-white">Active Conversations</h3>
-                  <p className="text-sm text-admin-muted">Ongoing crossover messages and updates.</p>
-                </div>
-                <button className="admin-btn-secondary" type="button" onClick={() => void props.onRefresh()}>Refresh</button>
-              </div>
-              <FilterBar filters={props.filters} setFilters={props.setFilters} type="crossover" staffOptions={props.staffOptions} />
-            </div>
-            <DesktopCrossoverTable rows={paged.rows} busy={props.busy} directory={props.data?.staff_directory} onMutate={props.onMutate} onDetail={props.onDetail} />
-            <MobileCards rows={paged.rows} render={(item) => (
-              <CrossoverCard item={item} busy={props.busy} directory={props.data?.staff_directory} onMutate={props.onMutate} onDetail={props.onDetail} />
-            )} />
-            <Pager page={paged.page} maxPage={paged.maxPage} total={rows.length} onPage={props.setPage} />
-          </section>
-          <CrossoverFormCard form={form} patchForm={patchForm} busy={props.busy} staffOptions={props.staffOptions} onSubmit={submit} />
+    <div className="crossover-dashboard space-y-5">
+      <header className="crossover-dashboard__page-header">
+        <h2 className="crossover-dashboard__page-title">Crossover Communication</h2>
+        <p className="crossover-dashboard__page-subtitle">
+          Main staff communication log between departments. Every entry is timestamped with the sender and who it was reported to. Urgent or high-priority items trigger alerts with full message details.
+        </p>
+        {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
+      </header>
+
+      <div className="crossover-dashboard__layout">
+        <div className="crossover-dashboard__main">
+          <ActiveConversationsCard
+            rows={paged.rows}
+            total={rows.length}
+            page={paged.page}
+            maxPage={paged.maxPage}
+            pageSize={PAGE_SIZE}
+            busy={props.busy}
+            loading={props.loading}
+            directory={props.data?.staff_directory}
+            filters={{
+              query: props.filters.query,
+              department: props.filters.department,
+              priority: props.filters.priority,
+              status: props.filters.status,
+              urgentOnly: props.filters.urgentOnly
+            }}
+            setFilters={(next) => props.setFilters({ ...props.filters, ...next })}
+            onPage={props.setPage}
+            onRefresh={props.onRefresh}
+            onMutate={props.onMutate}
+            onDetail={props.onDetail}
+            displayMessage={displayCrossoverMessage}
+            formatDateTime={formatDateTime}
+            createdByLabel={crossoverCreatedByLabel}
+            reportedToLabel={crossoverReportedTo}
+          />
+          <CreateCrossoverMessageCard
+            form={form}
+            patchForm={patchForm}
+            busy={props.busy}
+            staffOptions={props.staffOptions}
+            onSubmit={submit}
+            templateFields={getTemplateFields(form.template_title)}
+            hasTemplate={Boolean(form.template_title && getTemplateFields(form.template_title).length)}
+            onTemplateFieldChange={(key, value, field) => patchForm(patchCrossoverFieldValue(form, key, value, field))}
+          />
         </div>
-        <div className="space-y-5">
-          <TemplatesPanel onPick={pickTemplate} />
-          <RecentActivityPanel items={props.recentActivity} />
-        </div>
-      </section>
+        <aside className="crossover-dashboard__sidebar">
+          <CrossoverTemplatesSidebar onPick={pickTemplate} />
+          <CrossoverRecentActivitySidebar items={props.recentActivity} formatDateTime={formatDateTime} />
+        </aside>
+      </div>
       <DetailModal data={props.data} detail={props.detail} busy={props.busy} staffOptions={props.staffOptions} onMutate={props.onMutate} onClose={props.onCloseDetail} />
     </div>
   );
