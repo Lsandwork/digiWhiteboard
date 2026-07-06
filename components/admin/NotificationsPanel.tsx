@@ -1,15 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, CheckCheck, ExternalLink } from "lucide-react";
+import { BellRing, CheckCheck, RefreshCw } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
-import {
-  filterNotificationsForUser,
-  notificationReaderKey,
-  notificationsForSession,
-  type StaffNotification
-} from "@/lib/staff/notifications";
+import { canReviewManagementSupport } from "@/lib/admin/users";
 import type { StaffOpsState } from "@/lib/staff/admin-ops";
+import type { ManagementReport } from "@/lib/staff/management-reports";
+import type { NotificationDetailPayload } from "@/lib/staff/notification-detail";
+import {
+  countUnreadByCategory,
+  enrichNotifications,
+  filterNotificationsList,
+  linkedEntityId,
+  linkedEntityTable,
+  type EnrichedNotification,
+  type NotificationSidebarFilter,
+  type NotificationTopFilter
+} from "@/lib/staff/notification-hub";
+import { notificationReaderKey } from "@/lib/staff/notifications";
+import { NotificationResponseModal } from "@/components/admin/notifications/NotificationResponseModal";
+import { NotificationSidebar, NotificationToolbar } from "@/components/admin/notifications/NotificationFilters";
+import { NotificationTable } from "@/components/admin/notifications/NotificationTable";
+import { NotificationsPageLayout } from "@/components/admin/notifications/NotificationsPageLayout";
 
 type NotificationsPayload = StaffOpsState & {
   currentUser: { email: string | null; adminUserId: string | null; role: string };
@@ -20,50 +32,53 @@ type NotificationsPanelProps = {
   personalOnly?: boolean;
 };
 
-function priorityClass(priority: StaffNotification["priority"]) {
-  if (priority === "Critical" || priority === "High") return "admin-notif-priority--urgent";
-  if (priority === "Medium") return "admin-notif-priority--medium";
-  return "admin-notif-priority--low";
-}
-
-function targetLabel(notification: StaffNotification) {
-  switch (notification.target.kind) {
-    case "staff_name":
-      return `Assigned to ${notification.target.name}`;
-    case "staff_email":
-      return `For ${notification.target.email}`;
-    case "coordinator_pool":
-      return "Coordinators & Team Lead";
-    case "admin_pool":
-      return "Admin alert";
-    default:
-      return "Notification";
-  }
-}
-
-function typeLabel(type: StaffNotification["type"]) {
-  switch (type) {
-    case "assignment":
-      return "Assignment";
-    case "mention":
-      return "Mention";
-    case "reply":
-      return "Reply";
-    case "escalation":
-      return "Escalation";
-    case "auto_issue":
-      return "Auto issue";
-    default:
-      return "Update";
-  }
+async function fetchLinkedReports(ids: string[]): Promise<Map<string, ManagementReport>> {
+  const map = new Map<string, ManagementReport>();
+  const unique = [...new Set(ids)].slice(0, 40);
+  await Promise.all(
+    unique.map(async (id) => {
+      try {
+        const response = await fetch(`/api/admin/notifications?report_id=${encodeURIComponent(id)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const body = await response.json();
+        if (body.report) map.set(id, body.report as ManagementReport);
+      } catch {
+        // skip inaccessible linked reports
+      }
+    })
+  );
+  return map;
 }
 
 export function NotificationsPanel({ onOpenTab, personalOnly = false }: NotificationsPanelProps) {
   const [data, setData] = useState<NotificationsPayload | null>(null);
+  const [reportsById, setReportsById] = useState<Map<string, ManagementReport>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [filter, setFilter] = useState<"all" | "unread">("all");
   const [error, setError] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [modalSuccess, setModalSuccess] = useState<string | null>(null);
+  const [modalDetail, setModalDetail] = useState<NotificationDetailPayload | null>(null);
+  const [activeNotificationId, setActiveNotificationId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sidebar, setSidebar] = useState<NotificationSidebarFilter>("all");
+  const [topFilter, setTopFilter] = useState<NotificationTopFilter>("all");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"newest" | "oldest" | "priority">("newest");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [assignedFilter, setAssignedFilter] = useState("");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  const session = useMemo(
+    () => ({
+      email: data?.currentUser.email ?? null,
+      adminUserId: data?.currentUser.adminUserId ?? null,
+      role: data?.currentUser.role ?? null
+    }),
+    [data]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -72,7 +87,14 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
       const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load notifications.");
-      setData(body as NotificationsPayload);
+      const payload = body as NotificationsPayload;
+      setData(payload);
+
+      const reportIds = (payload.notifications ?? [])
+        .filter((n) => linkedEntityTable(n) === "management_reports")
+        .map((n) => linkedEntityId(n));
+      const reports = await fetchLinkedReports(reportIds);
+      setReportsById(reports);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load notifications.");
     } finally {
@@ -84,146 +106,242 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
     void load();
   }, [load]);
 
-  const readerKey = notificationReaderKey(data?.currentUser.email, data?.currentUser.adminUserId);
-
-  const visible = useMemo(() => {
+  const enriched = useMemo(() => {
     if (!data) return [];
-    const items = personalOnly
-      ? notificationsForSession(data, data.currentUser)
-      : filterNotificationsForUser(data, data.currentUser);
-    if (filter === "unread") {
-      return items.filter((notification) => !notification.read_by.includes(readerKey));
+    return enrichNotifications(data, session, reportsById, { personalOnly });
+  }, [data, session, reportsById, personalOnly]);
+
+  const filtered = useMemo(
+    () =>
+      filterNotificationsList(enriched, {
+        sidebar,
+        top: topFilter,
+        query,
+        status: statusFilter === "all" ? "all" : (statusFilter as EnrichedNotification["displayStatus"]),
+        assignedTo: assignedFilter || undefined,
+        sort
+      }),
+    [enriched, sidebar, topFilter, query, statusFilter, assignedFilter, sort]
+  );
+
+  const unreadCount = useMemo(() => enriched.filter((item) => item.isUnread).length, [enriched]);
+  const categoryCounts = useMemo(() => countUnreadByCategory(enriched), [enriched]);
+
+  const staffNames = useMemo(
+    () => (data?.staff_directory ?? []).filter((m) => m.status === "Active").map((m) => m.name),
+    [data]
+  );
+
+  const canManage = canReviewManagementSupport(session.role);
+
+  const loadModalDetail = useCallback(async (notificationId: string, markRead = true) => {
+    setModalLoading(true);
+    setModalError(null);
+    setModalSuccess(null);
+    try {
+      if (markRead) {
+        await fetch(`/api/admin/notifications/${encodeURIComponent(notificationId)}`, { method: "POST" });
+        setData((prev) => {
+          if (!prev) return prev;
+          const readerKey = notificationReaderKey(prev.currentUser.email, prev.currentUser.adminUserId);
+          return {
+            ...prev,
+            notifications: prev.notifications.map((item) =>
+              item.id === notificationId && !item.read_by.includes(readerKey)
+                ? { ...item, read_by: [...item.read_by, readerKey] }
+                : item
+            )
+          };
+        });
+      }
+      const response = await fetch(`/api/admin/notifications/${encodeURIComponent(notificationId)}`, { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "This notification could not be loaded.");
+      setModalDetail(body as NotificationDetailPayload);
+      if (body.report) {
+        setReportsById((prev) => new Map(prev).set(body.report.id, body.report));
+      }
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "This notification could not be loaded.");
+      setModalDetail(null);
+    } finally {
+      setModalLoading(false);
     }
-    return items;
-  }, [data, filter, personalOnly, readerKey]);
+  }, []);
 
-  const unreadCount = useMemo(() => {
-    if (!data) return 0;
-    const items = personalOnly
-      ? notificationsForSession(data, data.currentUser)
-      : filterNotificationsForUser(data, data.currentUser);
-    return items.filter((notification) => !notification.read_by.includes(readerKey)).length;
-  }, [data, personalOnly, readerKey]);
+  async function handleOpen(notification: EnrichedNotification) {
+    setActiveNotificationId(notification.id);
+    setReplyText("");
+    setModalOpen(true);
+    await loadModalDetail(notification.id);
+  }
 
-  async function mutate(action: string, payload: Record<string, unknown> = {}) {
+  function handleCloseModal() {
+    if (busy) return;
+    setModalOpen(false);
+    setActiveNotificationId(null);
+    setModalDetail(null);
+    setModalError(null);
+    setModalSuccess(null);
+    setReplyText("");
+  }
+
+  async function handleMarkAllRead() {
     setBusy(true);
     setError(null);
     try {
       const response = await fetch("/api/admin/staff-operations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, ...payload })
+        body: JSON.stringify({ action: "mark_all_notifications_read" })
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to update notifications.");
+      if (!response.ok) throw new Error(body.error ?? "Unable to mark all read.");
       await load();
-      return true;
-    } catch (mutateError) {
-      setError(mutateError instanceof Error ? mutateError.message : "Unable to update notifications.");
-      return false;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to mark all read.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function openNotification(notification: StaffNotification) {
-    await mutate("mark_notification_read", { notification_id: notification.id });
-    if (onOpenTab && notification.source_tab !== "notifications") {
-      onOpenTab(notification.source_tab);
+  async function handleSendReply(options: { internalNote: boolean; markResolved: boolean }) {
+    if (!activeNotificationId) return;
+    const message = replyText.trim();
+    if (!message) return;
+    setBusy(true);
+    setModalError(null);
+    setModalSuccess(null);
+    try {
+      const response = await fetch(`/api/admin/notifications/${encodeURIComponent(activeNotificationId)}/replies`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message, internal_note: options.internalNote, mark_resolved: options.markResolved })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Response didn't send. Try again.");
+      setReplyText("");
+      setModalSuccess(body.message ?? "Response sent.");
+      if (body.detail) setModalDetail(body.detail as NotificationDetailPayload);
+      await load();
+      if (activeNotificationId) await loadModalDetail(activeNotificationId, false);
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Response didn't send. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function patchModal(payload: Record<string, unknown>) {
+    if (!activeNotificationId) return;
+    setBusy(true);
+    setModalError(null);
+    setModalSuccess(null);
+    try {
+      const response = await fetch(`/api/admin/notifications/${encodeURIComponent(activeNotificationId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to update.");
+      if (body.detail) setModalDetail(body.detail as NotificationDetailPayload);
+      setModalSuccess("Updated.");
+      await load();
+    } catch (err) {
+      setModalError(err instanceof Error ? err.message : "Unable to update.");
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
-    <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
-      <header className="crossover-card crossover-card--sidebar p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <BellRing className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
-              <h2 className="crossover-dashboard__page-title">Notifications</h2>
-              {unreadCount > 0 ? <span className="crossover-badge crossover-badge--urgent">{unreadCount} unread</span> : null}
-            </div>
-            <p className="crossover-dashboard__page-subtitle max-w-2xl">
-              {personalOnly
-                ? "Personal alerts assigned directly to you, including @mentions and individual assignments."
-                : "Alerts for crossover updates, assignments, @mentions, and urgent escalations. Front Desk Coordinators and Team Lead staff see all staff updates; High and Urgent items also alert Admins."}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={`crossover-urgent-pill ${filter === "all" ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilter("all")}>
-              All
-            </button>
-            <button type="button" className={`crossover-urgent-pill ${filter === "unread" ? "crossover-urgent-pill--on" : ""}`} onClick={() => setFilter("unread")}>
-              Unread
-            </button>
-            <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy || unreadCount === 0} onClick={() => void mutate("mark_all_notifications_read")}>
-              <CheckCheck className="mr-2 inline h-4 w-4" />
-              Mark all read
-            </button>
-            <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void load()}>
-              Refresh
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {error ? <p className="admin-error">{error}</p> : null}
-
-      {loading ? (
-        <section className="admin-card p-5 text-admin-muted">Loading notifications…</section>
-      ) : visible.length === 0 ? (
-        <section className="admin-empty-state">
-          <p className="admin-empty-state-title">No notifications</p>
-          <p className="admin-empty-state-text">
-            {filter === "unread" ? "You are all caught up." : "New crossover, follow-up, and issue activity will appear here."}
-          </p>
-        </section>
-      ) : (
-        <div className="admin-notif-list space-y-3">
-          {visible.map((notification) => {
-            const unread = !notification.read_by.includes(readerKey);
-            return (
-              <article
-                key={notification.id}
-                className={`admin-notif-card ${unread ? "admin-notif-card--unread" : ""}`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <span className={`admin-notif-priority ${priorityClass(notification.priority)}`}>{notification.priority}</span>
-                      <span className="admin-notif-type">{typeLabel(notification.type)}</span>
-                      <span className="text-xs text-admin-muted">{targetLabel(notification)}</span>
-                      {unread ? <span className="admin-notif-dot" aria-label="Unread" /> : null}
-                    </div>
-                    <h3 className="font-bold text-white">{notification.title}</h3>
-                    {notification.body ? <p className="mt-1 text-sm text-admin-muted">{notification.body}</p> : null}
-                    <p className="mt-2 text-xs text-admin-muted">
-                      {new Date(notification.created_at).toLocaleString()}
-                      {notification.created_by ? ` • from ${notification.created_by}` : ""}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="admin-btn-secondary inline-flex items-center gap-2"
-                    disabled={busy}
-                    onClick={() => void openNotification(notification)}
-                  >
-                    Open
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </button>
+    <>
+      <NotificationsPageLayout
+        header={
+          <header className="notif-hub-header crossover-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="mb-2 flex items-center gap-2">
+                  <BellRing className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
+                  <h2 className="crossover-dashboard__page-title">Notifications</h2>
+                  {unreadCount > 0 ? <span className="crossover-badge crossover-badge--urgent">{unreadCount} unread</span> : null}
                 </div>
-              </article>
-            );
-          })}
-        </div>
-      )}
+                <p className="crossover-dashboard__page-subtitle max-w-2xl">
+                  Click <strong>Open</strong> on any notification to view the full submission and respond in a wide response window.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy || unreadCount === 0} onClick={() => void handleMarkAllRead()}>
+                  <CheckCheck className="mr-2 inline h-4 w-4" />
+                  Mark all read
+                </button>
+                <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void load()}>
+                  <RefreshCw className="mr-2 inline h-4 w-4" />
+                  Refresh
+                </button>
+              </div>
+            </div>
+            {error ? <p className="admin-error mt-3">{error}</p> : null}
+          </header>
+        }
+        sidebar={
+          <NotificationSidebar
+            sidebar={sidebar}
+            counts={categoryCounts}
+            mobileOpen={mobileFiltersOpen}
+            onSidebarChange={setSidebar}
+            onMobileToggle={() => setMobileFiltersOpen((open) => !open)}
+          />
+        }
+        toolbar={
+          <NotificationToolbar
+            top={topFilter}
+            query={query}
+            sort={sort}
+            statusFilter={statusFilter}
+            assignedFilter={assignedFilter}
+            showAssignedFilter={canManage}
+            staffNames={staffNames}
+            onTopChange={setTopFilter}
+            onQueryChange={setQuery}
+            onSortChange={setSort}
+            onStatusFilterChange={setStatusFilter}
+            onAssignedFilterChange={setAssignedFilter}
+            onMobileToggle={() => setMobileFiltersOpen((open) => !open)}
+          />
+        }
+        list={
+          loading ? (
+            <div className="notif-hub-list__empty">
+              <p className="notif-hub-list__empty-text">Loading notifications…</p>
+            </div>
+          ) : (
+            <NotificationTable items={filtered} onOpen={(item) => void handleOpen(item)} />
+          )
+        }
+      />
 
-      <section className="admin-card p-5">
-        <h3 className="admin-section-title">How tagging works</h3>
-        <p className="admin-section-helper">
-          Assign someone with the Assigned To field, or type <strong>@Name</strong> in a message (for example <strong>@Brian</strong>) to notify that staff member. Use priority Low through Critical — High and Urgent items also notify Admins automatically.
-        </p>
-      </section>
-    </div>
+      <NotificationResponseModal
+        open={modalOpen}
+        loading={modalLoading}
+        busy={busy}
+        error={modalError}
+        success={modalSuccess}
+        detail={modalDetail}
+        replyText={replyText}
+        staffNames={staffNames}
+        onClose={handleCloseModal}
+        onReplyTextChange={setReplyText}
+        onSendReply={(options) => void handleSendReply(options)}
+        onStatusChange={(status) => void patchModal({ status })}
+        onAssign={(name) => void patchModal({ assigned_to: name })}
+        onSupportAction={(action) => void patchModal({ support_action: action })}
+        onOpenTab={(tab) => {
+          handleCloseModal();
+          onOpenTab?.(tab);
+        }}
+      />
+    </>
   );
 }

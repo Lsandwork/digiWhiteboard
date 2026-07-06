@@ -14,7 +14,7 @@ import {
   listAllManagementReports,
   updateManagementReport
 } from "@/lib/staff/management-reports";
-import { listStaffOps, dispatchPersonalStaffEmailNotification } from "@/lib/staff/admin-ops";
+import { dispatchStaffOpsNotificationEvent, listStaffOps, dispatchPersonalStaffEmailNotification } from "@/lib/staff/admin-ops";
 
 export type SupportInboxFilter = {
   query?: string;
@@ -207,6 +207,35 @@ function appendAudit(
   return [...(report.audit_history ?? []), entry];
 }
 
+function responseAlertTitle(report: ManagementReport) {
+  if (report.report_type === "employee_write_up") return "Update on your write-up request";
+  if (report.item_type === "request") return "Response to your request";
+  if (report.item_type === "complaint") return "Response to your complaint";
+  if (report.report_type === "owner_complaint_dog_handler") return "Management replied to your submission";
+  return "Management responded to your submission";
+}
+
+function responseAlertBody(report: ManagementReport, message: string) {
+  const preview = message.slice(0, 200);
+  if (report.item_type === "request") {
+    return `There's a new response on your request. Open it to view and reply.\n\n${preview}`;
+  }
+  if (report.item_type === "complaint") {
+    return `Management responded to your complaint. Open it to review the update.\n\n${preview}`;
+  }
+  if (report.report_type === "employee_write_up") {
+    return `Your write-up request has an update from management.\n\n${preview}`;
+  }
+  return `There's a new response on your submission. Open it to view and reply.\n\n${preview}`;
+}
+
+function statusAlertTitle(report: ManagementReport, status: string) {
+  if (report.report_type === "employee_write_up") return "Update on your write-up request";
+  if (report.item_type === "request") return "Update on your request";
+  if (report.item_type === "complaint") return "Update on your complaint";
+  return "Update on your submission";
+}
+
 async function notifySubmitter(
   supabase: SupabaseClient,
   report: ManagementReport,
@@ -219,7 +248,7 @@ async function notifySubmitter(
   await dispatchPersonalStaffEmailNotification(
     supabase,
     {
-      eventType: "updated",
+      eventType: "reply",
       sourceTable: "management_reports",
       sourceId: report.id,
       sourceTab: "push_notices",
@@ -230,6 +259,38 @@ async function notifySubmitter(
     },
     email
   );
+}
+
+async function notifyManagementOnSubmitterReply(
+  supabase: SupabaseClient,
+  report: ManagementReport,
+  body: string,
+  actor: string
+) {
+  const itemLabel = report.item_type === "request" ? "request" : report.item_type === "complaint" ? "complaint" : "submission";
+  await dispatchStaffOpsNotificationEvent(supabase, {
+    eventType: "reply",
+    sourceTable: "management_reports",
+    sourceId: report.id,
+    sourceTab: "push_notices",
+    title: `New reply on your ${itemLabel}: ${report.title}`,
+    body: `The submitter replied. Open Notifications to review and respond.\n\n${body.slice(0, 200)}`,
+    priority: report.priority === "Urgent" ? "Urgent" : report.priority === "High" ? "High" : "Normal",
+    urgent: report.priority === "Urgent",
+    needsManagementReview: true,
+    assignedTo: report.assigned_to ?? undefined,
+    actor
+  });
+}
+
+export async function applySubmitterSupportReply(
+  supabase: SupabaseClient,
+  id: string,
+  body: string,
+  actor: string,
+  userRole: string
+) {
+  return applySupportItemAction(supabase, id, "add_submitter_reply", { body, user_role: userRole }, actor);
 }
 
 export async function applySupportItemAction(
@@ -267,8 +328,8 @@ export async function applySupportItemAction(
       reviewed_at: now,
       audit_history: appendAudit(report, "change_status", report.admin_status ?? null, status, actor)
     };
-    notifyTitle = `Support item ${status.toLowerCase()}`;
-    notifyBody = `Your ${report.item_type ?? "submission"} status was updated to ${status}.`;
+    notifyTitle = statusAlertTitle(report, status);
+    notifyBody = `Your ${report.item_type ?? "submission"} status was updated to ${status}. Open Notifications to view details.`;
   } else if (action === "add_internal_note") {
     const body = String(input.body ?? "").trim();
     if (!body) throw new Error("Internal note is required.");
@@ -298,17 +359,45 @@ export async function applySupportItemAction(
       visibility: "visible_to_submitter",
       created_at: now
     };
+    const nextStatus: SupportAdminStatus =
+      input.mark_resolved === true ? "Resolved" : "In Review";
     patch = {
       ...patch,
       management_response: body,
       comments: [...(report.comments ?? []), comment],
-      admin_status: report.admin_status === "Submitted" ? "In Review" : report.admin_status,
+      admin_status: input.mark_resolved === true ? "Resolved" : nextStatus,
+      status: input.mark_resolved === true ? "Reviewed" : report.status,
       reviewed_by: actor,
       reviewed_at: now,
       audit_history: appendAudit(report, "add_response", null, body.slice(0, 120), actor)
     };
-    notifyTitle = "Management response on your submission";
-    notifyBody = body;
+    notifyTitle = responseAlertTitle(report);
+    notifyBody = responseAlertBody(report, body);
+  } else if (action === "add_submitter_reply") {
+    const body = String(input.body ?? "").trim();
+    if (!body) throw new Error("Response is required.");
+    const submitterEmail = report.created_by?.trim().toLowerCase();
+    const actorEmail = actor.trim().toLowerCase();
+    if (!submitterEmail || submitterEmail !== actorEmail) {
+      throw new Error("You can only reply to your own submissions.");
+    }
+    const comment: SupportComment = {
+      id: newId("comment"),
+      user_id: String(input.user_id ?? "") || null,
+      user_name: report.submitted_by_name ?? actor,
+      user_role: String(input.user_role ?? report.submitted_by_role ?? "staff"),
+      body,
+      visibility: "visible_to_submitter",
+      created_at: now
+    };
+    patch = {
+      ...patch,
+      comments: [...(report.comments ?? []), comment],
+      admin_status: "Needs More Info",
+      status: "Needs Review",
+      audit_history: appendAudit(report, "add_submitter_reply", null, body.slice(0, 120), actor)
+    };
+    await notifyManagementOnSubmitterReply(supabase, report, body, actor);
   } else if (action === "close") {
     patch = {
       ...patch,

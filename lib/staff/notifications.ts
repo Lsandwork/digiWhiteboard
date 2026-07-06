@@ -26,6 +26,14 @@ export type StaffNotificationSourceTab =
   | "push_notices"
   | "notifications";
 
+export type NotificationThreadStatus =
+  | "open"
+  | "in_review"
+  | "waiting_on_response"
+  | "responded"
+  | "resolved"
+  | "closed";
+
 export type StaffNotification = {
   id: string;
   type: StaffNotificationType;
@@ -39,6 +47,13 @@ export type StaffNotification = {
   read_by: string[];
   created_by: string | null;
   created_at: string;
+  /** Optional extended metadata for thread hub (backward compatible). */
+  linked_entity_type?: string | null;
+  linked_entity_id?: string | null;
+  thread_status?: NotificationThreadStatus | null;
+  assigned_to?: string | null;
+  category?: string | null;
+  updated_at?: string | null;
 };
 
 export type StaffOpsNotificationEvent = {
