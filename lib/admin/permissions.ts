@@ -8,6 +8,7 @@ export type PermissionKey =
   | "view_staff_whiteboard"
   | "manage_staff_whiteboard"
   | "manage_push_notices"
+  | "manage_cast_videos"
   | "push_grooming_request"
   | "clear_grooming_request"
   | "view_front_desk_log"
@@ -148,6 +149,7 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_staff_whiteboard",
   "manage_staff_whiteboard",
   "manage_push_notices",
+  "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
   "view_front_desk_log",
@@ -248,6 +250,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
   "manage_push_notices",
+  "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
   "view_front_desk_log",
@@ -276,6 +279,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "view_staff_whiteboard",
   "manage_staff_whiteboard",
   "manage_push_notices",
+  "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
   "view_front_desk_log",
@@ -351,6 +355,7 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
 const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "manage_push_notices",
+  "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
   "view_front_desk_log",
@@ -517,6 +522,8 @@ export function hasAnyRole(access: UserAccess | null | undefined, roles: RoleKey
 
 export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   push_notices: "manage_push_notices",
+  emergency_alerts: "manage_push_notices",
+  cast_videos: "manage_cast_videos",
   grooming_push: "push_grooming_request",
   trainer_push: "push_trainer_request",
   trainer_entry: "create_trainer_entry",
@@ -563,6 +570,7 @@ export function effectiveAccessLabel(access: UserAccess | null | undefined, lega
 /** Preview labels for admin user form. */
 export const PERMISSION_PREVIEW_LABELS: Partial<Record<PermissionKey, string>> = {
   manage_push_notices: "Push Notices",
+  manage_cast_videos: "Cast Videos",
   view_front_desk_log: "Front Desk Log",
   view_owner_follow_up: "Owner Follow Up",
   view_active_issues: "Active Issues",

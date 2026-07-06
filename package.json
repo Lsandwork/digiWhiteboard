@@ -15,7 +15,10 @@
     "test:board-dog": "tsx scripts/test-board-dog.ts",
     "test:webhook": "tsx scripts/test-webhook.ts",
     "test:bad-signature": "tsx scripts/test-bad-signature.ts",
-    "test:yard-links": "tsx scripts/test-yard-links.ts"
+    "test:yard-links": "tsx scripts/test-yard-links.ts",
+    "test:cast-video-notices": "tsx scripts/test-cast-video-notices.ts",
+    "db:push": "tsx scripts/push-supabase-migration.ts",
+    "db:push:all": "npx supabase db push --linked --yes"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -31,12 +34,15 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.14.10",
+    "@types/pg": "^8.20.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
+    "pg": "^8.22.0",
     "postcss": "^8.5.10",
+    "supabase": "^2.109.0",
     "tailwindcss": "^3.4.4",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3"

@@ -48,8 +48,10 @@ export type AdminTab =
   | "schedule"
   | "display"
   | "push_notices"
+  | "emergency_alerts"
   | "grooming_push"
   | "trainer_push"
+  | "cast_videos"
   | "trainer_entry"
   | "crossover_communication"
   | "owner_follow_up"
@@ -84,8 +86,10 @@ export const ADMIN_TABS: AdminTab[] = [
   "schedule",
   "display",
   "push_notices",
+  "emergency_alerts",
   "grooming_push",
   "trainer_push",
+  "cast_videos",
   "trainer_entry",
   "crossover_communication",
   "owner_follow_up",
