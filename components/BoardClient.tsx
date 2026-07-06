@@ -157,10 +157,17 @@ export function BoardClient() {
   const visibleCastVideo = !visibleEmergencyCast && activeCastVideo && !dismissedCastIds.includes(activeCastVideo.id) ? activeCastVideo : null;
   useFitdogAlertSound(activeAlertKey);
   const {
+    castUrl,
     isCasting,
     castError,
-    canChromecast,
+    canCast,
+    castMethod,
     toggleTvCast,
+    startChromecast,
+    startWirelessCast,
+    startAirPlayCast,
+    copyCastUrl,
+    stopTvCast,
     setCastError
   } = useStaffTvCast(displayToken);
 
@@ -404,10 +411,17 @@ export function BoardClient() {
 
       {!tvMode ? (
         <StaffCastButton
+          castUrl={castUrl}
           isCasting={isCasting}
           castError={castError}
-          canChromecast={canChromecast}
+          canCast={canCast}
+          castMethod={castMethod}
           onToggle={() => void runCastAction(toggleTvCast)}
+          onChromecast={() => void runCastAction(startChromecast)}
+          onWireless={() => void runCastAction(startWirelessCast)}
+          onAirPlay={() => void runCastAction(startAirPlayCast)}
+          onCopyUrl={() => void runCastAction(copyCastUrl)}
+          onStop={() => void runCastAction(stopTvCast)}
         />
       ) : null}
 

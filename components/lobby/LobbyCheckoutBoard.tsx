@@ -69,8 +69,15 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     isTvLayout,
     showCastActive,
     castError,
-    canChromecast,
+    canCast,
+    castUrl,
+    castMethod,
     toggleTvCast,
+    startChromecast,
+    startWirelessCast,
+    startAirPlayCast,
+    copyCastUrl,
+    stopTvCast,
     setCastError
   } = useLobbyTvCast(tvModeFromUrl, displayToken);
 
@@ -310,10 +317,17 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
 
       <LobbyCastButton
+        castUrl={castUrl}
         isCasting={showCastActive}
         castError={castError}
-        canChromecast={canChromecast}
+        canCast={canCast}
+        castMethod={castMethod}
         onToggle={() => void runCastAction(toggleTvCast)}
+        onChromecast={() => void runCastAction(startChromecast)}
+        onWireless={() => void runCastAction(startWirelessCast)}
+        onAirPlay={() => void runCastAction(startAirPlayCast)}
+        onCopyUrl={() => void runCastAction(copyCastUrl)}
+        onStop={() => void runCastAction(stopTvCast)}
       />
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">

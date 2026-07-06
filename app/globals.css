@@ -1044,6 +1044,121 @@ html.staff-tv-display .board-shell {
   text-align: right;
 }
 
+.staff-cast-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.staff-cast-menu {
+  width: min(22rem, calc(100vw - 2rem));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  background: rgba(12, 18, 24, 0.97);
+  padding: 0.85rem;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.staff-cast-menu__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.staff-cast-menu__title {
+  margin: 0;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.staff-cast-menu__subtitle {
+  margin: 0.2rem 0 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.staff-cast-menu__close {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  width: 1.75rem;
+  height: 1.75rem;
+  color: #fff;
+}
+
+.staff-cast-menu__options {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.staff-cast-menu__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.65rem 0.7rem;
+  text-align: left;
+  color: #fff;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.staff-cast-menu__option:hover:not(:disabled) {
+  border-color: rgba(241, 95, 42, 0.55);
+  background: rgba(241, 95, 42, 0.08);
+}
+
+.staff-cast-menu__option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.staff-cast-menu__option-icon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9999px;
+  background: rgba(100, 185, 220, 0.14);
+  color: #9fe2f8;
+  flex-shrink: 0;
+}
+
+.staff-cast-menu__option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.staff-cast-menu__option-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.staff-cast-menu__option-description {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.staff-cast-menu__url,
+.staff-cast-menu__hint {
+  margin: 0.7rem 0 0;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  word-break: break-all;
+}
+
 @media (max-width: 768px) {
   .staff-cast-control {
     right: 0.75rem;
@@ -1056,6 +1171,10 @@ html.staff-tv-display .board-shell {
 
   .staff-cast-button {
     padding: 0.7rem;
+  }
+
+  .staff-cast-menu {
+    width: min(calc(100vw - 1.5rem), 22rem);
   }
 }
 

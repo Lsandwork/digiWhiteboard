@@ -1,17 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { openChromecastPicker } from "@/lib/lobby/cast-picker";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  openAirPlayPicker,
+  openChromecastPicker,
+  openMobileAwareCastPicker,
+  openWirelessCastPicker,
+  stopAllCastSessions,
+  type CastPickerMethod
+} from "@/lib/lobby/cast-picker";
+import { isCastSenderSupported } from "@/lib/lobby/cast-platform";
 import {
   getGoogleCastAppId,
-  isGoogleCastBrowser,
   isGoogleCastSessionActive,
-  preloadGoogleCast,
-  stopGoogleCastSession
+  preloadGoogleCast
 } from "@/lib/lobby/google-cast";
+import { buildLobbyTvCastUrl } from "@/lib/lobby/tv-cast";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
-
-export type CastMethod = "chromecast" | null;
 
 type CastStatus = "idle" | "casting" | "error";
 
@@ -19,38 +24,72 @@ export function useLobbyTvCast(initialTvLayout = false, displayToken = "") {
   const [tvLayoutActive] = useState(initialTvLayout);
   const [castStatus, setCastStatus] = useState<CastStatus>("idle");
   const [castError, setCastError] = useState<string | null>(null);
-  const [castMethod, setCastMethod] = useState<CastMethod>(null);
+  const [castMethod, setCastMethod] = useState<CastPickerMethod | null>(null);
   const { requestWakeLock, releaseWakeLock } = useScreenWakeLock();
 
   const isTvLayout = initialTvLayout || tvLayoutActive;
-  const canChromecast = isGoogleCastBrowser();
+  const canCast = isCastSenderSupported();
   const isCasting = castStatus === "casting" || isGoogleCastSessionActive();
   const showCastActive = isCasting;
+  const castUrl = useMemo(() => buildLobbyTvCastUrl(undefined, displayToken || undefined), [displayToken]);
 
   useEffect(() => {
-    if (!canChromecast) return;
+    if (!canCast) return;
     void preloadGoogleCast();
-  }, [canChromecast]);
+  }, [canCast]);
+
+  const beginCast = useCallback(
+    async (method: CastPickerMethod) => {
+      setCastError(null);
+      if (method === "wireless") {
+        await openWirelessCastPicker(displayToken || undefined, castUrl);
+      } else if (method === "airplay") {
+        await openAirPlayPicker();
+      } else {
+        await openChromecastPicker(displayToken || undefined, castUrl);
+      }
+      setCastMethod(method);
+      setCastStatus("casting");
+      await requestWakeLock();
+    },
+    [castUrl, displayToken, requestWakeLock]
+  );
 
   const stopTvCast = useCallback(async () => {
     setCastError(null);
-    await stopGoogleCastSession();
+    await stopAllCastSessions();
     await releaseWakeLock();
     setCastMethod(null);
     setCastStatus("idle");
   }, [releaseWakeLock]);
 
   const startChromecast = useCallback(async () => {
-    if (!canChromecast) {
-      throw new Error("Casting requires Google Chrome on desktop.");
+    if (!canCast) {
+      throw new Error("Casting is not available in this browser.");
     }
+    await beginCast("chromecast");
+  }, [beginCast, canCast]);
 
-    setCastError(null);
-    await openChromecastPicker(displayToken || undefined);
-    setCastMethod("chromecast");
-    setCastStatus("casting");
-    await requestWakeLock();
-  }, [canChromecast, displayToken, requestWakeLock]);
+  const startWirelessCast = useCallback(async () => {
+    if (!canCast) {
+      throw new Error("Casting is not available in this browser.");
+    }
+    await beginCast("wireless");
+  }, [beginCast, canCast]);
+
+  const startAirPlayCast = useCallback(async () => {
+    if (!canCast) {
+      throw new Error("Casting is not available in this browser.");
+    }
+    await beginCast("airplay");
+  }, [beginCast, canCast]);
+
+  const copyCastUrl = useCallback(async () => {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error("Clipboard is not available in this browser.");
+    }
+    await navigator.clipboard.writeText(castUrl);
+  }, [castUrl]);
 
   const toggleTvCast = useCallback(async () => {
     if (isCasting) {
@@ -58,20 +97,30 @@ export function useLobbyTvCast(initialTvLayout = false, displayToken = "") {
       return;
     }
 
-    await startChromecast();
-  }, [isCasting, startChromecast, stopTvCast]);
+    const result = await openMobileAwareCastPicker(displayToken || undefined, castUrl);
+    setCastMethod(result.method);
+    setCastStatus("casting");
+    await requestWakeLock();
+  }, [castUrl, displayToken, isCasting, requestWakeLock, stopTvCast]);
 
   return {
-    tvCastUrl: "/lobby/checkouts?display=tv",
+    tvCastUrl: castUrl,
+    castUrl,
     isTvLayout,
     isCasting,
     showCastActive,
     castStatus,
     castError,
     castMethod,
-    canChromecast,
+    canCast,
+    canChromecast: canCast,
     chromecastAppId: getGoogleCastAppId(),
+    startChromecast,
+    startWirelessCast,
+    startAirPlayCast,
+    copyCastUrl,
     toggleTvCast,
+    stopTvCast,
     setCastError
   };
 }
