@@ -1,10 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AdminGlobalSettings } from "@/lib/admin/settings";
 import type { HrConsultMessage } from "@/lib/hr/consult-store";
+import {
+  geminiModelRetryChain,
+  isGeminiModelNotFoundError,
+  resolveGeminiModel
+} from "@/lib/hr/gemini-config";
 
-export function isGeminiConfigured() {
-  return Boolean(process.env.GEMINI_API_KEY?.trim());
-}
+export { isGeminiConfigured } from "@/lib/hr/gemini-config";
 
 function buildSystemInstruction(settings: AdminGlobalSettings) {
   const location = `${settings.hr_company_city}, ${settings.hr_company_region}, ${settings.hr_company_country}`;
@@ -41,6 +44,29 @@ function historyToGemini(messages: HrConsultMessage[]) {
   }));
 }
 
+async function sendWithModel(
+  apiKey: string,
+  modelName: string,
+  settings: AdminGlobalSettings,
+  history: HrConsultMessage[],
+  userMessage: string
+) {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    systemInstruction: buildSystemInstruction(settings)
+  });
+
+  const chat = model.startChat({
+    history: historyToGemini(history)
+  });
+
+  const result = await chat.sendMessage(userMessage);
+  const text = result.response.text()?.trim();
+  if (!text) throw new Error("Gemini returned an empty response. Please try again.");
+  return text;
+}
+
 export async function consultGeminiHr(params: {
   settings: AdminGlobalSettings;
   history: HrConsultMessage[];
@@ -55,22 +81,31 @@ export async function consultGeminiHr(params: {
     throw new Error("HR Consult is disabled in Settings.");
   }
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({
-    model: params.settings.hr_consult_model || "gemini-2.0-flash",
-    systemInstruction: buildSystemInstruction(params.settings)
-  });
-
   const contextBlock = params.recordContext
     ? `\n\n---\nContext from an HR record the manager attached:\n${params.recordContext}\n---\n`
     : "";
 
-  const chat = model.startChat({
-    history: historyToGemini(params.history)
-  });
+  const message = `${contextBlock}${params.userMessage}`.trim();
+  const primaryModel = resolveGeminiModel(params.settings.hr_consult_model);
+  const models = geminiModelRetryChain(primaryModel);
+  let lastError: unknown;
 
-  const result = await chat.sendMessage(`${contextBlock}${params.userMessage}`.trim());
-  const text = result.response.text()?.trim();
-  if (!text) throw new Error("Gemini returned an empty response. Please try again.");
-  return text;
+  for (let index = 0; index < models.length; index += 1) {
+    const modelName = models[index]!;
+    try {
+      return await sendWithModel(apiKey, modelName, params.settings, params.history, message);
+    } catch (error) {
+      lastError = error;
+      console.error(`[hr-consult] Gemini model failed: ${modelName}`, error);
+
+      const hasFallback = index < models.length - 1;
+      if (hasFallback && isGeminiModelNotFoundError(error)) {
+        console.warn(`[hr-consult] Retrying with fallback model: ${models[index + 1]}`);
+        continue;
+      }
+      break;
+    }
+  }
+
+  throw lastError;
 }

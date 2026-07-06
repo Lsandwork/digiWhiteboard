@@ -5,6 +5,7 @@ import type { AdminGlobalSettings } from "@/lib/admin/settings";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { GEMINI_MODEL_OPTIONS } from "@/lib/hr/gemini-config";
 
 type AdminSettingsPageProps = {
   settings: AdminGlobalSettings;
@@ -119,7 +120,7 @@ export function AdminSettingsPage({
 
       <Section
         title="HR Consult (Gemini)"
-        helper="Company location and context shape legal-aware guidance for Fitdog in California. The API key stays in server environment variables (GEMINI_API_KEY)."
+        helper="Server env: GEMINI_API_KEY and GEMINI_MODEL (e.g. gemini-3.5-flash). GEMINI_MODEL overrides the dropdown below."
       >
         <div className="grid gap-4 md:grid-cols-2">
           <Toggle
@@ -127,11 +128,11 @@ export function AdminSettingsPage({
             checked={draft.hr_consult_enabled}
             onChange={(checked) => setDraft({ ...draft, hr_consult_enabled: checked })}
           />
-          <Field label="Gemini model">
+          <Field label="Gemini model (fallback when GEMINI_MODEL env is unset)">
             <select className="admin-input" value={draft.hr_consult_model} onChange={(e) => setDraft({ ...draft, hr_consult_model: e.target.value })}>
-              <option value="gemini-2.0-flash">Gemini 2.0 Flash (recommended)</option>
-              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+              {GEMINI_MODEL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </Field>
           <Field label="City">

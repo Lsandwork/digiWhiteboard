@@ -6,7 +6,8 @@ import { loadAdminSettings } from "@/lib/admin/settings";
 import { hasPermission, accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { appendHrConsultMessages, clearHrConsultThread, loadHrConsultThread } from "@/lib/hr/consult-store";
-import { consultGeminiHr, isGeminiConfigured } from "@/lib/hr/gemini-consult";
+import { consultGeminiHr } from "@/lib/hr/gemini-consult";
+import { geminiUserFacingError, isGeminiConfigured, resolveGeminiModel } from "@/lib/hr/gemini-config";
 import { hrRecordContextForConsult, isHrRecord } from "@/lib/hr/records";
 import { getManagementReportById } from "@/lib/staff/management-reports";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
       hr_company_region: settings.hr_company_region,
       hr_company_country: settings.hr_company_country,
       hr_company_situation: settings.hr_company_situation,
-      hr_consult_model: settings.hr_consult_model,
+      hr_consult_model: resolveGeminiModel(settings.hr_consult_model),
       business_display_name: settings.business_display_name
     },
     gemini_configured: isGeminiConfigured()
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
       gemini_configured: true
     });
   } catch (error) {
-    const errMessage = error instanceof Error ? error.message : "Unable to reach HR Consult.";
-    return NextResponse.json({ error: errMessage }, { status: 500 });
+    console.error("[hr-consult] Request failed:", error);
+    return NextResponse.json({ error: geminiUserFacingError(error) }, { status: 500 });
   }
 }

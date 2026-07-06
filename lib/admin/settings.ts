@@ -63,7 +63,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
   hr_company_country: "United States",
   hr_company_situation:
     "Fitdog is a premium dog daycare, boarding, grooming, and training facility. We operate with a team-oriented culture and follow California employment law. HR consult is used for internal guidance on write-ups, complaints, and workplace issues — not as a substitute for licensed legal counsel.",
-  hr_consult_model: "gemini-2.0-flash"
+  hr_consult_model: "gemini-3.5-flash"
 };
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;

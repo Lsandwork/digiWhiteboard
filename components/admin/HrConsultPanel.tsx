@@ -161,7 +161,9 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
         <section className="hr-consult-alert crossover-card p-5">
           <p className="font-bold text-white">Gemini API key needed</p>
           <p className="mt-2 text-sm text-admin-muted">
-            Add <code className="text-fitdog-orange">GEMINI_API_KEY</code> to your Vercel project environment variables, then redeploy. Company context can be configured in Settings → HR Consult.
+            Add <code className="text-fitdog-orange">GEMINI_API_KEY</code> and optionally{" "}
+            <code className="text-fitdog-orange">GEMINI_MODEL=gemini-3.5-flash</code> to Vercel environment variables, then redeploy.
+            Company context can be configured in Settings → HR Consult.
           </p>
         </section>
       ) : null}
