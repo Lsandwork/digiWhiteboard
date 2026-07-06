@@ -13,9 +13,11 @@ import {
   StaffPushNoticePanel,
   StaffPushNoticeTvOverlay
 } from "@/components/board/StaffPushNotice";
+import { CastVideoOverlay } from "@/components/board/CastVideoOverlay";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
 import { TrainerPushNoticeOverlay } from "@/components/board/TrainerPushNoticeOverlay";
 import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
+import { useCastVideoNotices } from "@/hooks/useCastVideoNotices";
 import { useGroomingPushNotices } from "@/hooks/useGroomingPushNotices";
 import { useTrainerPushNotices } from "@/hooks/useTrainerPushNotices";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
@@ -48,6 +50,22 @@ const emptyBoard: LiveBoardResponse = {
   counts: { checking_in: 0, checking_out: 0, total: 0 },
   last_updated: ""
 };
+
+function readDismissedCastIds() {
+  if (typeof window === "undefined") return [] as string[];
+  try {
+    const raw = window.sessionStorage.getItem("fitdog_dismissed_cast_videos");
+    const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeDismissedCastIds(ids: string[]) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem("fitdog_dismissed_cast_videos", JSON.stringify(ids));
+}
 
 function getDevDemoBoard(): LiveBoardResponse | null {
   if (process.env.NODE_ENV !== "development") return null;
@@ -100,6 +118,7 @@ export function BoardClient() {
   const tvMode = searchParams.get("display") === "tv";
   const debugBoard = searchParams.get("debugBoard") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? "";
+  const displayDepartment = searchParams.get("dept")?.trim() || "staff_whiteboard";
 
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
   const boardRef = useRef(board);
@@ -115,9 +134,27 @@ export function BoardClient() {
   const [useDevDemo, setUseDevDemo] = useState(false);
   const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
   const activePushNotice = useStaffPushNotice();
+  const {
+    activeNotice: emergencyCastVideo,
+    queue: emergencyCastQueue,
+    reload: reloadEmergencyCast,
+    viewerKey: castViewerKey
+  } = useCastVideoNotices({ department: displayDepartment, emergencyOnly: true });
+  const {
+    activeNotice: activeCastVideo,
+    queue: castVideoQueue,
+    reload: reloadCastVideo
+  } = useCastVideoNotices({ department: displayDepartment, emergencyOnly: false });
   const { activeNotice: activeGroomingNotice, queue: groomingQueue } = useGroomingPushNotices();
   const { activeNotice: activeTrainerNotice, queue: trainerQueue } = useTrainerPushNotices();
-  const activeAlertKey = activeGroomingNotice?.id ?? activeTrainerNotice?.id ?? activePushNotice?.id ?? null;
+  const activeAlertKey = emergencyCastVideo?.id ?? activeCastVideo?.id ?? activeGroomingNotice?.id ?? activeTrainerNotice?.id ?? activePushNotice?.id ?? null;
+  const isEmergencyStaffPush = Boolean(
+    activePushNotice && (activePushNotice.priority === "urgent" || activePushNotice.display_mode === "urgent")
+  );
+  const [dismissedCastIds, setDismissedCastIds] = useState<string[]>(() => readDismissedCastIds());
+
+  const visibleEmergencyCast = emergencyCastVideo && !dismissedCastIds.includes(emergencyCastVideo.id) ? emergencyCastVideo : null;
+  const visibleCastVideo = !visibleEmergencyCast && activeCastVideo && !dismissedCastIds.includes(activeCastVideo.id) ? activeCastVideo : null;
   useFitdogAlertSound(activeAlertKey);
   const {
     isCasting,
@@ -361,7 +398,9 @@ export function BoardClient() {
 
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
-      <StaffPushNoticeTvOverlay active={Boolean(activePushNotice) && !activeGroomingNotice && !activeTrainerNotice} />
+      <StaffPushNoticeTvOverlay
+        active={Boolean(activePushNotice) && !visibleEmergencyCast && !visibleCastVideo && !activeGroomingNotice && !activeTrainerNotice}
+      />
 
       {!tvMode ? (
         <StaffCastButton
@@ -391,7 +430,35 @@ export function BoardClient() {
           />
         ) : null}
 
-        {activeGroomingNotice ? (
+        {visibleEmergencyCast ? (
+          <CastVideoOverlay
+            notice={visibleEmergencyCast}
+            queue={emergencyCastQueue}
+            viewerKey={castViewerKey}
+            viewerLocation={displayDepartment}
+            onDismiss={() => {
+              const next = [...dismissedCastIds, visibleEmergencyCast.id];
+              setDismissedCastIds(next);
+              writeDismissedCastIds(next);
+              void reloadEmergencyCast();
+            }}
+          />
+        ) : isEmergencyStaffPush ? (
+          <StaffPushNoticeFullscreen notice={activePushNotice!} />
+        ) : visibleCastVideo ? (
+          <CastVideoOverlay
+            notice={visibleCastVideo}
+            queue={castVideoQueue}
+            viewerKey={castViewerKey}
+            viewerLocation={displayDepartment}
+            onDismiss={() => {
+              const next = [...dismissedCastIds, visibleCastVideo.id];
+              setDismissedCastIds(next);
+              writeDismissedCastIds(next);
+              void reloadCastVideo();
+            }}
+          />
+        ) : activeGroomingNotice ? (
           <GroomingPushNoticeOverlay
             notice={activeGroomingNotice}
             queue={groomingQueue}

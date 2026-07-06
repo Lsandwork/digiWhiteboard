@@ -15,6 +15,8 @@ import { AdminLogsPanel } from "@/components/admin/AdminLogsPanel";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage";
 import { PushNoticesPanel } from "@/components/admin/PushNoticesPanel";
+import { CastVideosPanel } from "@/components/admin/CastVideosPanel";
+import { EmergencyAlertsPanel } from "@/components/admin/EmergencyAlertsPanel";
 import { GroomingPushPanel } from "@/components/admin/GroomingPushPanel";
 import { TrainerPushPanel } from "@/components/admin/TrainerPushPanel";
 import { TrainerEntryPanel } from "@/components/admin/TrainerEntryPanel";
@@ -280,7 +282,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help", "demo_push"].includes(tab);
+  const showPreview = !["settings", "push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help", "demo_push"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -400,6 +402,10 @@ export function AdminDashboard() {
         {tab === "users" ? <AdminUsersPage /> : null}
 
         {tab === "push_notices" ? <PushNoticesPanel /> : null}
+
+        {tab === "emergency_alerts" ? <EmergencyAlertsPanel /> : null}
+
+        {tab === "cast_videos" ? <CastVideosPanel /> : null}
 
         {tab === "grooming_push" ? <GroomingPushPanel /> : null}
 

@@ -96,6 +96,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Push & Alerts",
     permissions: [
       p("manage_push_notices", "Push Notices", "Create and send staff push notices."),
+      p("manage_cast_videos", "Cast Videos", "Upload and push full-screen cast videos to displays."),
       p("push_grooming_request", "Grooming Push", "Send grooming push notices."),
       p("clear_grooming_request", "Clear Grooming Push", "Clear active grooming push notices."),
       p("push_trainer_request", "Trainer Push", "Send trainer push notices."),

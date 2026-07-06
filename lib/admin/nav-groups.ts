@@ -22,9 +22,11 @@ const TAB_LABELS: Record<AdminTab, string> = {
   promotions: "Promotions",
   schedule: "Class Schedule",
   display: "Display Settings",
-  push_notices: "Push Notices",
+  push_notices: "Standard Notices",
+  emergency_alerts: "Emergency Alerts",
   grooming_push: "Grooming Push",
   trainer_push: "Trainer Push",
+  cast_videos: "Cast Videos",
   trainer_entry: "Trainer's Entry",
   crossover_communication: "Front Desk Log",
   owner_follow_up: "Owner Follow Up",
@@ -54,7 +56,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
 };
 
 const LOBBY_CONTENT_TABS: AdminTab[] = ["content", "promotions", "schedule", "display"];
-const PUSH_ALERT_TABS: AdminTab[] = ["push_notices", "grooming_push", "trainer_push"];
+const PUSH_ALERT_TABS: AdminTab[] = ["push_notices", "emergency_alerts", "grooming_push", "cast_videos", "trainer_push"];
 const STAFF_OPS_TABS: AdminTab[] = ["crossover_communication", "owner_follow_up", "active_issues", "trainer_entry"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
 
@@ -86,7 +88,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
 
   if (visible.has("demo_push")) entries.push(leaf("demo_push"));
 
-  const pushAlerts = group("push_alerts", "Push & Alerts", PUSH_ALERT_TABS, visible);
+  const pushAlerts = group("push_notices", "Push Notices", PUSH_ALERT_TABS, visible);
   if (pushAlerts) entries.push(pushAlerts);
 
   const staffOps = group("staff_ops", "Staff Operations", STAFF_OPS_TABS, visible);
