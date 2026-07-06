@@ -225,7 +225,7 @@ export function GroomingManualOverrideFields({
         onChange={(event) => onDogAndOwnerChange(event.target.value)}
         placeholder="e.g. Jasper Sandoval"
       />
-      <p className="mt-1 text-xs text-amber-200">Admin manual entry only. Prefer selecting a dog from Gingr whenever possible.</p>
+      <p className="mt-1 text-xs text-amber-200">Use this if the dog isn&apos;t in the Gingr list. Prefer selecting from Gingr when possible.</p>
     </label>
   );
 }

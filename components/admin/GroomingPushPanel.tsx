@@ -74,9 +74,7 @@ export function GroomingPushPanel() {
       || ["owner_admin", "manager_admin", "front_desk_coordinator", "team_leader", "groomer"].includes(data.currentUser.role ?? "");
   }, [data]);
 
-  const canManualOverride = useMemo(() => {
-    return ["owner_admin", "manager_admin"].includes(data?.currentUser.role ?? "");
-  }, [data]);
+  const canManualOverride = useMemo(() => canPush, [canPush]);
 
   const parsedManualDog = useMemo(() => parseDogAndOwnerLastName(form.dog_and_owner), [form.dog_and_owner]);
 
@@ -192,7 +190,7 @@ export function GroomingPushPanel() {
                   checked={form.manualOverride}
                   onChange={(event) => setForm({ ...form, manualOverride: event.target.checked, selectedDog: null, dog_and_owner: "" })}
                 />
-                Admin manual override (type dog manually)
+                Type dog manually (can&apos;t find in Gingr list)
               </label>
             ) : null}
 
