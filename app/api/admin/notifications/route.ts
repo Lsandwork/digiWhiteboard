@@ -44,7 +44,12 @@ export async function GET(request: Request) {
       adminUserId: session?.adminUserId ?? null,
       role: session?.role ?? null
     };
-    if (!canViewManagementReport(report, sessionUser) && !canAccessManagementReports(session?.role)) {
+    const isSubmitter = report.created_by?.trim().toLowerCase() === session?.email?.trim().toLowerCase();
+    const canAccess =
+      canReviewManagementSupport(session?.role) ||
+      isSubmitter ||
+      canViewManagementReport(report, sessionUser);
+    if (!canAccess) {
       return NextResponse.json({ error: "You do not have permission to view this item." }, { status: 403 });
     }
 

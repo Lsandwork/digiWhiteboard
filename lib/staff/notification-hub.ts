@@ -262,6 +262,44 @@ export function enrichNotifications(
   });
 }
 
+export function enrichSingleNotification(
+  notification: StaffNotification,
+  state: StaffOpsState,
+  session: NotificationSession,
+  reportsById: Map<string, ManagementReport>
+): EnrichedNotification {
+  const readerKey = notificationReaderKey(session.email, session.adminUserId);
+  const canReview = canReviewManagementSupport(session.role);
+  const entityId = linkedEntityId(notification);
+  const entityTable = linkedEntityTable(notification);
+  const linkedReport = entityTable === "management_reports" ? reportsById.get(entityId) ?? null : null;
+  const linkedCrossover =
+    entityTable === "crossover_messages"
+      ? state.crossover_messages.find((item) => item.id === entityId) ?? null
+      : null;
+  const linkedFollowUp =
+    notification.source_tab === "owner_follow_up" || entityTable === "owner_follow_ups"
+      ? state.owner_follow_ups.find((item) => item.id === entityId) ?? null
+      : null;
+  const displayType = inferDisplayType(notification);
+  const displayStatus = inferDisplayStatus(notification, linkedReport, linkedCrossover);
+  const isUnread = !notification.read_by.includes(readerKey);
+  const needsReply = linkedReport ? reportNeedsReply(linkedReport, session, canReview) : false;
+  const preview = (notification.body ?? linkedReport?.summary ?? linkedCrossover?.message ?? "").slice(0, 160);
+
+  return {
+    ...notification,
+    displayType,
+    displayStatus,
+    preview,
+    isUnread,
+    needsReply,
+    linkedReport,
+    linkedCrossover,
+    linkedFollowUp
+  };
+}
+
 export function sortNotifications(items: EnrichedNotification[], sort: NotificationSort) {
   const copy = [...items];
   if (sort === "oldest") {
@@ -333,6 +371,8 @@ export function canViewManagementReport(report: ManagementReport, session: Notif
   if (canReviewManagementSupport(session.role)) return true;
   const email = session.email?.trim().toLowerCase();
   if (email && report.created_by?.trim().toLowerCase() === email) return true;
+  const staffSupportTypes = new Set(["groomer_complaint", "groomer_request", "trainer_complaint", "trainer_request"]);
+  if (isStaffOpsLimitedRole(session.role) && staffSupportTypes.has(report.report_type)) return true;
   return false;
 }
 

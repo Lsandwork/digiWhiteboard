@@ -140,19 +140,21 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
     setModalSuccess(null);
     try {
       if (markRead) {
-        await fetch(`/api/admin/notifications/${encodeURIComponent(notificationId)}`, { method: "POST" });
-        setData((prev) => {
-          if (!prev) return prev;
-          const readerKey = notificationReaderKey(prev.currentUser.email, prev.currentUser.adminUserId);
-          return {
-            ...prev,
-            notifications: prev.notifications.map((item) =>
-              item.id === notificationId && !item.read_by.includes(readerKey)
-                ? { ...item, read_by: [...item.read_by, readerKey] }
-                : item
-            )
-          };
-        });
+        const readRes = await fetch(`/api/admin/notifications/${encodeURIComponent(notificationId)}`, { method: "POST" });
+        if (readRes.ok) {
+          setData((prev) => {
+            if (!prev) return prev;
+            const readerKey = notificationReaderKey(prev.currentUser.email, prev.currentUser.adminUserId);
+            return {
+              ...prev,
+              notifications: prev.notifications.map((item) =>
+                item.id === notificationId && !item.read_by.includes(readerKey)
+                  ? { ...item, read_by: [...item.read_by, readerKey] }
+                  : item
+              )
+            };
+          });
+        }
       }
       const response = await fetch(`/api/admin/notifications/${encodeURIComponent(notificationId)}`, { cache: "no-store" });
       const body = await response.json();

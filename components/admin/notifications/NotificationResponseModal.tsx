@@ -149,21 +149,22 @@ export function NotificationResponseModal({
     "—";
 
   const modal = (
-    <div
-      className="notif-response-backdrop"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) onClose();
-      }}
-    >
+    <div className="admin-theme">
       <div
-        ref={dialogRef}
-        className="notif-response-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        onClick={(event) => event.stopPropagation()}
+        className="notif-response-backdrop"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !busy) onClose();
+        }}
       >
+        <div
+          ref={dialogRef}
+          className="notif-response-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={titleId}
+          tabIndex={-1}
+          onClick={(event) => event.stopPropagation()}
+        >
         <header className="notif-response-modal__header">
           <div className="notif-response-modal__header-main">
             {notification ? (
@@ -367,6 +368,7 @@ export function NotificationResponseModal({
             </div>
           </footer>
         ) : null}
+        </div>
       </div>
     </div>
   );

@@ -8,9 +8,8 @@ import {
   canReplyToCrossover,
   canReplyToManagementReport,
   canUseInternalNotes,
-  canViewManagementReport,
   crossoverRepliesForMessage,
-  enrichNotifications,
+  enrichSingleNotification,
   linkedEntityId,
   linkedEntityTable,
   type EnrichedNotification,
@@ -52,14 +51,12 @@ export async function loadNotificationDetail(
 
   if (entityTable === "management_reports") {
     const report = await getManagementReportById(supabase, entityId);
-    if (report && canViewManagementReport(report, session)) {
+    if (report) {
       reportsById.set(entityId, report);
     }
   }
 
-  const enriched = enrichNotifications(state, session, reportsById).find((item) => item.id === notificationId);
-  if (!enriched) return null;
-
+  const enriched = enrichSingleNotification(raw, state, session, reportsById);
   const report = reportsById.get(entityId) ?? enriched.linkedReport ?? null;
   const crossoverReplies =
     enriched.linkedCrossover ? crossoverRepliesForMessage(state, enriched.linkedCrossover.id) : [];
