@@ -8,6 +8,8 @@ import {
   ROLE_LABELS,
   buildUserAccess,
   canManageAdminUsers,
+  isSuperAdminAccess,
+  isSuperAdminLegacyRole,
   legacyRoleToRoleKey,
   previewLabelsForAccess,
   type DepartmentKey,
@@ -32,8 +34,8 @@ type UsersPayload = {
 };
 
 const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
-  { value: "super_admin", description: "Full system access including super admin management." },
-  { value: "admin", description: "Manage users, integrations, and day-to-day admin tools." },
+  { value: "super_admin", description: "Full system access including integrations, API, and permissions matrix." },
+  { value: "admin", description: "Manage users and day-to-day admin tools (no integrations or permissions matrix)." },
   { value: "management", description: "View and assign staff operations; receive management alerts." },
   { value: "front_desk_coordinator", description: "Push Notices, Front Desk Log, Owner Follow Up, Active Issues." },
   { value: "team_leader", description: "Team Lead DigiBoard panel: push notices, grooming push, front desk log, video links, personal notifications, write-ups, and profile settings." },
@@ -102,6 +104,8 @@ export function AdminUsersPage() {
   }, [menuUserId]);
 
   const canManage = canManageAdminUsers(data?.currentUser.access ?? null, data?.currentUser.role);
+  const actorIsSuperAdmin =
+    isSuperAdminLegacyRole(data?.currentUser.role) || isSuperAdminAccess(data?.currentUser.access ?? null);
 
   const filteredUsers = useMemo(() => {
     const users = data?.users ?? [];
@@ -227,7 +231,7 @@ export function AdminUsersPage() {
         />
       </section>
 
-      <AddUserModal open={addOpen} busy={busy} onClose={() => setAddOpen(false)} onSubmit={async (payload) => {
+      <AddUserModal open={addOpen} busy={busy} actorIsSuperAdmin={actorIsSuperAdmin} onClose={() => setAddOpen(false)} onSubmit={async (payload) => {
         setBusy(true);
         try {
           const response = await fetch("/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
@@ -247,6 +251,7 @@ export function AdminUsersPage() {
         <EditUserModal
           user={editUser}
           busy={busy}
+          actorIsSuperAdmin={actorIsSuperAdmin}
           onClose={() => setEditUser(null)}
           onSubmit={async (patch) => {
             setBusy(true);
@@ -373,12 +378,24 @@ function AccessPreview({ primary_role, additional_roles, departments }: RoleForm
   );
 }
 
-function PrimaryRoleChoiceGroup({ value, onChange }: { value: RoleKey; onChange: (role: RoleKey) => void }) {
+function PrimaryRoleChoiceGroup({
+  value,
+  onChange,
+  actorIsSuperAdmin
+}: {
+  value: RoleKey;
+  onChange: (role: RoleKey) => void;
+  actorIsSuperAdmin?: boolean;
+}) {
+  const options = actorIsSuperAdmin
+    ? PRIMARY_ROLE_OPTIONS
+    : PRIMARY_ROLE_OPTIONS.filter((option) => option.value !== "super_admin");
+
   return (
     <div>
       <span className="admin-label">Primary role</span>
       <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Primary role">
-        {PRIMARY_ROLE_OPTIONS.map((option) => {
+        {options.map((option) => {
           const selected = value === option.value;
           return (
             <button
@@ -452,7 +469,19 @@ function MultiSelectChips<T extends string>({
   );
 }
 
-function AddUserModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: boolean; onClose: () => void; onSubmit: (payload: Record<string, unknown>) => Promise<void> }) {
+function AddUserModal({
+  open,
+  busy,
+  actorIsSuperAdmin,
+  onClose,
+  onSubmit
+}: {
+  open: boolean;
+  busy: boolean;
+  actorIsSuperAdmin: boolean;
+  onClose: () => void;
+  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
+}) {
   const [form, setForm] = useState({
     full_name: "",
     email: "",
@@ -493,7 +522,7 @@ function AddUserModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: 
       <div className="grid gap-4">
         <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
         <Field label="Email / username"><input className="admin-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-        <PrimaryRoleChoiceGroup value={form.primary_role} onChange={(primary_role) => setForm({ ...form, primary_role })} />
+        <PrimaryRoleChoiceGroup value={form.primary_role} actorIsSuperAdmin={actorIsSuperAdmin} onChange={(primary_role) => setForm({ ...form, primary_role })} />
         <MultiSelectChips
           label="Additional roles"
           options={ADDITIONAL_ROLE_OPTIONS.map((option) => ({ value: option.value, label: ROLE_LABELS[option.value] }))}
@@ -521,8 +550,22 @@ function AddUserModal({ open, busy, onClose, onSubmit }: { open: boolean; busy: 
   );
 }
 
-function EditUserModal({ user, busy, onClose, onSubmit }: { user: UserRow; busy: boolean; onClose: () => void; onSubmit: (patch: Record<string, unknown>) => Promise<void> }) {
+function EditUserModal({
+  user,
+  busy,
+  actorIsSuperAdmin,
+  onClose,
+  onSubmit
+}: {
+  user: UserRow;
+  busy: boolean;
+  actorIsSuperAdmin: boolean;
+  onClose: () => void;
+  onSubmit: (patch: Record<string, unknown>) => Promise<void>;
+}) {
   const initialAccess = user.access ?? buildUserAccess({ primaryRole: legacyRoleToRoleKey(user.role) });
+  const targetIsSuperAdmin = isSuperAdminLegacyRole(user.role) || isSuperAdminAccess(user.access ?? null);
+  const readOnly = targetIsSuperAdmin && !actorIsSuperAdmin;
   const [form, setForm] = useState({
     full_name: user.full_name,
     email: user.email,
@@ -551,13 +594,18 @@ function EditUserModal({ user, busy, onClose, onSubmit }: { user: UserRow; busy:
     <Modal open title="Edit Admin User" onClose={onClose} closeOnBackdrop={false} closeOnEscape={!busy} footer={
       <div className="flex justify-end gap-2">
         <button type="button" className="admin-btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-        <button type="button" className="admin-btn-primary" disabled={busy} onClick={() => void onSubmit(form)}>{busy ? "Saving…" : "Save changes"}</button>
+        <button type="button" className="admin-btn-primary" disabled={busy || readOnly} onClick={() => void onSubmit(form)}>{busy ? "Saving…" : "Save changes"}</button>
       </div>
     }>
       <div className="grid gap-4">
-        <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
-        <Field label="Email / username"><input className="admin-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-        <PrimaryRoleChoiceGroup value={form.primary_role} onChange={(primary_role) => setForm({ ...form, primary_role })} />
+        {readOnly ? (
+          <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Only Super Admin can edit Super Admin accounts.
+          </p>
+        ) : null}
+        <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} disabled={readOnly} /></Field>
+        <Field label="Email / username"><input className="admin-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={readOnly} /></Field>
+        <PrimaryRoleChoiceGroup value={form.primary_role} actorIsSuperAdmin={actorIsSuperAdmin} onChange={(primary_role) => setForm({ ...form, primary_role })} />
         <MultiSelectChips
           label="Additional roles"
           options={ADDITIONAL_ROLE_OPTIONS.map((option) => ({ value: option.value, label: ROLE_LABELS[option.value] }))}

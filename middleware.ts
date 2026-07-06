@@ -41,6 +41,10 @@ export async function middleware(request: NextRequest) {
     if (isAdminSupportRoute && !isFullAdmin) {
       return NextResponse.redirect(new URL("/admin?board=staff", request.url));
     }
+
+    if (pathname.startsWith("/admin/settings/user-groups-permissions") && role !== "owner_admin") {
+      return NextResponse.redirect(new URL("/admin?tab=settings", request.url));
+    }
   }
 
   return NextResponse.next();

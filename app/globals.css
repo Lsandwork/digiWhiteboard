@@ -7675,3 +7675,151 @@ html.lobby-tv-display .social-video-shell {
     bottom: 0.75rem;
   }
 }
+
+/* User Groups & Permissions matrix */
+.rbac-matrix-wrap {
+  overflow: hidden;
+}
+
+.rbac-matrix-scroll {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.rbac-matrix {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.rbac-matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #1c120d;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.75rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.72);
+  vertical-align: bottom;
+}
+
+.rbac-matrix-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #1c120d;
+  min-width: 240px;
+  max-width: 320px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rbac-matrix-sticky-head {
+  z-index: 4;
+}
+
+.rbac-role-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.rbac-lock-hint {
+  color: rgba(241, 95, 42, 0.9);
+}
+
+.rbac-category-row td {
+  background: rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0;
+}
+
+.rbac-category-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.rbac-all-row td,
+.rbac-permission-row td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+}
+
+.rbac-permission-row:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.rbac-permission-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding-left: 0.5rem;
+  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.rbac-help {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.rbac-checkbox {
+  display: inline-grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.rbac-checkbox--on {
+  border-color: rgba(241, 95, 42, 0.85);
+  background: rgba(241, 95, 42, 0.85);
+  color: #fff;
+}
+
+.rbac-checkbox--on::after {
+  content: "✓";
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.rbac-checkbox--mixed {
+  border-color: rgba(241, 95, 42, 0.85);
+  background: rgba(241, 95, 42, 0.55);
+}
+
+.rbac-checkbox-dash {
+  display: block;
+  width: 0.55rem;
+  height: 2px;
+  background: #fff;
+  border-radius: 999px;
+}
+
+.rbac-checkbox--locked {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.rbac-checkbox:disabled {
+  cursor: not-allowed;
+}

@@ -1,12 +1,7 @@
 import type { UserAccess } from "@/lib/admin/permissions";
-import {
-  canAccessActionIntent,
-  fallbackActionLinks,
-  normalizeActionIntent,
-  resolveActionLinks,
-  type FitdogActionIntent,
-  type FitdogActionLink
-} from "@/lib/ai/fitdogActionLinks";
+import { canAccessActionIntent, fallbackActionLinks, normalizeActionIntent, resolveActionLinks, type FitdogActionIntent, type FitdogActionLink } from "@/lib/ai/fitdogActionLinks";
+import type { FitdogAiPushNoticeDraft } from "@/lib/ai/fitdogAiPushNotice";
+import { normalizePushNoticeDraft } from "@/lib/ai/fitdogAiPushNotice";
 
 export type FitdogAiTone = "normal" | "frustrated" | "urgent" | "safety" | "hr" | "client_issue";
 
@@ -76,7 +71,11 @@ export function sanitizeAiReply(reply: string): string {
   for (const pattern of BLOCKED_REPLY_PATTERNS) {
     text = text.replace(pattern, "").trim();
   }
-  return text.replace(/\n{3,}/g, "\n\n");
+  text = text.replace(/\n{3,}/g, "\n\n");
+  // Trim boilerplate link nudges when the assistant already handled the workflow in chat.
+  text = text.replace(/\n+Let me know if you want to broadcast.*$/i, "").trim();
+  text = text.replace(/\n+If you want to broadcast.*$/i, "").trim();
+  return text;
 }
 
 export type GeminiChatJson = {
@@ -86,6 +85,7 @@ export type GeminiChatJson = {
   tone: FitdogAiTone;
   needsEscalation: boolean;
   escalationReason: string;
+  pushNotice?: FitdogAiPushNoticeDraft | null;
 };
 
 export type GeminiVideoJson = GeminiChatJson & {
@@ -144,7 +144,8 @@ export function normalizeChatJson(raw: Partial<GeminiChatJson>, fallbackReply: s
     secondaryActionIntent: normalizeActionIntent(raw.secondaryActionIntent),
     tone,
     needsEscalation: Boolean(raw.needsEscalation),
-    escalationReason: String(raw.escalationReason ?? "").trim()
+    escalationReason: String(raw.escalationReason ?? "").trim(),
+    pushNotice: normalizePushNoticeDraft(raw.pushNotice)
   };
 }
 
@@ -168,18 +169,22 @@ export function guardChatResponse(params: {
   access: UserAccess;
   parsed: GeminiChatJson;
   toneHint?: FitdogAiTone | null;
+  pushNoticePushed?: boolean;
+  pendingPushNotice?: FitdogAiPushNoticeDraft | null;
 }): {
   reply: string;
   actionLinks: FitdogActionLink[];
   suggestedNextStep?: string;
   tone: FitdogAiTone;
+  pendingPushNotice?: FitdogAiPushNoticeDraft | null;
 } {
-  const { access, parsed, toneHint } = params;
+  const { access, parsed, toneHint, pushNoticePushed, pendingPushNotice } = params;
   let reply = parsed.reply;
 
-  if (parsed.needsEscalation || parsed.tone === "safety" || toneHint === "safety") {
+  const isSafety = parsed.tone === "safety" || toneHint === "safety";
+  if ((parsed.needsEscalation && isSafety) || isSafety) {
     if (!/team lead|manager|notify/i.test(reply)) {
-      reply = `${reply}\n\nNotify a team lead or manager right now, then document what you saw while it's fresh.`;
+      reply = `${reply}\n\nGet a team lead or manager now, then write down what you saw.`;
     }
   }
 
@@ -188,18 +193,38 @@ export function guardChatResponse(params: {
     parsed.secondaryActionIntent = "complaints_filed";
   }
 
-  let actionLinks = resolveActionLinks(access, parsed.actionIntent, parsed.secondaryActionIntent);
+  let primaryIntent = parsed.actionIntent;
+  let secondaryIntent = parsed.secondaryActionIntent;
+
+  if (pushNoticePushed) {
+    primaryIntent = "staff_whiteboard";
+    secondaryIntent = "none";
+  } else if (pendingPushNotice?.title && canAccessActionIntent(access, "push_notice")) {
+    primaryIntent = "none";
+    secondaryIntent = "none";
+  } else if (parsed.pushNotice?.ready && canAccessActionIntent(access, "push_notice")) {
+    primaryIntent = "none";
+    secondaryIntent = "none";
+  }
+
+  let actionLinks = resolveActionLinks(access, primaryIntent, secondaryIntent);
+  if (pushNoticePushed) {
+    actionLinks = actionLinks.filter((link) => !link.href.includes("push_notices"));
+  }
   if (!actionLinks.length) {
-    actionLinks = fallbackActionLinks(access, parsed.tone ?? toneHint ?? "normal");
+    actionLinks = pushNoticePushed
+      ? resolveActionLinks(access, "staff_whiteboard", "none")
+      : fallbackActionLinks(access, parsed.tone ?? toneHint ?? "normal");
   }
 
   const suggestedNextStep = parsed.escalationReason || actionLinks[0]?.reason || actionLinks[0]?.label;
 
   return {
     reply: sanitizeAiReply(reply),
-    actionLinks,
+    actionLinks: actionLinks.slice(0, 2),
     suggestedNextStep,
-    tone: parsed.tone ?? toneHint ?? "normal"
+    tone: parsed.tone ?? toneHint ?? "normal",
+    pendingPushNotice: pendingPushNotice ?? undefined
   };
 }
 

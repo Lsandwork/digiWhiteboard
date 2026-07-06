@@ -4,6 +4,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
 import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
+import { assertUserMutationAllowed } from "@/lib/admin/super-admin-guards";
 import { getUserAccess, roleKeyToLegacyRole, setUserAccess } from "@/lib/admin/user-access";
 import {
   AdminUserRole,
@@ -57,7 +58,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const existing = await getAdminUserById(supabase, id);
   if (!existing) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
+  const existingAccess = await getUserAccess(supabase, id, existing.role, existing.email);
   const primaryRoleKey = body.primary_role ?? (body.role ? legacyRoleToRoleKey(body.role) : legacyRoleToRoleKey(existing.role));
+
+  try {
+    await assertUserMutationAllowed({
+      supabase,
+      actorLegacyRole: session?.role,
+      actorAccess,
+      targetUserId: id,
+      targetLegacyRole: existing.role,
+      targetAccess: existingAccess,
+      nextPrimaryRole: body.primary_role ? primaryRoleKey : undefined,
+      nextStatus: body.status,
+      action: body.status === "disabled" ? "disable" : "update"
+    });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Not allowed." }, { status: 403 });
+  }
+
   const legacyRole = roleKeyToLegacyRole(primaryRoleKey) as AdminUserRole;
 
   const user = await updateAdminUser(supabase, id, {
@@ -112,6 +131,21 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 
   const existing = await getAdminUserById(supabase, id);
   if (!existing) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  const existingAccess = await getUserAccess(supabase, id, existing.role, existing.email);
+  try {
+    await assertUserMutationAllowed({
+      supabase,
+      actorLegacyRole: session?.role,
+      actorAccess,
+      targetUserId: id,
+      targetLegacyRole: existing.role,
+      targetAccess: existingAccess,
+      action: "delete"
+    });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Not allowed." }, { status: 403 });
+  }
 
   await deleteAdminUser(supabase, id);
 

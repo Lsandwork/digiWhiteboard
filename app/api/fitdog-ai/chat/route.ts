@@ -11,10 +11,30 @@ import {
   parseGeminiJson,
   type GeminiChatJson
 } from "@/lib/ai/fitdogAiGuards";
-import { fallbackActionLinks } from "@/lib/ai/fitdogActionLinks";
+import { fallbackActionLinks, canAccessActionIntent } from "@/lib/ai/fitdogActionLinks";
+import {
+  buildPushSuccessReply,
+  executeFitdogAiPushNotice,
+  inferPushNoticeDraft,
+  type FitdogAiChatHistoryItem
+} from "@/lib/ai/fitdogAiPushNotice";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+function parseHistory(raw: unknown): FitdogAiChatHistoryItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const role = row.role === "assistant" ? "assistant" : row.role === "user" ? "user" : null;
+      const content = String(row.content ?? "").trim();
+      if (!role || !content) return null;
+      return { role, content };
+    })
+    .filter(Boolean) as FitdogAiChatHistoryItem[];
+}
 
 export async function GET() {
   return NextResponse.json({ configured: isGeminiConfigured() });
@@ -41,6 +61,7 @@ export async function POST(request: Request) {
     }
 
     const currentPage = String(body.currentPage ?? "").trim() || undefined;
+    const history = parseHistory(body.history);
     const recentContext =
       body.recentContext && typeof body.recentContext === "object"
         ? (body.recentContext as Record<string, unknown>)
@@ -49,7 +70,7 @@ export async function POST(request: Request) {
     const context = await buildFitdogUserContext({ session, currentPage });
     const toneHint = detectToneHint(message);
     const systemInstruction = buildFitdogAiSystemPrompt(context);
-    const userPrompt = buildFitdogAiUserPrompt({ message, context, toneHint, recentContext });
+    const userPrompt = buildFitdogAiUserPrompt({ message, context, toneHint, recentContext, history });
 
     const { text } = await generateFitdogText({
       systemInstruction,
@@ -58,23 +79,55 @@ export async function POST(request: Request) {
     });
 
     const fallback: GeminiChatJson = {
-      reply:
-        "I'm having trouble shaping a full answer right now, but don't let this sit. Write down the time, dogs involved, and what you saw while it's fresh.",
+      reply: "Something glitched on my end. Jot down the time, dogs involved, and what you saw — then use the right Fitdog form.",
       actionIntent: toneHint === "safety" ? "front_desk_log" : "file_complaint",
-      secondaryActionIntent: "complaints_filed",
+      secondaryActionIntent: "none",
       tone: toneHint ?? "normal",
       needsEscalation: toneHint === "safety",
-      escalationReason: toneHint === "safety" ? "Possible safety concern mentioned." : ""
+      escalationReason: toneHint === "safety" ? "Possible safety concern mentioned." : "",
+      pushNotice: null
     };
 
     const parsed = normalizeChatJson(parseGeminiJson<Partial<GeminiChatJson>>(text, fallback), fallback.reply);
-    const guarded = guardChatResponse({ access: context.access, parsed, toneHint });
+
+    let pushNoticePushed = false;
+    let pushNoticeResult: { title: string; message: string | null; id: string } | null = null;
+    let pendingPushNotice = parsed.pushNotice;
+
+    const canPush = canAccessActionIntent(context.access, "push_notice");
+    let draftToPush = parsed.pushNotice?.ready ? parsed.pushNotice : null;
+    if (!draftToPush?.ready && canPush) {
+      const inferred = inferPushNoticeDraft(message, history);
+      if (inferred?.ready) draftToPush = inferred;
+    }
+
+    if (draftToPush?.ready && canPush && draftToPush.title) {
+      const notice = await executeFitdogAiPushNotice({ session, access: context.access, draft: draftToPush });
+      if (notice) {
+        pushNoticePushed = true;
+        pushNoticeResult = { id: notice.id, title: notice.title, message: notice.message };
+        parsed.reply = buildPushSuccessReply(notice);
+        pendingPushNotice = null;
+      }
+    } else if (parsed.pushNotice?.title && !parsed.pushNotice.ready && canPush) {
+      pendingPushNotice = parsed.pushNotice;
+    }
+
+    const guarded = guardChatResponse({
+      access: context.access,
+      parsed,
+      toneHint,
+      pushNoticePushed,
+      pendingPushNotice
+    });
 
     return NextResponse.json({
       reply: guarded.reply,
       actionLinks: guarded.actionLinks,
       suggestedNextStep: guarded.suggestedNextStep,
-      tone: guarded.tone
+      tone: guarded.tone,
+      pushNoticeResult,
+      pendingPushNotice: guarded.pendingPushNotice ?? null
     });
   } catch (error) {
     console.error("[fitdog-ai/chat] Request failed:", error);
@@ -83,8 +136,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: fitdogAiUserFacingError(error),
-        reply:
-          "I'm having trouble responding right now, but don't let the issue sit. Document what you saw while it's fresh and use the right Fitdog workflow.",
+        reply: "I'm having trouble responding right now. Write down what you saw while it's fresh and use the right Fitdog workflow.",
         actionLinks: context ? fallbackActionLinks(context.access, "normal") : [],
         tone: "normal"
       },

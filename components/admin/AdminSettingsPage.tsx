@@ -14,6 +14,7 @@ type AdminSettingsPageProps = {
   onSaved: (settings: AdminGlobalSettings) => void;
   onRefresh: () => Promise<void>;
   onResetBoard: () => Promise<void>;
+  canViewUserGroupsPermissions?: boolean;
 };
 
 export function AdminSettingsPage({
@@ -22,7 +23,8 @@ export function AdminSettingsPage({
   dataSource,
   onSaved,
   onRefresh,
-  onResetBoard
+  onResetBoard,
+  canViewUserGroupsPermissions = false
 }: AdminSettingsPageProps) {
   const { showToast } = useToast();
   const [draft, setDraft] = useState(settings);
@@ -90,6 +92,22 @@ export function AdminSettingsPage({
           </button>
         </div>
       </header>
+
+      {canViewUserGroupsPermissions ? (
+        <section className="admin-card p-5">
+          <header className="admin-section-header">
+            <div>
+              <h3 className="admin-section-title">User Groups &amp; Permissions</h3>
+              <p className="admin-section-helper">
+                Configure role permissions across Fitdog admin tools in a Gingr-style matrix.
+              </p>
+            </div>
+            <a href="/admin/settings/user-groups-permissions" className="admin-btn-primary">
+              Open permissions matrix
+            </a>
+          </header>
+        </section>
+      ) : null}
 
       <Section title="General Settings" helper="Defaults used when you open the admin dashboard.">
         <div className="grid gap-4 md:grid-cols-2">

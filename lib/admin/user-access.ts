@@ -8,6 +8,10 @@ import {
   type RoleKey,
   type UserAccess
 } from "@/lib/admin/permissions";
+import {
+  loadRolePermissionMatrix,
+  permissionsForRolesFromMatrix
+} from "@/lib/admin/role-permission-matrix";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -88,21 +92,32 @@ export async function getUserAccess(
   legacyRole?: string | null,
   email?: string | null
 ): Promise<UserAccess> {
+  const matrix = await loadRolePermissionMatrix(supabase);
+
   if (!userId) return accessFromLegacyRole(null, email ?? null, legacyRole);
 
   const state = await loadState(supabase);
   const assignment = state.assignments[userId];
   if (!assignment) {
     const primaryRole = legacyRoleToRoleKey(legacyRole);
-    return buildUserAccess({ userId, email, primaryRole, roles: [primaryRole] });
+    const roles = [primaryRole];
+    return buildUserAccess({
+      userId,
+      email,
+      primaryRole,
+      roles,
+      permissions: permissionsForRolesFromMatrix(roles, matrix)
+    });
   }
 
+  const roles = [...new Set([assignment.primaryRole, ...assignment.roles])];
   return buildUserAccess({
     userId,
     email,
     primaryRole: assignment.primaryRole,
     roles: assignment.roles,
-    departments: assignment.departments
+    departments: assignment.departments,
+    permissions: permissionsForRolesFromMatrix(roles, matrix)
   });
 }
 

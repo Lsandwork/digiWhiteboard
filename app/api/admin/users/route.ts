@@ -5,6 +5,7 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { validatePasswordStrength } from "@/lib/admin/password";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
 import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
+import { assertUserMutationAllowed } from "@/lib/admin/super-admin-guards";
 import { loadAdminSettings } from "@/lib/admin/settings";
 import {
   getUserAccess,
@@ -101,6 +102,20 @@ export async function POST(request: Request) {
   const legacyRole = roleKeyToLegacyRole(primaryRoleKey) as AdminUserRole;
   const additionalRoles = parseRoleKeys(body.additional_roles).filter((r) => r !== primaryRoleKey);
   const departments = parseDepartments(body.departments);
+
+  try {
+    await assertUserMutationAllowed({
+      supabase,
+      actorLegacyRole: session?.role,
+      actorAccess,
+      targetUserId: "new",
+      targetLegacyRole: legacyRole,
+      nextPrimaryRole: primaryRoleKey,
+      action: "update"
+    });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Not allowed." }, { status: 403 });
+  }
 
   if (!full_name || !email || !password) {
     return NextResponse.json({ error: "Full name, email, and password are required." }, { status: 400 });

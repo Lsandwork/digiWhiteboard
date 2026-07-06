@@ -50,6 +50,8 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab,
   firstAccessibleAdminTab,
+  hasPermission,
+  isSuperAdminLegacyRole,
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
@@ -283,6 +285,8 @@ export function AdminDashboard() {
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
   const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel;
+  const canViewUserGroupsPermissions =
+    isSuperAdminLegacyRole(currentRole) || hasPermission(userAccess, "view_user_groups_permissions");
 
   const preview = (
     <div className="space-y-4">
@@ -483,6 +487,7 @@ export function AdminDashboard() {
               onSaved={(settings) => setData({ ...data, admin_settings: settings })}
               onRefresh={() => load(true)}
               onResetBoard={() => resetSettings()}
+              canViewUserGroupsPermissions={canViewUserGroupsPermissions}
             />
           )
         ) : null}

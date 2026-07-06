@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
+import { ensureSuperAdminUsers } from "@/lib/admin/role-permission-matrix";
 import { getAdminUserById } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
 
   const supabase = getServiceSupabase();
   await migrateLegacyUserAccess(supabase).catch(() => undefined);
+  await ensureSuperAdminUsers(supabase).catch(() => undefined);
 
   const dbUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
   const mustChangePassword = session.mustChangePassword || dbUser?.force_password_change || false;

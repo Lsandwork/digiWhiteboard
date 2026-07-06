@@ -2,17 +2,23 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageCircleHeart, Send, Sparkles, Video, X } from "lucide-react";
-import { FitdogAiMessage, type FitdogAiChatMessage, type FitdogAiVideoAnalysis } from "@/components/ai/FitdogAiMessage";
+import {
+  FitdogAiMessage,
+  type FitdogAiChatMessage,
+  type FitdogAiPushNoticeResult,
+  type FitdogAiVideoAnalysis
+} from "@/components/ai/FitdogAiMessage";
 import { FitdogAiVideoScan } from "@/components/ai/FitdogAiVideoScan";
 import { FitdogAiVideoAnalysisCard } from "@/components/ai/FitdogAiVideoAnalysisCard";
 import type { FitdogActionLink } from "@/lib/ai/fitdogActionLinks";
+import type { FitdogAiPushNoticeDraft } from "@/lib/ai/fitdogAiPushNotice";
 
 const QUICK_PROMPTS = [
   { label: "Scan Video", mode: "video" as const },
+  { label: "Push team notice", message: "I need to push a notice to the team on the whiteboard." },
   { label: "Help me document this", message: "Help me document this clearly for Fitdog." },
-  { label: "Where should this go?", message: "Where should this go in Fitdog — Front Desk Log, complaint, request, or something else?" },
+  { label: "Where should this go?", message: "Where should this go in Fitdog — Front Desk Log, complaint, or request?" },
   { label: "I'm frustrated", message: "I'm frustrated and need help figuring out the right next step." },
-  { label: "Owner complaint", message: "An owner complained and I need help with next steps." },
   { label: "Grooming push", message: "I need a dog put in catch for grooming." }
 ];
 
@@ -33,6 +39,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
   const [messages, setMessages] = useState<FitdogAiChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [pushingNoticeId, setPushingNoticeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -50,6 +57,50 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, sending, open, mode]);
 
+  const pushNoticeFromChat = useCallback(async (noticeDraft: FitdogAiPushNoticeDraft, messageId: string) => {
+    setPushingNoticeId(messageId);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/push-notices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_and_push",
+          title: noticeDraft.title,
+          message: noticeDraft.message,
+          priority: noticeDraft.priority ?? "important",
+          display_mode: noticeDraft.display_mode ?? "normal"
+        })
+      });
+      const body = (await response.json()) as { error?: string; notice?: { id: string; title: string; message: string | null } };
+      if (!response.ok || !body.notice) {
+        throw new Error(body.error ?? "Unable to push notice.");
+      }
+      const result: FitdogAiPushNoticeResult = {
+        id: body.notice.id,
+        title: body.notice.title,
+        message: body.notice.message
+      };
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === messageId
+            ? {
+                ...item,
+                pushNoticeResult: result,
+                pendingPushNotice: null,
+                content: `Done — it's live on the staff whiteboard.\n\n${result.title}${result.message ? `\n${result.message}` : ""}`,
+                actionLinks: [{ label: "Open Staff Digital Whiteboard", href: "/" }]
+              }
+            : item
+        )
+      );
+    } catch (pushError) {
+      setError(pushError instanceof Error ? pushError.message : "Unable to push notice.");
+    } finally {
+      setPushingNoticeId(null);
+    }
+  }, []);
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
@@ -62,6 +113,11 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         createdAt: new Date().toISOString()
       };
 
+      const history = [...messages, userMessage].slice(-8).map((item) => ({
+        role: item.role,
+        content: item.content
+      }));
+
       setMessages((current) => [...current, userMessage]);
       setDraft("");
       setSending(true);
@@ -71,13 +127,15 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         const response = await fetch("/api/fitdog-ai/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: trimmed, currentPage })
+          body: JSON.stringify({ message: trimmed, currentPage, history })
         });
         const body = (await response.json()) as {
           error?: string;
           reply?: string;
           actionLinks?: FitdogActionLink[];
           tone?: FitdogAiChatMessage["tone"];
+          pushNoticeResult?: FitdogAiPushNoticeResult | null;
+          pendingPushNotice?: FitdogAiPushNoticeDraft | null;
         };
 
         if (!response.ok && !body.reply) {
@@ -90,6 +148,8 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
           content: body.reply ?? body.error ?? "Fitdog AI could not respond right now.",
           actionLinks: body.actionLinks,
           tone: body.tone,
+          pushNoticeResult: body.pushNoticeResult ?? null,
+          pendingPushNotice: body.pendingPushNotice ?? null,
           createdAt: new Date().toISOString()
         };
         setMessages((current) => [...current, assistantMessage]);
@@ -100,7 +160,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         inputRef.current?.focus();
       }
     },
-    [currentPage, sending]
+    [currentPage, messages, sending]
   );
 
   function handleVideoComplete(analysis: FitdogAiVideoAnalysis) {
@@ -166,7 +226,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
           <div ref={scrollRef} className="fitdog-ai-window__thread">
             {messages.length === 0 ? (
               <div className="fitdog-ai-window__empty">
-                <p>Ask for help with a dog, client, shift note, complaint, request, or next step.</p>
+                <p>Ask for help with a dog, client, shift note, team notice, complaint, or next step.</p>
                 <div className="fitdog-ai-quick-actions">
                   {QUICK_PROMPTS.map((prompt) => (
                     <button
@@ -189,7 +249,11 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
             ) : (
               messages.map((message) => (
                 <div key={message.id}>
-                  <FitdogAiMessage message={message} />
+                  <FitdogAiMessage
+                    message={message}
+                    onPushNotice={pushNoticeFromChat}
+                    pushingNoticeId={pushingNoticeId}
+                  />
                   {message.videoAnalysis ? <FitdogAiVideoAnalysisCard analysis={message.videoAnalysis} /> : null}
                 </div>
               ))
@@ -217,7 +281,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
               rows={2}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask for help with a dog, client, shift note, complaint, request, or next step..."
+              placeholder="Ask for help — or say what notice to push to the team..."
               disabled={sending || configured === false}
             />
             <button type="submit" className="fitdog-ai-send" disabled={sending || !draft.trim() || configured === false}>

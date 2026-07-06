@@ -6,6 +6,7 @@
 export type PermissionKey =
   | "view_admin_panel"
   | "view_staff_whiteboard"
+  | "manage_staff_whiteboard"
   | "manage_push_notices"
   | "push_grooming_request"
   | "clear_grooming_request"
@@ -28,8 +29,18 @@ export type PermissionKey =
   | "manage_staff_users"
   | "reset_user_password"
   | "force_password_change"
+  | "view_user_groups_permissions"
+  | "manage_user_groups_permissions"
+  | "manage_system_settings"
   | "configure_integrations"
+  | "view_integrations"
   | "view_integration_status"
+  | "view_api_access"
+  | "manage_api_keys"
+  | "view_gingr_sync_settings"
+  | "manage_gingr_sync_settings"
+  | "manage_gemini_settings"
+  | "manage_database_tools"
   | "manage_templates"
   | "receive_admin_alerts"
   | "manage_staff_directory"
@@ -49,8 +60,19 @@ export type PermissionKey =
   | "comment_package_commissions"
   | "manage_package_commissions"
   | "review_management_support"
+  | "view_notifications"
+  | "respond_to_notifications"
+  | "assign_notifications"
+  | "view_internal_notes"
+  | "create_internal_notes"
+  | "view_video_links"
+  | "manage_video_links"
+  | "use_fitdog_ai"
   | "view_hr_hub"
-  | "use_hr_consult";
+  | "use_hr_consult"
+  | "view_analytics"
+  | "export_reports"
+  | "view_admin_logs";
 
 export type RoleKey =
   | "super_admin"
@@ -124,6 +146,7 @@ export const COORDINATOR_LIKE_ROLES: RoleKey[] = ["front_desk_coordinator", "tea
 const ALL_PERMISSIONS = Object.freeze([
   "view_admin_panel",
   "view_staff_whiteboard",
+  "manage_staff_whiteboard",
   "manage_push_notices",
   "push_grooming_request",
   "clear_grooming_request",
@@ -146,8 +169,18 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_staff_users",
   "reset_user_password",
   "force_password_change",
+  "view_user_groups_permissions",
+  "manage_user_groups_permissions",
+  "manage_system_settings",
   "configure_integrations",
+  "view_integrations",
   "view_integration_status",
+  "view_api_access",
+  "manage_api_keys",
+  "view_gingr_sync_settings",
+  "manage_gingr_sync_settings",
+  "manage_gemini_settings",
+  "manage_database_tools",
   "manage_templates",
   "receive_admin_alerts",
   "manage_staff_directory",
@@ -167,9 +200,49 @@ const ALL_PERMISSIONS = Object.freeze([
   "comment_package_commissions",
   "manage_package_commissions",
   "review_management_support",
+  "view_notifications",
+  "respond_to_notifications",
+  "assign_notifications",
+  "view_internal_notes",
+  "create_internal_notes",
+  "view_video_links",
+  "manage_video_links",
+  "use_fitdog_ai",
   "view_hr_hub",
-  "use_hr_consult"
+  "use_hr_consult",
+  "view_analytics",
+  "export_reports",
+  "view_admin_logs"
 ] as const satisfies readonly PermissionKey[]);
+
+/** Permissions reserved for Super Admin — Admin cannot receive these by default. */
+export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
+  "view_user_groups_permissions",
+  "manage_user_groups_permissions",
+  "view_integrations",
+  "configure_integrations",
+  "view_integration_status",
+  "view_api_access",
+  "manage_api_keys",
+  "view_gingr_sync_settings",
+  "manage_gingr_sync_settings",
+  "manage_gemini_settings",
+  "manage_database_tools"
+]);
+
+const ADMIN_OPERATIONAL_PERMISSIONS: PermissionKey[] = ALL_PERMISSIONS.filter(
+  (permission) => !SUPER_ADMIN_ONLY_PERMISSIONS.has(permission)
+);
+
+const STAFF_NOTIFICATION_PERMISSIONS: PermissionKey[] = [
+  "view_notifications",
+  "respond_to_notifications"
+];
+
+const STAFF_VIDEO_AI_PERMISSIONS: PermissionKey[] = [
+  "view_video_links",
+  "use_fitdog_ai"
+];
 
 const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
@@ -194,12 +267,17 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "resolve_active_issue",
   "view_staff_directory",
   "manage_templates",
-  "view_integration_status"
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
 const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
+  "manage_staff_whiteboard",
+  "manage_push_notices",
+  "push_grooming_request",
+  "clear_grooming_request",
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
@@ -212,10 +290,19 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "assign_active_issue",
   "resolve_active_issue",
   "view_staff_directory",
-  "view_integration_status",
   "receive_admin_alerts",
+  "review_management_support",
+  "review_write_ups",
+  "manage_package_commissions",
   "view_hr_hub",
-  "use_hr_consult"
+  "use_hr_consult",
+  "view_analytics",
+  "export_reports",
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  "assign_notifications",
+  "view_internal_notes",
+  "create_internal_notes",
+  ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -229,7 +316,9 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "submit_trainer_request",
   "view_own_trainer_submissions",
   "view_package_commissions",
-  "comment_package_commissions"
+  "comment_package_commissions",
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
 /** Groomer DigiBoard panel — grooming push, front desk log, video links, notifications, complaints/requests, profile. */
@@ -243,7 +332,9 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "clear_grooming_request",
   "submit_groomer_complaint",
   "submit_groomer_request",
-  "view_own_groomer_submissions"
+  "view_own_groomer_submissions",
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
 const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
@@ -251,7 +342,9 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   "view_staff_whiteboard",
   "view_front_desk_log",
   "create_front_desk_log",
-  "edit_front_desk_log"
+  "edit_front_desk_log",
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
 /** Team Lead DigiBoard panel — push, grooming, front desk log, video links, notifications, write-ups, profile. */
@@ -264,7 +357,9 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "create_front_desk_log",
   "edit_front_desk_log",
   "submit_write_up",
-  "view_own_write_ups"
+  "view_own_write_ups",
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
 export const TEAM_LEADER_TABS = [
@@ -297,8 +392,8 @@ export const TRAINER_TABS = [
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: [...ALL_PERMISSIONS],
-  admin: [...ALL_PERMISSIONS],
-  management: [...MANAGEMENT_PERMISSIONS, "review_write_ups", "manage_package_commissions", "review_management_support", "view_hr_hub", "use_hr_consult"],
+  admin: [...ADMIN_OPERATIONAL_PERMISSIONS],
+  management: [...MANAGEMENT_PERMISSIONS],
   front_desk_coordinator: COORDINATOR_PERMISSIONS,
   team_leader: TEAM_LEADER_PERMISSIONS,
   groomer: GROOMER_PERMISSIONS,
@@ -382,6 +477,7 @@ export function buildUserAccess(input: {
   primaryRole: RoleKey;
   roles?: RoleKey[];
   departments?: DepartmentKey[];
+  permissions?: PermissionKey[];
 }): UserAccess {
   const roles = [...new Set([input.primaryRole, ...(input.roles ?? [])])];
   const departments = input.departments ?? [];
@@ -391,7 +487,7 @@ export function buildUserAccess(input: {
     primaryRole: input.primaryRole,
     roles,
     departments,
-    permissions: permissionsForRoles(roles),
+    permissions: input.permissions ?? permissionsForRoles(roles),
     displayLabel: buildDisplayLabel(roles)
   };
 }
@@ -428,11 +524,14 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   owner_follow_up: "view_owner_follow_up",
   active_issues: "view_active_issues",
   whiteboard_preview: "view_staff_whiteboard",
+  yard_links: "view_video_links",
   templates: "manage_templates",
-  notifications: "view_admin_panel",
+  notifications: "view_notifications",
   staff_directory: "view_staff_directory",
   users: "manage_staff_users",
-  integrations: "view_integration_status",
+  integrations: "view_integrations",
+  analytics: "view_analytics",
+  logs: "view_admin_logs",
   management_support: "submit_write_up",
   package_commissions: "manage_package_commissions",
   ms_hub: "review_management_support",
@@ -525,6 +624,18 @@ const ADMIN_SUPPORT_TAB_SET = new Set([
 
 const ADMIN_HR_TAB_SET = new Set(["hr_hub", "hr_consult"]);
 
+export function isSuperAdminLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "owner_admin";
+}
+
+export function isSuperAdminAccess(access: UserAccess | null | undefined) {
+  return hasRole(access, "super_admin");
+}
+
+export function canManageSuperAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null) {
+  return isSuperAdminAccess(actorAccess) || isSuperAdminLegacyRole(actorLegacyRole);
+}
+
 export function isTeamLeaderLegacyRole(legacyRole?: string | null) {
   return legacyRole === "team_leader";
 }
@@ -596,11 +707,30 @@ export function canAccessAdminTab(
   }
 
   if (tab === "integrations") {
-    return hasAnyPermission(effective, ["view_integration_status", "configure_integrations"]);
+    return hasAnyPermission(effective, ["view_integrations", "view_integration_status", "configure_integrations"]);
+  }
+
+  if (tab === "logs") {
+    return hasAnyPermission(effective, ["view_admin_logs", "configure_integrations"]);
+  }
+
+  if (tab === "analytics") {
+    return hasPermission(effective, "view_analytics") || canManageAdminUsers(effective, legacyRole);
+  }
+
+  if (tab === "notifications") {
+    return hasAnyPermission(effective, ["view_notifications", "view_admin_panel"]);
+  }
+
+  if (tab === "yard_links") {
+    return hasAnyPermission(effective, ["view_video_links", "view_admin_panel"]);
   }
 
   if (LOBBY_ONLY_TABS.has(tab)) {
-    return canManageAdminUsers(effective, legacyRole) || hasPermission(effective, "configure_integrations");
+    return (
+      canManageAdminUsers(effective, legacyRole) ||
+      hasAnyPermission(effective, ["configure_integrations", "view_integrations", "manage_staff_whiteboard"])
+    );
   }
 
   const required = TAB_PERMISSIONS[tab];
