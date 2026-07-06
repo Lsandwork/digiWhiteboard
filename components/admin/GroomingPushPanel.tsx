@@ -5,10 +5,12 @@ import { AlertTriangle, Clock3, Scissors, Send, XCircle } from "lucide-react";
 import {
   GROOMING_SAFETY_TAG_OPTIONS,
   GROOMING_SERVICE_OPTIONS,
+  groomingInstruction,
   parseDogAndOwnerLastName,
   type GroomingPushNotice
 } from "@/lib/staff/grooming-push-notices";
-import { groomingInstruction } from "@/lib/staff/grooming-push-notices";
+import { GroomingDogPicker, GroomingManualOverrideFields } from "@/components/admin/GroomingDogPicker";
+import type { GroomingPushActiveDog } from "@/lib/grooming-push-active-dogs";
 import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 
@@ -24,6 +26,8 @@ type GroomingPayload = {
 };
 
 const emptyForm = {
+  selectedDog: null as GroomingPushActiveDog | null,
+  manualOverride: false,
   dog_and_owner: "",
   service: "Bath + Brush",
   groomer_name: "",
@@ -71,7 +75,15 @@ export function GroomingPushPanel() {
       || ["owner_admin", "manager_admin", "front_desk_coordinator", "team_leader", "groomer"].includes(data.currentUser.role ?? "");
   }, [data]);
 
-  const parsedDog = useMemo(() => parseDogAndOwnerLastName(form.dog_and_owner), [form.dog_and_owner]);
+  const canManualOverride = useMemo(() => {
+    return ["owner_admin", "manager_admin"].includes(data?.currentUser.role ?? "");
+  }, [data]);
+
+  const parsedManualDog = useMemo(() => parseDogAndOwnerLastName(form.dog_and_owner), [form.dog_and_owner]);
+
+  const selectedDogReady = form.manualOverride
+    ? Boolean(parsedManualDog.dog_name)
+    : Boolean(form.selectedDog?.dogName);
 
   function toggleTag(tag: string) {
     setForm((current) => ({
@@ -85,31 +97,54 @@ export function GroomingPushPanel() {
   async function pushNotice() {
     setBusy(true);
     try {
-      const { dog_name, owner_name, owner_initial } = parsedDog;
-      if (!dog_name) throw new Error("Enter the dog name and owner last name.");
       const service = form.service === "Custom" ? form.custom_service.trim() : form.service;
       const safety_tags = [
         ...form.safety_tags,
         ...(form.custom_tag.trim() ? [form.custom_tag.trim()] : [])
       ];
+
+      const payload = form.manualOverride
+        ? {
+            manual_override: true,
+            dog_name: parsedManualDog.dog_name,
+            owner_name: parsedManualDog.owner_name,
+            owner_initial: parsedManualDog.owner_initial,
+            service,
+            groomer_name: form.groomer_name,
+            notes: form.notes || null,
+            safety_tags
+          }
+        : {
+            dog_id: form.selectedDog?.gingrAnimalId ?? form.selectedDog?.dogId,
+            dog_name: form.selectedDog!.dogName,
+            owner_name: form.selectedDog?.ownerName ?? null,
+            dog_photo_url: form.selectedDog?.dogPhotoUrl ?? null,
+            reservation_id: form.selectedDog?.reservationId,
+            appointment_id: form.selectedDog?.appointmentId,
+            gingr_display_status: form.selectedDog?.displayStatus,
+            service,
+            groomer_name: form.groomer_name,
+            notes: form.notes || null,
+            safety_tags
+          };
+
       const response = await fetch("/api/admin/grooming-push", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          dog_name,
-          owner_name,
-          owner_initial,
-          service,
-          groomer_name: form.groomer_name,
-          notes: form.notes || null,
-          safety_tags
-        })
+        body: JSON.stringify(payload)
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to push grooming notice.");
-      showToast(`Grooming request pushed for ${dog_name}.`, "success");
+
+      const pushedName = form.manualOverride ? parsedManualDog.dog_name : form.selectedDog?.dogName;
+      showToast(`Grooming request pushed for ${pushedName}.`, "success");
       setData((current) => current ? { ...current, activeNotice: body.activeNotice ?? body.notice, queue: body.queue ?? [] } : current);
-      setForm({ ...emptyForm, groomer_name: form.groomer_name, service: form.service, safety_tags: form.safety_tags });
+      setForm({
+        ...emptyForm,
+        groomer_name: form.groomer_name,
+        service: form.service,
+        safety_tags: form.safety_tags
+      });
       await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to push grooming notice.", "error");
@@ -139,7 +174,7 @@ export function GroomingPushPanel() {
       <header className="admin-page-header">
         <div>
           <h2 className="admin-page-title">Grooming Push</h2>
-          <p className="admin-page-subtitle">Send a high-priority handler alert to the Staff Digital Whiteboard when a dog needs to go to Catch.</p>
+          <p className="admin-page-subtitle">Select a dog checked in to Gingr and send a high-priority handler alert to the Staff Digital Whiteboard.</p>
         </div>
         <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void load()}>
           Refresh
@@ -150,19 +185,34 @@ export function GroomingPushPanel() {
         <div className="crossover-card crossover-card--conversations p-5">
           <div className="mb-5">
             <h3 className="crossover-card__title">Push to Staff Whiteboard</h3>
-            <p className="crossover-card__subtitle">Creates a 5-minute full-screen grooming request for handlers.</p>
+            <p className="crossover-card__subtitle">Creates a 5-minute full-screen grooming request with the dog&apos;s real Gingr profile photo.</p>
           </div>
 
           <div className="grid gap-4">
-            <label className="block">
-              <span className="admin-label">Dog name &amp; owner last name</span>
-              <input
-                className="admin-input"
-                value={form.dog_and_owner}
-                onChange={(e) => setForm({ ...form, dog_and_owner: e.target.value })}
-                placeholder="e.g. Jasper Sandoval"
+            {canManualOverride ? (
+              <label className="inline-flex items-center gap-2 text-sm text-admin-muted">
+                <input
+                  type="checkbox"
+                  checked={form.manualOverride}
+                  onChange={(event) => setForm({ ...form, manualOverride: event.target.checked, selectedDog: null, dog_and_owner: "" })}
+                />
+                Admin manual override (type dog manually)
+              </label>
+            ) : null}
+
+            {form.manualOverride ? (
+              <GroomingManualOverrideFields
+                enabled
+                dogAndOwner={form.dog_and_owner}
+                onDogAndOwnerChange={(value) => setForm({ ...form, dog_and_owner: value })}
               />
-            </label>
+            ) : (
+              <GroomingDogPicker
+                value={form.selectedDog}
+                onChange={(selectedDog) => setForm({ ...form, selectedDog })}
+                disabled={busy}
+              />
+            )}
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block">
@@ -215,20 +265,10 @@ export function GroomingPushPanel() {
               <textarea className="admin-input min-h-24" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             </label>
 
-            {parsedDog.dog_name ? (
-              <div className="rounded-xl border border-[rgba(245,158,11,0.22)] bg-black/20 p-4 text-sm text-admin-muted">
-                <p className="font-bold text-white">Preview message</p>
-                <p className="mt-2 text-white">{groomingInstruction({ dog_name: parsedDog.dog_name })}</p>
-                {parsedDog.owner_name ? (
-                  <p className="mt-1 text-xs text-admin-muted">Owner last name: {parsedDog.owner_name}</p>
-                ) : null}
-              </div>
-            ) : null}
-
             <button
               type="button"
               className="crossover-btn crossover-btn--primary inline-flex items-center justify-center gap-2"
-              disabled={busy || !canPush || !parsedDog.dog_name || !form.groomer_name.trim()}
+              disabled={busy || !canPush || !selectedDogReady || !form.groomer_name.trim()}
               onClick={() => void pushNotice()}
             >
               <Send className="h-4 w-4" /> Push to Staff Whiteboard

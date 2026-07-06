@@ -196,7 +196,7 @@ export async function applyDemoGroomingPushNotice(
   input: GroomingPushNoticeInput,
   actor: string | null
 ) {
-  const normalized = normalizeGroomingPushNoticeInput(input);
+  const normalized = normalizeGroomingPushNoticeInput({ ...input, manual_override: true });
   const notice = buildDemoGroomingNoticeFromFields(normalized, actor);
   const sandbox = await loadSandbox(supabase);
   sandbox.grooming_notices = [notice, ...sandbox.grooming_notices.filter((item) => item.status !== "active")].slice(

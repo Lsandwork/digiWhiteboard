@@ -6,7 +6,9 @@ import { AlertTriangle, Clock3, MapPin, Megaphone, PawPrint, Scissors, UserRound
 import {
   formatGroomingCountdown,
   groomingInstruction,
+  groomingStatusLabel,
   ownerDisplayLabel,
+  parseGingrNoticeMeta,
   type GroomingPushNotice
 } from "@/lib/staff/grooming-push-notices";
 import { formatBoardDateTime } from "@/lib/board-utils";
@@ -93,6 +95,8 @@ function QueueCard({ notice }: { notice: GroomingPushNotice }) {
 function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate }: GroomingPushNoticeOverlayProps) {
   const countdown = useMemo(() => formatGroomingCountdown(notice.expires_at, nowMs), [notice.expires_at, nowMs]);
   const owner = ownerDisplayLabel(notice);
+  const statusLabel = groomingStatusLabel(notice);
+  const userNotes = notice.user_notes ?? parseGingrNoticeMeta(notice.notes).userNotes;
   const requestedLabel = useMemo(() => {
     const date = new Date(notice.requested_at);
     if (Number.isNaN(date.getTime())) return "Requested recently";
@@ -116,8 +120,8 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
           />
           <div>
             <p className="grooming-push__brand-name">fitdog</p>
-            <h1 className="grooming-push__title">Grooming Whiteboard</h1>
-            <p className="grooming-push__subtitle">One-push grooming request for handlers.</p>
+            <h1 className="grooming-push__title">Grooming Push</h1>
+            <p className="grooming-push__subtitle">Handler alert — bring dog to Catch for groomer.</p>
           </div>
         </div>
         <div className="grooming-push__clock">
@@ -135,9 +139,10 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
             </div>
 
             <div className="grooming-push__details">
-              <p className="grooming-push__eyebrow">Bring to Catch</p>
+              <p className="grooming-push__eyebrow">Grooming Push</p>
               <h2 className="grooming-push__dog-name">{notice.dog_name.toUpperCase()}</h2>
               {owner ? <p className="grooming-push__owner">{owner.startsWith("Owner:") ? owner : `Owner: ${owner}`}</p> : null}
+              {statusLabel ? <p className="grooming-push__gingr-status">{statusLabel}</p> : null}
 
               <div className="grooming-push__meta-grid">
                 <p><Scissors className="inline h-4 w-4 text-fitdog-orange" aria-hidden /> {notice.service}</p>
@@ -146,7 +151,7 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
                 <p><Clock3 className="inline h-4 w-4 text-fitdog-orange" aria-hidden /> {requestedLabel}</p>
               </div>
 
-              {notice.notes ? <p className="grooming-push__notes">{notice.notes}</p> : null}
+              {userNotes ? <p className="grooming-push__notes">{userNotes}</p> : null}
 
               {notice.safety_tags?.length ? (
                 <div className="grooming-push__tags">

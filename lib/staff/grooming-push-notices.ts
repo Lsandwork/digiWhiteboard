@@ -22,6 +22,8 @@ export type GroomingPushNotice = {
   cleared_by: string | null;
   created_at: string;
   updated_at: string;
+  gingr_display_status?: string | null;
+  user_notes?: string | null;
 };
 
 export type GroomingPushNoticeInput = {
@@ -36,6 +38,10 @@ export type GroomingPushNoticeInput = {
   notes?: unknown;
   safety_tags?: unknown;
   requested_by?: unknown;
+  gingr_display_status?: unknown;
+  reservation_id?: unknown;
+  appointment_id?: unknown;
+  manual_override?: unknown;
 };
 
 export type GroomingDogOption = {
@@ -98,7 +104,35 @@ function ownerInitialFromName(ownerName: string | null) {
   return parts[0].charAt(0).toUpperCase();
 }
 
+const GINGR_META_RE = /^@@GINGR_META:([\s\S]*?)@@\n?/;
+
+export function parseGingrNoticeMeta(notes: string | null | undefined) {
+  if (!notes) return { displayStatus: null as string | null, userNotes: null as string | null };
+  const match = notes.match(GINGR_META_RE);
+  if (!match) return { displayStatus: null, userNotes: notes };
+  try {
+    const meta = JSON.parse(match[1]!) as { displayStatus?: string };
+    const userNotes = notes.replace(GINGR_META_RE, "").trim();
+    return {
+      displayStatus: meta.displayStatus ?? null,
+      userNotes: userNotes || null
+    };
+  } catch {
+    return { displayStatus: null, userNotes: notes };
+  }
+}
+
+export function packGingrNoticeNotes(displayStatus: string | null | undefined, userNotes: string | null | undefined) {
+  const cleanNotes = sanitizeText(userNotes, 400) || null;
+  const cleanStatus = sanitizeText(displayStatus, 120) || null;
+  if (!cleanStatus) return cleanNotes;
+  const meta = `@@GINGR_META:${JSON.stringify({ displayStatus: cleanStatus })}@@`;
+  return cleanNotes ? `${meta}\n${cleanNotes}` : meta;
+}
+
 function normalizeNoticeRow(row: Record<string, unknown>): GroomingPushNotice {
+  const rawNotes = row.notes != null ? String(row.notes) : null;
+  const { displayStatus, userNotes } = parseGingrNoticeMeta(rawNotes);
   return {
     id: String(row.id),
     dog_id: row.dog_id != null ? String(row.dog_id) : null,
@@ -109,7 +143,7 @@ function normalizeNoticeRow(row: Record<string, unknown>): GroomingPushNotice {
     service: String(row.service ?? "Grooming"),
     groomer_name: String(row.groomer_name ?? ""),
     action: String(row.action ?? "Bring to Catch"),
-    notes: row.notes != null ? String(row.notes) : null,
+    notes: rawNotes,
     safety_tags: Array.isArray(row.safety_tags) ? row.safety_tags.map(String) : [],
     status: (row.status === "cleared" || row.status === "expired" ? row.status : "active") as GroomingPushNoticeStatus,
     requested_by: row.requested_by != null ? String(row.requested_by) : null,
@@ -118,7 +152,9 @@ function normalizeNoticeRow(row: Record<string, unknown>): GroomingPushNotice {
     cleared_at: row.cleared_at != null ? String(row.cleared_at) : null,
     cleared_by: row.cleared_by != null ? String(row.cleared_by) : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
-    updated_at: String(row.updated_at ?? new Date().toISOString())
+    updated_at: String(row.updated_at ?? new Date().toISOString()),
+    gingr_display_status: displayStatus,
+    user_notes: userNotes
   };
 }
 
@@ -159,19 +195,29 @@ async function saveFallbackState(supabase: SupabaseClient, state: GroomingNotice
 }
 
 export function normalizeGroomingPushNoticeInput(input: GroomingPushNoticeInput) {
+  const manualOverride = Boolean(input.manual_override);
   const dog_name = sanitizeText(input.dog_name, 80);
   const groomer_name = sanitizeText(input.groomer_name, 80);
   const service = sanitizeText(input.service, 80) || "Grooming";
   const owner_name = sanitizeText(input.owner_name, 80) || null;
   const owner_initial = sanitizeText(input.owner_initial, 4) || ownerInitialFromName(owner_name);
-  const notes = sanitizeText(input.notes, 400) || null;
+  const user_notes = sanitizeText(input.notes, 400) || null;
+  const gingr_display_status = sanitizeText(input.gingr_display_status, 120) || null;
   const safety_tags = sanitizeTags(input.safety_tags);
+  const dog_id =
+    sanitizeText(input.dog_id, 120) ||
+    sanitizeText(input.reservation_id, 120) ||
+    sanitizeText(input.appointment_id, 120) ||
+    null;
 
+  if (!manualOverride && !dog_id) {
+    throw new Error("Select a dog from the Gingr list before pushing this notice.");
+  }
   if (!dog_name) throw new Error("Dog name is required.");
   if (!groomer_name) throw new Error("Groomer name is required.");
 
   return {
-    dog_id: sanitizeText(input.dog_id, 120) || null,
+    dog_id,
     dog_name,
     dog_photo_url: sanitizeText(input.dog_photo_url, 500) || null,
     owner_name,
@@ -179,7 +225,7 @@ export function normalizeGroomingPushNoticeInput(input: GroomingPushNoticeInput)
     service,
     groomer_name,
     action: sanitizeText(input.action, 80) || "Bring to Catch",
-    notes,
+    notes: packGingrNoticeNotes(gingr_display_status, user_notes),
     safety_tags,
     requested_by: sanitizeText(input.requested_by, 120) || null
   };
@@ -193,8 +239,15 @@ export function formatGroomingCountdown(expiresAt: string | null | undefined, no
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-export function groomingInstruction(notice: Pick<GroomingPushNotice, "dog_name">) {
-  return `Please bring ${notice.dog_name} to Catch for grooming. Confirm transfer with groomer/front desk.`;
+export function groomingInstruction(_notice: Pick<GroomingPushNotice, "dog_name">) {
+  return "PUT DOG IN CATCH FOR GROOMER. PLEASE USE SLIP LEAD.";
+}
+
+export function groomingStatusLabel(notice: Pick<GroomingPushNotice, "gingr_display_status" | "status">) {
+  const label = notice.gingr_display_status?.trim();
+  if (!label) return null;
+  if (label.toLowerCase().includes("checked in")) return "CHECKED IN TO GINGR";
+  return label.toUpperCase();
 }
 
 export function ownerDisplayLabel(notice: Pick<GroomingPushNotice, "owner_name" | "owner_initial">) {
