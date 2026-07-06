@@ -34,8 +34,30 @@ export const FITDOG_UI = {
   logout: "/assets/fitdog/ui/logout-64.png"
 } as const;
 
+/** Orange-glow sidebar icons (unified dashboard style). */
+export const FITDOG_SIDEBAR_ICONS = {
+  overview: "/assets/sidebar-icons/icon-overview.png",
+  templates: "/assets/sidebar-icons/icon-templates.png",
+  staffDirectory: "/assets/sidebar-icons/icon-staff-directory.png",
+  settings: "/assets/sidebar-icons/icon-settings.png",
+  logs: "/assets/sidebar-icons/icon-logs.png",
+  integrations: "/assets/sidebar-icons/icon-integrations.png",
+  help: "/assets/sidebar-icons/icon-help-center.png",
+  whiteboardPreview: "/assets/sidebar-icons/icon-whiteboard-preview.png",
+  analytics: "/assets/sidebar-icons/icon-analytics.png"
+} as const;
+
 /** Sidebar nav icons for staff panel tabs. */
 export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
+  overview: FITDOG_SIDEBAR_ICONS.overview,
+  whiteboard_preview: FITDOG_SIDEBAR_ICONS.whiteboardPreview,
+  analytics: FITDOG_SIDEBAR_ICONS.analytics,
+  templates: FITDOG_SIDEBAR_ICONS.templates,
+  staff_directory: FITDOG_SIDEBAR_ICONS.staffDirectory,
+  settings: FITDOG_SIDEBAR_ICONS.settings,
+  logs: FITDOG_SIDEBAR_ICONS.logs,
+  integrations: FITDOG_SIDEBAR_ICONS.integrations,
+  help: FITDOG_SIDEBAR_ICONS.help,
   push_notices: FITDOG_UI.pushNotices,
   grooming_push: FITDOG_UI.groomingPush,
   trainer_push: FITDOG_UI.groomingPush,
@@ -53,6 +75,5 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   hr_hub: FITDOG_UI.managementSupport,
   hr_consult: FITDOG_UI.managementSupport,
   demo_push: FITDOG_UI.pushNotices,
-  notifications: FITDOG_UI.notifications,
-  settings: FITDOG_UI.settings
+  notifications: FITDOG_UI.notifications
 };
