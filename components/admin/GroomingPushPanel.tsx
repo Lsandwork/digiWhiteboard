@@ -30,7 +30,6 @@ const emptyForm = {
   manualOverride: false,
   dog_and_owner: "",
   service: "Bath + Brush",
-  groomer_name: "",
   notes: "",
   safety_tags: [] as string[],
   custom_service: "",
@@ -110,7 +109,6 @@ export function GroomingPushPanel() {
             owner_name: parsedManualDog.owner_name,
             owner_initial: parsedManualDog.owner_initial,
             service,
-            groomer_name: form.groomer_name,
             notes: form.notes || null,
             safety_tags
           }
@@ -123,7 +121,6 @@ export function GroomingPushPanel() {
             appointment_id: form.selectedDog?.appointmentId,
             gingr_display_status: form.selectedDog?.displayStatus,
             service,
-            groomer_name: form.groomer_name,
             notes: form.notes || null,
             safety_tags
           };
@@ -141,7 +138,6 @@ export function GroomingPushPanel() {
       setData((current) => current ? { ...current, activeNotice: body.activeNotice ?? body.notice, queue: body.queue ?? [] } : current);
       setForm({
         ...emptyForm,
-        groomer_name: form.groomer_name,
         service: form.service,
         safety_tags: form.safety_tags
       });
@@ -228,20 +224,8 @@ export function GroomingPushPanel() {
                   <span className="admin-label">Custom service</span>
                   <input className="admin-input" value={form.custom_service} onChange={(e) => setForm({ ...form, custom_service: e.target.value })} />
                 </label>
-              ) : (
-                <label className="block">
-                  <span className="admin-label">Groomer</span>
-                  <input className="admin-input" value={form.groomer_name} onChange={(e) => setForm({ ...form, groomer_name: e.target.value })} placeholder="Sarah" />
-                </label>
-              )}
+              ) : null}
             </div>
-
-            {form.service === "Custom" ? (
-              <label className="block">
-                <span className="admin-label">Groomer</span>
-                <input className="admin-input" value={form.groomer_name} onChange={(e) => setForm({ ...form, groomer_name: e.target.value })} placeholder="Sarah" />
-              </label>
-            ) : null}
 
             <div>
               <span className="admin-label">Safety tags</span>
@@ -268,7 +252,7 @@ export function GroomingPushPanel() {
             <button
               type="button"
               className="crossover-btn crossover-btn--primary inline-flex items-center justify-center gap-2"
-              disabled={busy || !canPush || !selectedDogReady || !form.groomer_name.trim()}
+              disabled={busy || !canPush || !selectedDogReady}
               onClick={() => void pushNotice()}
             >
               <Send className="h-4 w-4" /> Push to Staff Whiteboard

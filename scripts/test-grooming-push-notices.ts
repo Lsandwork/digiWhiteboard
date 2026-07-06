@@ -18,6 +18,12 @@ function testNormalizeInput() {
   assert.equal(normalized.groomer_name, "Sarah");
   assert.equal(normalized.owner_initial, "R");
   assert.equal(normalized.safety_tags.length, 1);
+
+  const fromActor = normalizeGroomingPushNoticeInput(
+    { dog_id: "123", dog_name: "Milo", service: "Bath" },
+    "sarah.groomer@fitdog.com"
+  );
+  assert.equal(fromActor.groomer_name, "Sarah Groomer");
 }
 
 function testCountdown() {

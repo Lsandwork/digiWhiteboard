@@ -104,6 +104,19 @@ function ownerInitialFromName(ownerName: string | null) {
   return parts[0].charAt(0).toUpperCase();
 }
 
+/** Derive a display groomer name from the logged-in user when the form does not ask for one. */
+export function groomerNameFromActor(actor?: string | null) {
+  const raw = String(actor ?? "").trim();
+  if (!raw) return "Grooming";
+  if (raw.includes("@")) {
+    const local = raw.split("@")[0] ?? "";
+    const parts = local.split(/[._-]+/).filter(Boolean);
+    if (!parts.length) return "Grooming";
+    return parts.map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ").slice(0, 80);
+  }
+  return raw.slice(0, 80);
+}
+
 const GINGR_META_RE = /^@@GINGR_META:([\s\S]*?)@@\n?/;
 
 export function parseGingrNoticeMeta(notes: string | null | undefined) {
@@ -194,10 +207,10 @@ async function saveFallbackState(supabase: SupabaseClient, state: GroomingNotice
   await supabase.from("admin_settings").upsert({ id: "default", settings, updated_at: new Date().toISOString() });
 }
 
-export function normalizeGroomingPushNoticeInput(input: GroomingPushNoticeInput) {
+export function normalizeGroomingPushNoticeInput(input: GroomingPushNoticeInput, actor?: string | null) {
   const manualOverride = Boolean(input.manual_override);
   const dog_name = sanitizeText(input.dog_name, 80);
-  const groomer_name = sanitizeText(input.groomer_name, 80);
+  const groomer_name = sanitizeText(input.groomer_name, 80) || groomerNameFromActor(actor);
   const service = sanitizeText(input.service, 80) || "Grooming";
   const owner_name = sanitizeText(input.owner_name, 80) || null;
   const owner_initial = sanitizeText(input.owner_initial, 4) || ownerInitialFromName(owner_name);
@@ -365,7 +378,7 @@ export async function createGroomingPushNotice(
   input: GroomingPushNoticeInput,
   actor?: string | null
 ) {
-  const normalized = normalizeGroomingPushNoticeInput(input);
+  const normalized = normalizeGroomingPushNoticeInput(input, actor);
   const now = new Date();
   const requested_at = now.toISOString();
   const expires_at = new Date(now.getTime() + GROOMING_NOTICE_DURATION_MS).toISOString();
