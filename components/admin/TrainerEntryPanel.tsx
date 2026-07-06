@@ -8,6 +8,7 @@ import {
 } from "@/components/admin/front-desk/FrontDeskLogUI";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
 import { shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
+import { serializeTemplateFieldValues } from "@/lib/frontDeskLog/logTemplates";
 
 const emptyForm: ShiftLogFormShape = {
   log_type: "Training Note",
@@ -25,7 +26,10 @@ const emptyForm: ShiftLogFormShape = {
   urgent: false,
   create_owner_follow_up: false,
   create_active_issue: false,
-  template_title: null
+  template_title: null,
+  template_id: null,
+  template_fields: {},
+  field_errors: {}
 };
 
 function formatDateTime(value: string | null) {
@@ -96,7 +100,9 @@ export function TrainerEntryPanel() {
           urgent: payload.urgent,
           create_owner_follow_up: payload.create_owner_follow_up,
           create_active_issue: payload.create_active_issue,
-          template_title: payload.template_title
+          template_title: payload.template_title,
+          template_id: payload.template_id,
+          template_field_values: serializeTemplateFieldValues(payload.template_fields)
         })
       });
       const body = await response.json();

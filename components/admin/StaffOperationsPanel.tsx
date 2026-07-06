@@ -51,6 +51,13 @@ import { KpiSummaryCards, shiftLogKpiCards } from "@/components/admin/ui/KpiSumm
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { canPushCrossoverToWhiteboard } from "@/lib/admin/users";
 import {
+  buildFormFromTemplate,
+  getLogTemplateById,
+  serializeTemplateFieldValues,
+  validateTemplateFields,
+  type TemplateFieldValues
+} from "@/lib/frontDeskLog/logTemplates";
+import {
   formatShiftLogDayLabel,
   isDueToday,
   isLoggedToday,
@@ -134,7 +141,10 @@ const emptyShiftLogForm: ShiftLogFormShape = {
   urgent: false,
   create_owner_follow_up: false,
   create_active_issue: false,
-  template_title: null
+  template_title: null,
+  template_id: null,
+  template_fields: {},
+  field_errors: {}
 };
 
 const emptyShiftLogFilters: ShiftLogFilters = {
@@ -513,20 +523,33 @@ function CrossoverPage(props: {
     setOpenPage(1);
   }, [filters]);
 
-  const pickTemplate = useCallback((template: (typeof import("@/lib/staff/front-desk-log").SHIFT_LOG_TEMPLATES)[number]) => {
-    setForm({
-      ...emptyShiftLogForm,
-      log_type: template.log_type,
-      subject: template.subject,
-      details: template.details,
-      priority: template.priority,
-      status: template.status,
-      assigned_to: template.assigned_to,
-      needs_management_review: template.needs_management_review,
-      urgent: template.urgent,
-      template_title: template.title
+  const pickTemplate = useCallback((templateId: string) => {
+    const template = getLogTemplateById(templateId);
+    if (!template) return;
+    setForm((current) => {
+      const allowedKeys = new Set(template.fields.map((field) => field.key));
+      const preserved: TemplateFieldValues = {};
+      for (const key of allowedKeys) {
+        const fromFields = current.template_fields[key];
+        if (fromFields !== undefined && fromFields !== "" && !(Array.isArray(fromFields) && fromFields.length === 0)) {
+          preserved[key] = fromFields;
+        } else if (key === "dogName" && current.related_dog_name) {
+          preserved[key] = current.related_dog_name;
+        } else if (key === "ownerName" && current.related_owner_name) {
+          preserved[key] = current.related_owner_name;
+        }
+      }
+      return { ...emptyShiftLogForm, ...buildFormFromTemplate(template, preserved) };
     });
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const templateParam = params.get("template");
+    if (!templateParam) return;
+    const template = getLogTemplateById(templateParam);
+    if (template) pickTemplate(template.id);
+  }, [pickTemplate]);
 
   const queryFields = useCallback(
     (item: CrossoverMessage) => [
@@ -571,6 +594,14 @@ function CrossoverPage(props: {
 
   async function submit(extra: Partial<ShiftLogFormShape> = {}) {
     const payload = { ...form, ...extra };
+    const template = getLogTemplateById(payload.template_id);
+    if (template && payload.template_id && payload.template_id !== "custom") {
+      const errors = validateTemplateFields(template, payload.template_fields);
+      if (Object.keys(errors).length) {
+        setForm((current) => ({ ...current, field_errors: errors }));
+        return;
+      }
+    }
     await props.onMutate(
       "Unable to save shift log entry.",
       {
@@ -592,7 +623,9 @@ function CrossoverPage(props: {
         urgent: payload.urgent,
         create_owner_follow_up: payload.create_owner_follow_up,
         create_active_issue: payload.create_active_issue,
-        template_title: payload.template_title
+        template_title: payload.template_title,
+        template_id: payload.template_id,
+        template_field_values: serializeTemplateFieldValues(payload.template_fields)
       },
       "Shift log entry saved."
     );
@@ -689,7 +722,7 @@ function CrossoverPage(props: {
           />
         </div>
         <div className="crossover-dashboard__workspace-templates">
-          <QuickLogTemplatesSidebar onPick={pickTemplate} />
+          <QuickLogTemplatesSidebar selectedTemplateId={form.template_id} onPick={pickTemplate} />
         </div>
         <div className="crossover-dashboard__workspace-activity">
           <ShiftLogRecentActivitySidebar items={props.recentActivity} formatDateTime={formatDateTime} />

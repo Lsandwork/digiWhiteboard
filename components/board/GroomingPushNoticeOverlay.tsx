@@ -104,9 +104,10 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
   }, [notice.requested_at]);
 
   return (
-    <section className="grooming-push" role="alert" aria-live="assertive" aria-label={`Grooming request for ${notice.dog_name}`}>
+    <section className="grooming-push grooming-push--alerting" role="alert" aria-live="assertive" aria-label={`Grooming request for ${notice.dog_name}`}>
       <div className="grooming-push__pulse" aria-hidden="true" />
       <div className="grooming-push__glow" aria-hidden="true" />
+      <span className="grooming-push__flash-sweep" aria-hidden="true" />
 
       <header className="grooming-push__header">
         <div className="grooming-push__brand">
@@ -120,27 +121,27 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
           />
           <div>
             <p className="grooming-push__brand-name">fitdog</p>
-            <h1 className="grooming-push__title">Grooming Push</h1>
+            <h1 className="grooming-push__title grooming-push__title--flash">Grooming Push</h1>
             <p className="grooming-push__subtitle">Handler alert — bring dog to Catch for groomer.</p>
           </div>
         </div>
         <div className="grooming-push__clock">
           <p className="grooming-push__clock-time">{clockTime}</p>
           <p className="grooming-push__clock-date">{clockDate}</p>
-          <span className="grooming-push__live-pill">Live Request</span>
+          <span className="grooming-push__live-pill grooming-push__live-pill--flash">Live Request</span>
         </div>
       </header>
 
       <div className="grooming-push__layout">
-        <div className="grooming-push__main-card">
+        <div className="grooming-push__main-card grooming-push__main-card--flash">
           <div className="grooming-push__card-grid">
-            <div className="grooming-push__photo-wrap">
+            <div className="grooming-push__photo-wrap grooming-push__photo-wrap--flash">
               <DogPhoto notice={notice} />
             </div>
 
             <div className="grooming-push__details">
               <p className="grooming-push__eyebrow">Grooming Push</p>
-              <h2 className="grooming-push__dog-name">{notice.dog_name.toUpperCase()}</h2>
+              <h2 className="grooming-push__dog-name grooming-push__dog-name--flash">{notice.dog_name.toUpperCase()}</h2>
               {owner ? <p className="grooming-push__owner">{owner.startsWith("Owner:") ? owner : `Owner: ${owner}`}</p> : null}
               {statusLabel ? <p className="grooming-push__gingr-status">{statusLabel}</p> : null}
 
@@ -167,12 +168,12 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
 
             <div className="grooming-push__countdown-wrap">
               <p className="grooming-push__countdown-label">Time Remaining</p>
-              <div className="grooming-push__countdown">{countdown}</div>
+              <div className="grooming-push__countdown grooming-push__countdown--flash">{countdown}</div>
               <p className="grooming-push__countdown-note">This request stays on screen for 5 minutes or until groomer clears it.</p>
             </div>
           </div>
 
-          <div className="grooming-push__banner">
+          <div className="grooming-push__banner grooming-push__banner--flash">
             <Megaphone className="h-5 w-5 shrink-0 text-fitdog-orange" aria-hidden />
             <p>{groomingInstruction(notice)}</p>
           </div>
@@ -183,7 +184,7 @@ function GroomingPushNoticeContent({ notice, queue, nowMs, clockTime, clockDate 
           <StatusStep label="Requested" detail={requestedLabel} complete active />
           <StatusStep label="Awaiting Handler Transfer" detail="Waiting for handler." active />
           <StatusStep label="Cleared" detail="Request complete." />
-          <div className="grooming-push__status-callout">Awaiting Handler Transfer</div>
+          <div className="grooming-push__status-callout grooming-push__status-callout--flash">Awaiting Handler Transfer</div>
           <p className="grooming-push__status-footnote">Auto clears after 5 minutes if not manually cleared from the Grooming Push admin panel.</p>
         </aside>
       </div>

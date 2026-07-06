@@ -54,6 +54,7 @@ export type CrossoverMessage = {
   related_route: string | null;
   traffic_weather_issue: string | null;
   template_title: string | null;
+  template_id?: string | null;
   template_field_values: Record<string, string> | null;
   created_by: string | null;
   submitted_by?: string | null;
@@ -674,7 +675,15 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
     related_route: optionalString(input.related_route),
     traffic_weather_issue: optionalString(input.traffic_weather_issue),
     template_title: optionalString(input.template_title),
-    template_field_values: null,
+    template_id: optionalString(input.template_id),
+    template_field_values:
+      input.template_field_values && typeof input.template_field_values === "object" && !Array.isArray(input.template_field_values)
+        ? Object.fromEntries(
+            Object.entries(input.template_field_values as Record<string, unknown>)
+              .map(([key, value]) => [key, cleanString(value)])
+              .filter(([, value]) => value)
+          )
+        : null,
     created_by: actor,
     submitted_by: actor,
     assigned_to: assignedTo,

@@ -2,19 +2,30 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ClipboardList, Pencil, Plus } from "lucide-react";
+import { ClipboardList, Plus } from "lucide-react";
 import type { CrossoverMessage, CrossoverReply, StaffActivityLog, StaffDirectoryMember, StaffOpsPriority, StaffOpsStatus } from "@/lib/staff/admin-ops";
 import { STAFF_PRIORITIES } from "@/lib/staff/admin-ops";
 import { CROSSOVER_ASSETS } from "@/lib/admin/crossover-assets";
 import { FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
+import { DynamicTemplateFields } from "@/components/front-desk-log/DynamicTemplateFields";
+import {
+  CUSTOM_LOG_TEMPLATE,
+  compileGeneratedPreview,
+  getLogTemplateById,
+  LOG_TEMPLATES,
+  syncTemplateDrivenForm,
+  templateActionLabel,
+  validateTemplateFields,
+  type TemplateAction,
+  type TemplateFieldValues
+} from "@/lib/frontDeskLog/logTemplates";
 import {
   ASSIGNMENT_TEAMS,
   isDueToday,
   isOpenShiftLogStatus,
   OPEN_SHIFT_LOG_STATUSES,
   SHIFT_LOG_STATUSES,
-  SHIFT_LOG_TEMPLATES,
   SHIFT_LOG_TYPES,
   SHIFT_LOG_TYPE_TONES,
   shouldAlertManagement,
@@ -55,6 +66,9 @@ export type ShiftLogFormShape = {
   create_owner_follow_up: boolean;
   create_active_issue: boolean;
   template_title: string | null;
+  template_id: string | null;
+  template_fields: TemplateFieldValues;
+  field_errors: Record<string, string>;
 };
 
 function IconTile({ src, alt, size = 52 }: { src: string; alt: string; size?: number }) {
@@ -415,6 +429,13 @@ function Field({ label, children, required = false }: { label: string; children:
   );
 }
 
+function actionFormKey(action: TemplateAction): keyof Pick<ShiftLogFormShape, "needs_management_review" | "urgent" | "create_owner_follow_up" | "create_active_issue"> {
+  if (action === "needs_management_review") return "needs_management_review";
+  if (action === "urgent") return "urgent";
+  if (action === "create_owner_follow_up") return "create_owner_follow_up";
+  return "create_active_issue";
+}
+
 export function AddShiftLogEntryCard({
   form,
   patchForm,
@@ -430,22 +451,94 @@ export function AddShiftLogEntryCard({
   onSubmit: () => Promise<void>;
   onSubmitAndFollowUp: () => Promise<void>;
 }) {
+  const template = getLogTemplateById(form.template_id);
+  const isCustomLog = form.template_id === "custom";
+  const hasPreset = Boolean(template && template.id !== "custom");
+  const showDogName = isCustomLog && Boolean(template?.showDogName);
+  const showOwnerName = isCustomLog && Boolean(template?.showOwnerName);
+  const showDueDate = isCustomLog && Boolean(template?.showDueDate);
+  const showReminder = isCustomLog && Boolean(template?.showReminderDateTime);
+  const fieldErrors = hasPreset && template ? validateTemplateFields(template, form.template_fields) : {};
+  const hasFieldErrors = Object.keys(fieldErrors).length > 0;
   const willAlert = shouldAlertManagement(form.priority, form.urgent, form.needs_management_review);
-  const invalid = !form.subject.trim() || !form.details.trim();
+  const invalid = !form.subject.trim() || !form.details.trim() || hasFieldErrors;
+
+  const preview = useMemo(
+    () =>
+      hasPreset && template
+        ? compileGeneratedPreview(template, {
+            subject: form.subject,
+            details: form.details,
+            log_type: form.log_type,
+            priority: form.priority,
+            status: form.status,
+            assigned_to: form.assigned_to,
+            department_area: form.department_area,
+            template_fields: form.template_fields,
+            needs_management_review: form.needs_management_review,
+            urgent: form.urgent,
+            create_owner_follow_up: form.create_owner_follow_up,
+            create_active_issue: form.create_active_issue,
+            due_at: form.due_at,
+            reminder_at: form.reminder_at
+          })
+        : "",
+    [form, hasPreset, template]
+  );
+
+  function onTemplateFieldChange(key: string, value: string | string[]) {
+    if (!template) return;
+    const nextFields = { ...form.template_fields, [key]: value };
+    let next = syncTemplateDrivenForm({ ...form, template_fields: nextFields, field_errors: {} });
+    if (template.id === "facility_issue" && key === "safetyRisk") {
+      const risk = String(value);
+      if (risk === "High" || risk === "Urgent") next = { ...next, create_active_issue: true };
+      if (risk === "Urgent") next = { ...next, urgent: true };
+    }
+    if (template.id === "payment_billing_note" && key === "billingIssueType") {
+      const issue = String(value);
+      if (["Refund request", "Store credit", "Package issue", "Incorrect charge", "Duplicate charge"].includes(issue)) {
+        next = { ...next, needs_management_review: true };
+      }
+    }
+    if (template.id === "end_of_shift_handoff" && key === "ownerFollowUps") {
+      const text = String(value).trim();
+      next = { ...next, create_owner_follow_up: text.length > 0 };
+    }
+    patchForm(next);
+  }
+
+  function toggleAction(action: TemplateAction) {
+    const key = actionFormKey(action);
+    const nextValue = !form[key];
+    const patch: Partial<ShiftLogFormShape> = { [key]: nextValue };
+    if (action === "needs_management_review" && nextValue) {
+      patch.status = "Needs Management Review";
+    }
+    patchForm(patch);
+  }
 
   return (
-    <section className="crossover-card crossover-card--create" aria-labelledby="shift-log-create-heading">
+    <section className="crossover-card crossover-card--create shift-log-create-card" aria-labelledby="shift-log-create-heading">
       <header className="crossover-card__header crossover-card__header--create">
         <div className="crossover-card__header-main">
           <IconTile src={CROSSOVER_ASSETS.envelope} alt="Add shift log entry" />
           <div>
             <h3 id="shift-log-create-heading" className="crossover-card__title">Add Shift Log Entry</h3>
-            <p className="crossover-card__subtitle">Document shift notes, owner issues, dog updates, assessments, reminders, and follow-ups. Submitted By is saved automatically.</p>
+            <p className="crossover-card__subtitle">
+              {form.template_title
+                ? `Template loaded: ${form.template_title}`
+                : "Pick a Quick Log Template on the right, or choose Custom Log for a general note."}
+            </p>
+            {template?.description && hasPreset ? (
+              <p className="shift-log-template-loaded-hint">{template.description}</p>
+            ) : null}
           </div>
         </div>
       </header>
 
       <div className="crossover-form">
+        <h4 className="shift-log-form-section-title">Log Details</h4>
         <div className="crossover-form__row crossover-form__row--3">
           <Field label="Log Type" required>
             <select className="crossover-input crossover-select" value={form.log_type} onChange={(e) => patchForm({ log_type: e.target.value as ShiftLogType })}>
@@ -474,26 +567,85 @@ export function AddShiftLogEntryCard({
             <input className="crossover-input" value={form.department_area} onChange={(e) => patchForm({ department_area: e.target.value })} placeholder="Front Desk, Yard, Grooming..." />
           </Field>
         </div>
+        {!hasPreset && !isCustomLog ? (
+          <p className="crossover-template-hint">Select a template to load the correct fields for that log type. Each preset shows only the fields your team needs.</p>
+        ) : null}
+
         <Field label="Subject" required>
           <input className={`crossover-input ${!form.subject.trim() ? "crossover-input--invalid" : ""}`} value={form.subject} onChange={(e) => patchForm({ subject: e.target.value })} />
         </Field>
         <Field label="Details / Notes" required>
-          <textarea className={`crossover-input crossover-textarea ${!form.details.trim() ? "crossover-input--invalid" : ""}`} value={form.details} onChange={(e) => patchForm({ details: e.target.value })} rows={8} />
+          <textarea className={`crossover-input crossover-textarea ${!form.details.trim() ? "crossover-input--invalid" : ""}`} value={form.details} onChange={(e) => patchForm({ details: e.target.value })} rows={6} />
         </Field>
-        <div className="crossover-form__row crossover-form__row--2">
-          <Field label="Dog Name"><input className="crossover-input" value={form.related_dog_name} onChange={(e) => patchForm({ related_dog_name: e.target.value })} /></Field>
-          <Field label="Owner Name"><input className="crossover-input" value={form.related_owner_name} onChange={(e) => patchForm({ related_owner_name: e.target.value })} /></Field>
-        </div>
-        <div className="crossover-form__row crossover-form__row--2">
-          <Field label="Due Date"><input className="crossover-input" type="datetime-local" value={form.due_at} onChange={(e) => patchForm({ due_at: e.target.value })} /></Field>
-          <Field label="Reminder Date / Time"><input className="crossover-input" type="datetime-local" value={form.reminder_at} onChange={(e) => patchForm({ reminder_at: e.target.value })} /></Field>
-        </div>
-        <div className="shift-log-form__toggles">
-          <button type="button" role="switch" aria-checked={form.needs_management_review} className={`crossover-urgent-pill ${form.needs_management_review ? "crossover-urgent-pill--on" : ""}`} onClick={() => patchForm({ needs_management_review: !form.needs_management_review, status: !form.needs_management_review ? "Needs Management Review" : form.status })}>Needs Management Review</button>
-          <button type="button" role="switch" aria-checked={form.urgent} className={`crossover-urgent-pill ${form.urgent ? "crossover-urgent-pill--on" : ""}`} onClick={() => patchForm({ urgent: !form.urgent })}>Urgent</button>
-          <button type="button" role="switch" aria-checked={form.create_owner_follow_up} className={`crossover-urgent-pill ${form.create_owner_follow_up ? "crossover-urgent-pill--on" : ""}`} onClick={() => patchForm({ create_owner_follow_up: !form.create_owner_follow_up })}>Create Owner Follow Up</button>
-          <button type="button" role="switch" aria-checked={form.create_active_issue} className={`crossover-urgent-pill ${form.create_active_issue ? "crossover-urgent-pill--on" : ""}`} onClick={() => patchForm({ create_active_issue: !form.create_active_issue })}>Create Active Issue</button>
-        </div>
+
+        {hasPreset && template ? (
+          <DynamicTemplateFields
+            fields={template.fields}
+            values={form.template_fields}
+            errors={{ ...fieldErrors, ...form.field_errors }}
+            disabled={busy}
+            onChange={onTemplateFieldChange}
+          />
+        ) : null}
+
+        {showDogName || showOwnerName ? (
+          <div className="crossover-form__row crossover-form__row--2">
+            {showDogName ? (
+              <Field label="Dog Name"><input className="crossover-input" value={form.related_dog_name} onChange={(e) => patchForm({ related_dog_name: e.target.value })} /></Field>
+            ) : null}
+            {showOwnerName ? (
+              <Field label="Owner Name"><input className="crossover-input" value={form.related_owner_name} onChange={(e) => patchForm({ related_owner_name: e.target.value })} /></Field>
+            ) : null}
+          </div>
+        ) : null}
+
+        {showDueDate || showReminder ? (
+          <div className="crossover-form__row crossover-form__row--2">
+            {showDueDate ? (
+              <Field label="Due Date"><input className="crossover-input" type="datetime-local" value={form.due_at} onChange={(e) => patchForm({ due_at: e.target.value })} /></Field>
+            ) : null}
+            {showReminder ? (
+              <Field label="Reminder Date / Time"><input className="crossover-input" type="datetime-local" value={form.reminder_at} onChange={(e) => patchForm({ reminder_at: e.target.value })} /></Field>
+            ) : null}
+          </div>
+        ) : null}
+
+        {hasPreset && preview ? (
+          <section className="shift-log-preview-card" aria-labelledby="shift-log-preview-heading">
+            <h4 id="shift-log-preview-heading" className="shift-log-preview-card__title">Generated Log Preview</h4>
+            <pre className="shift-log-preview-card__body">{preview}</pre>
+          </section>
+        ) : null}
+
+        {hasPreset || isCustomLog ? (
+          <>
+            <h4 className="shift-log-form-section-title">Actions &amp; Follow-Up</h4>
+            <div className="shift-log-form__toggles">
+              {(isCustomLog
+                ? (["needs_management_review", "urgent", "create_owner_follow_up", "create_active_issue"] as TemplateAction[])
+                : template?.actions ?? []
+              ).map((action) => {
+                const key = actionFormKey(action);
+                const checked = form[key];
+                return (
+                  <button
+                    key={action}
+                    type="button"
+                    role="switch"
+                    aria-checked={checked}
+                    className={`crossover-urgent-pill ${checked ? "crossover-urgent-pill--on" : ""}`}
+                    onClick={() => toggleAction(action)}
+                  >
+                    {templateActionLabel(action)}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+        {hasFieldErrors ? (
+          <p className="shift-log-validation-summary" role="alert">Complete all required template fields before saving.</p>
+        ) : null}
         {willAlert ? <p className="shift-log-alert-warning">This will alert management/admin users when saved.</p> : null}
         <div className="crossover-form__footer">
           <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy || invalid} onClick={() => void onSubmitAndFollowUp()}>
@@ -510,7 +662,15 @@ export function AddShiftLogEntryCard({
   );
 }
 
-export function QuickLogTemplatesSidebar({ onPick }: { onPick: (template: (typeof SHIFT_LOG_TEMPLATES)[number]) => void }) {
+export function QuickLogTemplatesSidebar({
+  selectedTemplateId,
+  onPick
+}: {
+  selectedTemplateId: string | null;
+  onPick: (templateId: string) => void;
+}) {
+  const templates = useMemo(() => [...LOG_TEMPLATES, CUSTOM_LOG_TEMPLATE], []);
+
   return (
     <section className="crossover-card crossover-card--sidebar" aria-labelledby="shift-log-templates-heading">
       <header className="crossover-card__header crossover-card__header--compact">
@@ -520,13 +680,24 @@ export function QuickLogTemplatesSidebar({ onPick }: { onPick: (template: (typeo
         </div>
       </header>
       <div className="crossover-template-list">
-        {SHIFT_LOG_TEMPLATES.map((template) => (
-          <button key={template.title} type="button" className="crossover-template-row" onClick={() => onPick(template)}>
-            <Image src={CROSSOVER_ASSETS.documents} alt="" width={24} height={24} aria-hidden className="crossover-template-row__icon" />
-            <span className="crossover-template-row__title">{template.title}</span>
-            <Pencil className="crossover-template-row__edit" aria-hidden />
-          </button>
-        ))}
+        {templates.map((template) => {
+          const selected = selectedTemplateId === template.id;
+          return (
+            <button
+              key={template.id}
+              type="button"
+              className={`crossover-template-row ${selected ? "crossover-template-row--selected" : ""}`}
+              onClick={() => onPick(template.id)}
+              title={template.description}
+            >
+              <Image src={CROSSOVER_ASSETS.documents} alt="" width={24} height={24} aria-hidden className="crossover-template-row__icon" />
+              <span className="crossover-template-row__text">
+                <span className="crossover-template-row__title">{template.label}</span>
+                {selected ? <span className="crossover-template-row__description">{template.description}</span> : null}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
