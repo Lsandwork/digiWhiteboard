@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
 import { getDefaultCastRoute } from "../lib/lobby/cast-picker";
+import {
+  isAndroidChrome,
+  isCastSenderSupported,
+  isChromeIos,
+  prefersWirelessCastOnMobile,
+  shouldShowCastMenu
+} from "../lib/lobby/cast-platform";
 import { buildLobbyTvCastUrl, buildStaffTvCastUrl, getCastSiteOrigin } from "../lib/lobby/tv-cast";
 
 assert.equal(typeof getDefaultCastRoute(), "string");
@@ -8,5 +15,10 @@ assert.match(buildLobbyTvCastUrl("http://localhost:3000/lobby/checkouts", "secre
 assert.match(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /display=tv/);
 assert.match(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /token=secret/);
 assert.equal(getCastSiteOrigin("https://fitdog-gingr-status-board.vercel.app/"), "https://fitdog-gingr-status-board.vercel.app");
+assert.equal(typeof isAndroidChrome(), "boolean");
+assert.equal(typeof isChromeIos(), "boolean");
+assert.equal(typeof isCastSenderSupported(), "boolean");
+assert.equal(typeof prefersWirelessCastOnMobile(), "boolean");
+assert.equal(typeof shouldShowCastMenu(), "boolean");
 
 console.log("cast picker tests passed");

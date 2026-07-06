@@ -1,41 +1,50 @@
 "use client";
 
-import { Cast, MonitorOff, Tv } from "lucide-react";
+import { TvCastControl } from "@/components/shared/TvCastControl";
+import type { TvCastMethod } from "@/components/shared/TvCastControl";
 
 type StaffCastButtonProps = {
+  castUrl: string;
   isCasting: boolean;
   castError: string | null;
-  canChromecast: boolean;
+  canCast: boolean;
+  castMethod: TvCastMethod;
+  onChromecast: () => void;
+  onWireless: () => void;
+  onAirPlay: () => void;
+  onCopyUrl: () => void;
+  onStop: () => void;
   onToggle: () => void;
 };
 
-export function StaffCastButton({ isCasting, castError, canChromecast, onToggle }: StaffCastButtonProps) {
+export function StaffCastButton({
+  castUrl,
+  isCasting,
+  castError,
+  canCast,
+  castMethod,
+  onChromecast,
+  onWireless,
+  onAirPlay,
+  onCopyUrl,
+  onStop,
+  onToggle
+}: StaffCastButtonProps) {
   return (
-    <div className="staff-cast-control">
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`staff-cast-button ${isCasting ? "staff-cast-button--active" : ""}`}
-        aria-pressed={isCasting}
-        disabled={!canChromecast && !isCasting}
-        aria-label={
-          isCasting
-            ? "Stop casting staff digital whiteboard"
-            : canChromecast
-              ? "Cast staff digital whiteboard to TV with Google Chrome"
-              : "Casting requires Google Chrome"
-        }
-        title={canChromecast ? undefined : "Use Google Chrome on desktop to cast to TV."}
-      >
-        {isCasting ? <MonitorOff className="h-4 w-4 shrink-0" aria-hidden /> : <Tv className="h-4 w-4 shrink-0" aria-hidden />}
-        <span>{isCasting ? "Stop Casting" : "Cast to TV"}</span>
-        {!isCasting && canChromecast ? <Cast className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden /> : null}
-      </button>
-
-      {castError ? <p className="staff-cast-error">{castError}</p> : null}
-      {!canChromecast && !isCasting ? (
-        <p className="staff-cast-error">Use Google Chrome on desktop to cast.</p>
-      ) : null}
-    </div>
+    <TvCastControl
+      variant="staff"
+      boardLabel="Staff Whiteboard"
+      castUrl={castUrl}
+      isCasting={isCasting}
+      castError={castError}
+      canCast={canCast}
+      castMethod={castMethod}
+      onChromecast={onChromecast}
+      onWireless={onWireless}
+      onAirPlay={onAirPlay}
+      onCopyUrl={onCopyUrl}
+      onStop={onStop}
+      onQuickCast={onToggle}
+    />
   );
 }

@@ -1,3 +1,4 @@
+import { isAirPlayCastActive, stopAirPlayCast } from "@/lib/lobby/airplay-cast";
 import {
   buildLobbyTvCastUrl,
   isPresentationCastActive,
@@ -185,6 +186,7 @@ export async function startGoogleCastSession(displayToken?: string, castUrl?: st
 }
 
 export async function stopGoogleCastSession() {
+  stopAirPlayCast();
   await stopPresentationCast();
   const context = getCastContext();
   if (!context) return;
@@ -211,6 +213,7 @@ export async function broadcastCastHardReload() {
 }
 
 export function isGoogleCastSessionActive() {
+  if (isAirPlayCastActive()) return true;
   if (isPresentationCastActive()) return true;
   const context = getCastContext();
   if (!context) return false;
