@@ -14,6 +14,7 @@ import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
 import { getTabLabel } from "@/lib/admin/nav-groups";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
+import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { getEffectiveDemoRole } from "@/lib/demo/session";
 
@@ -163,6 +164,8 @@ export function AdminShell({
       }}
         />
       ) : null}
+
+      <FitdogAiBubble board={board} tab={tab} />
     </div>
   );
 }
