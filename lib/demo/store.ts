@@ -3,11 +3,24 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 import type { LiveBoardResponse } from "@/lib/types";
 import {
   buildDemoGroomingNotice,
+  buildDemoGroomingNoticeFromFields,
   buildDemoLiveDog,
   buildInitialDemoSandbox,
   type DemoPushAction,
   type DemoSandbox
 } from "@/lib/demo/constants";
+import {
+  applyDemoStaffPushAction,
+  deleteDemoStaffNotice,
+  demoStaffPushBoardState,
+  pushDemoStaffNoticeById,
+  updateDemoStaffNotice
+} from "@/lib/demo/staff-push";
+import {
+  normalizeGroomingPushNoticeInput,
+  type GroomingPushNotice,
+  type GroomingPushNoticeInput
+} from "@/lib/staff/grooming-push-notices";
 
 const SETTINGS_KEY = "demo_sandbox";
 
@@ -23,6 +36,7 @@ function parseSandbox(value: unknown): DemoSandbox {
     checking_in: Array.isArray(raw.checking_in) ? raw.checking_in : baseline.checking_in,
     checking_out: Array.isArray(raw.checking_out) ? raw.checking_out : baseline.checking_out,
     grooming_notices: Array.isArray(raw.grooming_notices) ? raw.grooming_notices : [],
+    staff_push_notices: Array.isArray(raw.staff_push_notices) ? raw.staff_push_notices : [],
     stats: raw.stats ?? baseline.stats,
     last_updated: raw.last_updated ?? new Date().toISOString()
   };
@@ -146,4 +160,106 @@ export async function clearDemoGroomingNotice(supabase: SupabaseClient, id: stri
   sandbox.last_updated = new Date().toISOString();
   await saveSandbox(supabase, sandbox);
   return sandbox;
+}
+
+function sortActiveGroomingNotices(notices: GroomingPushNotice[]) {
+  return [...notices]
+    .filter((notice) => notice.status === "active")
+    .sort((a, b) => new Date(a.requested_at).getTime() - new Date(b.requested_at).getTime());
+}
+
+function isActiveGroomingNotice(notice: GroomingPushNotice, now = Date.now()) {
+  if (notice.status !== "active") return false;
+  const expiresAt = new Date(notice.expires_at).getTime();
+  return Number.isFinite(expiresAt) && expiresAt > now;
+}
+
+export function demoGroomingPushBoardState(sandbox: DemoSandbox) {
+  const now = Date.now();
+  const active = sortActiveGroomingNotices(sandbox.grooming_notices).filter((notice) =>
+    isActiveGroomingNotice(notice, now)
+  );
+  return {
+    activeNotice: active[0] ?? null,
+    queue: active.slice(1, 4)
+  };
+}
+
+export function demoRecentGroomingNotices(sandbox: DemoSandbox, limit = 20) {
+  return [...sandbox.grooming_notices]
+    .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
+    .slice(0, limit);
+}
+
+export async function applyDemoGroomingPushNotice(
+  supabase: SupabaseClient,
+  input: GroomingPushNoticeInput,
+  actor: string | null
+) {
+  const normalized = normalizeGroomingPushNoticeInput(input);
+  const notice = buildDemoGroomingNoticeFromFields(normalized, actor);
+  const sandbox = await loadSandbox(supabase);
+  sandbox.grooming_notices = [notice, ...sandbox.grooming_notices.filter((item) => item.status !== "active")].slice(
+    0,
+    10
+  );
+  sandbox.stats.grooming_queue += 1;
+  sandbox.last_updated = new Date().toISOString();
+  if (!(await saveSandbox(supabase, sandbox))) {
+    throw new Error("Demo sandbox storage is not available.");
+  }
+  return { sandbox, notice, ...demoGroomingPushBoardState(sandbox) };
+}
+
+export async function applyDemoStaffPush(
+  supabase: SupabaseClient,
+  body: Record<string, unknown>,
+  actor: string | null
+) {
+  const sandbox = await loadSandbox(supabase);
+  const result = applyDemoStaffPushAction(sandbox, body, actor);
+  if (!(await saveSandbox(supabase, result.sandbox))) {
+    throw new Error("Demo sandbox storage is not available.");
+  }
+  return { ...result, ...demoStaffPushBoardState(result.sandbox) };
+}
+
+export async function pushDemoStaffNoticeAgain(
+  supabase: SupabaseClient,
+  id: string,
+  actor: string | null
+) {
+  const sandbox = await loadSandbox(supabase);
+  const result = pushDemoStaffNoticeById(sandbox, id, actor);
+  if (!(await saveSandbox(supabase, result.sandbox))) {
+    throw new Error("Demo sandbox storage is not available.");
+  }
+  return result;
+}
+
+export async function updateDemoStaffPushNotice(
+  supabase: SupabaseClient,
+  id: string,
+  body: Record<string, unknown>,
+  actor: string | null
+) {
+  const sandbox = await loadSandbox(supabase);
+  const result = updateDemoStaffNotice(sandbox, id, body, actor);
+  if (!(await saveSandbox(supabase, result.sandbox))) {
+    throw new Error("Demo sandbox storage is not available.");
+  }
+  return result;
+}
+
+export async function removeDemoStaffPushNotice(supabase: SupabaseClient, id: string) {
+  const sandbox = await loadSandbox(supabase);
+  const next = deleteDemoStaffNotice(sandbox, id);
+  if (!(await saveSandbox(supabase, next))) {
+    throw new Error("Demo sandbox storage is not available.");
+  }
+  return next;
+}
+
+export function getDemoActiveStaffPushNotice(sandbox: DemoSandbox) {
+  return demoStaffPushBoardState(sandbox).activeNotice;
 }

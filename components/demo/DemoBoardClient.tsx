@@ -5,12 +5,14 @@ import { PawPrint } from "lucide-react";
 import { BoardHeader } from "@/components/board/BoardHeader";
 import { BoardPanel } from "@/components/board/BoardPanel";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
+import { StaffPushNoticeFullscreen, StaffPushNoticePanel } from "@/components/board/StaffPushNotice";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
 import { formatBoardDateTime } from "@/lib/board-utils";
 import type { GroomingPushNotice } from "@/lib/staff/grooming-push-notices";
+import type { StaffPushNotice } from "@/lib/staff/push-notices";
 import type { LiveBoardResponse } from "@/lib/types";
 
 const emptyBoard: LiveBoardResponse = {
@@ -24,6 +26,7 @@ export function DemoBoardClient() {
   const [board, setBoard] = useState<LiveBoardResponse>(emptyBoard);
   const [activeGroomingNotice, setActiveGroomingNotice] = useState<GroomingPushNotice | null>(null);
   const [groomingQueue, setGroomingQueue] = useState<GroomingPushNotice[]>([]);
+  const [activePushNotice, setActivePushNotice] = useState<StaffPushNotice | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [clock, setClock] = useState<Date | null>(null);
 
@@ -38,12 +41,14 @@ export function DemoBoardClient() {
 
   const load = useCallback(async () => {
     try {
-      const [boardRes, groomingRes] = await Promise.all([
+      const [boardRes, groomingRes, pushRes] = await Promise.all([
         fetch("/api/demo/board", { cache: "no-store" }),
-        fetch("/api/demo/grooming-push", { cache: "no-store" })
+        fetch("/api/demo/grooming-push", { cache: "no-store" }),
+        fetch("/api/demo/push-notices", { cache: "no-store" })
       ]);
       const boardBody = await boardRes.json();
       const groomingBody = await groomingRes.json();
+      const pushBody = await pushRes.json();
       if (boardRes.ok) {
         setBoard({
           checking_in: boardBody.checking_in ?? [],
@@ -56,6 +61,9 @@ export function DemoBoardClient() {
         setActiveGroomingNotice(groomingBody.activeNotice ?? null);
         setGroomingQueue(groomingBody.queue ?? []);
       }
+      if (pushRes.ok) {
+        setActivePushNotice(pushBody.activeNotice ?? null);
+      }
     } catch {
       // keep last good state
     }
@@ -67,7 +75,7 @@ export function DemoBoardClient() {
     return () => window.clearInterval(timer);
   }, [load]);
 
-  useFitdogAlertSound(activeGroomingNotice?.id ?? null);
+  useFitdogAlertSound(activeGroomingNotice?.id ?? activePushNotice?.id ?? null);
 
   const { visibleCheckingInDogs: timedCheckIns } = useCheckinDisplayTimers(board.checking_in, nowMs);
   const { visibleCheckingInDogs } = useNewCheckingInAlerts(timedCheckIns);
@@ -84,6 +92,7 @@ export function DemoBoardClient() {
     () => (clock ? formatBoardDateTime(clock) : { time: "--:--", date: "DEMO" }),
     [clock]
   );
+  const hasVisibleDogs = visibleCheckingInDogs.length > 0 || visibleCheckoutDogs.length > 0;
   const groomingClock = groomingClockFromMs(nowMs);
 
   return (
@@ -111,24 +120,29 @@ export function DemoBoardClient() {
             clockTime={groomingClock.clockTime}
             clockDate={groomingClock.clockDate}
           />
+        ) : activePushNotice && !hasVisibleDogs ? (
+          <StaffPushNoticeFullscreen notice={activePushNotice} />
         ) : (
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
-            <BoardPanel
-              title="Checking In"
-              subtitle="Dogs Arriving Today"
-              mode="in"
-              checkingInEntries={visibleCheckingInDogs}
-              nowMs={nowMs}
-              showEmptyState
-            />
-            <BoardPanel
-              title="Checking Out"
-              subtitle="Dogs Heading Home"
-              mode="out"
-              checkingOutEntries={visibleCheckoutDogs}
-              nowMs={nowMs}
-              showEmptyState
-            />
+          <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
+            <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
+              <BoardPanel
+                title="Checking In"
+                subtitle="Dogs Arriving Today"
+                mode="in"
+                checkingInEntries={visibleCheckingInDogs}
+                nowMs={nowMs}
+                showEmptyState
+              />
+              <BoardPanel
+                title="Checking Out"
+                subtitle="Dogs Heading Home"
+                mode="out"
+                checkingOutEntries={visibleCheckoutDogs}
+                nowMs={nowMs}
+                showEmptyState
+              />
+            </div>
+            {activePushNotice ? <StaffPushNoticePanel notice={activePushNotice} /> : null}
           </div>
         )}
       </div>

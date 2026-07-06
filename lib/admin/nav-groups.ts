@@ -1,5 +1,5 @@
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
-import { ADMIN_SUPPORT_TABS } from "@/lib/admin/types";
+import { ADMIN_HR_TABS, ADMIN_SUPPORT_TABS } from "@/lib/admin/types";
 
 export type NavLeaf = {
   type: "item";
@@ -48,7 +48,9 @@ const TAB_LABELS: Record<AdminTab, string> = {
   settings: "Settings",
   logs: "Logs",
   integrations: "Integrations",
-  help: "Help Center"
+  help: "Help Center",
+  hr_hub: "Records",
+  hr_consult: "HR Consult"
 };
 
 const LOBBY_CONTENT_TABS: AdminTab[] = ["content", "promotions", "schedule", "display"];
@@ -94,6 +96,9 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
 
   const supportReview = group("support_review", "Support Review", SUPPORT_REVIEW_TABS, visible);
   if (supportReview) entries.push(supportReview);
+
+  const hrGroup = group("human_resources", "H.R.", [...ADMIN_HR_TABS], visible);
+  if (hrGroup) entries.push(hrGroup);
 
   entries.push(...singles(["analytics", "templates", "notifications", "staff_directory"], visible));
 

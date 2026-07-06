@@ -3,6 +3,8 @@ import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse } from 
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { deleteStaffPushNotice, pushStaffNoticeById, updateStaffPushNotice } from "@/lib/staff/push-notices";
+import { getEffectiveDemoRole, isDemoSession } from "@/lib/demo/session";
+import { pushDemoStaffNoticeAgain, removeDemoStaffPushNotice, updateDemoStaffPushNotice } from "@/lib/demo/store";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -23,13 +25,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, actor } = actorFromRequest(request);
-  if (!canManagePushNotices(session?.role)) return forbiddenResponse();
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canManagePushNotices(role)) return forbiddenResponse();
 
   const { id } = await context.params;
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
-    const notice = await updateStaffPushNotice(getServiceSupabase(), id, body, actor);
+    const supabase = getServiceSupabase();
+
+    if (isDemoSession(session)) {
+      const result = await updateDemoStaffPushNotice(supabase, id, body, actor);
+      return NextResponse.json({ notice: result.notice, demo: true });
+    }
+
+    const notice = await updateStaffPushNotice(supabase, id, body, actor);
     await writeAdminAuditLog({
       actorAdminId: session?.adminUserId,
       actorEmail: session?.email,
@@ -50,7 +60,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, actor } = actorFromRequest(request);
-  if (!canManagePushNotices(session?.role)) return forbiddenResponse();
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canManagePushNotices(role)) return forbiddenResponse();
 
   const { id } = await context.params;
 
@@ -61,7 +72,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       return NextResponse.json({ error: "Unsupported notice action." }, { status: 400 });
     }
 
-    const notice = await pushStaffNoticeById(getServiceSupabase(), id, actor, body.expires_at);
+    const supabase = getServiceSupabase();
+
+    if (isDemoSession(session)) {
+      const result = await pushDemoStaffNoticeAgain(supabase, id, actor);
+      return NextResponse.json({ notice: result.notice, demo: true });
+    }
+
+    const notice = await pushStaffNoticeById(supabase, id, actor, body.expires_at);
     await writeAdminAuditLog({
       actorAdminId: session?.adminUserId,
       actorEmail: session?.email,
@@ -82,12 +100,20 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session } = actorFromRequest(request);
-  if (!canManagePushNotices(session?.role)) return forbiddenResponse();
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canManagePushNotices(role)) return forbiddenResponse();
 
   const { id } = await context.params;
 
   try {
-    await deleteStaffPushNotice(getServiceSupabase(), id);
+    const supabase = getServiceSupabase();
+
+    if (isDemoSession(session)) {
+      await removeDemoStaffPushNotice(supabase, id);
+      return NextResponse.json({ ok: true, demo: true });
+    }
+
+    await deleteStaffPushNotice(supabase, id);
     await writeAdminAuditLog({
       actorAdminId: session?.adminUserId,
       actorEmail: session?.email,

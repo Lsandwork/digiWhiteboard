@@ -73,7 +73,9 @@ export type AdminTab =
   | "logs"
   | "integrations"
   | "help"
-  | "demo_push";
+  | "demo_push"
+  | "hr_hub"
+  | "hr_consult";
 
 export const ADMIN_TABS: AdminTab[] = [
   "overview",
@@ -107,8 +109,12 @@ export const ADMIN_TABS: AdminTab[] = [
   "logs",
   "integrations",
   "help",
-  "demo_push"
+  "demo_push",
+  "hr_hub",
+  "hr_consult"
 ];
+
+export const ADMIN_HR_TABS = ["hr_hub", "hr_consult"] as const;
 
 export const ADMIN_SUPPORT_TABS = [
   "ms_hub",

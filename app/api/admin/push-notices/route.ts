@@ -18,6 +18,9 @@ import {
   pushStaffNoticeById,
   sanitizeDogHandlerName
 } from "@/lib/staff/push-notices";
+import { getEffectiveDemoRole, isDemoSession } from "@/lib/demo/session";
+import { applyDemoStaffPush, getDemoSandbox } from "@/lib/demo/store";
+import { demoStaffPushBoardState } from "@/lib/demo/staff-push";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -38,10 +41,28 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session } = actorFromRequest(request);
-  if (!canManagePushNotices(session?.role)) return forbiddenResponse();
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canManagePushNotices(role)) return forbiddenResponse();
 
   try {
     const supabase = getServiceSupabase();
+
+    if (isDemoSession(session)) {
+      const sandbox = await getDemoSandbox(supabase);
+      const boardState = demoStaffPushBoardState(sandbox);
+      return NextResponse.json({
+        ...boardState,
+        defaultNotices: DEFAULT_STAFF_PUSH_NOTICES,
+        managementReports: [],
+        demo: true,
+        currentUser: {
+          email: session?.email ?? null,
+          adminUserId: session?.adminUserId ?? null,
+          role: role ?? "owner_admin"
+        }
+      });
+    }
+
     const [activeNotice, notices, managementReports] = await Promise.all([
       loadActiveStaffPushNotice(supabase),
       listStaffPushNotices(supabase),
@@ -69,12 +90,24 @@ export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, actor } = actorFromRequest(request);
-  if (!canManagePushNotices(session?.role)) return forbiddenResponse();
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canManagePushNotices(role)) return forbiddenResponse();
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action ?? "create");
     const supabase = getServiceSupabase();
+
+    if (isDemoSession(session)) {
+      const result = await applyDemoStaffPush(supabase, body, actor);
+      if (action === "clear") {
+        return NextResponse.json({ ok: true, activeNotice: null, demo: true });
+      }
+      if (action === "push_dog_handler_complaint" || action === "push_owner_complaint") {
+        return NextResponse.json({ notice: result.notice, report: result.report ?? null, demo: true });
+      }
+      return NextResponse.json({ notice: result.notice, activeNotice: result.activeNotice, demo: true });
+    }
 
     if (action === "clear") {
       await clearActiveStaffPushNotice(supabase, actor);

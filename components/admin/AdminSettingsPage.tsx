@@ -117,6 +117,48 @@ export function AdminSettingsPage({
         </div>
       </Section>
 
+      <Section
+        title="HR Consult (Gemini)"
+        helper="Company location and context shape legal-aware guidance for Fitdog in California. The API key stays in server environment variables (GEMINI_API_KEY)."
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <Toggle
+            label="Enable HR Consult"
+            checked={draft.hr_consult_enabled}
+            onChange={(checked) => setDraft({ ...draft, hr_consult_enabled: checked })}
+          />
+          <Field label="Gemini model">
+            <select className="admin-input" value={draft.hr_consult_model} onChange={(e) => setDraft({ ...draft, hr_consult_model: e.target.value })}>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash (recommended)</option>
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            </select>
+          </Field>
+          <Field label="City">
+            <input className="admin-input" value={draft.hr_company_city} onChange={(e) => setDraft({ ...draft, hr_company_city: e.target.value })} />
+          </Field>
+          <Field label="State / region">
+            <input className="admin-input" value={draft.hr_company_region} onChange={(e) => setDraft({ ...draft, hr_company_region: e.target.value })} />
+          </Field>
+          <Field label="Country">
+            <input className="admin-input" value={draft.hr_company_country} onChange={(e) => setDraft({ ...draft, hr_company_country: e.target.value })} />
+          </Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Company state (for legal context & recommendations)">
+            <textarea
+              className="admin-input min-h-[140px]"
+              value={draft.hr_company_situation}
+              onChange={(e) => setDraft({ ...draft, hr_company_situation: e.target.value })}
+              placeholder="Describe Fitdog's current situation: team size, growth stage, recent HR themes, policies in flux, etc."
+            />
+          </Field>
+          <p className="mt-2 text-xs text-admin-muted">
+            Sam uses this plus {draft.hr_company_city}, {draft.hr_company_region} to frame California-relevant guidance. This is internal context — not legal advice.
+          </p>
+        </div>
+      </Section>
+
       <Section title="Security Settings" helper="Control login behavior and password requirements.">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Session timeout (hours)">

@@ -5,6 +5,8 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { hasPermission } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { clearGroomingPushNotice, loadGroomingPushBoardState } from "@/lib/staff/grooming-push-notices";
+import { getEffectiveDemoRole, isDemoSession } from "@/lib/demo/session";
+import { clearDemoGroomingNotice, demoGroomingPushBoardState } from "@/lib/demo/store";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +24,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
 
-  if (!canClear(access, session?.role)) {
+  if (!canClear(access, role)) {
     return NextResponse.json({ error: "You do not have permission to clear grooming push notices." }, { status: 403 });
   }
 
@@ -31,6 +34,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const actor = session?.email ?? session?.adminUserId ?? "admin";
 
   try {
+    if (isDemoSession(session)) {
+      const sandbox = await clearDemoGroomingNotice(supabase, id);
+      const notice = sandbox.grooming_notices.find((item) => item.id === id) ?? null;
+      return NextResponse.json({ notice, ...demoGroomingPushBoardState(sandbox), demo: true });
+    }
+
     const notice = await clearGroomingPushNotice(supabase, id, actor);
     const boardState = await loadGroomingPushBoardState(supabase);
 

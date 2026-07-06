@@ -9,6 +9,14 @@ import {
   loadGroomingPushBoardState,
   listRecentGroomingPushNotices
 } from "@/lib/staff/grooming-push-notices";
+import { getEffectiveDemoRole, isDemoSession } from "@/lib/demo/session";
+import {
+  applyDemoGroomingPushNotice,
+  clearDemoGroomingNotice,
+  demoGroomingPushBoardState,
+  demoRecentGroomingNotices,
+  getDemoSandbox
+} from "@/lib/demo/store";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -31,12 +39,30 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, access } = await actorAccess(request);
-  if (!canPush(access, session?.role)) {
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canPush(access, role)) {
     return NextResponse.json({ error: "You do not have permission to view grooming push notices." }, { status: 403 });
   }
 
   try {
     const supabase = getServiceSupabase();
+
+    if (isDemoSession(session)) {
+      const sandbox = await getDemoSandbox(supabase);
+      const boardState = demoGroomingPushBoardState(sandbox);
+      return NextResponse.json({
+        ...boardState,
+        recent: demoRecentGroomingNotices(sandbox),
+        demo: true,
+        currentUser: {
+          email: session?.email ?? null,
+          adminUserId: session?.adminUserId ?? null,
+          role,
+          access
+        }
+      });
+    }
+
     const [boardState, recent] = await Promise.all([
       loadGroomingPushBoardState(supabase),
       listRecentGroomingPushNotices(supabase)
@@ -62,7 +88,8 @@ export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, access } = await actorAccess(request);
-  if (!canPush(access, session?.role)) {
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  if (!canPush(access, role)) {
     return NextResponse.json({ error: "You do not have permission to push grooming notices." }, { status: 403 });
   }
 
@@ -70,6 +97,17 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const supabase = getServiceSupabase();
     const actor = session?.email ?? session?.adminUserId ?? "admin";
+
+    if (isDemoSession(session)) {
+      const result = await applyDemoGroomingPushNotice(supabase, body, actor);
+      return NextResponse.json({
+        notice: result.notice,
+        activeNotice: result.activeNotice,
+        queue: result.queue,
+        demo: true
+      });
+    }
+
     const notice = await createGroomingPushNotice(supabase, body, actor);
     const boardState = await loadGroomingPushBoardState(supabase);
 

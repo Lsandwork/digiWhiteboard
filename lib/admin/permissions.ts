@@ -48,7 +48,9 @@ export type PermissionKey =
   | "view_package_commissions"
   | "comment_package_commissions"
   | "manage_package_commissions"
-  | "review_management_support";
+  | "review_management_support"
+  | "view_hr_hub"
+  | "use_hr_consult";
 
 export type RoleKey =
   | "super_admin"
@@ -164,7 +166,9 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_package_commissions",
   "comment_package_commissions",
   "manage_package_commissions",
-  "review_management_support"
+  "review_management_support",
+  "view_hr_hub",
+  "use_hr_consult"
 ] as const satisfies readonly PermissionKey[]);
 
 const COORDINATOR_PERMISSIONS: PermissionKey[] = [
@@ -209,7 +213,9 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "resolve_active_issue",
   "view_staff_directory",
   "view_integration_status",
-  "receive_admin_alerts"
+  "receive_admin_alerts",
+  "view_hr_hub",
+  "use_hr_consult"
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -292,7 +298,7 @@ export const TRAINER_TABS = [
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: [...ALL_PERMISSIONS],
-  management: [...MANAGEMENT_PERMISSIONS, "review_write_ups", "manage_package_commissions", "review_management_support"],
+  management: [...MANAGEMENT_PERMISSIONS, "review_write_ups", "manage_package_commissions", "review_management_support", "view_hr_hub", "use_hr_consult"],
   front_desk_coordinator: COORDINATOR_PERMISSIONS,
   team_leader: TEAM_LEADER_PERMISSIONS,
   groomer: GROOMER_PERMISSIONS,
@@ -435,6 +441,8 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   ms_trainer_complaints: "review_management_support",
   ms_trainer_requests: "review_management_support",
   admin_trainer_entries: "review_management_support",
+  hr_hub: "view_hr_hub",
+  hr_consult: "use_hr_consult",
   settings: "view_admin_panel",
   help: "view_admin_panel"
 };
@@ -515,6 +523,8 @@ const ADMIN_SUPPORT_TAB_SET = new Set([
   "admin_trainer_entries"
 ]);
 
+const ADMIN_HR_TAB_SET = new Set(["hr_hub", "hr_consult"]);
+
 export function isTeamLeaderLegacyRole(legacyRole?: string | null) {
   return legacyRole === "team_leader";
 }
@@ -558,6 +568,13 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     if (isGroomerLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole) || isTrainerLegacyRole(legacyRole)) return false;
     return hasPermission(effective, "review_management_support");
+  }
+
+  if (ADMIN_HR_TAB_SET.has(tab)) {
+    if (board !== "staff") return false;
+    if (isGroomerLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole) || isTrainerLegacyRole(legacyRole)) return false;
+    const required = TAB_PERMISSIONS[tab];
+    return required ? hasPermission(effective, required) : false;
   }
 
   if (

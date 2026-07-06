@@ -34,6 +34,8 @@ import {
   TrainerComplaintsAdminPanel,
   TrainerRequestsAdminPanel
 } from "@/components/admin/ManagementSupportHubPanels";
+import { HrConsultPanel } from "@/components/admin/HrConsultPanel";
+import { HrHubPanel } from "@/components/admin/HrHubPanel";
 import { AdminProfilePage } from "@/components/admin/AdminProfilePage";
 import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
@@ -84,6 +86,7 @@ export function AdminDashboard() {
 
   const board = (searchParams.get("board") === "staff" ? "staff" : "lobby") as AdminBoardType;
   const tab = parseAdminTab(searchParams.get("tab"));
+  const hrConsultRecordId = searchParams.get("record");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -164,12 +167,18 @@ export function AdminDashboard() {
     router.replace(`/admin?board=${nextBoard}&tab=${tab}`);
   }
 
-  function setActiveTab(nextTab: AdminTab) {
+  function setActiveTab(nextTab: AdminTab, extraParams?: Record<string, string>) {
     if (board === "staff" && nextTab === "users") {
       router.replace("/admin?tab=users");
       return;
     }
-    router.replace(`/admin?board=${board}&tab=${nextTab}`);
+    const params = new URLSearchParams({ board, tab: nextTab });
+    if (extraParams) {
+      for (const [key, value] of Object.entries(extraParams)) {
+        if (value) params.set(key, value);
+      }
+    }
+    router.replace(`/admin?${params.toString()}`);
   }
 
   async function saveBoardSettings(patch: Record<string, unknown>) {
@@ -428,6 +437,12 @@ export function AdminDashboard() {
         {tab === "admin_trainer_entries" ? <AdminTrainerEntriesPanel /> : null}
 
         {tab === "package_commissions" ? <PackageCommissionsPanel /> : null}
+
+        {tab === "hr_hub" ? (
+          <HrHubPanel onOpenConsult={(recordId) => setActiveTab("hr_consult", { record: recordId })} />
+        ) : null}
+
+        {tab === "hr_consult" ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">

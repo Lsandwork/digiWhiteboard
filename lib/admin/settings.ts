@@ -24,6 +24,13 @@ export type AdminGlobalSettings = {
   public_display_disabled: boolean;
   display_content_revision: number;
   cast_hard_reload_nonce: number;
+  /** HR Consult — company location & legal context for Gemini (not the API key). */
+  hr_consult_enabled: boolean;
+  hr_company_city: string;
+  hr_company_region: string;
+  hr_company_country: string;
+  hr_company_situation: string;
+  hr_consult_model: string;
 };
 
 export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
@@ -49,7 +56,14 @@ export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
   enable_publish_reminders: true,
   public_display_disabled: false,
   display_content_revision: 0,
-  cast_hard_reload_nonce: 0
+  cast_hard_reload_nonce: 0,
+  hr_consult_enabled: true,
+  hr_company_city: "Santa Monica",
+  hr_company_region: "California",
+  hr_company_country: "United States",
+  hr_company_situation:
+    "Fitdog is a premium dog daycare, boarding, grooming, and training facility. We operate with a team-oriented culture and follow California employment law. HR consult is used for internal guidance on write-ups, complaints, and workplace issues — not as a substitute for licensed legal counsel.",
+  hr_consult_model: "gemini-2.0-flash"
 };
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
