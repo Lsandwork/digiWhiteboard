@@ -51,10 +51,10 @@ const emptyBoard: LiveBoardResponse = {
   last_updated: ""
 };
 
-function readDismissedCastIds() {
+function readMinimizedCastIds() {
   if (typeof window === "undefined") return [] as string[];
   try {
-    const raw = window.sessionStorage.getItem("fitdog_dismissed_cast_videos");
+    const raw = window.sessionStorage.getItem("fitdog_minimized_cast_videos");
     const parsed = raw ? (JSON.parse(raw) as string[]) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -62,9 +62,9 @@ function readDismissedCastIds() {
   }
 }
 
-function writeDismissedCastIds(ids: string[]) {
+function writeMinimizedCastIds(ids: string[]) {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem("fitdog_dismissed_cast_videos", JSON.stringify(ids));
+  window.sessionStorage.setItem("fitdog_minimized_cast_videos", JSON.stringify(ids));
 }
 
 function getDevDemoBoard(): LiveBoardResponse | null {
@@ -151,10 +151,41 @@ export function BoardClient() {
   const isEmergencyStaffPush = Boolean(
     activePushNotice && (activePushNotice.priority === "urgent" || activePushNotice.display_mode === "urgent")
   );
-  const [dismissedCastIds, setDismissedCastIds] = useState<string[]>(() => readDismissedCastIds());
+  const [minimizedCastIds, setMinimizedCastIds] = useState<string[]>(() => readMinimizedCastIds());
 
-  const visibleEmergencyCast = emergencyCastVideo && !dismissedCastIds.includes(emergencyCastVideo.id) ? emergencyCastVideo : null;
-  const visibleCastVideo = !visibleEmergencyCast && activeCastVideo && !dismissedCastIds.includes(activeCastVideo.id) ? activeCastVideo : null;
+  const minimizeCast = useCallback((id: string) => {
+    setMinimizedCastIds((current) => {
+      if (current.includes(id)) return current;
+      const next = [...current, id];
+      writeMinimizedCastIds(next);
+      return next;
+    });
+  }, []);
+
+  const isCastMinimized = useCallback((id: string) => minimizedCastIds.includes(id), [minimizedCastIds]);
+
+  useEffect(() => {
+    const activeIds = [emergencyCastVideo?.id, activeCastVideo?.id].filter(Boolean) as string[];
+    if (!activeIds.length) return;
+    setMinimizedCastIds((current) => {
+      const next = current.filter((id) => activeIds.includes(id));
+      if (next.length === current.length) return current;
+      writeMinimizedCastIds(next);
+      return next;
+    });
+  }, [activeCastVideo?.id, emergencyCastVideo?.id]);
+
+  const showEmergencyCastFullscreen = emergencyCastVideo && !isCastMinimized(emergencyCastVideo.id);
+  const showCastFullscreen = !showEmergencyCastFullscreen && activeCastVideo && !isCastMinimized(activeCastVideo.id);
+  const minimizedCastNotice =
+    emergencyCastVideo && isCastMinimized(emergencyCastVideo.id)
+      ? emergencyCastVideo
+      : activeCastVideo && isCastMinimized(activeCastVideo.id)
+        ? activeCastVideo
+        : null;
+  const minimizedCastQueue =
+    minimizedCastNotice?.id === emergencyCastVideo?.id ? emergencyCastQueue : castVideoQueue;
+  const hasActiveCast = Boolean(emergencyCastVideo || activeCastVideo);
   useFitdogAlertSound(activeAlertKey);
   const {
     castUrl,
@@ -406,7 +437,7 @@ export function BoardClient() {
   return (
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
       <StaffPushNoticeTvOverlay
-        active={Boolean(activePushNotice) && !visibleEmergencyCast && !visibleCastVideo && !activeGroomingNotice && !activeTrainerNotice}
+        active={Boolean(activePushNotice) && !showEmergencyCastFullscreen && !showCastFullscreen && !hasActiveCast && !activeGroomingNotice && !activeTrainerNotice}
         notice={activePushNotice}
       />
 
@@ -445,33 +476,27 @@ export function BoardClient() {
           />
         ) : null}
 
-        {visibleEmergencyCast ? (
+        {showEmergencyCastFullscreen ? (
           <CastVideoOverlay
-            notice={visibleEmergencyCast}
+            notice={emergencyCastVideo!}
             queue={emergencyCastQueue}
             viewerKey={castViewerKey}
             viewerLocation={displayDepartment}
-            onDismiss={() => {
-              const next = [...dismissedCastIds, visibleEmergencyCast.id];
-              setDismissedCastIds(next);
-              writeDismissedCastIds(next);
-              void reloadEmergencyCast();
-            }}
+            boardMode
+            onMinimize={() => minimizeCast(emergencyCastVideo!.id)}
+            onDismiss={() => void reloadEmergencyCast()}
           />
         ) : isEmergencyStaffPush ? (
           <StaffPushNoticeFullscreen notice={activePushNotice!} />
-        ) : visibleCastVideo ? (
+        ) : showCastFullscreen ? (
           <CastVideoOverlay
-            notice={visibleCastVideo}
+            notice={activeCastVideo!}
             queue={castVideoQueue}
             viewerKey={castViewerKey}
             viewerLocation={displayDepartment}
-            onDismiss={() => {
-              const next = [...dismissedCastIds, visibleCastVideo.id];
-              setDismissedCastIds(next);
-              writeDismissedCastIds(next);
-              void reloadCastVideo();
-            }}
+            boardMode
+            onMinimize={() => minimizeCast(activeCastVideo!.id)}
+            onDismiss={() => void reloadCastVideo()}
           />
         ) : activeGroomingNotice ? (
           <GroomingPushNoticeOverlay
@@ -523,6 +548,22 @@ export function BoardClient() {
           <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
         </footer>
       </div>
+
+      {minimizedCastNotice ? (
+        <CastVideoOverlay
+          notice={minimizedCastNotice}
+          queue={minimizedCastQueue}
+          viewerKey={castViewerKey}
+          viewerLocation={displayDepartment}
+          boardMode
+          minimized
+          onMinimize={() => minimizeCast(minimizedCastNotice.id)}
+          onDismiss={() => {
+            if (minimizedCastNotice.id === emergencyCastVideo?.id) void reloadEmergencyCast();
+            else void reloadCastVideo();
+          }}
+        />
+      ) : null}
 
       {useDevDemo ? (
         <div className="pointer-events-none fixed left-4 top-4 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-200">

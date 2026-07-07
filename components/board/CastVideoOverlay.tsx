@@ -17,8 +17,14 @@ type CastVideoOverlayProps = {
   viewerKey: string;
   viewerRole?: string | null;
   viewerLocation?: string | null;
+  /** Staff whiteboard: auto-minimize instead of manual clear. */
+  boardMode?: boolean;
+  minimized?: boolean;
+  onMinimize?: () => void;
   onDismiss: () => void;
 };
+
+const BOARD_AUTO_MINIMIZE_MS = 10_000;
 
 class CastVideoOverlayErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -55,6 +61,9 @@ function CastVideoOverlayContent({
   viewerKey,
   viewerRole,
   viewerLocation,
+  boardMode = false,
+  minimized = false,
+  onMinimize,
   onDismiss
 }: CastVideoOverlayProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -138,50 +147,83 @@ function CastVideoOverlayContent({
   }, [isYouTubeCast, notice.allow_sound, notice.id, retryNonce, soundEnabled, videoFailed]);
 
   useEffect(() => {
-    if (!autoClearMs) return;
+    if (!autoClearMs || boardMode) return;
     const timer = window.setTimeout(() => {
       void dismiss({ skipped: !notice.require_acknowledgement });
     }, autoClearMs);
     return () => window.clearTimeout(timer);
-  }, [autoClearMs, dismiss, notice.require_acknowledgement]);
+  }, [autoClearMs, boardMode, dismiss, notice.require_acknowledgement]);
+
+  useEffect(() => {
+    if (!boardMode || minimized || notice.require_acknowledgement) return;
+    const timer = window.setTimeout(() => onMinimize?.(), BOARD_AUTO_MINIMIZE_MS);
+    return () => window.clearTimeout(timer);
+  }, [boardMode, minimized, notice.id, notice.require_acknowledgement, onMinimize]);
+
+  useEffect(() => {
+    if (!boardMode || minimized || !notice.require_acknowledgement || !watchedRequired) return;
+    const timer = window.setTimeout(() => onMinimize?.(), 2500);
+    return () => window.clearTimeout(timer);
+  }, [boardMode, minimized, notice.require_acknowledgement, onMinimize, watchedRequired]);
 
   const handleClear = () => {
+    if (boardMode) return;
     if (notice.require_acknowledgement && !watchedRequired) return;
     void dismiss({ acknowledged: notice.require_acknowledgement, skipped: !notice.require_acknowledgement });
   };
 
   return (
     <section
-      className={`cast-video ${closing ? "cast-video--closing" : "cast-video--entering"}`}
-      role="dialog"
-      aria-modal="true"
+      className={`cast-video ${minimized ? "cast-video--minimized" : ""} ${closing ? "cast-video--closing" : minimized ? "" : "cast-video--entering"}`}
+      role={minimized ? "complementary" : "dialog"}
+      aria-modal={minimized ? undefined : true}
       aria-label={`Cast video: ${notice.title}`}
     >
-      <div className="cast-video__backdrop" aria-hidden="true" />
-      <div className="cast-video__frame">
-        <header className="cast-video__header">
-          <div className="cast-video__brand">
-            <Image
-              src="/assets/fitdog/replace_f-logo.png"
-              alt="Fitdog"
-              width={88}
-              height={88}
-              className="cast-video__logo"
-              priority
-            />
-            <div>
-              <p className="cast-video__brand-name">fitdog</p>
-              <p className="cast-video__from">{yardSideLabel ? "Yard Push Notice" : "Message from Management"}</p>
+      {!minimized ? <div className="cast-video__backdrop" aria-hidden="true" /> : null}
+      <div className={`cast-video__frame ${minimized ? "cast-video__frame--minimized" : ""}`}>
+        <header className={`cast-video__header ${minimized ? "cast-video__header--minimized" : ""}`}>
+          {!minimized ? (
+            <div className="cast-video__brand">
+              <Image
+                src="/assets/fitdog/replace_f-logo.png"
+                alt="Fitdog"
+                width={88}
+                height={88}
+                className="cast-video__logo"
+                priority
+              />
+              <div>
+                <p className="cast-video__brand-name">fitdog</p>
+                <p className="cast-video__from">{yardSideLabel ? "Yard Push Notice" : "Message from Management"}</p>
+              </div>
             </div>
-          </div>
-          <div className="cast-video__meta">
-            <p className="cast-video__title">{notice.title}</p>
-            {displayDescription ? <p className="cast-video__description">{displayDescription}</p> : null}
-            <p className="cast-video__timestamp">
-              <Clock3 className="inline h-4 w-4" aria-hidden />
-              {pushedLabel}
-            </p>
-          </div>
+          ) : (
+            <div className="cast-video__pip-brand">
+              <Image
+                src="/assets/fitdog/replace_f-logo.png"
+                alt="Fitdog"
+                width={36}
+                height={36}
+                className="cast-video__pip-logo"
+              />
+              <div className="cast-video__pip-meta">
+                <p className="cast-video__pip-title">{notice.title}</p>
+                <p className="cast-video__pip-subtitle">
+                  {yardSideLabel ? "Yard Push · Live" : "Cast Video · Live"}
+                </p>
+              </div>
+            </div>
+          )}
+          {!minimized ? (
+            <div className="cast-video__meta">
+              <p className="cast-video__title">{notice.title}</p>
+              {displayDescription ? <p className="cast-video__description">{displayDescription}</p> : null}
+              <p className="cast-video__timestamp">
+                <Clock3 className="inline h-4 w-4" aria-hidden />
+                {pushedLabel}
+              </p>
+            </div>
+          ) : null}
           {notice.allow_sound ? (
             <button
               type="button"
@@ -194,7 +236,7 @@ function CastVideoOverlayContent({
           ) : null}
         </header>
 
-        <div className="cast-video__player-wrap">
+        <div className={`cast-video__player-wrap ${minimized ? "cast-video__player-wrap--minimized" : ""}`}>
           {isYouTubeCast ? (
             <>
               {buffering ? <div className="cast-video__buffering">Loading yard camera…</div> : null}
@@ -256,14 +298,35 @@ function CastVideoOverlayContent({
           )}
         </div>
 
-        {queue.length ? (
+        {!minimized && queue.length ? (
           <footer className="cast-video__queue">
             <p className="cast-video__queue-label">Queued videos: {queue.length}</p>
           </footer>
         ) : null}
 
-        <div className="cast-video__actions">
-          {notice.require_acknowledgement ? (
+        {!boardMode ? (
+          <div className="cast-video__actions">
+            {notice.require_acknowledgement ? (
+              <button
+                type="button"
+                className={`cast-video__watch-btn ${watchedRequired ? "cast-video__watch-btn--done" : ""}`}
+                onClick={() => setWatchedRequired(true)}
+              >
+                I&apos;ve Watched This
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="cast-video__clear-btn"
+              onClick={handleClear}
+              disabled={notice.require_acknowledgement && !watchedRequired}
+            >
+              <Check className="h-5 w-5" aria-hidden />
+              Clear Video
+            </button>
+          </div>
+        ) : !minimized && notice.require_acknowledgement ? (
+          <div className="cast-video__actions">
             <button
               type="button"
               className={`cast-video__watch-btn ${watchedRequired ? "cast-video__watch-btn--done" : ""}`}
@@ -271,17 +334,10 @@ function CastVideoOverlayContent({
             >
               I&apos;ve Watched This
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="cast-video__clear-btn"
-            onClick={handleClear}
-            disabled={notice.require_acknowledgement && !watchedRequired}
-          >
-            <Check className="h-5 w-5" aria-hidden />
-            Clear Video
-          </button>
-        </div>
+          </div>
+        ) : !minimized ? (
+          <p className="cast-video__board-hint">Minimizing to corner view so the board stays visible…</p>
+        ) : null}
       </div>
     </section>
   );

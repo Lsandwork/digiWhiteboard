@@ -8276,6 +8276,88 @@ html.lobby-tv-display .social-video-shell {
   cursor: not-allowed;
 }
 
+.cast-video__board-hint {
+  padding: 0.85rem 1.25rem 1.15rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.cast-video--minimized {
+  inset: auto;
+  right: clamp(0.75rem, 2vw, 1.25rem);
+  bottom: clamp(0.75rem, 2vw, 1.25rem);
+  width: min(420px, calc(100vw - 1.5rem));
+  height: auto;
+  padding: 0;
+  place-items: end;
+  pointer-events: none;
+}
+
+.cast-video__frame--minimized {
+  width: 100%;
+  height: auto;
+  max-height: none;
+  grid-template-rows: auto auto;
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.cast-video__header--minimized {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cast-video__pip-brand {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cast-video__pip-logo {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
+.cast-video__pip-meta {
+  min-width: 0;
+}
+
+.cast-video__pip-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.cast-video__pip-subtitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(241, 95, 42, 0.92);
+}
+
+.cast-video__player-wrap--minimized {
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+}
+
+.cast-video--minimized .cast-video__player,
+.cast-video--minimized .cast-video__player--youtube {
+  border-radius: 0 0 18px 18px;
+}
+
 @keyframes cast-video-enter {
   from {
     opacity: 0;
