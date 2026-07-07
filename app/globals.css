@@ -4456,6 +4456,20 @@ html.lobby-tv-display .social-video-shell {
   margin-bottom: 0.15rem;
 }
 
+.admin-nav-section {
+  margin: 1rem 0 0.35rem;
+  padding: 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.72);
+}
+
+.admin-nav-section:first-child {
+  margin-top: 0.15rem;
+}
+
 .admin-section-kicker {
   margin: 0 0 0.2rem;
   font-size: 0.72rem;

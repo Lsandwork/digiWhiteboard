@@ -11,7 +11,7 @@ import {
 } from "@/lib/admin/permissions";
 import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
-import { getTabLabel } from "@/lib/admin/nav-groups";
+import { buildAdminNav, findNavSectionForTab, getTabDescription, getTabLabel } from "@/lib/admin/nav-groups";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
@@ -78,6 +78,9 @@ export function AdminShell({
     canAccessAdminTab(access, item, effectiveRole, board, { isDemo })
   );
   const pageLabel = getTabLabel(tab);
+  const navEntries = buildAdminNav(visibleTabs, board);
+  const sectionLabel = findNavSectionForTab(navEntries, tab);
+  const pageDescription = getTabDescription(tab, board);
 
   return (
     <div className="admin-theme">
@@ -106,11 +109,9 @@ export function AdminShell({
                   <span className="admin-status-dot" aria-hidden />
                   <span className="text-xs font-semibold text-emerald-400">Online</span>
                 </div>
-                <p className="admin-section-kicker">{title}</p>
+                <p className="admin-section-kicker">{sectionLabel ?? title}</p>
                 <h1 className="admin-page-title">{pageLabel}</h1>
-                <p className="admin-page-subtitle mt-1 max-w-2xl">
-                  Manage what your {board === "staff" ? "staff board" : "lobby"} displays, content, and live preview.
-                </p>
+                <p className="admin-page-subtitle mt-1 max-w-2xl">{pageDescription}</p>
               </div>
 
               <div className="flex flex-col items-start gap-2 lg:items-end">

@@ -9,7 +9,7 @@ import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
-import { buildAdminNav, findNavGroupForTab, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
+import { buildAdminNav, findNavGroupForTab, findNavSectionForTab, getTabDescription, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
 
 const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
@@ -115,6 +115,59 @@ function SidebarNavGroup({
   );
 }
 
+function SidebarNavSection({ label }: { label: string }) {
+  return (
+    <p className="admin-nav-section" role="presentation">
+      {label}
+    </p>
+  );
+}
+
+function NavEntryList({
+  entries,
+  activeTab,
+  expandedGroups,
+  onToggleGroup,
+  onSelect
+}: {
+  entries: NavEntry[];
+  activeTab: AdminTab;
+  expandedGroups: Set<string>;
+  onToggleGroup: (id: string) => void;
+  onSelect: (tab: AdminTab) => void;
+}) {
+  return (
+    <>
+      {entries.map((entry) => {
+        if (entry.type === "section") {
+          return <SidebarNavSection key={entry.id} label={entry.label} />;
+        }
+        if (entry.type === "group") {
+          return (
+            <SidebarNavGroup
+              key={entry.id}
+              entry={entry}
+              activeTab={activeTab}
+              expanded={expandedGroups.has(entry.id)}
+              onToggle={() => onToggleGroup(entry.id)}
+              onSelect={onSelect}
+            />
+          );
+        }
+        return (
+          <SidebarNavItem
+            key={entry.tab}
+            tab={entry.tab}
+            label={entry.label}
+            active={activeTab === entry.tab}
+            onSelect={onSelect}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 type SidebarProps = {
   activeTab: AdminTab;
   board: AdminBoardType;
@@ -190,26 +243,13 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-          {navEntries.map((entry) =>
-            entry.type === "group" ? (
-              <SidebarNavGroup
-                key={entry.id}
-                entry={entry}
-                activeTab={activeTab}
-                expanded={expandedGroups.has(entry.id)}
-                onToggle={() => toggleGroup(entry.id)}
-                onSelect={handleSelect}
-              />
-            ) : (
-              <SidebarNavItem
-                key={entry.tab}
-                tab={entry.tab}
-                label={entry.label}
-                active={activeTab === entry.tab}
-                onSelect={handleSelect}
-              />
-            )
-          )}
+          <NavEntryList
+            entries={navEntries}
+            activeTab={activeTab}
+            expandedGroups={expandedGroups}
+            onToggleGroup={toggleGroup}
+            onSelect={handleSelect}
+          />
         </nav>
 
         <div className="space-y-3 p-4">
