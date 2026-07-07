@@ -1,6 +1,11 @@
 import { isPresentationCastSupported } from "@/lib/lobby/tv-cast";
-import { isAirPlayCastAvailable } from "@/lib/lobby/airplay-cast";
+import { isAirPlayCastAvailable, supportsTabCaptureAirPlay } from "@/lib/lobby/airplay-cast";
 import { isGoogleCastBrowser, isGoogleCastConfigured, isGoogleCastFrameworkReady } from "@/lib/lobby/google-cast";
+
+export function isIosMobile() {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
 
 export function isChromeIos() {
   if (typeof navigator === "undefined") return false;
@@ -58,7 +63,10 @@ export function shouldShowCastMenu() {
 
 export function getCastUnavailableMessage() {
   if (isChromeIos()) {
-    return "Use Wireless Display below, or copy the TV link and open it on your TV browser.";
+    return "Use Cast to TV below, or copy the TV link and open it on your TV browser.";
+  }
+  if (isIosMobile()) {
+    return "Use AirPlay below to share the TV link, or copy the TV link and open it on your Apple TV browser.";
   }
   if (isAndroidChrome()) {
     return "Use Google Chrome on the same Wi‑Fi as your TV, then choose Wireless Display or Chromecast.";
@@ -69,6 +77,9 @@ export function getCastUnavailableMessage() {
 export function getCastReadyHint() {
   if (prefersWirelessCastOnMobile()) {
     return "On mobile Chrome, Wireless Display is the fastest way to cast to Chromecast or smart TVs.";
+  }
+  if (isIosMobile()) {
+    return "AirPlay opens the TV link or share sheet. You can also mirror this screen from Control Center.";
   }
   if (isGoogleCastConfigured() && isGoogleCastFrameworkReady()) {
     return "Choose Chromecast to send this board to your TV.";
