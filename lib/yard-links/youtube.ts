@@ -17,6 +17,26 @@ export function buildYouTubeEmbedUrl(videoId: string) {
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }
 
+/** Full-screen yard cast overlay — autoplay muted until staff enables sound. */
+export function buildYouTubeCastEmbedUrl(videoId: string, options?: { muted?: boolean }) {
+  if (!isValidYouTubeVideoId(videoId)) {
+    throw new Error("Invalid YouTube video ID.");
+  }
+  const params = new URLSearchParams({
+    autoplay: "1",
+    mute: options?.muted === false ? "0" : "1",
+    playsinline: "1",
+    rel: "0",
+    modestbranding: "1"
+  });
+  return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+}
+
+export function youtubeThumbnailUrl(videoId: string) {
+  if (!isValidYouTubeVideoId(videoId)) return null;
+  return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+}
+
 export function buildYouTubeWatchUrl(videoId: string) {
   if (!isValidYouTubeVideoId(videoId)) {
     throw new Error("Invalid YouTube video ID.");

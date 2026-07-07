@@ -48,6 +48,7 @@ export type AdminTab =
   | "schedule"
   | "display"
   | "push_notices"
+  | "yard_push_notices"
   | "emergency_alerts"
   | "grooming_push"
   | "trainer_push"
@@ -70,6 +71,7 @@ export type AdminTab =
   | "templates"
   | "notifications"
   | "staff_directory"
+  | "staff_create_user"
   | "users"
   | "settings"
   | "logs"
@@ -86,6 +88,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "schedule",
   "display",
   "push_notices",
+  "yard_push_notices",
   "emergency_alerts",
   "grooming_push",
   "trainer_push",
@@ -108,6 +111,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "templates",
   "notifications",
   "staff_directory",
+  "staff_create_user",
   "users",
   "settings",
   "logs",

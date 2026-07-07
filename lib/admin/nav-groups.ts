@@ -23,6 +23,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   schedule: "Class Schedule",
   display: "Display Settings",
   push_notices: "Standard Notices",
+  yard_push_notices: "Yard Push Notices",
   emergency_alerts: "Emergency Alerts",
   grooming_push: "Grooming Push",
   trainer_push: "Trainer Push",
@@ -46,6 +47,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   templates: "Templates",
   notifications: "Notifications",
   staff_directory: "Staff Directory",
+  staff_create_user: "Create User",
   users: "Users",
   settings: "Settings",
   logs: "Logs",
@@ -56,9 +58,11 @@ const TAB_LABELS: Record<AdminTab, string> = {
 };
 
 const LOBBY_CONTENT_TABS: AdminTab[] = ["content", "promotions", "schedule", "display"];
-const PUSH_ALERT_TABS: AdminTab[] = ["push_notices", "emergency_alerts", "grooming_push", "cast_videos", "trainer_push"];
+const PUSH_ALERT_TABS: AdminTab[] = ["push_notices", "yard_push_notices", "emergency_alerts", "grooming_push", "cast_videos", "trainer_push"];
 const STAFF_OPS_TABS: AdminTab[] = ["crossover_communication", "owner_follow_up", "active_issues", "trainer_entry"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
+
+const STAFF_DIRECTORY_TABS: AdminTab[] = ["staff_directory", "staff_create_user"];
 
 const SUPPORT_REVIEW_TABS: AdminTab[] = [...ADMIN_SUPPORT_TABS, "package_commissions"];
 
@@ -102,7 +106,10 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
   const hrGroup = group("human_resources", "H.R.", [...ADMIN_HR_TABS], visible);
   if (hrGroup) entries.push(hrGroup);
 
-  entries.push(...singles(["analytics", "templates", "notifications", "staff_directory"], visible));
+  entries.push(...singles(["analytics", "templates", "notifications"], visible));
+
+  const staffDirectory = group("staff_directory", "Staff Directory", STAFF_DIRECTORY_TABS, visible);
+  if (staffDirectory) entries.push(staffDirectory);
 
   const adminSystem = group("admin_system", "Administration", ADMIN_SYSTEM_TABS, visible);
   if (adminSystem) entries.push(adminSystem);

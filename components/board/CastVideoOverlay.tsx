@@ -4,7 +4,8 @@ import { Component, useCallback, useEffect, useMemo, useRef, useState } from "re
 import Image from "next/image";
 import { Check, Clock3, RefreshCw, Volume2, VolumeX } from "lucide-react";
 import type { CastVideoNotice } from "@/lib/staff/cast-video-notices";
-import { castVideoAutoClearMs } from "@/lib/staff/cast-video-notices";
+import { castVideoAutoClearMs, isYouTubeEmbedCastVideo } from "@/lib/staff/cast-video-notices";
+import { yardPushSideFromNotice, yardPushSideLabel } from "@/lib/staff/yard-push-notices";
 import { formatBoardDateTime } from "@/lib/board-utils";
 import { trackCastVideoClose, trackCastVideoOpen } from "@/hooks/useCastVideoNotices";
 
@@ -56,6 +57,19 @@ function CastVideoOverlayContent({
 
   const pushedLabel = useMemo(() => formatTimestamp(notice.pushed_at), [notice.pushed_at]);
   const autoClearMs = castVideoAutoClearMs(notice.auto_clear_mode);
+  const isYouTubeCast = isYouTubeEmbedCastVideo(notice);
+  const yardSideLabel = yardPushSideLabel(yardPushSideFromNotice(notice));
+  const youtubeSrc = useMemo(() => {
+    if (!isYouTubeCast || !notice.video_url) return notice.video_url ?? undefined;
+    try {
+      const url = new URL(notice.video_url);
+      url.searchParams.set("autoplay", "1");
+      url.searchParams.set("mute", notice.allow_sound && soundEnabled ? "0" : "1");
+      return url.toString();
+    } catch {
+      return notice.video_url ?? undefined;
+    }
+  }, [isYouTubeCast, notice.allow_sound, notice.video_url, soundEnabled]);
 
   const dismiss = useCallback(
     async (options?: { acknowledged?: boolean; skipped?: boolean }) => {
@@ -86,7 +100,7 @@ function CastVideoOverlayContent({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || videoFailed) return;
+    if (!video || videoFailed || isYouTubeCast) return;
 
     const tryPlay = async () => {
       try {
@@ -99,7 +113,7 @@ function CastVideoOverlayContent({
     };
 
     void tryPlay();
-  }, [notice.allow_sound, notice.id, retryNonce, soundEnabled, videoFailed]);
+  }, [isYouTubeCast, notice.allow_sound, notice.id, retryNonce, soundEnabled, videoFailed]);
 
   useEffect(() => {
     if (!autoClearMs) return;
@@ -135,7 +149,7 @@ function CastVideoOverlayContent({
             />
             <div>
               <p className="cast-video__brand-name">fitdog</p>
-              <p className="cast-video__from">Message from Management</p>
+              <p className="cast-video__from">{yardSideLabel ? "Yard Push Notice" : "Message from Management"}</p>
             </div>
           </div>
           <div className="cast-video__meta">
@@ -159,7 +173,24 @@ function CastVideoOverlayContent({
         </header>
 
         <div className="cast-video__player-wrap">
-          {videoFailed ? (
+          {isYouTubeCast ? (
+            <>
+              {buffering ? <div className="cast-video__buffering">Loading yard camera…</div> : null}
+              <iframe
+                key={`${notice.id}-${soundEnabled ? "sound" : "muted"}-${retryNonce}`}
+                src={youtubeSrc}
+                title={notice.title}
+                className="cast-video__player cast-video__player--youtube"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+                onLoad={() => {
+                  setBuffering(false);
+                  setVideoFailed(false);
+                }}
+              />
+            </>
+          ) : videoFailed ? (
             <div className="cast-video__fallback">
               {notice.thumbnail_url ? (
                 // eslint-disable-next-line @next/next/no-img-element

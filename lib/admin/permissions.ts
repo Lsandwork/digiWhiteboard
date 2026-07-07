@@ -11,6 +11,7 @@ export type PermissionKey =
   | "manage_cast_videos"
   | "push_grooming_request"
   | "clear_grooming_request"
+  | "push_yard_notice"
   | "view_front_desk_log"
   | "create_front_desk_log"
   | "edit_front_desk_log"
@@ -152,6 +153,7 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
+  "push_yard_notice",
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
@@ -253,6 +255,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
+  "push_yard_notice",
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
@@ -282,6 +285,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
+  "push_yard_notice",
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
@@ -358,6 +362,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "manage_cast_videos",
   "push_grooming_request",
   "clear_grooming_request",
+  "push_yard_notice",
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
@@ -369,6 +374,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 
 export const TEAM_LEADER_TABS = [
   "push_notices",
+  "yard_push_notices",
   "grooming_push",
   "crossover_communication",
   "yard_links",
@@ -522,6 +528,7 @@ export function hasAnyRole(access: UserAccess | null | undefined, roles: RoleKey
 
 export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   push_notices: "manage_push_notices",
+  yard_push_notices: "push_yard_notice",
   emergency_alerts: "manage_push_notices",
   cast_videos: "manage_cast_videos",
   grooming_push: "push_grooming_request",
@@ -535,6 +542,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   templates: "manage_templates",
   notifications: "view_notifications",
   staff_directory: "view_staff_directory",
+  staff_create_user: "manage_staff_users",
   users: "manage_staff_users",
   integrations: "view_integrations",
   analytics: "view_analytics",
@@ -712,6 +720,12 @@ export function canAccessAdminTab(
 
   if (board === "staff" && (tab === "promotions" || tab === "schedule" || tab === "users")) {
     return false;
+  }
+
+  if (tab === "staff_create_user") {
+    return (
+      hasAnyRole(effective, ["super_admin", "admin", "management"]) || isSuperAdminLegacyRole(legacyRole)
+    );
   }
 
   if (tab === "integrations") {

@@ -10,3 +10,4 @@ coverage
 tsconfig.tsbuildinfo
 .vercel
 .env*
+videos/raw/

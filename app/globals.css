@@ -8160,6 +8160,11 @@ html.lobby-tv-display .social-video-shell {
   background: #000;
 }
 
+.cast-video__player--youtube {
+  border: 0;
+  min-height: min(62vh, 720px);
+}
+
 .cast-video__buffering {
   position: absolute;
   inset: 0;

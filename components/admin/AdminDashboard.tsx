@@ -23,10 +23,12 @@ import { TrainerEntryPanel } from "@/components/admin/TrainerEntryPanel";
 import { PackageCommissionsPanel } from "@/components/admin/PackageCommissionsPanel";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
+import { StaffCreateUserPage } from "@/components/admin/StaffCreateUserPage";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
 import { NotificationsPanel } from "@/components/admin/NotificationsPanel";
 import { AdminHelpCenter } from "@/components/admin/AdminHelpCenter";
 import { YardLinksPanel } from "@/components/admin/YardLinksPanel";
+import { YardPushNoticesPanel } from "@/components/admin/YardPushNoticesPanel";
 import { ManagementSupportPanel } from "@/components/admin/ManagementSupportPanel";
 import {
   AdminTrainerEntriesPanel,
@@ -282,7 +284,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "users", "logs", "integrations", "help", "demo_push"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -403,6 +405,8 @@ export function AdminDashboard() {
 
         {tab === "push_notices" ? <PushNoticesPanel /> : null}
 
+        {tab === "yard_push_notices" ? <YardPushNoticesPanel /> : null}
+
         {tab === "emergency_alerts" ? <EmergencyAlertsPanel /> : null}
 
         {tab === "cast_videos" ? <CastVideosPanel /> : null}
@@ -480,6 +484,10 @@ export function AdminDashboard() {
 
         {tab === "staff_directory" ? (
           <StaffDirectoryPanel />
+        ) : null}
+
+        {tab === "staff_create_user" ? (
+          <StaffCreateUserPage />
         ) : null}
 
         {tab === "settings" ? (

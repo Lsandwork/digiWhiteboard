@@ -187,6 +187,10 @@ export function isEmergencyCastVideo(notice: Pick<CastVideoNotice, "priority">) 
   return notice.priority === "emergency";
 }
 
+export function isYouTubeEmbedCastVideo(notice: Pick<CastVideoNotice, "mime_type">) {
+  return notice.mime_type === "application/x-youtube-embed";
+}
+
 export function castVideoTargetsDepartment(notice: Pick<CastVideoNotice, "departments">, department: string | null | undefined) {
   if (!department || department === "everyone") return true;
   if (notice.departments.includes("everyone")) return true;
