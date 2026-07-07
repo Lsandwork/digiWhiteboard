@@ -41,7 +41,10 @@ export function getCastSiteOrigin(currentHref?: string) {
 function buildTvCastUrl(pathname: string, currentHref?: string, displayToken?: string) {
   const origin = getCastSiteOrigin(currentHref);
   const url = new URL(pathname, origin);
-  url.searchParams.set("display", "tv");
+
+  if (!pathname.startsWith("/display/")) {
+    url.searchParams.set("display", "tv");
+  }
 
   const token =
     displayToken?.trim() ||
@@ -90,11 +93,11 @@ export async function stopPresentationCast() {
 }
 
 export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {
-  return buildTvCastUrl("/lobby/checkouts", currentHref, displayToken);
+  return buildTvCastUrl("/display/lobby-whiteboard", currentHref, displayToken);
 }
 
 export function buildStaffTvCastUrl(currentHref?: string, displayToken?: string) {
-  return buildTvCastUrl("/", currentHref, displayToken);
+  return buildTvCastUrl("/display/staff-whiteboard", currentHref, displayToken);
 }
 
 export function isPresentationCastSupported() {

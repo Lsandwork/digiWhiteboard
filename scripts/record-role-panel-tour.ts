@@ -1,9 +1,13 @@
 /**
  * Records a walkthrough video of each demo role logging in and visiting every panel tab.
  *
- * Usage:
- *   npm run dev   # in another terminal, unless RECORD_BASE_URL points to production
- *   npm run record:role-tour
+ * Usage (run each command on its own line — do not paste shell comments after npm):
+ *   npm run setup:record
+ *   npm run dev                    # terminal 1, unless using RECORD_BASE_URL
+ *   npm run record:role-tour       # terminal 2
+ *
+ * Record against production instead of localhost:
+ *   RECORD_BASE_URL=https://fitdog-gingr-status-board.vercel.app npm run record:role-tour
  *
  * Output:
  *   videos/fitdog-role-panel-tour.webm  (and .mp4 when ffmpeg is installed)

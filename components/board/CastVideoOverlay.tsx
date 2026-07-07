@@ -174,11 +174,23 @@ function CastVideoOverlayContent({
 
   return (
     <section
-      className={`cast-video ${minimized ? "cast-video--minimized" : ""} ${closing ? "cast-video--closing" : minimized ? "" : "cast-video--entering"}`}
+      className={`cast-video cast-video--alerting ${minimized ? "cast-video--minimized" : ""} ${closing ? "cast-video--closing" : minimized ? "" : "cast-video--entering"}`}
       role={minimized ? "complementary" : "dialog"}
       aria-modal={minimized ? undefined : true}
       aria-label={`Cast video: ${notice.title}`}
     >
+      {!minimized ? (
+        <>
+          <div className="cast-video__pulse" aria-hidden="true" />
+          <div className="cast-video__glow" aria-hidden="true" />
+          <span className="cast-video__flash-sweep" aria-hidden="true" />
+        </>
+      ) : (
+        <>
+          <div className="cast-video__pip-pulse" aria-hidden="true" />
+          <div className="cast-video__pip-glow" aria-hidden="true" />
+        </>
+      )}
       {!minimized ? <div className="cast-video__backdrop" aria-hidden="true" /> : null}
       <div className={`cast-video__frame ${minimized ? "cast-video__frame--minimized" : ""}`}>
         <header className={`cast-video__header ${minimized ? "cast-video__header--minimized" : ""}`}>

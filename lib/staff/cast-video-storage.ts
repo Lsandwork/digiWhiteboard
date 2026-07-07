@@ -28,6 +28,65 @@ export function validateCastThumbnailUpload(file: File) {
   }
 }
 
+export function buildCastVideoStoragePath(options: {
+  fileName: string;
+  kind: "video" | "thumbnail";
+  noticeId?: string;
+}) {
+  const ext = options.fileName.split(".").pop() || (options.kind === "video" ? "mp4" : "jpg");
+  const folder = options.noticeId ?? `draft-${Date.now()}`;
+  return `${folder}/${options.kind}-${Date.now()}-${sanitizeFileName(options.fileName || `upload.${ext}`)}`;
+}
+
+export async function createCastVideoSignedUpload(options: {
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  kind: "video" | "thumbnail";
+  noticeId?: string;
+}) {
+  if (options.kind === "video") {
+    validateCastVideoUpload({ name: options.fileName, type: options.mimeType, size: options.fileSize } as File);
+  } else {
+    validateCastThumbnailUpload({ name: options.fileName, type: options.mimeType, size: options.fileSize } as File);
+  }
+
+  const supabase = getServiceSupabase();
+  const storagePath = buildCastVideoStoragePath({
+    fileName: options.fileName,
+    kind: options.kind,
+    noticeId: options.noticeId
+  });
+
+  const { data, error } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUploadUrl(storagePath);
+  if (error || !data?.signedUrl) {
+    throw new Error(error?.message || "Unable to prepare cast video upload.");
+  }
+
+  return {
+    storage_path: storagePath,
+    signed_upload_url: data.signedUrl,
+    token: data.token,
+    mime_type: options.mimeType,
+    file_size_bytes: options.fileSize
+  };
+}
+
+export async function finalizeCastVideoUpload(options: {
+  storagePath: string;
+  mimeType: string;
+  fileSize: number;
+}) {
+  const supabase = getServiceSupabase();
+  const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(options.storagePath, 60 * 60 * 24);
+  return {
+    storage_path: options.storagePath,
+    signed_url: data?.signedUrl ?? null,
+    mime_type: options.mimeType,
+    file_size_bytes: options.fileSize
+  };
+}
+
 export async function uploadCastVideoAsset(options: {
   file: File;
   kind: "video" | "thumbnail";
@@ -35,9 +94,11 @@ export async function uploadCastVideoAsset(options: {
 }) {
   validateCastVideoUpload(options.file);
   const supabase = getServiceSupabase();
-  const ext = options.file.name.split(".").pop() || (options.kind === "video" ? "mp4" : "jpg");
-  const folder = options.noticeId ?? `draft-${Date.now()}`;
-  const path = `${folder}/${options.kind}-${Date.now()}-${sanitizeFileName(options.file.name || `upload.${ext}`)}`;
+  const path = buildCastVideoStoragePath({
+    fileName: options.file.name,
+    kind: options.kind,
+    noticeId: options.noticeId
+  });
 
   const buffer = Buffer.from(await options.file.arrayBuffer());
   const { error } = await supabase.storage.from(CAST_VIDEO_BUCKET).upload(path, buffer, {
@@ -49,30 +110,30 @@ export async function uploadCastVideoAsset(options: {
     throw new Error(error.message || "Unable to upload cast video.");
   }
 
-  const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(path, 60 * 60 * 24);
-  return {
-    storage_path: path,
-    signed_url: data?.signedUrl ?? null,
-    mime_type: options.file.type,
-    file_size_bytes: options.file.size
-  };
+  return finalizeCastVideoUpload({
+    storagePath: path,
+    mimeType: options.file.type,
+    fileSize: options.file.size
+  });
 }
 
 export async function uploadCastThumbnailAsset(file: File, noticeId?: string) {
   validateCastThumbnailUpload(file);
   const supabase = getServiceSupabase();
-  const ext = file.name.split(".").pop() || "jpg";
-  const folder = noticeId ?? `draft-${Date.now()}`;
-  const path = `${folder}/thumbnail-${Date.now()}-${sanitizeFileName(file.name || `thumb.${ext}`)}`;
+  const path = buildCastVideoStoragePath({
+    fileName: file.name,
+    kind: "thumbnail",
+    noticeId
+  });
   const buffer = Buffer.from(await file.arrayBuffer());
   const { error } = await supabase.storage.from(CAST_VIDEO_BUCKET).upload(path, buffer, {
     contentType: file.type,
     upsert: false
   });
   if (error) throw new Error(error.message || "Unable to upload thumbnail.");
-  const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(path, 60 * 60 * 24);
-  return {
-    storage_path: path,
-    signed_url: data?.signedUrl ?? null
-  };
+  return finalizeCastVideoUpload({
+    storagePath: path,
+    mimeType: file.type,
+    fileSize: file.size
+  });
 }

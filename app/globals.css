@@ -1018,6 +1018,95 @@ html.staff-tv-display .board-shell {
   min-height: 100vh;
 }
 
+.cast-keeper-warning {
+  position: fixed;
+  top: 0.75rem;
+  left: 50%;
+  z-index: 80;
+  max-width: min(42rem, calc(100vw - 2rem));
+  transform: translateX(-50%);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(15, 23, 42, 0.94);
+  padding: 0.55rem 0.85rem;
+  color: #fde68a;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+}
+
+.cast-keeper-status {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 70;
+  display: flex;
+  max-width: min(18rem, calc(100vw - 1.5rem));
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(2, 6, 11, 0.72);
+  padding: 0.35rem 0.65rem;
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 0.68rem;
+  line-height: 1.2;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.cast-keeper-status__dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #94a3b8;
+  flex-shrink: 0;
+}
+
+.cast-keeper-status--online .cast-keeper-status__dot {
+  background: #34d399;
+}
+
+.cast-keeper-status--reconnecting .cast-keeper-status__dot {
+  background: #fbbf24;
+}
+
+.cast-keeper-status--offline .cast-keeper-status__dot {
+  background: #f87171;
+}
+
+.cast-keeper-status__label {
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.cast-keeper-status__meta {
+  opacity: 0.85;
+}
+
+.cast-keeper-status__pulse {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+html.cast-keeper-display .staff-cast-control,
+html.cast-keeper-display .lobby-cast-control {
+  display: none !important;
+}
+
+html.cast-keeper-paused .push-notice-board-veil,
+html.cast-keeper-paused .push-notice-flash-layer,
+html.cast-keeper-paused .grooming-push-overlay,
+html.cast-keeper-paused .trainer-push-overlay,
+html.cast-keeper-paused .cast-video-overlay {
+  animation-play-state: paused !important;
+}
+
 .staff-cast-button {
   display: inline-flex;
   align-items: center;
@@ -1761,7 +1850,7 @@ html.lobby-tv-display .social-video-shell {
 
 .staff-push-notice-panel--alert,
 .staff-push-notice-fullscreen--alert {
-  animation: staffNoticePanelPulse 2.4s ease-in-out infinite;
+  animation: staffNoticePanelPulse 1.5s ease-in-out infinite;
 }
 
 .staff-push-notice-tv-flash {
@@ -1769,15 +1858,23 @@ html.lobby-tv-display .social-video-shell {
   inset: 0;
   z-index: 80;
   pointer-events: none;
-  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.18), transparent 68%);
+  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.22), transparent 68%);
   opacity: 0;
-  animation: staffNoticeTvGlow 2.8s ease-in-out infinite;
+  animation: staffNoticeTvGlow 1.8s ease-in-out infinite;
+}
+
+.staff-push-notice-tv-flash--reminder {
+  background: radial-gradient(circle at center, rgba(56, 189, 248, 0.2), transparent 68%);
 }
 
 .staff-push-notice-tv-flash--secondary {
-  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.12), transparent 72%);
-  animation: staffNoticeTvGlow 2.8s ease-in-out infinite;
-  animation-delay: -1.4s;
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.14), transparent 72%);
+  animation: staffNoticeTvGlow 1.8s ease-in-out infinite;
+  animation-delay: -0.9s;
+}
+
+.staff-push-notice-tv-flash--secondary.staff-push-notice-tv-flash--reminder {
+  background: radial-gradient(circle at center, rgba(14, 165, 233, 0.16), transparent 72%);
 }
 
 .staff-push-notice-tv-vignette {
@@ -1786,9 +1883,19 @@ html.lobby-tv-display .social-video-shell {
   z-index: 79;
   pointer-events: none;
   box-shadow:
-    inset 0 0 120px rgba(239, 68, 68, 0.28),
-    inset 0 0 240px rgba(127, 29, 29, 0.22);
-  animation: staffNoticeTvVignette 3.2s ease-in-out infinite;
+    inset 0 0 120px rgba(239, 68, 68, 0.32),
+    inset 0 0 240px rgba(127, 29, 29, 0.24);
+  animation: staffNoticeTvVignette 2s ease-in-out infinite;
+}
+
+.staff-push-notice-tv-vignette--reminder {
+  box-shadow:
+    inset 0 0 120px rgba(14, 165, 233, 0.28),
+    inset 0 0 240px rgba(30, 58, 138, 0.22);
+}
+
+.staff-push-notice-tv-bar--reminder {
+  background: linear-gradient(90deg, rgba(14, 116, 144, 0.95), rgba(2, 132, 199, 0.95), rgba(14, 116, 144, 0.95));
 }
 
 .staff-push-notice-tv-bar {
@@ -1847,13 +1954,13 @@ html.lobby-tv-display .social-video-shell {
   text-align: center;
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeAlertFlash 2.4s ease-in-out infinite;
+    staffNoticeAlertFlash 1.5s ease-in-out infinite;
 }
 
 .staff-push-notice--burst {
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeBurstFlash 1.8s ease-in-out infinite;
+    staffNoticeBurstFlash 1.2s ease-in-out infinite;
   border-width: 4px;
 }
 
@@ -1970,11 +2077,24 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice--daily-reminder {
-  border-color: rgba(56, 189, 248, 0.55);
+  border-color: rgba(56, 189, 248, 0.75);
   background:
-    radial-gradient(circle at top, rgba(14, 165, 233, 0.18), transparent 55%),
+    radial-gradient(circle at top, rgba(14, 165, 233, 0.28), transparent 55%),
+    radial-gradient(circle at 88% 12%, rgba(59, 130, 246, 0.22), transparent 34%),
     linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.98));
-  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(125, 211, 252, 0.18) inset,
+    0 18px 50px rgba(2, 6, 23, 0.45),
+    0 0 42px rgba(56, 189, 248, 0.28);
+  animation:
+    staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    staffNoticeReminderFlash 1.5s ease-in-out infinite;
+}
+
+.staff-push-notice--daily-reminder.staff-push-notice--burst {
+  animation:
+    staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    staffNoticeReminderBurstFlash 1.2s ease-in-out infinite;
 }
 
 .staff-push-notice--daily-reminder .staff-push-notice__icon {
@@ -1983,19 +2103,43 @@ html.lobby-tv-display .social-video-shell {
   box-shadow:
     0 18px 45px rgba(0, 0, 0, 0.28),
     0 0 0 4px rgba(255, 255, 255, 0.12),
-    0 0 24px rgba(56, 189, 248, 0.35);
-  animation: none;
+    0 0 24px rgba(56, 189, 248, 0.55);
+  animation: staffNoticeReminderIconPulse 1.5s ease-in-out infinite;
 }
 
 .staff-push-notice--daily-reminder .staff-push-notice__eyebrow {
   color: #bae6fd;
-  animation: none;
+  animation: staffNoticeReminderEyebrowFlash 1.5s ease-in-out infinite;
 }
 
 .staff-push-notice--daily-reminder .staff-push-notice__title {
   color: #f0f9ff;
-  text-shadow: none;
-  animation: none;
+  text-shadow: 0 0 24px rgba(56, 189, 248, 0.35);
+  animation: staffNoticeReminderTitlePulse 1.5s ease-in-out infinite;
+}
+
+.staff-push-notice__flash-layer--reminder,
+.staff-push-notice__flash.staff-push-notice__flash-layer--reminder {
+  background: radial-gradient(circle at center, rgba(125, 211, 252, 0.24), transparent 62%);
+}
+
+.staff-push-notice__flash--secondary.staff-push-notice__flash-layer--reminder {
+  background: radial-gradient(circle at center, rgba(14, 165, 233, 0.22), transparent 70%);
+}
+
+.staff-push-notice__edge-flash.staff-push-notice__flash-layer--reminder {
+  box-shadow:
+    inset 0 0 0 3px rgba(186, 230, 253, 0.2),
+    inset 0 0 36px rgba(56, 189, 248, 0.28);
+}
+
+.staff-push-notice__strobe-ring.staff-push-notice__flash-layer--reminder {
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+.staff-push-notice__beacon.staff-push-notice__flash-layer--reminder {
+  background: #7dd3fc;
+  box-shadow: 0 0 18px rgba(125, 211, 252, 0.95), 0 0 36px rgba(14, 165, 233, 0.75);
 }
 
 .staff-push-notice--daily-reminder-important {
@@ -2004,14 +2148,15 @@ html.lobby-tv-display .social-video-shell {
 
 .staff-push-notice-panel--daily-reminder,
 .staff-push-notice-fullscreen--daily-reminder {
-  border-color: rgba(56, 189, 248, 0.35);
+  border-color: rgba(56, 189, 248, 0.45);
+  animation: staffNoticeReminderPanelPulse 1.5s ease-in-out infinite;
 }
 
 .staff-push-notice--urgent.staff-push-notice--burst,
 .staff-push-notice--alert.staff-push-notice--burst {
   animation:
     staffNoticeSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1),
-    staffNoticeBurstFlash 1.8s ease-in-out infinite;
+    staffNoticeBurstFlash 1.2s ease-in-out infinite;
 }
 
 .staff-push-notice--fullscreen {
@@ -2513,6 +2658,130 @@ html.lobby-tv-display .social-video-shell {
   }
 }
 
+@keyframes staffNoticeReminderFlash {
+  0%,
+  100% {
+    border-color: rgba(56, 189, 248, 0.65);
+    box-shadow:
+      0 0 0 1px rgba(125, 211, 252, 0.16) inset,
+      0 18px 50px rgba(2, 6, 23, 0.45),
+      0 0 34px rgba(56, 189, 248, 0.22);
+  }
+  50% {
+    border-color: rgba(125, 211, 252, 0.98);
+    box-shadow:
+      0 0 0 2px rgba(186, 230, 253, 0.35) inset,
+      0 18px 50px rgba(2, 6, 23, 0.45),
+      0 0 64px rgba(56, 189, 248, 0.48);
+  }
+}
+
+@keyframes staffNoticeReminderBurstFlash {
+  0%,
+  100% {
+    filter: saturate(1) brightness(1);
+    border-color: rgba(56, 189, 248, 0.75);
+  }
+  50% {
+    filter: saturate(1.2) brightness(1.1);
+    border-color: rgba(186, 230, 253, 1);
+  }
+}
+
+@keyframes staffNoticeReminderIconPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 18px 45px rgba(0, 0, 0, 0.28),
+      0 0 0 4px rgba(255, 255, 255, 0.12),
+      0 0 24px rgba(56, 189, 248, 0.45);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow:
+      0 18px 45px rgba(0, 0, 0, 0.28),
+      0 0 0 6px rgba(255, 255, 255, 0.18),
+      0 0 42px rgba(56, 189, 248, 0.75);
+  }
+}
+
+@keyframes staffNoticeReminderEyebrowFlash {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+    text-shadow: 0 0 16px rgba(125, 211, 252, 0.55);
+  }
+}
+
+@keyframes staffNoticeReminderTitlePulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+    text-shadow: 0 0 28px rgba(56, 189, 248, 0.45);
+  }
+}
+
+@keyframes staffNoticeReminderPanelPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.45), 0 0 36px rgba(56, 189, 248, 0.22);
+  }
+}
+
+@keyframes pushBoardVeilGlow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.34;
+  }
+}
+
+@keyframes pushBoardVeilBarText {
+  0%,
+  100% {
+    opacity: 0.88;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@keyframes castVideoAlertBorder {
+  0%,
+  100% {
+    border-color: rgba(241, 95, 42, 0.45);
+    box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55), 0 0 28px rgba(241, 95, 42, 0.18);
+  }
+  50% {
+    border-color: rgba(255, 208, 120, 0.95);
+    box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55), 0 0 56px rgba(241, 95, 42, 0.42);
+  }
+}
+
+@keyframes castVideoPipPulse {
+  0%,
+  100% {
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(241, 95, 42, 0.35);
+  }
+  50% {
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(255, 183, 77, 0.75), 0 0 28px rgba(241, 95, 42, 0.35);
+  }
+}
+
 @keyframes staffNoticeBounce {
   0%,
   100% {
@@ -2573,7 +2842,19 @@ html.lobby-tv-display .social-video-shell {
   .staff-push-notice-tv-flash,
   .staff-push-notice-tv-vignette,
   .staff-push-notice-tv-bar,
-  .staff-push-notice-tv-bar span {
+  .staff-push-notice-tv-bar span,
+  .push-board-veil,
+  .push-board-veil-vignette,
+  .push-board-veil-bar,
+  .push-board-veil-bar span,
+  .cast-video--alerting .cast-video__frame,
+  .cast-video__pulse,
+  .cast-video__glow,
+  .cast-video__flash-sweep,
+  .cast-video__pip-pulse,
+  .cast-video__pip-glow,
+  .grooming-push--alerting,
+  .grooming-push--alerting * {
     animation: none !important;
   }
 
@@ -5986,7 +6267,7 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .grooming-push--alerting {
-  animation: grooming-push-border-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-border-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__pulse,
@@ -6000,11 +6281,11 @@ html.lobby-tv-display .social-video-shell {
 
 .grooming-push__pulse {
   border: 3px solid rgba(255, 183, 77, 0.55);
-  animation: grooming-push-ring-pulse 1.15s ease-in-out infinite;
+  animation: grooming-push-ring-pulse 0.85s ease-in-out infinite;
 }
 
 .grooming-push__glow {
-  animation: grooming-push-glow-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-glow-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__flash-sweep {
@@ -6193,38 +6474,38 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .grooming-push__dog-name--flash {
-  animation: grooming-push-dog-name-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-dog-name-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__banner--flash {
-  animation: grooming-push-banner-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-banner-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__countdown--flash {
-  animation: grooming-push-countdown-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-countdown-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__live-pill--flash {
   border-color: rgba(255, 159, 28, 0.55);
   background: rgba(255, 159, 28, 0.16);
   color: #fde68a;
-  animation: grooming-push-live-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-live-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__photo-wrap--flash {
-  animation: grooming-push-photo-ring 1.15s ease-in-out infinite;
+  animation: grooming-push-photo-ring 0.85s ease-in-out infinite;
 }
 
 .grooming-push__status-callout--flash {
-  animation: grooming-push-status-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-status-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__title--flash {
-  animation: grooming-push-dog-name-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-dog-name-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__main-card--flash {
-  animation: grooming-push-main-card-flash 1.15s ease-in-out infinite;
+  animation: grooming-push-main-card-flash 0.85s ease-in-out infinite;
 }
 
 .grooming-push__header,
@@ -8031,6 +8312,171 @@ html.lobby-tv-display .social-video-shell {
 }
 
 /* Cast Video Push Overlay */
+.push-board-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  animation: pushBoardVeilGlow 1.6s ease-in-out infinite;
+}
+
+.push-board-veil--secondary {
+  animation-delay: -0.8s;
+}
+
+.push-board-veil--alert {
+  background: radial-gradient(circle at center, rgba(251, 146, 60, 0.2), transparent 70%);
+}
+
+.push-board-veil--reminder {
+  background: radial-gradient(circle at center, rgba(56, 189, 248, 0.18), transparent 70%);
+}
+
+.push-board-veil--grooming,
+.push-board-veil--trainer {
+  background: radial-gradient(circle at center, rgba(255, 183, 77, 0.22), transparent 70%);
+}
+
+.push-board-veil--cast {
+  background: radial-gradient(circle at center, rgba(241, 95, 42, 0.2), transparent 70%);
+}
+
+.push-board-veil-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 69;
+  pointer-events: none;
+  animation: staffNoticeTvVignette 1.8s ease-in-out infinite;
+}
+
+.push-board-veil-vignette--alert {
+  box-shadow: inset 0 0 120px rgba(239, 68, 68, 0.24), inset 0 0 220px rgba(127, 29, 29, 0.18);
+}
+
+.push-board-veil-vignette--reminder {
+  box-shadow: inset 0 0 120px rgba(14, 165, 233, 0.22), inset 0 0 220px rgba(30, 58, 138, 0.16);
+}
+
+.push-board-veil-vignette--grooming,
+.push-board-veil-vignette--trainer {
+  box-shadow: inset 0 0 120px rgba(245, 158, 11, 0.24), inset 0 0 220px rgba(120, 53, 15, 0.18);
+}
+
+.push-board-veil-vignette--cast {
+  box-shadow: inset 0 0 120px rgba(241, 95, 42, 0.22), inset 0 0 220px rgba(124, 45, 18, 0.18);
+}
+
+.push-board-veil-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 71;
+  display: flex;
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  color: #fff7ed;
+  font-size: clamp(0.9rem, 1.5vw, 1.25rem);
+  font-weight: 1000;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+  animation: staffNoticeTvBarSlide 3.2s linear infinite;
+}
+
+.push-board-veil-bar span {
+  animation: pushBoardVeilBarText 0.85s ease-in-out infinite;
+}
+
+.push-board-veil-bar--alert {
+  background: linear-gradient(90deg, #b91c1c, #ea580c, #b91c1c);
+  background-size: 200% 100%;
+}
+
+.push-board-veil-bar--reminder {
+  background: linear-gradient(90deg, #0e7490, #0284c7, #0e7490);
+  background-size: 200% 100%;
+}
+
+.push-board-veil-bar--grooming,
+.push-board-veil-bar--trainer {
+  background: linear-gradient(90deg, #b45309, #f59e0b, #b45309);
+  background-size: 200% 100%;
+}
+
+.push-board-veil-bar--cast {
+  background: linear-gradient(90deg, #c2410c, #f97316, #c2410c);
+  background-size: 200% 100%;
+}
+
+.cast-video--alerting .cast-video__frame {
+  animation: castVideoAlertBorder 0.9s ease-in-out infinite;
+}
+
+.cast-video--alerting.cast-video--minimized .cast-video__frame--minimized {
+  animation: castVideoPipPulse 0.9s ease-in-out infinite;
+}
+
+.cast-video__pulse,
+.cast-video__glow,
+.cast-video__flash-sweep {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.cast-video__pulse {
+  border: 3px solid rgba(255, 183, 77, 0.45);
+  animation: grooming-push-ring-pulse 0.85s ease-in-out infinite;
+}
+
+.cast-video__glow {
+  animation: grooming-push-glow-flash 0.85s ease-in-out infinite;
+}
+
+.cast-video__flash-sweep {
+  z-index: 0;
+  overflow: hidden;
+}
+
+.cast-video__flash-sweep::before {
+  position: absolute;
+  top: -25%;
+  left: -60%;
+  width: 42%;
+  height: 150%;
+  content: "";
+  transform: skewX(-18deg);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 245, 205, 0.04),
+    rgba(255, 183, 77, 0.28),
+    rgba(255, 245, 205, 0.04),
+    transparent
+  );
+  animation: grooming-push-gold-sweep 1.8s ease-in-out infinite;
+}
+
+.cast-video__pip-pulse {
+  pointer-events: none;
+  position: absolute;
+  inset: -4px;
+  border-radius: 22px;
+  border: 2px solid rgba(255, 183, 77, 0.55);
+  animation: grooming-push-ring-pulse 0.85s ease-in-out infinite;
+}
+
+.cast-video__pip-glow {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  animation: grooming-push-glow-flash 0.85s ease-in-out infinite;
+}
+
 .cast-video {
   position: fixed;
   inset: 0;

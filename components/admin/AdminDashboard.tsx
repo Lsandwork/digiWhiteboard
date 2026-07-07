@@ -15,6 +15,7 @@ import { AdminLogsPanel } from "@/components/admin/AdminLogsPanel";
 import { AdminSettingsPage } from "@/components/admin/AdminSettingsPage";
 import { AdminUsersPage } from "@/components/admin/AdminUsersPage";
 import { PushNoticesPanel } from "@/components/admin/PushNoticesPanel";
+import { CastDisplayPanel } from "@/components/admin/CastDisplayPanel";
 import { CastVideosPanel } from "@/components/admin/CastVideosPanel";
 import { EmergencyAlertsPanel } from "@/components/admin/EmergencyAlertsPanel";
 import { GroomingPushPanel } from "@/components/admin/GroomingPushPanel";
@@ -379,14 +380,17 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "display" ? (
-          <BoardSettings
-            board={board}
-            lobbySettings={lobbySettings}
-            staffSettings={staffSettings}
-            onSaveLobby={(patch) => void saveBoardSettings(patch)}
-            onSaveStaff={(patch) => void saveBoardSettings(patch)}
-            onReset={() => setConfirmResetBoard(true)}
-          />
+          <div className="space-y-4">
+            <CastDisplayPanel board={board} onToast={showToast} />
+            <BoardSettings
+              board={board}
+              lobbySettings={lobbySettings}
+              staffSettings={staffSettings}
+              onSaveLobby={(patch) => void saveBoardSettings(patch)}
+              onSaveStaff={(patch) => void saveBoardSettings(patch)}
+              onReset={() => setConfirmResetBoard(true)}
+            />
+          </div>
         ) : null}
 
         {tab === "promotions" && board === "lobby" ? (
@@ -425,8 +429,9 @@ export function AdminDashboard() {
 
         {tab === "whiteboard_preview" ? (
           <div className="space-y-4">
+            <CastDisplayPanel board={board} onToast={showToast} />
             <LivePreviewPanel
-              board="staff"
+              board={board}
               lobbySettings={lobbySettings}
               staffSettings={staffSettings}
               promotions={data.promotions}

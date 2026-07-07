@@ -16,6 +16,8 @@ import {
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
+import { readApiJson } from "@/lib/admin/safe-fetch-json";
+import { uploadCastThumbnailDirect, uploadCastVideoDirect } from "@/lib/staff/cast-video-upload-client";
 import {
   CAST_VIDEO_AUTO_CLEAR_OPTIONS,
   CAST_VIDEO_DEPARTMENTS,
@@ -150,7 +152,7 @@ export function CastVideosPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/cast-videos", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readApiJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load cast videos.");
       setData(body as CastVideosPayload);
     } catch (error) {
@@ -193,30 +195,25 @@ export function CastVideosPanel() {
     setBusy(true);
     try {
       const thumbnailBlob = await captureVideoThumbnail(file);
-      const formData = new FormData();
-      formData.append("video", file);
+      const videoBody = await uploadCastVideoDirect(file, form.id || undefined);
+      let thumbnailBody: Awaited<ReturnType<typeof uploadCastThumbnailDirect>> | null = null;
       if (thumbnailBlob) {
-        formData.append("thumbnail", new File([thumbnailBlob], "thumbnail.jpg", { type: "image/jpeg" }));
+        thumbnailBody = await uploadCastThumbnailDirect(
+          new File([thumbnailBlob], "thumbnail.jpg", { type: "image/jpeg" }),
+          form.id || undefined
+        );
       }
-      if (form.id) formData.append("noticeId", form.id);
-
-      const response = await fetch("/api/admin/cast-videos/upload", {
-        method: "POST",
-        body: formData
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to upload video.");
 
       if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
       setLocalPreviewUrl(URL.createObjectURL(file));
       setForm((current) => ({
         ...current,
-        video_storage_path: body.video_storage_path ?? null,
-        video_url: body.video_url ?? null,
-        thumbnail_storage_path: body.thumbnail_storage_path ?? null,
-        thumbnail_url: body.thumbnail_url ?? null,
-        mime_type: body.mime_type ?? null,
-        file_size_bytes: body.file_size_bytes ?? null
+        video_storage_path: videoBody.video_storage_path ?? null,
+        video_url: videoBody.video_url ?? null,
+        thumbnail_storage_path: thumbnailBody?.thumbnail_storage_path ?? null,
+        thumbnail_url: thumbnailBody?.thumbnail_url ?? null,
+        mime_type: videoBody.mime_type ?? null,
+        file_size_bytes: videoBody.file_size_bytes ?? null
       }));
       showToast("Video uploaded.", "success");
     } catch (error) {
@@ -254,8 +251,7 @@ export function CastVideosPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(form.id ? { id: form.id, ...payload } : { action: "draft", ...payload })
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to save draft.");
+      const body = await readApiJson<{ error?: string; notice?: { id?: string } }>(response);
       setForm((current) => ({ ...current, id: body.notice?.id ?? current.id }));
       showToast("Draft saved.", "success");
       await load();
@@ -281,16 +277,17 @@ export function CastVideosPanel() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ action: "draft", ...payload })
         });
-        const createBody = await createResponse.json();
+        const createBody = await readApiJson<{ error?: string; notice?: { id?: string } }>(createResponse);
         if (!createResponse.ok) throw new Error(createBody.error ?? "Unable to save cast video.");
-        noticeId = createBody.notice?.id;
+        if (!createBody.notice?.id) throw new Error("Unable to save cast video.");
+        noticeId = createBody.notice.id;
       } else {
         const patchResponse = await fetch("/api/admin/cast-videos", {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ id: noticeId, ...payload })
         });
-        const patchBody = await patchResponse.json();
+        const patchBody = await readApiJson<{ error?: string }>(patchResponse);
         if (!patchResponse.ok) throw new Error(patchBody.error ?? "Unable to update cast video.");
       }
 
@@ -299,7 +296,7 @@ export function CastVideosPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "push" })
       });
-      const pushBody = await pushResponse.json();
+      const pushBody = await readApiJson<{ error?: string }>(pushResponse);
       if (!pushResponse.ok) throw new Error(pushBody.error ?? "Unable to push cast video.");
 
       showToast("Cast video pushed to displays.", "success");
@@ -331,7 +328,7 @@ export function CastVideosPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "create", ...payload })
       });
-      const body = await response.json();
+      const body = await readApiJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to schedule cast video.");
       showToast("Cast video scheduled.", "success");
       setForm(emptyForm());
@@ -351,7 +348,7 @@ export function CastVideosPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "clear" })
       });
-      const body = await response.json();
+      const body = await readApiJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to clear cast video.");
       showToast("Active cast video cleared.", "success");
       await load();
@@ -370,7 +367,7 @@ export function CastVideosPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "delete" })
       });
-      const body = await response.json();
+      const body = await readApiJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to delete cast video.");
       showToast("Cast video deleted.", "success");
       if (form.id === id) setForm(emptyForm());

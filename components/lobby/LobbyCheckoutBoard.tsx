@@ -32,6 +32,7 @@ import type { LobbyCheckoutDebug, LobbyCheckoutsResponse, LobbySettings, LobbySt
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
 import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
+import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 
 const defaultSettings: LobbySettings = {
@@ -60,11 +61,19 @@ function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null
   };
 }
 
-export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayToken?: string }) {
+export function LobbyCheckoutBoard({
+  embeddedDisplayToken,
+  castKeeperMode = false
+}: {
+  embeddedDisplayToken?: string;
+  castKeeperMode?: boolean;
+}) {
   const searchParams = useSearchParams();
-  const debugBoard = searchParams.get("debugBoard") === "1";
+  const castKeeper = useCastKeeperContext();
+  const debugBoard = !castKeeperMode && searchParams.get("debugBoard") === "1";
   const tvModeFromUrl = searchParams.get("display") !== "desktop";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
+  const tvLayoutRequested = castKeeperMode || tvModeFromUrl;
   const {
     isTvLayout,
     showCastActive,
@@ -79,7 +88,8 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
     copyCastUrl,
     stopTvCast,
     setCastError
-  } = useLobbyTvCast(tvModeFromUrl, displayToken);
+  } = useLobbyTvCast(tvLayoutRequested, displayToken);
+  const showTvLayout = castKeeperMode || isTvLayout;
 
   const runCastAction = useCallback(async (action: () => Promise<void>) => {
     try {
@@ -287,16 +297,36 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
   const showIdleSlideshow = !hasCheckout;
 
+  useEffect(() => {
+    if (!castKeeperMode) return;
+    const handleRefresh = () => {
+      void loadLobbyData();
+    };
+    window.addEventListener("fitdog-cast-keeper-refresh", handleRefresh);
+    return () => window.removeEventListener("fitdog-cast-keeper-refresh", handleRefresh);
+  }, [castKeeperMode, loadLobbyData]);
+
   useDisplaySync({
+    enabled: !castKeeperMode,
     onContentUpdate: () => {
       void loadLobbyMeta();
+      void loadLobbyCheckouts();
+      void loadFastLobbyCheckouts();
     }
   });
 
   useEffect(() => {
-    if (!isTvLayout) return;
+    if (!castKeeperMode) return;
+    if (lastFullFetchAt || lastFastFetchAt) {
+      castKeeper?.markDataFresh();
+    }
+  }, [castKeeper, castKeeperMode, lastFastFetchAt, lastFullFetchAt]);
+
+  useEffect(() => {
+    if (!showTvLayout) return;
 
     document.documentElement.classList.add("lobby-tv-display");
+    if (castKeeperMode) document.documentElement.classList.add("cast-keeper-display");
 
     const viewportMeta = document.querySelector('meta[name="viewport"]');
     const previousViewport = viewportMeta?.getAttribute("content") ?? null;
@@ -304,31 +334,34 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
 
     return () => {
       document.documentElement.classList.remove("lobby-tv-display");
+      document.documentElement.classList.remove("cast-keeper-display");
       if (previousViewport) {
         viewportMeta?.setAttribute("content", previousViewport);
       }
     };
-  }, [isTvLayout]);
+  }, [castKeeperMode, showTvLayout]);
 
   return (
     <main
-      className={`lobby-shell ${isTvLayout ? "lobby-tv-mode" : ""} ${hasCheckout ? "lobby-has-checkout" : "lobby-idle-state"}`}
+      className={`lobby-shell ${showTvLayout ? "lobby-tv-mode" : ""} ${castKeeperMode ? "cast-keeper-board" : ""} ${hasCheckout ? "lobby-has-checkout" : "lobby-idle-state"}`}
     >
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
 
-      <LobbyCastButton
-        castUrl={castUrl}
-        isCasting={showCastActive}
-        castError={castError}
-        canCast={canCast}
-        castMethod={castMethod}
-        onToggle={() => void runCastAction(toggleTvCast)}
-        onChromecast={() => void runCastAction(startChromecast)}
-        onWireless={() => void runCastAction(startWirelessCast)}
-        onAirPlay={() => void runCastAction(startAirPlayCast)}
-        onCopyUrl={() => void runCastAction(copyCastUrl)}
-        onStop={() => void runCastAction(stopTvCast)}
-      />
+      {!castKeeperMode ? (
+        <LobbyCastButton
+          castUrl={castUrl}
+          isCasting={showCastActive}
+          castError={castError}
+          canCast={canCast}
+          castMethod={castMethod}
+          onToggle={() => void runCastAction(toggleTvCast)}
+          onChromecast={() => void runCastAction(startChromecast)}
+          onWireless={() => void runCastAction(startWirelessCast)}
+          onAirPlay={() => void runCastAction(startAirPlayCast)}
+          onCopyUrl={() => void runCastAction(copyCastUrl)}
+          onStop={() => void runCastAction(stopTvCast)}
+        />
+      ) : null}
 
       <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} hasCheckout={hasCheckout} />
@@ -350,7 +383,7 @@ export function LobbyCheckoutBoard({ embeddedDisplayToken }: { embeddedDisplayTo
 
             {hasCheckout ? <LobbyQueueList dogs={queue} /> : null}
 
-            {showIdleSlideshow ? <LobbyIdleSlideshow tvMode={isTvLayout} /> : null}
+            {showIdleSlideshow ? <LobbyIdleSlideshow tvMode={showTvLayout} /> : null}
 
             {settings.show_events ? (
               <LobbyClassSchedule compact={hasCheckout} schedule={settings.class_schedule} />

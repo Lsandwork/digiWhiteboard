@@ -19,6 +19,7 @@
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "test:daily-reminders": "tsx scripts/test-daily-reminders.ts",
+    "setup:record": "playwright install chromium",
     "record:role-tour": "tsx scripts/record-role-panel-tour.ts",
     "db:push": "tsx scripts/push-supabase-migration.ts",
     "db:push:all": "npx supabase db push --linked --yes"

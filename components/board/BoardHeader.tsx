@@ -18,6 +18,7 @@ type BoardHeaderProps = {
   lastUpdated: string;
   wakeLockStatus: "unsupported" | "active" | "released" | "error" | "idle";
   onRequestWakeLock: () => void;
+  castKeeperMode?: boolean;
 };
 
 export function BoardHeader({
@@ -26,36 +27,58 @@ export function BoardHeader({
   clockDate,
   lastUpdated,
   wakeLockStatus,
-  onRequestWakeLock
+  onRequestWakeLock,
+  castKeeperMode = false
 }: BoardHeaderProps) {
   const [logoFailed, setLogoFailed] = useState(false);
 
   return (
     <header className="mb-5 grid gap-5 lg:mb-6 lg:grid-cols-[1fr_auto] lg:items-start">
       <div className="flex min-w-0 items-start gap-4 sm:gap-5 lg:gap-6">
-        <Link
-          href="/admin"
-          className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue transition hover:ring-2 hover:ring-fitdog-orange/60 sm:h-24 sm:w-24 lg:h-28 lg:w-28"
-          aria-label="Open Fitdog admin"
-          title="Fitdog Admin"
-        >
-          {logoFailed ? (
-            <span className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-3xl font-black text-white sm:text-4xl">
-              F
-            </span>
-          ) : (
-            <Image
-              src="/assets/fitdog/replace_f-logo.png"
-              alt="Fitdog Team"
-              width={224}
-              height={224}
-              priority
-              className="h-full w-full rounded-full object-contain"
-              draggable={false}
-              onError={() => setLogoFailed(true)}
-            />
-          )}
-        </Link>
+        {castKeeperMode ? (
+          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue sm:h-24 sm:w-24 lg:h-28 lg:w-28">
+            {logoFailed ? (
+              <span className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-3xl font-black text-white sm:text-4xl">
+                F
+              </span>
+            ) : (
+              <Image
+                src="/assets/fitdog/replace_f-logo.png"
+                alt="Fitdog Team"
+                width={224}
+                height={224}
+                priority
+                className="h-full w-full rounded-full object-contain"
+                draggable={false}
+                onError={() => setLogoFailed(true)}
+              />
+            )}
+          </div>
+        ) : (
+          <Link
+            href="/admin"
+            className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue transition hover:ring-2 hover:ring-fitdog-orange/60 sm:h-24 sm:w-24 lg:h-28 lg:w-28"
+            aria-label="Open Fitdog admin"
+            title="Fitdog Admin"
+          >
+            {logoFailed ? (
+              <span className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-3xl font-black text-white sm:text-4xl">
+                F
+              </span>
+            ) : (
+              <Image
+                src="/assets/fitdog/replace_f-logo.png"
+                alt="Fitdog Team"
+                width={224}
+                height={224}
+                priority
+                className="h-full w-full rounded-full object-contain"
+                draggable={false}
+                onError={() => setLogoFailed(true)}
+              />
+            )}
+          </Link>
+        )}
         <div className="min-w-0">
           <h1 className="text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
             Fitdog Health & Social Club
@@ -67,7 +90,7 @@ export function BoardHeader({
       <div className="flex flex-col items-start gap-3 lg:items-end">
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <LiveStatus connection={connection} />
-          <WakeLockStatusChip status={wakeLockStatus} onRequest={onRequestWakeLock} />
+          {castKeeperMode ? null : <WakeLockStatusChip status={wakeLockStatus} onRequest={onRequestWakeLock} />}
         </div>
 
         <ClockDate time={clockTime} date={clockDate} />

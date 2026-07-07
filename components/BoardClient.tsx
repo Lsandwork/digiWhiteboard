@@ -10,9 +10,9 @@ import { BoardPanel } from "@/components/board/BoardPanel";
 import { StaffCastButton } from "@/components/board/StaffCastButton";
 import {
   StaffPushNoticeFullscreen,
-  StaffPushNoticePanel,
-  StaffPushNoticeTvOverlay
+  StaffPushNoticePanel
 } from "@/components/board/StaffPushNotice";
+import { PushNoticeBoardVeil } from "@/components/board/PushNoticeFlashLayers";
 import { CastVideoOverlay } from "@/components/board/CastVideoOverlay";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
 import { TrainerPushNoticeOverlay } from "@/components/board/TrainerPushNoticeOverlay";
@@ -27,6 +27,7 @@ import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useStaffPushNotice } from "@/hooks/useStaffPushNotice";
 import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useStaffTvCast } from "@/hooks/useStaffTvCast";
+import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
 import {
@@ -39,6 +40,7 @@ import {
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime } from "@/lib/board-utils";
+import { isDailyReminderPushNotice } from "@/lib/staff/push-notices";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 type ConnectionState = "connecting" | "live" | "polling" | "offline";
@@ -112,10 +114,11 @@ function getDevDemoBoard(): LiveBoardResponse | null {
   };
 }
 
-export function BoardClient() {
+export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boolean }) {
   const searchParams = useSearchParams();
-  const staffMode = searchParams.get("staff") === "1";
-  const tvMode = searchParams.get("display") === "tv";
+  const castKeeper = useCastKeeperContext();
+  const staffMode = !castKeeperMode && searchParams.get("staff") === "1";
+  const tvMode = castKeeperMode || searchParams.get("display") === "tv";
   const debugBoard = searchParams.get("debugBoard") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? "";
   const displayDepartment = searchParams.get("dept")?.trim() || "staff_whiteboard";
@@ -186,6 +189,30 @@ export function BoardClient() {
   const minimizedCastQueue =
     minimizedCastNotice?.id === emergencyCastVideo?.id ? emergencyCastQueue : castVideoQueue;
   const hasActiveCast = Boolean(emergencyCastVideo || activeCastVideo);
+  const pushVeilActive = Boolean(
+    showEmergencyCastFullscreen ||
+      showCastFullscreen ||
+      minimizedCastNotice ||
+      activeGroomingNotice ||
+      activeTrainerNotice ||
+      activePushNotice
+  );
+  const pushVeilTone = activeGroomingNotice
+    ? "grooming"
+    : activeTrainerNotice
+      ? "trainer"
+      : hasActiveCast
+        ? "cast"
+        : activePushNotice && isDailyReminderPushNotice(activePushNotice)
+          ? "reminder"
+          : "alert";
+  const pushVeilLabel = activeGroomingNotice
+    ? "Grooming Push Active"
+    : activeTrainerNotice
+      ? "Trainer Push Active"
+      : hasActiveCast
+        ? "Video Cast Active"
+        : "Push Notice Active";
   useFitdogAlertSound(activeAlertKey);
   const {
     castUrl,
@@ -204,17 +231,21 @@ export function BoardClient() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("staff-tv-display", tvMode);
-    return () => document.documentElement.classList.remove("staff-tv-display");
-  }, [tvMode]);
+    document.documentElement.classList.toggle("cast-keeper-display", castKeeperMode);
+    return () => {
+      document.documentElement.classList.remove("staff-tv-display");
+      document.documentElement.classList.remove("cast-keeper-display");
+    };
+  }, [castKeeperMode, tvMode]);
 
   useEffect(() => {
     void unlockStaffPushNoticeAudio();
   }, []);
 
   useEffect(() => {
-    if (!tvMode) return;
+    if (!tvMode || castKeeperMode) return;
     void requestWakeLock();
-  }, [tvMode, requestWakeLock]);
+  }, [castKeeperMode, tvMode, requestWakeLock]);
 
   const runCastAction = useCallback(async (action: () => Promise<void>) => {
     try {
@@ -346,11 +377,27 @@ export function BoardClient() {
     [apiEndpoint, runFullPoll]
   );
 
+  useEffect(() => {
+    if (!castKeeperMode) return;
+    const handleRefresh = () => {
+      void loadBoard("polling");
+      void loadFastCheckouts();
+    };
+    window.addEventListener("fitdog-cast-keeper-refresh", handleRefresh);
+    return () => window.removeEventListener("fitdog-cast-keeper-refresh", handleRefresh);
+  }, [castKeeperMode, loadBoard, loadFastCheckouts]);
+
   useDisplaySync({
+    enabled: !castKeeperMode,
     onContentUpdate: () => {
       void loadBoard("polling");
     }
   });
+
+  useEffect(() => {
+    if (!castKeeperMode || !lastSuccessAt) return;
+    castKeeper?.markDataFresh();
+  }, [castKeeper, castKeeperMode, lastSuccessAt]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
@@ -435,11 +482,8 @@ export function BoardClient() {
   const expiredCheckoutCount = Math.max(0, stickyCheckoutDogs.length - visibleCheckoutDogs.length);
 
   return (
-    <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
-      <StaffPushNoticeTvOverlay
-        active={Boolean(activePushNotice) && !showEmergencyCastFullscreen && !showCastFullscreen && !hasActiveCast && !activeGroomingNotice && !activeTrainerNotice}
-        notice={activePushNotice}
-      />
+    <main className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white ${castKeeperMode ? "cast-keeper-board" : ""}`}>
+      <PushNoticeBoardVeil active={pushVeilActive} tone={pushVeilTone} label={pushVeilLabel} />
 
       {!tvMode ? (
         <StaffCastButton
@@ -465,6 +509,7 @@ export function BoardClient() {
           lastUpdated={board.last_updated}
           wakeLockStatus={wakeLockStatus}
           onRequestWakeLock={() => void requestWakeLock()}
+          castKeeperMode={castKeeperMode}
         />
 
         {fetchError && !hasBoardData ? (
@@ -577,7 +622,7 @@ export function BoardClient() {
         </div>
       ) : null}
 
-      {debugBoard ? (
+      {debugBoard && !castKeeperMode ? (
         <BoardDebugPanel
           endpoint={apiEndpoint}
           fetchStatus={fetchStatus}
