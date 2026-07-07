@@ -120,7 +120,7 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   front_desk_coordinator: "Front Desk - Coordinator",
   team_leader: "Team Lead",
   groomer: "Groomer",
-  daycare: "Daycare",
+  daycare: "Dog Handler",
   trainer: "Trainer",
   driver: "Driver",
   hiker: "Hiker",
@@ -355,6 +355,19 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
+/** Dog Handler panel — basic tools only: checklist, support, uploads, HR/PIP, write-ups, shift entry. */
+const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
+  "view_admin_panel",
+  "create_front_desk_log",
+  "submit_groomer_complaint",
+  "submit_groomer_request",
+  "view_own_groomer_submissions",
+  "submit_write_up",
+  "view_own_write_ups",
+  "create_trainer_entry",
+  "view_hr_hub"
+];
+
 /** Team Lead DigiBoard panel — push, grooming, front desk log, video links, notifications, write-ups, profile. */
 const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
@@ -401,6 +414,15 @@ export const TRAINER_TABS = [
   "settings"
 ] as const;
 
+export const DOG_HANDLER_TABS = [
+  "checklist",
+  "management_support",
+  "bulk_photo_upload",
+  "write_ups",
+  "handler_shift_entry",
+  "hr_pip"
+] as const;
+
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: [...ALL_PERMISSIONS],
   admin: [...ADMIN_OPERATIONAL_PERMISSIONS],
@@ -409,7 +431,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   team_leader: TEAM_LEADER_PERMISSIONS,
   groomer: GROOMER_PERMISSIONS,
   trainer: TRAINER_PERMISSIONS,
-  daycare: STAFF_VIEWER_PERMISSIONS,
+  daycare: DOG_HANDLER_PERMISSIONS,
   driver: STAFF_VIEWER_PERMISSIONS,
   hiker: STAFF_VIEWER_PERMISSIONS,
   overnight: STAFF_VIEWER_PERMISSIONS,
@@ -425,6 +447,11 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
       return "super_admin";
     case "manager_admin":
       return "admin";
+    case "assistant_manager":
+      return "management";
+    case "daycare":
+    case "dog_handler":
+      return "daycare";
     case "front_desk_coordinator":
     case "front_desk":
     case "coordinator":
@@ -448,8 +475,11 @@ export function roleKeyToLegacyRole(role: RoleKey): string {
     case "super_admin":
       return "owner_admin";
     case "admin":
-    case "management":
       return "manager_admin";
+    case "management":
+      return "assistant_manager";
+    case "daycare":
+      return "daycare";
     case "front_desk_coordinator":
       return "front_desk_coordinator";
     case "team_leader":
@@ -527,6 +557,7 @@ export function hasAnyRole(access: UserAccess | null | undefined, roles: RoleKey
 }
 
 export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
+  checklist: "view_admin_panel",
   push_notices: "manage_push_notices",
   yard_push_notices: "push_yard_notice",
   emergency_alerts: "manage_push_notices",
@@ -557,6 +588,10 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   admin_trainer_entries: "review_management_support",
   hr_hub: "view_hr_hub",
   hr_consult: "use_hr_consult",
+  bulk_photo_upload: "view_admin_panel",
+  write_ups: "submit_write_up",
+  handler_shift_entry: "create_trainer_entry",
+  hr_pip: "view_hr_hub",
   settings: "view_admin_panel",
   help: "view_admin_panel"
 };
@@ -664,6 +699,10 @@ export function isTrainerLegacyRole(legacyRole?: string | null) {
   return legacyRole === "trainer";
 }
 
+export function isDogHandlerLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "daycare" || legacyRole === "dog_handler";
+}
+
 export function canAccessAdminTab(
   access: UserAccess | null | undefined,
   tab: string,
@@ -689,6 +728,11 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     if (tab === "management_support") return hasAnyPermission(effective, ["submit_trainer_complaint", "view_own_trainer_submissions", "view_package_commissions"]);
     return (TRAINER_TABS as readonly string[]).includes(tab);
+  }
+
+  if (isDogHandlerLegacyRole(legacyRole)) {
+    if (board !== "staff") return false;
+    return (DOG_HANDLER_TABS as readonly string[]).includes(tab);
   }
 
   if (ADMIN_SUPPORT_TAB_SET.has(tab)) {
@@ -802,6 +846,13 @@ export function firstAccessibleAdminTab(
       if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
     }
     return "trainer_push";
+  }
+
+  if (isDogHandlerLegacyRole(legacyRole) && board === "staff") {
+    for (const tab of DOG_HANDLER_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
+    }
+    return "whiteboard_preview";
   }
 
   const tabs =

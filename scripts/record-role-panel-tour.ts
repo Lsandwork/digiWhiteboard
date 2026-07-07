@@ -16,7 +16,12 @@ import { execSync, spawnSync } from "node:child_process";
 import { mkdir, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Page } from "playwright";
-import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_ROLE_OPTIONS } from "../lib/demo/constants";
+import {
+  DEMO_ACCOUNTS,
+  DEMO_EMAIL,
+  DEMO_PASSWORD,
+  type DemoAccount
+} from "../lib/demo/constants";
 import { canAccessAdminTab, accessFromLegacyRole } from "../lib/admin/permissions";
 import { ADMIN_TABS, type AdminBoardType, type AdminTab } from "../lib/admin/types";
 import { getTabLabel } from "../lib/admin/nav-groups";
@@ -29,6 +34,8 @@ const FINAL_MP4 = path.join(OUTPUT_DIR, "fitdog-role-panel-tour.mp4");
 const PAGE_PAUSE_MS = Number(process.env.RECORD_PAGE_PAUSE_MS ?? 1400);
 const TITLE_PAUSE_MS = Number(process.env.RECORD_TITLE_PAUSE_MS ?? 2200);
 const TAB_BANNER_MS = Number(process.env.RECORD_TAB_BANNER_MS ?? 900);
+
+const ROLE_ACCOUNTS = DEMO_ACCOUNTS.filter((account) => account.email !== DEMO_EMAIL);
 
 function tabsForRole(role: string, board: AdminBoardType): AdminTab[] {
   const access = accessFromLegacyRole(null, DEMO_EMAIL, role);
@@ -79,28 +86,26 @@ async function waitForDashboard(page: Page) {
   await page.waitForTimeout(500);
 }
 
-async function loginDemoUser(page: Page, roleLabel: string) {
+async function loginDemoAccount(page: Page, account: DemoAccount) {
   await page.goto(`${BASE_URL}/admin/login`, { waitUntil: "domcontentloaded" });
-  await page.fill("#username", DEMO_EMAIL);
+  await page.fill("#username", account.email);
   await page.fill("#password", DEMO_PASSWORD);
-  await showTitleCard(page, "Signing In", `${roleLabel} · ${DEMO_EMAIL}`);
+  await showTitleCard(page, "Signing In", `${account.label} · ${account.email}`);
 
   const loginResponse = await page.request.post(`${BASE_URL}/api/admin/login`, {
-    data: { username: DEMO_EMAIL, password: DEMO_PASSWORD }
+    data: { username: account.email, password: DEMO_PASSWORD }
   });
   if (!loginResponse.ok()) {
-    throw new Error(`Login failed for ${roleLabel}: ${await loginResponse.text()}`);
+    throw new Error(`Login failed for ${account.label}: ${await loginResponse.text()}`);
   }
 
   await page.goto(`${BASE_URL}/admin?board=staff&tab=demo_push`, { waitUntil: "domcontentloaded" });
   await waitForDashboard(page);
 }
 
-async function switchDemoRoleInUi(page: Page, roleLabel: string) {
-  await page.click(".demo-role-switcher__trigger");
-  await page.click(`.demo-role-switcher__item:has-text("${roleLabel}")`);
-  await page.waitForLoadState("domcontentloaded");
-  await waitForDashboard(page);
+async function logoutDemoUser(page: Page) {
+  await page.request.post(`${BASE_URL}/api/admin/logout`);
+  await page.context().clearCookies();
 }
 
 async function visitTab(page: Page, board: AdminBoardType, tab: AdminTab, roleLabel: string) {
@@ -137,30 +142,24 @@ async function main() {
   await showTitleCard(
     page,
     "Role Panel Tour",
-    "Fitdog Admin Center — login and every panel page for each user type"
+    "Fitdog Admin Center — each role signs in and visits every panel page"
   );
 
-  let loggedIn = false;
+  for (const [index, account] of ROLE_ACCOUNTS.entries()) {
+    const { role, label: roleLabel } = account;
+    console.log(`Recording ${roleLabel} (${index + 1}/${ROLE_ACCOUNTS.length})…`);
 
-  for (const [index, roleOption] of DEMO_ROLE_OPTIONS.entries()) {
-    const { value: role, label: roleLabel } = roleOption;
-    console.log(`Recording ${roleLabel} (${index + 1}/${DEMO_ROLE_OPTIONS.length})…`);
-
-    if (!loggedIn) {
-      await loginDemoUser(page, roleLabel);
-      loggedIn = true;
-      if (role !== "owner_admin") {
-        await switchDemoRoleInUi(page, roleLabel);
-      }
-    } else {
-      await showTitleCard(page, "Switching User", `Now viewing the ${roleLabel} panel`);
-      await switchDemoRoleInUi(page, roleLabel);
+    if (index > 0) {
+      await logoutDemoUser(page);
     }
 
+    await loginDemoAccount(page, account);
     await showTitleCard(page, roleLabel, "Panel overview and available pages");
 
     const boards: AdminBoardType[] =
-      role === "owner_admin" || role === "manager_admin" ? ["staff", "lobby"] : ["staff"];
+      role === "owner_admin" || role === "manager_admin" || role === "assistant_manager"
+        ? ["staff", "lobby"]
+        : ["staff"];
 
     for (const board of boards) {
       const tabs = tabsForRole(role, board);

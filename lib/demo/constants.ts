@@ -5,17 +5,67 @@ import type { StaffPushNotice } from "@/lib/staff/push-notices";
 export const DEMO_EMAIL = "demo@demo.com";
 export const DEMO_PASSWORD = "password123";
 
-export const DEMO_DOG_PHOTO = "/assets/fitdog-lobby-whiteboard/slideshow/14-show-off-your-dog.png";
+/** bcrypt hash for password123 — shared by all demo accounts. */
+export const DEMO_PASSWORD_HASH =
+  "$2b$12$8PMCI0xrJlcJUNlNG36ruegMm4Z4hVZVMTEge71iAM13Z/i.cz0Cm";
+
+export type DemoAccountRole =
+  | "owner_admin"
+  | "manager_admin"
+  | "assistant_manager"
+  | "front_desk_coordinator"
+  | "team_leader"
+  | "groomer"
+  | "trainer"
+  | "daycare";
+
+export type DemoAccount = {
+  email: string;
+  fullName: string;
+  role: DemoAccountRole;
+  label: string;
+};
+
+/** Dedicated logins for the investor role walkthrough (password123 for all). */
+export const DEMO_ACCOUNTS: DemoAccount[] = [
+  { email: DEMO_EMAIL, fullName: "Investor Demo", role: "owner_admin", label: "Investor (all roles)" },
+  { email: "demo-super@demo.com", fullName: "Super Admin Demo", role: "owner_admin", label: "Super Admin" },
+  { email: "demo-admin@demo.com", fullName: "Admin Demo", role: "manager_admin", label: "Admin" },
+  {
+    email: "demo-management@demo.com",
+    fullName: "Assistant Manager Demo",
+    role: "assistant_manager",
+    label: "Assistant Manager"
+  },
+  {
+    email: "demo-teamlead@demo.com",
+    fullName: "Team Lead Demo",
+    role: "team_leader",
+    label: "Team Lead"
+  },
+  {
+    email: "demo-frontdesk@demo.com",
+    fullName: "Front Desk Demo",
+    role: "front_desk_coordinator",
+    label: "Front Desk"
+  },
+  { email: "demo-groomer@demo.com", fullName: "Groomer Demo", role: "groomer", label: "Groomer" },
+  { email: "demo-trainer@demo.com", fullName: "Trainer Demo", role: "trainer", label: "Trainer" },
+  { email: "demo-handler@demo.com", fullName: "Dog Handler Demo", role: "daycare", label: "Dog Handler" }
+];
 
 export const DEMO_ROLE_OPTIONS = [
-  { value: "owner_admin", label: "Admin" },
-  { value: "manager_admin", label: "Management" },
+  { value: "owner_admin", label: "Super Admin" },
+  { value: "manager_admin", label: "Admin" },
+  { value: "assistant_manager", label: "Assistant Manager" },
   { value: "front_desk_coordinator", label: "Front Desk" },
   { value: "team_leader", label: "Team Lead" },
   { value: "groomer", label: "Groomer" },
   { value: "trainer", label: "Trainer" },
-  { value: "viewer", label: "Viewer" }
+  { value: "daycare", label: "Dog Handler" }
 ] as const;
+
+export const DEMO_DOG_PHOTO = "/assets/fitdog-lobby-whiteboard/slideshow/14-show-off-your-dog.png";
 
 export type DemoPushAction = "check_in" | "check_out" | "grooming";
 
@@ -161,4 +211,19 @@ export function buildDemoGroomingNotice(dogInput: string, requestedBy: string | 
     },
     requestedBy
   );
+}
+
+export function findDemoAccount(email: string) {
+  const normalized = email.trim().toLowerCase();
+  return DEMO_ACCOUNTS.find((account) => account.email === normalized) ?? null;
+}
+
+export function isInvestorDemoEmail(email?: string | null) {
+  return email?.trim().toLowerCase() === DEMO_EMAIL;
+}
+
+export function isDemoEmail(email?: string | null) {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) return false;
+  return normalized.endsWith("@demo.com");
 }

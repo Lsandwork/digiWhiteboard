@@ -22,7 +22,8 @@
     "setup:record": "playwright install chromium",
     "record:role-tour": "tsx scripts/record-role-panel-tour.ts",
     "db:push": "tsx scripts/push-supabase-migration.ts",
-    "db:push:all": "npx supabase db push --linked --yes"
+    "db:push:query": "tsx scripts/push-supabase-migration-query.ts",
+    "db:push:all": "tsx scripts/push-all-supabase-migrations.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

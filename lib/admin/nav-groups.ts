@@ -23,6 +23,7 @@ export type NavSection = {
 export type NavEntry = NavLeaf | NavGroup | NavSection;
 
 const TAB_LABELS: Record<AdminTab, string> = {
+  checklist: "Check List",
   overview: "Overview",
   content: "Board Messages",
   promotions: "Promotions",
@@ -60,10 +61,15 @@ const TAB_LABELS: Record<AdminTab, string> = {
   integrations: "Integrations",
   help: "Help Center",
   hr_hub: "HR Records",
-  hr_consult: "HR Consult"
+  hr_consult: "HR Consult",
+  bulk_photo_upload: "Bulk Photo Upload",
+  write_ups: "Write Ups",
+  handler_shift_entry: "Handler Shift Entry Log",
+  hr_pip: "P.I.P"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
+  checklist: "Personal handler checklist for daily shift tasks.",
   overview: "Sync health, checkout counts, and quick board settings.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   promotions: "Manage lobby promotion cards shown during idle time.",
@@ -93,7 +99,11 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   integrations: "Gingr sync, webhooks, and connection status.",
   help: "Setup guides and how-to articles.",
   analytics: "Operational metrics and board activity summary.",
-  demo_push: "Try push notices in demo mode."
+  demo_push: "Try push notices in demo mode.",
+  bulk_photo_upload: "Upload and verify dog photos in batches.",
+  write_ups: "Submit and review your own write-up forms.",
+  handler_shift_entry: "Create handler shift log entries sent to Front Desk Log.",
+  hr_pip: "View your performance improvement plan records."
 };
 
 const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "display", "whiteboard_preview"];
@@ -186,7 +196,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_dashboard",
         "Dashboard",
-        singles(["demo_push", "overview", "whiteboard_preview", "display", "content", "analytics"], visible)
+        singles(["demo_push", "overview", "whiteboard_preview", "display", "content", "analytics", "checklist"], visible)
       )
     );
 
@@ -205,7 +215,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["management_support"], visible)
+          ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload", "write_ups"], visible)
         ])
       )
     );
@@ -224,7 +234,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         "People & HR",
         compactEntries([
           group("people_directory", "Staff", ["staff_directory", "staff_create_user"], visible),
-          group("human_resources", "Human Resources", [...ADMIN_HR_TABS], visible)
+          group("human_resources", "Human Resources", [...ADMIN_HR_TABS, "hr_pip"], visible)
         ])
       )
     );

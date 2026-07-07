@@ -42,6 +42,7 @@ export type AdminDashboardData = {
 };
 
 export type AdminTab =
+  | "checklist"
   | "overview"
   | "content"
   | "promotions"
@@ -79,9 +80,14 @@ export type AdminTab =
   | "help"
   | "demo_push"
   | "hr_hub"
-  | "hr_consult";
+  | "hr_consult"
+  | "bulk_photo_upload"
+  | "write_ups"
+  | "handler_shift_entry"
+  | "hr_pip";
 
 export const ADMIN_TABS: AdminTab[] = [
+  "checklist",
   "overview",
   "content",
   "promotions",
@@ -119,7 +125,11 @@ export const ADMIN_TABS: AdminTab[] = [
   "help",
   "demo_push",
   "hr_hub",
-  "hr_consult"
+  "hr_consult",
+  "bulk_photo_upload",
+  "write_ups",
+  "handler_shift_entry",
+  "hr_pip"
 ];
 
 export const ADMIN_HR_TABS = ["hr_hub", "hr_consult"] as const;

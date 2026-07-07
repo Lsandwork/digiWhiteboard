@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { findAdminUserByEmail, verifyAdminUserPassword } from "@/lib/admin/users";
 import { loadAdminSettings } from "@/lib/admin/settings";
+import { DEMO_PASSWORD, findDemoAccount } from "@/lib/demo/constants";
 
 export function getAdminUsername() {
   return process.env.ADMIN_USERNAME?.trim() || "admin";
@@ -15,8 +16,6 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(aBuf, bBuf);
 }
 
-import { DEMO_EMAIL, DEMO_PASSWORD } from "@/lib/demo/constants";
-
 export type AdminAuthResult = {
   ok: boolean;
   email: string;
@@ -24,17 +23,20 @@ export type AdminAuthResult = {
   role?: string;
   forcePasswordChange?: boolean;
   isDemo?: boolean;
+  demoRole?: string;
   source: "database" | "env" | "demo";
 };
 
 export async function verifyAdminCredentials(username: string, password: string): Promise<AdminAuthResult> {
   const normalized = username.trim().toLowerCase();
 
-  if (normalized === DEMO_EMAIL && password === DEMO_PASSWORD) {
+  const demoAccount = findDemoAccount(normalized);
+  if (demoAccount && password === DEMO_PASSWORD) {
     return {
       ok: true,
-      email: DEMO_EMAIL,
-      role: "owner_admin",
+      email: demoAccount.email,
+      role: demoAccount.role,
+      demoRole: demoAccount.role,
       forcePasswordChange: false,
       isDemo: true,
       source: "demo"
@@ -47,12 +49,15 @@ export async function verifyAdminCredentials(username: string, password: string)
     if (dbUser && dbUser.status === "active") {
       const valid = await verifyAdminUserPassword(dbUser, password);
       if (valid) {
+        const isDemoDbUser = normalized.endsWith("@demo.com");
         return {
           ok: true,
           email: dbUser.email,
           adminUserId: dbUser.id,
           role: dbUser.role,
+          demoRole: isDemoDbUser ? dbUser.role : undefined,
           forcePasswordChange: dbUser.force_password_change,
+          isDemo: isDemoDbUser,
           source: "database"
         };
       }

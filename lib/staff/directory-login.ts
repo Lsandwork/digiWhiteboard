@@ -30,10 +30,12 @@ export type StaffDirectoryLoginSyncResult = {
 const dashboardRoles: AdminUserRole[] = [
   "owner_admin",
   "manager_admin",
+  "assistant_manager",
   "front_desk_coordinator",
   "team_leader",
   "groomer",
   "trainer",
+  "daycare",
   "viewer"
 ];
 

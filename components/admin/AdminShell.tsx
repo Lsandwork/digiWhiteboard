@@ -16,7 +16,7 @@ import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
-import { getEffectiveDemoRole } from "@/lib/demo/session";
+import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
 type AdminShellProps = {
   board: AdminBoardType;
@@ -156,7 +156,7 @@ export function AdminShell({
         </div>
       </div>
 
-      {isDemo ? (
+      {isDemo && usesDemoRoleSwitcher({ email: username, role: role ?? undefined, isDemo: true, demoRole: demoRole ?? undefined }) ? (
         <DemoRoleSwitcher
           currentRole={getEffectiveDemoRole({ email: username, role: role ?? undefined, isDemo: true, demoRole: demoRole ?? undefined })}
           onSwitched={() => {

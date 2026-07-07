@@ -63,6 +63,7 @@ import type { AdminUserRole } from "@/lib/admin/users";
 import { isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
 import { DemoPushPanel } from "@/components/demo/DemoPushPanel";
 import { getEffectiveDemoRole } from "@/lib/demo/session";
+import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel } from "@/components/admin/HandlerBasicPanels";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -289,7 +290,8 @@ export function AdminDashboard() {
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
-  const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel;
+  const isHandlerPanel = !isDemo && currentRole === "daycare";
+  const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel || isHandlerPanel;
   const canViewUserGroupsPermissions =
     isSuperAdminLegacyRole(currentRole) || hasPermission(userAccess, "view_user_groups_permissions");
 
@@ -349,6 +351,7 @@ export function AdminDashboard() {
         {error ? <p className="admin-error">{error}</p> : null}
 
         {tab === "demo_push" ? <DemoPushPanel /> : null}
+        {tab === "checklist" ? <HandlerChecklistPanel /> : null}
 
         {tab === "overview" ? (
           <>
@@ -445,7 +448,7 @@ export function AdminDashboard() {
         {tab === "yard_links" ? <YardLinksPanel /> : null}
 
         {tab === "management_support" ? (
-          <ManagementSupportPanel mode={isGroomerPanel ? "groomer" : isTrainerPanel ? "trainer" : "team_leader"} />
+          <ManagementSupportPanel mode={isHandlerPanel ? "handler" : isGroomerPanel ? "groomer" : isTrainerPanel ? "trainer" : "team_leader"} />
         ) : null}
 
         {tab === "ms_hub" ? <ManagementSupportHubPanel /> : null}
@@ -462,6 +465,10 @@ export function AdminDashboard() {
         ) : null}
 
         {tab === "hr_consult" ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null}
+        {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel /> : null}
+        {tab === "write_ups" ? <ManagementSupportPanel mode="team_leader" /> : null}
+        {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
+        {tab === "hr_pip" ? <HrHubPanel /> : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">

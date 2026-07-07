@@ -180,7 +180,7 @@ function GroomerManagementSupportPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/management-support", { cache: "no-store" });
+      const response = await fetch("/api/admin/management-support?view=write_ups", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
       setData(body as Payload);
@@ -621,10 +621,10 @@ export function ManagementSupportPanel({
   mode = "team_leader",
   initialSubTab = "submit"
 }: {
-  mode?: "team_leader" | "groomer" | "trainer";
+  mode?: "team_leader" | "groomer" | "trainer" | "handler";
   initialSubTab?: ManagementSupportSubTab;
 }) {
-  if (mode === "groomer") return <GroomerManagementSupportPanel />;
+  if (mode === "groomer" || mode === "handler") return <GroomerManagementSupportPanel />;
   if (mode === "trainer") return <TrainerManagementSupportPanel />;
   return <TeamLeadManagementSupportPanel initialSubTab={initialSubTab} />;
 }

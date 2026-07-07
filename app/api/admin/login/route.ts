@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       role: auth.role,
       mustChangePassword: auth.forcePasswordChange ?? false,
       isDemo: auth.isDemo ?? false,
-      demoRole: auth.isDemo ? auth.role ?? "owner_admin" : undefined
+      demoRole: auth.isDemo ? auth.demoRole ?? auth.role ?? "owner_admin" : undefined
     });
     const response = NextResponse.json({
       ok: true,

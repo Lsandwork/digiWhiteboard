@@ -57,6 +57,8 @@ export async function GET(request: Request) {
   const role = session?.role;
 
   try {
+    const url = new URL(request.url);
+    const view = url.searchParams.get("view");
     const supabase = getServiceSupabase();
     if (canAccessManagementReports(role)) {
       const reports = await listManagementReports(supabase, 100);
@@ -66,6 +68,18 @@ export async function GET(request: Request) {
           email: session?.email ?? null,
           adminUserId: session?.adminUserId ?? null,
           role: role ?? "owner_admin"
+        }
+      });
+    }
+
+    if (view === "write_ups" && canViewOwnWriteUps(role)) {
+      const reports = await listWriteUpsForCreator(supabase, actor, 100);
+      return NextResponse.json({
+        reports,
+        currentUser: {
+          email: session?.email ?? null,
+          adminUserId: session?.adminUserId ?? null,
+          role: role ?? "team_leader"
         }
       });
     }

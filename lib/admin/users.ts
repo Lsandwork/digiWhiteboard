@@ -15,31 +15,37 @@ export function normalizeAdminUserId(value?: string | null) {
 export type AdminUserRole =
   | "owner_admin"
   | "manager_admin"
+  | "assistant_manager"
   | "front_desk_coordinator"
   | "team_leader"
   | "groomer"
   | "trainer"
+  | "daycare"
   | "viewer";
 export type AdminUserStatus = "active" | "disabled";
 
 export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   owner_admin: "Owner Admin",
   manager_admin: "Manager Admin",
+  assistant_manager: "Assistant Manager",
   front_desk_coordinator: "Front Desk Coordinator",
   team_leader: "Team Lead",
   groomer: "Groomer",
   trainer: "Trainer",
+  daycare: "Dog Handler",
   viewer: "Viewer"
 };
 
 /** Sidebar user card — uses hyphenated front desk label per staff admin UX. */
 export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
-  owner_admin: "Owner Admin",
-  manager_admin: "Manager Admin",
+  owner_admin: "Super Admin",
+  manager_admin: "Admin",
+  assistant_manager: "Assistant Manager",
   front_desk_coordinator: "Front Desk - Coordinator",
   team_leader: "Team Lead",
   groomer: "Groomer",
   trainer: "Trainer",
+  daycare: "Dog Handler",
   viewer: "Viewer"
 };
 
@@ -135,27 +141,27 @@ export function isTrainerRole(role?: string | null) {
 
 /** Team leads can submit employee write-ups for management review. */
 export function canSubmitWriteUp(role?: string | null) {
-  return role === "team_leader";
+  return role === "team_leader" || role === "daycare";
 }
 
 /** Team leads can review status of their own submitted write-ups. */
 export function canViewOwnWriteUps(role?: string | null) {
-  return role === "team_leader";
+  return role === "team_leader" || role === "daycare";
 }
 
 /** Groomers can file complaints for admin and management review. */
 export function canSubmitGroomerComplaint(role?: string | null) {
-  return role === "groomer";
+  return role === "groomer" || role === "daycare";
 }
 
 /** Groomers can file requests for admin and management review. */
 export function canSubmitGroomerRequest(role?: string | null) {
-  return role === "groomer";
+  return role === "groomer" || role === "daycare";
 }
 
 /** Groomers can review their own filed complaints and requests. */
 export function canViewOwnGroomerSubmissions(role?: string | null) {
-  return role === "groomer";
+  return role === "groomer" || role === "daycare";
 }
 
 /** Trainers can file complaints for admin and management review. */
@@ -185,7 +191,7 @@ export function canCommentPackageCommissions(role?: string | null) {
 
 /** Trainers can submit trainer shift log entries. */
 export function canCreateTrainerEntry(role?: string | null) {
-  return role === "trainer";
+  return role === "trainer" || role === "daycare";
 }
 
 /** Admin and management can manage package commission CSV data. */
