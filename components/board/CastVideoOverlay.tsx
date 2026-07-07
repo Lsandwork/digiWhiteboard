@@ -5,7 +5,9 @@ import Image from "next/image";
 import { Check, Clock3, RefreshCw, Volume2, VolumeX } from "lucide-react";
 import type { CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import { castVideoAutoClearMs, isYouTubeEmbedCastVideo } from "@/lib/staff/cast-video-notices";
-import { yardPushSideFromNotice, yardPushSideLabel } from "@/lib/staff/yard-push-notices";
+import { isYardPushCastNotice, yardPushSideFromNotice, yardPushSideLabel, YARD_PUSH_SIDE_OPTIONS } from "@/lib/staff/yard-push-notices";
+import { YARD_LINK_FEEDS } from "@/lib/yard-links/config";
+import { buildYouTubeCastEmbedUrl } from "@/lib/yard-links/youtube";
 import { formatBoardDateTime } from "@/lib/board-utils";
 import { trackCastVideoClose, trackCastVideoOpen } from "@/hooks/useCastVideoNotices";
 
@@ -38,6 +40,15 @@ function formatTimestamp(value: string | null | undefined) {
   return formatBoardDateTime(date).time;
 }
 
+function resolveYardPushEmbedUrl(notice: CastVideoNotice) {
+  const side = yardPushSideFromNotice(notice);
+  if (!side) return null;
+  const option = YARD_PUSH_SIDE_OPTIONS.find((item) => item.id === side);
+  const feed = YARD_LINK_FEEDS.find((item) => item.title === option?.feedTitle);
+  if (!feed) return null;
+  return buildYouTubeCastEmbedUrl(feed.videoId, { muted: true });
+}
+
 function CastVideoOverlayContent({
   notice,
   queue,
@@ -57,19 +68,30 @@ function CastVideoOverlayContent({
 
   const pushedLabel = useMemo(() => formatTimestamp(notice.pushed_at), [notice.pushed_at]);
   const autoClearMs = castVideoAutoClearMs(notice.auto_clear_mode);
-  const isYouTubeCast = isYouTubeEmbedCastVideo(notice);
+  const isYouTubeCast = isYouTubeEmbedCastVideo(notice) || isYardPushCastNotice(notice);
   const yardSideLabel = yardPushSideLabel(yardPushSideFromNotice(notice));
+  const displayDescription = useMemo(() => {
+    if (yardSideLabel) return `${yardSideLabel} yard live camera`;
+    const description = notice.description?.trim();
+    if (!description || description.startsWith("yard_push:")) return null;
+    return description;
+  }, [notice.description, yardSideLabel]);
   const youtubeSrc = useMemo(() => {
-    if (!isYouTubeCast || !notice.video_url) return notice.video_url ?? undefined;
+    if (!isYouTubeCast) return notice.video_url ?? undefined;
+    let base = notice.video_url ?? undefined;
+    if (!base || !/youtube\.com\/embed\//i.test(base)) {
+      base = resolveYardPushEmbedUrl(notice) ?? base;
+    }
+    if (!base) return undefined;
     try {
-      const url = new URL(notice.video_url);
+      const url = new URL(base);
       url.searchParams.set("autoplay", "1");
       url.searchParams.set("mute", notice.allow_sound && soundEnabled ? "0" : "1");
       return url.toString();
     } catch {
-      return notice.video_url ?? undefined;
+      return base;
     }
-  }, [isYouTubeCast, notice.allow_sound, notice.video_url, soundEnabled]);
+  }, [isYouTubeCast, notice, soundEnabled]);
 
   const dismiss = useCallback(
     async (options?: { acknowledged?: boolean; skipped?: boolean }) => {
@@ -154,7 +176,7 @@ function CastVideoOverlayContent({
           </div>
           <div className="cast-video__meta">
             <p className="cast-video__title">{notice.title}</p>
-            {notice.description ? <p className="cast-video__description">{notice.description}</p> : null}
+            {displayDescription ? <p className="cast-video__description">{displayDescription}</p> : null}
             <p className="cast-video__timestamp">
               <Clock3 className="inline h-4 w-4" aria-hidden />
               {pushedLabel}

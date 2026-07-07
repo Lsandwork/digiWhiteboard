@@ -4,10 +4,12 @@
 import {
   castVideoTargetsDepartment,
   isEmergencyCastVideo,
+  isYouTubeEmbedCastVideo,
   loadCastVideoBoardState,
   normalizeCastVideoNoticeInput,
   type CastVideoDepartment
 } from "../lib/staff/cast-video-notices";
+import { buildYouTubeCastEmbedUrl } from "../lib/yard-links/youtube";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -119,10 +121,58 @@ async function testBoardStateFallback() {
   assert(state.activeNotice === null, "fallback should return empty active notice");
 }
 
+function testYouTubeDetection() {
+  const embedUrl = buildYouTubeCastEmbedUrl("o5rwgL1BKeQ");
+  assert(
+    isYouTubeEmbedCastVideo({
+      mime_type: "application/x-youtube-embed",
+      video_url: embedUrl,
+      description: "yard_push:small_side"
+    }),
+    "youtube mime should match"
+  );
+  assert(
+    isYouTubeEmbedCastVideo({
+      mime_type: "applicationxyoutube-embed",
+      video_url: embedUrl,
+      description: null
+    }),
+    "legacy corrupted mime should match"
+  );
+  assert(
+    isYouTubeEmbedCastVideo({
+      mime_type: null,
+      video_url: embedUrl,
+      description: "yard_push:small_side"
+    }),
+    "yard push description should match"
+  );
+}
+
+function testYouTubeUrlPreservation() {
+  const embedUrl = buildYouTubeCastEmbedUrl("wK0m06yoW4Q");
+  const normalized = normalizeCastVideoNoticeInput({
+    title: "Yard Live",
+    description: "yard_push:large_side",
+    departments: ["staff_whiteboard"],
+    video_url: embedUrl,
+    thumbnail_url: "https://img.youtube.com/vi/wK0m06yoW4Q/hqdefault.jpg",
+    mime_type: "application/x-youtube-embed"
+  });
+  assert(normalized.video_url === embedUrl, "video_url should preserve slashes");
+  assert(
+    normalized.thumbnail_url === "https://img.youtube.com/vi/wK0m06yoW4Q/hqdefault.jpg",
+    "thumbnail_url should preserve slashes"
+  );
+  assert(normalized.mime_type === "application/x-youtube-embed", "mime_type should preserve slashes");
+}
+
 async function main() {
   testNormalizeInput();
   testDepartmentTargeting();
   testEmergencyDetection();
+  testYouTubeDetection();
+  testYouTubeUrlPreservation();
   await testBoardStateFallback();
   console.log("cast-video-notices: all tests passed");
 }

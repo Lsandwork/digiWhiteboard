@@ -151,6 +151,23 @@ function sanitizeText(value: unknown, maxLength: number) {
     .slice(0, maxLength);
 }
 
+function sanitizeUrl(value: unknown, maxLength: number) {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/[<>"'`\\]/g, "")
+    .slice(0, maxLength);
+  if (!/^https?:\/\//i.test(raw)) return null;
+  return raw;
+}
+
+function sanitizeMimeType(value: unknown) {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/[<>&"'`\\]/g, "")
+    .slice(0, 80);
+  return raw || null;
+}
+
 function normalizePriority(value: unknown): CastVideoPriority {
   const raw = sanitizeText(value, 20).toLowerCase();
   if (raw === "emergency" || raw === "urgent" || raw === "important" || raw === "normal") return raw;
@@ -187,8 +204,19 @@ export function isEmergencyCastVideo(notice: Pick<CastVideoNotice, "priority">) 
   return notice.priority === "emergency";
 }
 
-export function isYouTubeEmbedCastVideo(notice: Pick<CastVideoNotice, "mime_type">) {
-  return notice.mime_type === "application/x-youtube-embed";
+export function isYouTubeEmbedCastVideo(
+  notice: Pick<CastVideoNotice, "mime_type" | "video_url" | "description">
+) {
+  const mime = notice.mime_type ?? "";
+  if (
+    mime === "application/x-youtube-embed" ||
+    mime === "applicationxyoutube-embed" ||
+    mime === "youtube-embed"
+  ) {
+    return true;
+  }
+  if (String(notice.description ?? "").startsWith("yard_push:")) return true;
+  return /youtube\.com\/embed\//i.test(notice.video_url ?? "");
 }
 
 export function castVideoTargetsDepartment(notice: Pick<CastVideoNotice, "departments">, department: string | null | undefined) {
@@ -283,10 +311,10 @@ export function normalizeCastVideoNoticeInput(input: CastVideoNoticeInput) {
   const priority = normalizePriority(input.priority);
   const departments = normalizeDepartments(input.departments);
   const video_storage_path = sanitizeText(input.video_storage_path, 500) || null;
-  const video_url = sanitizeText(input.video_url, 1000) || null;
+  const video_url = sanitizeUrl(input.video_url, 1000);
   const thumbnail_storage_path = sanitizeText(input.thumbnail_storage_path, 500) || null;
-  const thumbnail_url = sanitizeText(input.thumbnail_url, 1000) || null;
-  const mime_type = sanitizeText(input.mime_type, 80) || null;
+  const thumbnail_url = sanitizeUrl(input.thumbnail_url, 1000);
+  const mime_type = sanitizeMimeType(input.mime_type);
   const file_size_bytes = input.file_size_bytes != null ? Number(input.file_size_bytes) : null;
   const allow_sound = Boolean(input.allow_sound);
   const require_acknowledgement = Boolean(input.require_acknowledgement);

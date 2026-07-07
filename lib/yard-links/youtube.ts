@@ -27,7 +27,9 @@ export function buildYouTubeCastEmbedUrl(videoId: string, options?: { muted?: bo
     mute: options?.muted === false ? "0" : "1",
     playsinline: "1",
     rel: "0",
-    modestbranding: "1"
+    modestbranding: "1",
+    enablejsapi: "1",
+    iv_load_policy: "3"
   });
   return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
 }

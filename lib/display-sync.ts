@@ -27,8 +27,10 @@ export function writeStoredDisplaySync(state: DisplaySyncState) {
 
 export function hardReloadDisplay(castReloadNonce: number) {
   if (typeof window === "undefined") return;
+  const nonce = Number(castReloadNonce);
+  if (!Number.isFinite(nonce)) return;
   const url = new URL(window.location.href);
-  url.searchParams.set("_cast_reload", String(castReloadNonce));
+  url.searchParams.set("_cast_reload", String(nonce));
   window.location.replace(url.toString());
 }
 
