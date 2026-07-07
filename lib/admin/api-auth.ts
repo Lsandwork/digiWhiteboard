@@ -20,7 +20,8 @@ import {
   canViewPackageCommissions as userCanViewPackageCommissions,
   canViewOwnWriteUps as userCanViewOwnWriteUps,
   canViewStaffDirectory,
-  hasCoordinatorAccess
+  hasCoordinatorAccess,
+  isFullAdminRole
 } from "@/lib/admin/users";
 
 export function isAdminRequest(request: Request) {
@@ -56,6 +57,25 @@ export function canManageWhiteboardAdmin(role?: string | null) {
 
 export function canCreatePushNotice(role?: string | null) {
   return canManagePushNotices(role);
+}
+
+/** Edit Daily Reminder templates — admins and management only. */
+export function canEditDailyReminders(role?: string | null) {
+  return isFullAdminRole(role) || role === "management" || !role;
+}
+
+/** Send Daily Reminders early — admins, management, team leads, and coordinators. */
+export function canSendDailyReminderEarly(role?: string | null) {
+  return canAccessPushNotices(role) || !role;
+}
+
+/** Force resend a Daily Reminder — full admins only. */
+export function canForceResendDailyReminder(role?: string | null) {
+  return isFullAdminRole(role) || !role;
+}
+
+export function canViewDailyReminderHistory(role?: string | null) {
+  return canSendDailyReminderEarly(role);
 }
 
 export function canManageCrossover(role?: string | null) {

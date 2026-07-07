@@ -3,7 +3,8 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 export type StaffPushNoticePriority = "normal" | "important" | "urgent";
 export type StaffPushNoticeDisplayMode = "normal" | "urgent";
 export type StaffPushNoticeRecurrence = "none" | "day" | "week" | "month";
-export type StaffPushNoticeType = "standard" | "owner_complaint_dog_handler";
+export type StaffPushNoticeType = "standard" | "owner_complaint_dog_handler" | "daily_reminder";
+export type DailyReminderPushSentType = "automatic" | "early" | "force_resend";
 
 export type OwnerComplaintCategory = "on_phone" | "yard_dirty" | "not_engaged" | "handling_concern";
 
@@ -54,6 +55,14 @@ export type StaffPushNotice = {
   scheduled_at?: string | null;
   recurrence?: StaffPushNoticeRecurrence;
   next_scheduled_at?: string | null;
+  daily_reminder_id?: string | null;
+  daily_reminder_sent_type?: DailyReminderPushSentType | null;
+  daily_reminder_scheduled_time?: string | null;
+  daily_reminder_audience?: string[] | null;
+  daily_reminder_sent_by_name?: string | null;
+  daily_reminder_footer?: string | null;
+  source?: string | null;
+  source_id?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -72,6 +81,14 @@ export type StaffPushNoticeInput = {
   schedule_enabled?: unknown;
   scheduled_at?: unknown;
   recurrence?: unknown;
+  daily_reminder_id?: unknown;
+  daily_reminder_sent_type?: unknown;
+  daily_reminder_scheduled_time?: unknown;
+  daily_reminder_audience?: unknown;
+  daily_reminder_sent_by_name?: unknown;
+  daily_reminder_footer?: unknown;
+  source?: unknown;
+  source_id?: unknown;
 };
 
 export const DOG_HANDLER_COMPLAINT_NOTICE_LABEL = "Owner Complaint";
@@ -103,6 +120,10 @@ export function sanitizeDogHandlerName(value: unknown) {
 
 export function isDogHandlerComplaintNotice(notice: Pick<StaffPushNotice, "notice_type" | "title">) {
   return notice.notice_type === "owner_complaint_dog_handler";
+}
+
+export function isDailyReminderPushNotice(notice: Pick<StaffPushNotice, "notice_type">) {
+  return notice.notice_type === "daily_reminder";
 }
 
 export function buildOwnerComplaintNoticeInput(
@@ -190,8 +211,19 @@ function normalizeRecurrence(value: unknown): StaffPushNoticeRecurrence {
 }
 
 function normalizeNoticeType(value: unknown): StaffPushNoticeType | undefined {
-  if (value === "owner_complaint_dog_handler") return value;
+  if (value === "owner_complaint_dog_handler" || value === "daily_reminder") return value;
   return undefined;
+}
+
+function normalizeDailyReminderSentType(value: unknown): DailyReminderPushSentType | null {
+  if (value === "automatic" || value === "early" || value === "force_resend") return value;
+  return null;
+}
+
+function normalizeStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const next = value.map((item) => String(item).trim()).filter(Boolean);
+  return next.length ? next : null;
 }
 
 function normalizeDogHandlerName(value: unknown) {
@@ -266,6 +298,18 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
     throw new Error("Please enter the dog handler name before pushing this notice.");
   }
 
+  const daily_reminder_id = input.daily_reminder_id != null ? String(input.daily_reminder_id) : null;
+  const daily_reminder_sent_type = normalizeDailyReminderSentType(input.daily_reminder_sent_type);
+  const daily_reminder_scheduled_time =
+    input.daily_reminder_scheduled_time != null ? String(input.daily_reminder_scheduled_time) : null;
+  const daily_reminder_audience = normalizeStringArray(input.daily_reminder_audience);
+  const daily_reminder_sent_by_name =
+    input.daily_reminder_sent_by_name != null ? sanitizeDogHandlerName(input.daily_reminder_sent_by_name) : null;
+  const daily_reminder_footer =
+    input.daily_reminder_footer != null ? String(input.daily_reminder_footer).trim().slice(0, 200) : null;
+  const source = input.source != null ? String(input.source).trim().slice(0, 80) : null;
+  const source_id = input.source_id != null ? String(input.source_id).trim().slice(0, 80) : null;
+
   return {
     title,
     message: message || null,
@@ -280,7 +324,15 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
     schedule_enabled,
     scheduled_at,
     recurrence,
-    next_scheduled_at: schedule_enabled ? scheduled_at : null
+    next_scheduled_at: schedule_enabled ? scheduled_at : null,
+    daily_reminder_id,
+    daily_reminder_sent_type,
+    daily_reminder_scheduled_time,
+    daily_reminder_audience,
+    daily_reminder_sent_by_name,
+    daily_reminder_footer,
+    source,
+    source_id
   };
 }
 

@@ -407,6 +407,7 @@ export function BoardClient() {
     <main className="board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white">
       <StaffPushNoticeTvOverlay
         active={Boolean(activePushNotice) && !visibleEmergencyCast && !visibleCastVideo && !activeGroomingNotice && !activeTrainerNotice}
+        notice={activePushNotice}
       />
 
       {!tvMode ? (

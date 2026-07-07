@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BellRing, Download, Pencil, Plus, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
+import { DailyRemindersSection } from "@/components/admin/DailyRemindersSection";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { canAccessPushNotices, canViewManagementReports } from "@/lib/admin/users";
@@ -466,8 +467,8 @@ export function PushNoticesPanel() {
 
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="crossover-card p-5">
-          <h3 className="crossover-card__title">Create Custom Notice</h3>
-          <p className="crossover-card__subtitle mb-4">Create a staff-only alert and push it live immediately or save it for later.</p>
+          <h3 className="crossover-card__title">Manual Push Notices</h3>
+          <p className="crossover-card__subtitle mb-4">Create a custom staff alert and push it live immediately or save it for later.</p>
           <NoticeForm form={form} onChange={setForm} />
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void saveCustom()}>
@@ -502,6 +503,8 @@ export function PushNoticesPanel() {
           </button>
         </div>
       </section>
+
+      <DailyRemindersSection canView={canManage} />
 
       <section className="crossover-card crossover-card--conversations">
         <div className="crossover-card__header">
