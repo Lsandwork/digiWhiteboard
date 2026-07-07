@@ -6,6 +6,7 @@ import { validatePasswordStrength } from "@/lib/admin/password";
 import { canManageAdminUsers } from "@/lib/admin/permissions";
 import { legacyRoleToRoleKey, type DepartmentKey, type RoleKey } from "@/lib/admin/permissions";
 import { assertUserMutationAllowed } from "@/lib/admin/super-admin-guards";
+import { canAssignPrimaryRole, canCreateAdminUsers } from "@/lib/admin/user-creation-access";
 import { loadAdminSettings } from "@/lib/admin/settings";
 import {
   getUserAccess,
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
 
-  if (!canManageAdminUsers(actorAccess, session?.role)) {
+  if (!canCreateAdminUsers(actorAccess, session?.role) && !canManageAdminUsers(actorAccess, session?.role)) {
     return NextResponse.json({ error: "You do not have permission to add users." }, { status: 403 });
   }
 
@@ -115,6 +116,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Not allowed." }, { status: 403 });
+  }
+
+  if (!canAssignPrimaryRole(actorAccess, session?.role, primaryRoleKey)) {
+    return NextResponse.json({ error: "You cannot assign that role." }, { status: 403 });
   }
 
   if (!full_name || !email || !password) {

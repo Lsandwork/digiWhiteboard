@@ -1,0 +1,76 @@
+"use client";
+
+import clsx from "clsx";
+
+type FitdogGeminiAvatarProps = {
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  /** Subtle pulse ring for typing / active states */
+  active?: boolean;
+};
+
+const SIZE_MAP = {
+  sm: 36,
+  md: 40,
+  lg: 44
+} as const;
+
+export function FitdogGeminiAvatar({ size = "md", className, active = false }: FitdogGeminiAvatarProps) {
+  const dimension = SIZE_MAP[size];
+
+  return (
+    <span
+      className={clsx("fitdog-gemini-avatar", active && "fitdog-gemini-avatar--active", className)}
+      style={{ width: dimension, height: dimension }}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-full w-full">
+        <defs>
+          <linearGradient id="fitdogGeminiRing" x1="6" y1="4" x2="42" y2="44" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#4285F4" />
+            <stop offset="0.35" stopColor="#9B72F2" />
+            <stop offset="0.68" stopColor="#D96570" />
+            <stop offset="1" stopColor="#F26522" />
+          </linearGradient>
+          <linearGradient id="fitdogGeminiFace" x1="14" y1="12" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#FFF7ED" />
+            <stop offset="1" stopColor="#FFE4C7" />
+          </linearGradient>
+          <radialGradient id="fitdogGeminiGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(24 24) rotate(90) scale(22)">
+            <stop stopColor="#F59E0B" stopOpacity="0.35" />
+            <stop offset="1" stopColor="#111827" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        <circle cx="24" cy="24" r="23" fill="url(#fitdogGeminiGlow)" />
+        <circle cx="24" cy="24" r="22" stroke="url(#fitdogGeminiRing)" strokeWidth="2.5" fill="#111827" />
+        <circle cx="24" cy="24" r="18.5" fill="url(#fitdogGeminiFace)" />
+
+        {/* Fitdog mascot — simplified dog head */}
+        <path
+          d="M17.5 20.2c-2.1 0.8-3.4 2.6-3.4 4.8 0 1.2 0.4 2.3 1.1 3.2-0.5 0.8-0.8 1.7-0.8 2.7 0 2.8 2.4 5 5.4 5h5.4c3 0 5.4-2.2 5.4-5 0-1-0.3-1.9-0.8-2.7 0.7-0.9 1.1-2 1.1-3.2 0-2.2-1.3-4-3.4-4.8"
+          fill="#F26522"
+        />
+        <path d="M16.8 18.4c-1.4-1.8-0.2-4.2 2.1-4.2 1.2 0 2.2 0.7 2.7 1.7" stroke="#F26522" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M31.2 18.4c1.4-1.8 0.2-4.2-2.1-4.2-1.2 0-2.2 0.7-2.7 1.7" stroke="#F26522" strokeWidth="2.2" strokeLinecap="round" />
+        <path d="M18.5 17.8h11" stroke="#F26522" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M20.2 16.1c0.4-1.2 1.4-2 2.6-2 1.2 0 2.2 0.8 2.6 2" stroke="#F26522" strokeWidth="1.8" strokeLinecap="round" />
+        <path d="M25.6 16.1c0.4-1.2 1.4-2 2.6-2 1.2 0 2.2 0.8 2.6 2" stroke="#F26522" strokeWidth="1.8" strokeLinecap="round" />
+        <ellipse cx="21.2" cy="24.2" rx="1.5" ry="1.1" fill="#7C2D12" />
+        <ellipse cx="26.8" cy="24.2" rx="1.5" ry="1.1" fill="#7C2D12" />
+        <ellipse cx="24" cy="28.2" rx="2.4" ry="1.8" fill="#FFF7ED" />
+        <ellipse cx="24" cy="27.8" rx="1.5" ry="1.1" fill="#7C2D12" />
+
+        {/* Gemini sparkle */}
+        <path
+          d="M35.8 11.2 36.8 14l2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1 1-2.8Z"
+          fill="#9B72F2"
+        />
+        <path
+          d="M12.4 13.6 12.9 15.1l1.5 0.5-1.5 0.5-0.5 1.5-0.5-1.5-1.5-0.5 1.5-0.5 0.5-1.5Z"
+          fill="#4285F4"
+        />
+      </svg>
+    </span>
+  );
+}

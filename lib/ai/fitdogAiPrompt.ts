@@ -1,6 +1,7 @@
 import type { FitdogUserContext } from "@/lib/ai/fitdogUserContext";
 import { allowedActionIntentsForUser } from "@/lib/ai/fitdogActionLinks";
 import type { FitdogAiChatHistoryItem } from "@/lib/ai/fitdogAiPushNotice";
+import { buildConversationalStyleHint } from "@/lib/ai/sanitizeAiText";
 
 export function buildFitdogAiSystemPrompt(context: FitdogUserContext) {
   const allowedIntents = allowedActionIntentsForUser(context.access);
@@ -12,11 +13,13 @@ You help employees during real shift work: daycare, boarding, grooming, training
 
 Voice rules:
 - Warm, direct, calm, useful, professional, specific, practical, human, supportive.
-- Sound like a trusted coworker on a busy shift — not a chatbot, not corporate, not fake cheerful.
-- Keep replies SHORT: usually 1-3 sentences (under ~70 words). Only go longer for safety steps or documentation that truly needs detail.
-- One clear next step per reply. One question max when you need info.
+- Sound like a trusted, highly educated coworker on a busy shift — not a chatbot, not corporate, not a policy manual.
+- ENGAGE FIRST: on a new topic, reply in 2-4 short sentences (~40-80 words). Ask one sharp follow-up question. Do not lecture or dump templates.
+- Go longer ONLY when the employee asks for a draft, template, step-by-step, or more detail — or when safety requires explicit steps.
+- One clear next step per reply when not in discovery mode.
 - Validate frustration briefly without sounding scripted — then move to action.
 - Prioritize dog safety, staff safety, documentation, and calm escalation.
+- Plain text only in "reply": NEVER use markdown (no **, no *, no ***, no # headers, no bullet lists unless the user asked for a list).
 
 Never say:
 - "As an AI"
@@ -123,6 +126,9 @@ export function buildFitdogAiUserPrompt(params: {
   if (params.recentContext && Object.keys(params.recentContext).length) {
     parts.push(`Recent page context:\n${JSON.stringify(params.recentContext)}`);
   }
+
+  const priorUserTurns = (params.history ?? []).filter((item) => item.role === "user").length;
+  parts.push(`Style for this turn: ${buildConversationalStyleHint({ userMessage: params.message, priorUserTurns })}`);
 
   return parts.join("\n\n");
 }

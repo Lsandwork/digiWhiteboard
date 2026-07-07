@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
+import { FitdogGeminiAvatar } from "@/components/ai/FitdogGeminiAvatar";
 
 const FitdogAiChatWindow = dynamic(
   () => import("@/components/ai/FitdogAiChatWindow").then((module) => module.FitdogAiChatWindow),
@@ -34,7 +34,7 @@ export function FitdogAiBubble({ board = "staff", tab }: FitdogAiBubbleProps) {
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <Sparkles className="h-6 w-6" aria-hidden />
+        <FitdogGeminiAvatar size="sm" />
         <span>Fitdog AI</span>
       </button>
 

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+<rect width="980" height="520" rx="30" fill="#0E131B"/><rect x="1" y="1" width="978" height="518" rx="30" fill="none" stroke="#263241" stroke-width="2"/>
+<text x="45" y="60" font-family="Inter, Arial" font-size="31" font-weight="900" fill="#F8FAFC">Admin Activity Overview</text>
+<text x="45" y="96" font-family="Inter, Arial" font-size="16" fill="#A6B0BE">Last 30 days of actions, security events, and alerts</text>
+<g transform="translate(65 130)">
+<g stroke="#263241" stroke-width="2"><path d="M0 0h850"/><path d="M0 70h850"/><path d="M0 140h850"/><path d="M0 210h850"/><path d="M0 280h850"/></g>
+<path d="M0 280 65 220 130 250 195 180 260 200 325 130 390 164 455 92 520 132 585 70 650 116 715 52 780 80 850 24" fill="none" stroke="#F97316" stroke-width="8" stroke-linecap="round"/>
+<path d="M0 280 65 220 130 250 195 180 260 200 325 130 390 164 455 92 520 132 585 70 650 116 715 52 780 80 850 24 V320 H0Z" fill="#F97316" opacity=".12"/>
+</g>
+<circle cx="72" cy="466" r="5" fill="#F97316"/><text x="90" y="472" font-family="Inter, Arial" font-size="15" fill="#CBD5E1">Most active day: Jun 3, 2026</text>
+</svg>

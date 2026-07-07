@@ -25,7 +25,7 @@ const STARTERS = [
   "I need to document a performance issue — where do I start?",
   "An owner complained about a handler on the yard. What should I do first?",
   "How should I talk to an employee about a repeated tardiness pattern?",
-  "What should be in a written warning for a safety violation?"
+  "I need to address a safety violation with a team member — where do I start?"
 ];
 
 function formatTime(value: string) {

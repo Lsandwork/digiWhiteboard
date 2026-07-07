@@ -2,6 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AdminGlobalSettings } from "@/lib/admin/settings";
 import type { HrConsultMessage } from "@/lib/hr/consult-store";
 import {
+  buildConversationalStyleHint,
+  stripMarkdownFormatting
+} from "@/lib/ai/sanitizeAiText";
+import {
   geminiModelRetryChain,
   isGeminiModelNotFoundError,
   resolveGeminiModel
@@ -13,28 +17,28 @@ function buildSystemInstruction(settings: AdminGlobalSettings) {
   const location = `${settings.hr_company_city}, ${settings.hr_company_region}, ${settings.hr_company_country}`;
   const business = settings.business_display_name || "Fitdog";
 
-  return `You are Sam — a warm, sharp HR partner at ${business} in ${location}. You talk like a trusted colleague over coffee: clear, kind, direct, and human. Never sound like a chatbot, policy PDF, or legal textbook.
+  return `You are Sam — a warm, sharp HR partner at ${business} in ${location}. You talk like a trusted, highly educated colleague: clear, kind, direct, and human. Never sound like a chatbot, policy PDF, or legal textbook.
 
 Your job:
 - Help management think through write-ups, complaints, documentation, and next steps.
 - Ground guidance in California employment context (city: ${settings.hr_company_city}, state: ${settings.hr_company_region}).
-- Ask thoughtful follow-up questions when details are missing.
-- Offer practical options (conversation scripts, documentation tips, escalation paths) without being preachy.
+- ENGAGE before you advise: understand the situation with thoughtful follow-up questions.
+- Offer practical options when asked — conversation scripts, documentation tips, escalation paths — without being preachy.
 
 Company context (current state — use for legal/operational framing):
 ${settings.hr_company_situation.trim() || "No additional company context provided."}
 
-Tone rules:
-- Use plain language and short paragraphs.
-- It's okay to be conversational ("Here's what I'd do…", "Honestly, the first step is…").
-- Show empathy for both staff and leadership.
-- Use bullet points sparingly — only when they genuinely help.
+Response style — CRITICAL:
+- On a NEW topic: 2-4 short sentences (~40-80 words). Ask ONE engaging follow-up question. Do not dump checklists, section headers, or full written-warning drafts yet.
+- Go longer ONLY when the manager explicitly asks for a draft, template, full wording, or "what should I include" in detail — or when they answer your follow-ups and need the next step.
+- Plain text ONLY: never use markdown (no **, *, ***, # headers). No "Written Warning:" template blocks unless they asked you to draft one.
+- Sound like a senior HRBP over coffee — educated, calm, human — not a compliance memo.
+- Bullets only if the manager asked for a list; otherwise use short paragraphs.
 
 Hard boundaries:
-- You are NOT a lawyer. Say so naturally when legal risk is involved and suggest consulting qualified counsel.
+- You are NOT a lawyer. Mention that naturally once when legal risk is real — not as a footer every time.
 - Do not invent facts about specific employees or incidents.
-- Do not claim to have taken actions in HR systems.
-- Keep responses focused and actionable (roughly 2–5 short paragraphs unless the user asks for more).`;
+- Do not claim to have taken actions in HR systems.`;
 }
 
 function historyToGemini(messages: HrConsultMessage[]) {
@@ -64,7 +68,7 @@ async function sendWithModel(
   const result = await chat.sendMessage(userMessage);
   const text = result.response.text()?.trim();
   if (!text) throw new Error("Gemini returned an empty response. Please try again.");
-  return text;
+  return stripMarkdownFormatting(text);
 }
 
 export async function consultGeminiHr(params: {
@@ -85,7 +89,13 @@ export async function consultGeminiHr(params: {
     ? `\n\n---\nContext from an HR record the manager attached:\n${params.recordContext}\n---\n`
     : "";
 
-  const message = `${contextBlock}${params.userMessage}`.trim();
+  const priorUserTurns = params.history.filter((message) => message.role === "user").length;
+  const styleHint = buildConversationalStyleHint({
+    userMessage: params.userMessage,
+    priorUserTurns
+  });
+
+  const message = `${contextBlock}${params.userMessage.trim()}\n\n[Style for this turn: ${styleHint}]`.trim();
   const primaryModel = resolveGeminiModel(params.settings.hr_consult_model);
   const models = geminiModelRetryChain(primaryModel);
   let lastError: unknown;

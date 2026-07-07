@@ -66,8 +66,10 @@ export function detectToneHint(message: string): FitdogAiTone | null {
   return null;
 }
 
+import { stripMarkdownFormatting } from "@/lib/ai/sanitizeAiText";
+
 export function sanitizeAiReply(reply: string): string {
-  let text = reply.trim();
+  let text = stripMarkdownFormatting(reply);
   for (const pattern of BLOCKED_REPLY_PATTERNS) {
     text = text.replace(pattern, "").trim();
   }

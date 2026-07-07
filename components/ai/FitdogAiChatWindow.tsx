@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, MessageCircleHeart, Send, Sparkles, Video, X } from "lucide-react";
+import { Loader2, MessageCircleHeart, Send, Video, X } from "lucide-react";
+import { FitdogGeminiAvatar } from "@/components/ai/FitdogGeminiAvatar";
 import {
   FitdogAiMessage,
   type FitdogAiChatMessage,
@@ -189,10 +190,10 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
     <div className="fitdog-ai-window" role="dialog" aria-label="Fitdog AI">
       <header className="fitdog-ai-window__header">
         <div className="fitdog-ai-window__title-wrap">
-          <Sparkles className="h-5 w-5 text-fitdog-orange" aria-hidden />
+          <FitdogGeminiAvatar size="lg" />
           <div>
             <p className="fitdog-ai-window__title">Fitdog AI</p>
-            <p className="fitdog-ai-window__subtitle">Santa Monica shift support</p>
+            <p className="fitdog-ai-window__subtitle">Powered by Gemini · Santa Monica shift support</p>
           </div>
         </div>
         <button type="button" className="fitdog-ai-window__close" onClick={onClose} aria-label="Close Fitdog AI">
@@ -260,9 +261,12 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
             )}
             {sending ? (
               <div className="fitdog-ai-typing" aria-live="polite">
-                <span />
-                <span />
-                <span />
+                <FitdogGeminiAvatar size="md" active />
+                <div className="fitdog-ai-typing__dots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
               </div>
             ) : null}
           </div>

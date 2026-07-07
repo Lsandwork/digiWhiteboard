@@ -9,11 +9,20 @@ import { resolveDogPhotoUrl } from "@/lib/board-utils";
 type DogAvatarProps = {
   dog: LiveDog;
   mode: "in" | "out";
+  size?: "default" | "solo";
   isAlerting?: boolean;
   isNew?: boolean;
 };
 
-function LetterFallback({ initial, mode }: { initial: string; mode: "in" | "out" }) {
+function LetterFallback({
+  initial,
+  mode,
+  size = "default"
+}: {
+  initial: string;
+  mode: "in" | "out";
+  size?: "default" | "solo";
+}) {
   return (
     <div
       className={clsx(
@@ -22,9 +31,14 @@ function LetterFallback({ initial, mode }: { initial: string; mode: "in" | "out"
       )}
     >
       {initial ? (
-        <span className="text-3xl font-black sm:text-4xl">{initial}</span>
+        <span className={clsx("font-black", size === "solo" ? "text-5xl sm:text-6xl lg:text-7xl" : "text-3xl sm:text-4xl")}>
+          {initial}
+        </span>
       ) : (
-        <Dog className="h-10 w-10 sm:h-12 sm:w-12" strokeWidth={1.75} />
+        <Dog
+          className={clsx(size === "solo" ? "h-16 w-16 sm:h-20 sm:w-20 lg:h-24 lg:w-24" : "h-10 w-10 sm:h-12 sm:w-12")}
+          strokeWidth={1.75}
+        />
       )}
     </div>
   );
@@ -35,24 +49,26 @@ function DogAvatarContent({
   animalName,
   initial,
   mode,
-  isNew
+  isNew,
+  size = "default"
 }: {
   photoUrl: string;
   animalName: string;
   initial: string;
   mode: "in" | "out";
   isNew: boolean;
+  size?: "default" | "solo";
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   if (failed) {
-    return <LetterFallback initial={initial} mode={mode} />;
+    return <LetterFallback initial={initial} mode={mode} size={size} />;
   }
 
   return (
     <>
-      {!loaded ? <LetterFallback initial={initial} mode={mode} /> : null}
+      {!loaded ? <LetterFallback initial={initial} mode={mode} size={size} /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={photoUrl}
@@ -72,14 +88,17 @@ function DogAvatarContent({
   );
 }
 
-export function DogAvatar({ dog, mode, isAlerting = false, isNew = false }: DogAvatarProps) {
+export function DogAvatar({ dog, mode, size = "default", isAlerting = false, isNew = false }: DogAvatarProps) {
   const photoUrl = resolveDogPhotoUrl(dog);
   const initial = dog.animal_name.trim().slice(0, 1).toUpperCase();
 
   return (
     <div
       className={clsx(
-        "relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-full border-2 sm:h-[100px] sm:w-[100px]",
+        "relative shrink-0 overflow-hidden rounded-full border-2",
+        size === "solo"
+          ? "h-[132px] w-[132px] border-[3px] sm:h-[168px] sm:w-[168px] lg:h-[208px] lg:w-[208px] xl:h-[240px] xl:w-[240px]"
+          : "h-[88px] w-[88px] sm:h-[100px] sm:w-[100px]",
         mode === "in"
           ? "border-fitdog-blue/80 shadow-glowBlue"
           : "border-fitdog-orange/80 shadow-glowOrange",
@@ -95,9 +114,10 @@ export function DogAvatar({ dog, mode, isAlerting = false, isNew = false }: DogA
           initial={initial}
           mode={mode}
           isNew={isNew}
+          size={size}
         />
       ) : (
-        <LetterFallback initial={initial} mode={mode} />
+        <LetterFallback initial={initial} mode={mode} size={size} />
       )}
     </div>
   );

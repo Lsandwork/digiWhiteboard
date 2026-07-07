@@ -88,11 +88,22 @@ export function BoardPanel(props: BoardPanelProps) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 sm:gap-4">
+      <div
+        className={clsx(
+          "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 sm:gap-4",
+          count === 1 && "board-panel-cards--solo"
+        )}
+      >
         {mode === "in" ? (
           props.checkingInEntries.length ? (
             props.checkingInEntries.map(({ dog, isNew }) => (
-              <DogStatusCard key={dog.id} dog={dog} mode="in" isNew={isNew} />
+              <DogStatusCard
+                key={dog.id}
+                dog={dog}
+                mode="in"
+                isNew={isNew}
+                variant={count === 1 ? "solo" : "default"}
+              />
             ))
           ) : showEmptyState ? (
             <EmptyBoardState mode="in" />
@@ -111,6 +122,7 @@ export function BoardPanel(props: BoardPanelProps) {
               nowMs={nowMs}
               showStaffClear={showStaffClear}
               onClear={() => props.onClearCheckout?.(entry.dog.id)}
+              variant={count === 1 ? "solo" : "default"}
             />
           ))
         ) : showEmptyState ? (

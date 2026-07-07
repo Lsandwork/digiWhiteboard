@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Megaphone } from "lucide-react";
+import { FitdogGeminiAvatar } from "@/components/ai/FitdogGeminiAvatar";
 import type { FitdogActionLink } from "@/lib/ai/fitdogActionLinks";
 import type { FitdogAiTone } from "@/lib/ai/fitdogAiGuards";
 import type { FitdogAiPushNoticeDraft } from "@/lib/ai/fitdogAiPushNotice";
@@ -55,7 +56,12 @@ export function FitdogAiMessage({ message, onPushNotice, pushingNoticeId }: Fitd
 
   return (
     <div className={`fitdog-ai-message ${isUser ? "fitdog-ai-message--user" : "fitdog-ai-message--assistant"}`}>
-      {!isUser ? <p className="fitdog-ai-message__label">Fitdog AI</p> : null}
+      {!isUser ? (
+        <div className="fitdog-ai-message__header">
+          <FitdogGeminiAvatar size="md" />
+          <p className="fitdog-ai-message__label">Fitdog AI</p>
+        </div>
+      ) : null}
       <div className="fitdog-ai-message__bubble">
         <p className="whitespace-pre-wrap">{message.content}</p>
       </div>

@@ -10,6 +10,7 @@ import { getCheckoutDisplayMs } from "@/lib/checkout-display";
 type DogStatusCardProps = {
   dog: LiveDog;
   mode: "in" | "out";
+  variant?: "default" | "solo";
   isNew?: boolean;
   isAlerting?: boolean;
   isReminding?: boolean;
@@ -23,6 +24,7 @@ type DogStatusCardProps = {
 export function DogStatusCard({
   dog,
   mode,
+  variant = "default",
   isNew = false,
   isAlerting = false,
   isReminding = false,
@@ -43,10 +45,13 @@ export function DogStatusCard({
   const remainingSeconds = Math.floor((remainingMs % 60_000) / 1000);
   const remainingLabel = `${remainingMinutes}:${String(remainingSeconds).padStart(2, "0")}`;
 
+  const isSolo = variant === "solo";
+
   return (
     <article
       className={clsx(
         "board-card relative overflow-hidden rounded-2xl p-4 sm:p-5",
+        isSolo && "board-card--solo flex min-h-0 flex-1 flex-col justify-center rounded-3xl p-6 sm:p-8 lg:p-10",
         mode === "in" ? "board-card-in" : "board-card-out",
         mode === "in" && isNew && "checkin-entrance",
         mode === "out" && isNew && "checkout-entrance",
@@ -72,35 +77,42 @@ export function DogStatusCard({
         </button>
       ) : null}
 
-      <div className="flex items-center gap-4 sm:gap-5">
-        <DogAvatar dog={dog} mode={mode} isAlerting={isAlerting} isNew={isNew} />
+      <div className={clsx("flex items-center gap-4 sm:gap-5", isSolo && "gap-6 sm:gap-8 lg:gap-10")}>
+        <DogAvatar dog={dog} mode={mode} isAlerting={isAlerting} isNew={isNew} size={isSolo ? "solo" : "default"} />
 
         <div className="min-w-0 flex-1">
           <h3
             className={clsx(
-              "truncate text-3xl font-black leading-tight sm:text-4xl",
-              mode === "out" && isAlerting ? "checkout-name-alert text-white" : "text-white"
+              "truncate font-black leading-tight text-white",
+              isSolo ? "text-5xl sm:text-6xl lg:text-7xl xl:text-8xl" : "text-3xl sm:text-4xl",
+              mode === "out" && isAlerting && "checkout-name-alert"
             )}
           >
             {dog.animal_name}
           </h3>
           {personName ? (
-            <p className="mt-1 truncate text-lg text-slate-400 sm:text-xl">
+            <p className={clsx("mt-1 truncate text-slate-400", isSolo ? "mt-2 text-2xl sm:text-3xl lg:text-4xl" : "text-lg sm:text-xl")}>
               {personLabel}: <span className="text-slate-200">{personName}</span>
             </p>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className={clsx("flex shrink-0 flex-col items-end gap-2", isSolo && "gap-3 sm:gap-4")}>
           {mode === "out" && isAlerting ? (
-            <span className="checkout-ready-badge inline-flex items-center gap-2 rounded-full border border-amber-300/60 bg-amber-400/15 px-3 py-1.5 text-xs font-black uppercase tracking-wide text-amber-100 sm:px-4 sm:py-2 sm:text-sm">
+            <span
+              className={clsx(
+                "checkout-ready-badge inline-flex items-center gap-2 rounded-full border border-amber-300/60 bg-amber-400/15 px-3 py-1.5 font-black uppercase tracking-wide text-amber-100 sm:px-4 sm:py-2",
+                isSolo ? "text-base sm:text-lg lg:text-xl" : "text-xs sm:text-sm"
+              )}
+            >
               Ready
             </span>
           ) : null}
 
           <span
             className={clsx(
-              "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wide sm:px-4 sm:py-2 sm:text-sm",
+              "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 font-bold uppercase tracking-wide sm:px-4 sm:py-2",
+              isSolo ? "text-base sm:text-lg lg:text-xl" : "text-xs sm:text-sm",
               mode === "in"
                 ? "border-fitdog-blue/50 bg-fitdog-blue/12 text-fitdog-blue"
                 : "border-fitdog-orange/50 bg-fitdog-orange/12 text-fitdog-orange",
@@ -114,21 +126,28 @@ export function DogStatusCard({
           </span>
 
           {locationLabel ? (
-            <span className="inline-flex items-center gap-1.5 text-sm text-slate-400 sm:text-base">
-              <MapPin className="h-4 w-4 shrink-0" />
-              <span className="max-w-[140px] truncate sm:max-w-[180px]">{locationLabel}</span>
+            <span className={clsx("inline-flex items-center gap-1.5 text-slate-400", isSolo ? "text-lg sm:text-xl lg:text-2xl" : "text-sm sm:text-base")}>
+              <MapPin className={clsx("shrink-0", isSolo ? "h-6 w-6 lg:h-7 lg:w-7" : "h-4 w-4")} />
+              <span className={clsx("truncate", isSolo ? "max-w-[220px] sm:max-w-[280px] lg:max-w-[360px]" : "max-w-[140px] sm:max-w-[180px]")}>
+                {locationLabel}
+              </span>
             </span>
           ) : null}
         </div>
       </div>
 
       {mode === "out" && displayUntil ? (
-        <div className="mt-4">
-          <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-amber-200/80 sm:text-xs">
+        <div className={clsx("mt-4", isSolo && "mt-6 sm:mt-8 lg:mt-10")}>
+          <div
+            className={clsx(
+              "mb-1 flex items-center justify-between font-bold uppercase tracking-[0.18em] text-amber-200/80",
+              isSolo ? "text-sm sm:text-base lg:text-lg" : "text-[10px] sm:text-xs"
+            )}
+          >
             <span>Pickup Window</span>
             <span>Clears in {remainingLabel}</span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-slate-900/90">
+          <div className={clsx("overflow-hidden rounded-full bg-slate-900/90", isSolo ? "h-2.5 sm:h-3 lg:h-4" : "h-1.5")}>
             <div
               className={clsx(
                 "h-full rounded-full transition-[width] duration-700",
