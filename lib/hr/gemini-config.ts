@@ -45,8 +45,17 @@ export function resolveGeminiModel(settingsOverride?: string | null): string {
 
 export function geminiModelRetryChain(primary: string): string[] {
   const normalized = normalizeGeminiModelId(primary);
-  if (normalized === GEMINI_MODEL_FALLBACK) return [normalized];
-  return [normalized, GEMINI_MODEL_FALLBACK];
+  const chain: string[] = [];
+  for (const candidate of [normalized, GEMINI_MODEL_FALLBACK, GEMINI_MODEL_LITE]) {
+    if (!chain.includes(candidate)) chain.push(candidate);
+  }
+  return chain;
+}
+
+export function isGeminiRetryableError(error: unknown): boolean {
+  if (isGeminiModelNotFoundError(error)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /429|503|500|502|504|quota|rate limit|overloaded|unavailable|resource exhausted/i.test(message);
 }
 
 export function isGeminiModelNotFoundError(error: unknown): boolean {

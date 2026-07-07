@@ -4,6 +4,7 @@ import {
   geminiModelRetryChain,
   isGeminiConfigured,
   isGeminiModelNotFoundError,
+  isGeminiRetryableError,
   resolveGeminiModel
 } from "@/lib/hr/gemini-config";
 
@@ -55,7 +56,7 @@ export async function generateFitdogText(params: {
       lastError = error;
       console.error(`[fitdog-ai] Gemini model failed: ${modelName}`, error);
       const hasFallback = index < models.length - 1;
-      if (hasFallback && isGeminiModelNotFoundError(error)) {
+      if (hasFallback && (isGeminiModelNotFoundError(error) || isGeminiRetryableError(error))) {
         console.warn(`[fitdog-ai] Retrying with fallback model: ${models[index + 1]}`);
         continue;
       }
