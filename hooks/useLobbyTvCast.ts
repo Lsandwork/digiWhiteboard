@@ -20,23 +20,31 @@ import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 
 type CastStatus = "idle" | "casting" | "error";
 
-export function useLobbyTvCast(initialTvLayout = false, displayToken = "") {
+export function useLobbyTvCast(
+  initialTvLayout = false,
+  displayToken = "",
+  castReceiverMode = false
+) {
   const [tvLayoutActive] = useState(initialTvLayout);
   const [castStatus, setCastStatus] = useState<CastStatus>("idle");
   const [castError, setCastError] = useState<string | null>(null);
   const [castMethod, setCastMethod] = useState<CastPickerMethod | null>(null);
-  const { requestWakeLock, releaseWakeLock } = useScreenWakeLock();
+  const { requestWakeLock, releaseWakeLock } = useScreenWakeLock({
+    enabled: !castReceiverMode,
+    persistent: !castReceiverMode,
+    aggressive: !castReceiverMode
+  });
 
   const isTvLayout = initialTvLayout || tvLayoutActive;
-  const canCast = isCastSenderSupported();
+  const canCast = !castReceiverMode && isCastSenderSupported();
   const isCasting = castStatus === "casting" || isGoogleCastSessionActive();
   const showCastActive = isCasting;
   const castUrl = useMemo(() => buildLobbyTvCastUrl(undefined, displayToken || undefined), [displayToken]);
 
   useEffect(() => {
-    if (!canCast) return;
+    if (castReceiverMode || !canCast) return;
     void preloadGoogleCast();
-  }, [canCast]);
+  }, [canCast, castReceiverMode]);
 
   const beginCast = useCallback(
     async (method: CastPickerMethod) => {

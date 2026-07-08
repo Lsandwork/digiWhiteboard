@@ -8,6 +8,7 @@ import { LobbyFeaturedCard } from "@/components/lobby/LobbyFeaturedCard";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
+import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyDebugPanel } from "@/components/lobby/LobbyDebugPanel";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
@@ -88,7 +89,7 @@ export function LobbyCheckoutBoard({
     copyCastUrl,
     stopTvCast,
     setCastError
-  } = useLobbyTvCast(tvLayoutRequested, displayToken);
+  } = useLobbyTvCast(tvLayoutRequested, displayToken, castKeeperMode);
   const showTvLayout = castKeeperMode || isTvLayout;
 
   const runCastAction = useCallback(async (action: () => Promise<void>) => {
@@ -167,6 +168,7 @@ export function LobbyCheckoutBoard({
           setLastFastFetchAt(new Date().toISOString());
           setRefreshMessage(null);
           setHealthy(true);
+          if (castKeeperMode) castKeeper?.markDataFresh();
         }
       } catch {
         // Keep the last good lobby checkout data when a fast refresh fails.
@@ -174,7 +176,7 @@ export function LobbyCheckoutBoard({
         window.clearTimeout(timeout);
       }
     });
-  }, [applyCheckoutUpdate, fastCheckoutEndpoint, requestHeaders, runFastPoll]);
+  }, [applyCheckoutUpdate, castKeeper, castKeeperMode, fastCheckoutEndpoint, requestHeaders, runFastPoll]);
 
   const loadLobbyCheckouts = useCallback(async () => {
     await runFullPoll(async () => {
@@ -195,6 +197,7 @@ export function LobbyCheckoutBoard({
           setLastFullFetchAt(new Date().toISOString());
           setRefreshMessage(null);
           setHealthy(true);
+          if (castKeeperMode) castKeeper?.markDataFresh();
         } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
           setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
         } else {
@@ -215,7 +218,7 @@ export function LobbyCheckoutBoard({
         window.clearTimeout(timeout);
       }
     });
-  }, [applyCheckoutUpdate, fullCheckoutEndpoint, requestHeaders, runFullPoll]);
+  }, [applyCheckoutUpdate, castKeeper, castKeeperMode, fullCheckoutEndpoint, requestHeaders, runFullPoll]);
 
   const loadLobbyMeta = useCallback(async () => {
     try {
@@ -281,17 +284,44 @@ export function LobbyCheckoutBoard({
     const supabase = getBrowserSupabase();
     if (!supabase) return;
 
-    const channel = supabase
-      .channel("lobby-live-transition-dogs")
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
-        debouncedRefreshCheckouts();
-      })
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelayMs = 5_000;
+    let cancelled = false;
+
+    const subscribe = () => {
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`lobby-live-transition-dogs-${castKeeperMode ? "cast" : "board"}-${Date.now()}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
+          debouncedRefreshCheckouts();
+        })
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            reconnectDelayMs = 5_000;
+            return;
+          }
+
+          if (castKeeperMode) {
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            reconnectTimer = window.setTimeout(() => {
+              if (channel) void supabase.removeChannel(channel);
+              subscribe();
+            }, reconnectDelayMs);
+            reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60_000);
+          }
+        });
+    };
+
+    subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (channel) void supabase.removeChannel(channel);
     };
-  }, [debouncedRefreshCheckouts]);
+  }, [castKeeperMode, debouncedRefreshCheckouts]);
 
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
@@ -317,29 +347,20 @@ export function LobbyCheckoutBoard({
 
   useEffect(() => {
     if (!castKeeperMode) return;
-    if (lastFullFetchAt || lastFastFetchAt) {
+    if (healthy && !refreshMessage && (lastFullFetchAt || lastFastFetchAt)) {
       castKeeper?.markDataFresh();
     }
-  }, [castKeeper, castKeeperMode, lastFastFetchAt, lastFullFetchAt]);
+  }, [castKeeper, castKeeperMode, healthy, lastFastFetchAt, lastFullFetchAt, refreshMessage]);
 
   useEffect(() => {
     if (!showTvLayout) return;
 
     document.documentElement.classList.add("lobby-tv-display");
-    if (castKeeperMode) document.documentElement.classList.add("cast-keeper-display");
-
-    const viewportMeta = document.querySelector('meta[name="viewport"]');
-    const previousViewport = viewportMeta?.getAttribute("content") ?? null;
-    viewportMeta?.setAttribute("content", "width=1920, initial-scale=1");
 
     return () => {
       document.documentElement.classList.remove("lobby-tv-display");
-      document.documentElement.classList.remove("cast-keeper-display");
-      if (previousViewport) {
-        viewportMeta?.setAttribute("content", previousViewport);
-      }
     };
-  }, [castKeeperMode, showTvLayout]);
+  }, [showTvLayout]);
 
   return (
     <main
@@ -363,7 +384,8 @@ export function LobbyCheckoutBoard({
         />
       ) : null}
 
-      <div className="lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5">
+      <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby">
+        <div className={`lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""}`}>
         <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} hasCheckout={hasCheckout} />
 
         {refreshMessage ? (
@@ -404,7 +426,8 @@ export function LobbyCheckoutBoard({
             </svg>
           </div>
         </footer>
-      </div>
+        </div>
+      </TvLayoutCanvas>
 
       {debugBoard ? (
         <LobbyDebugPanel

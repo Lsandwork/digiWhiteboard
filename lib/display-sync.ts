@@ -22,7 +22,11 @@ export function readStoredDisplaySync(): DisplaySyncState | null {
 
 export function writeStoredDisplaySync(state: DisplaySyncState) {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(DISPLAY_SYNC_STORAGE_KEY, JSON.stringify(state));
+  try {
+    window.sessionStorage.setItem(DISPLAY_SYNC_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage failures on locked-down TV browsers.
+  }
 }
 
 export function hardReloadDisplay(castReloadNonce: number) {

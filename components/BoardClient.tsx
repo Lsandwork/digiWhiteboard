@@ -6,6 +6,7 @@ import { PawPrint } from "lucide-react";
 import { BoardDebugPanel } from "@/components/board/BoardDebugPanel";
 import { BoardErrorBanner } from "@/components/board/BoardErrorBanner";
 import { BoardHeader } from "@/components/board/BoardHeader";
+import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { BoardPanel } from "@/components/board/BoardPanel";
 import { StaffCastButton } from "@/components/board/StaffCastButton";
 import {
@@ -135,7 +136,14 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
   const [useDevDemo, setUseDevDemo] = useState(false);
-  const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
+  const { status: localWakeLockStatus, requestWakeLock } = useScreenWakeLock({
+    enabled: !castKeeperMode && tvMode,
+    persistent: tvMode,
+    aggressive: tvMode
+  });
+  const wakeLockStatus = castKeeperMode
+    ? ((castKeeper?.wakeLockStatus ?? "idle") as typeof localWakeLockStatus)
+    : localWakeLockStatus;
   const activePushNotice = useStaffPushNotice();
   const {
     activeNotice: emergencyCastVideo,
@@ -231,21 +239,14 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
   useEffect(() => {
     document.documentElement.classList.toggle("staff-tv-display", tvMode);
-    document.documentElement.classList.toggle("cast-keeper-display", castKeeperMode);
     return () => {
       document.documentElement.classList.remove("staff-tv-display");
-      document.documentElement.classList.remove("cast-keeper-display");
     };
-  }, [castKeeperMode, tvMode]);
+  }, [tvMode]);
 
   useEffect(() => {
     void unlockStaffPushNoticeAudio();
   }, []);
-
-  useEffect(() => {
-    if (!tvMode || castKeeperMode) return;
-    void requestWakeLock();
-  }, [castKeeperMode, tvMode, requestWakeLock]);
 
   const runCastAction = useCallback(async (action: () => Promise<void>) => {
     try {
@@ -317,13 +318,19 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
           debug: data.debug ?? previous.debug
         }));
         setLastFetchAt(new Date().toISOString());
+        castKeeper?.markDataFresh();
       } catch {
         // Keep the last good board data when a fast refresh fails.
       } finally {
         window.clearTimeout(timeout);
       }
     });
-  }, [fastCheckoutEndpoint, runFastPoll]);
+  }, [fastCheckoutEndpoint, castKeeper, runFastPoll]);
+
+  const loadFastCheckoutsRef = useRef(loadFastCheckouts);
+  useEffect(() => {
+    loadFastCheckoutsRef.current = loadFastCheckouts;
+  }, [loadFastCheckouts]);
 
   const loadBoard = useCallback(
     async (mode: ConnectionState = "polling") => {
@@ -362,6 +369,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
         setFetchStatus("ok");
         setLastSuccessAt(data.last_updated);
         setConnection((current) => (current === "live" ? "live" : mode));
+        castKeeper?.markDataFresh();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Live board data is not loading.";
         const hasData =
@@ -374,7 +382,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       }
       });
     },
-    [apiEndpoint, runFullPoll]
+    [apiEndpoint, castKeeper, runFullPoll]
   );
 
   useEffect(() => {
@@ -395,9 +403,9 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   });
 
   useEffect(() => {
-    if (!castKeeperMode || !lastSuccessAt) return;
+    if (!castKeeperMode || !lastSuccessAt || fetchStatus !== "ok" || fetchError) return;
     castKeeper?.markDataFresh();
-  }, [castKeeper, castKeeperMode, lastSuccessAt]);
+  }, [castKeeper, castKeeperMode, fetchError, fetchStatus, lastSuccessAt]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
@@ -427,30 +435,57 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       return () => window.clearTimeout(fallbackTimer);
     }
 
-    const channel = supabase
-      .channel("live-transition-dogs")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "live_transition_dogs" },
-        (payload) => {
-          const next = payload.new as LiveDog | null;
-          const old = payload.old as LiveDog | null;
-          const dogName = next?.animal_name ?? old?.animal_name;
-          if (dogName && next?.display_status === "checking_in" && !next.hidden) setToast(`${dogName} is checking in.`);
-          if (dogName && next?.display_status === "checking_out" && !next.hidden) setToast(`${dogName} is checking out.`);
-          if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
-          if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
-          void loadFastCheckouts();
-        }
-      )
-      .subscribe((status) => {
-        setConnection(status === "SUBSCRIBED" ? "live" : "polling");
-      });
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: number | null = null;
+    let reconnectDelayMs = 5_000;
+    let cancelled = false;
+
+    const subscribe = () => {
+      if (cancelled) return;
+
+      channel = supabase
+        .channel(`live-transition-dogs-${castKeeperMode ? "cast" : "board"}-${Date.now()}`)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "live_transition_dogs" },
+          (payload) => {
+            const next = payload.new as LiveDog | null;
+            const old = payload.old as LiveDog | null;
+            const dogName = next?.animal_name ?? old?.animal_name;
+            if (dogName && next?.display_status === "checking_in" && !next.hidden) setToast(`${dogName} is checking in.`);
+            if (dogName && next?.display_status === "checking_out" && !next.hidden) setToast(`${dogName} is checking out.`);
+            if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
+            if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
+            void loadFastCheckoutsRef.current();
+          }
+        )
+        .subscribe((status) => {
+          if (status === "SUBSCRIBED") {
+            setConnection("live");
+            reconnectDelayMs = 5_000;
+            return;
+          }
+
+          setConnection("polling");
+          if (castKeeperMode) {
+            if (reconnectTimer) window.clearTimeout(reconnectTimer);
+            reconnectTimer = window.setTimeout(() => {
+              if (channel) void supabase.removeChannel(channel);
+              subscribe();
+            }, reconnectDelayMs);
+            reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60_000);
+          }
+        });
+    };
+
+    subscribe();
 
     return () => {
-      void supabase.removeChannel(channel);
+      cancelled = true;
+      if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (channel) void supabase.removeChannel(channel);
     };
-  }, [loadBoard, loadFastCheckouts]);
+  }, [castKeeperMode]);
 
   useEffect(() => {
     if (!toast) return;
@@ -501,7 +536,10 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
         />
       ) : null}
 
-      <div className="mx-auto flex h-full w-full max-w-[1920px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+      <TvLayoutCanvas enabled={tvMode} className="fitdog-tv-stage--staff kennel-lines">
+        <div
+          className={`mx-auto flex h-full w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6 ${tvMode ? "fitdog-board-canvas-inner" : "max-w-[1920px]"}`}
+        >
         <BoardHeader
           connection={connection}
           clockTime={dateTime.time}
@@ -592,7 +630,8 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
           <span>Thank you for trusting us with your pups!</span>
           <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
         </footer>
-      </div>
+        </div>
+      </TvLayoutCanvas>
 
       {minimizedCastNotice ? (
         <CastVideoOverlay

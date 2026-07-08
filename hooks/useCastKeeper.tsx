@@ -17,6 +17,7 @@ import {
 } from "@/lib/display-keeper-client";
 import {
   CAST_KEEPER_HEARTBEAT_MS,
+  CAST_KEEPER_RECONNECT_HEARTBEAT_MS,
   CAST_KEEPER_RELOAD_COOLDOWN_MS,
   CAST_KEEPER_STALE_MS,
   getOrCreateDisplayDeviceId,
@@ -47,6 +48,25 @@ type UseCastKeeperOptions = {
   enabled?: boolean;
   onContentUpdate?: () => void;
 };
+
+async function ackDisplayCommands(commandIds: string[]) {
+  if (!commandIds.length) return;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch("/api/displays/commands/ack", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ commandIds })
+      });
+      if (response.ok) return;
+    } catch {
+      // Retry below.
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+  }
+}
 
 async function postHeartbeat(body: Record<string, unknown>) {
   const response = await fetch("/api/displays/heartbeat", {
@@ -79,18 +99,35 @@ export function useCastKeeper({
   const [connection, setConnection] = useState<CastKeeperConnection>("online");
   const [lastHeartbeatAt, setLastHeartbeatAt] = useState<string | null>(null);
   const [lastDataAt, setLastDataAt] = useState<string | null>(new Date().toISOString());
-  const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock();
+  const { status: wakeLockStatus, requestWakeLock } = useScreenWakeLock({
+    enabled,
+    persistent: true,
+    aggressive: true
+  });
+  const wakeLockStatusRef = useRef(wakeLockStatus);
+  const connectionRef = useRef<CastKeeperConnection>("online");
 
   useEffect(() => {
     onContentUpdateRef.current = onContentUpdate;
   }, [onContentUpdate]);
 
+  useEffect(() => {
+    wakeLockStatusRef.current = wakeLockStatus;
+  }, [wakeLockStatus]);
+
+  useEffect(() => {
+    connectionRef.current = connection;
+  }, [connection]);
+
   const markDataFresh = useCallback(() => {
     const now = Date.now();
     lastDataAtRef.current = now;
     setLastDataAt(new Date(now).toISOString());
-    if (connection === "offline") setConnection("online");
-  }, [connection]);
+    if (connectionRef.current === "offline") {
+      connectionRef.current = "online";
+      setConnection("online");
+    }
+  }, []);
 
   const maybeReloadStale = useCallback(() => {
     const now = Date.now();
@@ -106,11 +143,7 @@ export function useCastKeeper({
     const hardRefresh = commands.some((command) => command.command_type === "hard_refresh");
     const commandIds = commands.map((command) => command.id);
     if (commandIds.length) {
-      void fetch("/api/displays/commands/ack", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ commandIds })
-      });
+      void ackDisplayCommands(commandIds);
     }
     if (hardRefresh) {
       const now = Date.now();
@@ -128,18 +161,21 @@ export function useCastKeeper({
         displayType,
         route,
         status: navigator.onLine ? "online" : "offline",
-        wakeLockStatus,
+        wakeLockStatus: wakeLockStatusRef.current,
         lastDataAt: new Date(lastDataAtRef.current).toISOString()
       });
 
       if (!body?.ok) {
-        setConnection(navigator.onLine ? "reconnecting" : "offline");
+        const nextConnection = navigator.onLine ? "reconnecting" : "offline";
+        connectionRef.current = nextConnection;
+        setConnection(nextConnection);
         return;
       }
 
       const now = Date.now();
       lastHeartbeatOkRef.current = now;
       setLastHeartbeatAt(body.serverTime);
+      connectionRef.current = "online";
       setConnection("online");
 
       if (syncRef.current) {
@@ -148,6 +184,8 @@ export function useCastKeeper({
         const stored = readInitialDisplaySync();
         if (stored) {
           applyDisplaySyncUpdate(body.sync, stored, () => onContentUpdateRef.current?.());
+        } else {
+          onContentUpdateRef.current?.();
         }
       }
       syncRef.current = body.sync;
@@ -155,9 +193,11 @@ export function useCastKeeper({
 
       await processCommands(body.commands);
     } catch {
-      setConnection(navigator.onLine ? "reconnecting" : "offline");
+      const nextConnection = navigator.onLine ? "reconnecting" : "offline";
+      connectionRef.current = nextConnection;
+      setConnection(nextConnection);
     }
-  }, [displayType, processCommands, route, wakeLockStatus]);
+  }, [displayType, processCommands, route]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -214,12 +254,28 @@ export function useCastKeeper({
   useEffect(() => {
     if (!enabled) return;
 
+    let heartbeatTimer: number | null = null;
+    let cancelled = false;
+
+    const scheduleHeartbeat = () => {
+      if (cancelled) return;
+      const delay =
+        connectionRef.current === "reconnecting"
+          ? CAST_KEEPER_RECONNECT_HEARTBEAT_MS
+          : CAST_KEEPER_HEARTBEAT_MS;
+      heartbeatTimer = window.setTimeout(async () => {
+        await runHeartbeat();
+        scheduleHeartbeat();
+      }, delay);
+    };
+
     void runHeartbeat();
-    const heartbeatTimer = window.setInterval(() => void runHeartbeat(), CAST_KEEPER_HEARTBEAT_MS);
+    scheduleHeartbeat();
     const staleTimer = window.setInterval(maybeReloadStale, 30_000);
 
     return () => {
-      window.clearInterval(heartbeatTimer);
+      cancelled = true;
+      if (heartbeatTimer) window.clearTimeout(heartbeatTimer);
       window.clearInterval(staleTimer);
     };
   }, [enabled, maybeReloadStale, runHeartbeat]);
