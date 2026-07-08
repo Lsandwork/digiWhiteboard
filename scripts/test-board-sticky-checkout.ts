@@ -53,13 +53,29 @@ assert.equal(stickyCheckoutStateToDogs(sticky).length, 1);
 sticky = mergeStickyCheckoutDogs(sticky, [], now);
 assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "empty poll must not erase sticky checkout");
 
-sticky = mergeStickyCheckoutDogs(sticky, [], now, { pruneAbsent: true });
-assert.equal(stickyCheckoutStateToDogs(sticky).length, 0, "basket-filtered empty poll clears sticky checkout");
+sticky = mergeStickyCheckoutDogs(sticky, [], now, { basketAuthoritative: true });
+assert.equal(stickyCheckoutStateToDogs(sticky).length, 0, "authoritative empty basket clears sticky checkout");
 
 sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
 sticky = mergeStickyCheckoutDogs(sticky, [], now);
-assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "empty poll must not erase sticky checkout without basket filter");
+assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "empty poll must not erase sticky checkout without basket authority");
 
+const otherDog = checkoutDog({
+  id: "supabase-uuid-2",
+  gingr_reservation_id: "res-200",
+  gingr_animal_id: "animal-300",
+  animal_name: "Nova"
+});
+sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog, otherDog], now);
+sticky = mergeStickyCheckoutDogs(sticky, [otherDog], now, { basketAuthoritative: true });
+assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "authoritative poll removes checkout rows missing from server response");
+assert.equal(stickyCheckoutStateToDogs(sticky)[0]?.animal_name, "Nova");
+
+sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
+sticky = mergeStickyCheckoutDogs(sticky, [otherDog], now);
+assert.equal(stickyCheckoutStateToDogs(sticky).length, 2, "non-authoritative poll keeps existing checkout rows");
+
+sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
 sticky = mergeStickyCheckoutDogs(sticky, [gingrDog], now);
 const merged = stickyCheckoutStateToDogs(sticky);
 assert.equal(merged.length, 1);

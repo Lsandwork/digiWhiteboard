@@ -18,10 +18,15 @@ export function buildGingrBasketCheckoutKeys(board: GingrBasketBoard) {
   return keys;
 }
 
-export function getCachedGingrBasketCheckoutKeys(now = Date.now()) {
-  const cached = getCachedBackOfHouseBoard(now, true);
+export function getCachedGingrBasketCheckoutKeys(now = Date.now(), allowStale = false) {
+  const cached = getCachedBackOfHouseBoard(now, allowStale);
   if (!cached) return null;
   return buildGingrBasketCheckoutKeys(cached);
+}
+
+/** Fresh Gingr basket keys for display filtering — avoids stale-cache flicker during active checkouts. */
+export function getFreshGingrBasketCheckoutKeys(now = Date.now()) {
+  return getCachedGingrBasketCheckoutKeys(now, false);
 }
 
 export function filterCheckoutsToGingrBasket(dogs: LiveDog[], gingrCheckoutKeys: Set<string>) {

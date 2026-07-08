@@ -30,7 +30,7 @@ import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useStaffTvCast } from "@/hooks/useStaffTvCast";
 import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, mergeCheckoutDogs } from "@/lib/board-checkout-merge";
 import {
   getCheckoutMergeKey,
   mergeStickyCheckoutDogs,
@@ -143,7 +143,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const [toast, setToast] = useState<string | null>(null);
   const [useDevDemo, setUseDevDemo] = useState(false);
   const checkoutBasketFilteredRef = useRef(false);
-  const [checkoutPruneRevision, setCheckoutPruneRevision] = useState(0);
+  const checkoutBasketEmptyRef = useRef(false);
   const { status: localWakeLockStatus, requestWakeLock } = useScreenWakeLock({
     enabled: !castKeeperMode && tvMode,
     persistent: tvMode,
@@ -302,10 +302,10 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       stickyCheckoutRef.current,
       board.checking_out,
       new Date(nowMs),
-      { pruneAbsent: checkoutBasketFilteredRef.current }
+      { basketAuthoritative: checkoutBasketFilteredRef.current }
     );
     return stickyCheckoutStateToDogs(stickyCheckoutRef.current);
-  }, [board.checking_out, checkoutPruneRevision, nowMs]);
+  }, [board.checking_out, nowMs]);
 
   const checkoutFirstSeenByKey = useMemo(
     () => stickyCheckoutFirstSeenByKey(stickyCheckoutRef.current),
@@ -343,22 +343,26 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
         if (!response.ok || data.error) return;
 
-        if (data.basket_filtered) {
-          checkoutBasketFilteredRef.current = true;
-          setCheckoutPruneRevision((current) => current + 1);
-        }
+        checkoutBasketFilteredRef.current = Boolean(data.basket_filtered);
+        checkoutBasketEmptyRef.current = Boolean(data.basket_filtered && data.checking_out.length === 0);
 
-        setBoard((previous) => ({
-          ...previous,
-          checking_out: data.checking_out,
-          counts: {
-            checking_in: previous.counts.checking_in,
-            checking_out: data.checking_out.length,
-            total: previous.counts.checking_in + data.checking_out.length
-          },
-          last_updated: data.last_updated ?? previous.last_updated,
-          debug: data.debug ?? previous.debug
-        }));
+        setBoard((previous) => {
+          const nextCheckouts = data.basket_filtered
+            ? data.checking_out
+            : mergeCheckoutDogs(previous.checking_out, data.checking_out);
+
+          return {
+            ...previous,
+            checking_out: nextCheckouts,
+            counts: {
+              checking_in: previous.counts.checking_in,
+              checking_out: nextCheckouts.length,
+              total: previous.counts.checking_in + nextCheckouts.length
+            },
+            last_updated: data.last_updated ?? previous.last_updated,
+            debug: data.debug ?? previous.debug
+          };
+        });
         setLastFetchAt(new Date().toISOString());
         castKeeper?.markDataFresh();
       } catch {
@@ -392,7 +396,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
         if (data.basket_filtered) {
           checkoutBasketFilteredRef.current = true;
-          setCheckoutPruneRevision((current) => current + 1);
+          checkoutBasketEmptyRef.current = data.checking_out.length === 0;
         }
 
         const hasLiveDogs = data.checking_in.length > 0 || data.checking_out.length > 0;

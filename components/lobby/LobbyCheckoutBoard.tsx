@@ -119,6 +119,7 @@ export function LobbyCheckoutBoard({
   const checkoutsRef = useRef(checkouts);
   const stickyCheckoutRef = useRef<StickyLobbyCheckoutState>(new Map());
   const checkoutBasketFilteredRef = useRef(false);
+  const checkoutBasketEmptyRef = useRef(false);
 
   useEffect(() => {
     checkoutsRef.current = checkouts;
@@ -138,15 +139,15 @@ export function LobbyCheckoutBoard({
   const checkoutPollMs = clampCheckoutPollMs(settings.refresh_interval_ms || BOARD_CHECKOUT_POLL_MS);
 
   const applyCheckoutUpdate = useCallback((incoming: LobbyCheckoutsResponse) => {
-    if (incoming.basket_filtered) {
-      checkoutBasketFilteredRef.current = true;
-    }
+    const incomingDogs = [...(incoming.queue ?? []), ...(incoming.featured ? [incoming.featured] : [])];
+    checkoutBasketFilteredRef.current = Boolean(incoming.basket_filtered);
+    checkoutBasketEmptyRef.current = Boolean(incoming.basket_filtered && incomingDogs.length === 0);
 
     stickyCheckoutRef.current = mergeStickyLobbyCheckouts(
       stickyCheckoutRef.current,
       incoming,
       Date.now(),
-      { pruneAbsent: checkoutBasketFilteredRef.current }
+      { basketAuthoritative: checkoutBasketFilteredRef.current }
     );
     const stickyResponse = stickyLobbyStateToResponse(
       stickyCheckoutRef.current,

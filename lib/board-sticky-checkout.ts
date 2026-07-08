@@ -49,10 +49,10 @@ export function mergeStickyCheckoutDogs(
   previous: StickyCheckoutState,
   incoming: LiveDog[],
   now = new Date(),
-  options: { pruneAbsent?: boolean } = {}
+  options: { basketAuthoritative?: boolean } = {}
 ): StickyCheckoutState {
   const next = new Map(previous);
-  const { pruneAbsent = false } = options;
+  const { basketAuthoritative = false } = options;
 
   for (const [key, entry] of next) {
     if (shouldExpireCheckoutDog(entry.dog, now, entry.firstSeenAt)) {
@@ -60,13 +60,15 @@ export function mergeStickyCheckoutDogs(
     }
   }
 
-  if (pruneAbsent) {
+  if (incoming.length > 0 && basketAuthoritative) {
     const incomingKeys = new Set(incoming.map((dog) => getCheckoutMergeKey(dog)));
     for (const key of next.keys()) {
       if (!incomingKeys.has(key)) {
         next.delete(key);
       }
     }
+  } else if (incoming.length === 0 && basketAuthoritative) {
+    next.clear();
   }
 
   for (const dog of incoming) {

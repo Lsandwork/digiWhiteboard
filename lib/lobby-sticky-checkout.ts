@@ -45,10 +45,10 @@ export function mergeStickyLobbyCheckouts(
   previous: StickyLobbyCheckoutState,
   incoming: LobbyCheckoutsResponse,
   nowMs: number,
-  options: { pruneAbsent?: boolean } = {}
+  options: { basketAuthoritative?: boolean } = {}
 ): StickyLobbyCheckoutState {
   const next = new Map(previous);
-  const { pruneAbsent = false } = options;
+  const { basketAuthoritative = false } = options;
 
   for (const [key, entry] of next) {
     if (isLobbyCheckoutDogExpired(entry.dog, nowMs)) {
@@ -57,17 +57,17 @@ export function mergeStickyLobbyCheckouts(
   }
 
   const incomingDogs = lobbyCheckoutsToDogs(incoming);
-  if (!incomingDogs.length) {
-    return pruneAbsent ? new Map() : next;
-  }
-
-  if (pruneAbsent) {
+  if (incomingDogs.length > 0 && basketAuthoritative) {
     const incomingKeys = new Set(incomingDogs.map((dog) => getLobbyCheckoutMergeKey(dog)));
     for (const key of next.keys()) {
       if (!incomingKeys.has(key)) {
         next.delete(key);
       }
     }
+  } else if (incomingDogs.length === 0 && basketAuthoritative) {
+    return new Map();
+  } else if (!incomingDogs.length) {
+    return next;
   }
 
   for (const dog of incomingDogs) {

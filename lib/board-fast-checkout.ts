@@ -1,8 +1,7 @@
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import {
   filterCheckoutsToGingrBasket,
-  getCachedGingrBasketCheckoutKeys,
-  hideBasketClearedCheckoutRows
+  getFreshGingrBasketCheckoutKeys
 } from "@/lib/basket-cleared-checkout";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
@@ -62,17 +61,10 @@ export async function loadFastPromptedCheckouts(
   const expiredCount = prompted.filter((dog) => shouldExpireCheckoutDog(dog, now)).length;
   let visible = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
   let basketFiltered = false;
-  let basketClearedRows = 0;
 
-  const gingrCheckoutKeys = getCachedGingrBasketCheckoutKeys(now.getTime());
+  const gingrCheckoutKeys = getFreshGingrBasketCheckoutKeys(now.getTime());
   if (gingrCheckoutKeys) {
     basketFiltered = true;
-    try {
-      const hidden = await hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, now);
-      basketClearedRows = hidden.hidden_count;
-    } catch {
-      // Keep serving the last good board data when basket reconciliation fails.
-    }
     visible = filterCheckoutsToGingrBasket(visible, gingrCheckoutKeys);
   }
 
@@ -86,7 +78,7 @@ export async function loadFastPromptedCheckouts(
     filtered_unprompted_rows: rows.length - prompted.length,
     expired_checkout_rows: expiredCount,
     basket_filtered: basketFiltered,
-    basket_cleared_rows: basketClearedRows,
+    basket_cleared_rows: 0,
     data_source: "supabase_live_transition_dogs"
   };
 }
