@@ -378,6 +378,9 @@ export async function createGroomingPushNotice(
   input: GroomingPushNoticeInput,
   actor?: string | null
 ) {
+  const { clearAllActiveCastVideos } = await import("@/lib/staff/cast-video-notices");
+  await clearAllActiveCastVideos(supabase, actor);
+
   const normalized = normalizeGroomingPushNoticeInput(input, actor);
   const now = new Date();
   const requested_at = now.toISOString();

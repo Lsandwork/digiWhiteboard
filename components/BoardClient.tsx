@@ -69,6 +69,12 @@ function writeMinimizedCastIds(ids: string[]) {
   window.sessionStorage.setItem("fitdog_minimized_cast_videos", JSON.stringify(ids));
 }
 
+function isTimedPushStillActive(expiresAt: string | null | undefined, nowMs: number) {
+  if (!expiresAt) return true;
+  const expiresMs = new Date(expiresAt).getTime();
+  return Number.isFinite(expiresMs) && expiresMs > nowMs;
+}
+
 function getDevDemoBoard(): LiveBoardResponse | null {
   if (process.env.NODE_ENV !== "development") return null;
 
@@ -150,7 +156,27 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   } = useCastVideoNotices({ department: displayDepartment, emergencyOnly: false });
   const { activeNotice: activeGroomingNotice, queue: groomingQueue } = useGroomingPushNotices();
   const { activeNotice: activeTrainerNotice, queue: trainerQueue } = useTrainerPushNotices();
-  const activeAlertKey = emergencyCastVideo?.id ?? activeCastVideo?.id ?? activeGroomingNotice?.id ?? activeTrainerNotice?.id ?? activePushNotice?.id ?? null;
+  const effectiveGroomingNotice =
+    activeGroomingNotice && isTimedPushStillActive(activeGroomingNotice.expires_at, nowMs)
+      ? activeGroomingNotice
+      : null;
+  const effectiveTrainerNotice =
+    activeTrainerNotice && isTimedPushStillActive(activeTrainerNotice.expires_at, nowMs)
+      ? activeTrainerNotice
+      : null;
+  const effectiveCastVideo =
+    activeCastVideo && isTimedPushStillActive(activeCastVideo.expires_at, nowMs) ? activeCastVideo : null;
+  const effectiveEmergencyCastVideo =
+    emergencyCastVideo && isTimedPushStillActive(emergencyCastVideo.expires_at, nowMs)
+      ? emergencyCastVideo
+      : null;
+  const activeAlertKey =
+    effectiveEmergencyCastVideo?.id ??
+    effectiveCastVideo?.id ??
+    effectiveGroomingNotice?.id ??
+    effectiveTrainerNotice?.id ??
+    activePushNotice?.id ??
+    null;
   const isEmergencyStaffPush = Boolean(
     activePushNotice && (activePushNotice.priority === "urgent" || activePushNotice.display_mode === "urgent")
   );
@@ -168,7 +194,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const isCastMinimized = useCallback((id: string) => minimizedCastIds.includes(id), [minimizedCastIds]);
 
   useEffect(() => {
-    const activeIds = [emergencyCastVideo?.id, activeCastVideo?.id].filter(Boolean) as string[];
+    const activeIds = [effectiveEmergencyCastVideo?.id, effectiveCastVideo?.id].filter(Boolean) as string[];
     if (!activeIds.length) return;
     setMinimizedCastIds((current) => {
       const next = current.filter((id) => activeIds.includes(id));
@@ -176,39 +202,46 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       writeMinimizedCastIds(next);
       return next;
     });
-  }, [activeCastVideo?.id, emergencyCastVideo?.id]);
+  }, [effectiveCastVideo?.id, effectiveEmergencyCastVideo?.id]);
 
-  const showEmergencyCastFullscreen = emergencyCastVideo && !isCastMinimized(emergencyCastVideo.id);
-  const showCastFullscreen = !showEmergencyCastFullscreen && activeCastVideo && !isCastMinimized(activeCastVideo.id);
+  const showEmergencyCastFullscreen =
+    effectiveEmergencyCastVideo && !isCastMinimized(effectiveEmergencyCastVideo.id);
+  const showCastFullscreen =
+    !showEmergencyCastFullscreen && effectiveCastVideo && !isCastMinimized(effectiveCastVideo.id);
   const minimizedCastNotice =
-    emergencyCastVideo && isCastMinimized(emergencyCastVideo.id)
-      ? emergencyCastVideo
-      : activeCastVideo && isCastMinimized(activeCastVideo.id)
-        ? activeCastVideo
+    effectiveEmergencyCastVideo && isCastMinimized(effectiveEmergencyCastVideo.id)
+      ? effectiveEmergencyCastVideo
+      : effectiveCastVideo && isCastMinimized(effectiveCastVideo.id)
+        ? effectiveCastVideo
         : null;
   const minimizedCastQueue =
-    minimizedCastNotice?.id === emergencyCastVideo?.id ? emergencyCastQueue : castVideoQueue;
-  const hasActiveCast = Boolean(emergencyCastVideo || activeCastVideo);
+    minimizedCastNotice?.id === effectiveEmergencyCastVideo?.id ? emergencyCastQueue : castVideoQueue;
+  const hasActiveCast = Boolean(effectiveEmergencyCastVideo || effectiveCastVideo);
+  const showMinimizedCast =
+    Boolean(minimizedCastNotice) &&
+    !effectiveGroomingNotice &&
+    !effectiveTrainerNotice &&
+    !isEmergencyStaffPush;
   const pushVeilActive = Boolean(
     showEmergencyCastFullscreen ||
       showCastFullscreen ||
-      minimizedCastNotice ||
-      activeGroomingNotice ||
-      activeTrainerNotice ||
+      showMinimizedCast ||
+      effectiveGroomingNotice ||
+      effectiveTrainerNotice ||
       activePushNotice
   );
-  const pushVeilTone = activeGroomingNotice
+  const pushVeilTone = effectiveGroomingNotice
     ? "grooming"
-    : activeTrainerNotice
+    : effectiveTrainerNotice
       ? "trainer"
       : hasActiveCast
         ? "cast"
         : activePushNotice && isDailyReminderPushNotice(activePushNotice)
           ? "reminder"
           : "alert";
-  const pushVeilLabel = activeGroomingNotice
+  const pushVeilLabel = effectiveGroomingNotice
     ? "Grooming Push Active"
-    : activeTrainerNotice
+    : effectiveTrainerNotice
       ? "Trainer Push Active"
       : hasActiveCast
         ? "Video Cast Active"
@@ -400,6 +433,27 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   }, [castKeeper, castKeeperMode, lastSuccessAt]);
 
   useEffect(() => {
+    if (!castKeeperMode) return;
+    if (
+      effectiveEmergencyCastVideo ||
+      effectiveCastVideo ||
+      effectiveGroomingNotice ||
+      effectiveTrainerNotice ||
+      activePushNotice
+    ) {
+      castKeeper?.markDataFresh();
+    }
+  }, [
+    activePushNotice,
+    castKeeper,
+    castKeeperMode,
+    effectiveCastVideo,
+    effectiveEmergencyCastVideo,
+    effectiveGroomingNotice,
+    effectiveTrainerNotice
+  ]);
+
+  useEffect(() => {
     const initialLoad = window.setTimeout(() => {
       void loadBoard("connecting");
       void loadFastCheckouts();
@@ -523,41 +577,41 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
         {showEmergencyCastFullscreen ? (
           <CastVideoOverlay
-            notice={emergencyCastVideo!}
+            notice={effectiveEmergencyCastVideo!}
             queue={emergencyCastQueue}
             viewerKey={castViewerKey}
             viewerLocation={displayDepartment}
             boardMode
-            onMinimize={() => minimizeCast(emergencyCastVideo!.id)}
+            onMinimize={() => minimizeCast(effectiveEmergencyCastVideo!.id)}
             onDismiss={() => void reloadEmergencyCast()}
           />
         ) : isEmergencyStaffPush ? (
           <StaffPushNoticeFullscreen notice={activePushNotice!} />
-        ) : showCastFullscreen ? (
-          <CastVideoOverlay
-            notice={activeCastVideo!}
-            queue={castVideoQueue}
-            viewerKey={castViewerKey}
-            viewerLocation={displayDepartment}
-            boardMode
-            onMinimize={() => minimizeCast(activeCastVideo!.id)}
-            onDismiss={() => void reloadCastVideo()}
-          />
-        ) : activeGroomingNotice ? (
+        ) : effectiveGroomingNotice ? (
           <GroomingPushNoticeOverlay
-            notice={activeGroomingNotice}
+            notice={effectiveGroomingNotice}
             queue={groomingQueue}
             nowMs={nowMs}
             clockTime={groomingClock.clockTime}
             clockDate={groomingClock.clockDate}
           />
-        ) : activeTrainerNotice ? (
+        ) : effectiveTrainerNotice ? (
           <TrainerPushNoticeOverlay
-            notice={activeTrainerNotice}
+            notice={effectiveTrainerNotice}
             queue={trainerQueue}
             nowMs={nowMs}
             clockTime={groomingClock.clockTime}
             clockDate={groomingClock.clockDate}
+          />
+        ) : showCastFullscreen ? (
+          <CastVideoOverlay
+            notice={effectiveCastVideo!}
+            queue={castVideoQueue}
+            viewerKey={castViewerKey}
+            viewerLocation={displayDepartment}
+            boardMode
+            onMinimize={() => minimizeCast(effectiveCastVideo!.id)}
+            onDismiss={() => void reloadCastVideo()}
           />
         ) : activePushNotice && !hasVisibleDogs ? (
           <StaffPushNoticeFullscreen notice={activePushNotice} />
@@ -594,7 +648,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
         </footer>
       </div>
 
-      {minimizedCastNotice ? (
+      {showMinimizedCast && minimizedCastNotice ? (
         <CastVideoOverlay
           notice={minimizedCastNotice}
           queue={minimizedCastQueue}
@@ -604,7 +658,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
           minimized
           onMinimize={() => minimizeCast(minimizedCastNotice.id)}
           onDismiss={() => {
-            if (minimizedCastNotice.id === emergencyCastVideo?.id) void reloadEmergencyCast();
+            if (minimizedCastNotice.id === effectiveEmergencyCastVideo?.id) void reloadEmergencyCast();
             else void reloadCastVideo();
           }}
         />

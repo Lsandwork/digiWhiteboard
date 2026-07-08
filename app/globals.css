@@ -1099,11 +1099,12 @@ html.cast-keeper-display .lobby-cast-control {
   display: none !important;
 }
 
-html.cast-keeper-paused .push-notice-board-veil,
-html.cast-keeper-paused .push-notice-flash-layer,
-html.cast-keeper-paused .grooming-push-overlay,
-html.cast-keeper-paused .trainer-push-overlay,
-html.cast-keeper-paused .cast-video-overlay {
+html.cast-keeper-paused .push-board-veil,
+html.cast-keeper-paused .push-board-veil-vignette,
+html.cast-keeper-paused .push-board-veil-bar,
+html.cast-keeper-paused .grooming-push,
+html.cast-keeper-paused .trainer-push,
+html.cast-keeper-paused .cast-video {
   animation-play-state: paused !important;
 }
 

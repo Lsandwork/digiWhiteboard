@@ -5,6 +5,7 @@ import { Cast, Copy, MonitorOff, Radio, Smartphone, Tv, Wifi, X } from "lucide-r
 import {
   getCastReadyHint,
   getCastUnavailableMessage,
+  isIosMobile,
   shouldShowCastMenu,
   supportsAirPlayCast,
   supportsChromecastPicker,
@@ -134,7 +135,7 @@ export function TvCastControl({
               <button
                 type="button"
                 className={`${menuClass}__option`}
-                disabled={!supportsWirelessPresentationCast()}
+                disabled={!supportsWirelessPresentationCast() && !isIosMobile()}
                 onClick={() => {
                   setMenuOpen(false);
                   onWireless();
@@ -185,7 +186,11 @@ export function TvCastControl({
                   </span>
                   <span className={`${menuClass}__option-copy`}>
                     <span className={`${menuClass}__option-title`}>AirPlay</span>
-                    <span className={`${menuClass}__option-description`}>Mirror this tab to Apple TV or AirPlay TVs.</span>
+                    <span className={`${menuClass}__option-description`}>
+                      {isIosMobile()
+                        ? "Share the TV link or open TV mode, then mirror from Control Center."
+                        : "Mirror this tab to Apple TV or AirPlay TVs."}
+                    </span>
                   </span>
                 </button>
               ) : null}
