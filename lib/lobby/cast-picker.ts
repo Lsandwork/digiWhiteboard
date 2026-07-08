@@ -141,20 +141,28 @@ export async function openChromecastPicker(displayToken?: string, castUrl?: stri
     return { method: "wireless", connection };
   }
 
-  try {
-    await preloadGoogleCast();
-    if (isGoogleCastFrameworkReady()) {
-      await startGoogleCastSession(displayToken, url);
-      return { method: "chromecast" };
-    }
-  } catch (error) {
-    if (isCastCancelled(error)) {
-      throw error;
+  if (isGoogleCastConfigured()) {
+    try {
+      await preloadGoogleCast();
+      if (isGoogleCastFrameworkReady()) {
+        await startGoogleCastSession(displayToken, url);
+        return { method: "chromecast" };
+      }
+    } catch (error) {
+      if (isCastCancelled(error)) {
+        throw error;
+      }
     }
   }
 
   if (isChromeIos() || isIosMobile()) {
     return openAirPlayPicker(displayToken, url);
+  }
+
+  if (!isGoogleCastConfigured()) {
+    throw new Error(
+      "Chromecast whiteboard casting needs setup. Use Wireless Display, copy the TV link, or ask an admin to configure Google Cast."
+    );
   }
 
   throw new Error("Unable to cast the whiteboard. Use Google Chrome on the same Wi‑Fi as your TV.");

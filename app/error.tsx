@@ -11,6 +11,14 @@ export default function Error({
 }) {
   useEffect(() => {
     console.error(error);
+    if (typeof window === "undefined") return;
+    if (!window.location.pathname.startsWith("/display/")) return;
+
+    const reloadTimer = window.setTimeout(() => {
+      window.location.reload();
+    }, 10_000);
+
+    return () => window.clearTimeout(reloadTimer);
   }, [error]);
 
   return (

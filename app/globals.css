@@ -1015,7 +1015,126 @@ html.staff-tv-display .staff-cast-control {
 }
 
 html.staff-tv-display .board-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: transparent;
+}
+
+html.staff-tv-display .fitdog-tv-stage--staff {
+  background-color: #02060b;
+}
+
+/* Uniform 1920×1080 TV canvas — scales to fit any display without distortion */
+html.fitdog-tv-active,
+html.fitdog-tv-active body {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.fitdog-tv-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: #02060b;
+}
+
+.fitdog-tv-stage--lobby {
+  background: transparent;
+}
+
+.fitdog-tv-canvas {
+  width: 1920px;
+  height: 1080px;
+  flex-shrink: 0;
+  transform: scale(var(--fitdog-tv-scale, 1));
+  transform-origin: center center;
+  overflow: hidden;
+}
+
+.fitdog-board-canvas-inner,
+.fitdog-lobby-canvas-inner {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-height: 0;
+}
+
+html.staff-tv-display .fitdog-board-canvas-inner {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem 2.5rem 1.5rem;
+}
+
+html.staff-tv-display .fitdog-board-canvas-inner > .grid.flex-1 {
+  min-height: 0;
+}
+
+html.staff-tv-display .board-panel {
+  min-height: 0;
+}
+
+html.staff-tv-display .board-panel h2 {
+  font-size: 2.35rem;
+}
+
+html.staff-tv-display .board-panel .text-xs {
+  font-size: 0.95rem;
+}
+
+html.staff-tv-display .board-card h3 {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+html.staff-tv-display .board-card p.truncate {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+html.staff-tv-display .board-card .truncate.max-w-\[140px\],
+html.staff-tv-display .board-card .truncate.max-w-\[180px\],
+html.staff-tv-display .board-card .truncate.max-w-\[220px\],
+html.staff-tv-display .board-card .truncate.max-w-\[280px\],
+html.staff-tv-display .board-card .truncate.max-w-\[360px\] {
+  max-width: none;
+}
+
+html.staff-tv-display .board-card--solo h3 {
+  font-size: 4.5rem;
+  line-height: 1.05;
+}
+
+html.staff-tv-display .board-card--solo p {
+  font-size: 2rem;
+}
+
+html.lobby-tv-display .fitdog-lobby-canvas-inner {
+  min-height: 0;
+  height: 100%;
+  max-width: none;
+  padding: 1.25rem 2.5rem 1rem;
+}
+
+html.lobby-tv-display .fitdog-tv-canvas .lobby-main-grid {
+  min-height: 0;
+}
+
+html.lobby-tv-display .lobby-queue-row__name,
+html.lobby-tv-display .lobby-queue-row__breed {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .cast-keeper-warning {
@@ -2892,6 +3011,11 @@ html.lobby-tv-display .social-video-shell {
   display: grid;
   min-height: 100vh;
   grid-template-columns: 260px minmax(0, 1fr);
+  transition: grid-template-columns 0.2s ease;
+}
+
+.admin-layout--collapsed {
+  grid-template-columns: 84px minmax(0, 1fr);
 }
 
 .admin-sidebar {
@@ -2902,6 +3026,46 @@ html.lobby-tv-display .social-video-shell {
   flex-direction: column;
   border-right: 1px solid var(--admin-border);
   background: rgba(15, 10, 8, 0.96);
+  transition: padding 0.2s ease, border-color 0.2s ease;
+}
+
+.admin-sidebar--collapsed .admin-sidebar-brand {
+  justify-content: center;
+}
+
+.admin-sidebar-brand__text,
+.admin-nav-item > span,
+.admin-nav-group__chevron {
+  transition: opacity 0.16s ease;
+}
+
+.admin-sidebar--collapsed .admin-sidebar-brand__text,
+.admin-sidebar--collapsed .admin-nav-item > span,
+.admin-sidebar--collapsed .admin-nav-group__chevron,
+.admin-sidebar--collapsed .admin-nav-section,
+.admin-sidebar--collapsed .admin-sidebar-help-card,
+.admin-sidebar--collapsed .admin-user-card .min-w-0 {
+  opacity: 0;
+}
+
+.admin-sidebar--collapsed .admin-nav-section,
+.admin-sidebar--collapsed .admin-sidebar-help-card,
+.admin-sidebar--collapsed .admin-user-card .min-w-0 {
+  display: none;
+}
+
+.admin-sidebar--collapsed .admin-nav-item {
+  justify-content: center;
+  padding-inline: 0.6rem;
+  transition: padding 0.16s ease, justify-content 0.16s ease;
+}
+
+.admin-sidebar--collapsed .admin-nav-item--nested {
+  padding-left: 0.6rem;
+}
+
+.admin-sidebar-collapse-btn {
+  min-height: 2.25rem;
 }
 
 .admin-main {
@@ -4959,6 +5123,14 @@ html.lobby-tv-display .social-video-shell {
     box-shadow: 12px 0 40px rgba(0, 0, 0, 0.35);
   }
 
+  .admin-layout--collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar-collapse-btn {
+    display: none;
+  }
+
   .admin-sidebar--open {
     transform: translateX(0);
   }
@@ -4983,6 +5155,20 @@ html.lobby-tv-display .social-video-shell {
 
   .admin-preview-column {
     position: static;
+  }
+}
+
+@media (max-width: 767px) {
+  .admin-main {
+    padding: 1rem 0.85rem 1.5rem;
+  }
+
+  .admin-header {
+    margin-bottom: 1rem;
+  }
+
+  .admin-content-grid {
+    gap: 0.85rem;
   }
 }
 

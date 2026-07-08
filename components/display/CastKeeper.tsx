@@ -20,7 +20,10 @@ function formatStatusTime(value: string | null) {
 
 export function CastKeeperChrome({ displayType }: CastKeeperChromeProps) {
   const keeper = useCastKeeperContext();
-  const showWakeWarning = keeper?.wakeLockStatus === "unsupported" || keeper?.wakeLockStatus === "error";
+  const showWakeWarning =
+    keeper?.wakeLockStatus === "unsupported" ||
+    keeper?.wakeLockStatus === "error" ||
+    keeper?.wakeLockStatus === "released";
 
   const statusLabel = useMemo(() => {
     if (!keeper) return "Cast Keeper";
@@ -40,7 +43,8 @@ export function CastKeeperChrome({ displayType }: CastKeeperChromeProps) {
     <>
       {showWakeWarning ? (
         <div className="cast-keeper-warning" role="status">
-          Keep this computer awake while casting. If the computer sleeps, the cast may disconnect.
+          Display may sleep — keep this screen awake. Wake lock is{" "}
+          {keeper?.wakeLockStatus === "unsupported" ? "not supported" : "inactive"} on this device.
         </div>
       ) : null}
 

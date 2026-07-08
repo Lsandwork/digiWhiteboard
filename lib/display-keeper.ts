@@ -39,8 +39,9 @@ export type DisplayDevice = {
 };
 
 export const CAST_KEEPER_DEVICE_STORAGE_KEY = "fitdog_display_device_id";
-export const CAST_KEEPER_HEARTBEAT_MS = 30_000;
-export const CAST_KEEPER_STALE_MS = 5 * 60_000;
+export const CAST_KEEPER_HEARTBEAT_MS = 15_000;
+export const CAST_KEEPER_RECONNECT_HEARTBEAT_MS = 4_000;
+export const CAST_KEEPER_STALE_MS = 8 * 60_000;
 export const CAST_KEEPER_RELOAD_COOLDOWN_MS = 2 * 60_000;
 export const CAST_KEEPER_OFFLINE_DEVICE_MS = 90_000;
 
@@ -64,14 +65,21 @@ export type HeartbeatResponse = {
 
 export function getOrCreateDisplayDeviceId() {
   if (typeof window === "undefined") return "server";
-  const existing = window.localStorage.getItem(CAST_KEEPER_DEVICE_STORAGE_KEY)?.trim();
-  if (existing) return existing;
-  const next =
+
+  const memoryFallback = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `display-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  window.localStorage.setItem(CAST_KEEPER_DEVICE_STORAGE_KEY, next);
-  return next;
+
+  try {
+    const existing = window.localStorage.getItem(CAST_KEEPER_DEVICE_STORAGE_KEY)?.trim();
+    if (existing) return existing;
+    const next = memoryFallback();
+    window.localStorage.setItem(CAST_KEEPER_DEVICE_STORAGE_KEY, next);
+    return next;
+  } catch {
+    return memoryFallback();
+  }
 }
 
 export function buildCastDisplayPath(displayType: DisplayType) {

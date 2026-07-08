@@ -1,5 +1,5 @@
 import { getPublicBuildId } from "@/lib/build-id";
-import { loadDisplaySyncState } from "@/lib/display-sync-server";
+import { defaultDisplaySyncState, loadDisplaySyncState } from "@/lib/display-sync-server";
 import type { DisplayCommand, DisplayDevice, DisplayType, HeartbeatRequest } from "@/lib/display-keeper";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -56,8 +56,11 @@ export async function upsertDisplayHeartbeat(supabase: SupabaseClient, input: He
   };
 
   const { error } = await supabase.from("display_devices").upsert(payload, { onConflict: "id" });
-  if (error && isMissingRelation(error)) return null;
-  if (error) throw error;
+  if (error) {
+    if (isMissingRelation(error)) return null;
+    console.error("[display-heartbeat] device upsert failed:", error.message ?? error);
+    return null;
+  }
   return payload;
 }
 
@@ -75,8 +78,11 @@ export async function listPendingDisplayCommands(
     .order("created_at", { ascending: true })
     .limit(20);
 
-  if (error && isMissingRelation(error)) return [];
-  if (error) throw error;
+  if (error) {
+    if (isMissingRelation(error)) return [];
+    console.error("[display-heartbeat] list commands failed:", error.message ?? error);
+    return [];
+  }
   return (data ?? []).map((row) => normalizeCommand(row as Record<string, unknown>));
 }
 
@@ -132,10 +138,15 @@ export async function queueDisplayCommand(
 
 export async function buildHeartbeatResponse(supabase: SupabaseClient, input: HeartbeatRequest) {
   await upsertDisplayHeartbeat(supabase, input);
-  const [sync, commands] = await Promise.all([
-    loadDisplaySyncState(supabase),
-    listPendingDisplayCommands(supabase, input.displayType, input.deviceId)
-  ]);
+
+  let sync = defaultDisplaySyncState();
+  try {
+    sync = await loadDisplaySyncState(supabase);
+  } catch (error) {
+    console.error("[display-heartbeat] sync load failed:", error);
+  }
+
+  const commands = await listPendingDisplayCommands(supabase, input.displayType, input.deviceId);
 
   return {
     ok: true,
