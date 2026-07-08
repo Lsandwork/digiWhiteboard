@@ -568,6 +568,30 @@ export async function updateCastVideoNotice(
   return normalizeNoticeRow(data as Record<string, unknown>);
 }
 
+export async function clearAllActiveCastVideos(supabase: SupabaseClient, actor?: string | null) {
+  const notices = await listCastVideoNotices(supabase, 100);
+  for (const notice of notices) {
+    if (notice.status !== "active") continue;
+    await clearCastVideoNotice(supabase, notice.id, actor);
+  }
+}
+
+/** Clears other active cast videos (including yard push) so a new cast can take over. */
+export async function clearCompetingCastVideosBeforePush(
+  supabase: SupabaseClient,
+  pushedNotice: Pick<CastVideoNotice, "id" | "priority">,
+  actor?: string | null
+) {
+  const notices = await listCastVideoNotices(supabase, 100);
+  const pushingEmergency = isEmergencyCastVideo(pushedNotice);
+  for (const notice of notices) {
+    if (notice.status !== "active") continue;
+    if (notice.id === pushedNotice.id) continue;
+    if (!pushingEmergency && isEmergencyCastVideo(notice)) continue;
+    await clearCastVideoNotice(supabase, notice.id, actor);
+  }
+}
+
 export async function pushCastVideoNotice(
   supabase: SupabaseClient,
   id: string,
@@ -580,6 +604,8 @@ export async function pushCastVideoNotice(
   if (!existing.video_storage_path && !existing.video_url) {
     throw new Error("Upload a video before pushing.");
   }
+
+  await clearCompetingCastVideosBeforePush(supabase, existing, actor);
 
   const now = new Date();
   const nowIso = now.toISOString();
