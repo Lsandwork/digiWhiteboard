@@ -159,7 +159,8 @@ export async function loadLobbyCheckoutDogsFast(supabase: SupabaseClient, now = 
     activeCount: sorted.length,
     lastPromptedAt: featuredDog ? getLobbyPromptedAt(featuredDog) : sorted[0] ? getLobbyPromptedAt(sorted[0]) : null,
     data_source: result.data_source,
-    used_cached_gingr: false
+    used_cached_gingr: false,
+    basket_filtered: result.basket_filtered
   };
 }
 
@@ -196,6 +197,7 @@ export async function loadLobbyCheckoutDogs(supabase: SupabaseClient, maxQueueCo
     activeCount: featuredDog ? 1 + queueDogs.length : queueDogs.length,
     lastPromptedAt: featuredDog ? getLobbyPromptedAt(featuredDog) : sorted[0] ? getLobbyPromptedAt(sorted[0]) : null,
     data_source: gingrLive ? "gingr_and_supabase" : "supabase_live_transition_dogs",
-    used_cached_gingr: usedCachedGingr
+    used_cached_gingr: usedCachedGingr,
+    basket_filtered: gingrLive
   };
 }

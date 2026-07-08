@@ -142,6 +142,8 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
   const [useDevDemo, setUseDevDemo] = useState(false);
+  const checkoutBasketFilteredRef = useRef(false);
+  const [checkoutPruneRevision, setCheckoutPruneRevision] = useState(0);
   const { status: localWakeLockStatus, requestWakeLock } = useScreenWakeLock({
     enabled: !castKeeperMode && tvMode,
     persistent: tvMode,
@@ -299,10 +301,11 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
     stickyCheckoutRef.current = mergeStickyCheckoutDogs(
       stickyCheckoutRef.current,
       board.checking_out,
-      new Date(nowMs)
+      new Date(nowMs),
+      { pruneAbsent: checkoutBasketFilteredRef.current }
     );
     return stickyCheckoutStateToDogs(stickyCheckoutRef.current);
-  }, [board.checking_out, nowMs]);
+  }, [board.checking_out, checkoutPruneRevision, nowMs]);
 
   const checkoutFirstSeenByKey = useMemo(
     () => stickyCheckoutFirstSeenByKey(stickyCheckoutRef.current),
@@ -335,9 +338,15 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
         const data = (await response.json()) as LiveBoardResponse & {
           checking_out: LiveDog[];
           counts?: { checking_out: number };
+          basket_filtered?: boolean;
         };
 
         if (!response.ok || data.error) return;
+
+        if (data.basket_filtered) {
+          checkoutBasketFilteredRef.current = true;
+          setCheckoutPruneRevision((current) => current + 1);
+        }
 
         setBoard((previous) => ({
           ...previous,
@@ -379,6 +388,11 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
         if (!response.ok || data.error) {
           throw new Error(data.error ?? `Board request failed (${response.status}).`);
+        }
+
+        if (data.basket_filtered) {
+          checkoutBasketFilteredRef.current = true;
+          setCheckoutPruneRevision((current) => current + 1);
         }
 
         const hasLiveDogs = data.checking_in.length > 0 || data.checking_out.length > 0;

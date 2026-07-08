@@ -1,4 +1,9 @@
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
+import {
+  filterCheckoutsToGingrBasket,
+  getCachedGingrBasketCheckoutKeys,
+  hideBasketClearedCheckoutRows
+} from "@/lib/basket-cleared-checkout";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
@@ -14,6 +19,8 @@ export type FastCheckoutLoadResult = {
   raw_checkout_rows: number;
   filtered_unprompted_rows: number;
   expired_checkout_rows: number;
+  basket_filtered: boolean;
+  basket_cleared_rows: number;
   data_source: "supabase_live_transition_dogs";
 };
 
@@ -52,7 +59,23 @@ export async function loadFastPromptedCheckouts(
 
   const rows = enrichDogs((data ?? []) as LiveDog[]);
   const prompted = rows.filter(isPromptedCheckoutDog);
-  const visible = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
+  const expiredCount = prompted.filter((dog) => shouldExpireCheckoutDog(dog, now)).length;
+  let visible = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
+  let basketFiltered = false;
+  let basketClearedRows = 0;
+
+  const gingrCheckoutKeys = getCachedGingrBasketCheckoutKeys(now.getTime());
+  if (gingrCheckoutKeys) {
+    basketFiltered = true;
+    try {
+      const hidden = await hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, now);
+      basketClearedRows = hidden.hidden_count;
+    } catch {
+      // Keep serving the last good board data when basket reconciliation fails.
+    }
+    visible = filterCheckoutsToGingrBasket(visible, gingrCheckoutKeys);
+  }
+
   const withPhotos = await applyStoredAnimalPhotos(supabase, visible);
 
   return {
@@ -61,7 +84,9 @@ export async function loadFastPromptedCheckouts(
     prompted_count: prompted.length,
     raw_checkout_rows: rows.length,
     filtered_unprompted_rows: rows.length - prompted.length,
-    expired_checkout_rows: prompted.length - visible.length,
+    expired_checkout_rows: expiredCount,
+    basket_filtered: basketFiltered,
+    basket_cleared_rows: basketClearedRows,
     data_source: "supabase_live_transition_dogs"
   };
 }

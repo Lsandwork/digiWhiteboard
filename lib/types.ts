@@ -32,6 +32,7 @@ export type LiveBoardResponse = {
   };
   last_updated: string;
   error?: string;
+  basket_filtered?: boolean;
   debug?: {
     endpoint?: string;
     raw_record_count?: number;

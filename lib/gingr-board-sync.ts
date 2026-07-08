@@ -1,5 +1,6 @@
 import { resolveActiveCheckinDisplayUntil } from "@/lib/checkin-display";
 import { resolveActiveCheckoutDisplayUntil } from "@/lib/checkout-display";
+import { buildGingrBasketCheckoutKeys, hideBasketClearedCheckoutRows } from "@/lib/basket-cleared-checkout";
 import { extractPhotoUrl } from "@/lib/board-utils";
 import { getCheckoutFilterReason, isPromptedCheckoutRecord } from "@/lib/checkout-prompt";
 import { normalizeBoardDog, type BoardDogSource } from "@/lib/board-dog";
@@ -326,12 +327,22 @@ export async function syncGingrBoardState(
 
   if (error) throw error;
 
+  let basketClearedRows = 0;
+  try {
+    const gingrCheckoutKeys = buildGingrBasketCheckoutKeys(resolvedBoard);
+    const hidden = await hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, new Date(now));
+    basketClearedRows = hidden.hidden_count;
+  } catch {
+    // Basket reconciliation should not block the broader Gingr sync.
+  }
+
   return {
     synced: true,
     reason: null,
     checking_in: 0,
     checking_out: 0,
     removed_back_of_house_rows: removed?.length ?? 0,
+    basket_cleared_rows: basketClearedRows,
     raw_checking_in_candidates: resolvedBoard.checking_in.length,
     ...getGingrCheckoutPromptStats(resolvedBoard)
   };

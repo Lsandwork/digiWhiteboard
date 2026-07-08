@@ -36,6 +36,7 @@ export async function GET(request: Request) {
         queue: checkout.queue.length
       },
       last_updated: now.toISOString(),
+      basket_filtered: checkout.basket_filtered ?? false,
       ...(debugBoard
         ? {
             debug: {

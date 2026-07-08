@@ -17,6 +17,7 @@ export async function GET(request: Request) {
       checking_out: result.checking_out,
       counts: { checking_out: result.checking_out.length },
       last_updated: now.toISOString(),
+      basket_filtered: result.basket_filtered,
       ...(debugBoard
         ? {
             debug: {

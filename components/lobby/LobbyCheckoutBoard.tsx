@@ -58,6 +58,7 @@ function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null
     queue: body?.queue ?? [],
     counts: body?.counts ?? { active: 0, queue: 0 },
     last_updated: body?.last_updated ?? "",
+    basket_filtered: body?.basket_filtered,
     error: body?.error
   };
 }
@@ -117,6 +118,7 @@ export function LobbyCheckoutBoard({
 
   const checkoutsRef = useRef(checkouts);
   const stickyCheckoutRef = useRef<StickyLobbyCheckoutState>(new Map());
+  const checkoutBasketFilteredRef = useRef(false);
 
   useEffect(() => {
     checkoutsRef.current = checkouts;
@@ -136,10 +138,15 @@ export function LobbyCheckoutBoard({
   const checkoutPollMs = clampCheckoutPollMs(settings.refresh_interval_ms || BOARD_CHECKOUT_POLL_MS);
 
   const applyCheckoutUpdate = useCallback((incoming: LobbyCheckoutsResponse) => {
+    if (incoming.basket_filtered) {
+      checkoutBasketFilteredRef.current = true;
+    }
+
     stickyCheckoutRef.current = mergeStickyLobbyCheckouts(
       stickyCheckoutRef.current,
       incoming,
-      Date.now()
+      Date.now(),
+      { pruneAbsent: checkoutBasketFilteredRef.current }
     );
     const stickyResponse = stickyLobbyStateToResponse(
       stickyCheckoutRef.current,

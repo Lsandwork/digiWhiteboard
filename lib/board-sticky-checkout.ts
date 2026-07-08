@@ -48,13 +48,24 @@ function pickLaterDisplayUntil(existing: LiveDog, incoming: LiveDog, now: Date) 
 export function mergeStickyCheckoutDogs(
   previous: StickyCheckoutState,
   incoming: LiveDog[],
-  now = new Date()
+  now = new Date(),
+  options: { pruneAbsent?: boolean } = {}
 ): StickyCheckoutState {
   const next = new Map(previous);
+  const { pruneAbsent = false } = options;
 
   for (const [key, entry] of next) {
     if (shouldExpireCheckoutDog(entry.dog, now, entry.firstSeenAt)) {
       next.delete(key);
+    }
+  }
+
+  if (pruneAbsent) {
+    const incomingKeys = new Set(incoming.map((dog) => getCheckoutMergeKey(dog)));
+    for (const key of next.keys()) {
+      if (!incomingKeys.has(key)) {
+        next.delete(key);
+      }
     }
   }
 

@@ -332,6 +332,7 @@ export async function GET(request: Request) {
         total: checkingIn.length + checkingOut.length
       },
       last_updated: now.toISOString(),
+      basket_filtered: Boolean(gingrBoard && gingrBoard.source !== "disabled"),
       ...(debugBoard
         ? {
             debug: {

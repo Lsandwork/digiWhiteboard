@@ -53,6 +53,13 @@ assert.equal(stickyCheckoutStateToDogs(sticky).length, 1);
 sticky = mergeStickyCheckoutDogs(sticky, [], now);
 assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "empty poll must not erase sticky checkout");
 
+sticky = mergeStickyCheckoutDogs(sticky, [], now, { pruneAbsent: true });
+assert.equal(stickyCheckoutStateToDogs(sticky).length, 0, "basket-filtered empty poll clears sticky checkout");
+
+sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
+sticky = mergeStickyCheckoutDogs(sticky, [], now);
+assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "empty poll must not erase sticky checkout without basket filter");
+
 sticky = mergeStickyCheckoutDogs(sticky, [gingrDog], now);
 const merged = stickyCheckoutStateToDogs(sticky);
 assert.equal(merged.length, 1);

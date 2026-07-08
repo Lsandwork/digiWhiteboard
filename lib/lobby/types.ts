@@ -65,6 +65,7 @@ export type LobbyCheckoutsResponse = {
   counts: { active: number; queue: number };
   last_updated: string;
   error?: string;
+  basket_filtered?: boolean;
   debug?: LobbyCheckoutDebug;
 };
 
