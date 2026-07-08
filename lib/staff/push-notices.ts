@@ -639,6 +639,9 @@ export async function pushStaffNoticeById(
   actor: string | null,
   expiresAt?: unknown
 ) {
+  const { clearAllActiveCastVideos } = await import("@/lib/staff/cast-video-notices");
+  await clearAllActiveCastVideos(supabase, actor);
+
   const now = new Date().toISOString();
   const state = clearActiveNoticesInState(await loadNoticeState(supabase), actor, id);
   const existing = state.notices.find((notice) => notice.id === id);
@@ -664,6 +667,9 @@ export async function createAndPushStaffNotice(
   input: StaffPushNoticeInput,
   actor: string | null
 ) {
+  const { clearAllActiveCastVideos } = await import("@/lib/staff/cast-video-notices");
+  await clearAllActiveCastVideos(supabase, actor);
+
   const state = clearActiveNoticesInState(await loadNoticeState(supabase), actor);
   const normalized = normalizeNoticeInput(input);
   const now = new Date().toISOString();

@@ -155,6 +155,19 @@ function CastVideoOverlayContent({
   }, [autoClearMs, boardMode, dismiss, notice.require_acknowledgement]);
 
   useEffect(() => {
+    if (!boardMode || !notice.expires_at) return;
+    const remainingMs = new Date(notice.expires_at).getTime() - Date.now();
+    if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
+      void dismiss({ skipped: !notice.require_acknowledgement });
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void dismiss({ skipped: !notice.require_acknowledgement });
+    }, remainingMs);
+    return () => window.clearTimeout(timer);
+  }, [boardMode, dismiss, notice.expires_at, notice.id, notice.require_acknowledgement]);
+
+  useEffect(() => {
     if (!boardMode || minimized || notice.require_acknowledgement) return;
     const timer = window.setTimeout(() => onMinimize?.(), BOARD_AUTO_MINIMIZE_MS);
     return () => window.clearTimeout(timer);
