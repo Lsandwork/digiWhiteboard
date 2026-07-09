@@ -1,5 +1,6 @@
 export const DISPLAY_SYNC_POLL_MS = 5000;
 export const DISPLAY_SYNC_STORAGE_KEY = "fitdog-display-sync";
+export const DISPLAY_BUILD_RELOAD_KEY = "fitdog-display-build-reload";
 
 export type DisplaySyncState = {
   display_content_revision: number;

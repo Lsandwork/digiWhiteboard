@@ -16,6 +16,8 @@ import {
   readInitialDisplaySync
 } from "@/lib/display-keeper-client";
 import {
+  CAST_KEEPER_HEARTBEAT_FAILURE_THRESHOLD,
+  CAST_KEEPER_HEARTBEAT_GRACE_MS,
   CAST_KEEPER_HEARTBEAT_MS,
   CAST_KEEPER_RECONNECT_HEARTBEAT_MS,
   CAST_KEEPER_RELOAD_COOLDOWN_MS,
@@ -69,14 +71,31 @@ async function ackDisplayCommands(commandIds: string[]) {
 }
 
 async function postHeartbeat(body: Record<string, unknown>) {
-  const response = await fetch("/api/displays/heartbeat", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    cache: "no-store",
-    body: JSON.stringify(body)
-  });
-  if (!response.ok) return null;
-  return (await response.json()) as HeartbeatResponse;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await fetch("/api/displays/heartbeat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        cache: "no-store",
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        if (attempt === 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, 750));
+          continue;
+        }
+        return null;
+      }
+      return (await response.json()) as HeartbeatResponse;
+    } catch {
+      if (attempt === 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+        continue;
+      }
+      return null;
+    }
+  }
+  return null;
 }
 
 function safeReload() {
@@ -95,6 +114,7 @@ export function useCastKeeper({
   const lastHeartbeatOkRef = useRef<number>(Date.now());
   const lastReloadAtRef = useRef<number>(0);
   const syncRef = useRef<HeartbeatResponse["sync"] | null>(null);
+  const heartbeatFailuresRef = useRef(0);
   const deviceIdRef = useRef(getOrCreateDisplayDeviceId());
   const [connection, setConnection] = useState<CastKeeperConnection>("online");
   const [lastHeartbeatAt, setLastHeartbeatAt] = useState<string | null>(null);
@@ -122,11 +142,28 @@ export function useCastKeeper({
   const markDataFresh = useCallback(() => {
     const now = Date.now();
     lastDataAtRef.current = now;
+    lastHeartbeatOkRef.current = now;
+    heartbeatFailuresRef.current = 0;
     setLastDataAt(new Date(now).toISOString());
-    if (connectionRef.current === "offline") {
+    if (connectionRef.current !== "online") {
       connectionRef.current = "online";
       setConnection("online");
     }
+  }, []);
+
+  const reportHeartbeatFailure = useCallback(() => {
+    const now = Date.now();
+    heartbeatFailuresRef.current += 1;
+    const recentlyHealthy = now - lastHeartbeatOkRef.current < CAST_KEEPER_HEARTBEAT_GRACE_MS;
+    if (
+      heartbeatFailuresRef.current < CAST_KEEPER_HEARTBEAT_FAILURE_THRESHOLD &&
+      recentlyHealthy
+    ) {
+      return;
+    }
+    const nextConnection = navigator.onLine ? "reconnecting" : "offline";
+    connectionRef.current = nextConnection;
+    setConnection(nextConnection);
   }, []);
 
   const maybeReloadStale = useCallback(() => {
@@ -166,13 +203,12 @@ export function useCastKeeper({
       });
 
       if (!body?.ok) {
-        const nextConnection = navigator.onLine ? "reconnecting" : "offline";
-        connectionRef.current = nextConnection;
-        setConnection(nextConnection);
+        reportHeartbeatFailure();
         return;
       }
 
       const now = Date.now();
+      heartbeatFailuresRef.current = 0;
       lastHeartbeatOkRef.current = now;
       setLastHeartbeatAt(body.serverTime);
       connectionRef.current = "online";
@@ -193,11 +229,9 @@ export function useCastKeeper({
 
       await processCommands(body.commands);
     } catch {
-      const nextConnection = navigator.onLine ? "reconnecting" : "offline";
-      connectionRef.current = nextConnection;
-      setConnection(nextConnection);
+      reportHeartbeatFailure();
     }
-  }, [displayType, processCommands, route]);
+  }, [displayType, processCommands, reportHeartbeatFailure, route]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -229,7 +263,7 @@ export function useCastKeeper({
     if (!enabled) return;
 
     const handleOnline = () => {
-      setConnection("reconnecting");
+      heartbeatFailuresRef.current = 0;
       void runHeartbeat();
     };
     const handleOffline = () => setConnection("offline");

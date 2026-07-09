@@ -7,10 +7,10 @@ import { startDisplayKeepaliveFallback } from "@/lib/display-keepalive-fallback"
 export function DisplayBootstrap() {
   useEffect(() => {
     document.documentElement.classList.add("cast-keeper-display");
-    const stopKeepalive = startDisplayKeepaliveFallback();
+    // Keepalive stays active for the full display session; Cast Keeper also holds a consumer.
+    startDisplayKeepaliveFallback();
 
     return () => {
-      stopKeepalive();
       document.documentElement.classList.remove("cast-keeper-display");
     };
   }, []);

@@ -134,6 +134,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const boardRef = useRef(board);
   const stickyCheckoutRef = useRef<StickyCheckoutState>(new Map());
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const hasSuccessfulLoadRef = useRef(false);
   const [fetchStatus, setFetchStatus] = useState<FetchStatus>("idle");
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(null);
@@ -364,6 +365,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
           };
         });
         setLastFetchAt(new Date().toISOString());
+        hasSuccessfulLoadRef.current = true;
         castKeeper?.markDataFresh();
       } catch {
         // Keep the last good board data when a fast refresh fails.
@@ -419,7 +421,8 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
         setFetchError(null);
         setFetchStatus("ok");
         setLastSuccessAt(data.last_updated);
-        setConnection((current) => (current === "live" ? "live" : mode));
+        hasSuccessfulLoadRef.current = true;
+        setConnection((current) => (castKeeperMode ? "polling" : current === "live" ? "live" : mode));
         castKeeper?.markDataFresh();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Live board data is not loading.";
@@ -427,7 +430,11 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
           boardRef.current.checking_in.length > 0 || boardRef.current.checking_out.length > 0;
         setFetchError(message);
         setFetchStatus(hasData ? "ok" : "error");
-        setConnection(hasData ? (mode === "connecting" ? "polling" : mode) : "offline");
+        if (castKeeperMode && (hasSuccessfulLoadRef.current || hasData)) {
+          setConnection("polling");
+        } else {
+          setConnection(hasData ? (mode === "connecting" ? "polling" : mode) : "offline");
+        }
       } finally {
         window.clearTimeout(timeout);
       }
@@ -501,6 +508,13 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   }, [loadBoard, loadFastCheckouts]);
 
   useEffect(() => {
+    if (castKeeperMode) {
+      const timer = window.setTimeout(() => {
+        setConnection(hasSuccessfulLoadRef.current ? "polling" : "connecting");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
     const supabase = getBrowserSupabase();
     if (!supabase) {
       const fallbackTimer = window.setTimeout(() => setConnection("polling"), 0);

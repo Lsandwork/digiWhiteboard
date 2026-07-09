@@ -41,9 +41,11 @@ export type DisplayDevice = {
 export const CAST_KEEPER_DEVICE_STORAGE_KEY = "fitdog_display_device_id";
 export const CAST_KEEPER_HEARTBEAT_MS = 15_000;
 export const CAST_KEEPER_RECONNECT_HEARTBEAT_MS = 4_000;
-export const CAST_KEEPER_STALE_MS = 8 * 60_000;
+export const CAST_KEEPER_STALE_MS = 12 * 60_000;
 export const CAST_KEEPER_RELOAD_COOLDOWN_MS = 2 * 60_000;
 export const CAST_KEEPER_OFFLINE_DEVICE_MS = 90_000;
+export const CAST_KEEPER_HEARTBEAT_FAILURE_THRESHOLD = 3;
+export const CAST_KEEPER_HEARTBEAT_GRACE_MS = 60_000;
 
 export type HeartbeatRequest = {
   deviceId: string;
