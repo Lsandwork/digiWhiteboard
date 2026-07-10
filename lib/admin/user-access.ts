@@ -8,6 +8,7 @@ import {
   type RoleKey,
   type UserAccess
 } from "@/lib/admin/permissions";
+import type { AdminUserRole } from "@/lib/admin/users";
 import {
   loadRolePermissionMatrix,
   permissionsForRolesFromMatrix
@@ -182,6 +183,49 @@ function defaultDepartmentsForRole(role: RoleKey): DepartmentKey[] {
     default:
       return [];
   }
+}
+
+const STAFF_DIRECTORY_DEPARTMENT_TO_RBAC: Record<string, DepartmentKey> = {
+  "front desk": "front_desk",
+  "team lead": "front_desk",
+  management: "management",
+  grooming: "grooming",
+  training: "training",
+  "dog handler": "daycare",
+  daycare: "daycare",
+  overnight: "overnight",
+  maintenance: "maintenance",
+  transportation: "transportation",
+  admin: "admin"
+};
+
+export function departmentsForLegacyRole(
+  legacyRole?: AdminUserRole | null,
+  staffDepartmentLabel?: string | null
+): DepartmentKey[] {
+  const primaryRole = legacyRoleToRoleKey(legacyRole);
+  const normalized = String(staffDepartmentLabel ?? "")
+    .trim()
+    .toLowerCase();
+  const mapped = normalized ? STAFF_DIRECTORY_DEPARTMENT_TO_RBAC[normalized] : undefined;
+  if (mapped) return [mapped];
+  return defaultDepartmentsForRole(primaryRole);
+}
+
+/** Keep RBAC assignments aligned when staff directory creates or updates a login. */
+export async function syncUserAccessFromLegacyRole(
+  supabase: SupabaseClient,
+  userId: string,
+  legacyRole?: AdminUserRole | null,
+  staffDepartmentLabel?: string | null
+) {
+  if (!userId || !legacyRole) return;
+  const primaryRole = legacyRoleToRoleKey(legacyRole);
+  await setUserAccess(supabase, userId, {
+    primaryRole,
+    roles: [primaryRole],
+    departments: departmentsForLegacyRole(legacyRole, staffDepartmentLabel)
+  });
 }
 
 export { roleKeyToLegacyRole, legacyRoleToRoleKey };

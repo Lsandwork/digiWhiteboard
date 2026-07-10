@@ -11,3 +11,4 @@ tsconfig.tsbuildinfo
 .vercel
 .env*
 videos/raw/
+public/assets/fitdog/social-moments/clips-original/

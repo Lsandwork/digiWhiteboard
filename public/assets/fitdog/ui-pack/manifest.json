@@ -1,0 +1,24 @@
+{
+  "name": "fitdog-ui-pack",
+  "version": "1.0.0",
+  "style": "dark amber dashboard",
+  "tabIcons": [
+    "checklist.svg",
+    "emergency-alerts.svg",
+    "cast-videos.svg",
+    "owner-follow-up.svg",
+    "active-issues.svg",
+    "users.svg",
+    "bulk-photo-upload.svg",
+    "write-ups.svg",
+    "handler-shift-entry.svg",
+    "hr-pip.svg"
+  ],
+  "buttonIcons": [
+    "button-collapse.svg",
+    "button-expand.svg",
+    "button-sync.svg",
+    "button-upload.svg",
+    "button-save.svg"
+  ]
+}

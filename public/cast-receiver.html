@@ -34,11 +34,25 @@
       const statusEl = document.getElementById("status");
       const context = cast.framework.CastReceiverContext.getInstance();
       let pendingUrl = "";
+      let navigating = false;
+
+      function preconnectToBoard(url) {
+        try {
+          const target = new URL(url);
+          const link = document.createElement("link");
+          link.rel = "preconnect";
+          link.href = target.origin;
+          document.head.appendChild(link);
+        } catch (error) {
+          // Ignore malformed URLs.
+        }
+      }
 
       function navigateToBoard(url) {
-        if (!url || typeof url !== "string") return;
+        if (!url || typeof url !== "string" || navigating) return;
+        navigating = true;
         pendingUrl = url;
-        statusEl.textContent = "Opening digital whiteboard...";
+        preconnectToBoard(url);
         window.location.replace(url);
       }
 
@@ -61,7 +75,6 @@
             navigateToBoard(payload.url);
             return;
           }
-          statusEl.textContent = "Refreshing digital whiteboard...";
           window.location.reload();
           return;
         }

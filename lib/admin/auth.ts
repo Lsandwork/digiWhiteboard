@@ -16,6 +16,19 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(aBuf, bBuf);
 }
 
+/**
+ * Login must stay usable even when Supabase is slow/degraded. Bound each DB
+ * call so a stalled query falls back to env/demo auth instead of hanging ~40s.
+ */
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    )
+  ]);
+}
+
 export type AdminAuthResult = {
   ok: boolean;
   email: string;
@@ -45,7 +58,7 @@ export async function verifyAdminCredentials(username: string, password: string)
 
   try {
     const supabase = getServiceSupabase();
-    const dbUser = await findAdminUserByEmail(supabase, normalized);
+    const dbUser = await withTimeout(findAdminUserByEmail(supabase, normalized), 8000, "admin user lookup");
     if (dbUser && dbUser.status === "active") {
       const valid = await verifyAdminUserPassword(dbUser, password);
       if (valid) {
@@ -66,7 +79,8 @@ export async function verifyAdminCredentials(username: string, password: string)
     // Fall through to env auth if DB unavailable.
   }
 
-  const settings = await loadAdminSettings(getServiceSupabase()).catch(() => null);
+  const settings = await withTimeout(loadAdminSettings(getServiceSupabase()), 8000, "admin settings")
+    .catch(() => null);
   if (settings && !settings.allow_env_admin_login) {
     return { ok: false, email: normalized, source: "env" };
   }

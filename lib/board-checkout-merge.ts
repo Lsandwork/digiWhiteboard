@@ -1,15 +1,17 @@
-import type { LiveDog } from "@/lib/types";
+import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
+import type { LiveBoardResponse, LiveDog } from "@/lib/types";
+import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
-export const BOARD_CHECKOUT_POLL_MIN_MS = 2000;
-export const BOARD_CHECKOUT_POLL_MAX_MS = 5000;
-export const BOARD_CHECKOUT_POLL_MS = 2000;
-export const BOARD_FULL_SYNC_POLL_MS = 8000;
-export const BOARD_REALTIME_DEBOUNCE_MS = 250;
+export const BOARD_CHECKOUT_POLL_MIN_MS = 4000;
+export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
+export const BOARD_CHECKOUT_POLL_MS = 5000;
+export const BOARD_FULL_SYNC_POLL_MS = 20_000;
+export const BOARD_REALTIME_DEBOUNCE_MS = 750;
 
 export function clampCheckoutPollMs(intervalMs: number) {
   return Math.min(BOARD_CHECKOUT_POLL_MAX_MS, Math.max(BOARD_CHECKOUT_POLL_MIN_MS, intervalMs));
 }
-export const BOARD_SETTINGS_POLL_MS = 15000;
+export const BOARD_SETTINGS_POLL_MS = 30_000;
 export const BOARD_FETCH_TIMEOUT_MS = 10000;
 export const BOARD_FAST_FETCH_TIMEOUT_MS = 4000;
 
@@ -19,12 +21,73 @@ export function sortCheckoutDogs(dogs: LiveDog[]) {
   );
 }
 
+export function preserveDogPhotos(previousDogs: LiveDog[], nextDogs: LiveDog[]) {
+  if (!previousDogs.length) return nextDogs;
+
+  const previousByKey = new Map(previousDogs.map((dog) => [getStableDogPhotoKey(dog), dog]));
+  return nextDogs.map((dog) => {
+    const previous = previousByKey.get(getStableDogPhotoKey(dog));
+    const photoUrl = dog.photo_url?.trim() || previous?.photo_url?.trim() || null;
+    if (!photoUrl) return dog;
+    rememberStableDogPhoto(getStableDogPhotoKey(dog), photoUrl);
+    if (dog.photo_url?.trim()) return dog;
+    return { ...dog, photo_url: photoUrl };
+  });
+}
+
+export function mergeBoardResponse(previous: LiveBoardResponse, next: LiveBoardResponse): LiveBoardResponse {
+  const checkingIn = preserveDogPhotos(previous.checking_in, next.checking_in);
+  const checkingOut = preserveDogPhotos(previous.checking_out, next.checking_out);
+
+  if (
+    areCheckoutListsEquivalent(previous.checking_in, checkingIn) &&
+    areCheckoutListsEquivalent(previous.checking_out, checkingOut) &&
+    previous.last_updated === next.last_updated
+  ) {
+    return previous;
+  }
+
+  return {
+    ...next,
+    checking_in: checkingIn,
+    checking_out: checkingOut
+  };
+}
+
+export function areCheckoutListsEquivalent(previous: LiveDog[], next: LiveDog[]) {
+  if (previous.length !== next.length) return false;
+
+  const previousByKey = new Map(previous.map((dog) => [getCheckoutMergeKey(dog), dog]));
+  for (const dog of next) {
+    const existing = previousByKey.get(getCheckoutMergeKey(dog));
+    if (!existing) return false;
+    if (existing.hidden !== dog.hidden) return false;
+    if (existing.display_status !== dog.display_status) return false;
+    if (existing.animal_name !== dog.animal_name) return false;
+    if ((existing.photo_url ?? null) !== (dog.photo_url ?? null)) return false;
+    if ((existing.display_until ?? null) !== (dog.display_until ?? null)) return false;
+    if ((existing.status_started_at ?? null) !== (dog.status_started_at ?? null)) return false;
+  }
+
+  return true;
+}
+
 export function mergeCheckoutDogs(primary: LiveDog[], secondary: LiveDog[]) {
   const dogsByKey = new Map<string, LiveDog>();
 
   for (const dog of [...primary, ...secondary]) {
     const key = dog.gingr_reservation_id ?? dog.gingr_animal_id ?? dog.id;
-    if (!dogsByKey.has(key)) dogsByKey.set(key, dog);
+    const existing = dogsByKey.get(key);
+    if (!existing) {
+      dogsByKey.set(key, dog);
+      continue;
+    }
+
+    dogsByKey.set(key, {
+      ...existing,
+      ...dog,
+      photo_url: dog.photo_url ?? existing.photo_url
+    });
   }
 
   return [...dogsByKey.values()];

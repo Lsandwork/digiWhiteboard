@@ -85,7 +85,7 @@ export function getOrCreateDisplayDeviceId() {
 }
 
 export function buildCastDisplayPath(displayType: DisplayType) {
-  return displayType === "staff_whiteboard" ? "/display/staff-whiteboard" : "/display/lobby-whiteboard";
+  return displayType === "staff_whiteboard" ? "/" : "/lobby/checkouts";
 }
 
 export function buildCastDisplayUrl(displayType: DisplayType, origin?: string) {

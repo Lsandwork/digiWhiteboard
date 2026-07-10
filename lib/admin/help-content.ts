@@ -557,7 +557,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Supabase: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY",
       "Gingr: GINGR_API_KEY, GINGR_WEBHOOK_SIGNATURE_KEY, GINGR_SUBDOMAIN",
       "Admin: ADMIN_PASSWORD_HASH, ADMIN_SESSION_SECRET, ADMIN_USERNAME (optional)",
-      "Lobby TV token: LOBBY_DISPLAY_TOKEN (if using secured lobby URL)",
+      "Lobby TV token: LOBBY_DISPLAY_TOKEN (optional — embeds token in cast URLs; lobby reads stay open for all staff)",
       "After changing env vars on Vercel, redeploy once."
     ],
     tips: ["See .env.example in the project for the full list."]

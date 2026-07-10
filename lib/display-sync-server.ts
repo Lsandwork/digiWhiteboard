@@ -1,38 +1,39 @@
 import { getPublicBuildId } from "@/lib/build-id";
-import { DEFAULT_ADMIN_SETTINGS, loadAdminSettings, updateAdminSettings } from "@/lib/admin/settings";
-import { loadLobbySettings } from "@/lib/lobby/settings";
-import { loadStaffBoardSettings } from "@/lib/staff/settings";
+import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
+import {
+  cachedLoadSettingsBundle,
+  cachedUpdateAdminSettings,
+  DISPLAY_SYNC_CACHE_TTL_MS
+} from "@/lib/board-settings-cache";
+import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
 import type { DisplaySyncState } from "@/lib/display-sync";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 export async function loadDisplaySyncState(supabase: SupabaseClient): Promise<DisplaySyncState> {
-  const [adminSettings, lobbySettings, staffSettings] = await Promise.all([
-    loadAdminSettings(supabase),
-    loadLobbySettings(supabase),
-    loadStaffBoardSettings(supabase)
-  ]);
-
-  return {
-    display_content_revision: adminSettings.display_content_revision ?? 0,
-    cast_hard_reload_nonce: adminSettings.cast_hard_reload_nonce ?? 0,
-    build_id: getPublicBuildId(),
-    lobby_published_version: lobbySettings.published_version ?? "v1.0.0",
-    staff_published_version: staffSettings.published_version ?? "v1.0.0"
-  };
+  return getOrLoadTtlCache("display-sync", DISPLAY_SYNC_CACHE_TTL_MS, async () => {
+    const { admin, lobby, staff } = await cachedLoadSettingsBundle(supabase);
+    return {
+      display_content_revision: admin.display_content_revision ?? 0,
+      cast_hard_reload_nonce: admin.cast_hard_reload_nonce ?? 0,
+      build_id: getPublicBuildId(),
+      lobby_published_version: lobby.published_version ?? "v1.0.0",
+      staff_published_version: staff.published_version ?? "v1.0.0"
+    };
+  });
 }
 
 export async function bumpDisplayContentRevision(supabase: SupabaseClient) {
-  const current = await loadAdminSettings(supabase);
-  const nextRevision = (current.display_content_revision ?? 0) + 1;
-  await updateAdminSettings(supabase, { display_content_revision: nextRevision });
+  const { admin } = await cachedLoadSettingsBundle(supabase);
+  const nextRevision = (admin.display_content_revision ?? 0) + 1;
+  await cachedUpdateAdminSettings(supabase, { display_content_revision: nextRevision });
   return nextRevision;
 }
 
 export async function bumpCastHardReloadNonce(supabase: SupabaseClient) {
-  const current = await loadAdminSettings(supabase);
-  const nextNonce = (current.cast_hard_reload_nonce ?? 0) + 1;
-  await updateAdminSettings(supabase, { cast_hard_reload_nonce: nextNonce });
+  const { admin } = await cachedLoadSettingsBundle(supabase);
+  const nextNonce = (admin.cast_hard_reload_nonce ?? 0) + 1;
+  await cachedUpdateAdminSettings(supabase, { cast_hard_reload_nonce: nextNonce });
   return nextNonce;
 }
 

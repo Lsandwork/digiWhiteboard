@@ -17,11 +17,14 @@ export function ChangeHistoryModal({ open, board, onClose }: ChangeHistoryModalP
 
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    void fetch(`/api/admin/publish-history?board=${board}&limit=20`, { cache: "no-store" })
-      .then((response) => response.json())
-      .then((body) => setHistory(body.history ?? []))
-      .finally(() => setLoading(false));
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      void fetch(`/api/admin/publish-history?board=${board}&limit=20`, { cache: "no-store" })
+        .then((response) => response.json())
+        .then((body) => setHistory(body.history ?? []))
+        .finally(() => setLoading(false));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, board]);
 
   return (

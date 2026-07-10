@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { useLobbyDogPhoto } from "@/hooks/useLobbyDogPhoto";
+import {
+  buildCastOptimizedDogPhotoUrl,
+  rememberStableDogPhoto,
+  getRememberedDogPhoto
+} from "@/lib/dog-photo-display-cache";
+import { getLobbyCheckoutMergeKey } from "@/lib/lobby-display-stable";
+import { useDogPhotoFallback } from "@/hooks/useDogPhotoFallback";
 
 type LobbyDogAvatarProps = {
   dogName: string;
@@ -11,15 +17,42 @@ type LobbyDogAvatarProps = {
   size?: "featured" | "queue";
 };
 
-export function LobbyDogAvatar({ dogName, animalId, imageUrl, size = "queue" }: LobbyDogAvatarProps) {
-  const resolvedPhotoUrl = useLobbyDogPhoto(animalId, imageUrl);
+export const LobbyDogAvatar = memo(function LobbyDogAvatar({
+  dogName,
+  animalId,
+  imageUrl,
+  size = "queue"
+}: LobbyDogAvatarProps) {
+  const photoKey = animalId?.trim()
+    ? getLobbyCheckoutMergeKey({ id: animalId, gingr_animal_id: animalId })
+    : getLobbyCheckoutMergeKey({ id: dogName, gingr_animal_id: null });
+
+  const resolvedPhotoUrl = useDogPhotoFallback(animalId, imageUrl);
+  const lastGoodUrlRef = useRef(resolvedPhotoUrl);
   const [photoFailed, setPhotoFailed] = useState(false);
+  const [castOptimized, setCastOptimized] = useState(false);
   const initial = dogName.trim().slice(0, 1).toUpperCase() || "?";
-  const showPhoto = Boolean(resolvedPhotoUrl) && !photoFailed;
 
   useEffect(() => {
-    setPhotoFailed(false);
-  }, [resolvedPhotoUrl]);
+    if (resolvedPhotoUrl) {
+      rememberStableDogPhoto(photoKey, resolvedPhotoUrl);
+      lastGoodUrlRef.current = resolvedPhotoUrl;
+      setPhotoFailed(false);
+    }
+  }, [photoKey, resolvedPhotoUrl]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCastOptimized(document.documentElement.classList.contains("fitdog-cast-mode"));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const rawDisplayUrl = resolvedPhotoUrl || lastGoodUrlRef.current || getRememberedDogPhoto(photoKey);
+  const displayUrl = rawDisplayUrl && castOptimized
+    ? buildCastOptimizedDogPhotoUrl(rawDisplayUrl, size === "featured" ? 640 : 256)
+    : rawDisplayUrl;
+  const showPhoto = Boolean(displayUrl) && !photoFailed;
 
   return (
     <div
@@ -31,12 +64,13 @@ export function LobbyDogAvatar({ dogName, animalId, imageUrl, size = "queue" }: 
       {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={resolvedPhotoUrl ?? undefined}
-          src={resolvedPhotoUrl ?? undefined}
+          key={photoKey}
+          src={displayUrl ?? undefined}
           alt={`Photo of ${dogName}`}
           className="h-full w-full object-cover"
-          loading="lazy"
+          loading={size === "featured" ? "eager" : "lazy"}
           decoding="async"
+          draggable={false}
           onError={() => setPhotoFailed(true)}
         />
       ) : (
@@ -46,4 +80,4 @@ export function LobbyDogAvatar({ dogName, animalId, imageUrl, size = "queue" }: 
       )}
     </div>
   );
-}
+});

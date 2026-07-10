@@ -125,6 +125,7 @@ export function loadGoogleCastSdk() {
 }
 
 function getCastContext() {
+  if (typeof window === "undefined") return null;
   return window.cast?.framework.CastContext.getInstance() ?? null;
 }
 
@@ -155,14 +156,43 @@ export async function preloadGoogleCast() {
   }
 }
 
+/**
+ * Opens the Chromecast device picker. Must be called synchronously from a user gesture.
+ * Never awaits SDK load here — preload Google Cast on page load instead.
+ */
+export function requestGoogleCastDevicePickerFromUserGesture() {
+  if (!isGoogleCastFrameworkReady()) {
+    throw new Error("Google Cast is still loading. Wait a second, then click Cast again.");
+  }
+
+  const context = getCastContext();
+  if (!context) {
+    throw new Error("Google Cast could not be initialized.");
+  }
+
+  if (!castInitialized) {
+    context.setOptions({
+      receiverApplicationId: getEffectiveGoogleCastAppId(),
+      autoJoinPolicy: window.chrome?.cast?.AutoJoinPolicy.ORIGIN_SCOPED ?? "origin_scoped"
+    });
+    castInitialized = true;
+  }
+
+  // requestSession() must stay in the same turn as the click handler.
+  const sessionPromise = context.requestSession();
+  return { context, sessionPromise };
+}
+
 export async function requestGoogleCastDevicePicker() {
-  const context = await initializeGoogleCast();
-  await context.requestSession();
+  const { context, sessionPromise } = requestGoogleCastDevicePickerFromUserGesture();
+  await sessionPromise;
   return context;
 }
 
 export async function startGoogleCastSession(displayToken?: string, castUrl?: string) {
-  const context = await requestGoogleCastDevicePicker();
+  const { context, sessionPromise } = requestGoogleCastDevicePickerFromUserGesture();
+  await sessionPromise;
+
   const session = context.getCurrentSession();
   if (!session) {
     throw new Error("No cast session was created.");
@@ -172,13 +202,13 @@ export async function startGoogleCastSession(displayToken?: string, castUrl?: st
   const payload = JSON.stringify({ url });
   let lastError: unknown = null;
 
-  for (let attempt = 0; attempt < 6; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       await session.sendMessage(LOBBY_CAST_NAMESPACE, payload);
       return context;
     } catch (error) {
       lastError = error;
-      await new Promise((resolve) => window.setTimeout(resolve, 400));
+      await new Promise((resolve) => window.setTimeout(resolve, 200));
     }
   }
 

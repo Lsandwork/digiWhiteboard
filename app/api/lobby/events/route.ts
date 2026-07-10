@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { isLobbyAdmin, isLobbyDisplayAuthorized, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
+import { canReadLobbyBoard, isLobbyAdmin, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbyEvents } from "@/lib/lobby/settings";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!isLobbyDisplayAuthorized(request) && !isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+  if (!canReadLobbyBoard(request)) return unauthorizedLobbyResponse();
 
   try {
     const events = await loadLobbyEvents(getServiceSupabase());

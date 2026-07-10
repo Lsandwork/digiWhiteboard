@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import { SocialMomentsCacheBootstrap } from "@/components/lobby/SocialMomentsCacheBootstrap";
 import { SOCIAL_MOMENTS, type SocialMoment } from "@/lib/lobby/social-moments";
+import {
+  getPrefetchedClipSrc,
+  prefetchSocialMomentWindow,
+  releaseSocialMomentPrefetchCache,
+  SOCIAL_MOMENTS_PREFETCH_AHEAD
+} from "@/lib/lobby/social-moments-prefetch";
 
 const CROSSFADE_MS = 180;
 
@@ -12,7 +19,22 @@ function nextClipIndex(current: number, length: number) {
   return length ? (current + 1) % length : 0;
 }
 
-export function SocialMomentsCarousel() {
+function upcomingIndices(startIndex: number, length: number, count: number) {
+  if (!length) return [] as number[];
+  const indices: number[] = [];
+  for (let offset = 0; offset <= count; offset += 1) {
+    indices.push((startIndex + offset) % length);
+  }
+  return indices;
+}
+
+export function SocialMomentsCarousel({
+  paused = false,
+  performanceMode = false
+}: {
+  paused?: boolean;
+  performanceMode?: boolean;
+}) {
   const [mounted, setMounted] = useState(false);
   const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set());
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -20,18 +42,25 @@ export function SocialMomentsCarousel() {
   const [slotIndices, setSlotIndices] = useState<[number, number]>([0, 1]);
   const [activeSlot, setActiveSlot] = useState<VideoSlot>(0);
   const [crossfading, setCrossfading] = useState(false);
+  const [prefetchVersion, setPrefetchVersion] = useState(0);
 
   const videoRefs = useRef<[HTMLVideoElement | null, HTMLVideoElement | null]>([null, null]);
   const transitioningRef = useRef(false);
   const crossfadeTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setMounted(true);
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduceMotion(media.matches);
-    update();
+    const initialTimer = window.setTimeout(() => {
+      setMounted(true);
+      update();
+    }, 0);
     media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
+    return () => {
+      window.clearTimeout(initialTimer);
+      media.removeEventListener("change", update);
+      releaseSocialMomentPrefetchCache();
+    };
   }, []);
 
   useEffect(() => {
@@ -39,6 +68,20 @@ export function SocialMomentsCarousel() {
       if (crossfadeTimerRef.current) window.clearTimeout(crossfadeTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!paused) return;
+    if (crossfadeTimerRef.current) {
+      window.clearTimeout(crossfadeTimerRef.current);
+      crossfadeTimerRef.current = null;
+    }
+    transitioningRef.current = false;
+    const timer = window.setTimeout(() => setCrossfading(false), 0);
+    for (const video of videoRefs.current) {
+      video?.pause();
+    }
+    return () => window.clearTimeout(timer);
+  }, [paused]);
 
   const clips = useMemo(
     () => SOCIAL_MOMENTS.filter((clip) => !failedIds.has(clip.id)),
@@ -48,6 +91,7 @@ export function SocialMomentsCarousel() {
   const hasClips = clips.length > 0;
   const safeIndex = hasClips ? clipIndex % clips.length : 0;
   const currentClip = hasClips ? clips[safeIndex] : null;
+  const staticPosterMode = reduceMotion || performanceMode;
 
   const currentSourceIndex = currentClip
     ? SOCIAL_MOMENTS.findIndex((clip) => clip.id === currentClip.id)
@@ -55,29 +99,26 @@ export function SocialMomentsCarousel() {
 
   useEffect(() => {
     if (clipIndex >= clips.length && clips.length > 0) {
-      setClipIndex(0);
-      setSlotIndices([0, clips.length > 1 ? 1 : 0]);
-      setActiveSlot(0);
+      const timer = window.setTimeout(() => {
+        setClipIndex(0);
+        setSlotIndices([0, clips.length > 1 ? 1 : 0]);
+        setActiveSlot(0);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
   }, [clipIndex, clips.length]);
 
-  const preloadClip = useCallback((clip: SocialMoment) => {
-    if (typeof document === "undefined") return;
-    const existing = document.querySelector(`link[data-social-preload="${clip.id}"]`);
-    if (existing) return;
-    const link = document.createElement("link");
-    link.rel = "preload";
-    link.as = "video";
-    link.href = clip.src;
-    link.setAttribute("data-social-preload", clip.id);
-    document.head.appendChild(link);
-  }, []);
-
   useEffect(() => {
-    if (!hasClips || reduceMotion) return;
-    const upcoming = clips[nextClipIndex(safeIndex, clips.length)];
-    if (upcoming) preloadClip(upcoming);
-  }, [clips, hasClips, preloadClip, reduceMotion, safeIndex]);
+    if (!hasClips || staticPosterMode || paused) return;
+    let cancelled = false;
+    void (async () => {
+      await prefetchSocialMomentWindow(clips, safeIndex);
+      if (!cancelled) setPrefetchVersion((value) => value + 1);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clips, hasClips, paused, safeIndex, staticPosterMode]);
 
   const playSlot = useCallback(async (slot: VideoSlot) => {
     const video = videoRefs.current[slot];
@@ -105,7 +146,36 @@ export function SocialMomentsCarousel() {
     });
   }, [clips.length]);
 
-  const beginCrossfade = useCallback((targetIndex: number) => {
+  const waitForBufferedVideo = useCallback((video: HTMLVideoElement) => {
+    return new Promise<void>((resolve) => {
+      if (video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        resolve();
+        return;
+      }
+
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+
+      const onError = () => {
+        cleanup();
+        resolve();
+      };
+
+      const cleanup = () => {
+        video.removeEventListener("canplaythrough", onReady);
+        video.removeEventListener("error", onError);
+      };
+
+      video.addEventListener("canplaythrough", onReady);
+      video.addEventListener("error", onError);
+      video.load();
+    });
+  }, []);
+
+  const beginCrossfade = useCallback(async (targetIndex: number) => {
+    if (paused) return;
     if (!clips.length || transitioningRef.current) return;
     if (targetIndex === safeIndex) return;
 
@@ -125,79 +195,72 @@ export function SocialMomentsCarousel() {
       return;
     }
 
-    const startFade = () => {
-      setCrossfading(true);
-      void playSlot(inactiveSlot);
-      if (crossfadeTimerRef.current) window.clearTimeout(crossfadeTimerRef.current);
-      crossfadeTimerRef.current = window.setTimeout(() => {
-        finishCrossfade(targetIndex, inactiveSlot);
-      }, CROSSFADE_MS);
-    };
-
-    if (inactiveVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-      startFade();
-      return;
+    const targetClip = clips[targetIndex];
+    if (targetClip) {
+      await prefetchSocialMomentWindow(clips, targetIndex);
     }
 
-    const onReady = () => {
-      inactiveVideo.removeEventListener("canplay", onReady);
-      startFade();
-    };
+    await waitForBufferedVideo(inactiveVideo);
 
-    inactiveVideo.addEventListener("canplay", onReady);
-    inactiveVideo.load();
-  }, [activeSlot, clips.length, finishCrossfade, playSlot, safeIndex]);
+    setCrossfading(true);
+    void playSlot(inactiveSlot);
+    if (crossfadeTimerRef.current) window.clearTimeout(crossfadeTimerRef.current);
+    crossfadeTimerRef.current = window.setTimeout(() => {
+      finishCrossfade(targetIndex, inactiveSlot);
+    }, CROSSFADE_MS);
+  }, [activeSlot, clips, finishCrossfade, paused, playSlot, safeIndex, waitForBufferedVideo]);
 
   const goNext = useCallback(() => {
+    if (paused) return;
     if (!clips.length) return;
-    if (reduceMotion) {
+    if (staticPosterMode) {
       setClipIndex((current) => nextClipIndex(current, clips.length));
       return;
     }
-    beginCrossfade(nextClipIndex(safeIndex, clips.length));
-  }, [beginCrossfade, clips.length, reduceMotion, safeIndex]);
+    void beginCrossfade(nextClipIndex(safeIndex, clips.length));
+  }, [beginCrossfade, clips.length, paused, safeIndex, staticPosterMode]);
 
   const goPrevious = useCallback(() => {
+    if (paused) return;
     if (!clips.length) return;
     const target = (safeIndex - 1 + clips.length) % clips.length;
-    if (reduceMotion) {
+    if (staticPosterMode) {
       setClipIndex(target);
       return;
     }
-    beginCrossfade(target);
-  }, [beginCrossfade, clips.length, reduceMotion, safeIndex]);
+    void beginCrossfade(target);
+  }, [beginCrossfade, clips.length, paused, safeIndex, staticPosterMode]);
 
   const selectClip = useCallback((clipId: string) => {
+    if (paused) return;
     const target = clips.findIndex((clip) => clip.id === clipId);
     if (target < 0) return;
-    if (reduceMotion) {
+    if (staticPosterMode) {
       setClipIndex(target);
       return;
     }
-    beginCrossfade(target);
-  }, [beginCrossfade, clips, reduceMotion]);
-
-  const handleError = useCallback((clip: SocialMoment) => {
-    setFailedIds((current) => {
-      const next = new Set(current);
-      next.add(clip.id);
-      return next;
-    });
-    if (clip.id === currentClip?.id) {
-      goNext();
-    }
-  }, [currentClip?.id, goNext]);
+    void beginCrossfade(target);
+  }, [beginCrossfade, clips, paused, staticPosterMode]);
 
   useEffect(() => {
-    if (!mounted || reduceMotion || !hasClips) return;
+    if (!mounted || staticPosterMode || !hasClips || paused) return;
     void playSlot(activeSlot);
-  }, [activeSlot, hasClips, mounted, playSlot, reduceMotion, slotIndices]);
+  }, [activeSlot, hasClips, mounted, paused, playSlot, prefetchVersion, staticPosterMode, slotIndices]);
+
+  const shouldPreloadSlot = useCallback(
+    (slot: VideoSlot, clipIndexForSlot: number) => {
+      if (slot === activeSlot) return true;
+      return upcomingIndices(safeIndex, clips.length, SOCIAL_MOMENTS_PREFETCH_AHEAD).includes(clipIndexForSlot);
+    },
+    [activeSlot, clips.length, safeIndex]
+  );
 
   const renderVideoSlot = (slot: VideoSlot) => {
     const clip = clips[slotIndices[slot]];
     if (!clip) return null;
     const inactiveSlot: VideoSlot = activeSlot === 0 ? 1 : 0;
     const isVisible = crossfading ? slot === inactiveSlot : slot === activeSlot;
+    const preloadMode = shouldPreloadSlot(slot, slotIndices[slot]) ? "auto" : "metadata";
 
     return (
       <video
@@ -205,20 +268,28 @@ export function SocialMomentsCarousel() {
           videoRefs.current[slot] = node;
         }}
         className={`social-video-layer ${isVisible ? "social-video-layer--visible" : "social-video-layer--hidden"}`}
-        src={clip.src}
+        src={getPrefetchedClipSrc(clip)}
         poster={clip.poster}
-        autoPlay={slot === activeSlot && !crossfading}
+        autoPlay={slot === activeSlot && !crossfading && !paused}
         muted
         playsInline
-        preload={slot === activeSlot || slotIndices[slot] === nextClipIndex(safeIndex, clips.length) ? "auto" : "metadata"}
-        onEnded={slot === activeSlot && !crossfading ? goNext : undefined}
-        onError={() => handleError(clip)}
+        preload={preloadMode}
+        onEnded={slot === activeSlot && !crossfading && !paused ? goNext : undefined}
+        onError={() => {
+          setFailedIds((current) => {
+            const next = new Set(current);
+            next.add(clip.id);
+            return next;
+          });
+        }}
       />
     );
   };
 
   return (
     <section className="social-moments-card flex h-full min-h-0 flex-col" aria-label="Fitdog Social Moments">
+      <SocialMomentsCacheBootstrap />
+
       <div className="social-moments-header">
         <div>
           <p className="social-moments-eyebrow">Social Moments</p>
@@ -250,7 +321,7 @@ export function SocialMomentsCarousel() {
             sizes="(max-width: 768px) 100vw, 390px"
             priority
           />
-        ) : currentClip && reduceMotion ? (
+        ) : currentClip && staticPosterMode ? (
           <div className="social-video-static">
             <Image
               src={currentClip.poster}

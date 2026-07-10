@@ -137,7 +137,8 @@ export function DailyRemindersSection({ canView }: { canView: boolean }) {
   }, [canView, showToast]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const permissions = data?.permissions ?? { canEdit: false, canSendEarly: false, canForceResend: false };

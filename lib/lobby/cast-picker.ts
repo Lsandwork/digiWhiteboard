@@ -15,7 +15,6 @@ import {
   isGoogleCastBrowser,
   isGoogleCastConfigured,
   isGoogleCastFrameworkReady,
-  preloadGoogleCast,
   startGoogleCastSession
 } from "@/lib/lobby/google-cast";
 import {
@@ -45,53 +44,30 @@ export function isCastDevicePickerSupported() {
   return isAirPlayCastAvailable() || isGoogleCastBrowser() || isPresentationCastSupported();
 }
 
-export async function probeCastDeviceAvailability(displayToken?: string, castUrl?: string) {
-  if (isAirPlayCastAvailable()) {
-    return true;
-  }
-
-  if (prefersWirelessCastOnMobile() && isPresentationCastSupported()) {
-    return true;
-  }
-
-  if (isGoogleCastBrowser()) {
-    try {
-      await preloadGoogleCast();
-      if (isGoogleCastFrameworkReady()) return true;
-    } catch {
-      // Fall through to Presentation API.
-    }
-  }
-
-  if (isPresentationCastSupported()) {
-    const PresentationRequestCtor = getPresentationRequestConstructor();
-    if (!PresentationRequestCtor) return false;
-
-    try {
-      const request = new PresentationRequestCtor([tvUrl(displayToken, castUrl)]);
-      if (request.getAvailability) {
-        const availability = await request.getAvailability();
-        return availability.value;
-      }
-      return true;
-    } catch {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-export async function openPresentationDevicePicker(displayToken?: string, castUrl?: string): Promise<PresentationConnectionLike> {
+/**
+ * Starts Presentation API casting. `request.start()` is invoked synchronously so it
+ * stays inside the user-gesture stack (no awaits before start).
+ */
+export function openPresentationDevicePicker(displayToken?: string, castUrl?: string): Promise<PresentationConnectionLike> {
   const PresentationRequestCtor = getPresentationRequestConstructor();
   if (!PresentationRequestCtor) {
     throw new Error("Wireless display is not supported in this browser. Try Google Chrome on Android or desktop.");
   }
 
-  const request = new PresentationRequestCtor([tvUrl(displayToken, castUrl)]);
-  const connection = await request.start();
-  setActivePresentationConnection(connection);
-  return connection;
+  const targetUrl = tvUrl(displayToken, castUrl);
+  let request: { start: () => Promise<PresentationConnectionLike> };
+  try {
+    request = new PresentationRequestCtor([targetUrl]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Invalid cast URL.";
+    throw new Error(/pattern/i.test(message) ? "Cast URL was invalid for this browser." : message);
+  }
+
+  const startPromise = request.start();
+  return startPromise.then((connection: PresentationConnectionLike) => {
+    setActivePresentationConnection(connection);
+    return connection;
+  });
 }
 
 export function getDefaultCastRoute(): "chromecast" | "wireless" | "airplay" {
@@ -103,69 +79,48 @@ export function getDefaultCastRoute(): "chromecast" | "wireless" | "airplay" {
   return "chromecast";
 }
 
+function tryGoogleCastIfReady(displayToken?: string, castUrl?: string) {
+  if (!isGoogleCastBrowser() || !isGoogleCastConfigured() || !isGoogleCastFrameworkReady()) {
+    return null;
+  }
+  // startGoogleCastSession calls requestSession() synchronously when the SDK is already ready.
+  return startGoogleCastSession(displayToken, castUrl);
+}
+
 export async function openChromecastPicker(displayToken?: string, castUrl?: string): Promise<CastPickerResult> {
   const url = tvUrl(displayToken, castUrl);
 
-  if (isPresentationCastSupported() && (isChromeIos() || isMobileBrowser())) {
-    try {
-      const connection = await openPresentationDevicePicker(displayToken, url);
-      return { method: "wireless", connection };
-    } catch (error) {
-      if (isCastCancelled(error)) throw error;
-    }
-  }
-
-  if (!isGoogleCastBrowser()) {
-    if (isAirPlayCastAvailable()) {
-      return openAirPlayPicker(displayToken, url);
-    }
-    throw new Error("Chromecast is not available in this browser. Use Google Chrome.");
-  }
-
-  if (isGoogleCastConfigured()) {
-    try {
-      await preloadGoogleCast();
-      if (isGoogleCastFrameworkReady()) {
-        await startGoogleCastSession(displayToken, url);
-        return { method: "chromecast" };
-      }
-    } catch (error) {
-      if (isCastCancelled(error)) {
-        throw error;
-      }
-    }
-  }
-
+  // One gesture-gated picker per click. Never await anything before start()/requestSession(),
+  // and never fall through to another picker after an await (the user gesture is already spent).
   if (isPresentationCastSupported()) {
     const connection = await openPresentationDevicePicker(displayToken, url);
-    return { method: "wireless", connection };
-  }
-
-  if (isGoogleCastConfigured()) {
-    try {
-      await preloadGoogleCast();
-      if (isGoogleCastFrameworkReady()) {
-        await startGoogleCastSession(displayToken, url);
-        return { method: "chromecast" };
-      }
-    } catch (error) {
-      if (isCastCancelled(error)) {
-        throw error;
-      }
+    if (isChromeIos() || isMobileBrowser()) {
+      return { method: "wireless", connection };
     }
+    return { method: "chromecast" };
   }
 
-  if (isChromeIos() || isIosMobile()) {
+  if (isGoogleCastBrowser()) {
+    const googleCastPromise = tryGoogleCastIfReady(displayToken, url);
+    if (googleCastPromise) {
+      await googleCastPromise;
+      return { method: "chromecast" };
+    }
+
+    if (!isGoogleCastConfigured()) {
+      throw new Error(
+        "Chromecast whiteboard casting needs setup. Use the Cast to TV button in Chrome, copy the TV link, or ask an admin to configure Google Cast."
+      );
+    }
+
+    throw new Error("Google Cast is still loading. Wait a second, then click Cast to TV again.");
+  }
+
+  if (isAirPlayCastAvailable()) {
     return openAirPlayPicker(displayToken, url);
   }
 
-  if (!isGoogleCastConfigured()) {
-    throw new Error(
-      "Chromecast whiteboard casting needs setup. Use Wireless Display, copy the TV link, or ask an admin to configure Google Cast."
-    );
-  }
-
-  throw new Error("Unable to cast the whiteboard. Use Google Chrome on the same Wi‑Fi as your TV.");
+  throw new Error("Chromecast is not available in this browser. Use Google Chrome.");
 }
 
 export async function openWirelessCastPicker(displayToken?: string, castUrl?: string): Promise<CastPickerResult> {
@@ -240,4 +195,37 @@ export async function openDefaultCastDevicePicker(displayToken?: string, castUrl
 /** @deprecated Use openMobileAwareCastPicker, openChromecastPicker, or openAirPlayPicker. */
 export async function openCastDevicePicker(displayToken?: string, castUrl?: string): Promise<CastPickerResult> {
   return openMobileAwareCastPicker(displayToken, castUrl);
+}
+
+/** Availability probe only — never call from a cast-start click handler. */
+export async function probeCastDeviceAvailability(displayToken?: string, castUrl?: string) {
+  if (isAirPlayCastAvailable()) {
+    return true;
+  }
+
+  if (prefersWirelessCastOnMobile() && isPresentationCastSupported()) {
+    return true;
+  }
+
+  if (isGoogleCastBrowser() && isGoogleCastFrameworkReady()) {
+    return true;
+  }
+
+  if (isPresentationCastSupported()) {
+    const PresentationRequestCtor = getPresentationRequestConstructor();
+    if (!PresentationRequestCtor) return false;
+
+    try {
+      const request = new PresentationRequestCtor([tvUrl(displayToken, castUrl)]);
+      if (request.getAvailability) {
+        const availability = await request.getAvailability();
+        return availability.value;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
+  return false;
 }

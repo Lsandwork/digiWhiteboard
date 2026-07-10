@@ -8,8 +8,18 @@ type LobbyDebugPanelProps = {
   fastDebug?: LobbyCheckoutDebug;
   fullDebug?: LobbyCheckoutDebug;
   checkouts: LobbyCheckoutsResponse;
+  rawCheckoutCount: number;
   visibleCheckoutCount: number;
   checkoutPollMs: number;
+  displayMode: "IDLE" | "CHECKOUT_ACTIVE";
+  activeCheckoutDogName: string | null;
+  activeCheckoutDogId: string | null;
+  activeCheckoutStartedAt: string | null;
+  activeCheckoutExpiresAt: string | null;
+  lastSuccessfulSyncAt: string | null;
+  lastEmptySyncAt: string | null;
+  idleCarouselPaused: boolean;
+  activePollingIntervalCount: number;
 };
 
 export function LobbyDebugPanel({
@@ -20,8 +30,18 @@ export function LobbyDebugPanel({
   fastDebug,
   fullDebug,
   checkouts,
+  rawCheckoutCount,
   visibleCheckoutCount,
-  checkoutPollMs
+  checkoutPollMs,
+  displayMode,
+  activeCheckoutDogName,
+  activeCheckoutDogId,
+  activeCheckoutStartedAt,
+  activeCheckoutExpiresAt,
+  lastSuccessfulSyncAt,
+  lastEmptySyncAt,
+  idleCarouselPaused,
+  activePollingIntervalCount
 }: LobbyDebugPanelProps) {
   return (
     <div className="fixed bottom-4 right-4 z-50 w-[min(420px,calc(100%-2rem))] rounded-2xl border border-slate-600/60 bg-slate-950/95 p-4 text-xs text-slate-200 shadow-2xl backdrop-blur">
@@ -38,6 +58,42 @@ export function LobbyDebugPanel({
         <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Checkout poll</dt>
           <dd>{checkoutPollMs}ms</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Display mode</dt>
+          <dd className="font-mono">{displayMode}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Active checkout dog</dt>
+          <dd className="text-right">{activeCheckoutDogName ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Active checkout id</dt>
+          <dd className="text-right font-mono">{activeCheckoutDogId ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Checkout started</dt>
+          <dd>{activeCheckoutStartedAt ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Checkout expires</dt>
+          <dd>{activeCheckoutExpiresAt ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Last successful sync</dt>
+          <dd>{lastSuccessfulSyncAt ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Last empty sync</dt>
+          <dd>{lastEmptySyncAt ?? "—"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Idle carousel paused</dt>
+          <dd>{idleCarouselPaused ? "yes" : "no"}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Polling intervals</dt>
+          <dd>{activePollingIntervalCount}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Last fast fetch</dt>
@@ -74,6 +130,10 @@ export function LobbyDebugPanel({
         <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Active checkouts (API)</dt>
           <dd>{checkouts.counts.active}</dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-slate-400">Raw checkout dogs</dt>
+          <dd>{rawCheckoutCount}</dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-slate-400">Visible checkouts</dt>

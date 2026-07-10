@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin/users";
 import { loadAdminSettings } from "@/lib/admin/settings";
 import { validatePasswordStrength } from "@/lib/admin/password";
+import { syncUserAccessFromLegacyRole } from "@/lib/admin/user-access";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -18,6 +19,7 @@ export type StaffDirectoryLoginSyncInput = {
   email: string | null;
   admin_user_id?: string | null;
   dashboard_role?: AdminUserRole | null;
+  department?: string | null;
   temp_password?: string | null;
   confirm_password?: string | null;
 };
@@ -92,6 +94,22 @@ async function applyTempPasswordToLinkedUser(
   await changeAdminUserPassword(supabase, linkedUser.id, input.tempPassword, true);
 }
 
+async function finalizeDirectoryLoginSync(
+  supabase: SupabaseClient,
+  result: StaffDirectoryLoginSyncResult,
+  department?: string | null
+): Promise<StaffDirectoryLoginSyncResult> {
+  if (result.admin_user_id && result.dashboard_role) {
+    await syncUserAccessFromLegacyRole(
+      supabase,
+      result.admin_user_id,
+      result.dashboard_role,
+      department
+    );
+  }
+  return result;
+}
+
 export async function syncStaffDirectoryLoginAccount(
   supabase: SupabaseClient,
   input: StaffDirectoryLoginSyncInput,
@@ -109,6 +127,7 @@ export async function syncStaffDirectoryLoginAccount(
   }
 
   const linkedUser = await resolveLinkedAdminUser(supabase, input);
+  let result: StaffDirectoryLoginSyncResult;
 
   if (hasTempPassword && email) {
     if (linkedUser) {
@@ -118,38 +137,39 @@ export async function syncStaffDirectoryLoginAccount(
         role,
         tempPassword
       });
-      return { admin_user_id: linkedUser.id, dashboard_role: role };
-    }
-
-    try {
-      const user = await createAdminUser(supabase, {
-        full_name: input.name.trim(),
-        email,
-        password: tempPassword,
-        role,
-        force_password_change: true,
-        created_by: normalizeAdminUserId(createdByAdminId)
-      });
-      return { admin_user_id: user.id, dashboard_role: role };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      if (message.includes("already in use")) {
-        const existing = await findAdminUserByEmail(supabase, email);
-        if (existing) {
-          await applyTempPasswordToLinkedUser(supabase, existing, {
-            name: input.name,
-            email,
-            role,
-            tempPassword
-          });
-          return { admin_user_id: existing.id, dashboard_role: role };
+      result = { admin_user_id: linkedUser.id, dashboard_role: role };
+    } else {
+      try {
+        const user = await createAdminUser(supabase, {
+          full_name: input.name.trim(),
+          email,
+          password: tempPassword,
+          role,
+          force_password_change: true,
+          created_by: normalizeAdminUserId(createdByAdminId)
+        });
+        result = { admin_user_id: user.id, dashboard_role: role };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("already in use")) {
+          const existing = await findAdminUserByEmail(supabase, email);
+          if (existing) {
+            await applyTempPasswordToLinkedUser(supabase, existing, {
+              name: input.name,
+              email,
+              role,
+              tempPassword
+            });
+            result = { admin_user_id: existing.id, dashboard_role: role };
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
         }
       }
-      throw error;
     }
-  }
-
-  if (linkedUser && email) {
+  } else if (linkedUser && email) {
     const patch: Partial<Pick<AdminUserRecord, "full_name" | "email" | "role">> = {
       full_name: input.name.trim(),
       role
@@ -158,11 +178,13 @@ export async function syncStaffDirectoryLoginAccount(
       patch.email = email;
     }
     await updateAdminUser(supabase, linkedUser.id, patch);
-    return { admin_user_id: linkedUser.id, dashboard_role: role };
+    result = { admin_user_id: linkedUser.id, dashboard_role: role };
+  } else {
+    result = {
+      admin_user_id: linkedUser?.id ?? (isAdminUserUuid(input.admin_user_id) ? input.admin_user_id! : null),
+      dashboard_role: linkedUser ? role : input.dashboard_role ?? null
+    };
   }
 
-  return {
-    admin_user_id: linkedUser?.id ?? (isAdminUserUuid(input.admin_user_id) ? input.admin_user_id! : null),
-    dashboard_role: linkedUser ? role : input.dashboard_role ?? null
-  };
+  return finalizeDirectoryLoginSync(supabase, result, input.department);
 }

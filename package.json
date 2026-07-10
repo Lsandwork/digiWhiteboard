@@ -16,15 +16,19 @@
     "test:webhook": "tsx scripts/test-webhook.ts",
     "test:bad-signature": "tsx scripts/test-bad-signature.ts",
     "test:yard-links": "tsx scripts/test-yard-links.ts",
+    "test:role-access": "tsx scripts/test-role-access.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "check:display-health": "tsx scripts/check-display-health.ts",
+    "test:whiteboard-state": "tsx scripts/test-whiteboard-state.ts",
+    "test:shelly-alert": "tsx scripts/test-shelly-alert.ts",
     "test:daily-reminders": "tsx scripts/test-daily-reminders.ts",
     "setup:record": "playwright install chromium",
     "record:role-tour": "tsx scripts/record-role-panel-tour.ts",
     "db:push": "tsx scripts/push-supabase-migration.ts",
     "db:push:query": "tsx scripts/push-supabase-migration-query.ts",
-    "db:push:all": "tsx scripts/push-all-supabase-migrations.ts"
+    "db:push:all": "tsx scripts/push-all-supabase-migrations.ts",
+    "compress:social-moments": "tsx scripts/compress-social-moments.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -46,6 +50,7 @@
     "autoprefixer": "^10.4.19",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.9",
+    "ffmpeg-static": "^5.3.0",
     "pg": "^8.22.0",
     "playwright": "^1.61.1",
     "postcss": "^8.5.10",

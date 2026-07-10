@@ -567,8 +567,18 @@ function clearActiveNoticesInState(state: StaffPushNoticeState, actor: string | 
   };
 }
 
-export async function loadActiveStaffPushNotice(supabase: SupabaseClient): Promise<StaffPushNotice | null> {
+export async function loadActiveStaffPushNotice(
+  supabase: SupabaseClient,
+  options?: { mutate?: boolean }
+): Promise<StaffPushNotice | null> {
   const loadedState = await loadNoticeState(supabase);
+  const mutate = options?.mutate !== false;
+
+  // Board/cast reads must stay read-only — expire/schedule writes amplify admin_settings traffic.
+  if (!mutate) {
+    return getActiveNoticeFromState(loadedState);
+  }
+
   const cleared = clearExpiredActiveNoticesInState(loadedState, "timeout");
   const state = cleared.state;
   const active = getActiveNoticeFromState(state);
@@ -659,6 +669,8 @@ export async function pushStaffNoticeById(
   await saveNoticeState(supabase, {
     notices: sortNotices(state.notices.map((notice) => (notice.id === id ? updated : notice)))
   });
+  const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
+  await triggerShellyAlertForPushNotice(updated);
   return updated;
 }
 
@@ -686,11 +698,15 @@ export async function createAndPushStaffNotice(
     updated_at: now
   };
   await saveNoticeState(supabase, { notices: sortNotices([notice, ...state.notices]) });
+  const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
+  await triggerShellyAlertForPushNotice(notice);
   return notice;
 }
 
 export async function clearActiveStaffPushNotice(supabase: SupabaseClient, actor: string | null) {
   await saveNoticeState(supabase, clearActiveNoticesInState(await loadNoticeState(supabase), actor));
+  const { clearShellyAlert } = await import("@/lib/shelly-alert");
+  await clearShellyAlert("push_notice_clear");
 }
 
 export async function deleteStaffPushNotice(supabase: SupabaseClient, id: string) {

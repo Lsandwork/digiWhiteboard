@@ -128,7 +128,7 @@ export function canCreateDogHandlerComplaintNotice(role?: string | null) {
 
 /** Management write-up reports — admin and management only. */
 export function canViewManagementReports(role?: string | null) {
-  return isFullAdminRole(role);
+  return isAdminOrManagementRole(role);
 }
 
 export function isGroomerRole(role?: string | null) {
@@ -141,31 +141,53 @@ export function isTrainerRole(role?: string | null) {
 
 /** Team leads can submit employee write-ups for management review. */
 export function canSubmitWriteUp(role?: string | null) {
-  return role === "team_leader" || role === "daycare";
+  return role === "team_leader";
 }
 
-/** Team leads can review status of their own submitted write-ups. */
+/** Team leads track their submissions; dog handlers can view write-ups about them. */
 export function canViewOwnWriteUps(role?: string | null) {
   return role === "team_leader" || role === "daycare";
 }
 
-/** Groomers can file complaints for admin and management review. */
+/** Operational staff (not admin/management) can file complaints. */
+export function canFileStaffComplaint(role?: string | null) {
+  if (!role) return false;
+  if (isAdminOrManagementRole(role)) return false;
+  return (
+    role === "front_desk_coordinator" ||
+    role === "team_leader" ||
+    role === "groomer" ||
+    role === "trainer" ||
+    role === "daycare" ||
+    role === "viewer"
+  );
+}
+
+/** Groomer-style complaint form — all operational staff except admin/management. */
 export function canSubmitGroomerComplaint(role?: string | null) {
-  return role === "groomer" || role === "daycare";
+  return canFileStaffComplaint(role);
 }
 
-/** Groomers can file requests for admin and management review. */
+/** Groomer-style request form — groomers and dog handlers only. */
 export function canSubmitGroomerRequest(role?: string | null) {
+  if (isAdminOrManagementRole(role)) return false;
   return role === "groomer" || role === "daycare";
 }
 
-/** Groomers can review their own filed complaints and requests. */
+/** Groomers and dog handlers can review their own filed complaints and requests. */
 export function canViewOwnGroomerSubmissions(role?: string | null) {
-  return role === "groomer" || role === "daycare";
+  if (isAdminOrManagementRole(role)) return false;
+  return (
+    role === "groomer" ||
+    role === "daycare" ||
+    role === "front_desk_coordinator" ||
+    role === "team_leader"
+  );
 }
 
 /** Trainers can file complaints for admin and management review. */
 export function canSubmitTrainerComplaint(role?: string | null) {
+  if (isAdminOrManagementRole(role)) return false;
   return role === "trainer";
 }
 
@@ -199,9 +221,14 @@ export function canManagePackageCommissions(role?: string | null) {
   return isFullAdminRole(role);
 }
 
-/** Admin and management can review all management support submissions. */
+/** Admin and management can review all management support submissions (including write-ups). */
 export function canReviewManagementSupport(role?: string | null) {
-  return isFullAdminRole(role);
+  return isAdminOrManagementRole(role);
+}
+
+/** Admin and management can review employee write-up submissions. */
+export function canReviewWriteUps(role?: string | null) {
+  return isAdminOrManagementRole(role);
 }
 
 export function isStaffPanelLimitedRole(role?: string | null) {
@@ -212,13 +239,28 @@ export function isFullAdminRole(role?: string | null) {
   return role === "owner_admin" || role === "manager_admin" || !role;
 }
 
+/** Assistant Manager — management tier (not full admin). */
+export function isManagementRole(role?: string | null) {
+  return role === "assistant_manager";
+}
+
+/** Owner Admin, Manager Admin, or Assistant Manager. */
+export function isAdminOrManagementRole(role?: string | null) {
+  return isFullAdminRole(role) || isManagementRole(role);
+}
+
+/** HR Records and HR Consult — admin and management only. */
+export function canAccessHrPanels(role?: string | null) {
+  return isAdminOrManagementRole(role);
+}
+
 /** View Staff Directory — coordinators and full admins; mutations remain full-admin only. */
 export function canViewStaffDirectory(role?: string | null) {
   return isFullAdminRole(role) || hasCoordinatorAccess(role);
 }
 
 export function canManageStaffDirectory(role?: string | null) {
-  return isFullAdminRole(role);
+  return isFullAdminRole(role) || role === "assistant_manager";
 }
 
 export type AdminUserRecord = {
@@ -233,6 +275,7 @@ export type AdminUserRecord = {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  avatar_url?: string | null;
 };
 
 export type AdminUserPublic = Omit<AdminUserRecord, "password_hash">;
@@ -363,6 +406,18 @@ export async function getAdminUserById(supabase: SupabaseClient, id: string) {
 
   const state = await loadFallbackAdminUsersState(supabase);
   return state.users.find((user) => user.id === id) ?? null;
+}
+
+/** Update the signed-in user's own profile photo (data URL or null to clear). */
+export async function updateAdminUserAvatar(supabase: SupabaseClient, id: string, avatarUrl: string | null) {
+  const { data, error } = await supabase
+    .from("admin_users")
+    .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by, avatar_url")
+    .maybeSingle();
+  if (error) throwAdminUserError(error);
+  return (data as AdminUserPublic) ?? null;
 }
 
 export async function hashAdminPassword(password: string) {

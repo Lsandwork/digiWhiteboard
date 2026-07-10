@@ -2,6 +2,7 @@ import { normalizeBoardDog, type BoardDogSource } from "@/lib/board-dog";
 import { extractPhotoUrl } from "@/lib/board-utils";
 import { loadStoredAnimalPhotoMap } from "@/lib/animal-photo-store";
 import type { GingrBackOfHouseRecord } from "@/lib/gingr-board-sync";
+import { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import type { LiveDog } from "@/lib/types";
 
@@ -284,8 +285,9 @@ export async function loadActiveDogsForGroomingPush(
   }
 
   const cachedBoard = getCachedBackOfHouseBoard(Date.now(), true);
-  if (cachedBoard) {
-    for (const record of cachedBoard.checking_in as GingrBackOfHouseRecord[]) {
+  const board = cachedBoard ?? (await fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => null));
+  if (board) {
+    for (const record of board.checking_in as GingrBackOfHouseRecord[]) {
       const mutable = recordToMutable(record, now, timeZone);
       if (mutable) mergeDog(map, mutable);
     }
@@ -313,7 +315,7 @@ export async function loadActiveDogsForGroomingPush(
     dogs: enriched,
     meta: {
       source: cachedBoard ? "cache_and_supabase" : "supabase_only",
-      cached_gingr_records: cachedBoard?.checking_in.length ?? 0,
+      cached_gingr_records: board?.checking_in.length ?? 0,
       live_transition_rows: liveRows?.length ?? 0
     }
   };

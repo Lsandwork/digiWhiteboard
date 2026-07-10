@@ -1,0 +1,25 @@
+.takeoverRoot {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.takeoverCanvas {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.takeoverCardWrap {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  padding: clamp(1rem, 3vw, 3rem);
+}
+
+.takeoverCardWrap--dailyReminder {
+  animation: none;
+}

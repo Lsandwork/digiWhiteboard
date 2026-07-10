@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   openAirPlayPicker,
   openChromecastPicker,
-  openMobileAwareCastPicker,
   openWirelessCastPicker,
   stopAllCastSessions,
   type CastPickerMethod
@@ -24,15 +23,38 @@ export function useStaffTvCast(displayToken = "") {
   const [castStatus, setCastStatus] = useState<CastStatus>("idle");
   const [castError, setCastError] = useState<string | null>(null);
   const [castMethod, setCastMethod] = useState<CastPickerMethod | null>(null);
-  const { requestWakeLock, releaseWakeLock } = useScreenWakeLock();
-  const canCast = isCastSenderSupported();
   const isCasting = castStatus === "casting" || isGoogleCastSessionActive();
+  const { requestWakeLock, releaseWakeLock } = useScreenWakeLock({
+    enabled: isCasting,
+    persistent: true,
+    aggressive: true,
+    renewIntervalMs: 10_000
+  });
+  const canCast = isCastSenderSupported();
   const castUrl = useMemo(() => buildStaffTvCastUrl(undefined, displayToken || undefined), [displayToken]);
 
   useEffect(() => {
     if (!canCast) return;
     void preloadGoogleCast();
-  }, [canCast]);
+    // Warm DNS/TLS for the cast page before the user picks a Chromecast device.
+    try {
+      const link = document.createElement("link");
+      link.rel = "prefetch";
+      link.href = castUrl;
+      link.as = "document";
+      document.head.appendChild(link);
+    } catch {
+      // Ignore prefetch failures.
+    }
+  }, [canCast, castUrl]);
+
+  useEffect(() => {
+    if (isCasting) {
+      void requestWakeLock();
+      return;
+    }
+    void releaseWakeLock();
+  }, [isCasting, releaseWakeLock, requestWakeLock]);
 
   const beginCast = useCallback(
     async (method: CastPickerMethod) => {
@@ -46,9 +68,8 @@ export function useStaffTvCast(displayToken = "") {
       }
       setCastMethod(method);
       setCastStatus("casting");
-      await requestWakeLock();
     },
-    [castUrl, displayToken, requestWakeLock]
+    [castUrl, displayToken]
   );
 
   const stopTvCast = useCallback(async () => {
@@ -93,11 +114,10 @@ export function useStaffTvCast(displayToken = "") {
       return;
     }
 
-    const result = await openMobileAwareCastPicker(displayToken || undefined, castUrl);
+    const result = await openChromecastPicker(displayToken || undefined, castUrl);
     setCastMethod(result.method);
     setCastStatus("casting");
-    await requestWakeLock();
-  }, [castUrl, displayToken, isCasting, requestWakeLock, stopTvCast]);
+  }, [castUrl, displayToken, isCasting, stopTvCast]);
 
   return {
     castUrl,

@@ -20,6 +20,11 @@ export type AdminSession = {
 };
 
 function base64UrlToBytes(value: string) {
+  // Reject anything that is not valid base64url before handing it to atob,
+  // which throws "The string did not match the expected pattern." in Safari/edge.
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+    throw new Error("Invalid base64url payload.");
+  }
   const padded = value.replace(/-/g, "+").replace(/_/g, "/");
   const padLen = (4 - (padded.length % 4)) % 4;
   const binary = atob(padded + "=".repeat(padLen));
@@ -58,13 +63,13 @@ async function signPayload(encoded: string) {
 export async function verifyAdminSessionTokenEdge(token: string | undefined | null): Promise<AdminSession | null> {
   if (!token) return null;
 
-  const [encoded, signature] = token.split(".");
-  if (!encoded || !signature) return null;
-
-  const expected = await signPayload(encoded);
-  if (!timingSafeEqualString(signature, expected)) return null;
-
   try {
+    const [encoded, signature] = token.split(".");
+    if (!encoded || !signature) return null;
+
+    const expected = await signPayload(encoded);
+    if (!timingSafeEqualString(signature, expected)) return null;
+
     const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(encoded))) as SessionPayload;
     if (!payload.sub || !payload.exp || payload.exp < Date.now()) return null;
     return {
@@ -76,6 +81,7 @@ export async function verifyAdminSessionTokenEdge(token: string | undefined | nu
       demoRole: payload.demoRole
     };
   } catch {
+    // Any malformed cookie/signature is treated as "not logged in" — never throw.
     return null;
   }
 }

@@ -44,15 +44,15 @@ export function createAdminSessionToken(session: AdminSession, ttlMs = SESSION_T
 export function verifyAdminSessionToken(token: string | undefined | null): AdminSession | null {
   if (!token) return null;
 
-  const [encoded, signature] = token.split(".");
-  if (!encoded || !signature) return null;
-
-  const expected = signPayload(encoded);
-  const sigBuf = Buffer.from(signature);
-  const expBuf = Buffer.from(expected);
-  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
-
   try {
+    const [encoded, signature] = token.split(".");
+    if (!encoded || !signature) return null;
+
+    const expected = signPayload(encoded);
+    const sigBuf = Buffer.from(signature);
+    const expBuf = Buffer.from(expected);
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) return null;
+
     const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8")) as SessionPayload;
     if (!payload.sub || !payload.exp || payload.exp < Date.now()) return null;
     return {

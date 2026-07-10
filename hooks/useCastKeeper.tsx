@@ -48,6 +48,7 @@ type UseCastKeeperOptions = {
   displayType: DisplayType;
   route: string;
   enabled?: boolean;
+  allowStaleReload?: boolean;
   onContentUpdate?: () => void;
 };
 
@@ -107,11 +108,12 @@ export function useCastKeeper({
   displayType,
   route,
   enabled = true,
+  allowStaleReload = true,
   onContentUpdate
 }: UseCastKeeperOptions) {
   const onContentUpdateRef = useRef(onContentUpdate);
-  const lastDataAtRef = useRef<number>(Date.now());
-  const lastHeartbeatOkRef = useRef<number>(Date.now());
+  const lastDataAtRef = useRef<number>(0);
+  const lastHeartbeatOkRef = useRef<number>(0);
   const lastReloadAtRef = useRef<number>(0);
   const syncRef = useRef<HeartbeatResponse["sync"] | null>(null);
   const heartbeatFailuresRef = useRef(0);
@@ -126,6 +128,12 @@ export function useCastKeeper({
   });
   const wakeLockStatusRef = useRef(wakeLockStatus);
   const connectionRef = useRef<CastKeeperConnection>("online");
+
+  useEffect(() => {
+    const now = Date.now();
+    lastDataAtRef.current = now;
+    lastHeartbeatOkRef.current = now;
+  }, []);
 
   useEffect(() => {
     onContentUpdateRef.current = onContentUpdate;
@@ -167,13 +175,14 @@ export function useCastKeeper({
   }, []);
 
   const maybeReloadStale = useCallback(() => {
+    if (!allowStaleReload) return;
     const now = Date.now();
     const staleFor = Math.max(now - lastDataAtRef.current, now - lastHeartbeatOkRef.current);
     if (staleFor < CAST_KEEPER_STALE_MS) return;
     if (now - lastReloadAtRef.current < CAST_KEEPER_RELOAD_COOLDOWN_MS) return;
     lastReloadAtRef.current = now;
     safeReload();
-  }, []);
+  }, [allowStaleReload]);
 
   const processCommands = useCallback(async (commands: HeartbeatResponse["commands"]) => {
     if (!commands.length) return;
@@ -330,6 +339,7 @@ type CastKeeperProviderProps = {
   displayType: DisplayType;
   route: string;
   enabled?: boolean;
+  allowStaleReload?: boolean;
   onContentUpdate?: () => void;
   children: ReactNode;
 };
@@ -338,9 +348,10 @@ export function CastKeeperProvider({
   displayType,
   route,
   enabled = true,
+  allowStaleReload = true,
   onContentUpdate,
   children
 }: CastKeeperProviderProps) {
-  const value = useCastKeeper({ displayType, route, enabled, onContentUpdate });
+  const value = useCastKeeper({ displayType, route, enabled, allowStaleReload, onContentUpdate });
   return <CastKeeperContext.Provider value={value}>{children}</CastKeeperContext.Provider>;
 }

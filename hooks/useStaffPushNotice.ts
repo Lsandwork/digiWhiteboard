@@ -1,47 +1,45 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { fetchBoardJson } from "@/lib/board-fetch";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 
-const STAFF_PUSH_NOTICE_POLL_MS = 3000;
-const STAFF_PUSH_NOTICE_TIMEOUT_MS = 3000;
+const STAFF_PUSH_NOTICE_POLL_MS = 12_000;
+const STAFF_PUSH_NOTICE_TIMEOUT_MS = 4000;
 
 type StaffPushNoticeResponse = {
   activeNotice: StaffPushNotice | null;
   healthy?: boolean;
 };
 
-export function useStaffPushNotice() {
+export function useStaffPushNotice(options?: { enabled?: boolean; debug?: boolean }) {
+  const enabled = options?.enabled !== false;
+  const debug = Boolean(options?.debug);
   const [activeNotice, setActiveNotice] = useState<StaffPushNotice | null>(null);
 
   const loadNotice = useCallback(async () => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), STAFF_PUSH_NOTICE_TIMEOUT_MS);
-
-    try {
-      const response = await fetch("/api/staff/push-notices", {
-        cache: "no-store",
-        signal: controller.signal
-      });
-      const data = (await response.json()) as StaffPushNoticeResponse;
-      if (!response.ok) return;
-      setActiveNotice(data.activeNotice ?? null);
-    } catch {
-      // Push Notices are optional; keep the dog board working if this fetch fails.
-      setActiveNotice(null);
-    } finally {
-      window.clearTimeout(timeout);
+    if (!enabled) return;
+    const result = await fetchBoardJson<StaffPushNoticeResponse>({
+      url: "/api/staff/push-notices",
+      timeoutMs: STAFF_PUSH_NOTICE_TIMEOUT_MS,
+      debug,
+      cacheKey: "staff-push-notice",
+      keepLastGood: true
+    });
+    if (result.data) {
+      setActiveNotice(result.data.activeNotice ?? null);
     }
-  }, []);
+  }, [debug, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     const initial = window.setTimeout(() => void loadNotice(), 0);
     const timer = window.setInterval(() => void loadNotice(), STAFF_PUSH_NOTICE_POLL_MS);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [loadNotice]);
+  }, [enabled, loadNotice]);
 
   return activeNotice;
 }

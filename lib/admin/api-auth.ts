@@ -17,6 +17,7 @@ import {
   canViewOwnTrainerSubmissions as userCanViewOwnTrainerSubmissions,
   canManagePackageCommissions as userCanManagePackageCommissions,
   canReviewManagementSupport as userCanReviewManagementSupport,
+  canAccessHrPanels as userCanAccessHrPanels,
   canViewPackageCommissions as userCanViewPackageCommissions,
   canViewOwnWriteUps as userCanViewOwnWriteUps,
   canViewStaffDirectory,
@@ -111,7 +112,7 @@ export function canAccessManagementReports(role?: string | null) {
 }
 
 export function canSubmitWriteUp(role?: string | null) {
-  return userCanSubmitWriteUp(role) || !role;
+  return userCanSubmitWriteUp(role);
 }
 
 export function canViewOwnWriteUps(role?: string | null) {
@@ -119,7 +120,7 @@ export function canViewOwnWriteUps(role?: string | null) {
 }
 
 export function canSubmitGroomerComplaint(role?: string | null) {
-  return userCanSubmitGroomerComplaint(role) || !role;
+  return userCanSubmitGroomerComplaint(role);
 }
 
 export function canViewOwnGroomerSubmissions(role?: string | null) {
@@ -148,6 +149,10 @@ export function canViewPackageCommissions(role?: string | null) {
 
 export function canReviewManagementSupport(role?: string | null) {
   return userCanReviewManagementSupport(role) || !role;
+}
+
+export function canAccessHrPanels(role?: string | null) {
+  return userCanAccessHrPanels(role) || !role;
 }
 
 export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

@@ -3,6 +3,7 @@ import { resolveActiveCheckinDisplayUntil, shouldExpireCheckinDog } from "@/lib/
 import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
+import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveDog } from "@/lib/types";
@@ -152,6 +153,14 @@ export async function POST(request: Request) {
         source: "webhook",
         details: { dog_id: savedDog.id }
       });
+
+      if (!continuing) {
+        if (webhookType === "checking_in") {
+          await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
+        } else if (webhookType === "checking_out") {
+          await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
+        }
+      }
     }
 
     if (acceptedPassiveTypes.has(webhookType)) {

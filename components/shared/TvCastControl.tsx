@@ -231,8 +231,8 @@ export function TvCastControl({
         className={buttonClass}
         aria-pressed={false}
         disabled={!canCast}
-        aria-label={`Cast ${boardLabel} to TV with Google Chrome`}
-        title={canCast ? undefined : getCastUnavailableMessage()}
+        aria-label={`Cast ${boardLabel} to Chromecast from Google Chrome`}
+        title={canCast ? "Cast to Chromecast using Google Chrome" : getCastUnavailableMessage()}
       >
         <Tv className="h-4 w-4 shrink-0" aria-hidden />
         <span>Cast to TV</span>

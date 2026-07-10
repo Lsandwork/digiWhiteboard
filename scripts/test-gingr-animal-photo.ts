@@ -42,6 +42,35 @@ assert.equal(
   "https://fitdog.gingrapp.com/uploads/maisy.jpg"
 );
 
+assert.equal(
+  extractGingrAnimalPhotoFromData(
+    {
+      results: {
+        "99": {
+          profile: {
+            a_image: "/uploads/animals/keyed-maisy.jpg"
+          }
+        }
+      }
+    },
+    "99"
+  ),
+  "https://fitdog.gingrapp.com/uploads/animals/keyed-maisy.jpg"
+);
+
+assert.equal(
+  extractGingrAnimalPhotoFromData(
+    {
+      animals: [
+        { a_id: "12", a_image: "/uploads/animals/wrong.jpg" },
+        { a_id: "99", profile: { image_url: "/uploads/animals/right.jpg" } }
+      ]
+    },
+    "99"
+  ),
+  "https://fitdog.gingrapp.com/uploads/animals/right.jpg"
+);
+
 assert.equal(extractGingrAnimalPhotoFromData({ id: "1", a_first: "No Photo" }), null);
 
 console.log("gingr animal photo extraction tests passed");

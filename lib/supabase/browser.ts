@@ -15,7 +15,11 @@ export function getBrowserSupabase() {
   }
 
   if (!browserSupabase) {
-    browserSupabase = createClient(url, anonKey);
+    try {
+      browserSupabase = createClient(url, anonKey);
+    } catch {
+      return null;
+    }
   }
 
   return browserSupabase;

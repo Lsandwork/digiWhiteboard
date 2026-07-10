@@ -60,10 +60,13 @@ function SupportDetailModal({
 
   useEffect(() => {
     if (!item) return;
-    setAssignedTo(item.assigned_to ?? "");
-    setStatus(item.admin_status ?? "Submitted");
-    setResponse("");
-    setInternalNote("");
+    const timer = window.setTimeout(() => {
+      setAssignedTo(item.assigned_to ?? "");
+      setStatus(item.admin_status ?? "Submitted");
+      setResponse("");
+      setInternalNote("");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [item]);
 
   if (!item) return null;

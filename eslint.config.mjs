@@ -1,5 +1,10 @@
 import nextVitals from "eslint-config-next/core-web-vitals";
 
-const eslintConfig = [...nextVitals];
+const eslintConfig = [
+  {
+    ignores: ["__MACOSX/**"]
+  },
+  ...nextVitals
+];
 
 export default eslintConfig;

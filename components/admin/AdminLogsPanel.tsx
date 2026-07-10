@@ -36,7 +36,8 @@ export function AdminLogsPanel({ webhookUrl, events, failedEvents, board }: Admi
   }, [actionFilter, actorFilter, board, search]);
 
   useEffect(() => {
-    void loadLogs();
+    const timer = window.setTimeout(() => void loadLogs(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadLogs]);
 
   const actionOptions = useMemo(() => {

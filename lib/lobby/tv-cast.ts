@@ -1,3 +1,5 @@
+import { safeCastUrl, safeOrigin } from "@/lib/safe-url";
+
 export type PresentationConnectionLike = {
   state: string;
   close: () => void;
@@ -13,47 +15,65 @@ type PresentationRequestConstructor = new (urls: string[]) => PresentationReques
 
 let activePresentationConnection: PresentationConnectionLike | null = null;
 
+function defaultCastOrigin() {
+  return typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+}
+
 export function getCastSiteOrigin(currentHref?: string) {
   if (typeof window !== "undefined") {
-    return window.location.origin;
+    return safeOrigin(window.location.origin, defaultCastOrigin());
   }
 
   const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (site) {
-    try {
-      return new URL(site).origin;
-    } catch {
-      // Fall through.
-    }
+    const origin = safeOrigin(site, "");
+    if (origin) return origin;
   }
 
   if (currentHref) {
-    try {
-      return new URL(currentHref).origin;
-    } catch {
-      // Fall through.
-    }
+    const origin = safeOrigin(currentHref, "");
+    if (origin) return origin;
   }
 
   return "http://localhost:3000";
 }
 
+function readSearchParam(name: string) {
+  if (typeof window === "undefined") return null;
+  try {
+    return new URL(window.location.href).searchParams.get(name);
+  } catch {
+    return null;
+  }
+}
+
 function buildTvCastUrl(pathname: string, currentHref?: string, displayToken?: string) {
   const origin = getCastSiteOrigin(currentHref);
-  const url = new URL(pathname, origin);
+  const fallback = safeCastUrl(pathname, origin, `${defaultCastOrigin()}${pathname.startsWith("/") ? pathname : `/${pathname}`}`);
 
-  if (!pathname.startsWith("/display/")) {
-    url.searchParams.set("display", "tv");
+  try {
+    const url = new URL(pathname, origin);
+
+    if (!pathname.startsWith("/display/")) {
+      url.searchParams.set("display", "tv");
+      url.searchParams.set("chromecast", "1");
+    }
+
+    url.searchParams.set("castMode", "1");
+
+    const token = displayToken?.trim() || readSearchParam("token")?.trim();
+    if (token) {
+      url.searchParams.set("token", token);
+    }
+
+    if (readSearchParam("debugBoard") === "1") {
+      url.searchParams.set("debugBoard", "1");
+    }
+
+    return url.toString();
+  } catch {
+    return fallback;
   }
-
-  const token =
-    displayToken?.trim() ||
-    (typeof window !== "undefined" ? new URL(window.location.href).searchParams.get("token")?.trim() : "");
-  if (token) {
-    url.searchParams.set("token", token);
-  }
-
-  return url.toString();
 }
 
 export function setActivePresentationConnection(connection: PresentationConnectionLike | null) {
@@ -93,11 +113,11 @@ export async function stopPresentationCast() {
 }
 
 export function buildLobbyTvCastUrl(currentHref?: string, displayToken?: string) {
-  return buildTvCastUrl("/display/lobby-whiteboard", currentHref, displayToken);
+  return buildTvCastUrl("/lobby/checkouts", currentHref, displayToken);
 }
 
 export function buildStaffTvCastUrl(currentHref?: string, displayToken?: string) {
-  return buildTvCastUrl("/display/staff-whiteboard", currentHref, displayToken);
+  return buildTvCastUrl("/", currentHref, displayToken);
 }
 
 export function isPresentationCastSupported() {

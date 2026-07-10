@@ -1,4 +1,5 @@
 import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
+import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { getGingrAnimalPhotoUrlMap } from "@/lib/gingr-animal-photo";
 import type { LiveDog } from "@/lib/types";
@@ -15,26 +16,26 @@ export async function enrichStaffBoardAnimalPhotos(supabase: SupabaseClient, dog
   }));
 
   const withStoredPhotos = await applyStoredAnimalPhotos(supabase, withPayloadPhotos);
+  const withCachedBackOfHousePhotos = applyCachedBackOfHousePhotos(withStoredPhotos);
 
-  const missingAnimalIds = [
+  const stillMissingAnimalIds = [
     ...new Set(
-      withStoredPhotos
+      withCachedBackOfHousePhotos
         .filter((dog) => !dog.photo_url && dog.gingr_animal_id)
         .map((dog) => dog.gingr_animal_id as string)
     )
   ];
 
-  if (!missingAnimalIds.length) {
-    return withStoredPhotos;
+  if (!stillMissingAnimalIds.length) {
+    return withCachedBackOfHousePhotos;
   }
 
-  const photoMap = await getGingrAnimalPhotoUrlMap(missingAnimalIds, {
-    bypassFetchGate: true,
-    timeoutMs: 5000
+  const photoMap = await getGingrAnimalPhotoUrlMap(stillMissingAnimalIds, {
+    timeoutMs: 3000
   });
 
   return Promise.all(
-    withStoredPhotos.map(async (dog) => {
+    withCachedBackOfHousePhotos.map(async (dog) => {
       if (dog.photo_url) return dog;
 
       const apiPhoto = dog.gingr_animal_id ? photoMap.get(dog.gingr_animal_id) : null;

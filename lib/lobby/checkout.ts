@@ -5,6 +5,7 @@ import {
   mergeCheckoutDogs,
   reconcileGingrSourcedCheckouts
 } from "@/lib/board-checkout-merge";
+import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
 import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
@@ -38,7 +39,7 @@ export function isVisibleLobbyCheckoutDog(
 function enrichDogPhotos(dogs: LiveDog[]) {
   return dogs.map((dog) => ({
     ...dog,
-    photo_url: resolveDogPhotoUrl(dog)
+    photo_url: dog.photo_url ?? resolveDogPhotoUrl(dog)
   }));
 }
 
@@ -48,22 +49,24 @@ async function enrichLobbyGingrAnimalPhotos(supabase: SupabaseClient, dogs: Live
     photo_url: dog.photo_url ?? resolveDogPhotoUrl(dog)
   }));
 
-  const missingAnimalIds = [
+  const withStoredPhotos = applyCachedBackOfHousePhotos(
+    await applyStoredAnimalPhotos(supabase, withResolvedPayloadPhotos)
+  );
+
+  const stillMissingAnimalIds = [
     ...new Set(
-      withResolvedPayloadPhotos
-        .filter((dog) => !dog.photo_url && dog.gingr_animal_id)
-        .map((dog) => dog.gingr_animal_id as string)
+      withStoredPhotos.filter((dog) => !dog.photo_url && dog.gingr_animal_id).map((dog) => dog.gingr_animal_id as string)
     )
   ];
 
-  if (!missingAnimalIds.length) {
-    return withResolvedPayloadPhotos;
+  if (!stillMissingAnimalIds.length) {
+    return withStoredPhotos;
   }
 
-  const photoMap = await getGingrAnimalPhotoUrlMap(missingAnimalIds, { bypassFetchGate: true, timeoutMs: 5000 });
+  const photoMap = await getGingrAnimalPhotoUrlMap(stillMissingAnimalIds, { timeoutMs: 3000 });
 
   return Promise.all(
-    withResolvedPayloadPhotos.map(async (dog) => {
+    withStoredPhotos.map(async (dog) => {
       if (dog.photo_url) return dog;
 
       const apiPhoto = dog.gingr_animal_id ? photoMap.get(dog.gingr_animal_id) : null;

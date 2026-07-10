@@ -178,15 +178,18 @@ function isAlreadyOnTvLayout(castUrl: string) {
   }
 }
 
-async function startPresentationUrlCast(castUrl: string) {
+function startPresentationUrlCast(castUrl: string) {
   const PresentationRequestCtor = getPresentationRequestConstructor();
   if (!PresentationRequestCtor) {
     throw new Error("Wireless display is not supported in this browser.");
   }
 
   const request = new PresentationRequestCtor([castUrl]);
-  const connection = await request.start();
-  setActivePresentationConnection(connection);
+  // Call start() before any await so the browser still trusts this as a user gesture.
+  const startPromise = request.start();
+  return startPromise.then((connection) => {
+    setActivePresentationConnection(connection);
+  });
 }
 
 /** iOS/mobile flow that casts the dedicated TV URL instead of mirroring the tab. */

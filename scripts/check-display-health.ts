@@ -59,7 +59,7 @@ function checkLobbyDisplayTokenEnv() {
   record(
     "Lobby display token",
     "pass",
-    "LOBBY_DISPLAY_TOKEN is set. Lobby TVs must open /display/lobby-whiteboard with ?token=… or use the embedded server token."
+    "LOBBY_DISPLAY_TOKEN is set. Lobby TVs can open /lobby-cast or /display/lobby-whiteboard with ?token=… or use the embedded server token."
   );
 }
 
@@ -94,13 +94,13 @@ function checkCastUrls() {
   const lobbyUrl = buildLobbyTvCastUrl(`${baseUrl}/lobby/checkouts`, token);
   const staffUrl = buildStaffTvCastUrl(`${baseUrl}/`, token);
 
-  if (!lobbyUrl.includes("/display/lobby-whiteboard")) {
+  if (!lobbyUrl.includes("display=tv") || lobbyUrl.includes("/lobby-cast")) {
     record("Lobby cast URL", "fail", `Unexpected lobby cast URL: ${lobbyUrl}`);
   } else {
     record("Lobby cast URL", "pass", lobbyUrl);
   }
 
-  if (!staffUrl.includes("/display/staff-whiteboard")) {
+  if (!staffUrl.includes("display=tv") || staffUrl.includes("/staff-cast")) {
     record("Staff cast URL", "fail", `Unexpected staff cast URL: ${staffUrl}`);
   } else {
     record("Staff cast URL", "pass", staffUrl);
@@ -255,8 +255,8 @@ async function checkLobbyCheckoutApi() {
     if (response.status === 401 && !token) {
       record(
         "Lobby checkout API",
-        "warn",
-        "Production requires LOBBY_DISPLAY_TOKEN. Set TEST_LOBBY_DISPLAY_TOKEN in your shell to verify the secured lobby API."
+        "fail",
+        "Lobby checkout reads should be public for casting. Check canReadLobbyBoard() and redeploy."
       );
       return;
     }
@@ -316,12 +316,40 @@ function printSummary() {
   printChromecastSetupGuide();
 }
 
+async function checkWhiteboardStateApi() {
+  const baseUrl = resolveBaseUrl();
+
+  for (const board of ["staff", "lobby"] as const) {
+    try {
+      const response = await fetch(`${baseUrl}/api/whiteboard/state?board=${board}`, { cache: "no-store" });
+      const body = (await response.json()) as { error?: string; version?: string; payload?: { boardType?: string } };
+
+      if (!response.ok || body.error || !body.version || body.payload?.boardType !== board) {
+        record(`Whiteboard state API (${board})`, "fail", `/api/whiteboard/state?board=${board} failed (HTTP ${response.status}).`);
+        continue;
+      }
+
+      record(`Whiteboard state API (${board})`, "pass", `version=${body.version}`);
+    } catch (error) {
+      record(
+        `Whiteboard state API (${board})`,
+        "fail",
+        `/api/whiteboard/state?board=${board} is unreachable. (${error instanceof Error ? error.message : String(error)})`
+      );
+    }
+  }
+}
+
 async function run() {
   checkChromecastEnv();
   checkLobbyDisplayTokenEnv();
   checkCastReceiverAsset();
   checkCastUrls();
 
+  await checkHttpEndpoint("Staff board page", "/", /Checking In|Staff Digital|Loading live board/i);
+  await checkHttpEndpoint("Staff cast redirect", "/staff-cast", /Checking In|Staff Digital|Loading live board/i);
+  await checkHttpEndpoint("Lobby board page", "/lobby/checkouts", /Lobby|Checking Out|Loading lobby board/i);
+  await checkHttpEndpoint("Lobby cast redirect", "/lobby-cast", /Lobby|Checking Out|Loading lobby board/i);
   await checkHttpEndpoint("Lobby display page", "/display/lobby-whiteboard", /lobby|cast|whiteboard|Loading/i);
   await checkHttpEndpoint("Staff display page", "/display/staff-whiteboard", /staff|cast|whiteboard|Loading/i);
   await checkHttpEndpoint("Cast receiver (hosted)", "/cast-receiver.html", /Fitdog Cast Receiver/);
@@ -329,6 +357,7 @@ async function run() {
   await checkHeartbeatApi();
   await checkLiveBoardApi();
   await checkLobbyCheckoutApi();
+  await checkWhiteboardStateApi();
 
   printSummary();
 

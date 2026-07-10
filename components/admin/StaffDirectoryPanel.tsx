@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { ADMIN_USER_ROLE_LABELS, isFullAdminRole } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS, canManageStaffDirectory } from "@/lib/admin/users";
 import type { StaffActivityLog, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { STAFF_DEPARTMENTS, departmentForDashboardRole } from "@/lib/staff/admin-ops";
 
@@ -24,6 +24,7 @@ type StaffMemberForm = {
   phone: string;
   status: "Active" | "Inactive";
   notes: string;
+  checklist_items: string;
   dashboard_role: AdminUserRole;
   temp_password: string;
   confirm_password: string;
@@ -35,6 +36,7 @@ const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "viewer", label: "Viewer" },
   { value: "groomer", label: "Groomer" },
   { value: "trainer", label: "Trainer" },
+  { value: "daycare", label: "Dog Handler" },
   { value: "front_desk_coordinator", label: "Front Desk - Coordinator" },
   { value: "team_leader", label: "Team Lead" },
   { value: "manager_admin", label: "Manager Admin" },
@@ -51,6 +53,7 @@ const emptyForm: StaffMemberForm = {
   phone: "",
   status: "Active",
   notes: "",
+  checklist_items: "",
   dashboard_role: "viewer",
   temp_password: "",
   confirm_password: ""
@@ -65,6 +68,7 @@ function formFromMember(member: StaffDirectoryMember): StaffMemberForm {
     phone: member.phone ?? "",
     status: member.status,
     notes: member.notes ?? "",
+    checklist_items: (member.checklist_items ?? []).join("\n"),
     dashboard_role: member.dashboard_role ?? "viewer",
     temp_password: "",
     confirm_password: ""
@@ -87,6 +91,10 @@ function payloadFromForm(form: StaffMemberForm, includePassword: boolean) {
     phone: form.phone.trim(),
     status: form.status,
     notes: form.notes.trim(),
+    checklist_items: form.checklist_items
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean),
     dashboard_role: form.email.trim() ? form.dashboard_role : null
   };
 
@@ -169,7 +177,21 @@ export function StaffDirectoryPanel() {
 
   const activeCount = (data?.staff_directory ?? []).filter((member) => member.status === "Active").length;
   const inactiveCount = (data?.staff_directory ?? []).filter((member) => member.status === "Inactive").length;
-  const canManageDirectory = isFullAdminRole(data?.currentUser.role);
+  const canManageDirectory = canManageStaffDirectory(data?.currentUser.role);
+  const [selectedChecklistUserId, setSelectedChecklistUserId] = useState<string>("");
+  const selectedChecklistMember = useMemo(
+    () => (data?.staff_directory ?? []).find((member) => member.id === selectedChecklistUserId) ?? null,
+    [data?.staff_directory, selectedChecklistUserId]
+  );
+  const [checklistDraft, setChecklistDraft] = useState("");
+
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setChecklistDraft((selectedChecklistMember?.checklist_items ?? []).join("\n")),
+      0
+    );
+    return () => window.clearTimeout(timer);
+  }, [selectedChecklistMember]);
 
   return (
     <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
@@ -353,6 +375,57 @@ export function StaffDirectoryPanel() {
             ) : null}
           </div>
         </section>
+        {canManageDirectory ? (
+          <section className="admin-card p-5">
+            <h3 className="text-lg font-black text-white">Checklist Assignments</h3>
+            <p className="mt-1 text-sm text-admin-muted">
+              Place per-user checklist configuration here so admins and management can maintain unique checklist items by user.
+            </p>
+            <div className="mt-3 grid gap-3">
+              <select
+                className="admin-select"
+                value={selectedChecklistUserId}
+                onChange={(event) => setSelectedChecklistUserId(event.target.value)}
+              >
+                <option value="">Select a user</option>
+                {(data?.staff_directory ?? []).map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name} {member.email ? `(${member.email})` : ""}
+                  </option>
+                ))}
+              </select>
+              <textarea
+                className="admin-input min-h-[180px]"
+                placeholder="One checklist item per line"
+                value={checklistDraft}
+                onChange={(event) => setChecklistDraft(event.target.value)}
+                disabled={!selectedChecklistMember}
+              />
+              <button
+                type="button"
+                className="admin-btn-primary justify-center"
+                disabled={busy || !selectedChecklistMember}
+                onClick={() => {
+                  if (!selectedChecklistMember) return;
+                  void mutate(
+                    "Unable to save checklist items.",
+                    {
+                      action: "update_staff_member",
+                      id: selectedChecklistMember.id,
+                      checklist_items: checklistDraft
+                        .split("\n")
+                        .map((item) => item.trim())
+                        .filter(Boolean)
+                    },
+                    "Checklist items updated."
+                  );
+                }}
+              >
+                Save Checklist Items
+              </button>
+            </div>
+          </section>
+        ) : null}
       </section>
 
       {canManageDirectory ? (
@@ -443,7 +516,7 @@ function StaffMemberModal({
       setSetTempPassword(false);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [member?.id, mode, open]);
+  }, [member, mode, open]);
 
   const canSave = form.name.trim().length > 0 && (!setTempPassword || (form.temp_password.length > 0 && form.confirm_password.length > 0));
 
@@ -516,6 +589,14 @@ function StaffMemberFields({
         <ChoiceGroup label="Status" value={form.status} options={staffStatusOptions} onChange={(status) => onChange({ ...form, status: status as StaffMemberForm["status"] })} />
         <FormField label="Notes">
           <textarea className="admin-input min-h-[90px]" value={form.notes} onChange={(event) => onChange({ ...form, notes: event.target.value })} />
+        </FormField>
+        <FormField label="Checklist Items (one per line)">
+          <textarea
+            className="admin-input min-h-[110px]"
+            value={form.checklist_items}
+            onChange={(event) => onChange({ ...form, checklist_items: event.target.value })}
+            placeholder="Clock in and confirm yard assignment."
+          />
         </FormField>
       </section>
 

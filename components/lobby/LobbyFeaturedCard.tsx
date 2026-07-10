@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import type { LobbyCheckoutDog } from "@/lib/lobby/types";
 import { LobbyDogAvatar } from "@/components/lobby/LobbyDogAvatar";
 
@@ -7,7 +8,7 @@ type LobbyFeaturedCardProps = {
   dog: LobbyCheckoutDog;
 };
 
-export function LobbyFeaturedCard({ dog }: LobbyFeaturedCardProps) {
+export const LobbyFeaturedCard = memo(function LobbyFeaturedCard({ dog }: LobbyFeaturedCardProps) {
   return (
     <section className="lobby-panel lobby-featured-card relative overflow-hidden rounded-2xl border-l-[6px] border-l-lobby-orange">
       <div className="lobby-featured-card__inner relative z-10 flex items-center">
@@ -27,4 +28,4 @@ export function LobbyFeaturedCard({ dog }: LobbyFeaturedCardProps) {
       </div>
     </section>
   );
-}
+});

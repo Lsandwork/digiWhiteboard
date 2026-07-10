@@ -19,7 +19,7 @@ for (const role of ALL_ROLES) {
   );
   assert.equal(
     canAccessAdminTab(access, "yard_links", role, "lobby"),
-    role !== "groomer" && role !== "team_leader",
+    !["front_desk_coordinator", "groomer", "team_leader", "trainer", "daycare"].includes(role),
     `${role} lobby yard_links access`
   );
 }

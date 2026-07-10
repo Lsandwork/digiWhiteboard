@@ -1,15 +1,20 @@
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import {
   filterCheckoutsToGingrBasket,
-  getFreshGingrBasketCheckoutKeys
+  getCachedGingrBasketCheckoutKeys
 } from "@/lib/basket-cleared-checkout";
+import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
 import { sortCheckoutDogs } from "@/lib/board-checkout-merge";
+import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
+
+const FAST_CHECKOUT_QUERY_TIMEOUT_MS = 2500;
+const FAST_CHECKOUT_PHOTO_TIMEOUT_MS = 1200;
 
 export type FastCheckoutLoadResult = {
   checking_out: LiveDog[];
@@ -42,17 +47,26 @@ function newestCheckoutTimestamp(dogs: LiveDog[]) {
   return newest;
 }
 
-/** Supabase/webhook only — never calls Gingr. */
+/** Supabase/webhook only — never calls Gingr. Hard-timeout so board polls never hang. */
 export async function loadFastPromptedCheckouts(
   supabase: SupabaseClient,
   now = new Date()
 ): Promise<FastCheckoutLoadResult> {
-  const { data, error } = await supabase
-    .from("live_transition_dogs")
-    .select("*")
-    .eq("hidden", false)
-    .eq("display_status", "checking_out")
-    .order("status_started_at", { ascending: true });
+  const { data, error } = await withTimeoutOrThrow(
+    Promise.resolve(
+      supabase
+        .from("live_transition_dogs")
+        .select(
+          "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at"
+        )
+        .eq("hidden", false)
+        .eq("display_status", "checking_out")
+        .order("status_started_at", { ascending: true })
+        .limit(40)
+    ),
+    FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+    "fast-checkout live_transition_dogs"
+  );
 
   if (error) throw error;
 
@@ -62,13 +76,24 @@ export async function loadFastPromptedCheckouts(
   let visible = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
   let basketFiltered = false;
 
-  const gingrCheckoutKeys = getFreshGingrBasketCheckoutKeys(now.getTime());
+  const gingrCheckoutKeys = getCachedGingrBasketCheckoutKeys(now.getTime(), true);
   if (gingrCheckoutKeys) {
     basketFiltered = true;
     visible = filterCheckoutsToGingrBasket(visible, gingrCheckoutKeys);
   }
 
-  const withPhotos = await applyStoredAnimalPhotos(supabase, visible);
+  let withPhotos = applyCachedBackOfHousePhotos(visible);
+  try {
+    withPhotos = applyCachedBackOfHousePhotos(
+      await withTimeoutOrThrow(
+        applyStoredAnimalPhotos(supabase, visible),
+        FAST_CHECKOUT_PHOTO_TIMEOUT_MS,
+        "fast-checkout photos"
+      )
+    );
+  } catch {
+    // Photos are optional — never fail the checkout list for photo store latency.
+  }
 
   return {
     checking_out: sortCheckoutDogs(withPhotos),

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { isAdminRequest, unauthorizedAdminResponse, canAccessHrPanels } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { loadAdminSettings } from "@/lib/admin/settings";
-import { hasPermission, accessFromLegacyRole } from "@/lib/admin/permissions";
-import { getUserAccess } from "@/lib/admin/user-access";
 import { appendHrConsultMessages, clearHrConsultThread, loadHrConsultThread } from "@/lib/hr/consult-store";
 import { consultGeminiHr } from "@/lib/hr/gemini-consult";
 import { geminiUserFacingError, isGeminiConfigured, resolveGeminiModel } from "@/lib/hr/gemini-config";
@@ -21,17 +19,14 @@ function forbiddenResponse() {
 async function actorAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
   const supabase = getServiceSupabase();
-  const access = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
-  return { session, access, supabase };
+  return { session, supabase };
 }
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, access, supabase } = await actorAccess(request);
-  if (!hasPermission(access, "use_hr_consult")) return forbiddenResponse();
+  const { session, supabase } = await actorAccess(request);
+  if (!canAccessHrPanels(session?.role)) return forbiddenResponse();
 
   const email = session?.email ?? "admin";
   const [thread, settings] = await Promise.all([loadHrConsultThread(supabase, email), loadAdminSettings(supabase)]);
@@ -54,8 +49,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, access, supabase } = await actorAccess(request);
-  if (!hasPermission(access, "use_hr_consult")) return forbiddenResponse();
+  const { session, supabase } = await actorAccess(request);
+  if (!canAccessHrPanels(session?.role)) return forbiddenResponse();
 
   const email = session?.email ?? "admin";
   const actor = session?.email ?? session?.adminUserId ?? "admin";

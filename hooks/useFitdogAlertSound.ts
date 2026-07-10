@@ -6,16 +6,22 @@ import { playStaffPushNoticeAlarm, unlockStaffPushNoticeAudio } from "@/lib/staf
 /** Plays the Fitdog alert sound once when `alertKey` changes to a new non-null value. */
 export function useFitdogAlertSound(alertKey: string | null) {
   const lastKeyRef = useRef<string | null>(null);
+  const replayedOnInteractionKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     void unlockStaffPushNoticeAudio();
 
     const unlockOnInteraction = () => {
-      void unlockStaffPushNoticeAudio();
+      void unlockStaffPushNoticeAudio().finally(() => {
+        const activeKey = lastKeyRef.current;
+        if (!activeKey || replayedOnInteractionKeyRef.current === activeKey) return;
+        replayedOnInteractionKeyRef.current = activeKey;
+        void playStaffPushNoticeAlarm();
+      });
     };
 
-    window.addEventListener("pointerdown", unlockOnInteraction, { once: true });
-    window.addEventListener("keydown", unlockOnInteraction, { once: true });
+    window.addEventListener("pointerdown", unlockOnInteraction);
+    window.addEventListener("keydown", unlockOnInteraction);
 
     const unlockInterval = window.setInterval(() => {
       void unlockStaffPushNoticeAudio();
@@ -31,12 +37,14 @@ export function useFitdogAlertSound(alertKey: string | null) {
   useEffect(() => {
     if (!alertKey) {
       lastKeyRef.current = null;
+      replayedOnInteractionKeyRef.current = null;
       return;
     }
 
     if (alertKey !== lastKeyRef.current) {
       lastKeyRef.current = alertKey;
-      playStaffPushNoticeAlarm();
+      replayedOnInteractionKeyRef.current = null;
+      void playStaffPushNoticeAlarm();
     }
   }, [alertKey]);
 }

@@ -73,7 +73,31 @@ export async function GET(request: Request) {
     }
 
     if (view === "write_ups" && canViewOwnWriteUps(role)) {
-      const reports = await listWriteUpsForCreator(supabase, actor, 100);
+      let reports = await listWriteUpsForCreator(supabase, actor, 100);
+
+      // Dog handlers can only view write-ups where they are the employee subject.
+      if (role === "daycare") {
+        let actorName: string | null = null;
+        if (session?.adminUserId) {
+          const { data } = await supabase
+            .from("admin_users")
+            .select("full_name")
+            .eq("id", session.adminUserId)
+            .maybeSingle();
+          actorName = (data?.full_name ?? "").trim() || null;
+        }
+        const actorEmail = (session?.email ?? "").trim().toLowerCase();
+        const normalizedName = (actorName ?? "").trim().toLowerCase();
+        const all = await listManagementReports(supabase, 200);
+        reports = all.filter((report) => {
+          if (report.report_type !== "employee_write_up") return false;
+          const employeeName = (report.employee_name ?? "").trim().toLowerCase();
+          if (!employeeName) return false;
+          if (normalizedName && employeeName === normalizedName) return true;
+          return Boolean(actorEmail) && employeeName === actorEmail;
+        });
+      }
+
       return NextResponse.json({
         reports,
         currentUser: {

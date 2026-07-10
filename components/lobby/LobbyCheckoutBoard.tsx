@@ -9,6 +9,7 @@ import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
+import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
 import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyDebugPanel } from "@/components/lobby/LobbyDebugPanel";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
@@ -24,26 +25,35 @@ import {
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import {
+  areLobbyCheckoutsDisplayEqual,
+  stabilizeLobbyCheckoutsResponse
+} from "@/lib/lobby-display-stable";
+import {
+  areStickyLobbyStatesEqual,
+  expireStickyLobbyCheckouts,
   mergeStickyLobbyCheckouts,
   stickyLobbyStateToResponse,
   type StickyLobbyCheckoutState
 } from "@/lib/lobby-sticky-checkout";
 import { lobbyAssets } from "@/lib/lobby/assets";
-import type { LobbyCheckoutDebug, LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
+import { debugBoardClient } from "@/lib/board-debug";
+import {
+  getDefaultLobbySettings,
+  sanitizeLobbyCheckouts,
+  sanitizeLobbySettings,
+  userFacingCheckoutMessage
+} from "@/lib/lobby/validate";
+import { rememberLobbyBoardHealthyState } from "@/components/lobby/LobbyErrorBoundary";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
 import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
 import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
+import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
+import { useDogPhotoPreloader } from "@/hooks/useDogPhotoPreloader";
+import type { LobbyCheckoutDebug, LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
 
-const defaultSettings: LobbySettings = {
-  max_queue_count: 6,
-  refresh_interval_ms: 3000,
-  show_promotions: true,
-  show_events: true,
-  footer_message: "Thanks for being part of the Fitdog family. We'll take care of the rest.",
-  lobby_message: "Thank you for letting us play, care & connect!"
-};
+const defaultSettings: LobbySettings = getDefaultLobbySettings();
 
 const emptyCheckouts: LobbyCheckoutsResponse = {
   featured: null,
@@ -52,15 +62,24 @@ const emptyCheckouts: LobbyCheckoutsResponse = {
   last_updated: ""
 };
 
+type LobbyDisplayMode = "IDLE" | "CHECKOUT_ACTIVE";
+
+const LOBBY_EMPTY_CHECKOUT_GRACE_MS = 25_000;
+
 function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null | undefined): LobbyCheckoutsResponse {
+  const sanitized = sanitizeLobbyCheckouts(body ?? {});
   return {
-    featured: body?.featured ?? null,
-    queue: body?.queue ?? [],
-    counts: body?.counts ?? { active: 0, queue: 0 },
-    last_updated: body?.last_updated ?? "",
-    basket_filtered: body?.basket_filtered,
-    error: body?.error
+    featured: sanitized.featured,
+    queue: sanitized.queue,
+    counts: sanitized.counts,
+    last_updated: sanitized.last_updated,
+    basket_filtered: sanitized.basket_filtered,
+    error: sanitized.error
   };
+}
+
+function checkoutDogsFromResponse(response: LobbyCheckoutsResponse) {
+  return [...(response.featured ? [response.featured] : []), ...(response.queue ?? [])];
 }
 
 export function LobbyCheckoutBoard({
@@ -72,8 +91,9 @@ export function LobbyCheckoutBoard({
 }) {
   const searchParams = useSearchParams();
   const castKeeper = useCastKeeperContext();
-  const debugBoard = !castKeeperMode && searchParams.get("debugBoard") === "1";
+  const debugBoard = searchParams.get("debugBoard") === "1";
   const tvModeFromUrl = searchParams.get("display") !== "desktop";
+  const castMode = castKeeperMode || searchParams.get("castMode") === "1" || searchParams.get("chromecast") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
   const tvLayoutRequested = castKeeperMode || tvModeFromUrl;
   const {
@@ -99,20 +119,28 @@ export function LobbyCheckoutBoard({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to start casting.";
       const cancelled = /cancel|abort|denied/i.test(message);
+      const patternError = /did not match the expected pattern/i.test(message);
       if (!cancelled) {
-        setCastError(message);
+        setCastError(patternError ? "Cast URL was invalid for this browser. Refresh and try again." : message);
+      }
+      if (debugBoard) {
+        debugBoardClient(true, "lobby-cast", "cast action failed", { message, patternError });
       }
     }
-  }, [setCastError]);
+  }, [debugBoard, setCastError]);
 
-  const [clock, setClock] = useState(() => new Date());
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [clock, setClock] = useState<Date | null>(null);
+  const [nowMs, setNowMs] = useState(0);
   const [settings, setSettings] = useState<LobbySettings>(defaultSettings);
+  const [rawCheckouts, setRawCheckouts] = useState<LobbyCheckoutsResponse>(emptyCheckouts);
   const [checkouts, setCheckouts] = useState<LobbyCheckoutsResponse>(emptyCheckouts);
+  const [displayMode, setDisplayMode] = useState<LobbyDisplayMode>("IDLE");
   const [healthy, setHealthy] = useState(true);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [lastFastFetchAt, setLastFastFetchAt] = useState<string | null>(null);
   const [lastFullFetchAt, setLastFullFetchAt] = useState<string | null>(null);
+  const [lastSuccessfulSyncAt, setLastSuccessfulSyncAt] = useState<string | null>(null);
+  const [lastEmptySyncAt, setLastEmptySyncAt] = useState<string | null>(null);
   const [fastDebug, setFastDebug] = useState<LobbyCheckoutDebug | undefined>();
   const [fullDebug, setFullDebug] = useState<LobbyCheckoutDebug | undefined>();
 
@@ -120,6 +148,8 @@ export function LobbyCheckoutBoard({
   const stickyCheckoutRef = useRef<StickyLobbyCheckoutState>(new Map());
   const checkoutBasketFilteredRef = useRef(false);
   const checkoutBasketEmptyRef = useRef(false);
+  const lastEmptySyncAtMsRef = useRef<number | null>(null);
+  const emptyBasketStreakRef = useRef(0);
 
   useEffect(() => {
     checkoutsRef.current = checkouts;
@@ -138,23 +168,71 @@ export function LobbyCheckoutBoard({
   const fullCheckoutEndpoint = debugBoard ? "/api/lobby/checkouts?debugBoard=1" : "/api/lobby/checkouts";
   const checkoutPollMs = clampCheckoutPollMs(settings.refresh_interval_ms || BOARD_CHECKOUT_POLL_MS);
 
-  const applyCheckoutUpdate = useCallback((incoming: LobbyCheckoutsResponse) => {
-    const incomingDogs = [...(incoming.queue ?? []), ...(incoming.featured ? [incoming.featured] : [])];
-    checkoutBasketFilteredRef.current = Boolean(incoming.basket_filtered);
-    checkoutBasketEmptyRef.current = Boolean(incoming.basket_filtered && incomingDogs.length === 0);
+  const applyCheckoutUpdate = useCallback((incoming: LobbyCheckoutsResponse, source: "fast" | "full") => {
+    const now = Date.now();
+    const syncIso = new Date(now).toISOString();
+    const incomingDogs = checkoutDogsFromResponse(incoming);
+    const currentHasCheckout = stickyCheckoutRef.current.size > 0;
 
-    stickyCheckoutRef.current = mergeStickyLobbyCheckouts(
+    setRawCheckouts(incoming);
+    setLastSuccessfulSyncAt(syncIso);
+
+    if (incomingDogs.length > 0) {
+      lastEmptySyncAtMsRef.current = null;
+      setLastEmptySyncAt(null);
+      setDisplayMode("CHECKOUT_ACTIVE");
+    } else {
+      if (lastEmptySyncAtMsRef.current == null) {
+        lastEmptySyncAtMsRef.current = now;
+        setLastEmptySyncAt(syncIso);
+      }
+    }
+
+    checkoutBasketFilteredRef.current = Boolean(incoming.basket_filtered);
+    if (incoming.basket_filtered && incomingDogs.length === 0) {
+      emptyBasketStreakRef.current += 1;
+    } else {
+      emptyBasketStreakRef.current = 0;
+    }
+
+    const emptyGraceActive =
+      currentHasCheckout &&
+      incomingDogs.length === 0 &&
+      lastEmptySyncAtMsRef.current != null &&
+      now - lastEmptySyncAtMsRef.current < LOBBY_EMPTY_CHECKOUT_GRACE_MS;
+    checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2 && !emptyGraceActive;
+
+    const nextSticky = mergeStickyLobbyCheckouts(
       stickyCheckoutRef.current,
       incoming,
-      Date.now(),
-      { basketAuthoritative: checkoutBasketFilteredRef.current }
+      now,
+      {
+        basketAuthoritative: checkoutBasketFilteredRef.current,
+        basketConfirmedEmpty: checkoutBasketEmptyRef.current,
+        pruneMissingFromBasket: source === "full" && !emptyGraceActive,
+        skipExpiry: true
+      }
     );
-    const stickyResponse = stickyLobbyStateToResponse(
-      stickyCheckoutRef.current,
-      incoming.last_updated || new Date().toISOString()
+
+    if (areStickyLobbyStatesEqual(stickyCheckoutRef.current, nextSticky)) {
+      return;
+    }
+
+    stickyCheckoutRef.current = nextSticky;
+    const stickyResponse = stabilizeLobbyCheckoutsResponse(
+      stickyLobbyStateToResponse(
+        stickyCheckoutRef.current,
+        incoming.last_updated || new Date().toISOString()
+      )
     );
+
+    if (areLobbyCheckoutsDisplayEqual(checkoutsRef.current, stickyResponse)) {
+      return;
+    }
+
     setCheckouts(stickyResponse);
     checkoutsRef.current = stickyResponse;
+    setDisplayMode(stickyResponse.featured || stickyResponse.queue.length ? "CHECKOUT_ACTIVE" : "IDLE");
   }, []);
 
   const loadFastLobbyCheckouts = useCallback(async () => {
@@ -171,7 +249,7 @@ export function LobbyCheckoutBoard({
         const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
 
         if (checkoutsRes.ok && !checkoutBody.error) {
-          applyCheckoutUpdate(checkoutBody);
+          applyCheckoutUpdate(checkoutBody, "fast");
           setFastDebug(checkoutBody.debug);
           setLastFastFetchAt(new Date().toISOString());
           setRefreshMessage(null);
@@ -200,33 +278,47 @@ export function LobbyCheckoutBoard({
         const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
 
         if (checkoutsRes.ok && !checkoutBody.error) {
-          applyCheckoutUpdate(checkoutBody);
+          applyCheckoutUpdate(checkoutBody, "full");
           setFullDebug(checkoutBody.debug);
           setLastFullFetchAt(new Date().toISOString());
           setRefreshMessage(null);
           setHealthy(true);
           if (castKeeperMode) castKeeper?.markDataFresh();
-        } else if (checkoutsRef.current.featured || checkoutsRef.current.queue.length) {
-          setRefreshMessage(checkoutBody.error ?? "Live board temporarily refreshing");
         } else {
-          setCheckouts(checkoutBody);
-          const message =
-            checkoutBody.error === "Unauthorized."
-              ? "Lobby display is unauthorized. Open the board with a valid TV token."
-              : (checkoutBody.error ?? "Live board temporarily refreshing");
-          setRefreshMessage(message);
-          setHealthy(false);
+          const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
+          const message = userFacingCheckoutMessage(checkoutBody.error, hasVisibleCheckouts);
+          if (message) {
+            setRefreshMessage(message);
+          } else {
+            setRefreshMessage(null);
+          }
+          if (!hasVisibleCheckouts) {
+            setHealthy(true);
+          } else if (message) {
+            setHealthy(false);
+          }
+          if (debugBoard && checkoutBody.error) {
+            debugBoardClient(true, "lobby-checkouts", "full sync kept last-good board", {
+              error: checkoutBody.error,
+              stale: Boolean((checkoutBody as { stale?: boolean }).stale),
+              hasVisibleCheckouts
+            });
+          }
         }
       } catch {
-        if (!checkoutsRef.current.featured && !checkoutsRef.current.queue.length) {
+        const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
+        if (!hasVisibleCheckouts) {
+          setHealthy(true);
+          setRefreshMessage(null);
+        } else {
           setHealthy(false);
+          setRefreshMessage("Live board temporarily refreshing");
         }
-        setRefreshMessage("Live board temporarily refreshing");
       } finally {
         window.clearTimeout(timeout);
       }
     });
-  }, [applyCheckoutUpdate, castKeeper, castKeeperMode, fullCheckoutEndpoint, requestHeaders, runFullPoll]);
+  }, [applyCheckoutUpdate, castKeeper, castKeeperMode, debugBoard, fullCheckoutEndpoint, requestHeaders, runFullPoll]);
 
   const loadLobbyMeta = useCallback(async () => {
     try {
@@ -236,22 +328,45 @@ export function LobbyCheckoutBoard({
       ]);
 
       if (settingsRes.ok) {
-        const body = (await settingsRes.json()) as { settings: LobbySettings };
-        if (body.settings) setSettings(body.settings);
+        const body = (await settingsRes.json()) as { settings?: LobbySettings };
+        if (body.settings) {
+          const sanitized = sanitizeLobbySettings(body.settings, debugBoard);
+          setSettings((current) => {
+            const nextRefresh = clampCheckoutPollMs(sanitized.refresh_interval_ms ?? current.refresh_interval_ms);
+            const next = {
+              ...current,
+              ...sanitized,
+              refresh_interval_ms: nextRefresh
+            };
+            if (
+              current.refresh_interval_ms === next.refresh_interval_ms &&
+              current.max_queue_count === next.max_queue_count &&
+              current.show_promotions === next.show_promotions &&
+              current.show_events === next.show_events &&
+              current.footer_message === next.footer_message &&
+              current.lobby_message === next.lobby_message
+            ) {
+              return current;
+            }
+            return next;
+          });
+          rememberLobbyBoardHealthyState(sanitized.footer_message);
+        }
       }
 
       if (statusRes.ok) {
         const body = (await statusRes.json()) as LobbyStatusResponse;
-        setHealthy(body.healthy);
-        setSettings((current) => ({
-          ...current,
-          refresh_interval_ms: clampCheckoutPollMs(body.refresh_interval_ms)
-        }));
+        setHealthy(body.healthy || (!checkoutsRef.current.featured && !checkoutsRef.current.queue.length));
+        setSettings((current) => {
+          const nextRefresh = clampCheckoutPollMs(body.refresh_interval_ms);
+          if (current.refresh_interval_ms === nextRefresh) return current;
+          return { ...current, refresh_interval_ms: nextRefresh };
+        });
       }
     } catch {
       // Checkout polling owns the visible error state.
     }
-  }, [requestHeaders]);
+  }, [debugBoard, requestHeaders]);
 
   const loadLobbyData = useCallback(async () => {
     await Promise.all([loadLobbyCheckouts(), loadFastLobbyCheckouts(), loadLobbyMeta()]);
@@ -263,11 +378,36 @@ export function LobbyCheckoutBoard({
   }, [loadLobbyData]);
 
   useEffect(() => {
+    const next = expireStickyLobbyCheckouts(stickyCheckoutRef.current, nowMs);
+    if (!areStickyLobbyStatesEqual(stickyCheckoutRef.current, next)) {
+      stickyCheckoutRef.current = next;
+      const stickyResponse = stabilizeLobbyCheckoutsResponse(
+        stickyLobbyStateToResponse(
+          next,
+          checkoutsRef.current.last_updated || new Date().toISOString()
+        )
+      );
+      if (!areLobbyCheckoutsDisplayEqual(checkoutsRef.current, stickyResponse)) {
+        setCheckouts(stickyResponse);
+        checkoutsRef.current = stickyResponse;
+        setDisplayMode(stickyResponse.featured || stickyResponse.queue.length ? "CHECKOUT_ACTIVE" : "IDLE");
+      }
+    }
+  }, [nowMs]);
+
+  useEffect(() => {
+    const initialClock = window.setTimeout(() => {
+      setClock(new Date());
+      setNowMs(Date.now());
+    }, 0);
     const clockTimer = window.setInterval(() => {
       setClock(new Date());
       setNowMs(Date.now());
     }, 1000);
-    return () => window.clearInterval(clockTimer);
+    return () => {
+      window.clearTimeout(initialClock);
+      window.clearInterval(clockTimer);
+    };
   }, []);
 
   const debouncedRefreshCheckouts = useDebouncedCallback(() => {
@@ -275,18 +415,21 @@ export function LobbyCheckoutBoard({
   }, BOARD_REALTIME_DEBOUNCE_MS);
 
   useEffect(() => {
-    const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), checkoutPollMs);
-    const fullPollTimer = window.setInterval(() => void loadLobbyCheckouts(), BOARD_FULL_SYNC_POLL_MS);
+    const fastPollIntervalMs = castKeeperMode ? 30_000 : checkoutPollMs;
+    const fullPollIntervalMs = castKeeperMode ? 60_000 : BOARD_FULL_SYNC_POLL_MS;
+    const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), fastPollIntervalMs);
+    const fullPollTimer = window.setInterval(() => void loadLobbyCheckouts(), fullPollIntervalMs);
     return () => {
       window.clearInterval(fastPollTimer);
       window.clearInterval(fullPollTimer);
     };
-  }, [checkoutPollMs, loadFastLobbyCheckouts, loadLobbyCheckouts]);
+  }, [castKeeperMode, checkoutPollMs, loadFastLobbyCheckouts, loadLobbyCheckouts]);
 
   useEffect(() => {
+    if (castKeeperMode) return;
     const metaTimer = window.setInterval(() => void loadLobbyMeta(), BOARD_SETTINGS_POLL_MS);
     return () => window.clearInterval(metaTimer);
-  }, [loadLobbyMeta]);
+  }, [castKeeperMode, loadLobbyMeta]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -331,9 +474,47 @@ export function LobbyCheckoutBoard({
     };
   }, [castKeeperMode, debouncedRefreshCheckouts]);
 
-  const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(checkouts, nowMs);
+  const displayCheckouts = useMemo(() => stabilizeLobbyCheckoutsResponse(checkouts), [checkouts]);
+  const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(displayCheckouts, nowMs);
+  const checkoutActive = displayMode === "CHECKOUT_ACTIVE" && hasCheckout;
+  const idleCarouselPaused = checkoutActive;
+  const activeCheckoutDog = checkoutActive ? featured ?? queue[0] ?? null : null;
+  const rawCheckoutCount = checkoutDogsFromResponse(rawCheckouts).length;
+  const activeCheckoutStartedAt = activeCheckoutDog?.prompted_at ?? null;
+  const activeCheckoutExpiresAt = activeCheckoutDog?.display_until ?? null;
+  const activePollingIntervalCount = castKeeperMode ? 2 : 3;
   const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
-  const showIdleSlideshow = !hasCheckout;
+  const castHealth: CastModeStatus =
+    !healthy && !lastFastFetchAt && !lastFullFetchAt
+      ? "offline"
+      : refreshMessage || castKeeper?.connection === "reconnecting"
+        ? "reconnecting"
+        : "live";
+  const castDogPhotoUrls = useMemo(
+    () => [
+      featured?.dog_photo_url,
+      queue[0]?.dog_photo_url,
+      queue[1]?.dog_photo_url,
+      queue[2]?.dog_photo_url
+    ],
+    [featured?.dog_photo_url, queue]
+  );
+  useDogPhotoPreloader(castDogPhotoUrls, { enabled: castMode, debugBoard, width: 640 });
+  useCastModeRuntime({
+    enabled: castMode,
+    boardType: "lobby",
+    debugBoard,
+    health: castHealth,
+    onFallbackRefresh: () => window.location.reload()
+  });
+
+  useEffect(() => {
+    const photoUrl = activeCheckoutDog?.dog_photo_url?.trim();
+    if (!photoUrl || typeof window === "undefined") return;
+    const image = new window.Image();
+    image.decoding = "async";
+    image.src = photoUrl;
+  }, [activeCheckoutDog?.dog_photo_url]);
 
   useEffect(() => {
     if (!castKeeperMode) return;
@@ -372,9 +553,10 @@ export function LobbyCheckoutBoard({
 
   return (
     <main
-      className={`lobby-shell ${showTvLayout ? "lobby-tv-mode" : ""} ${castKeeperMode ? "cast-keeper-board" : ""} ${hasCheckout ? "lobby-has-checkout" : "lobby-idle-state"}`}
+      className={`lobby-shell ${showTvLayout ? "lobby-tv-mode" : ""} ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""} ${checkoutActive ? "lobby-has-checkout" : "lobby-idle-state"}`}
     >
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
+      {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
 
       {!castKeeperMode ? (
         <LobbyCastButton
@@ -394,7 +576,7 @@ export function LobbyCheckoutBoard({
 
       <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby">
         <div className={`lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""}`}>
-        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} hasCheckout={hasCheckout} />
+        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} hasCheckout={checkoutActive} />
 
         {refreshMessage ? (
           <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm text-amber-100">
@@ -402,26 +584,38 @@ export function LobbyCheckoutBoard({
           </div>
         ) : null}
 
-        <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
-          <div
-            className={`flex min-h-0 flex-col gap-4 ${hasCheckout ? "lobby-checkout-column" : ""}`}
-            data-queue-size={hasCheckout ? queue.length : undefined}
-          >
-            {featured ? (
-              <LobbyFeaturedCard dog={featured} />
-            ) : null}
+        {checkoutActive ? (
+          <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
+            <div
+              className="lobby-checkout-column flex min-h-0 flex-col gap-4"
+              data-queue-size={queue.length}
+            >
+              {featured ? (
+                <LobbyFeaturedCard key={featured.gingr_animal_id ?? featured.id} dog={featured} />
+              ) : null}
 
-            {hasCheckout ? <LobbyQueueList dogs={queue} /> : null}
+              <LobbyQueueList dogs={queue} />
 
-            {showIdleSlideshow ? <LobbyIdleSlideshow tvMode={showTvLayout} /> : null}
+              {settings.show_events ? (
+                <LobbyClassSchedule compact schedule={settings.class_schedule} />
+              ) : null}
+            </div>
 
-            {settings.show_events ? (
-              <LobbyClassSchedule compact={hasCheckout} schedule={settings.class_schedule} />
-            ) : null}
+            {settings.show_promotions ? <SocialMomentsCarousel paused={idleCarouselPaused} performanceMode={castMode} /> : null}
           </div>
+        ) : (
+          <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
+            <div className="flex min-h-0 flex-col gap-4">
+              <LobbyIdleSlideshow tvMode={showTvLayout} />
 
-          {settings.show_promotions ? <SocialMomentsCarousel /> : null}
-        </div>
+              {settings.show_events ? (
+                <LobbyClassSchedule schedule={settings.class_schedule} />
+              ) : null}
+            </div>
+
+            {settings.show_promotions ? <SocialMomentsCarousel performanceMode={castMode} /> : null}
+          </div>
+        )}
 
         <footer className="lobby-footer mt-4 flex h-14 shrink-0 items-center gap-4 px-8">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center">
@@ -446,8 +640,18 @@ export function LobbyCheckoutBoard({
           fastDebug={fastDebug}
           fullDebug={fullDebug}
           checkouts={checkouts}
+          rawCheckoutCount={rawCheckoutCount}
           visibleCheckoutCount={(featured ? 1 : 0) + queue.length}
           checkoutPollMs={checkoutPollMs}
+          displayMode={displayMode}
+          activeCheckoutDogName={activeCheckoutDog?.dog_name ?? null}
+          activeCheckoutDogId={activeCheckoutDog?.gingr_animal_id ?? activeCheckoutDog?.id ?? null}
+          activeCheckoutStartedAt={activeCheckoutStartedAt}
+          activeCheckoutExpiresAt={activeCheckoutExpiresAt}
+          lastSuccessfulSyncAt={lastSuccessfulSyncAt}
+          lastEmptySyncAt={lastEmptySyncAt}
+          idleCarouselPaused={idleCarouselPaused}
+          activePollingIntervalCount={activePollingIntervalCount}
         />
       ) : null}
     </main>

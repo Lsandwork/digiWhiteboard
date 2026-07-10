@@ -72,12 +72,16 @@ function gingrUrl(subdomain: string, path: string, params: Record<string, string
 async function fetchGingrJson<T>(url: string, endpoint: "back_of_house" | "reservation_types"): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
+  const revalidateSeconds = endpoint === "back_of_house" ? 9 : 600;
 
   try {
     markGingrEndpointCalled(endpoint);
     const response = await fetch(url, {
       headers: { Accept: "application/json" },
-      cache: "no-store",
+      next: {
+        revalidate: revalidateSeconds,
+        tags: [`gingr-${endpoint}`]
+      },
       signal: controller.signal
     });
 

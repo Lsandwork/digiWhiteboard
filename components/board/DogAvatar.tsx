@@ -1,10 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Dog } from "lucide-react";
 import type { LiveDog } from "@/lib/types";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import {
+  buildCastOptimizedDogPhotoUrl,
+  getStableDogPhotoKey,
+  hasLoadedDogPhoto,
+  markDogPhotoLoaded,
+  rememberStableDogPhoto,
+  resolveStableDogPhotoUrl
+} from "@/lib/dog-photo-display-cache";
+import { useDogPhotoFallback } from "@/hooks/useDogPhotoFallback";
 
 type DogAvatarProps = {
   dog: LiveDog;
@@ -45,6 +54,7 @@ function LetterFallback({
 }
 
 function DogAvatarContent({
+  stableKey,
   photoUrl,
   animalName,
   initial,
@@ -52,6 +62,7 @@ function DogAvatarContent({
   isNew,
   size = "default"
 }: {
+  stableKey: string;
   photoUrl: string;
   animalName: string;
   initial: string;
@@ -59,29 +70,48 @@ function DogAvatarContent({
   isNew: boolean;
   size?: "default" | "solo";
 }) {
+  const [lastGoodUrl, setLastGoodUrl] = useState(photoUrl);
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => hasLoadedDogPhoto(stableKey));
 
-  if (failed) {
+  useEffect(() => {
+    if (photoUrl) {
+      rememberStableDogPhoto(stableKey, photoUrl);
+      const timer = window.setTimeout(() => {
+        setLastGoodUrl(photoUrl);
+        setFailed(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [photoUrl, stableKey]);
+
+  const displayUrl = photoUrl || lastGoodUrl;
+
+  if (!displayUrl || failed) {
     return <LetterFallback initial={initial} mode={mode} size={size} />;
   }
 
+  const showLetterUnderlay = !loaded && !hasLoadedDogPhoto(stableKey);
+
   return (
     <>
-      {!loaded ? <LetterFallback initial={initial} mode={mode} size={size} /> : null}
+      {showLetterUnderlay ? <LetterFallback initial={initial} mode={mode} size={size} /> : null}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={photoUrl}
+        src={displayUrl}
         alt={`Photo of ${animalName}`}
         className={clsx(
           "absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-300",
-          loaded ? "opacity-100" : "opacity-0",
+          loaded || hasLoadedDogPhoto(stableKey) ? "opacity-100" : "opacity-0",
           isNew && mode === "out" && "checkout-avatar-photo-pop"
         )}
         loading="lazy"
         decoding="async"
         draggable={false}
-        onLoad={() => setLoaded(true)}
+        onLoad={() => {
+          markDogPhotoLoaded(stableKey);
+          setLoaded(true);
+        }}
         onError={() => setFailed(true)}
       />
     </>
@@ -89,8 +119,22 @@ function DogAvatarContent({
 }
 
 export function DogAvatar({ dog, mode, size = "default", isAlerting = false, isNew = false }: DogAvatarProps) {
-  const photoUrl = resolveDogPhotoUrl(dog);
+  const stableKey = getStableDogPhotoKey(dog);
+  const serverPhotoUrl = resolveStableDogPhotoUrl(dog, resolveDogPhotoUrl);
+  const photoUrl = useDogPhotoFallback(dog.gingr_animal_id, serverPhotoUrl);
+  const [castOptimized, setCastOptimized] = useState(false);
   const initial = dog.animal_name.trim().slice(0, 1).toUpperCase();
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCastOptimized(document.documentElement.classList.contains("fitdog-cast-mode"));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const displayPhotoUrl = photoUrl && castOptimized
+    ? buildCastOptimizedDogPhotoUrl(photoUrl, size === "solo" ? 640 : 256)
+    : photoUrl;
 
   return (
     <div
@@ -106,10 +150,11 @@ export function DogAvatar({ dog, mode, size = "default", isAlerting = false, isN
         isAlerting && mode === "out" && "checkout-avatar-alert-ring"
       )}
     >
-      {photoUrl ? (
+      {displayPhotoUrl ? (
         <DogAvatarContent
-          key={`${dog.id}:${photoUrl}`}
-          photoUrl={photoUrl}
+          key={stableKey}
+          stableKey={stableKey}
+          photoUrl={displayPhotoUrl}
           animalName={dog.animal_name}
           initial={initial}
           mode={mode}

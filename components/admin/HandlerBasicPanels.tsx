@@ -5,6 +5,7 @@ import { CheckSquare, ImagePlus } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { AddShiftLogEntryCard, type ShiftLogFormShape } from "@/components/admin/front-desk/FrontDeskLogUI";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
+import type { ManagementReport } from "@/lib/staff/management-reports";
 import { shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
 import { serializeTemplateFieldValues } from "@/lib/frontDeskLog/logTemplates";
 
@@ -14,6 +15,13 @@ const CHECKLIST_ITEMS = [
   "Review dogs that need special handling today.",
   "Log behavior/safety notes before shift end."
 ];
+
+type ChecklistItemState = {
+  checked: boolean;
+  timestamp: string;
+};
+
+type ChecklistState = Record<string, ChecklistItemState>;
 
 const emptyShiftForm: ShiftLogFormShape = {
   log_type: "Daycare Note",
@@ -45,19 +53,74 @@ function formatDateTime(value: string | null) {
 }
 
 export function HandlerChecklistPanel() {
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const { showToast } = useToast();
+  const [items, setItems] = useState<string[]>(CHECKLIST_ITEMS);
+  const [checked, setChecked] = useState<ChecklistState>({});
+
+  useEffect(() => {
+    let active = true;
+    const loadChecklist = async () => {
+      try {
+        const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Unable to load checklist items.");
+        const currentEmail = String(body.currentUser?.email ?? "").trim().toLowerCase();
+        const currentId = String(body.currentUser?.adminUserId ?? "").trim();
+        const matched = (body.staff_directory ?? []).find((member: { email?: string | null; admin_user_id?: string | null }) => {
+          const memberEmail = String(member.email ?? "").trim().toLowerCase();
+          const memberAdminId = String(member.admin_user_id ?? "").trim();
+          return (currentEmail && memberEmail && memberEmail === currentEmail) || (currentId && memberAdminId && memberAdminId === currentId);
+        });
+        const assigned = Array.isArray(matched?.checklist_items)
+          ? (matched.checklist_items as unknown[]).map((item) => String(item).trim()).filter(Boolean)
+          : [];
+        if (!active) return;
+        setItems(assigned.length ? assigned : CHECKLIST_ITEMS);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "Unable to load checklist items.", "error");
+      }
+    };
+    void loadChecklist();
+    return () => {
+      active = false;
+    };
+  }, [showToast]);
 
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem("fitdog_handler_checklist");
-      if (raw) setChecked(JSON.parse(raw) as Record<string, boolean>);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Record<string, boolean | ChecklistItemState>;
+      const now = new Date().toISOString();
+      const normalized: ChecklistState = {};
+      for (const item of items) {
+        const value = parsed[item];
+        if (value && typeof value === "object" && "checked" in value && "timestamp" in value) {
+          normalized[item] = {
+            checked: Boolean(value.checked),
+            timestamp: typeof value.timestamp === "string" ? value.timestamp : now
+          };
+          continue;
+        }
+        normalized[item] = {
+          checked: Boolean(value),
+          timestamp: now
+        };
+      }
+      window.setTimeout(() => setChecked(normalized), 0);
     } catch {
       // ignore parse issues
     }
-  }, []);
+  }, [items]);
 
   function toggle(item: string) {
-    const next = { ...checked, [item]: !checked[item] };
+    const next: ChecklistState = {
+      ...checked,
+      [item]: {
+        checked: !checked[item]?.checked,
+        timestamp: new Date().toISOString()
+      }
+    };
     setChecked(next);
     window.localStorage.setItem("fitdog_handler_checklist", JSON.stringify(next));
   }
@@ -72,10 +135,15 @@ export function HandlerChecklistPanel() {
         </div>
       </header>
       <div className="grid gap-2">
-        {CHECKLIST_ITEMS.map((item) => (
+        {items.map((item) => (
           <label key={item} className="flex items-start gap-3 rounded-xl border border-admin-border p-3 text-sm">
-            <input type="checkbox" className="mt-1" checked={Boolean(checked[item])} onChange={() => toggle(item)} />
-            <span>{item}</span>
+            <input type="checkbox" className="mt-1" checked={Boolean(checked[item]?.checked)} onChange={() => toggle(item)} />
+            <span>
+              <span className="block">{item}</span>
+              <span className="mt-1 block text-xs text-admin-muted">
+                {formatDateTime(checked[item]?.timestamp ?? null)}
+              </span>
+            </span>
           </label>
         ))}
       </div>
@@ -85,32 +153,46 @@ export function HandlerChecklistPanel() {
 
 export function BulkPhotoUploadPanel() {
   const { showToast } = useToast();
-  const [animalIds, setAnimalIds] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [animalIdsByIndex, setAnimalIdsByIndex] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Array<{ id: string; photoUrl: string | null }>>([]);
+  const [results, setResults] = useState<Array<{ animalId: string; fileName: string; updated: boolean; error?: string }>>([]);
 
-  async function runLookup() {
-    const ids = animalIds
-      .split(/\s|,|\n/)
-      .map((value) => value.trim())
-      .filter(Boolean);
-    if (!ids.length) {
-      showToast("Enter at least one animal ID.", "error");
+  function inferAnimalId(fileName: string) {
+    const match = fileName.match(/\d{3,}/);
+    return match ? match[0] : "";
+  }
+
+  async function uploadPhotos() {
+    if (!selectedFiles.length) {
+      showToast("Select at least one image.", "error");
       return;
     }
+
+    const missing = selectedFiles.some((_, idx) => !(animalIdsByIndex[idx] ?? "").trim());
+    if (missing) {
+      showToast("Add an animal ID for each selected image.", "error");
+      return;
+    }
+
     setLoading(true);
     try {
-      const mapped = await Promise.all(
-        ids.map(async (id) => {
-          const response = await fetch(`/api/gingr/animal-photo?animalId=${encodeURIComponent(id)}`);
-          const body = (await response.json().catch(() => ({}))) as { photoUrl?: string | null };
-          return { id, photoUrl: response.ok ? body.photoUrl ?? null : null };
-        })
-      );
-      setResults(mapped);
-      showToast("Photo lookup complete.", "success");
-    } catch {
-      showToast("Unable to check photos right now.", "error");
+      const formData = new FormData();
+      selectedFiles.forEach((file, index) => {
+        formData.append("files", file);
+        formData.append(`animal_id_${index}`, (animalIdsByIndex[index] ?? "").trim());
+      });
+
+      const response = await fetch("/api/admin/bulk-photo-upload", {
+        method: "POST",
+        body: formData
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Upload failed.");
+      const uploadResults = (body.results ?? []) as Array<{ animalId: string; fileName: string; updated: boolean; error?: string }>;
+      setResults(uploadResults);
+      const successCount = uploadResults.filter((item) => item.updated).length;
+      showToast(`Uploaded ${successCount}/${uploadResults.length} photo(s).`, successCount ? "success" : "error");
     } finally {
       setLoading(false);
     }
@@ -122,26 +204,54 @@ export function BulkPhotoUploadPanel() {
         <ImagePlus className="h-5 w-5 text-fitdog-orange" />
         <div>
           <h2 className="admin-page-title">Bulk Photo Upload</h2>
-          <p className="admin-page-subtitle">Paste Gingr animal IDs to verify photo availability in batch.</p>
+          <p className="admin-page-subtitle">Select one or more photos from phone/computer and map each to a Gingr animal ID.</p>
         </div>
       </header>
-      <textarea
-        className="crossover-input min-h-32 w-full"
-        placeholder="Paste animal IDs, separated by commas or new lines"
-        value={animalIds}
-        onChange={(event) => setAnimalIds(event.target.value)}
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        className="admin-input w-full"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? []);
+          setSelectedFiles(files);
+          const mapped: Record<number, string> = {};
+          files.forEach((file, index) => {
+            mapped[index] = inferAnimalId(file.name);
+          });
+          setAnimalIdsByIndex(mapped);
+          setResults([]);
+        }}
       />
+      {selectedFiles.length ? (
+        <div className="mt-4 grid gap-3">
+          {selectedFiles.map((file, index) => (
+            <div key={`${file.name}-${index}`} className="rounded-xl border border-admin-border p-3">
+              <p className="text-sm font-semibold text-white">{file.name}</p>
+              <input
+                className="admin-input mt-2"
+                placeholder="Gingr Animal ID"
+                value={animalIdsByIndex[index] ?? ""}
+                onChange={(event) => setAnimalIdsByIndex((current) => ({ ...current, [index]: event.target.value }))}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="mt-3">
-        <button type="button" className="crossover-btn crossover-btn--primary" disabled={loading} onClick={() => void runLookup()}>
-          {loading ? "Checking..." : "Check Photos"}
+        <button type="button" className="crossover-btn crossover-btn--primary" disabled={loading} onClick={() => void uploadPhotos()}>
+          {loading ? "Uploading..." : "Upload Photos"}
         </button>
       </div>
       {results.length ? (
         <div className="mt-4 grid gap-2">
           {results.map((result) => (
-            <div key={result.id} className="rounded-xl border border-admin-border p-3 text-sm">
-              <span className="font-semibold text-white">{result.id}</span>
-              <span className="ml-2 text-admin-muted">{result.photoUrl ? "Photo found" : "No photo found"}</span>
+            <div key={`${result.fileName}-${result.animalId}`} className="rounded-xl border border-admin-border p-3 text-sm">
+              <span className="font-semibold text-white">{result.fileName}</span>
+              <span className="ml-2 text-admin-muted">→ {result.animalId || "No animal ID"}</span>
+              <span className={`ml-2 ${result.updated ? "text-emerald-300" : "text-rose-300"}`}>
+                {result.updated ? "Uploaded" : result.error ?? "Failed"}
+              </span>
             </div>
           ))}
         </div>
@@ -271,5 +381,60 @@ export function HandlerShiftEntryPanel() {
         </div>
       </section>
     </div>
+  );
+}
+
+export function HandlerWriteUpsPanel() {
+  const { showToast } = useToast();
+  const [reports, setReports] = useState<ManagementReport[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admin/management-support?view=write_ups", { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to load write-ups.");
+      setReports((body.reports as ManagementReport[]) ?? []);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to load write-ups.", "error");
+    } finally {
+      setLoading(false);
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  return (
+    <section className="crossover-card p-5">
+      <header className="mb-4">
+        <h2 className="admin-page-title">Write Ups</h2>
+        <p className="admin-page-subtitle">
+          View-only list of write-ups submitted for your user profile.
+        </p>
+      </header>
+      {loading ? <p className="text-sm text-admin-muted">Loading write-ups…</p> : null}
+      <div className="grid gap-3">
+        {reports.length ? reports.map((report) => (
+          <article key={report.id} className="rounded-xl border border-admin-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-bold text-white">{report.title}</p>
+              <span className="crossover-badge">{report.admin_status ?? report.status}</span>
+            </div>
+            <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
+            <p className="mt-2 text-xs text-admin-muted">
+              {formatDateTime(report.created_at)}
+            </p>
+          </article>
+        )) : (
+          <p className="text-sm text-admin-muted">
+            No write-ups found for this Dog Handler profile.
+          </p>
+        )}
+      </div>
+    </section>
   );
 }

@@ -1,4 +1,4 @@
-export const DISPLAY_SYNC_POLL_MS = 5000;
+export const DISPLAY_SYNC_POLL_MS = 15_000;
 export const DISPLAY_SYNC_STORAGE_KEY = "fitdog-display-sync";
 export const DISPLAY_BUILD_RELOAD_KEY = "fitdog-display-build-reload";
 
@@ -34,9 +34,13 @@ export function hardReloadDisplay(castReloadNonce: number) {
   if (typeof window === "undefined") return;
   const nonce = Number(castReloadNonce);
   if (!Number.isFinite(nonce)) return;
-  const url = new URL(window.location.href);
-  url.searchParams.set("_cast_reload", String(nonce));
-  window.location.replace(url.toString());
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("_cast_reload", String(nonce));
+    window.location.replace(url.toString());
+  } catch {
+    window.location.reload();
+  }
 }
 
 export function softReloadDisplay() {

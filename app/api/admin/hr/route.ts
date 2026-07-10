@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { isAdminRequest, unauthorizedAdminResponse, canAccessHrPanels } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { hasPermission, accessFromLegacyRole } from "@/lib/admin/permissions";
-import { getUserAccess } from "@/lib/admin/user-access";
 import { buildHrHubStats, isHrRecord, toHrRecord } from "@/lib/hr/records";
 import { listAllManagementReports, getManagementReportById } from "@/lib/staff/management-reports";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -15,18 +13,14 @@ function forbiddenResponse() {
 
 async function actorAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
-  const supabase = getServiceSupabase();
-  const access = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
-  return { session, access };
+  return { session };
 }
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, access } = await actorAccess(request);
-  if (!hasPermission(access, "view_hr_hub")) return forbiddenResponse();
+  const { session } = await actorAccess(request);
+  if (!canAccessHrPanels(session?.role)) return forbiddenResponse();
 
   try {
     const url = new URL(request.url);

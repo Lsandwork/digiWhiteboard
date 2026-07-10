@@ -6,12 +6,15 @@ export function useLobbyDogPhoto(animalId: string | null | undefined, initialUrl
   const [photoUrl, setPhotoUrl] = useState(initialUrl ?? null);
 
   useEffect(() => {
-    setPhotoUrl(initialUrl ?? null);
+    const timer = window.setTimeout(() => setPhotoUrl(initialUrl ?? null), 0);
+    return () => window.clearTimeout(timer);
   }, [initialUrl, animalId]);
 
   useEffect(() => {
     const trimmedAnimalId = animalId?.trim();
     if (!trimmedAnimalId) return;
+    // Never hit Gingr when the server already provided a photo URL.
+    if (initialUrl?.trim()) return;
 
     let cancelled = false;
 
@@ -35,7 +38,7 @@ export function useLobbyDogPhoto(animalId: string | null | undefined, initialUrl
     return () => {
       cancelled = true;
     };
-  }, [animalId]);
+  }, [animalId, initialUrl]);
 
   return photoUrl;
 }

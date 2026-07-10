@@ -63,8 +63,15 @@ function startKeepaliveEngine() {
 
   playVideo();
 
+  const watchdogTimer = window.setInterval(() => {
+    if (video.paused && !video.ended) {
+      playVideo();
+    }
+  }, 30_000);
+
   const stop = () => {
     if (videoRetryTimer) window.clearTimeout(videoRetryTimer);
+    window.clearInterval(watchdogTimer);
     video.pause();
     video.remove();
     stopCanvas();

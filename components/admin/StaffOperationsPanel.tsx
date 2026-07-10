@@ -519,8 +519,11 @@ function CrossoverPage(props: {
   const todayLabel = useMemo(() => formatShiftLogDayLabel(), []);
 
   useEffect(() => {
-    setDailyPage(1);
-    setOpenPage(1);
+    const timer = window.setTimeout(() => {
+      setDailyPage(1);
+      setOpenPage(1);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [filters]);
 
   const pickTemplate = useCallback((templateId: string) => {
@@ -548,7 +551,9 @@ function CrossoverPage(props: {
     const templateParam = params.get("template");
     if (!templateParam) return;
     const template = getLogTemplateById(templateParam);
-    if (template) pickTemplate(template.id);
+    if (!template) return;
+    const timer = window.setTimeout(() => pickTemplate(template.id), 0);
+    return () => window.clearTimeout(timer);
   }, [pickTemplate]);
 
   const queryFields = useCallback(
@@ -741,8 +746,12 @@ function FollowUpPage(props: {
   useEffect(() => {
     if (!props.data) return;
     const department = homeDepartmentForUser(props.data.staff_directory, props.data.currentUser);
-    setForm((current) => ({ ...current, department }));
-  }, [props.data?.currentUser.adminUserId, props.data?.currentUser.email, props.data?.currentUser.role, props.data?.staff_directory]);
+    const timer = window.setTimeout(
+      () => setForm((current) => ({ ...current, department })),
+      0
+    );
+    return () => window.clearTimeout(timer);
+  }, [props.data]);
 
   const rows = useMemo(() => (props.data?.owner_follow_ups ?? []).filter((item) => {
     if (props.filters.priority && item.priority !== props.filters.priority) return false;

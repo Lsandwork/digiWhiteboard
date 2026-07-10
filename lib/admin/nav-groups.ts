@@ -65,7 +65,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   bulk_photo_upload: "Bulk Photo Upload",
   write_ups: "Write Ups",
   handler_shift_entry: "Handler Shift Entry Log",
-  hr_pip: "P.I.P"
+  hr_pip: "P.I.P",
+  remote_cast: "Remote Whiteboard Cast"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -103,7 +104,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   bulk_photo_upload: "Upload and verify dog photos in batches.",
   write_ups: "Submit and review your own write-up forms.",
   handler_shift_entry: "Create handler shift log entries sent to Front Desk Log.",
-  hr_pip: "View your performance improvement plan records."
+  hr_pip: "View your performance improvement plan records.",
+  remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
 };
 
 const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "display", "whiteboard_preview"];
@@ -176,7 +178,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
             LOBBY_BOARD_TABS.filter((tab) => tab !== "display" && tab !== "whiteboard_preview"),
             visible
           ),
-          group("lobby_display", "Display & Cast", ["display", "whiteboard_preview"], visible)
+          group("lobby_display", "Display & Cast", ["display", "whiteboard_preview", "remote_cast"], visible)
         ])
       )
     );
@@ -196,7 +198,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_dashboard",
         "Dashboard",
-        singles(["demo_push", "overview", "whiteboard_preview", "display", "content", "analytics", "checklist"], visible)
+        singles(["demo_push", "overview", "whiteboard_preview", "display", "remote_cast", "content", "analytics", "checklist"], visible)
       )
     );
 

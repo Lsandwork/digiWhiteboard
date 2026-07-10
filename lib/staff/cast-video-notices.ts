@@ -343,14 +343,18 @@ export async function resolveCastVideoSignedUrls(supabase: SupabaseClient, notic
   let video_url = notice.video_url;
   let thumbnail_url = notice.thumbnail_url;
 
-  if (notice.video_storage_path) {
-    const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(notice.video_storage_path, 60 * 60 * 4);
-    if (data?.signedUrl) video_url = data.signedUrl;
-  }
+  try {
+    if (notice.video_storage_path) {
+      const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(notice.video_storage_path, 60 * 60 * 4);
+      if (data?.signedUrl) video_url = data.signedUrl;
+    }
 
-  if (notice.thumbnail_storage_path) {
-    const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(notice.thumbnail_storage_path, 60 * 60 * 4);
-    if (data?.signedUrl) thumbnail_url = data.signedUrl;
+    if (notice.thumbnail_storage_path) {
+      const { data } = await supabase.storage.from(CAST_VIDEO_BUCKET).createSignedUrl(notice.thumbnail_storage_path, 60 * 60 * 4);
+      if (data?.signedUrl) thumbnail_url = data.signedUrl;
+    }
+  } catch {
+    // Keep existing public URLs if signed URL generation is slow/unavailable.
   }
 
   return { ...notice, video_url, thumbnail_url };
@@ -422,10 +426,12 @@ function filterBoardNotices(notices: CastVideoNotice[], department: string | nul
 
 export async function loadCastVideoBoardState(
   supabase: SupabaseClient,
-  options?: { department?: string | null; emergencyOnly?: boolean }
+  options?: { department?: string | null; emergencyOnly?: boolean; mutate?: boolean }
 ) {
-  await expireStaleCastVideoNotices(supabase);
-  await activateDueScheduledCastVideos(supabase);
+  // Board reads must stay fast — expire/activate writes belong on admin/push paths.
+  if (options?.mutate !== false) {
+    await Promise.allSettled([expireStaleCastVideoNotices(supabase), activateDueScheduledCastVideos(supabase)]);
+  }
   const now = Date.now();
   const department = options?.department ?? "staff_whiteboard";
   const emergencyOnly = Boolean(options?.emergencyOnly);
@@ -434,14 +440,16 @@ export async function loadCastVideoBoardState(
     .from("cast_video_notices")
     .select("*")
     .eq("status", "active")
-    .order("pushed_at", { ascending: true });
+    .order("pushed_at", { ascending: true })
+    .limit(8);
 
   if (error && isMissingRelation(error)) {
     const state = await loadFallbackState(supabase);
     let active = filterBoardNotices(state.notices, department, now);
     if (emergencyOnly) active = active.filter((notice) => isEmergencyCastVideo(notice));
     else active = active.filter((notice) => !isEmergencyCastVideo(notice));
-    const resolved = await Promise.all(active.map((notice) => resolveCastVideoSignedUrls(supabase, notice)));
+    const slice = active.slice(0, 5);
+    const resolved = await Promise.all(slice.map((notice) => resolveCastVideoSignedUrls(supabase, notice)));
     return {
       activeNotice: resolved[0] ?? null,
       queue: resolved.slice(1, 5)
@@ -457,7 +465,8 @@ export async function loadCastVideoBoardState(
     notices = notices.filter((notice) => !isEmergencyCastVideo(notice));
   }
 
-  const resolved = await Promise.all(notices.map((notice) => resolveCastVideoSignedUrls(supabase, notice)));
+  const slice = notices.slice(0, 5);
+  const resolved = await Promise.all(slice.map((notice) => resolveCastVideoSignedUrls(supabase, notice)));
   return {
     activeNotice: resolved[0] ?? null,
     queue: resolved.slice(1, 5)
@@ -631,10 +640,15 @@ export async function pushCastVideoNotice(
     });
     await saveFallbackState(supabase, { notices: next });
     if (!pushed) throw new Error("Cast video notice not found.");
+    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
+    await triggerShellyAlert("cast_video_push", `cast-video:${id}`);
     return pushed;
   }
   if (error) throw error;
-  return normalizeNoticeRow(data as Record<string, unknown>);
+  const pushed = normalizeNoticeRow(data as Record<string, unknown>);
+  const { triggerShellyAlert } = await import("@/lib/shelly-alert");
+  await triggerShellyAlert("cast_video_push", `cast-video:${pushed.id}`);
+  return pushed;
 }
 
 export async function clearCastVideoNotice(supabase: SupabaseClient, id: string, actor?: string | null) {

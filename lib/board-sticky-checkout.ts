@@ -1,13 +1,22 @@
 import { sortCheckoutDogs } from "@/lib/board-checkout-merge";
-import { getCheckoutDisplayUntilAt, shouldExpireCheckoutDog } from "@/lib/checkout-display";
+import { getCheckoutDisplayMs, getCheckoutDisplayUntilAt, shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import type { LiveDog } from "@/lib/types";
 
 export type StickyCheckoutEntry = {
   dog: LiveDog;
   firstSeenAt: number;
+  introducedAt: number;
+  displayUntilMs: number;
 };
 
 export type StickyCheckoutState = Map<string, StickyCheckoutEntry>;
+
+export type StickyCheckoutMergeOptions = {
+  basketAuthoritative?: boolean;
+  basketConfirmedEmpty?: boolean;
+  pruneMissingFromBasket?: boolean;
+  skipExpiry?: boolean;
+};
 
 /** Stable identity across Gingr rows, Supabase webhooks, and fast/full poll responses. */
 export function getCheckoutMergeKey(dog: LiveDog) {
@@ -27,10 +36,23 @@ function pickEarliestIso(a: string | null | undefined, b: string | null | undefi
   return new Date(a).getTime() <= new Date(b).getTime() ? a : b;
 }
 
+function resolveDisplayUntilMs(
+  entry: StickyCheckoutEntry | undefined,
+  dog: LiveDog,
+  firstSeenAt: number,
+  now: Date
+) {
+  const computed =
+    getCheckoutDisplayUntilAt(dog, firstSeenAt, now)?.getTime() ?? firstSeenAt + getCheckoutDisplayMs();
+  if (!entry) return computed;
+  return Math.max(entry.displayUntilMs, computed);
+}
+
 function mergeCheckoutDogFields(existing: LiveDog, incoming: LiveDog, now: Date) {
   return {
     ...existing,
     ...incoming,
+    photo_url: incoming.photo_url ?? existing.photo_url,
     status_started_at: pickEarliestIso(existing.status_started_at, incoming.status_started_at),
     display_until: pickLaterDisplayUntil(existing, incoming, now)
   };
@@ -49,25 +71,32 @@ export function mergeStickyCheckoutDogs(
   previous: StickyCheckoutState,
   incoming: LiveDog[],
   now = new Date(),
-  options: { basketAuthoritative?: boolean } = {}
+  options: StickyCheckoutMergeOptions = {}
 ): StickyCheckoutState {
   const next = new Map(previous);
-  const { basketAuthoritative = false } = options;
+  const {
+    basketAuthoritative = false,
+    basketConfirmedEmpty = false,
+    pruneMissingFromBasket = false,
+    skipExpiry = false
+  } = options;
 
-  for (const [key, entry] of next) {
-    if (shouldExpireCheckoutDog(entry.dog, now, entry.firstSeenAt)) {
-      next.delete(key);
+  if (!skipExpiry) {
+    for (const [key, entry] of next) {
+      if (shouldExpireCheckoutDog(entry.dog, now, entry.firstSeenAt) || now.getTime() >= entry.displayUntilMs) {
+        next.delete(key);
+      }
     }
   }
 
-  if (incoming.length > 0 && basketAuthoritative) {
+  if (incoming.length > 0 && basketAuthoritative && pruneMissingFromBasket) {
     const incomingKeys = new Set(incoming.map((dog) => getCheckoutMergeKey(dog)));
     for (const key of next.keys()) {
       if (!incomingKeys.has(key)) {
         next.delete(key);
       }
     }
-  } else if (incoming.length === 0 && basketAuthoritative) {
+  } else if (incoming.length === 0 && basketAuthoritative && basketConfirmedEmpty) {
     next.clear();
   }
 
@@ -81,14 +110,34 @@ export function mergeStickyCheckoutDogs(
 
     const existing = next.get(key);
     const firstSeenAt = existing?.firstSeenAt ?? getAnchorMs(dog);
+    const introducedAt = existing?.introducedAt ?? firstSeenAt;
     const mergedDog = existing ? mergeCheckoutDogFields(existing.dog, dog, now) : dog;
+    const displayUntilMs = resolveDisplayUntilMs(existing, mergedDog, firstSeenAt, now);
 
-    if (shouldExpireCheckoutDog(mergedDog, now, firstSeenAt)) {
+    if (!skipExpiry && (shouldExpireCheckoutDog(mergedDog, now, firstSeenAt) || now.getTime() >= displayUntilMs)) {
       next.delete(key);
       continue;
     }
 
-    next.set(key, { dog: mergedDog, firstSeenAt });
+    next.set(key, {
+      dog: mergedDog,
+      firstSeenAt,
+      introducedAt,
+      displayUntilMs
+    });
+  }
+
+  return next;
+}
+
+export function expireStickyCheckoutDogs(previous: StickyCheckoutState, now = new Date()) {
+  const next = new Map(previous);
+  const nowMs = now.getTime();
+
+  for (const [key, entry] of next) {
+    if (shouldExpireCheckoutDog(entry.dog, now, entry.firstSeenAt) || nowMs >= entry.displayUntilMs) {
+      next.delete(key);
+    }
   }
 
   return next;
@@ -104,4 +153,32 @@ export function stickyCheckoutFirstSeenByKey(state: StickyCheckoutState) {
     firstSeenByKey.set(key, entry.firstSeenAt);
   }
   return firstSeenByKey;
+}
+
+export function stickyCheckoutDisplayMetaByKey(state: StickyCheckoutState) {
+  const metaByKey = new Map<string, { firstSeenAt: number; introducedAt: number; displayUntilMs: number }>();
+  for (const [key, entry] of state) {
+    metaByKey.set(key, {
+      firstSeenAt: entry.firstSeenAt,
+      introducedAt: entry.introducedAt,
+      displayUntilMs: entry.displayUntilMs
+    });
+  }
+  return metaByKey;
+}
+
+export function areStickyCheckoutStatesEqual(a: StickyCheckoutState, b: StickyCheckoutState) {
+  if (a.size !== b.size) return false;
+  for (const [key, entry] of a) {
+    const other = b.get(key);
+    if (!other) return false;
+    if (other.firstSeenAt !== entry.firstSeenAt) return false;
+    if (other.introducedAt !== entry.introducedAt) return false;
+    if (other.displayUntilMs !== entry.displayUntilMs) return false;
+    if (other.dog.id !== entry.dog.id) return false;
+    if (other.dog.photo_url !== entry.dog.photo_url) return false;
+    if (other.dog.display_status !== entry.dog.display_status) return false;
+    if (other.dog.hidden !== entry.dog.hidden) return false;
+  }
+  return true;
 }

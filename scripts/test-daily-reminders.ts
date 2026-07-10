@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   buildDailyReminderPushNoticeInput,
+  type DailyReminderAudience,
   formatDailyReminderAudience,
   getShiftDate,
   isReminderDue,
@@ -22,6 +23,17 @@ function testDogHandlerBefore630() {
   const earlyMorning = new Date("2026-07-06T13:00:00.000Z");
   assert.equal(isReminderDue({ ...reminder, audience: ["dog_handler"] }, zone, earlyMorning), false);
   assert.equal(targetsDogHandlers({ audience: ["dog_handler"] }), true);
+}
+
+function testDueWindow() {
+  const reminder = {
+    scheduled_time: "06:35:00",
+    audience: ["dog_handler"] as DailyReminderAudience[]
+  };
+  const zone = "America/Los_Angeles";
+  assert.equal(isReminderDue(reminder, zone, new Date("2026-07-06T13:35:00.000Z")), true);
+  assert.equal(isReminderDue(reminder, zone, new Date("2026-07-06T13:39:59.000Z")), true);
+  assert.equal(isReminderDue(reminder, zone, new Date("2026-07-06T13:40:00.000Z")), false);
 }
 
 function testBuildPushNoticeInput() {
@@ -65,6 +77,7 @@ function testScheduledToday() {
 
 testAudienceLabel();
 testDogHandlerBefore630();
+testDueWindow();
 testBuildPushNoticeInput();
 testShiftDate();
 testScheduledToday();

@@ -5,17 +5,17 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
-import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, firstAccessibleAdminTab, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import type { AdminTab } from "@/lib/admin/types";
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@/lib/demo/constants";
 
 function defaultAdminRoute(role?: string, isDemo?: boolean) {
   if (isDemo) return "/admin?board=staff&tab=demo_push";
   const access = accessFromLegacyRole(null, null, role);
-  if (canAccessTab(access, "push_notices", role)) return "/admin?board=staff&tab=push_notices";
-  if (canAccessTab(access, "grooming_push", role)) return "/admin?board=staff&tab=grooming_push";
-  if (canAccessTab(access, "crossover_communication", role)) return "/admin?board=staff&tab=crossover_communication";
-  if (canAccessTab(access, "notifications", role)) return "/admin?board=staff&tab=notifications";
-  return "/admin";
+  const board = isStaffDigiBoardOnlyLegacyRole(role) ? "staff" : "lobby";
+  const tab = firstAccessibleAdminTab(access, role, board) as AdminTab;
+  const resolvedBoard = board === "staff" && tab === "users" ? "lobby" : board;
+  return `/admin?board=${resolvedBoard}&tab=${tab}`;
 }
 
 export function AdminLogin() {
@@ -35,11 +35,14 @@ export function AdminLogin() {
     setBusy(true);
     setError(null);
 
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 45_000);
     try {
       const response = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password }),
+        signal: controller.signal
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Invalid username or password.");
@@ -54,8 +57,16 @@ export function AdminLogin() {
       router.replace(next);
       router.refresh();
     } catch (loginError) {
-      setError(loginError instanceof Error ? loginError.message : "Invalid username or password.");
+      const aborted = loginError instanceof DOMException && loginError.name === "AbortError";
+      setError(
+        aborted
+          ? "Sign-in is taking longer than usual. Check your connection and try again."
+          : loginError instanceof Error
+            ? loginError.message
+            : "Invalid username or password."
+      );
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
     }
   }

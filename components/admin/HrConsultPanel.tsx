@@ -60,13 +60,15 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
   }, [showToast]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   useEffect(() => {
     if (!initialRecordId) return;
-    setAttachedRecordId(initialRecordId);
-    void (async () => {
+    const timer = window.setTimeout(() => {
+      setAttachedRecordId(initialRecordId);
+      void (async () => {
       try {
         const response = await fetch(`/api/admin/hr?id=${encodeURIComponent(initialRecordId)}`, { cache: "no-store" });
         const body = await response.json();
@@ -76,7 +78,9 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
       } catch {
         setAttachedLabel("Attached HR record");
       }
-    })();
+      })();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [initialRecordId]);
 
   useEffect(() => {

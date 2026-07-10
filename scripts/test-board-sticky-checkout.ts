@@ -53,7 +53,26 @@ assert.equal(stickyCheckoutStateToDogs(sticky).length, 1);
 sticky = mergeStickyCheckoutDogs(sticky, [], now);
 assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "empty poll must not erase sticky checkout");
 
-sticky = mergeStickyCheckoutDogs(sticky, [], now, { basketAuthoritative: true });
+sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
+sticky = mergeStickyCheckoutDogs(sticky, [], now, {
+  basketAuthoritative: true,
+  basketConfirmedEmpty: false,
+  pruneMissingFromBasket: false
+});
+assert.equal(
+  stickyCheckoutStateToDogs(sticky).length,
+  1,
+  "fast authoritative poll must not erase sticky checkout rows"
+);
+
+sticky = mergeStickyCheckoutDogs(sticky, [], now, { basketAuthoritative: true, basketConfirmedEmpty: false });
+assert.equal(
+  stickyCheckoutStateToDogs(sticky).length,
+  1,
+  "authoritative empty poll keeps sticky checkout until basket is confirmed empty"
+);
+
+sticky = mergeStickyCheckoutDogs(sticky, [], now, { basketAuthoritative: true, basketConfirmedEmpty: true });
 assert.equal(stickyCheckoutStateToDogs(sticky).length, 0, "authoritative empty basket clears sticky checkout");
 
 sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
@@ -67,7 +86,7 @@ const otherDog = checkoutDog({
   animal_name: "Nova"
 });
 sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog, otherDog], now);
-sticky = mergeStickyCheckoutDogs(sticky, [otherDog], now, { basketAuthoritative: true });
+sticky = mergeStickyCheckoutDogs(sticky, [otherDog], now, { basketAuthoritative: true, pruneMissingFromBasket: true });
 assert.equal(stickyCheckoutStateToDogs(sticky).length, 1, "authoritative poll removes checkout rows missing from server response");
 assert.equal(stickyCheckoutStateToDogs(sticky)[0]?.animal_name, "Nova");
 

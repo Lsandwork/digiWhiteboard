@@ -31,12 +31,15 @@ export function DemoBoardClient() {
   const [clock, setClock] = useState<Date | null>(null);
 
   useEffect(() => {
-    setClock(new Date());
+    const initialTimer = window.setTimeout(() => setClock(new Date()), 0);
     const timer = window.setInterval(() => {
       setNowMs(Date.now());
       setClock(new Date());
     }, 1000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const load = useCallback(async () => {
@@ -70,9 +73,12 @@ export function DemoBoardClient() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const initialTimer = window.setTimeout(() => void load(), 0);
     const timer = window.setInterval(() => void load(), 2000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [load]);
 
   useFitdogAlertSound(activeGroomingNotice?.id ?? activePushNotice?.id ?? null);

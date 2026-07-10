@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, Download, Pencil, Plus, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
+import { BellRing, Download, Lightbulb, Pencil, Plus, PowerOff, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { DailyRemindersSection } from "@/components/admin/DailyRemindersSection";
 import { Modal } from "@/components/admin/ui/Modal";
@@ -262,6 +262,69 @@ export function PushNoticesPanel() {
     );
   }
 
+  async function testAlertLight() {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/integrations/shelly/flash", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          type: "test_light",
+          eventKey: `test-light:${Date.now()}`
+        })
+      });
+      let body: { ok?: boolean; error?: string; skipped?: string } = {};
+      try {
+        body = (await response.json()) as { ok?: boolean; error?: string; skipped?: string };
+      } catch {
+        if (response.status === 404) {
+          throw new Error("Shelly flash API is not deployed yet. Redeploy production, then try again.");
+        }
+        throw new Error(`Alert light test failed (HTTP ${response.status}).`);
+      }
+      if (!response.ok || !body.ok) {
+        if (response.status === 404) {
+          throw new Error("Shelly flash API is not deployed yet. Redeploy production, then try again.");
+        }
+        if (body.skipped === "rate_limited") {
+          throw new Error("Alert light is cooling down. Wait a few seconds and try again.");
+        }
+        if (body.skipped === "duplicate") {
+          throw new Error("This test was already sent recently. Try again in a moment.");
+        }
+        throw new Error(body.error ?? "Unable to test alert light.");
+      }
+      showToast("Alert light test sent.", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to test alert light.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearAlertLight() {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/integrations/shelly/flash", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "clear",
+          reason: "push_notices_user_clear"
+        })
+      });
+      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error ?? "Unable to clear the alert light.");
+      }
+      showToast("Alert light cleared.", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to clear the alert light.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
       <header className="crossover-dashboard__page-header">
@@ -269,6 +332,28 @@ export function PushNoticesPanel() {
           <h2 className="crossover-dashboard__page-title">Push Notices</h2>
           <p className="crossover-dashboard__page-subtitle">Send live reminders to the Staff Digital Whiteboard.</p>
         </div>
+        {canManage ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="admin-btn-secondary inline-flex items-center gap-2"
+              disabled={busy}
+              onClick={() => void clearAlertLight()}
+            >
+              <PowerOff className="h-4 w-4" />
+              Clear Alert Light
+            </button>
+            <button
+              type="button"
+              className="admin-btn-secondary inline-flex items-center gap-2"
+              disabled={busy}
+              onClick={() => void testAlertLight()}
+            >
+              <Lightbulb className="h-4 w-4" />
+              Test Alert Light
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {!canManage ? (
@@ -386,6 +471,48 @@ export function PushNoticesPanel() {
         </section>
       ) : null}
 
+      <section className="crossover-card crossover-card--sidebar p-5">
+        <h3 className="crossover-card__title">Active Notice</h3>
+        <p className="crossover-card__subtitle mb-4">Currently showing on the Staff Digital Whiteboard.</p>
+        {data?.activeNotice ? (
+          <ActiveNoticePreview notice={data.activeNotice} />
+        ) : (
+          <div className="rounded-2xl border border-admin-border bg-white/[0.03] p-5 text-sm text-admin-muted">
+            No active notice is currently pushed.
+          </div>
+        )}
+        <button
+          type="button"
+          className="crossover-btn crossover-btn--outline mt-4 inline-flex w-full items-center justify-center gap-2"
+          disabled={busy || !canManage || !data?.activeNotice}
+          onClick={() => void clearActive()}
+        >
+          <XCircle className="h-4 w-4" /> Clear Active Notice
+        </button>
+      </section>
+
+      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="crossover-card p-5">
+          <h3 className="crossover-card__title">Manual Push Notices</h3>
+          <p className="crossover-card__subtitle mb-4">Create a custom staff alert and push it live immediately or save it for later.</p>
+          <NoticeForm form={form} onChange={setForm} />
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void saveCustom()}>
+              <Plus className="h-4 w-4" /> Save Custom
+            </button>
+            <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy || !canManage || !form.scheduled_at} onClick={() => void scheduleCustom()}>
+              <BellRing className="h-4 w-4" /> Schedule Notice
+            </button>
+            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void pushCustom()}>
+              <Send className="h-4 w-4" /> Push Notice
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <DailyRemindersSection canView={canManage} />
+
       {canViewReports ? (
         <section className="crossover-card crossover-card--sidebar p-5">
           <div className="crossover-card__header crossover-card__header--compact">
@@ -464,47 +591,6 @@ export function PushNoticesPanel() {
           </div>
         </section>
       ) : null}
-
-      <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="crossover-card p-5">
-          <h3 className="crossover-card__title">Manual Push Notices</h3>
-          <p className="crossover-card__subtitle mb-4">Create a custom staff alert and push it live immediately or save it for later.</p>
-          <NoticeForm form={form} onChange={setForm} />
-          <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void saveCustom()}>
-              <Plus className="h-4 w-4" /> Save Custom
-            </button>
-            <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy || !canManage || !form.scheduled_at} onClick={() => void scheduleCustom()}>
-              <BellRing className="h-4 w-4" /> Schedule Notice
-            </button>
-            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void pushCustom()}>
-              <Send className="h-4 w-4" /> Push Notice
-            </button>
-          </div>
-        </div>
-
-        <div className="crossover-card crossover-card--sidebar p-5">
-          <h3 className="crossover-card__title">Active Notice</h3>
-          <p className="crossover-card__subtitle mb-4">Currently showing on the Staff Digital Whiteboard.</p>
-          {data?.activeNotice ? (
-            <ActiveNoticePreview notice={data.activeNotice} />
-          ) : (
-            <div className="rounded-2xl border border-admin-border bg-white/[0.03] p-5 text-sm text-admin-muted">
-              No active notice is currently pushed.
-            </div>
-          )}
-          <button
-            type="button"
-            className="crossover-btn crossover-btn--outline mt-4 inline-flex w-full items-center justify-center gap-2"
-            disabled={busy || !canManage || !data?.activeNotice}
-            onClick={() => void clearActive()}
-          >
-            <XCircle className="h-4 w-4" /> Clear Active Notice
-          </button>
-        </div>
-      </section>
-
-      <DailyRemindersSection canView={canManage} />
 
       <section className="crossover-card crossover-card--conversations">
         <div className="crossover-card__header">

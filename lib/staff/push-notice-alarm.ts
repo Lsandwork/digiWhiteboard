@@ -31,19 +31,23 @@ export async function unlockStaffPushNoticeAudio() {
   }
 }
 
-export function playStaffPushNoticeAlarm() {
-  if (typeof window === "undefined") return;
+export async function playStaffPushNoticeAlarm() {
+  if (typeof window === "undefined") return false;
 
   const el = getAlertAudio();
-  if (!el) return;
+  if (!el) return false;
 
   el.loop = false;
   el.currentTime = 0;
-  void unlockStaffPushNoticeAudio().finally(() => {
-    void el.play().catch(() => {
-      // Autoplay may be blocked until the display receives a gesture.
-    });
-  });
+  try {
+    await unlockStaffPushNoticeAudio();
+    el.currentTime = 0;
+    await el.play();
+    return true;
+  } catch {
+    // Autoplay may be blocked until the display receives a gesture.
+    return false;
+  }
 }
 
 /** @deprecated Same as playStaffPushNoticeAlarm — plays the Fitdog alert once. */

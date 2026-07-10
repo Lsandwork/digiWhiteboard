@@ -56,14 +56,16 @@ import {
   canAccessAdminTab,
   firstAccessibleAdminTab,
   hasPermission,
+  isStaffDigiBoardOnlyLegacyRole,
   isSuperAdminLegacyRole,
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
+import { isGroomerRole, isTeamLeaderRole, isTrainerRole, isFullAdminRole, isFrontDeskCoordinatorRole, isAdminOrManagementRole } from "@/lib/admin/users";
 import { DemoPushPanel } from "@/components/demo/DemoPushPanel";
 import { getEffectiveDemoRole } from "@/lib/demo/session";
-import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel } from "@/components/admin/HandlerBasicPanels";
+import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, HandlerWriteUpsPanel } from "@/components/admin/HandlerBasicPanels";
+import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -136,24 +138,29 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const session = data?.session as { role?: string; isDemo?: boolean; demoRole?: string } | undefined;
-    const isDemo = Boolean(session?.isDemo);
-    const effectiveRole = isDemo ? getEffectiveDemoRole({ email: data?.username ?? "", ...session }) : session?.role;
-    if (!isDemo && (isTeamLeaderRole(effectiveRole) || isGroomerRole(effectiveRole) || isTrainerRole(effectiveRole)) && board !== "staff") {
-      router.replace(`/admin?board=staff&tab=${tab}`);
-    }
-  }, [board, data?.session, router, tab]);
-
-  useEffect(() => {
     const session = data?.session as { role?: string; isDemo?: boolean; demoRole?: string; access?: UserAccess | null; adminUserId?: string } | undefined;
-    const isDemo = Boolean(session?.isDemo);
-    const effectiveRole = isDemo ? getEffectiveDemoRole({ email: data?.username ?? "", ...session }) : session?.role;
-    const access = session?.access
-      ?? accessFromLegacyRole(session?.adminUserId ?? null, data?.username ?? null, effectiveRole);
+    if (!session) return;
 
-    if (!canAccessAdminTab(access, tab, effectiveRole, board, { isDemo })) {
-      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, board, { isDemo }) as AdminTab;
-      const fallbackBoard = board === "staff" && fallbackTab === "users" ? "lobby" : board;
+    const isDemo = Boolean(session.isDemo);
+    const effectiveRole = isDemo ? getEffectiveDemoRole({ email: data?.username ?? "", ...session }) : session.role;
+    const access = session.access
+      ?? accessFromLegacyRole(session.adminUserId ?? null, data?.username ?? null, effectiveRole);
+    const staffOnly = !isDemo && isStaffDigiBoardOnlyLegacyRole(effectiveRole);
+    const effectiveBoard = staffOnly ? "staff" : board;
+
+    if (staffOnly && board !== "staff") {
+      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
+      router.replace(`/admin?board=staff&tab=${tab}`);
+      return;
+    }
+
+    if (!canAccessAdminTab(access, tab, effectiveRole, effectiveBoard, { isDemo })) {
+      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
+      const fallbackBoard =
+        effectiveBoard === "staff" && fallbackTab === "users" ? "lobby" : staffOnly ? "staff" : effectiveBoard;
+      if (typeof window !== "undefined" && fallbackBoard === "staff") {
+        window.localStorage.setItem("fitdog_admin_board", "staff");
+      }
       router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
     }
   }, [board, data?.session, data?.username, router, tab]);
@@ -286,12 +293,14 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
   const isHandlerPanel = !isDemo && currentRole === "daycare";
-  const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel || isHandlerPanel;
+  const isCoordinatorPanel = !isDemo && isFrontDeskCoordinatorRole(currentRole);
+  const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel || isHandlerPanel || isCoordinatorPanel;
+  const canSeeAdminUtilities = isFullAdminRole(currentRole) || currentRole === "assistant_manager";
   const canViewUserGroupsPermissions =
     isSuperAdminLegacyRole(currentRole) || hasPermission(userAccess, "view_user_groups_permissions");
 
@@ -345,8 +354,9 @@ export function AdminDashboard() {
           void load(true);
           router.refresh();
         }}
+        canSeeAdminUtilities={canSeeAdminUtilities}
         preview={preview}
-        showPreview={showPreview && !isDemo}
+        showPreview={showPreview && !isDemo && canSeeAdminUtilities}
       >
         {error ? <p className="admin-error">{error}</p> : null}
 
@@ -448,7 +458,19 @@ export function AdminDashboard() {
         {tab === "yard_links" ? <YardLinksPanel /> : null}
 
         {tab === "management_support" ? (
-          <ManagementSupportPanel mode={isHandlerPanel ? "handler" : isGroomerPanel ? "groomer" : isTrainerPanel ? "trainer" : "team_leader"} />
+          <ManagementSupportPanel
+            mode={
+              isHandlerPanel
+                ? "handler"
+                : isGroomerPanel
+                  ? "groomer"
+                  : isTrainerPanel
+                    ? "trainer"
+                    : isCoordinatorPanel
+                      ? "coordinator"
+                      : "team_leader"
+            }
+          />
         ) : null}
 
         {tab === "ms_hub" ? <ManagementSupportHubPanel /> : null}
@@ -461,14 +483,17 @@ export function AdminDashboard() {
         {tab === "package_commissions" ? <PackageCommissionsPanel /> : null}
 
         {tab === "hr_hub" ? (
-          <HrHubPanel onOpenConsult={(recordId) => setActiveTab("hr_consult", { record: recordId })} />
+          isAdminOrManagementRole(currentRole) ? (
+            <HrHubPanel onOpenConsult={(recordId) => setActiveTab("hr_consult", { record: recordId })} />
+          ) : null
         ) : null}
 
-        {tab === "hr_consult" ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null}
+        {tab === "hr_consult" ? (isAdminOrManagementRole(currentRole) ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null) : null}
+        {tab === "remote_cast" ? <RemoteCastPanel /> : null}
         {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel /> : null}
-        {tab === "write_ups" ? <ManagementSupportPanel mode="team_leader" /> : null}
+        {tab === "write_ups" ? (isHandlerPanel ? <HandlerWriteUpsPanel /> : <ManagementSupportPanel mode="team_leader" />) : null}
         {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
-        {tab === "hr_pip" ? <HrHubPanel /> : null}
+        {tab === "hr_pip" ? (isAdminOrManagementRole(currentRole) ? <HrHubPanel /> : null) : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">

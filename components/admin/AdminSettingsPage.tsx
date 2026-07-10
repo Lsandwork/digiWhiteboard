@@ -33,7 +33,10 @@ export function AdminSettingsPage({
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmDisableDisplay, setConfirmDisableDisplay] = useState(false);
 
-  useEffect(() => setDraft(settings), [settings]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDraft(settings), 0);
+    return () => window.clearTimeout(timer);
+  }, [settings]);
 
   const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(settings), [draft, settings]);
 

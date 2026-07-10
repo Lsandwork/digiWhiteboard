@@ -133,7 +133,7 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
 export const DEPARTMENT_LABELS: Record<DepartmentKey, string> = {
   front_desk: "Front Desk",
   management: "Management",
-  daycare: "Daycare",
+  daycare: "Dog Handler",
   grooming: "Grooming",
   training: "Training",
   transportation: "Transportation",
@@ -234,8 +234,21 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "manage_database_tools"
 ]);
 
-const ADMIN_OPERATIONAL_PERMISSIONS: PermissionKey[] = ALL_PERMISSIONS.filter(
-  (permission) => !SUPER_ADMIN_ONLY_PERMISSIONS.has(permission)
+/** Staff file complaints/write-ups; admin and management review only. */
+const STAFF_SUBMISSION_PERMISSIONS = new Set<PermissionKey>([
+  "submit_write_up",
+  "submit_groomer_complaint",
+  "submit_groomer_request",
+  "submit_trainer_complaint",
+  "submit_trainer_request"
+]);
+
+function withoutStaffSubmissions(permissions: PermissionKey[]): PermissionKey[] {
+  return permissions.filter((permission) => !STAFF_SUBMISSION_PERMISSIONS.has(permission));
+}
+
+const ADMIN_OPERATIONAL_PERMISSIONS: PermissionKey[] = withoutStaffSubmissions(
+  ALL_PERMISSIONS.filter((permission) => !SUPER_ADMIN_ONLY_PERMISSIONS.has(permission))
 );
 
 const STAFF_NOTIFICATION_PERMISSIONS: PermissionKey[] = [
@@ -272,7 +285,9 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "assign_active_issue",
   "resolve_active_issue",
   "view_staff_directory",
-  "manage_templates",
+  "submit_groomer_complaint",
+  "submit_groomer_request",
+  "view_own_groomer_submissions",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -355,17 +370,15 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
-/** Dog Handler panel — basic tools only: checklist, support, uploads, HR/PIP, write-ups, shift entry. */
+/** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
 const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "create_front_desk_log",
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
-  "submit_write_up",
   "view_own_write_ups",
-  "create_trainer_entry",
-  "view_hr_hub"
+  "create_trainer_entry"
 ];
 
 /** Team Lead DigiBoard panel — push, grooming, front desk log, video links, notifications, write-ups, profile. */
@@ -381,9 +394,25 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "edit_front_desk_log",
   "submit_write_up",
   "view_own_write_ups",
+  "submit_groomer_complaint",
+  "view_own_groomer_submissions",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
+
+export const FRONT_DESK_COORDINATOR_TABS = [
+  "push_notices",
+  "grooming_push",
+  "crossover_communication",
+  "owner_follow_up",
+  "active_issues",
+  "staff_directory",
+  "yard_links",
+  "notifications",
+  "management_support",
+  "settings",
+  "help"
+] as const;
 
 export const TEAM_LEADER_TABS = [
   "push_notices",
@@ -393,7 +422,8 @@ export const TEAM_LEADER_TABS = [
   "yard_links",
   "notifications",
   "management_support",
-  "settings"
+  "settings",
+  "help"
 ] as const;
 
 export const GROOMER_TABS = [
@@ -402,29 +432,33 @@ export const GROOMER_TABS = [
   "yard_links",
   "notifications",
   "management_support",
-  "settings"
+  "settings",
+  "help"
 ] as const;
 
 export const TRAINER_TABS = [
   "trainer_push",
   "trainer_entry",
+  "package_commissions",
   "yard_links",
   "notifications",
   "management_support",
-  "settings"
+  "settings",
+  "help"
 ] as const;
 
 export const DOG_HANDLER_TABS = [
   "checklist",
+  "yard_links",
   "management_support",
   "bulk_photo_upload",
   "write_ups",
   "handler_shift_entry",
-  "hr_pip"
+  "help"
 ] as const;
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
-  super_admin: [...ALL_PERMISSIONS],
+  super_admin: withoutStaffSubmissions([...ALL_PERMISSIONS]),
   admin: [...ADMIN_OPERATIONAL_PERMISSIONS],
   management: [...MANAGEMENT_PERMISSIONS],
   front_desk_coordinator: COORDINATOR_PERMISSIONS,
@@ -679,12 +713,26 @@ export function isSuperAdminLegacyRole(legacyRole?: string | null) {
   return legacyRole === "owner_admin";
 }
 
+/** Owner Admin and Manager Admin — full sidebar and utilities (matches middleware / API guards). */
+export function isFullAdminLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "owner_admin" || legacyRole === "manager_admin" || !legacyRole;
+}
+
+/** Owner Admin, Manager Admin, or Assistant Manager. */
+export function isAdminOrManagementLegacyRole(legacyRole?: string | null) {
+  return isFullAdminLegacyRole(legacyRole) || legacyRole === "assistant_manager";
+}
+
 export function isSuperAdminAccess(access: UserAccess | null | undefined) {
   return hasRole(access, "super_admin");
 }
 
 export function canManageSuperAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null) {
   return isSuperAdminAccess(actorAccess) || isSuperAdminLegacyRole(actorLegacyRole);
+}
+
+export function isFrontDeskCoordinatorLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "front_desk_coordinator";
 }
 
 export function isTeamLeaderLegacyRole(legacyRole?: string | null) {
@@ -703,6 +751,17 @@ export function isDogHandlerLegacyRole(legacyRole?: string | null) {
   return legacyRole === "daycare" || legacyRole === "dog_handler";
 }
 
+/** Staff DigiBoard roles — staff board only (not lobby admin). */
+export function isStaffDigiBoardOnlyLegacyRole(legacyRole?: string | null) {
+  return (
+    isTeamLeaderLegacyRole(legacyRole) ||
+    isGroomerLegacyRole(legacyRole) ||
+    isTrainerLegacyRole(legacyRole) ||
+    isDogHandlerLegacyRole(legacyRole) ||
+    isFrontDeskCoordinatorLegacyRole(legacyRole)
+  );
+}
+
 export function canAccessAdminTab(
   access: UserAccess | null | undefined,
   tab: string,
@@ -712,7 +771,27 @@ export function canAccessAdminTab(
 ): boolean {
   if (tab === "demo_push") return options?.isDemo === true && board === "staff";
 
+  if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
+    return true;
+  }
+
+  // Remote Whiteboard Cast controls real building displays — full admins only
+  // (owner/manager are handled by the early return above).
+  if (tab === "remote_cast") return false;
+
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+
+  if (
+    tab === "templates" &&
+    (isTeamLeaderLegacyRole(legacyRole) || isFrontDeskCoordinatorLegacyRole(legacyRole))
+  ) {
+    return false;
+  }
+
+  if (isFrontDeskCoordinatorLegacyRole(legacyRole)) {
+    if (board !== "staff") return false;
+    return (FRONT_DESK_COORDINATOR_TABS as readonly string[]).includes(tab);
+  }
 
   if (isTeamLeaderLegacyRole(legacyRole)) {
     if (board !== "staff") return false;
@@ -726,6 +805,7 @@ export function canAccessAdminTab(
 
   if (isTrainerLegacyRole(legacyRole)) {
     if (board !== "staff") return false;
+    if (tab === "package_commissions") return hasPermission(effective, "view_package_commissions");
     if (tab === "management_support") return hasAnyPermission(effective, ["submit_trainer_complaint", "view_own_trainer_submissions", "view_package_commissions"]);
     return (TRAINER_TABS as readonly string[]).includes(tab);
   }
@@ -741,11 +821,12 @@ export function canAccessAdminTab(
     return hasPermission(effective, "review_management_support");
   }
 
-  if (ADMIN_HR_TAB_SET.has(tab)) {
+  if (ADMIN_HR_TAB_SET.has(tab) || tab === "hr_pip") {
     if (board !== "staff") return false;
-    if (isGroomerLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole) || isTrainerLegacyRole(legacyRole)) return false;
-    const required = TAB_PERMISSIONS[tab];
-    return required ? hasPermission(effective, required) : false;
+    return (
+      isAdminOrManagementLegacyRole(legacyRole) ||
+      hasAnyRole(effective, ["super_admin", "admin", "management"])
+    );
   }
 
   if (
@@ -753,7 +834,8 @@ export function canAccessAdminTab(
     hasPermission(effective, "review_management_support") &&
     !isTeamLeaderLegacyRole(legacyRole) &&
     !isGroomerLegacyRole(legacyRole) &&
-    !isTrainerLegacyRole(legacyRole)
+    !isTrainerLegacyRole(legacyRole) &&
+    !isFrontDeskCoordinatorLegacyRole(legacyRole)
   ) {
     return false;
   }
@@ -827,36 +909,49 @@ export function firstAccessibleAdminTab(
 ): string {
   if (options?.isDemo && board === "staff") return "demo_push";
 
-  if (isTeamLeaderLegacyRole(legacyRole) && board === "staff") {
-    for (const tab of TEAM_LEADER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
+  const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(legacyRole) ? "staff" : board;
+
+  if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
+    return board === "staff" ? "overview" : "overview";
+  }
+
+  if (isFrontDeskCoordinatorLegacyRole(legacyRole) && resolvedBoard === "staff") {
+    for (const tab of FRONT_DESK_COORDINATOR_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
     return "push_notices";
   }
 
-  if (isGroomerLegacyRole(legacyRole) && board === "staff") {
+  if (isTeamLeaderLegacyRole(legacyRole) && resolvedBoard === "staff") {
+    for (const tab of TEAM_LEADER_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
+    }
+    return "push_notices";
+  }
+
+  if (isGroomerLegacyRole(legacyRole) && resolvedBoard === "staff") {
     for (const tab of GROOMER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
     return "grooming_push";
   }
 
-  if (isTrainerLegacyRole(legacyRole) && board === "staff") {
+  if (isTrainerLegacyRole(legacyRole) && resolvedBoard === "staff") {
     for (const tab of TRAINER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
     return "trainer_push";
   }
 
-  if (isDogHandlerLegacyRole(legacyRole) && board === "staff") {
+  if (isDogHandlerLegacyRole(legacyRole) && resolvedBoard === "staff") {
     for (const tab of DOG_HANDLER_TABS) {
-      if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
     return "whiteboard_preview";
   }
 
   const tabs =
-    board === "staff"
+    resolvedBoard === "staff"
       ? [
           "push_notices",
           "grooming_push",
@@ -875,7 +970,7 @@ export function firstAccessibleAdminTab(
       : ["overview", "content", "users", "settings", "integrations", "help"];
 
   for (const tab of tabs) {
-    if (canAccessAdminTab(access, tab, legacyRole, board, options)) return tab;
+    if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
   }
   return "help";
 }

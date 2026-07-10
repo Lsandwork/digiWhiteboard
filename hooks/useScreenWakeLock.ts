@@ -108,8 +108,8 @@ export function useScreenWakeLock(options: UseScreenWakeLockOptions = {}) {
 
   useEffect(() => {
     if (!enabled) {
-      setStatus("idle");
-      return;
+      const idleTimer = window.setTimeout(() => setStatus("idle"), 0);
+      return () => window.clearTimeout(idleTimer);
     }
 
     const initialTimer = window.setTimeout(() => {

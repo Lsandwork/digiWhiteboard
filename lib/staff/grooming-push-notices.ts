@@ -311,8 +311,13 @@ export async function expireStaleGroomingPushNotices(supabase: SupabaseClient) {
   if (error) throw error;
 }
 
-export async function loadGroomingPushBoardState(supabase: SupabaseClient) {
-  await expireStaleGroomingPushNotices(supabase);
+export async function loadGroomingPushBoardState(
+  supabase: SupabaseClient,
+  options?: { mutate?: boolean }
+) {
+  if (options?.mutate !== false) {
+    await expireStaleGroomingPushNotices(supabase);
+  }
   const now = Date.now();
 
   const { data, error } = await supabase
@@ -320,7 +325,8 @@ export async function loadGroomingPushBoardState(supabase: SupabaseClient) {
     .select("*")
     .eq("status", "active")
     .gt("expires_at", new Date(now).toISOString())
-    .order("requested_at", { ascending: true });
+    .order("requested_at", { ascending: true })
+    .limit(5);
 
   if (error && isMissingRelation(error)) {
     const state = await loadFallbackState(supabase);
@@ -406,10 +412,15 @@ export async function createGroomingPushNotice(
       updated_at: requested_at
     };
     await saveFallbackState(supabase, { notices: [notice, ...state.notices] });
+    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
+    await triggerShellyAlert("grooming_push", `grooming:${notice.id}`);
     return notice;
   }
   if (error) throw error;
-  return normalizeNoticeRow(data as Record<string, unknown>);
+  const notice = normalizeNoticeRow(data as Record<string, unknown>);
+  const { triggerShellyAlert } = await import("@/lib/shelly-alert");
+  await triggerShellyAlert("grooming_push", `grooming:${notice.id}`);
+  return notice;
 }
 
 export async function clearGroomingPushNotice(

@@ -19,6 +19,11 @@ export function isLobbyDisplayAuthorized(request: Request) {
   return queryToken === requiredToken || headerToken === requiredToken;
 }
 
+/** Lobby board reads are public so any staff member can cast without admin login. */
+export function canReadLobbyBoard(_request: Request) {
+  return true;
+}
+
 export function unauthorizedLobbyResponse(body: Record<string, unknown> = { error: "Unauthorized." }) {
   return Response.json(body, { status: 401 });
 }

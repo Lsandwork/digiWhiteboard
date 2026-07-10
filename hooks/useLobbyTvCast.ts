@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   openAirPlayPicker,
   openChromecastPicker,
-  openMobileAwareCastPicker,
   openWirelessCastPicker,
   stopAllCastSessions,
   type CastPickerMethod
@@ -29,15 +28,15 @@ export function useLobbyTvCast(
   const [castStatus, setCastStatus] = useState<CastStatus>("idle");
   const [castError, setCastError] = useState<string | null>(null);
   const [castMethod, setCastMethod] = useState<CastPickerMethod | null>(null);
-  const { requestWakeLock, releaseWakeLock } = useScreenWakeLock({
-    enabled: !castReceiverMode,
-    persistent: !castReceiverMode,
-    aggressive: !castReceiverMode
-  });
-
   const isTvLayout = initialTvLayout || tvLayoutActive;
   const canCast = !castReceiverMode && isCastSenderSupported();
   const isCasting = castStatus === "casting" || isGoogleCastSessionActive();
+  const { requestWakeLock, releaseWakeLock } = useScreenWakeLock({
+    enabled: isCasting && !castReceiverMode,
+    persistent: true,
+    aggressive: true,
+    renewIntervalMs: 10_000
+  });
   const showCastActive = isCasting;
   const castUrl = useMemo(() => buildLobbyTvCastUrl(undefined, displayToken || undefined), [displayToken]);
 
@@ -45,6 +44,14 @@ export function useLobbyTvCast(
     if (castReceiverMode || !canCast) return;
     void preloadGoogleCast();
   }, [canCast, castReceiverMode]);
+
+  useEffect(() => {
+    if (!isCasting || castReceiverMode) {
+      void releaseWakeLock();
+      return;
+    }
+    void requestWakeLock();
+  }, [castReceiverMode, isCasting, releaseWakeLock, requestWakeLock]);
 
   const beginCast = useCallback(
     async (method: CastPickerMethod) => {
@@ -58,9 +65,8 @@ export function useLobbyTvCast(
       }
       setCastMethod(method);
       setCastStatus("casting");
-      await requestWakeLock();
     },
-    [castUrl, displayToken, requestWakeLock]
+    [castUrl, displayToken]
   );
 
   const stopTvCast = useCallback(async () => {
@@ -105,11 +111,10 @@ export function useLobbyTvCast(
       return;
     }
 
-    const result = await openMobileAwareCastPicker(displayToken || undefined, castUrl);
+    const result = await openChromecastPicker(displayToken || undefined, castUrl);
     setCastMethod(result.method);
     setCastStatus("casting");
-    await requestWakeLock();
-  }, [castUrl, displayToken, isCasting, requestWakeLock, stopTvCast]);
+  }, [castUrl, displayToken, isCasting, stopTvCast]);
 
   return {
     tvCastUrl: castUrl,

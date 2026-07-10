@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { fetchBoardJson } from "@/lib/board-fetch";
 import type { TrainerPushNotice } from "@/lib/staff/trainer-push-notices";
 
-const TRAINER_PUSH_POLL_MS = 3000;
-const TRAINER_PUSH_TIMEOUT_MS = 3000;
+const TRAINER_PUSH_POLL_MS = 12_000;
+const TRAINER_PUSH_TIMEOUT_MS = 4000;
 
 type TrainerPushResponse = {
   activeNotice: TrainerPushNotice | null;
@@ -12,38 +13,36 @@ type TrainerPushResponse = {
   healthy?: boolean;
 };
 
-export function useTrainerPushNotices() {
+export function useTrainerPushNotices(options?: { enabled?: boolean; debug?: boolean }) {
+  const enabled = options?.enabled !== false;
+  const debug = Boolean(options?.debug);
   const [activeNotice, setActiveNotice] = useState<TrainerPushNotice | null>(null);
   const [queue, setQueue] = useState<TrainerPushNotice[]>([]);
 
   const loadNotices = useCallback(async () => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), TRAINER_PUSH_TIMEOUT_MS);
-
-    try {
-      const response = await fetch("/api/staff/trainer-push", {
-        cache: "no-store",
-        signal: controller.signal
-      });
-      const data = (await response.json()) as TrainerPushResponse;
-      if (!response.ok) return;
-      setActiveNotice(data.activeNotice ?? null);
-      setQueue(data.queue ?? []);
-    } catch {
-      // Optional overlay — never break the dog board.
-    } finally {
-      window.clearTimeout(timeout);
+    if (!enabled) return;
+    const result = await fetchBoardJson<TrainerPushResponse>({
+      url: "/api/staff/trainer-push",
+      timeoutMs: TRAINER_PUSH_TIMEOUT_MS,
+      debug,
+      cacheKey: "trainer-push",
+      keepLastGood: true
+    });
+    if (result.data) {
+      setActiveNotice(result.data.activeNotice ?? null);
+      setQueue(result.data.queue ?? []);
     }
-  }, []);
+  }, [debug, enabled]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => void loadNotices(), 0);
+    if (!enabled) return;
+    const initial = window.setTimeout(() => void loadNotices(), 500);
     const timer = window.setInterval(() => void loadNotices(), TRAINER_PUSH_POLL_MS);
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
     };
-  }, [loadNotices]);
+  }, [enabled, loadNotices]);
 
   return { activeNotice, queue, reload: loadNotices };
 }

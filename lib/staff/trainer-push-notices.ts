@@ -185,8 +185,13 @@ export async function expireStaleTrainerPushNotices(supabase: SupabaseClient) {
   await saveState(supabase, { notices: next });
 }
 
-export async function loadTrainerPushBoardState(supabase: SupabaseClient) {
-  await expireStaleTrainerPushNotices(supabase);
+export async function loadTrainerPushBoardState(
+  supabase: SupabaseClient,
+  options?: { mutate?: boolean }
+) {
+  if (options?.mutate !== false) {
+    await expireStaleTrainerPushNotices(supabase);
+  }
   const now = Date.now();
   const state = await loadState(supabase);
   const active = sortActiveNotices(state.notices).filter((notice) => isActiveNotice(notice, now));

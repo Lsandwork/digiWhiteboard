@@ -1,17 +1,26 @@
 import { NextResponse } from "next/server";
-import { isLobbyAdmin, isLobbyDisplayAuthorized, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
-import { loadLobbySettings, updateLobbySettings } from "@/lib/lobby/settings";
+import { cachedLoadLobbySettings } from "@/lib/board-settings-cache";
+import { canReadLobbyBoard, isLobbyAdmin, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
+import { updateLobbySettings } from "@/lib/lobby/settings";
+import { sanitizeLobbySettings } from "@/lib/lobby/validate";
 import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!isLobbyDisplayAuthorized(request) && !isLobbyAdmin(request)) return unauthorizedLobbyResponse();
+  if (!canReadLobbyBoard(request)) return unauthorizedLobbyResponse();
+
+  const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
 
   try {
-    const settings = await loadLobbySettings(getServiceSupabase());
-    return NextResponse.json({ settings });
+    const settings = sanitizeLobbySettings(await cachedLoadLobbySettings(getServiceSupabase()), debugBoard);
+    return NextResponse.json(
+      { settings },
+      {
+        headers: { "cache-control": "private, max-age=4, stale-while-revalidate=12" }
+      }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load lobby settings.";
     return NextResponse.json({ error: message }, { status: 500 });

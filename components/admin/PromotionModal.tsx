@@ -29,21 +29,24 @@ export function PromotionModal({ open, promotion, busy, onClose, onSave }: Promo
 
   useEffect(() => {
     if (!open) return;
-    if (promotion) {
-      setForm({
-        title: promotion.title,
-        subtitle: promotion.subtitle ?? "",
-        category: promotion.category ?? "",
-        icon_key: promotion.icon_key ?? "",
-        image_url: promotion.image_url ?? "",
-        starts_at: promotion.starts_at ? promotion.starts_at.slice(0, 16) : "",
-        ends_at: promotion.ends_at ? promotion.ends_at.slice(0, 16) : "",
-        active: promotion.active,
-        sort_order: promotion.sort_order
-      });
-    } else {
-      setForm(emptyForm);
-    }
+    const timer = window.setTimeout(() => {
+      if (promotion) {
+        setForm({
+          title: promotion.title,
+          subtitle: promotion.subtitle ?? "",
+          category: promotion.category ?? "",
+          icon_key: promotion.icon_key ?? "",
+          image_url: promotion.image_url ?? "",
+          starts_at: promotion.starts_at ? promotion.starts_at.slice(0, 16) : "",
+          ends_at: promotion.ends_at ? promotion.ends_at.slice(0, 16) : "",
+          active: promotion.active,
+          sort_order: promotion.sort_order
+        });
+      } else {
+        setForm(emptyForm);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, promotion]);
 
   return (

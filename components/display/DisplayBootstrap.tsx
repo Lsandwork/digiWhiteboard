@@ -7,8 +7,23 @@ import { startDisplayKeepaliveFallback } from "@/lib/display-keepalive-fallback"
 export function DisplayBootstrap() {
   useEffect(() => {
     document.documentElement.classList.add("cast-keeper-display");
-    // Keepalive stays active for the full display session; Cast Keeper also holds a consumer.
     startDisplayKeepaliveFallback();
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    if (siteUrl) {
+      try {
+        const origin = new URL(siteUrl).origin;
+        for (const rel of ["preconnect", "dns-prefetch"] as const) {
+          if (document.querySelector(`link[rel="${rel}"][href="${origin}"]`)) continue;
+          const link = document.createElement("link");
+          link.rel = rel;
+          link.href = origin;
+          document.head.appendChild(link);
+        }
+      } catch {
+        // Ignore invalid site URL.
+      }
+    }
 
     return () => {
       document.documentElement.classList.remove("cast-keeper-display");

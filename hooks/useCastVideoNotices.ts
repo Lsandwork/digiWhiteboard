@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fetchBoardJson } from "@/lib/board-fetch";
 import type { CastVideoNotice } from "@/lib/staff/cast-video-notices";
-import { getBrowserSupabase } from "@/lib/supabase/browser";
 
-const CAST_VIDEO_POLL_MS = 3000;
-const CAST_VIDEO_TIMEOUT_MS = 3000;
+const CAST_VIDEO_POLL_MS = 12_000;
+const CAST_VIDEO_TIMEOUT_MS = 4000;
 
 type CastVideoResponse = {
   activeNotice: CastVideoNotice | null;
@@ -23,11 +23,18 @@ function getViewerKey() {
   return next;
 }
 
-export function useCastVideoNotices(options?: { department?: string; emergencyOnly?: boolean }) {
+export function useCastVideoNotices(options?: {
+  department?: string;
+  emergencyOnly?: boolean;
+  enabled?: boolean;
+  debug?: boolean;
+}) {
   const [activeNotice, setActiveNotice] = useState<CastVideoNotice | null>(null);
   const [queue, setQueue] = useState<CastVideoNotice[]>([]);
   const department = options?.department ?? "staff_whiteboard";
   const emergencyOnly = Boolean(options?.emergencyOnly);
+  const enabled = options?.enabled !== false;
+  const debug = Boolean(options?.debug);
 
   const query = useMemo(() => {
     const params = new URLSearchParams({ department });
@@ -36,58 +43,29 @@ export function useCastVideoNotices(options?: { department?: string; emergencyOn
   }, [department, emergencyOnly]);
 
   const loadNotices = useCallback(async () => {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), CAST_VIDEO_TIMEOUT_MS);
-
-    try {
-      const response = await fetch(`/api/staff/cast-videos?${query}`, {
-        cache: "no-store",
-        signal: controller.signal
-      });
-      const data = (await response.json()) as CastVideoResponse;
-      if (!response.ok) return;
-      setActiveNotice(data.activeNotice ?? null);
-      setQueue(data.queue ?? []);
-    } catch {
-      // Optional overlay — never break the dog board.
-    } finally {
-      window.clearTimeout(timeout);
+    if (!enabled) return;
+    const result = await fetchBoardJson<CastVideoResponse>({
+      url: `/api/staff/cast-videos?${query}`,
+      timeoutMs: CAST_VIDEO_TIMEOUT_MS,
+      debug,
+      cacheKey: `cast-videos:${query}`,
+      keepLastGood: true
+    });
+    if (result.data) {
+      setActiveNotice(result.data.activeNotice ?? null);
+      setQueue(result.data.queue ?? []);
     }
-  }, [query]);
+  }, [debug, enabled, query]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => void loadNotices(), 0);
+    if (!enabled) return;
+    const initial = window.setTimeout(() => void loadNotices(), emergencyOnly ? 0 : 400);
     const timer = window.setInterval(() => void loadNotices(), CAST_VIDEO_POLL_MS);
-
-    let channel: { unsubscribe?: () => void } | null = null;
-    try {
-      const supabase = getBrowserSupabase();
-      if (!supabase) throw new Error("Supabase unavailable");
-      channel = supabase
-        .channel(`cast-video-notices-${department}-${emergencyOnly ? "emergency" : "regular"}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table: "cast_video_notices" },
-          () => void loadNotices()
-        )
-        .subscribe();
-    } catch {
-      // Realtime is optional; polling remains the fallback.
-    }
-
     return () => {
       window.clearTimeout(initial);
       window.clearInterval(timer);
-      if (channel) {
-        try {
-          const supabase = getBrowserSupabase();
-          if (supabase) void supabase.removeChannel(channel as never);
-        } catch {
-          // ignore cleanup errors
-        }
-      }
     };
-  }, [department, emergencyOnly, loadNotices]);
+  }, [emergencyOnly, enabled, loadNotices]);
 
   return { activeNotice, queue, reload: loadNotices, viewerKey: getViewerKey() };
 }

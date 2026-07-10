@@ -146,6 +146,7 @@ export type StaffDirectoryMember = {
   phone: string | null;
   status: "Active" | "Inactive";
   notes: string | null;
+  checklist_items?: string[] | null;
   admin_user_id: string | null;
   dashboard_role: AdminUserRole | null;
   created_at: string;
@@ -217,6 +218,7 @@ export const DEFAULT_STAFF_DIRECTORY: StaffDirectoryMember[] = STAFF_MEMBERS.map
   phone: null,
   status: "Active",
   notes: null,
+  checklist_items: null,
   admin_user_id: null,
   dashboard_role: null,
   created_at: "2026-01-01T00:00:00.000Z",
@@ -335,6 +337,22 @@ function optionalString(value: unknown) {
   return cleaned || null;
 }
 
+function normalizeChecklistItems(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const items = value
+    .map((item) => cleanString(item))
+    .filter(Boolean)
+    .slice(0, 50);
+  return items.length ? items : null;
+}
+
+function normalizeStaffDirectoryMember(member: StaffDirectoryMember): StaffDirectoryMember {
+  return {
+    ...member,
+    checklist_items: normalizeChecklistItems(member.checklist_items)
+  };
+}
+
 function normalizePriority(value: unknown): StaffOpsPriority {
   return STAFF_PRIORITIES.includes(value as StaffOpsPriority) ? (value as StaffOpsPriority) : "Normal";
 }
@@ -380,7 +398,7 @@ function parseState(value: unknown): StaffOpsState {
     owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
     active_issues: sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
     activity_logs: sortNewest(Array.isArray(state.activity_logs) ? state.activity_logs : []).slice(0, 100),
-    staff_directory: directory,
+    staff_directory: directory.map(normalizeStaffDirectoryMember),
     notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : [])
   };
 }
@@ -751,6 +769,8 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
       source_id: record.id,
       created_by: actor
     });
+    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
+    await triggerShellyAlert("urgent_front_desk", `front-desk:${record.id}`);
   }
 
   await saveState(supabase, {
@@ -1119,6 +1139,10 @@ export async function createActiveIssue(supabase: SupabaseClient, input: Record<
       actor
     }
   );
+  if (record.priority === "Urgent" || record.priority === "High" || record.priority === "Critical") {
+    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
+    await triggerShellyAlert("urgent_front_desk", `active-issue:${record.id}`);
+  }
   await saveState(supabase, next);
   return record;
 }
@@ -1200,6 +1224,7 @@ export async function createStaffDirectoryMember(
       name,
       email,
       dashboard_role: dashboardRole,
+      department,
       temp_password: optionalString(input.temp_password),
       confirm_password: optionalString(input.confirm_password)
     },
@@ -1214,6 +1239,7 @@ export async function createStaffDirectoryMember(
     phone: optionalString(input.phone),
     status: input.status === "Inactive" ? "Inactive" : "Active",
     notes: optionalString(input.notes),
+    checklist_items: normalizeChecklistItems(input.checklist_items),
     admin_user_id: login.admin_user_id,
     dashboard_role: login.dashboard_role,
     created_at: now,
@@ -1260,6 +1286,7 @@ export async function updateStaffDirectoryMember(
       email: nextEmail,
       admin_user_id: existing.admin_user_id,
       dashboard_role: nextDashboardRole,
+      department: nextDepartment,
       temp_password: optionalString(patch.temp_password),
       confirm_password: optionalString(patch.confirm_password)
     },
@@ -1280,6 +1307,7 @@ export async function updateStaffDirectoryMember(
         phone: patch.phone !== undefined ? optionalString(patch.phone) : member.phone,
         status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : member.status,
         notes: patch.notes !== undefined ? optionalString(patch.notes) : member.notes,
+        checklist_items: patch.checklist_items !== undefined ? normalizeChecklistItems(patch.checklist_items) : member.checklist_items ?? null,
         admin_user_id: login.admin_user_id,
         dashboard_role: login.dashboard_role,
         updated_at: now

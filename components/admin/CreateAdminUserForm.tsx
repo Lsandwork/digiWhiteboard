@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 import {
   ROLE_LABELS,
@@ -22,14 +22,29 @@ type CreateAdminUserFormProps = {
   actorLegacyRole?: string | null;
   actorIsSuperAdmin: boolean;
   busy?: boolean;
+  formResetVersion?: number;
   onSubmit: (payload: Record<string, unknown>) => Promise<void>;
 };
+
+function buildInitialForm(defaultRole: RoleKey) {
+  return {
+    full_name: "",
+    email: "",
+    primary_role: defaultRole,
+    additional_roles: [] as RoleKey[],
+    departments: ["front_desk"] as DepartmentKey[],
+    password: "",
+    confirm_password: "",
+    force_password_change: true
+  };
+}
 
 export function CreateAdminUserForm({
   actorAccess,
   actorLegacyRole,
   actorIsSuperAdmin,
   busy = false,
+  formResetVersion = 0,
   onSubmit
 }: CreateAdminUserFormProps) {
   const creatableRoles = useMemo(
@@ -41,16 +56,12 @@ export function CreateAdminUserForm({
     ? "front_desk_coordinator"
     : creatableRoles[0] ?? "viewer";
 
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    primary_role: defaultRole as RoleKey,
-    additional_roles: [] as RoleKey[],
-    departments: ["front_desk"] as DepartmentKey[],
-    password: "",
-    confirm_password: "",
-    force_password_change: true
-  });
+  const [form, setForm] = useState(() => buildInitialForm(defaultRole));
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setForm(buildInitialForm(defaultRole)), 0);
+    return () => window.clearTimeout(timer);
+  }, [defaultRole, formResetVersion]);
 
   const accessPreview = buildUserAccess({
     primaryRole: form.primary_role,

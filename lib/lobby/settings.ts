@@ -1,5 +1,6 @@
 import type { LobbyEvent, LobbyPromotion, LobbySettings } from "@/lib/lobby/types";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
+import { sanitizeLobbySettings } from "@/lib/lobby/validate";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -27,19 +28,7 @@ export async function loadLobbySettings(supabase: SupabaseClient): Promise<Lobby
     }
     if (!data) return defaultSettings;
 
-    const refreshIntervalMs = Number(data.refresh_interval_ms ?? defaultSettings.refresh_interval_ms);
-    return {
-      max_queue_count: Math.min(6, Math.max(3, Number(data.max_queue_count ?? defaultSettings.max_queue_count))),
-      refresh_interval_ms: Math.min(5000, Math.max(2000, refreshIntervalMs)),
-      show_promotions: Boolean(data.show_promotions ?? defaultSettings.show_promotions),
-      show_events: Boolean(data.show_events ?? defaultSettings.show_events),
-      footer_message: data.footer_message ?? defaultSettings.footer_message,
-      lobby_message: data.lobby_message ?? defaultSettings.lobby_message,
-      class_schedule: Array.isArray(data.class_schedule) ? (data.class_schedule as LobbySettings["class_schedule"]) : LOBBY_CLASS_SCHEDULE,
-      published_version: data.published_version ?? defaultSettings.published_version,
-      published_at: data.published_at ?? null,
-      published_by: data.published_by ?? null
-    };
+    return sanitizeLobbySettings(data);
   } catch {
     return defaultSettings;
   }
@@ -89,7 +78,7 @@ export async function updateLobbySettings(
   }
 ) {
   const refreshIntervalMs = patch.refresh_interval_ms
-    ? Math.max(3000, patch.refresh_interval_ms)
+    ? Math.min(12_000, Math.max(4000, patch.refresh_interval_ms))
     : undefined;
 
   const { data, error } = await supabase
@@ -104,5 +93,11 @@ export async function updateLobbySettings(
     .single();
 
   if (error) throw error;
+  try {
+    const { invalidateBoardSettingsCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardSettingsCaches();
+  } catch {
+    // Cache invalidation is best-effort.
+  }
   return data;
 }

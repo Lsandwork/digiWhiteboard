@@ -23,7 +23,7 @@ export async function loadStaffBoardSettings(supabase: SupabaseClient): Promise<
     if (!data) return defaultStaffSettings;
 
     return {
-      refresh_interval_ms: Math.min(5000, Math.max(2000, Number(data.refresh_interval_ms ?? 2000))),
+      refresh_interval_ms: Math.min(12_000, Math.max(4000, Number(data.refresh_interval_ms ?? 5000))),
       team_reminder: data.team_reminder ?? defaultStaffSettings.team_reminder,
       important_notice: data.important_notice ?? defaultStaffSettings.important_notice,
       show_team_reminders: Boolean(data.show_team_reminders ?? true),
@@ -52,6 +52,12 @@ export async function updateStaffBoardSettings(
     .single();
 
   if (error) throw error;
+  try {
+    const { invalidateBoardSettingsCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardSettingsCaches();
+  } catch {
+    // Cache invalidation is best-effort.
+  }
   return data;
 }
 

@@ -27,7 +27,11 @@ type CachedBackOfHouseBoard = {
 let cachedBackOfHouseBoard: CachedBackOfHouseBoard | null = null;
 
 export function isGingrPhotoFetchEnabled() {
-  return process.env.GINGR_FETCH_ANIMAL_PHOTOS === "true";
+  const flag = process.env.GINGR_FETCH_ANIMAL_PHOTOS?.trim().toLowerCase();
+  if (flag === "false" || flag === "0" || flag === "no") return false;
+  if (flag === "true" || flag === "1" || flag === "yes") return true;
+  // Opt-out: fetch photos when Gingr is configured unless explicitly disabled.
+  return Boolean(process.env.GINGR_API_KEY?.trim());
 }
 
 export function canCallGingrEndpoint(endpoint: GingrEndpoint, now = Date.now()) {

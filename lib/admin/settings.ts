@@ -92,5 +92,11 @@ export async function updateAdminSettings(
     .from("admin_settings")
     .upsert({ id: "default", settings: next, updated_at: new Date().toISOString() });
   if (error) throw error;
+  try {
+    const { invalidateBoardSettingsCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardSettingsCaches();
+  } catch {
+    // Cache invalidation is best-effort.
+  }
   return next;
 }

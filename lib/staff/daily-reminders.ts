@@ -116,6 +116,7 @@ export const DAILY_REMINDER_DAY_OPTIONS = [
 
 const SWING_HANDLER_SETTINGS_KEY = "daily_reminders_swing_handler_present";
 const MIN_DOG_HANDLER_MINUTES = 6 * 60 + 30;
+const AUTOMATIC_DAILY_REMINDER_DUE_WINDOW_MINUTES = 5;
 
 const DAY_KEYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 
@@ -285,7 +286,8 @@ export function isReminderDue(
   const nowMinutes = zonedMinutesNow(timeZone, now);
   const scheduledMinutes = minutesFromTime(reminder.scheduled_time);
   if (targetsDogHandlers(reminder) && nowMinutes < MIN_DOG_HANDLER_MINUTES) return false;
-  return nowMinutes >= scheduledMinutes;
+  const minutesSinceScheduled = nowMinutes - scheduledMinutes;
+  return minutesSinceScheduled >= 0 && minutesSinceScheduled < AUTOMATIC_DAILY_REMINDER_DUE_WINDOW_MINUTES;
 }
 
 function nextScheduledSendIso(

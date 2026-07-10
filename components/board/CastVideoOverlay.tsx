@@ -67,7 +67,7 @@ function CastVideoOverlayContent({
   onDismiss
 }: CastVideoOverlayProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const openedAtRef = useRef(Date.now());
+  const openedAtRef = useRef(0);
   const [videoFailed, setVideoFailed] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
   const [buffering, setBuffering] = useState(true);
@@ -158,8 +158,11 @@ function CastVideoOverlayContent({
     if (!boardMode || !notice.expires_at) return;
     const remainingMs = new Date(notice.expires_at).getTime() - Date.now();
     if (!Number.isFinite(remainingMs) || remainingMs <= 0) {
-      void dismiss({ skipped: !notice.require_acknowledgement });
-      return;
+      const expiredTimer = window.setTimeout(
+        () => void dismiss({ skipped: !notice.require_acknowledgement }),
+        0
+      );
+      return () => window.clearTimeout(expiredTimer);
     }
     const timer = window.setTimeout(() => {
       void dismiss({ skipped: !notice.require_acknowledgement });

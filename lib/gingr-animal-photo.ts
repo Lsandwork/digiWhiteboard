@@ -43,35 +43,45 @@ function readPhotoFromGingrData(data: unknown, animalId?: string) {
   if (!data) return null;
 
   const targetId = animalId?.trim();
-  const records = Array.isArray(data) ? data : [data];
+  const candidates: Array<{ record: UnknownRecord; inheritedId: string }> = [];
+  const seen = new Set<object>();
+  const recordId = (record: UnknownRecord) =>
+    String(record.id ?? record.system_id ?? record.animal_id ?? record.a_id ?? "").trim();
 
-  for (const record of records) {
-    if (!record || typeof record !== "object") continue;
+  function collect(value: unknown, depth = 0, inheritedId = "") {
+    if (!value || typeof value !== "object" || depth > 6 || seen.has(value as object)) return;
+    seen.add(value as object);
 
-    const rec = record as UnknownRecord;
-    const nestedAnimal =
-      rec.animal && typeof rec.animal === "object" && !Array.isArray(rec.animal)
-        ? (rec.animal as UnknownRecord)
-        : null;
-    const animals = Array.isArray(rec.animals) ? rec.animals : null;
-
-    const candidates: UnknownRecord[] = [rec];
-    if (nestedAnimal) candidates.push(nestedAnimal);
-    if (animals) {
-      for (const animal of animals) {
-        if (animal && typeof animal === "object") {
-          candidates.push(animal as UnknownRecord);
-        }
-      }
+    if (Array.isArray(value)) {
+      for (const item of value) collect(item, depth + 1, inheritedId);
+      return;
     }
 
-    for (const candidate of candidates) {
-      if (targetId) {
-        const candidateId = String(candidate.id ?? candidate.system_id ?? candidate.animal_id ?? "").trim();
-        if (candidateId && candidateId !== targetId) continue;
-      }
+    const record = value as UnknownRecord;
+    const currentId = recordId(record) || inheritedId;
+    candidates.push({ record, inheritedId: currentId });
+    for (const nested of Object.values(record)) {
+      if (nested && typeof nested === "object") collect(nested, depth + 1, currentId);
+    }
+  }
 
-      const photoUrl = extractPhotoUrl(candidate);
+  collect(data);
+
+  const matchingCandidates = targetId
+    ? candidates.filter((candidate) => candidate.inheritedId === targetId)
+    : candidates;
+
+  for (const candidate of matchingCandidates) {
+    const photoUrl = extractPhotoUrl(candidate.record);
+    if (photoUrl) return photoUrl;
+  }
+
+  // Gingr sometimes returns a keyed object whose animal record omits its ID.
+  // Only use ID-less records as the fallback so another animal's photo cannot leak in.
+  if (targetId) {
+    for (const candidate of candidates) {
+      if (candidate.inheritedId) continue;
+      const photoUrl = extractPhotoUrl(candidate.record);
       if (photoUrl) return photoUrl;
     }
   }

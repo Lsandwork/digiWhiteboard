@@ -35,8 +35,8 @@ export async function GET(request: Request) {
     photoUrl = null;
   }
 
-  if (!photoUrl && canFetchAnimalPhoto(animalId, Date.now(), { bypassFetchGate: true })) {
-    photoUrl = await getGingrAnimalPhotoUrl(animalId, 4000, { bypassFetchGate: true });
+  if (!photoUrl && canFetchAnimalPhoto(animalId, Date.now())) {
+    photoUrl = await getGingrAnimalPhotoUrl(animalId, 4000);
   }
 
   return NextResponse.json(

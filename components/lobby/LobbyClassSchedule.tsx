@@ -14,6 +14,17 @@ export function LobbyClassSchedule({
   schedule?: LobbyScheduleDay[];
   compact?: boolean;
 }) {
+  const safeSchedule = Array.isArray(schedule)
+    ? schedule.filter(
+        (entry) =>
+          entry &&
+          typeof entry.day === "string" &&
+          entry.day.trim() &&
+          Array.isArray(entry.classes) &&
+          entry.classes.length > 0
+      )
+    : LOBBY_CLASS_SCHEDULE;
+
   return (
     <section
       className={`lobby-panel lobby-class-schedule relative overflow-hidden rounded-2xl p-4${compact ? " lobby-class-schedule--compact" : ""}`}
@@ -34,7 +45,7 @@ export function LobbyClassSchedule({
           <h3 className="text-lg font-black uppercase tracking-[0.16em] text-white">Class Schedule</h3>
         </div>
         <div className="lobby-class-schedule-grid grid grid-cols-5 gap-3">
-          {schedule.map((entry) => (
+          {safeSchedule.map((entry) => (
             <LobbyScheduleCard key={entry.day} day={entry.day} classes={entry.classes} />
           ))}
         </div>

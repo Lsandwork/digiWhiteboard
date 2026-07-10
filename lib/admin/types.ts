@@ -84,7 +84,8 @@ export type AdminTab =
   | "bulk_photo_upload"
   | "write_ups"
   | "handler_shift_entry"
-  | "hr_pip";
+  | "hr_pip"
+  | "remote_cast";
 
 export const ADMIN_TABS: AdminTab[] = [
   "checklist",
@@ -129,7 +130,8 @@ export const ADMIN_TABS: AdminTab[] = [
   "bulk_photo_upload",
   "write_ups",
   "handler_shift_entry",
-  "hr_pip"
+  "hr_pip",
+  "remote_cast"
 ];
 
 export const ADMIN_HR_TABS = ["hr_hub", "hr_consult"] as const;

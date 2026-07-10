@@ -115,8 +115,11 @@ export function NotificationResponseModal({
 
   useEffect(() => {
     if (!open) return;
-    setInternalNote(false);
-    setMarkResolved(false);
+    const timer = window.setTimeout(() => {
+      setInternalNote(false);
+      setMarkResolved(false);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [open, detail?.notification.id]);
 
   if (!open) return null;

@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, MonitorPlay, RefreshCw } from "lucide-react";
 import type { AdminBoardType } from "@/lib/admin/types";
 import {
+  buildLobbyCastUrl,
+  buildStaffCastUrl
+} from "@/lib/whiteboard/cast-options";
+import {
   buildCastDisplayUrl,
   displayTypeLabel,
   isDisplayDeviceOnline,
@@ -42,7 +46,11 @@ function formatSeen(value: string | null | undefined) {
 
 export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
   const displayType = boardToDisplayType(board);
-  const castUrl = useMemo(() => buildCastDisplayUrl(displayType), [displayType]);
+  const legacyCastUrl = useMemo(() => buildCastDisplayUrl(displayType), [displayType]);
+  const castLiteUrl = useMemo(
+    () => (board === "lobby" ? buildLobbyCastUrl() : buildStaffCastUrl()),
+    [board]
+  );
   const [devices, setDevices] = useState<DisplayDevice[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -63,19 +71,26 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
   }, [displayType]);
 
   useEffect(() => {
-    void loadDevices();
+    const initialTimer = window.setTimeout(() => void loadDevices(), 0);
     const timer = window.setInterval(() => void loadDevices(), 30_000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [loadDevices]);
 
   const openCastDisplay = () => {
-    window.open(castUrl, "_blank", "noopener,noreferrer");
+    window.open(castLiteUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const openLegacyCastDisplay = () => {
+    window.open(legacyCastUrl, "_blank", "noopener,noreferrer");
   };
 
   const copyCastLink = async () => {
     try {
-      await navigator.clipboard.writeText(castUrl);
-      onToast?.("Cast display link copied.", "success");
+      await navigator.clipboard.writeText(castLiteUrl);
+      onToast?.("Cast Mode URL copied.", "success");
     } catch {
       onToast?.("Unable to copy link.", "error");
     }
@@ -101,26 +116,37 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
           <div>
             <h2 className="admin-page-title">Cast Display</h2>
             <p className="admin-page-subtitle mt-1 max-w-2xl">
-              Use this link for Chromecast/Google TV display mode. For the most reliable setup, open this page
-              directly on the Google TV Streamer instead of casting a Chrome tab.
+              Use Cast Mode URLs for Chromecast and Google TV Streamer. These lightweight pages stay smooth for long
+              sessions. Open directly on the TV browser for best reliability.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="admin-btn-primary inline-flex items-center gap-2" onClick={openCastDisplay}>
               <ExternalLink className="h-4 w-4" />
-              Open Cast Display
+              {board === "lobby" ? "Open Lobby Cast Mode" : "Open Staff Cast Mode"}
             </button>
             <button type="button" className="admin-btn-secondary inline-flex items-center gap-2" onClick={() => void copyCastLink()}>
               <Copy className="h-4 w-4" />
-              Copy Cast Display Link
+              {board === "lobby" ? "Copy Lobby Cast URL" : "Copy Staff Cast URL"}
+            </button>
+            <button
+              type="button"
+              className="admin-btn-secondary inline-flex items-center gap-2"
+              onClick={openLegacyCastDisplay}
+            >
+              <MonitorPlay className="h-4 w-4" />
+              Open Legacy Display
             </button>
           </div>
         </div>
 
         <p className="mt-4 rounded-xl border border-admin-border bg-ink-950/40 px-4 py-3 text-sm text-admin-muted">
-          <span className="font-semibold text-white">{displayTypeLabel(displayType)}</span>
+          <span className="font-semibold text-white">{displayTypeLabel(displayType)} — Cast Mode</span>
           <span className="mx-2 text-admin-muted">·</span>
-          <code className="text-xs text-emerald-300">{castUrl}</code>
+          <code className="text-xs text-emerald-300">{castLiteUrl}</code>
+        </p>
+        <p className="mt-2 text-xs text-admin-muted">
+          Legacy display URL: <code className="text-emerald-300/80">{legacyCastUrl}</code>
         </p>
       </section>
 

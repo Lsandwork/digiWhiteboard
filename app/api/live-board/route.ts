@@ -15,15 +15,20 @@ import {
   syncGingrBoardState
 } from "@/lib/gingr-board-sync";
 import { canCallGingrEndpoint } from "@/lib/gingr-request-guard";
+import { LIVE_BOARD_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
+import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
+const LIVE_BOARD_LAST_GOOD_KEY = "live-board:last-good";
+
 function enrichDogs(dogs: LiveDog[]) {
   return dogs.map((dog) => ({
     ...dog,
-    photo_url: resolveDogPhotoUrl(dog)
+    photo_url: dog.photo_url ?? resolveDogPhotoUrl(dog)
   }));
 }
 function filterVisibleDogs(
@@ -179,8 +184,9 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase();
     const requestStartedAt = Date.now();
+    const loadLiveBoard = async () => {
+    const supabase = getServiceSupabase();
     const usedCachedGingr = !canCallGingrEndpoint("back_of_house");
     let gingrBoard: Awaited<ReturnType<typeof fetchGingrBackOfHouse>> | null = null;
     let gingrError: string | null = null;
@@ -323,7 +329,22 @@ export async function GET(request: Request) {
     checkingIn = checkingIn.map((dog) => enrichedById.get(dog.id) ?? dog);
     checkingOut = checkingOut.map((dog) => enrichedById.get(dog.id) ?? dog);
 
-    const response: LiveBoardResponse = {
+    if (checkingIn.length || checkingOut.length) {
+      after(async () => {
+        await Promise.all(
+          [
+            ...checkingIn.map((dog) =>
+              triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(dog))
+            ),
+            ...checkingOut.map((dog) =>
+              triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(dog))
+            )
+          ]
+        );
+      });
+    }
+
+    const built: LiveBoardResponse = {
       checking_in: checkingIn,
       checking_out: checkingOut,
       counts: {
@@ -361,10 +382,33 @@ export async function GET(request: Request) {
         : {})
     };
 
-    return NextResponse.json(response);
+    setTtlCache(LIVE_BOARD_LAST_GOOD_KEY, built, 120_000);
+    return built;
+    };
+
+    const response = debugBoard
+      ? await loadLiveBoard()
+      : await getOrLoadTtlCache("live-board:response", LIVE_BOARD_CACHE_TTL_MS, loadLiveBoard);
+
+    debugBoardLog(debugBoard, "live-board ok", {
+      durationMs: Date.now() - requestStartedAt,
+      checkingIn: response.checking_in.length,
+      checkingOut: response.checking_out.length
+    });
+    return NextResponse.json(response, {
+      headers: { "cache-control": "private, max-age=2, stale-while-revalidate=6" }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load live board.";
     console.error("[Fitdog Board API] error:", message);
+    const lastGood = getTtlCache<LiveBoardResponse>(LIVE_BOARD_LAST_GOOD_KEY);
+    debugBoardLog(debugBoard, "live-board failed", { error: message, hasLastGood: Boolean(lastGood) });
+    if (lastGood) {
+      return NextResponse.json(
+        { ...lastGood, stale: true, error: message },
+        { status: 200, headers: { "cache-control": "private, max-age=1" } }
+      );
+    }
     return NextResponse.json(
       {
         error: message,

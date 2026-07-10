@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, HelpCircle, Menu, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, ChevronsRight, HelpCircle, Menu, X } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
 import type { AdminBoardType } from "@/lib/admin/types";
@@ -52,12 +52,14 @@ function SidebarNavItem({
   active: boolean;
   nested?: boolean;
   onSelect: (tab: AdminTab) => void;
+  collapsed?: boolean;
 }) {
   return (
     <button
       type="button"
       className={`admin-nav-item ${nested ? "admin-nav-item--nested" : ""} ${active ? "admin-nav-item--active" : ""}`}
       onClick={() => onSelect(tab)}
+      title={label}
     >
       {!nested ? <NavIcon tab={tab} /> : null}
       <span>{label}</span>
@@ -180,6 +182,8 @@ type SidebarProps = {
   onLogout: () => void;
   onOpenHelp?: () => void;
   visibleTabs?: AdminTab[];
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 };
 
 export function Sidebar({
@@ -193,7 +197,9 @@ export function Sidebar({
   onTabChange,
   onLogout,
   onOpenHelp,
-  visibleTabs = ADMIN_TABS
+  visibleTabs = ADMIN_TABS,
+  collapsed = false,
+  onToggleCollapsed
 }: SidebarProps) {
   const navEntries = useMemo(() => buildAdminNav(visibleTabs, board), [visibleTabs, board]);
   const activeGroupId = useMemo(() => findNavGroupForTab(navEntries, activeTab), [navEntries, activeTab]);
@@ -201,12 +207,15 @@ export function Sidebar({
 
   useEffect(() => {
     if (!activeGroupId) return;
-    setExpandedGroups((current) => {
-      if (current.has(activeGroupId)) return current;
-      const next = new Set(current);
-      next.add(activeGroupId);
-      return next;
-    });
+    const timer = window.setTimeout(() => {
+      setExpandedGroups((current) => {
+        if (current.has(activeGroupId)) return current;
+        const next = new Set(current);
+        next.add(activeGroupId);
+        return next;
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [activeGroupId]);
 
   const roleLabel = displayLabel ?? getAdminSidebarRoleLabel(role, username);
@@ -228,7 +237,7 @@ export function Sidebar({
   return (
     <>
       {mobileOpen ? <button type="button" className="admin-mobile-backdrop" aria-label="Close menu" onClick={onMobileClose} /> : null}
-      <aside className={`admin-sidebar ${mobileOpen ? "admin-sidebar--open" : ""}`}>
+      <aside className={`admin-sidebar ${mobileOpen ? "admin-sidebar--open" : ""} ${collapsed ? "admin-sidebar--collapsed" : ""}`}>
         <div className="flex items-center justify-between gap-3 px-4 py-5">
           <div className="admin-sidebar-brand">
             <Image src={FITDOG_BRAND.logoBadge128} alt="Fitdog" width={44} height={44} className="rounded-full" />
@@ -239,6 +248,19 @@ export function Sidebar({
           </div>
           <button type="button" className="admin-icon-btn admin-sidebar-close" onClick={onMobileClose} aria-label="Close navigation">
             <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="px-3 pb-2">
+          <button
+            type="button"
+            className="admin-nav-item admin-sidebar-collapse-btn"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <ChevronsRight className="h-4 w-4 shrink-0" /> : <ChevronsLeft className="h-4 w-4 shrink-0" />}
+            <span>{collapsed ? "Expand" : "Collapse"}</span>
           </button>
         </div>
 

@@ -7,13 +7,13 @@ import { lobbyAssets } from "@/lib/lobby/assets";
 import { formatBoardDateTime } from "@/lib/board-utils";
 
 type LobbyHeaderProps = {
-  clock: Date;
+  clock: Date | null;
   healthy: boolean;
   hasCheckout?: boolean;
 };
 
 export function LobbyHeader({ clock, healthy, hasCheckout = false }: LobbyHeaderProps) {
-  const { time, date } = formatBoardDateTime(clock);
+  const { time, date } = clock ? formatBoardDateTime(clock) : { time: "--:--", date: "LOADING" };
 
   return (
     <header className="lobby-header mb-1 grid grid-cols-[200px_1fr_auto] items-center gap-6">
@@ -35,13 +35,13 @@ export function LobbyHeader({ clock, healthy, hasCheckout = false }: LobbyHeader
           <h1 className="text-[2.75rem] font-black uppercase leading-none tracking-wide text-white">Now Checking Out</h1>
         ) : null}
 
-        <div
-          className={`lobby-header-tagline ${hasCheckout ? "lobby-header-tagline--compact mt-2" : "lobby-header-tagline--idle"}`}
-        >
-          <span className="lobby-header-tagline__line" aria-hidden />
-          <p className="lobby-header-tagline__text">Your Dog&apos;s Best Life</p>
-          <span className="lobby-header-tagline__line" aria-hidden />
-        </div>
+        {!hasCheckout ? (
+          <div className="lobby-header-tagline lobby-header-tagline--idle">
+            <span className="lobby-header-tagline__line" aria-hidden />
+            <p className="lobby-header-tagline__text">Your Dog&apos;s Best Life</p>
+            <span className="lobby-header-tagline__line" aria-hidden />
+          </div>
+        ) : null}
 
         <p className={`lobby-header-subtitle ${hasCheckout ? "mt-1.5 text-lg" : "mt-2 text-xl"}`}>
           Thank you for letting us <span className="font-semibold text-lobby-teal">play, care &amp; connect!</span>

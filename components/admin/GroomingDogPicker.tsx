@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Loader2, PawPrint, Search } from "lucide-react";
+import { ChevronDown, Loader2, PawPrint, RefreshCw, Search } from "lucide-react";
 import type { GroomingPushActiveDog, GroomingPushDogGroup } from "@/lib/grooming-push-active-dogs";
 import { groomingInstruction } from "@/lib/staff/grooming-push-notices";
 
@@ -33,30 +33,44 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
+  const load = useMemo(
+    () => async (signal?: AbortSignal) => {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/gingr/active-dogs-for-grooming-push", { cache: "no-store" });
+        const response = await fetch("/api/gingr/active-dogs-for-grooming-push", { cache: "no-store", signal });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "Unable to load dogs from Gingr.");
-        if (!cancelled) setDogs(body.dogs ?? []);
+        setDogs(body.dogs ?? []);
       } catch (loadError) {
-        if (!cancelled) {
+        if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load dogs from Gingr.");
           setDogs([]);
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    }
-    void load();
+      setLoading(false);
+    },
+    []
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void load(controller.signal), 0);
     return () => {
-      cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
     };
-  }, []);
+  }, [load]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void load(controller.signal), 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, load]);
 
   useEffect(() => {
     function onPointerDown(event: MouseEvent) {
@@ -114,6 +128,15 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
               placeholder="Search by dog or owner name"
               autoFocus
             />
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--ghost ml-auto inline-flex items-center gap-1 text-xs"
+              onClick={() => void load()}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Sync
+            </button>
           </div>
 
           <div className="grooming-dog-picker__list">

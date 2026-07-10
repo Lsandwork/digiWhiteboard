@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { isLobbyAdmin, isLobbyDisplayAuthorized, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
+import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
-import { loadLobbySettings } from "@/lib/lobby/settings";
+import { sanitizeLobbyCheckouts } from "@/lib/lobby/validate";
+import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  if (!isLobbyDisplayAuthorized(request) && !isLobbyAdmin(request)) {
+  if (!canReadLobbyBoard(request)) {
     return unauthorizedLobbyResponse({
       featured: null,
       queue: [],
@@ -21,14 +23,18 @@ export async function GET(request: Request) {
   const fast = new URL(request.url).searchParams.get("fast") === "1";
   const startedAt = Date.now();
   const now = new Date();
+  const cacheKey = fast ? "lobby-checkouts:fast" : "lobby-checkouts:full";
+  const lastGoodKey = `${cacheKey}:last-good`;
 
   try {
     const supabase = getServiceSupabase();
-    const checkout = fast
-      ? await loadLobbyCheckoutDogsFast(supabase, now)
-      : await loadLobbyCheckoutDogs(supabase, (await loadLobbySettings(supabase)).max_queue_count, now);
+    const checkout = await getOrLoadTtlCache(cacheKey, FAST_CHECKOUT_CACHE_TTL_MS, async () => {
+      if (fast) return loadLobbyCheckoutDogsFast(supabase, now);
+      const settings = await cachedLoadLobbySettings(supabase);
+      return loadLobbyCheckoutDogs(supabase, settings.max_queue_count, now);
+    });
 
-    return NextResponse.json({
+    const payload = sanitizeLobbyCheckouts({
       featured: checkout.featured,
       queue: checkout.queue,
       counts: {
@@ -52,17 +58,42 @@ export async function GET(request: Request) {
           }
         : {})
     });
+
+    setTtlCache(lastGoodKey, payload, 120_000);
+    debugBoardLog(debugBoard, "lobby checkouts ok", {
+      fast,
+      durationMs: Date.now() - startedAt,
+      active: checkout.activeCount
+    });
+
+    return NextResponse.json(payload, {
+      headers: { "cache-control": "private, max-age=1, stale-while-revalidate=4" }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load lobby checkouts.";
+    const lastGood = getTtlCache<Record<string, unknown>>(lastGoodKey);
+    debugBoardLog(debugBoard, "lobby checkouts failed", {
+      error: message,
+      hasLastGood: Boolean(lastGood),
+      durationMs: Date.now() - startedAt
+    });
+    if (lastGood) {
+      return NextResponse.json(
+        sanitizeLobbyCheckouts({ ...lastGood, stale: true, error: message }),
+        { status: 200, headers: { "cache-control": "private, max-age=1" } }
+      );
+    }
     return NextResponse.json(
-      {
+      sanitizeLobbyCheckouts({
         featured: null,
         queue: [],
         counts: { active: 0, queue: 0 },
         last_updated: now.toISOString(),
+        basket_filtered: false,
+        stale: true,
         error: message
-      },
-      { status: 500 }
+      }),
+      { status: 200, headers: { "cache-control": "private, max-age=1" } }
     );
   }
 }
