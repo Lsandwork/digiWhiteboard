@@ -167,7 +167,7 @@ function GroomerSubmissionForm({
   );
 }
 
-function GroomerManagementSupportPanel() {
+function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?: boolean }) {
   const { showToast } = useToast();
   const [section, setSection] = useState<GroomerSection>("complaint");
   const [subTab, setSubTab] = useState<GroomerSubTab>("file");
@@ -180,7 +180,7 @@ function GroomerManagementSupportPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/management-support?view=write_ups", { cache: "no-store" });
+      const response = await fetch("/api/admin/management-support", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
       setData(body as Payload);
@@ -192,7 +192,8 @@ function GroomerManagementSupportPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const complaints = useMemo(
@@ -254,16 +255,18 @@ function GroomerManagementSupportPanel() {
         >
           Complaints
         </button>
-        <button
-          type="button"
-          className={`crossover-btn ${section === "request" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
-          onClick={() => {
-            setSection("request");
-            setSubTab("file");
-          }}
-        >
-          Requests
-        </button>
+        {showRequests ? (
+          <button
+            type="button"
+            className={`crossover-btn ${section === "request" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+            onClick={() => {
+              setSection("request");
+              setSubTab("file");
+            }}
+          >
+            Requests
+          </button>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -357,7 +360,8 @@ function TrainerManagementSupportPanel() {
   }, []);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const complaints = useMemo(
@@ -476,10 +480,15 @@ function TrainerManagementSupportPanel() {
   );
 }
 
+type TeamLeadPanelSection = "write_up" | "complaint";
+
 function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialSubTab?: ManagementSupportSubTab }) {
   const { showToast } = useToast();
+  const [panelSection, setPanelSection] = useState<TeamLeadPanelSection>("write_up");
   const [subTab, setSubTab] = useState<ManagementSupportSubTab>(initialSubTab);
+  const [complaintSubTab, setComplaintSubTab] = useState<GroomerSubTab>("file");
   const [data, setData] = useState<Payload | null>(null);
+  const [complaintData, setComplaintData] = useState<Payload | null>(null);
   const [form, setForm] = useState<WarningNoticeFormData>(EMPTY_WARNING_NOTICE_FORM);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -489,7 +498,7 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/management-support", { cache: "no-store" });
+      const response = await fetch("/api/admin/management-support?view=write_ups", { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
       setData(body as Payload);
@@ -507,11 +516,57 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
     }
   }, [form.documented_by]);
 
+  const loadComplaints = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/management-support", { cache: "no-store" });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to load complaints.");
+      setComplaintData(body as Payload);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load complaints.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    const timer = window.setTimeout(() => {
+      if (panelSection === "write_up") void load();
+      else void loadComplaints();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load, loadComplaints, panelSection]);
 
   const writeUps = useMemo(() => data?.reports.filter((report) => report.report_type === "employee_write_up") ?? [], [data]);
+  const complaints = useMemo(
+    () => complaintData?.complaints ?? complaintData?.reports.filter((report) => report.report_type === "groomer_complaint") ?? [],
+    [complaintData]
+  );
+
+  async function submitComplaint(description: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/management-support", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "create_groomer_complaint", description })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to submit complaint.");
+      showToast("Complaint submitted to admin and management for review.", "success");
+      setComplaintSubTab("filed");
+      await loadComplaints();
+    } catch (submitError) {
+      const message = submitError instanceof Error ? submitError.message : "Unable to submit complaint.";
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function submitWriteUp() {
     setBusy(true);
@@ -546,10 +601,71 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
       <header className="admin-page-header">
         <div>
           <h2 className="admin-page-title">Management Support</h2>
-          <p className="admin-page-subtitle">Submit employee write-ups for admin and management review, then track their status.</p>
+          <p className="admin-page-subtitle">
+            Submit employee write-ups (team leads only) or file a complaint for admin and management review.
+          </p>
         </div>
       </header>
 
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`crossover-btn ${panelSection === "write_up" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+          onClick={() => setPanelSection("write_up")}
+        >
+          Write-Ups
+        </button>
+        <button
+          type="button"
+          className={`crossover-btn ${panelSection === "complaint" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+          onClick={() => setPanelSection("complaint")}
+        >
+          Complaints
+        </button>
+      </div>
+
+      {panelSection === "complaint" ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={`crossover-btn ${complaintSubTab === "file" ? "crossover-btn--outline" : "crossover-btn--ghost"}`}
+              onClick={() => setComplaintSubTab("file")}
+            >
+              File Complaint
+            </button>
+            <button
+              type="button"
+              className={`crossover-btn ${complaintSubTab === "filed" ? "crossover-btn--outline" : "crossover-btn--ghost"}`}
+              onClick={() => setComplaintSubTab("filed")}
+            >
+              Complaints Filed
+            </button>
+          </div>
+          {error ? <p className="admin-error">{error}</p> : null}
+          {loading ? <p className="text-sm text-admin-muted">Loading…</p> : null}
+          {complaintSubTab === "file" ? (
+            <GroomerSubmissionForm
+              title="File Complaint"
+              subtitle="Describe the issue. Your complaint goes directly to admin and management for review."
+              placeholder="Describe the complaint, including relevant details, timing, and anyone involved."
+              busy={busy}
+              onSubmit={submitComplaint}
+            />
+          ) : (
+            <section className="crossover-card p-5">
+              <div className="grid gap-3">
+                {complaints.length ? (
+                  complaints.map((report) => <SubmissionReviewCard key={report.id} report={report} />)
+                ) : (
+                  <p className="text-sm text-admin-muted">No complaints filed yet.</p>
+                )}
+              </div>
+            </section>
+          )}
+        </>
+      ) : (
+        <>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
@@ -613,6 +729,8 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
           </div>
         </section>
       )}
+        </>
+      )}
     </div>
   );
 }
@@ -621,9 +739,10 @@ export function ManagementSupportPanel({
   mode = "team_leader",
   initialSubTab = "submit"
 }: {
-  mode?: "team_leader" | "groomer" | "trainer" | "handler";
+  mode?: "team_leader" | "groomer" | "trainer" | "handler" | "coordinator";
   initialSubTab?: ManagementSupportSubTab;
 }) {
+  if (mode === "coordinator") return <GroomerManagementSupportPanel />;
   if (mode === "groomer" || mode === "handler") return <GroomerManagementSupportPanel />;
   if (mode === "trainer") return <TrainerManagementSupportPanel />;
   return <TeamLeadManagementSupportPanel initialSubTab={initialSubTab} />;
