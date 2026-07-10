@@ -173,7 +173,13 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
   const api = readFileSync(join(process.cwd(), "app/api/admin/walks-board/route.ts"), "utf8");
   assert.match(api, /isAdminRequest/);
   assert.doesNotMatch(api, /view_admin_panel/);
+  assert.doesNotMatch(api, /Signed-in staff account required/);
+  assert.match(api, /resolveWalkBoardActor/);
   assert.match(api, /canSnoozeWalkBoard|snoozeWalkBoardEntry/);
+
+  const actor = readFileSync(join(process.cwd(), "lib/walks-board/actor.ts"), "utf8");
+  assert.match(actor, /findAdminUserByEmail/);
+  assert.match(actor, /actorUserId: null/);
 
   const lobby = readFileSync(join(process.cwd(), "components/lobby/LobbyCheckoutBoard.tsx"), "utf8");
   assert.doesNotMatch(lobby, /WalksBoardPanel/);
@@ -184,7 +190,7 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
 
 // Every staff role can open the Walks Board tab on the staff board.
 {
-  const roles = ["groomer", "trainer", "daycare", "viewer"] as const;
+  const roles = ["groomer", "trainer", "daycare", "viewer", "owner_admin"] as const;
   for (const role of roles) {
     const access = accessFromLegacyRole(`walk-${role}`, `${role}@fitdog.test`, role);
     assert.equal(
@@ -192,6 +198,11 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
       true,
       `${role} can access walks_board on staff board`
     );
+  }
+
+  const limitedRoles = ["groomer", "trainer", "daycare", "viewer"] as const;
+  for (const role of limitedRoles) {
+    const access = accessFromLegacyRole(`walk-${role}`, `${role}@fitdog.test`, role);
     assert.equal(
       canAccessAdminTab(access, "walks_board", role, "lobby"),
       false,

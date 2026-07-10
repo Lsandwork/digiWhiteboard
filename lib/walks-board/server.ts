@@ -155,7 +155,7 @@ export async function addWalkBoardEntry(
   input: {
     dogName: string;
     walkType: unknown;
-    actorUserId: string;
+    actorUserId: string | null;
     actorEmail?: string | null;
     forceDuplicate?: boolean;
   }
@@ -217,7 +217,7 @@ export async function addWalkBoardEntry(
 
 export async function markWalkBoardWalked(
   supabase: SupabaseClient,
-  input: { entryId: string; actorUserId: string; actorEmail?: string | null; expectedVersion?: number }
+  input: { entryId: string; actorUserId: string | null; actorEmail?: string | null; expectedVersion?: number }
 ): Promise<WalkBoardEntryView> {
   const { data: current, error: loadError } = await supabase
     .from("walk_board_entries")
@@ -283,7 +283,7 @@ export async function snoozeWalkBoardEntry(
   supabase: SupabaseClient,
   input: {
     entryId: string;
-    actorUserId: string;
+    actorUserId: string | null;
     actorEmail?: string | null;
     access: UserAccess;
     expectedVersion?: number;
@@ -359,7 +359,7 @@ export async function snoozeWalkBoardEntry(
 
 export async function clearWalkBoardEntry(
   supabase: SupabaseClient,
-  input: { entryId: string; actorUserId: string; actorEmail?: string | null; expectedVersion?: number }
+  input: { entryId: string; actorUserId: string | null; actorEmail?: string | null; expectedVersion?: number }
 ): Promise<{ ok: true }> {
   const { data: current, error: loadError } = await supabase
     .from("walk_board_entries")

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { normalizeAdminUserId } from "@/lib/admin/users";
+import { accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getRequestUserAccess } from "@/lib/auth/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { resolveWalkBoardActor } from "@/lib/walks-board/actor";
 import { summarizeWalkBoardEntries, sortWalkBoardEntries } from "@/lib/walks-board/display";
 import {
   addWalkBoardEntry,
@@ -18,24 +19,16 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function actorFromRequest(request: Request) {
-  const session = getAdminSessionFromRequest(request);
-  return {
-    session,
-    actorUserId: normalizeAdminUserId(session?.adminUserId),
-    actorEmail: session?.email ?? null
-  };
-}
-
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session } = actorFromRequest(request);
-  if (!session?.adminUserId) {
-    return NextResponse.json({ error: "Signed-in staff account required." }, { status: 401 });
+  const session = getAdminSessionFromRequest(request);
+  if (!session?.email) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
   const supabase = getServiceSupabase();
+  const actor = await resolveWalkBoardActor(supabase, session);
   const url = new URL(request.url);
   const entryId = url.searchParams.get("entryId");
 
@@ -50,9 +43,9 @@ export async function GET(request: Request) {
   const summary = summarizeWalkBoardEntries(entries, nowMs);
   const permissions = await resolveWalkBoardPermissions(
     supabase,
-    session?.adminUserId,
-    session?.role,
-    session?.email
+    actor?.actorUserId ?? session.adminUserId,
+    session.role,
+    session.email
   );
 
   return NextResponse.json({
@@ -67,16 +60,24 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, actorUserId, actorEmail } = actorFromRequest(request);
-  if (!actorUserId) {
-    return NextResponse.json({ error: "Signed-in staff account required." }, { status: 401 });
+  const session = getAdminSessionFromRequest(request);
+  if (!session?.email) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const access = await getRequestUserAccess(request);
+  const supabase = getServiceSupabase();
+  const actor = await resolveWalkBoardActor(supabase, session);
+  if (!actor) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const { actorUserId, actorEmail } = actor;
+  const access =
+    (await getRequestUserAccess(request)) ??
+    accessFromLegacyRole(actorUserId, actorEmail, session.role);
 
   const body = await request.json().catch(() => ({}));
   const action = String(body.action ?? "").trim();
-  const supabase = getServiceSupabase();
 
   try {
     if (action === "add") {
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
         entryId,
         actorUserId,
         actorEmail,
-        access: access!,
+        access,
         expectedVersion
       });
       return NextResponse.json({ ok: true, entry });
