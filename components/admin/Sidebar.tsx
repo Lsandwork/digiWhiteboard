@@ -9,7 +9,7 @@ import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
-import { buildAdminNav, findNavGroupForTab, findNavSectionForTab, getTabDescription, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
+import { buildAdminNav, buildTrainerNav, findNavGroupForTab, findNavSectionForTab, getTabDescription, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
 
 const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
@@ -201,7 +201,10 @@ export function Sidebar({
   collapsed = false,
   onToggleCollapsed
 }: SidebarProps) {
-  const navEntries = useMemo(() => buildAdminNav(visibleTabs, board), [visibleTabs, board]);
+  const navEntries = useMemo(
+    () => (isTrainerRole(role) ? buildTrainerNav(visibleTabs) : buildAdminNav(visibleTabs, board)),
+    [visibleTabs, board, role]
+  );
   const activeGroupId = useMemo(() => findNavGroupForTab(navEntries, activeTab), [navEntries, activeTab]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(activeGroupId ? [activeGroupId] : []));
 

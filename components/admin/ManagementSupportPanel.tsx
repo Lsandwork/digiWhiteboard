@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ClipboardList, Download, FilePenLine, MessageSquarePlus, Send, ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import { PackageCommissionsPanel } from "@/components/admin/PackageCommissionsPanel";
 import { EMPTY_WARNING_NOTICE_FORM, WarningNoticeForm } from "@/components/admin/WarningNoticeForm";
 import type { WarningNoticeFormData } from "@/lib/staff/warning-notice-constants";
 import type { ManagementReport } from "@/lib/staff/management-reports";
@@ -11,7 +10,7 @@ import type { ManagementReport } from "@/lib/staff/management-reports";
 type ManagementSupportSubTab = "submit" | "review";
 type GroomerSection = "complaint" | "request";
 type GroomerSubTab = "file" | "filed";
-type TrainerSection = "complaint" | "request" | "commissions";
+type TrainerSection = "complaint" | "request";
 type TrainerSubTab = "file" | "filed";
 
 type Payload = {
@@ -408,73 +407,66 @@ function TrainerManagementSupportPanel() {
       <header className="admin-page-header">
         <div>
           <h2 className="admin-page-title">Management Support</h2>
-          <p className="admin-page-subtitle">File complaints and requests, review package commissions, and track submission status.</p>
+          <p className="admin-page-subtitle">File complaints and requests and track submission status.</p>
         </div>
       </header>
 
       <div className="flex flex-wrap gap-2">
         <button type="button" className={`crossover-btn ${section === "complaint" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => { setSection("complaint"); setSubTab("file"); }}>Complaints</button>
         <button type="button" className={`crossover-btn ${section === "request" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => { setSection("request"); setSubTab("file"); }}>Requests</button>
-        <button type="button" className={`crossover-btn ${section === "commissions" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => setSection("commissions")}>Package Commissions</button>
       </div>
 
-      {section === "commissions" ? (
-        <PackageCommissionsPanel embedded />
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={`crossover-btn ${subTab === "file" ? "crossover-btn--outline" : "crossover-btn--ghost"}`} onClick={() => setSubTab("file")}>
+          <FilePenLine className="h-4 w-4" />
+          {section === "complaint" ? "File Complaint" : "File Request"}
+        </button>
+        <button type="button" className={`crossover-btn ${subTab === "filed" ? "crossover-btn--outline" : "crossover-btn--ghost"}`} onClick={() => setSubTab("filed")}>
+          <ClipboardList className="h-4 w-4" />
+          {section === "complaint" ? "Complaints Filed" : "Requests Filed"}
+        </button>
+      </div>
+
+      {error ? <p className="admin-error">{error}</p> : null}
+      {loading ? <p className="text-sm text-admin-muted">Loading management support…</p> : null}
+
+      {subTab === "file" ? (
+        section === "complaint" ? (
+          <GroomerSubmissionForm
+            title="File Complaint"
+            subtitle="Describe the issue. Your complaint goes directly to admin and management for review."
+            placeholder="Describe the complaint, including relevant details, timing, and anyone involved."
+            busy={busy}
+            onSubmit={(description) => submitTrainerForm("create_trainer_complaint", description)}
+          />
+        ) : (
+          <GroomerSubmissionForm
+            title="File Request"
+            subtitle="Describe what you need. Your request goes directly to admin and management for review."
+            placeholder="Describe the request, supplies needed, scheduling help, or other support needed."
+            busy={busy}
+            onSubmit={(description) => submitTrainerForm("create_trainer_request", description)}
+          />
+        )
       ) : (
-        <>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={`crossover-btn ${subTab === "file" ? "crossover-btn--outline" : "crossover-btn--ghost"}`} onClick={() => setSubTab("file")}>
-              <FilePenLine className="h-4 w-4" />
-              {section === "complaint" ? "File Complaint" : "File Request"}
-            </button>
-            <button type="button" className={`crossover-btn ${subTab === "filed" ? "crossover-btn--outline" : "crossover-btn--ghost"}`} onClick={() => setSubTab("filed")}>
-              <ClipboardList className="h-4 w-4" />
-              {section === "complaint" ? "Complaints Filed" : "Requests Filed"}
-            </button>
+        <section className="crossover-card p-5">
+          <div className="crossover-card__header crossover-card__header--compact">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
+              <h3 className="crossover-card__title">{section === "complaint" ? "Complaints Filed" : "Requests Filed"}</h3>
+            </div>
+            <span className="crossover-link-btn">{filedItems.length} total</span>
           </div>
-
-          {error ? <p className="admin-error">{error}</p> : null}
-          {loading ? <p className="text-sm text-admin-muted">Loading management support…</p> : null}
-
-          {subTab === "file" ? (
-            section === "complaint" ? (
-              <GroomerSubmissionForm
-                title="File Complaint"
-                subtitle="Describe the issue. Your complaint goes directly to admin and management for review."
-                placeholder="Describe the complaint, including relevant details, timing, and anyone involved."
-                busy={busy}
-                onSubmit={(description) => submitTrainerForm("create_trainer_complaint", description)}
-              />
-            ) : (
-              <GroomerSubmissionForm
-                title="File Request"
-                subtitle="Describe what you need. Your request goes directly to admin and management for review."
-                placeholder="Describe the request, supplies needed, scheduling help, or other support needed."
-                busy={busy}
-                onSubmit={(description) => submitTrainerForm("create_trainer_request", description)}
-              />
-            )
-          ) : (
-            <section className="crossover-card p-5">
-              <div className="crossover-card__header crossover-card__header--compact">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
-                  <h3 className="crossover-card__title">{section === "complaint" ? "Complaints Filed" : "Requests Filed"}</h3>
-                </div>
-                <span className="crossover-link-btn">{filedItems.length} total</span>
-              </div>
-              <div className="grid gap-3">
-                {filedItems.length ? filedItems.map((report) => <SubmissionReviewCard key={report.id} report={report} />) : (
-                  <p className="text-sm text-admin-muted">
-                    {section === "complaint"
-                      ? "No complaints filed yet. Use File Complaint to send one to admin and management."
-                      : "No requests filed yet. Use File Request to send one to admin and management."}
-                  </p>
-                )}
-              </div>
-            </section>
-          )}
-        </>
+          <div className="grid gap-3">
+            {filedItems.length ? filedItems.map((report) => <SubmissionReviewCard key={report.id} report={report} />) : (
+              <p className="text-sm text-admin-muted">
+                {section === "complaint"
+                  ? "No complaints filed yet. Use File Complaint to send one to admin and management."
+                  : "No requests filed yet. Use File Request to send one to admin and management."}
+              </p>
+            )}
+          </div>
+        </section>
       )}
     </div>
   );
@@ -482,7 +474,15 @@ function TrainerManagementSupportPanel() {
 
 type TeamLeadPanelSection = "write_up" | "complaint";
 
-function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialSubTab?: ManagementSupportSubTab }) {
+function TeamLeadManagementSupportPanel({
+  initialSubTab = "submit",
+  allowWriteUpReview = false,
+  reviewAllWriteUps = false
+}: {
+  initialSubTab?: ManagementSupportSubTab;
+  allowWriteUpReview?: boolean;
+  reviewAllWriteUps?: boolean;
+}) {
   const { showToast } = useToast();
   const [panelSection, setPanelSection] = useState<TeamLeadPanelSection>("write_up");
   const [subTab, setSubTab] = useState<ManagementSupportSubTab>(initialSubTab);
@@ -498,7 +498,10 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/admin/management-support?view=write_ups", { cache: "no-store" });
+      const url = reviewAllWriteUps
+        ? "/api/admin/management-support"
+        : "/api/admin/management-support?view=write_ups";
+      const response = await fetch(url, { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
       setData(body as Payload);
@@ -514,7 +517,7 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
     } finally {
       setLoading(false);
     }
-  }, [form.documented_by]);
+  }, [form.documented_by, reviewAllWriteUps]);
 
   const loadComplaints = useCallback(async () => {
     setLoading(true);
@@ -585,8 +588,10 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
         documented_by: data?.currentUser.email ?? "",
         manager_signature: data?.currentUser.email ?? ""
       });
-      setSubTab("review");
-      await load();
+      if (allowWriteUpReview) {
+        setSubTab("review");
+        await load();
+      }
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Unable to submit write-up.";
       setError(message);
@@ -602,7 +607,9 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
         <div>
           <h2 className="admin-page-title">Management Support</h2>
           <p className="admin-page-subtitle">
-            Submit employee write-ups (team leads only) or file a complaint for admin and management review.
+            {allowWriteUpReview
+              ? "Submit employee write-ups and review all submitted warning notices."
+              : "Submit employee write-ups or file a complaint for admin and management review."}
           </p>
         </div>
       </header>
@@ -675,14 +682,16 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
           <FilePenLine className="h-4 w-4" />
           Write Up Submit
         </button>
-        <button
-          type="button"
-          className={`crossover-btn ${subTab === "review" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
-          onClick={() => setSubTab("review")}
-        >
-          <ClipboardList className="h-4 w-4" />
-          Write Up Review
-        </button>
+        {allowWriteUpReview ? (
+          <button
+            type="button"
+            className={`crossover-btn ${subTab === "review" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+            onClick={() => setSubTab("review")}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Write Up Review
+          </button>
+        ) : null}
       </div>
 
       {error ? <p className="admin-error">{error}</p> : null}
@@ -718,13 +727,19 @@ function TeamLeadManagementSupportPanel({ initialSubTab = "submit" }: { initialS
           <div className="crossover-card__header crossover-card__header--compact">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-[var(--crossover-gold)]" aria-hidden />
-              <h3 className="crossover-card__title">Your Submitted Write-Ups</h3>
+              <h3 className="crossover-card__title">
+                {reviewAllWriteUps ? "Submitted Write-Ups" : "Your Submitted Write-Ups"}
+              </h3>
             </div>
             <span className="crossover-link-btn">{writeUps.length} total</span>
           </div>
           <div className="grid gap-3">
             {writeUps.length ? writeUps.map((report) => <SubmissionReviewCard key={report.id} report={report} />) : (
-              <p className="text-sm text-admin-muted">No write-ups submitted yet. Use Write Up Submit to send one to admin and management.</p>
+              <p className="text-sm text-admin-muted">
+                {reviewAllWriteUps
+                  ? "No write-ups submitted yet."
+                  : "No write-ups submitted yet. Use Write Up Submit to send one to admin and management."}
+              </p>
             )}
           </div>
         </section>
@@ -739,11 +754,20 @@ export function ManagementSupportPanel({
   mode = "team_leader",
   initialSubTab = "submit"
 }: {
-  mode?: "team_leader" | "groomer" | "trainer" | "handler" | "coordinator";
+  mode?: "team_leader" | "groomer" | "trainer" | "handler" | "coordinator" | "admin";
   initialSubTab?: ManagementSupportSubTab;
 }) {
   if (mode === "coordinator") return <GroomerManagementSupportPanel />;
   if (mode === "groomer" || mode === "handler") return <GroomerManagementSupportPanel />;
   if (mode === "trainer") return <TrainerManagementSupportPanel />;
+  if (mode === "admin") {
+    return (
+      <TeamLeadManagementSupportPanel
+        initialSubTab={initialSubTab}
+        allowWriteUpReview
+        reviewAllWriteUps
+      />
+    );
+  }
   return <TeamLeadManagementSupportPanel initialSubTab={initialSubTab} />;
 }

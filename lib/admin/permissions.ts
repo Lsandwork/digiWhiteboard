@@ -236,9 +236,8 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "manage_database_tools"
 ]);
 
-/** Staff file complaints/write-ups; admin and management review only. */
+/** Staff file complaints/requests; admin and management review (and may also submit write-ups). */
 const STAFF_SUBMISSION_PERMISSIONS = new Set<PermissionKey>([
-  "submit_write_up",
   "submit_groomer_complaint",
   "submit_groomer_request",
   "submit_trainer_complaint",
@@ -319,6 +318,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "receive_walks_board_reminders",
   "review_management_support",
   "review_write_ups",
+  "submit_write_up",
+  "view_package_commissions",
   "manage_package_commissions",
   "view_hr_hub",
   "use_hr_consult",
@@ -396,7 +397,6 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "create_front_desk_log",
   "edit_front_desk_log",
   "submit_write_up",
-  "view_own_write_ups",
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
   "receive_walks_board_reminders",
@@ -793,6 +793,10 @@ export function canAccessAdminTab(
   if (tab === "walks_board") return board === "staff";
 
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+
+  if (tab === "write_ups" && board === "staff") {
+    return hasAnyPermission(effective, ["submit_write_up", "review_write_ups", "view_own_write_ups"]);
+  }
 
   if (
     tab === "templates" &&

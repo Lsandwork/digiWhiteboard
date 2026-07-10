@@ -7,7 +7,7 @@ export const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "front_desk_coordinator", description: "Push Notices, Front Desk Log, Owner Follow Up, Active Issues." },
   { value: "team_leader", description: "Team Lead panel: push notices, grooming push, front desk log, and more." },
   { value: "groomer", description: "Groomer panel: grooming push, front desk log, notifications, and profile." },
-  { value: "trainer", description: "Trainer panel: trainer push, shift log entry, and package commissions." },
+  { value: "trainer", description: "Trainer panel: trainer push, shift log entry, and package & class commissions." },
   { value: "daycare", description: "Daycare staff board access." },
   { value: "driver", description: "Transportation staff board access." },
   { value: "hiker", description: "Hiking/transportation staff board access." },

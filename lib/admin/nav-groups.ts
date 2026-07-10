@@ -48,7 +48,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   ms_trainer_complaints: "Trainer Complaints",
   ms_trainer_requests: "Trainer Requests",
   admin_trainer_entries: "Trainer Entries",
-  package_commissions: "Package Commissions",
+  package_commissions: "Package & Class Commissions",
   demo_push: "Demo Push",
   analytics: "Analytics",
   templates: "Message Templates",
@@ -84,6 +84,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   trainer_push: "Alert handlers when a dog needs training.",
   cast_videos: "Upload and push full-screen videos to displays.",
   trainer_entry: "Log trainer check-ins and session notes.",
+  package_commissions: "Track package and class sales, confirm commissions, and review trainer earnings.",
   crossover_communication: "Front desk handoff log between shifts.",
   owner_follow_up: "Track owner follow-ups and callbacks.",
   active_issues: "Monitor open floor issues and escalations.",
@@ -127,7 +128,8 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "walks_board"
 ];
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
-const SUPPORT_INBOX_TABS: AdminTab[] = [...ADMIN_SUPPORT_TABS, "package_commissions"];
+const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
+const SUPPORT_INBOX_TABS: AdminTab[] = [...ADMIN_SUPPORT_TABS];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
 
@@ -153,8 +155,8 @@ function section(id: string, label: string): NavSection {
   return { type: "section", id, label };
 }
 
-function sectionEntries(sectionId: string, sectionLabel: string, items: NavEntry[]): NavEntry[] {
-  const content = flattenSingleChildGroups(items);
+function sectionEntries(sectionId: string, sectionLabel: string, items: NavEntry[], preserveGroups = false): NavEntry[] {
+  const content = preserveGroups ? compactEntries(items) : flattenSingleChildGroups(compactEntries(items));
   if (!content.length) return [];
   return [section(sectionId, sectionLabel), ...content];
 }
@@ -240,6 +242,15 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
 
     entries.push(
       ...sectionEntries(
+        "staff_commissions",
+        "Commissions",
+        compactEntries([group("commissions", "Commissions", COMMISSIONS_TABS, visible)]),
+        true
+      )
+    );
+
+    entries.push(
+      ...sectionEntries(
         "staff_people",
         "People & HR",
         compactEntries([
@@ -259,6 +270,68 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       )
     );
   }
+
+  if (visible.has("help")) {
+    entries.push(section("help", "Support"));
+    entries.push(leaf("help"));
+  }
+
+  return entries;
+}
+
+/** Trainer panel nav — grouped for training workflows instead of admin review sections. */
+export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
+  const visible = new Set(visibleTabs);
+  const entries: NavEntry[] = [];
+
+  entries.push(
+    ...sectionEntries(
+      "trainer_push",
+      "Push to Whiteboard",
+      compactEntries([group("trainer_live_alerts", "Live Alerts", ["trainer_push"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "trainer_training",
+      "Training",
+      compactEntries([...singles(["trainer_entry"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "trainer_commissions",
+      "Commissions",
+      compactEntries([group("commissions", "Commissions", COMMISSIONS_TABS, visible)]),
+      true
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "trainer_support",
+      "Support",
+      compactEntries([...singles(["management_support"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "trainer_comms",
+      "Communications",
+      compactEntries([...singles(["notifications", "yard_links", "walks_board"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "trainer_admin",
+      "Settings",
+      compactEntries([...singles(["settings"], visible)])
+    )
+  );
 
   if (visible.has("help")) {
     entries.push(section("help", "Support"));

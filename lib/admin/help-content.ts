@@ -400,18 +400,19 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "groomer-trainer-crossover",
     title: "What can a Groomer or Trainer do?",
-    summary: "Groomer and Trainer accounts access Crossover Communication as the main department handoff log, plus notifications for urgent alerts.",
+    summary: "Groomers use the Front Desk Log for handoffs. Trainers use the Trainer Panel with push alerts, shift entries, and package & class commissions.",
     category: "Users & Login",
-    keywords: ["groomer", "trainer", "crossover", "grooming", "training", "handoff", "communication log"],
+    keywords: ["groomer", "trainer", "crossover", "grooming", "training", "handoff", "commissions", "package", "class"],
     steps: [
       "Groomer and Trainer users log in with their assigned email and password.",
-      "After login, they land on Staff Digital Whiteboard → Crossover Communication.",
-      "They can create, view, reply to, and update crossover messages for department handoffs.",
-      "Every entry is timestamped with the sender and who it was reported to.",
-      "Urgent or high-priority crossover messages send in-app alerts with the full message to the destination department, coordinators, and management.",
-      "They also have access to Notifications and Help Center tabs."
+      "Groomers land on Staff Digital Whiteboard → Grooming Push and can use the Front Desk Log for handoffs.",
+      "Trainers land on Staff Digital Whiteboard → Trainer Push.",
+      "Open the Commissions tab → Package & Class Commissions to review trainer earnings.",
+      "Admin and management add sold packages/classes, then confirm commissions once verified.",
+      "Trainers can comment or dispute a commission row; disputes flag the record for management review.",
+      "Both roles also have access to Notifications, Video Links, Walks Board, and Help Center."
     ],
-    adminTab: "crossover_communication",
+    adminTab: "trainer_push",
     adminBoard: "staff",
     tips: ["Assign the Groomer or Trainer dashboard role in Admin Users or Staff Directory when creating a login."]
   },

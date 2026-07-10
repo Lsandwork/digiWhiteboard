@@ -144,8 +144,7 @@ export const ADMIN_SUPPORT_TABS = [
   "ms_groomer_requests",
   "ms_trainer_complaints",
   "ms_trainer_requests",
-  "admin_trainer_entries",
-  "package_commissions"
+  "admin_trainer_entries"
 ] as const;
 
 export function parseAdminTab(value: string | null): AdminTab {

@@ -1,6 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 export type PackageCommissionStatus = "Pending" | "Approved" | "Paid" | "Needs Review" | "Disputed";
+export type PackageCommissionSaleCategory = "package" | "class";
 
 export type PackageCommissionComment = {
   id: string;
@@ -17,6 +18,7 @@ export type PackageCommissionRow = {
   trainer_user_id: string | null;
   trainer_name: string;
   trainer_email: string | null;
+  sale_category: PackageCommissionSaleCategory;
   package_type: string;
   gingr_transaction_url: string;
   commission_amount: string;
@@ -24,6 +26,9 @@ export type PackageCommissionRow = {
   status: PackageCommissionStatus;
   notes: string | null;
   created_by: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  confirmed_by_user_id: string | null;
   comments: PackageCommissionComment[];
   created_at: string;
   updated_at: string;
@@ -35,6 +40,7 @@ export type PackageCommissionInput = {
   trainer_name?: unknown;
   trainer_email?: unknown;
   trainer_user_id?: unknown;
+  sale_category?: unknown;
   package_type?: unknown;
   gingr_transaction_url?: unknown;
   commission_amount?: unknown;
@@ -42,6 +48,18 @@ export type PackageCommissionInput = {
   status?: unknown;
   notes?: unknown;
   created_by?: unknown;
+};
+
+export type PackageCommissionActor = {
+  email?: string | null;
+  adminUserId?: string | null;
+  name?: string | null;
+};
+
+export type PackageCommissionViewer = {
+  role?: string | null;
+  email?: string | null;
+  adminUserId?: string | null;
 };
 
 const SETTINGS_STORE_KEY = "package_commissions";
@@ -64,6 +82,11 @@ function sanitizeUrl(value: unknown) {
   if (!raw) return "";
   if (/^https?:\/\//i.test(raw)) return raw;
   return raw.startsWith("www.") ? `https://${raw}` : raw;
+}
+
+function normalizeSaleCategory(value: unknown): PackageCommissionSaleCategory {
+  const token = sanitizeText(value, 20).toLowerCase();
+  return token === "class" ? "class" : "package";
 }
 
 type PackageCommissionState = { rows: PackageCommissionRow[] };
@@ -103,6 +126,7 @@ function normalizeInput(input: PackageCommissionInput) {
   const trainer_name = sanitizeText(input.trainer_name, 80) || "Unassigned";
   const trainer_email = sanitizeText(input.trainer_email, 120) || null;
   const trainer_user_id = sanitizeText(input.trainer_user_id, 120) || null;
+  const sale_category = normalizeSaleCategory(input.sale_category);
   const package_type = sanitizeText(input.package_type, 120);
   const gingr_transaction_url = sanitizeUrl(input.gingr_transaction_url);
   const commission_amount = sanitizeText(input.commission_amount, 40);
@@ -120,25 +144,74 @@ function normalizeInput(input: PackageCommissionInput) {
   if (!commission_amount) throw new Error("Commission amount is required.");
   if (!sold_at) throw new Error("Date sold is required.");
 
-  return { dog_name, owner_name, trainer_name, trainer_email, trainer_user_id, package_type, gingr_transaction_url, commission_amount, sold_at, status, notes, created_by };
+  return {
+    dog_name,
+    owner_name,
+    trainer_name,
+    trainer_email,
+    trainer_user_id,
+    sale_category,
+    package_type,
+    gingr_transaction_url,
+    commission_amount,
+    sold_at,
+    status,
+    notes,
+    created_by
+  };
 }
 
-function normalizeRow(row: PackageCommissionRow): PackageCommissionRow {
+export function normalizePackageCommissionRow(row: PackageCommissionRow): PackageCommissionRow {
   return {
     ...row,
     trainer_user_id: row.trainer_user_id ?? null,
     trainer_name: row.trainer_name ?? "Unassigned",
     trainer_email: row.trainer_email ?? null,
+    sale_category: normalizeSaleCategory(row.sale_category),
     status: row.status ?? "Pending",
     notes: row.notes ?? null,
     created_by: row.created_by ?? null,
+    confirmed_at: row.confirmed_at ?? null,
+    confirmed_by: row.confirmed_by ?? null,
+    confirmed_by_user_id: row.confirmed_by_user_id ?? null,
     comments: row.comments ?? []
   };
 }
 
+function actorLabel(actor: PackageCommissionActor) {
+  return sanitizeText(actor.name, 120) || sanitizeText(actor.email, 120) || sanitizeText(actor.adminUserId, 120) || "admin";
+}
+
+export function filterPackageCommissionsForViewer(rows: PackageCommissionRow[], viewer: PackageCommissionViewer) {
+  if (viewer.role !== "trainer") return rows;
+
+  const email = viewer.email?.trim().toLowerCase() ?? "";
+  const userId = viewer.adminUserId?.trim() ?? "";
+
+  return rows.filter((row) => {
+    if (userId && row.trainer_user_id === userId) return true;
+    if (email && row.trainer_email?.trim().toLowerCase() === email) return true;
+    return false;
+  });
+}
+
+export function trainerOwnsCommissionRow(row: PackageCommissionRow, viewer: PackageCommissionViewer) {
+  if (viewer.role !== "trainer") return true;
+  const email = viewer.email?.trim().toLowerCase() ?? "";
+  const userId = viewer.adminUserId?.trim() ?? "";
+  if (userId && row.trainer_user_id === userId) return true;
+  if (email && row.trainer_email?.trim().toLowerCase() === email) return true;
+  return false;
+}
+
 export async function listPackageCommissions(supabase: SupabaseClient) {
   const state = await loadState(supabase);
-  return sortRows(state.rows.map(normalizeRow));
+  return sortRows(state.rows.map(normalizePackageCommissionRow));
+}
+
+export async function listPackageCommissionsForViewer(supabase: SupabaseClient, viewer: PackageCommissionViewer) {
+  const rows = await listPackageCommissions(supabase);
+  return filterPackageCommissionsForViewer(rows, viewer);
 }
 
 export async function createPackageCommissionRow(supabase: SupabaseClient, input: PackageCommissionInput) {
@@ -147,6 +220,9 @@ export async function createPackageCommissionRow(supabase: SupabaseClient, input
   const row: PackageCommissionRow = {
     id: newId("pkg"),
     ...normalized,
+    confirmed_at: null,
+    confirmed_by: null,
+    confirmed_by_user_id: null,
     comments: [],
     created_at: now,
     updated_at: now
@@ -160,15 +236,83 @@ export async function updatePackageCommissionRow(
   supabase: SupabaseClient,
   id: string,
   input: PackageCommissionInput
-) {
+): Promise<PackageCommissionRow> {
   const normalized = normalizeInput(input);
   const now = new Date().toISOString();
   const state = await loadState(supabase);
   let updated: PackageCommissionRow | null = null;
   const next = state.rows.map((row) => {
     if (row.id !== id) return row;
-    updated = { ...row, ...normalized, updated_at: now };
-    return updated;
+    const nextRow = normalizePackageCommissionRow({
+      ...row,
+      ...normalized,
+      updated_at: now
+    });
+    updated = nextRow;
+    return nextRow;
+  });
+  if (!updated) throw new Error("Package commission row not found.");
+  await saveState(supabase, { rows: sortRows(next) });
+  return updated;
+}
+
+export async function confirmPackageCommissionRow(
+  supabase: SupabaseClient,
+  id: string,
+  actor: PackageCommissionActor
+): Promise<PackageCommissionRow> {
+  const now = new Date().toISOString();
+  const state = await loadState(supabase);
+  let updated: PackageCommissionRow | null = null;
+  const next = state.rows.map((row) => {
+    if (row.id !== id) return row;
+    const nextRow = normalizePackageCommissionRow({
+      ...row,
+      status: "Approved",
+      confirmed_at: now,
+      confirmed_by: actorLabel(actor),
+      confirmed_by_user_id: actor.adminUserId ?? null,
+      updated_at: now
+    });
+    updated = nextRow;
+    return nextRow;
+  });
+  if (!updated) throw new Error("Package commission row not found.");
+  await saveState(supabase, { rows: sortRows(next) });
+  return updated;
+}
+
+export async function setPackageCommissionStatus(
+  supabase: SupabaseClient,
+  id: string,
+  status: PackageCommissionStatus,
+  actor: PackageCommissionActor
+): Promise<PackageCommissionRow> {
+  const now = new Date().toISOString();
+  const state = await loadState(supabase);
+  let updated: PackageCommissionRow | null = null;
+  const next = state.rows.map((row) => {
+    if (row.id !== id) return row;
+    const confirmed =
+      status === "Approved"
+        ? {
+            confirmed_at: row.confirmed_at ?? now,
+            confirmed_by: row.confirmed_by ?? actorLabel(actor),
+            confirmed_by_user_id: row.confirmed_by_user_id ?? actor.adminUserId ?? null
+          }
+        : {
+            confirmed_at: row.confirmed_at,
+            confirmed_by: row.confirmed_by,
+            confirmed_by_user_id: row.confirmed_by_user_id
+          };
+    const nextRow = normalizePackageCommissionRow({
+      ...row,
+      status,
+      ...confirmed,
+      updated_at: now
+    });
+    updated = nextRow;
+    return nextRow;
   });
   if (!updated) throw new Error("Package commission row not found.");
   await saveState(supabase, { rows: sortRows(next) });
@@ -186,24 +330,34 @@ export async function addPackageCommissionComment(
   supabase: SupabaseClient,
   rowId: string,
   author: string,
-  body: string
+  body: string,
+  options: { concern_type?: string | null } = {}
 ): Promise<{ row: PackageCommissionRow; comment: PackageCommissionComment }> {
   const trimmed = sanitizeText(body, 800);
   if (!trimmed) throw new Error("Comment is required.");
 
   const now = new Date().toISOString();
+  const concernType = sanitizeText(options.concern_type, 40) || null;
   const comment: PackageCommissionComment = {
     id: newId("pkg-comment"),
     author: sanitizeText(author, 120) || "Trainer",
     body: trimmed,
-    created_at: now
+    created_at: now,
+    concern_type: concernType
   };
 
   const state = await loadState(supabase);
   let updated: PackageCommissionRow | undefined;
   const next = state.rows.map((row) => {
     if (row.id !== rowId) return row;
-    updated = { ...row, comments: [...row.comments, comment], updated_at: now };
+    const nextStatus =
+      concernType === "dispute" && row.status !== "Paid" ? ("Needs Review" as PackageCommissionStatus) : row.status;
+    updated = normalizePackageCommissionRow({
+      ...row,
+      status: nextStatus,
+      comments: [...row.comments, comment],
+      updated_at: now
+    });
     return updated;
   });
   if (!updated) throw new Error("Package commission row not found.");
@@ -234,6 +388,8 @@ export function parsePackageCommissionCsv(text: string): PackageCommissionInput[
         owner_name: record.owner_name ?? record.owner ?? record["owner name"] ?? "",
         trainer_name: record.trainer_name ?? record.trainer ?? "",
         trainer_email: record.trainer_email ?? "",
+        trainer_user_id: record.trainer_user_id ?? "",
+        sale_category: record.sale_category ?? record.category ?? record.type ?? "package",
         package_type: record.package_type ?? record.package ?? record["package type"] ?? "",
         gingr_transaction_url: record.gingr_transaction_url ?? record.gingr_transaction_link ?? record.gingr_url ?? record.url ?? record.link ?? "",
         commission_amount: record.commission_amount ?? record.commission ?? "",
@@ -264,22 +420,53 @@ export async function importPackageCommissionCsv(supabase: SupabaseClient, text:
 }
 
 export function exportPackageCommissionsCsv(rows: PackageCommissionRow[]) {
-  const header = "dog_name,owner_name,trainer_name,trainer_email,package_type,gingr_transaction_link,commission_amount,date_package_sold,status,notes";
+  const header =
+    "dog_name,owner_name,trainer_name,trainer_email,sale_category,package_type,gingr_transaction_link,commission_amount,date_package_sold,status,notes,confirmed_at,confirmed_by";
   const body = rows.map((row) =>
     [
       row.dog_name,
       row.owner_name,
       row.trainer_name,
       row.trainer_email ?? "",
+      row.sale_category,
       row.package_type,
       row.gingr_transaction_url,
       row.commission_amount,
       row.sold_at,
       row.status,
-      row.notes ?? ""
+      row.notes ?? "",
+      row.confirmed_at ?? "",
+      row.confirmed_by ?? ""
     ]
       .map((value) => `"${String(value).replace(/"/g, '""')}"`)
       .join(",")
   );
   return [header, ...body].join("\n");
+}
+
+export function parseCommissionAmount(value: string) {
+  const normalized = String(value).replace(/[^0-9.-]+/g, "");
+  const amount = Number.parseFloat(normalized);
+  return Number.isFinite(amount) ? amount : 0;
+}
+
+export function summarizeCommissionRows(rows: PackageCommissionRow[]) {
+  const totals = {
+    pending: 0,
+    approved: 0,
+    paid: 0,
+    needsReview: 0,
+    disputed: 0
+  };
+
+  for (const row of rows) {
+    const amount = parseCommissionAmount(row.commission_amount);
+    if (row.status === "Pending") totals.pending += amount;
+    else if (row.status === "Approved") totals.approved += amount;
+    else if (row.status === "Paid") totals.paid += amount;
+    else if (row.status === "Needs Review") totals.needsReview += amount;
+    else if (row.status === "Disputed") totals.disputed += amount;
+  }
+
+  return totals;
 }

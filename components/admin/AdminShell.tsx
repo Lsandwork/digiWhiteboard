@@ -10,7 +10,8 @@ import {
 } from "@/lib/admin/permissions";
 import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
-import { buildAdminNav, findNavSectionForTab, getTabDescription, getTabLabel } from "@/lib/admin/nav-groups";
+import { buildAdminNav, buildTrainerNav, findNavSectionForTab, getTabDescription, getTabLabel } from "@/lib/admin/nav-groups";
+import { isTrainerRole } from "@/lib/admin/users";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
@@ -79,7 +80,9 @@ export function AdminShell({
     canAccessAdminTab(access, item, effectiveRole, board, { isDemo })
   );
   const pageLabel = getTabLabel(tab);
-  const navEntries = buildAdminNav(visibleTabs, board);
+  const navEntries = isTrainerRole(effectiveRole)
+    ? buildTrainerNav(visibleTabs)
+    : buildAdminNav(visibleTabs, board);
   const sectionLabel = findNavSectionForTab(navEntries, tab);
   const pageDescription = getTabDescription(tab, board);
 

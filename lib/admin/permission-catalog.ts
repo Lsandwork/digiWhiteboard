@@ -144,9 +144,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     key: "write_ups",
     label: "Write-Ups",
     permissions: [
-      p("submit_write_up", "Submit Write-Up Request", "Submit employee write-up requests."),
-      p("view_own_write_ups", "View Own Write-Ups", "View own write-up submissions."),
-      p("review_write_ups", "Review Write-Ups", "Review and respond to write-up requests.")
+      p("submit_write_up", "Submit Write-Up Request", "Submit employee warning notices."),
+      p("view_own_write_ups", "View Own Write-Ups", "View write-ups where the employee is the signed-in dog handler."),
+      p("review_write_ups", "Review Write-Ups", "Review all submitted employee write-ups.")
     ]
   },
   {
@@ -184,9 +184,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     permissions: [
       p("view_staff_directory", "View Staff Directory", "View staff directory."),
       p("manage_staff_directory", "Manage Staff Directory", "Edit staff directory entries."),
-      p("view_package_commissions", "View Package Commissions", "View trainer package commissions."),
-      p("comment_package_commissions", "Comment on Commissions", "Add comments to commission rows."),
-      p("manage_package_commissions", "Manage Package Commissions", "Administer package commissions.")
+      p("view_package_commissions", "View Package & Class Commissions", "View trainer package and class commissions."),
+      p("comment_package_commissions", "Comment on Commissions", "Add comments or disputes to commission rows."),
+      p("manage_package_commissions", "Manage Package & Class Commissions", "Add, confirm, and administer trainer commissions.")
     ]
   },
   {

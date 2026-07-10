@@ -43,6 +43,7 @@ for (const role of roles) {
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "hr_hub", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "package_commissions", "trainer", "staff"), true);
+assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "package_commissions", "assistant_manager", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "grooming_push", "groomer", "staff"), true);
 
 console.log("role access tests passed");

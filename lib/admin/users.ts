@@ -139,14 +139,14 @@ export function isTrainerRole(role?: string | null) {
   return role === "trainer";
 }
 
-/** Team leads can submit employee write-ups for management review. */
+/** Team leads and admin/management can submit employee write-ups. */
 export function canSubmitWriteUp(role?: string | null) {
-  return role === "team_leader";
+  return role === "team_leader" || isAdminOrManagementRole(role);
 }
 
-/** Team leads track their submissions; dog handlers can view write-ups about them. */
+/** Dog handlers can view write-ups where they are the named employee. */
 export function canViewOwnWriteUps(role?: string | null) {
-  return role === "team_leader" || role === "daycare";
+  return role === "daycare";
 }
 
 /** Operational staff (not admin/management) can file complaints. */
@@ -201,9 +201,9 @@ export function canViewOwnTrainerSubmissions(role?: string | null) {
   return role === "trainer";
 }
 
-/** Trainers can view package commission records. */
+/** Trainers, admin, and management can view package commission records. */
 export function canViewPackageCommissions(role?: string | null) {
-  return role === "trainer" || isFullAdminRole(role);
+  return role === "trainer" || isAdminOrManagementRole(role);
 }
 
 /** Trainers can comment on package commission rows. */
@@ -216,9 +216,9 @@ export function canCreateTrainerEntry(role?: string | null) {
   return role === "trainer" || role === "daycare";
 }
 
-/** Admin and management can manage package commission CSV data. */
+/** Admin and management can manage package commission data. */
 export function canManagePackageCommissions(role?: string | null) {
-  return isFullAdminRole(role);
+  return isAdminOrManagementRole(role);
 }
 
 /** Admin and management can review all management support submissions (including write-ups). */
