@@ -101,7 +101,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("clear_grooming_request", "Clear Grooming Push", "Clear active grooming push notices."),
       p("push_trainer_request", "Trainer Push", "Send trainer push notices."),
       p("clear_trainer_request", "Clear Trainer Push", "Clear trainer push notices."),
-      p("receive_admin_alerts", "Receive Admin Alerts", "Receive high-priority management alerts.")
+      p("receive_admin_alerts", "Receive Admin Alerts", "Receive high-priority management alerts."),
+      p("receive_walks_board_reminders", "Receive Walks Board Reminders", "Receive walk-due reminders for tracked dogs.")
     ]
   },
   {

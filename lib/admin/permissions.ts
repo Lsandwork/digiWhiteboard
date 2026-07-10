@@ -74,7 +74,8 @@ export type PermissionKey =
   | "use_hr_consult"
   | "view_analytics"
   | "export_reports"
-  | "view_admin_logs";
+  | "view_admin_logs"
+  | "receive_walks_board_reminders";
 
 export type RoleKey =
   | "super_admin"
@@ -216,7 +217,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "use_hr_consult",
   "view_analytics",
   "export_reports",
-  "view_admin_logs"
+  "view_admin_logs",
+  "receive_walks_board_reminders"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -314,6 +316,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "resolve_active_issue",
   "view_staff_directory",
   "receive_admin_alerts",
+  "receive_walks_board_reminders",
   "review_management_support",
   "review_write_ups",
   "manage_package_commissions",
@@ -396,6 +399,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_own_write_ups",
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
+  "receive_walks_board_reminders",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -408,6 +412,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "active_issues",
   "staff_directory",
   "yard_links",
+  "walks_board",
   "notifications",
   "management_support",
   "settings",
@@ -420,6 +425,7 @@ export const TEAM_LEADER_TABS = [
   "grooming_push",
   "crossover_communication",
   "yard_links",
+  "walks_board",
   "notifications",
   "management_support",
   "settings",
@@ -430,6 +436,7 @@ export const GROOMER_TABS = [
   "grooming_push",
   "crossover_communication",
   "yard_links",
+  "walks_board",
   "notifications",
   "management_support",
   "settings",
@@ -441,6 +448,7 @@ export const TRAINER_TABS = [
   "trainer_entry",
   "package_commissions",
   "yard_links",
+  "walks_board",
   "notifications",
   "management_support",
   "settings",
@@ -450,6 +458,7 @@ export const TRAINER_TABS = [
 export const DOG_HANDLER_TABS = [
   "checklist",
   "yard_links",
+  "walks_board",
   "management_support",
   "bulk_photo_upload",
   "write_ups",
@@ -626,6 +635,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   write_ups: "submit_write_up",
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
+  walks_board: "view_admin_panel",
   settings: "view_admin_panel",
   help: "view_admin_panel"
 };

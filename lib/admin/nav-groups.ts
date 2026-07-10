@@ -66,7 +66,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   write_ups: "Write Ups",
   handler_shift_entry: "Handler Shift Entry Log",
   hr_pip: "P.I.P",
-  remote_cast: "Remote Whiteboard Cast"
+  remote_cast: "Remote Whiteboard Cast",
+  walks_board: "Walks Board"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -92,6 +93,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   ms_hub: "Review management support submissions.",
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
+  walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
   staff_directory: "Edit staff names, roles, and contact info.",
   staff_create_user: "Create a new staff admin login.",
   users: "Manage admin users, roles, and permissions.",
@@ -217,7 +219,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload", "write_ups"], visible)
+          ...singles(["walks_board", "management_support", "handler_shift_entry", "bulk_photo_upload", "write_ups"], visible)
         ])
       )
     );

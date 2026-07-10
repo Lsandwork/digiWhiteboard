@@ -115,5 +115,6 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   hr_pip: FITDOG_UI_PACK.hrPip,
   demo_push: FITDOG_UI.pushNotices,
   notifications: FITDOG_UI.notifications,
+  walks_board: FITDOG_UI.frontDeskLog,
   remote_cast: FITDOG_UI_PACK.castVideos
 };
