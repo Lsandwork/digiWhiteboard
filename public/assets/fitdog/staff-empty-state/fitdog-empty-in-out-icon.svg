@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#FF8A00" stop-opacity=".28"/>
+      <stop offset=".62" stop-color="#A94C00" stop-opacity=".10"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="48" y1="36" x2="208" y2="220">
+      <stop stop-color="#FFB04A"/>
+      <stop offset=".52" stop-color="#FF8A00"/>
+      <stop offset="1" stop-color="#A94C00"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="128" cy="128" r="104" fill="url(#bg)"/>
+  <circle cx="128" cy="128" r="92" stroke="url(#ring)" stroke-width="5"/>
+  <circle cx="128" cy="128" r="82" stroke="#FF8A00" stroke-opacity=".18" stroke-width="1.5"/>
+  <g stroke="#FF8A00" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M78 99h86"/>
+    <path d="m145 77 24 22-24 22"/>
+    <path d="M178 157H92"/>
+    <path d="m111 135-24 22 24 22"/>
+  </g>
+</svg>

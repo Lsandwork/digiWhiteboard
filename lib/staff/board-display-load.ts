@@ -134,7 +134,9 @@ export async function loadStaffBoardDogsForDisplay(supabase: SupabaseClient, now
     const basketMatchedPromptedCheckouts = promptedCheckoutRows.visible.filter((dog) =>
       isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)
     );
-    checkingIn = visible.checkingIn;
+    // Prefer the webhook's immediate transition signal while retaining any
+    // dogs already present in Gingr's back-of-house response.
+    checkingIn = mergeCheckoutDogs(visible.checkingIn, activeCheckinRows.visible);
     checkingOut = sortCheckoutDogs(mergeCheckoutDogs(visible.checkingOut, basketMatchedPromptedCheckouts));
   } else {
     if (gingrBoardResult?.source === "disabled") {

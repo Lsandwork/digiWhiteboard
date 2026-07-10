@@ -19,8 +19,10 @@ export async function GET(request: Request) {
     });
   }
 
-  const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
-  const fast = new URL(request.url).searchParams.get("fast") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const debugBoard = searchParams.get("debugBoard") === "1";
+  const fast = searchParams.get("fast") === "1";
+  const fresh = searchParams.get("fresh") === "1";
   const startedAt = Date.now();
   const now = new Date();
   const cacheKey = fast ? "lobby-checkouts:fast" : "lobby-checkouts:full";
@@ -28,11 +30,14 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
-    const checkout = await getOrLoadTtlCache(cacheKey, FAST_CHECKOUT_CACHE_TTL_MS, async () => {
+    const loadCheckouts = async () => {
       if (fast) return loadLobbyCheckoutDogsFast(supabase, now);
       const settings = await cachedLoadLobbySettings(supabase);
       return loadLobbyCheckoutDogs(supabase, settings.max_queue_count, now);
-    });
+    };
+    const checkout = fresh
+      ? await loadCheckouts()
+      : await getOrLoadTtlCache(cacheKey, FAST_CHECKOUT_CACHE_TTL_MS, loadCheckouts);
 
     const payload = sanitizeLobbyCheckouts({
       featured: checkout.featured,
@@ -59,6 +64,7 @@ export async function GET(request: Request) {
         : {})
     });
 
+    if (fresh) setTtlCache(cacheKey, checkout, FAST_CHECKOUT_CACHE_TTL_MS);
     setTtlCache(lastGoodKey, payload, 120_000);
     debugBoardLog(debugBoard, "lobby checkouts ok", {
       fast,
@@ -67,7 +73,9 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(payload, {
-      headers: { "cache-control": "private, max-age=1, stale-while-revalidate=4" }
+      headers: {
+        "cache-control": fresh ? "private, no-store, max-age=0" : "private, max-age=1, stale-while-revalidate=4"
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load lobby checkouts.";

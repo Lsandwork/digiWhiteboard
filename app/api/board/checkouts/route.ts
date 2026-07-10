@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
+import { loadFastBoardTransitions } from "@/lib/board-fast-checkout";
 import { FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
@@ -11,18 +11,26 @@ export const dynamic = "force-dynamic";
 const LAST_GOOD_KEY = "board-checkouts:last-good";
 
 export async function GET(request: Request) {
-  const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const debugBoard = searchParams.get("debugBoard") === "1";
+  const fresh = searchParams.get("fresh") === "1";
   const startedAt = Date.now();
   const now = new Date();
 
   try {
-    const result = await getOrLoadTtlCache("board-checkouts:fast", FAST_CHECKOUT_CACHE_TTL_MS, () =>
-      loadFastPromptedCheckouts(getServiceSupabase(), now)
-    );
+    const loadCheckouts = () => loadFastBoardTransitions(getServiceSupabase(), now);
+    const result = fresh
+      ? await loadCheckouts()
+      : await getOrLoadTtlCache("board-checkouts:fast", FAST_CHECKOUT_CACHE_TTL_MS, loadCheckouts);
     const durationMs = Date.now() - startedAt;
     const payload = {
+      checking_in: result.checking_in,
       checking_out: result.checking_out,
-      counts: { checking_out: result.checking_out.length },
+      counts: {
+        checking_in: result.checking_in.length,
+        checking_out: result.checking_out.length,
+        total: result.checking_in.length + result.checking_out.length
+      },
       last_updated: now.toISOString(),
       basket_filtered: result.basket_filtered,
       ...(debugBoard
@@ -39,12 +47,14 @@ export async function GET(request: Request) {
               raw_checkout_rows: result.raw_checkout_rows,
               filtered_unprompted_checkout_rows: result.filtered_unprompted_rows,
               expired_checking_out_count: result.expired_checkout_rows,
+              visible_checking_in_count: result.checking_in.length,
               visible_checking_out_count: result.checking_out.length
             }
           }
         : {})
     };
 
+    if (fresh) setTtlCache("board-checkouts:fast", result, FAST_CHECKOUT_CACHE_TTL_MS);
     setTtlCache(LAST_GOOD_KEY, payload, 120_000);
 
     if (result.checking_out.length) {
@@ -57,9 +67,15 @@ export async function GET(request: Request) {
       });
     }
 
-    debugBoardLog(debugBoard, "fast checkouts ok", { durationMs, count: result.checking_out.length });
+    debugBoardLog(debugBoard, "fast transitions ok", {
+      durationMs,
+      checkingIn: result.checking_in.length,
+      checkingOut: result.checking_out.length
+    });
     return NextResponse.json(payload, {
-      headers: { "cache-control": "private, max-age=1, stale-while-revalidate=4" }
+      headers: {
+        "cache-control": fresh ? "private, no-store, max-age=0" : "private, max-age=1, stale-while-revalidate=4"
+      }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load fast checkout board.";
@@ -74,8 +90,9 @@ export async function GET(request: Request) {
     // Return 200 empty so clients keep last-good UI instead of error-flashing.
     return NextResponse.json(
       {
+        checking_in: [],
         checking_out: [],
-        counts: { checking_out: 0 },
+        counts: { checking_in: 0, checking_out: 0, total: 0 },
         last_updated: now.toISOString(),
         basket_filtered: false,
         stale: true,

@@ -9,6 +9,8 @@ import { BoardHeader } from "@/components/board/BoardHeader";
 import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { BoardPanel } from "@/components/board/BoardPanel";
+import { StaffBoardEmptyState } from "@/components/board/StaffBoardEmptyState";
+import { getStaffBoardLayoutState, staffBoardLayoutClass } from "@/lib/staff/board-layout";
 import { StaffCastButton } from "@/components/board/StaffCastButton";
 import {
   StaffPushNoticeFullscreen,
@@ -92,6 +94,10 @@ function newestCheckoutAlertSoundKey(entries: { dog: LiveDog }[]) {
   const anchor = dog.status_started_at ?? dog.updated_at ?? dog.id;
   const dogKey = dog.gingr_reservation_id ?? dog.gingr_animal_id ?? dog.id;
   return `checkout:${dogKey}:${anchor}`;
+}
+
+function freshBoardUrl(url: string) {
+  return `${url}${url.includes("?") ? "&" : "?"}fresh=1`;
 }
 
 function getDevDemoBoard(): LiveBoardResponse | null {
@@ -413,7 +419,7 @@ export function BoardClient({
     boardRef.current = board;
   }, [board]);
 
-  const loadFastCheckouts = useCallback(async () => {
+  const loadFastCheckouts = useCallback(async (options: { fresh?: boolean } = {}) => {
     await runFastPoll(async () => {
       const result = await fetchBoardJson<
         LiveBoardResponse & {
@@ -423,7 +429,7 @@ export function BoardClient({
           stale?: boolean;
         }
       >({
-        url: fastCheckoutEndpoint,
+        url: options.fresh ? freshBoardUrl(fastCheckoutEndpoint) : fastCheckoutEndpoint,
         timeoutMs: BOARD_FAST_FETCH_TIMEOUT_MS,
         debug: debugBoard,
         cacheKey: "staff-fast-checkouts",
@@ -445,6 +451,10 @@ export function BoardClient({
       checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2;
 
       setBoard((previous) => {
+        // The fast endpoint includes webhook-sourced check-ins as well as
+        // prompted checkouts, so both columns can update without waiting for
+        // the heavier Gingr-backed full-board request.
+        const nextCheckins = preserveDogPhotos(previous.checking_in, data.checking_in ?? []);
         // When Gingr basket filtering is authoritative, replace (don't ghost-merge) after empty streak.
         const nextRaw =
           data.basket_filtered && checkoutBasketEmptyRef.current
@@ -455,17 +465,21 @@ export function BoardClient({
                 : previous.checking_out
               : mergeCheckoutDogs(previous.checking_out, data.checking_out);
         const nextCheckouts = preserveDogPhotos(previous.checking_out, nextRaw);
-        if (areCheckoutListsEquivalent(previous.checking_out, nextCheckouts)) {
+        if (
+          areCheckoutListsEquivalent(previous.checking_in, nextCheckins) &&
+          areCheckoutListsEquivalent(previous.checking_out, nextCheckouts)
+        ) {
           return previous;
         }
 
         return {
           ...previous,
+          checking_in: nextCheckins,
           checking_out: nextCheckouts,
           counts: {
-            checking_in: previous.counts.checking_in,
+            checking_in: nextCheckins.length,
             checking_out: nextCheckouts.length,
-            total: previous.counts.checking_in + nextCheckouts.length
+            total: nextCheckins.length + nextCheckouts.length
           },
           last_updated: data.last_updated ?? previous.last_updated,
           debug: data.debug ?? previous.debug
@@ -619,7 +633,7 @@ export function BoardClient({
 
     const clockIntervalMs = castKeeperMode ? 60_000 : 1000;
     const nowIntervalMs = castKeeperMode ? 5_000 : 1000;
-    const fastPollIntervalMs = castKeeperMode ? 12_000 : BOARD_CHECKOUT_POLL_MS;
+    const fastPollIntervalMs = BOARD_CHECKOUT_POLL_MS;
     const fullPollIntervalMs = castKeeperMode ? 25_000 : BOARD_FULL_SYNC_POLL_MS;
 
     const clockTimer = window.setInterval(() => setClock(new Date()), clockIntervalMs);
@@ -668,7 +682,11 @@ export function BoardClient({
             if (dogName && next?.display_status === "checking_out" && !next.hidden) setToast(`${dogName} is checking out.`);
             if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
             if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
-            void loadFastCheckoutsRef.current();
+            // Realtime events must bypass the short server caches; otherwise an
+            // immediate request can receive the pre-event snapshot and wait for
+            // the next poll. The fast endpoint covers both check-ins and
+            // prompted checkouts without waiting on the heavier Gingr request.
+            void loadFastCheckoutsRef.current({ fresh: true });
           }
         )
         .subscribe((status) => {
@@ -748,7 +766,16 @@ export function BoardClient({
     health: castHealth,
     onFallbackRefresh: () => window.location.reload()
   });
-  const showEmptyState = fetchStatus === "ok" && !fetchError;
+  const isBoardDataLoaded = (fetchStatus === "ok" && !fetchError) || hasVisibleDogs;
+  const staffBoardLayout = useMemo(
+    () =>
+      getStaffBoardLayoutState({
+        checkInCount: visibleCheckingInDogs.length,
+        checkOutCount: visibleCheckoutDogs.length,
+        isLoaded: isBoardDataLoaded
+      }),
+    [isBoardDataLoaded, visibleCheckingInDogs.length, visibleCheckoutDogs.length]
+  );
   const expiredCheckoutCount = Math.max(0, stickyCheckoutDogs.length - visibleCheckoutDogs.length);
   // Only urgent/emergency pushes (or empty board) take over fullscreen — never hide dogs for routine notices on TV.
   const showActivePushFullscreen = Boolean(
@@ -841,26 +868,46 @@ export function BoardClient({
           <StaffPushNoticeFullscreen notice={activePushNotice!} />
         ) : (
           <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
-            <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
-              <BoardPanel
-                title="Checking In"
-                subtitle="Dogs Arriving Today"
-                mode="in"
-                checkingInEntries={visibleCheckingInDogs}
-                nowMs={nowMs}
-                showEmptyState={showEmptyState}
+            {staffBoardLayout.variant === "loading" ? (
+              <div
+                className="staff-board-content staff-board-content--loading min-h-0 flex-1"
+                aria-busy="true"
+                aria-label="Loading board data"
+                data-staff-board-layout="loading"
               />
-              <BoardPanel
-                title="Checking Out"
-                subtitle="Dogs Heading Home"
-                mode="out"
-                checkingOutEntries={visibleCheckoutDogs}
-                nowMs={nowMs}
-                showStaffClear={staffMode}
-                onClearCheckout={handleClearCheckout}
-                showEmptyState={showEmptyState}
-              />
-            </div>
+            ) : staffBoardLayout.showApprovedEmptyState ? (
+              <StaffBoardEmptyState />
+            ) : (
+              <div
+                className={staffBoardLayoutClass(staffBoardLayout.variant)}
+                data-staff-board-layout={staffBoardLayout.variant}
+              >
+                {staffBoardLayout.showCheckInPanel ? (
+                  <BoardPanel
+                    title="Checking In"
+                    subtitle="Dogs Arriving Today"
+                    mode="in"
+                    checkingInEntries={visibleCheckingInDogs}
+                    nowMs={nowMs}
+                    showEmptyState={false}
+                    fullWidth={staffBoardLayout.isSinglePanel}
+                  />
+                ) : null}
+                {staffBoardLayout.showCheckOutPanel ? (
+                  <BoardPanel
+                    title="Checking Out"
+                    subtitle="Dogs Heading Home"
+                    mode="out"
+                    checkingOutEntries={visibleCheckoutDogs}
+                    nowMs={nowMs}
+                    showStaffClear={staffMode}
+                    onClearCheckout={handleClearCheckout}
+                    showEmptyState={false}
+                    fullWidth={staffBoardLayout.isSinglePanel}
+                  />
+                ) : null}
+              </div>
+            )}
             {activePushNotice ? <StaffPushNoticePanel notice={activePushNotice} /> : null}
           </div>
         )}

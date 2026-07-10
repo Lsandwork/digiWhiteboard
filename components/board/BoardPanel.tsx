@@ -7,6 +7,7 @@ import { EmptyBoardState } from "@/components/board/EmptyBoardState";
 
 type BoardPanelProps = {
   showEmptyState?: boolean;
+  fullWidth?: boolean;
   nowMs: number;
 } & (
   | {
@@ -30,7 +31,7 @@ type BoardPanelProps = {
 );
 
 export function BoardPanel(props: BoardPanelProps) {
-  const { title, subtitle, mode, nowMs, showStaffClear = false, showEmptyState = true } = props;
+  const { title, subtitle, mode, nowMs, showStaffClear = false, showEmptyState = true, fullWidth = false } = props;
   const Icon = mode === "in" ? LogIn : LogOut;
   const count = mode === "in" ? props.checkingInEntries.length : props.checkingOutEntries.length;
   const hasCheckoutAlerts = mode === "out" && count > 0;
@@ -40,7 +41,8 @@ export function BoardPanel(props: BoardPanelProps) {
       className={clsx(
         "board-panel flex min-h-0 flex-1 flex-col rounded-3xl p-4 sm:p-5 lg:p-6",
         mode === "in" ? "board-panel-in" : "board-panel-out",
-        hasCheckoutAlerts && "board-panel-out-active"
+        hasCheckoutAlerts && "board-panel-out-active",
+        fullWidth && "board-panel--full-width"
       )}
     >
       <div className="mb-4 flex items-start justify-between gap-4 sm:mb-5">

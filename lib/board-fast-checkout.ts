@@ -5,6 +5,7 @@ import {
 } from "@/lib/basket-cleared-checkout";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
 import { sortCheckoutDogs } from "@/lib/board-checkout-merge";
@@ -26,6 +27,10 @@ export type FastCheckoutLoadResult = {
   basket_filtered: boolean;
   basket_cleared_rows: number;
   data_source: "supabase_live_transition_dogs";
+};
+
+export type FastBoardTransitionLoadResult = FastCheckoutLoadResult & {
+  checking_in: LiveDog[];
 };
 
 function enrichDogs(dogs: LiveDog[]) {
@@ -101,6 +106,81 @@ export async function loadFastPromptedCheckouts(
     prompted_count: prompted.length,
     raw_checkout_rows: rows.length,
     filtered_unprompted_rows: rows.length - prompted.length,
+    expired_checkout_rows: expiredCount,
+    basket_filtered: basketFiltered,
+    basket_cleared_rows: 0,
+    data_source: "supabase_live_transition_dogs"
+  };
+}
+
+/**
+ * Staff board fast path: one Supabase query for both active check-ins and
+ * prompted checkouts. This avoids waiting for the heavier Gingr-backed
+ * /api/live-board request before a webhook-triggered dog can appear.
+ */
+export async function loadFastBoardTransitions(
+  supabase: SupabaseClient,
+  now = new Date()
+): Promise<FastBoardTransitionLoadResult> {
+  const { data, error } = await withTimeoutOrThrow(
+    Promise.resolve(
+      supabase
+        .from("live_transition_dogs")
+        .select(
+          "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at"
+        )
+        .eq("hidden", false)
+        .in("display_status", ["checking_in", "checking_out"])
+        .order("status_started_at", { ascending: true })
+        .limit(80)
+    ),
+    FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+    "fast-board live_transition_dogs"
+  );
+
+  if (error) throw error;
+
+  const rows = enrichDogs((data ?? []) as LiveDog[]);
+  const checkinRows = rows.filter(
+    (dog) => dog.display_status === "checking_in" && dog.raw_payload?.source !== "gingr_back_of_house"
+  );
+  const visibleCheckins = checkinRows.filter((dog) => !shouldExpireCheckinDog(dog, now));
+
+  const checkoutRows = rows.filter((dog) => dog.display_status === "checking_out");
+  const prompted = checkoutRows.filter(isPromptedCheckoutDog);
+  const expiredCount = prompted.filter((dog) => shouldExpireCheckoutDog(dog, now)).length;
+  let visibleCheckouts = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
+  let basketFiltered = false;
+
+  const gingrCheckoutKeys = getCachedGingrBasketCheckoutKeys(now.getTime(), true);
+  if (gingrCheckoutKeys) {
+    basketFiltered = true;
+    visibleCheckouts = filterCheckoutsToGingrBasket(visibleCheckouts, gingrCheckoutKeys);
+  }
+
+  let visible = applyCachedBackOfHousePhotos([...visibleCheckins, ...visibleCheckouts]);
+  try {
+    visible = applyCachedBackOfHousePhotos(
+      await withTimeoutOrThrow(
+        applyStoredAnimalPhotos(supabase, visible),
+        FAST_CHECKOUT_PHOTO_TIMEOUT_MS,
+        "fast-board photos"
+      )
+    );
+  } catch {
+    // Photos are optional — dog status should never wait for photo storage.
+  }
+
+  const checkingIn = visible.filter((dog) => dog.display_status === "checking_in");
+  const checkingOut = visible.filter((dog) => dog.display_status === "checking_out");
+
+  return {
+    checking_in: checkingIn,
+    checking_out: sortCheckoutDogs(checkingOut),
+    newest_checkout_at: newestCheckoutTimestamp(checkingOut),
+    prompted_count: prompted.length,
+    raw_checkout_rows: checkoutRows.length,
+    filtered_unprompted_rows: checkoutRows.length - prompted.length,
     expired_checkout_rows: expiredCount,
     basket_filtered: basketFiltered,
     basket_cleared_rows: 0,

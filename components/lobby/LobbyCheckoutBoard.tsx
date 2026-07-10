@@ -66,6 +66,10 @@ type LobbyDisplayMode = "IDLE" | "CHECKOUT_ACTIVE";
 
 const LOBBY_EMPTY_CHECKOUT_GRACE_MS = 25_000;
 
+function freshBoardUrl(url: string) {
+  return `${url}${url.includes("?") ? "&" : "?"}fresh=1`;
+}
+
 function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null | undefined): LobbyCheckoutsResponse {
   const sanitized = sanitizeLobbyCheckouts(body ?? {});
   return {
@@ -235,13 +239,13 @@ export function LobbyCheckoutBoard({
     setDisplayMode(stickyResponse.featured || stickyResponse.queue.length ? "CHECKOUT_ACTIVE" : "IDLE");
   }, []);
 
-  const loadFastLobbyCheckouts = useCallback(async () => {
+  const loadFastLobbyCheckouts = useCallback(async (options: { fresh?: boolean } = {}) => {
     await runFastPoll(async () => {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS);
 
       try {
-        const checkoutsRes = await fetch(fastCheckoutEndpoint, {
+        const checkoutsRes = await fetch(options.fresh ? freshBoardUrl(fastCheckoutEndpoint) : fastCheckoutEndpoint, {
           cache: "no-store",
           headers: requestHeaders,
           signal: controller.signal
@@ -411,11 +415,15 @@ export function LobbyCheckoutBoard({
   }, []);
 
   const debouncedRefreshCheckouts = useDebouncedCallback(() => {
-    void loadFastLobbyCheckouts();
+    // Bypass the short server cache after a DB event so the event-triggered
+    // refresh cannot receive the snapshot from just before the dog appeared.
+    void loadFastLobbyCheckouts({ fresh: true });
   }, BOARD_REALTIME_DEBOUNCE_MS);
 
   useEffect(() => {
-    const fastPollIntervalMs = castKeeperMode ? 30_000 : checkoutPollMs;
+    // Cast/remote displays need the same quick fallback as direct boards when
+    // Realtime is unavailable. The API's short TTL still deduplicates callers.
+    const fastPollIntervalMs = castKeeperMode ? BOARD_CHECKOUT_POLL_MS : checkoutPollMs;
     const fullPollIntervalMs = castKeeperMode ? 60_000 : BOARD_FULL_SYNC_POLL_MS;
     const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), fastPollIntervalMs);
     const fullPollTimer = window.setInterval(() => void loadLobbyCheckouts(), fullPollIntervalMs);

@@ -4,9 +4,9 @@ import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-di
 
 export const BOARD_CHECKOUT_POLL_MIN_MS = 4000;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
-export const BOARD_CHECKOUT_POLL_MS = 5000;
+export const BOARD_CHECKOUT_POLL_MS = 4000;
 export const BOARD_FULL_SYNC_POLL_MS = 20_000;
-export const BOARD_REALTIME_DEBOUNCE_MS = 750;
+export const BOARD_REALTIME_DEBOUNCE_MS = 250;
 
 export function clampCheckoutPollMs(intervalMs: number) {
   return Math.min(BOARD_CHECKOUT_POLL_MAX_MS, Math.max(BOARD_CHECKOUT_POLL_MIN_MS, intervalMs));

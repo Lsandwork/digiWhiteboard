@@ -162,7 +162,8 @@ async function loadSupabaseBoardRows(supabase: ReturnType<typeof getServiceSupab
 }
 
 export async function GET(request: Request) {
-  const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
+  const searchParams = new URL(request.url).searchParams;
+  const debugBoard = searchParams.get("debugBoard") === "1";
   const now = new Date();
 
   const envCheck = getBoardEnvCheck();
@@ -236,7 +237,10 @@ export async function GET(request: Request) {
       const basketMatchedPromptedCheckouts = promptedCheckoutRows.visible.filter((dog) =>
         isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)
       );
-      checkingIn = visible.checkingIn;
+      // Webhook rows are the fastest signal that a check-in started. Merge them
+      // with the Gingr basket instead of waiting for Gingr's back-of-house feed
+      // to catch up before the dog can appear on the board.
+      checkingIn = mergeCheckoutDogs(visible.checkingIn, activeCheckinRows.visible);
       checkingOut = sortCheckoutDogs(
         mergeCheckoutDogs(visible.checkingOut, basketMatchedPromptedCheckouts)
       );

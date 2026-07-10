@@ -77,27 +77,27 @@ export function DogStatusCard({
         </button>
       ) : null}
 
-      <div className={clsx("flex items-center gap-4 sm:gap-5", isSolo && "gap-6 sm:gap-8 lg:gap-10")}>
+      <div className={clsx("board-dog-card__grid", isSolo && "board-dog-card__grid--solo")}>
         <DogAvatar dog={dog} mode={mode} isAlerting={isAlerting} isNew={isNew} size={isSolo ? "solo" : "default"} />
 
-        <div className="min-w-0 flex-1">
+        <div className="board-dog-details min-w-0">
           <h3
             className={clsx(
-              "truncate font-black leading-tight text-white",
-              isSolo ? "text-5xl sm:text-6xl lg:text-7xl xl:text-8xl" : "text-3xl sm:text-4xl",
+              "board-dog-name",
+              isSolo && "board-dog-name--solo",
               mode === "out" && isAlerting && "checkout-name-alert"
             )}
           >
-            {dog.animal_name}
+            {dog.animal_name || "Dog"}
           </h3>
           {personName ? (
-            <p className={clsx("mt-1 truncate text-slate-400", isSolo ? "mt-2 text-2xl sm:text-3xl lg:text-4xl" : "text-lg sm:text-xl")}>
+            <p className={clsx("board-dog-meta mt-1 text-slate-400", isSolo && "board-dog-meta--solo")}>
               {personLabel}: <span className="text-slate-200">{personName}</span>
             </p>
           ) : null}
         </div>
 
-        <div className={clsx("flex shrink-0 flex-col items-end gap-2", isSolo && "gap-3 sm:gap-4")}>
+        <div className={clsx("board-dog-status flex shrink-0 flex-col items-end gap-2", isSolo && "gap-3 sm:gap-4")}>
           {mode === "out" && isAlerting ? (
             <span
               className={clsx(

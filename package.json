@@ -18,6 +18,7 @@
     "test:yard-links": "tsx scripts/test-yard-links.ts",
     "test:role-access": "tsx scripts/test-role-access.ts",
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
+    "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "check:display-health": "tsx scripts/check-display-health.ts",
