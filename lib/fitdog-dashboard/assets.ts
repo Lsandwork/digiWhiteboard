@@ -34,6 +34,29 @@ export const FITDOG_UI = {
   logout: "/assets/fitdog/ui/logout-64.png"
 } as const;
 
+/** Vector icon pack for tabs that were missing bespoke assets. */
+export const FITDOG_UI_PACK = {
+  checklist: "/assets/fitdog/ui-pack/checklist.svg",
+  emergencyAlerts: "/assets/fitdog/ui-pack/emergency-alerts.svg",
+  castVideos: "/assets/fitdog/ui-pack/cast-videos.svg",
+  ownerFollowUp: "/assets/fitdog/ui-pack/owner-follow-up.svg",
+  activeIssues: "/assets/fitdog/ui-pack/active-issues.svg",
+  users: "/assets/fitdog/ui-pack/users.svg",
+  bulkPhotoUpload: "/assets/fitdog/ui-pack/bulk-photo-upload.svg",
+  writeUps: "/assets/fitdog/ui-pack/write-ups.svg",
+  handlerShiftEntry: "/assets/fitdog/ui-pack/handler-shift-entry.svg",
+  hrPip: "/assets/fitdog/ui-pack/hr-pip.svg"
+} as const;
+
+/** Reusable button icon set aligned to dashboard style. */
+export const FITDOG_BUTTON_ICONS = {
+  collapse: "/assets/fitdog/ui-pack/button-collapse.svg",
+  expand: "/assets/fitdog/ui-pack/button-expand.svg",
+  sync: "/assets/fitdog/ui-pack/button-sync.svg",
+  upload: "/assets/fitdog/ui-pack/button-upload.svg",
+  save: "/assets/fitdog/ui-pack/button-save.svg"
+} as const;
+
 /** Orange-glow sidebar icons (unified dashboard style). */
 export const FITDOG_SIDEBAR_ICONS = {
   overview: "/assets/sidebar-icons/icon-overview.png",
@@ -49,22 +72,32 @@ export const FITDOG_SIDEBAR_ICONS = {
 
 /** Sidebar nav icons for staff panel tabs. */
 export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
+  checklist: FITDOG_UI_PACK.checklist,
   overview: FITDOG_SIDEBAR_ICONS.overview,
+  content: FITDOG_UI.openItems,
+  promotions: FITDOG_UI.pushNotices,
+  schedule: FITDOG_UI.dueToday,
+  display: FITDOG_UI.view,
   whiteboard_preview: FITDOG_SIDEBAR_ICONS.whiteboardPreview,
   analytics: FITDOG_SIDEBAR_ICONS.analytics,
   templates: FITDOG_SIDEBAR_ICONS.templates,
   staff_directory: FITDOG_SIDEBAR_ICONS.staffDirectory,
   staff_create_user: FITDOG_UI.edit,
+  users: FITDOG_UI_PACK.users,
   settings: FITDOG_SIDEBAR_ICONS.settings,
   logs: FITDOG_SIDEBAR_ICONS.logs,
   integrations: FITDOG_SIDEBAR_ICONS.integrations,
   help: FITDOG_SIDEBAR_ICONS.help,
   push_notices: FITDOG_UI.pushNotices,
   yard_push_notices: FITDOG_UI.videoLinks,
+  emergency_alerts: FITDOG_UI_PACK.emergencyAlerts,
   grooming_push: FITDOG_UI.groomingPush,
   trainer_push: FITDOG_UI.groomingPush,
+  cast_videos: FITDOG_UI_PACK.castVideos,
   trainer_entry: FITDOG_UI.frontDeskLog,
   crossover_communication: FITDOG_UI.frontDeskLog,
+  owner_follow_up: FITDOG_UI_PACK.ownerFollowUp,
+  active_issues: FITDOG_UI_PACK.activeIssues,
   yard_links: FITDOG_UI.videoLinks,
   management_support: FITDOG_UI.managementSupport,
   ms_hub: FITDOG_UI.managementSupport,
@@ -76,6 +109,11 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   package_commissions: FITDOG_UI.managementSupport,
   hr_hub: FITDOG_UI.managementSupport,
   hr_consult: FITDOG_UI.managementSupport,
+  bulk_photo_upload: FITDOG_UI_PACK.bulkPhotoUpload,
+  write_ups: FITDOG_UI_PACK.writeUps,
+  handler_shift_entry: FITDOG_UI_PACK.handlerShiftEntry,
+  hr_pip: FITDOG_UI_PACK.hrPip,
   demo_push: FITDOG_UI.pushNotices,
-  notifications: FITDOG_UI.notifications
+  notifications: FITDOG_UI.notifications,
+  remote_cast: FITDOG_UI_PACK.castVideos
 };

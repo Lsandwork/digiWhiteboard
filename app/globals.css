@@ -1218,6 +1218,10 @@ html.cast-keeper-display .lobby-cast-control {
   display: none !important;
 }
 
+html.cast-lite-mode:not(.chromecast-receiver) .staff-cast-control {
+  display: flex !important;
+}
+
 html.cast-keeper-paused .push-board-veil,
 html.cast-keeper-paused .push-board-veil-vignette,
 html.cast-keeper-paused .push-board-veil-bar,
@@ -3039,29 +3043,49 @@ html.lobby-tv-display .social-video-shell {
   transition: opacity 0.16s ease;
 }
 
+/* Collapsed rail: only centered icon PNGs, no labels/chevrons/expanded children. */
 .admin-sidebar--collapsed .admin-sidebar-brand__text,
 .admin-sidebar--collapsed .admin-nav-item > span,
 .admin-sidebar--collapsed .admin-nav-group__chevron,
 .admin-sidebar--collapsed .admin-nav-section,
 .admin-sidebar--collapsed .admin-sidebar-help-card,
-.admin-sidebar--collapsed .admin-user-card .min-w-0 {
-  opacity: 0;
-}
-
-.admin-sidebar--collapsed .admin-nav-section,
-.admin-sidebar--collapsed .admin-sidebar-help-card,
+.admin-sidebar--collapsed .admin-nav-group__children,
 .admin-sidebar--collapsed .admin-user-card .min-w-0 {
   display: none;
 }
 
+.admin-sidebar--collapsed nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.admin-sidebar--collapsed .admin-nav-group {
+  width: auto;
+}
+
 .admin-sidebar--collapsed .admin-nav-item {
+  width: 46px;
+  height: 46px;
+  gap: 0;
+  padding: 0;
+  margin-inline: auto;
   justify-content: center;
-  padding-inline: 0.6rem;
-  transition: padding 0.16s ease, justify-content 0.16s ease;
+  transition: none;
 }
 
 .admin-sidebar--collapsed .admin-nav-item--nested {
-  padding-left: 0.6rem;
+  padding-left: 0;
+}
+
+.admin-sidebar--collapsed .admin-nav-item__icon {
+  margin: 0;
+}
+
+.admin-sidebar--collapsed .admin-user-card {
+  justify-content: center;
+  padding-inline: 0;
 }
 
 .admin-sidebar-collapse-btn {
@@ -9040,5 +9064,674 @@ html.lobby-tv-display .social-video-shell {
   .cast-video__watch-btn,
   .cast-video__clear-btn {
     justify-content: center;
+  }
+}
+
+/* ── Cast Lite Mode (Chromecast / long-running displays) ── */
+
+.cast-lite-mode {
+  contain: layout style;
+}
+
+.cast-lite-mode.cast-lite-low-motion *,
+.cast-lite-mode.cast-lite-low-motion *::before,
+.cast-lite-mode.cast-lite-low-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.15s !important;
+}
+
+html.cast-performance-mode,
+html.cast-performance-mode.cast-lite-mode,
+html.cast-performance-mode.cast-keeper-display {
+  background: #02060b;
+}
+
+html.cast-performance-mode .kennel-lines,
+html.cast-performance-mode.cast-lite-mode .kennel-lines {
+  background: #02060b;
+  background-image: none;
+}
+
+html.cast-performance-mode .glass-panel,
+html.cast-performance-mode .board-panel,
+html.cast-performance-mode .board-chip,
+html.cast-performance-mode .cast-lite-panel {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.cast-performance-mode .staff-push-notice__flash,
+html.cast-performance-mode .staff-push-notice__flash-layer,
+html.cast-performance-mode .staff-push-notice__stripes,
+html.cast-performance-mode .staff-push-notice__strobe-ring,
+html.cast-performance-mode .staff-push-notice__beacon,
+html.cast-performance-mode .staff-push-notice__scanlines,
+html.cast-performance-mode .staff-push-notice__edge-flash,
+html.cast-performance-mode .push-board-veil,
+html.cast-performance-mode .push-board-veil-vignette,
+html.cast-performance-mode .grooming-push__pulse,
+html.cast-performance-mode .grooming-push__glow,
+html.cast-performance-mode .grooming-push__flash-sweep,
+html.cast-performance-mode .grooming-push--alerting * {
+  animation: none !important;
+}
+
+html.cast-performance-mode .chromecast-receiver .grooming-push--alerting,
+html.chromecast-receiver .grooming-push--alerting,
+html.chromecast-receiver .grooming-push--alerting * {
+  animation: none !important;
+  transition: none !important;
+}
+
+html.chromecast-receiver img {
+  content-visibility: auto;
+}
+
+
+.cast-lite-shell--video {
+  contain: strict;
+}
+
+.cast-lite-video-stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  contain: layout paint;
+}
+
+.cast-lite-video-stage__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cast-lite-video-stage__title {
+  font-size: clamp(1.5rem, 2.5vw, 2.25rem);
+  font-weight: 900;
+  color: #fff;
+}
+
+.cast-lite-video-stage__subtitle,
+.cast-lite-video-stage__date {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: rgba(148, 163, 184, 0.9);
+}
+
+.cast-lite-video-stage__clock {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 900;
+  color: #fff;
+}
+
+.cast-lite-video--low-motion .cast-lite-video__player {
+  transform: translateZ(0);
+  will-change: auto;
+}
+
+.cast-lite-video {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  margin: 0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  contain: strict;
+  max-height: none;
+}
+
+.cast-lite-video__player {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  max-height: calc(100vh - 8rem);
+  object-fit: contain;
+  display: block;
+  background: #000;
+  transform: translateZ(0);
+}
+
+.cast-lite-video__title {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  text-align: center;
+}
+
+
+.cast-lite-shell {
+  min-height: 100vh;
+  background: #0a0f1a;
+  color: #fff;
+  contain: layout paint;
+}
+
+.cast-lite-shell--staff {
+  background: linear-gradient(160deg, #0a0f1a 0%, #111827 50%, #0f172a 100%);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.cast-lite-shell--lobby {
+  background: linear-gradient(160deg, #0c1220 0%, #1a1f2e 50%, #0f1419 100%);
+}
+
+.cast-lite-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  contain: layout;
+}
+
+.cast-lite-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  contain: layout;
+}
+
+.cast-lite-brand__title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.cast-lite-brand__subtitle {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 0.1rem;
+}
+
+.cast-lite-clock {
+  text-align: right;
+  contain: layout;
+}
+
+.cast-lite-clock__time {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.cast-lite-clock__date {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.cast-lite-staff-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 0 1.5rem 1.5rem;
+  contain: layout;
+  flex: 1;
+  min-height: 0;
+}
+
+.cast-lite-panel {
+  contain: layout paint;
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cast-lite-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cast-lite-panel__header h2 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.cast-lite-panel__header span {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.cast-lite-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  flex: 1;
+  min-height: 8rem;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.cast-lite-panel--in .cast-lite-panel__header {
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.cast-lite-panel--out .cast-lite-panel__header {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.cast-lite-dog-card__avatar {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 800;
+  font-size: 1.25rem;
+}
+
+.cast-lite-dog-card__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cast-lite-dog-card__copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.cast-lite-dog-card__room {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 0.15rem;
+}
+
+.cast-lite-push {
+  margin: 0 1.5rem 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  contain: layout paint;
+}
+
+.cast-lite-push--urgent {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.cast-lite-push--grooming {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.cast-lite-push__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.cast-lite-push__title {
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin-top: 0.2rem;
+}
+
+.cast-lite-push__message {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 0.25rem;
+}
+
+.cast-lite-lobby-bg {
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.cast-lite-shell--lobby > *:not(.cast-lite-lobby-bg) {
+  position: relative;
+  z-index: 1;
+}
+
+.cast-lite-header--lobby {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.cast-lite-lobby-idle,
+.cast-lite-lobby-checkouts {
+  padding: 1.5rem;
+  contain: layout paint;
+}
+
+.cast-lite-lobby-idle p {
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 36rem;
+  margin: 2rem auto;
+}
+
+.cast-lite-lobby-queue {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.cast-lite-lobby-footer {
+  padding: 0.75rem 1.5rem 1.25rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 768px) {
+  .cast-lite-staff-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cast-lite-reconnect {
+  position: fixed;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 50;
+}
+
+.cast-lite-reconnect--visible {
+  opacity: 1;
+}
+
+.cast-lite-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding: 0 1.5rem 1.5rem;
+  contain: layout;
+}
+
+.cast-lite-section {
+  contain: layout paint;
+}
+
+.cast-lite-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.75rem;
+}
+
+.cast-lite-dog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cast-lite-dog-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  contain: layout paint;
+  min-height: 4.5rem;
+}
+
+.cast-lite-dog-card__photo {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cast-lite-dog-card__photo-fallback {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.5rem;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  font-size: 1.5rem;
+}
+
+.cast-lite-dog-card__name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.cast-lite-dog-card__meta {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.cast-lite-banner {
+  margin: 0 1.5rem 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  contain: layout paint;
+}
+
+.cast-lite-banner--grooming {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.cast-lite-banner__title {
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.cast-lite-banner__body {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 0.25rem;
+}
+
+.cast-lite-debug {
+  position: fixed;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.85);
+  font-family: ui-monospace, monospace;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
+  z-index: 100;
+  max-width: 20rem;
+  line-height: 1.4;
+}
+
+.cast-lite-empty {
+  padding: 1rem;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 768px) {
+  .cast-lite-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Performance-focused cast mode for the main Staff/Lobby whiteboards. */
+
+html.fitdog-cast-mode,
+html.fitdog-cast-mode body {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #02060b;
+}
+
+html.fitdog-cast-mode body {
+  max-width: 100vw;
+}
+
+html.fitdog-cast-mode .fitdog-cast-board,
+html.fitdog-cast-mode .fitdog-tv-stage--staff,
+html.fitdog-cast-mode .fitdog-tv-stage--lobby,
+html.fitdog-cast-mode .fitdog-board-canvas-inner,
+html.fitdog-cast-mode .fitdog-lobby-canvas-inner {
+  width: 100vw;
+  max-width: 100vw;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  contain: layout paint style;
+}
+
+html.fitdog-cast-mode .fitdog-board-canvas-inner,
+html.fitdog-cast-mode .fitdog-lobby-canvas-inner {
+  aspect-ratio: 16 / 9;
+}
+
+html.fitdog-cast-mode img,
+html.fitdog-cast-mode video {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+html.fitdog-cast-mode .board-panel,
+html.fitdog-cast-mode .board-card,
+html.fitdog-cast-mode .lobby-panel,
+html.fitdog-cast-mode .social-moments-card,
+html.fitdog-cast-mode .lobby-class-schedule,
+html.fitdog-cast-mode .staff-push-notice,
+html.fitdog-cast-mode .grooming-push,
+html.fitdog-cast-mode .trainer-push {
+  contain: layout paint;
+}
+
+html.fitdog-cast-mode .social-video-stack video {
+  display: none;
+}
+
+html.fitdog-cast-mode .social-video-static-controls {
+  display: none;
+}
+
+.cast-mode-status {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 120;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(2, 6, 11, 0.72);
+  padding: 0.35rem 0.7rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.cast-mode-status__dot {
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: #68f77f;
+  box-shadow: 0 0 12px rgba(104, 247, 127, 0.75);
+}
+
+.cast-mode-status--reconnecting .cast-mode-status__dot {
+  background: #fbbf24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.72);
+}
+
+.cast-mode-status--offline .cast-mode-status__dot {
+  background: #fb7185;
+  box-shadow: 0 0 12px rgba(251, 113, 133, 0.72);
+}
+
+@keyframes fitdog-cast-alert-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.018);
+  }
+}
+
+@keyframes fitdog-cast-alert-fade {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+html.fitdog-cast-mode .checkout-alert-active,
+html.fitdog-cast-mode .checkout-ready-badge,
+html.fitdog-cast-mode .checkout-status-badge-alert,
+html.fitdog-cast-mode .checkout-avatar-alert-ring,
+html.fitdog-cast-mode .staff-push-notice__beacon,
+html.fitdog-cast-mode .grooming-push--alerting,
+html.fitdog-cast-mode .trainer-push--alerting {
+  animation: fitdog-cast-alert-pulse 1.8s ease-in-out infinite !important;
+}
+
+html.fitdog-cast-mode .push-board-veil,
+html.fitdog-cast-mode .staff-push-notice__flash-layer {
+  animation: fitdog-cast-alert-fade 2.4s ease-in-out infinite !important;
+}
+
+@media (min-aspect-ratio: 16 / 9) {
+  html.fitdog-cast-mode .fitdog-board-canvas-inner,
+  html.fitdog-cast-mode .fitdog-lobby-canvas-inner {
+    max-height: 100vh;
+    max-height: 100dvh;
   }
 }
