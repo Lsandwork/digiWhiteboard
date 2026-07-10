@@ -6,6 +6,7 @@ import { PawPrint } from "lucide-react";
 import { BoardDebugPanel } from "@/components/board/BoardDebugPanel";
 import { BoardErrorBanner } from "@/components/board/BoardErrorBanner";
 import { BoardHeader } from "@/components/board/BoardHeader";
+import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { BoardPanel } from "@/components/board/BoardPanel";
 import { StaffCastButton } from "@/components/board/StaffCastButton";
@@ -18,29 +19,32 @@ import { CastVideoOverlay } from "@/components/board/CastVideoOverlay";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
 import { TrainerPushNoticeOverlay } from "@/components/board/TrainerPushNoticeOverlay";
 import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
-import { useCastVideoNotices } from "@/hooks/useCastVideoNotices";
-import { useGroomingPushNotices } from "@/hooks/useGroomingPushNotices";
-import { useTrainerPushNotices } from "@/hooks/useTrainerPushNotices";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
 import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
-import { useStaffPushNotice } from "@/hooks/useStaffPushNotice";
+import { useStaffBoardOverlays } from "@/hooks/useStaffBoardOverlays";
+import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
+import { useDogPhotoPreloader } from "@/hooks/useDogPhotoPreloader";
 import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useStaffTvCast } from "@/hooks/useStaffTvCast";
 import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, mergeCheckoutDogs } from "@/lib/board-checkout-merge";
+import { fetchBoardJson } from "@/lib/board-fetch";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
 import {
+  areStickyCheckoutStatesEqual,
+  expireStickyCheckoutDogs,
   getCheckoutMergeKey,
   mergeStickyCheckoutDogs,
+  stickyCheckoutDisplayMetaByKey,
   stickyCheckoutFirstSeenByKey,
   stickyCheckoutStateToDogs,
   type StickyCheckoutState
 } from "@/lib/board-sticky-checkout";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
-import { formatBoardDateTime } from "@/lib/board-utils";
+import { formatBoardDateTime, resolveDogPhotoUrl } from "@/lib/board-utils";
 import { isDailyReminderPushNotice } from "@/lib/staff/push-notices";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
@@ -74,6 +78,20 @@ function isTimedPushStillActive(expiresAt: string | null | undefined, nowMs: num
   if (!expiresAt) return true;
   const expiresMs = new Date(expiresAt).getTime();
   return Number.isFinite(expiresMs) && expiresMs > nowMs;
+}
+
+function newestCheckoutAlertSoundKey(entries: { dog: LiveDog }[]) {
+  if (!entries.length) return null;
+
+  const newest = entries.reduce((latest, entry) => {
+    const latestAt = new Date(latest.dog.status_started_at ?? latest.dog.updated_at ?? 0).getTime();
+    const entryAt = new Date(entry.dog.status_started_at ?? entry.dog.updated_at ?? 0).getTime();
+    return entryAt >= latestAt ? entry : latest;
+  });
+  const dog = newest.dog;
+  const anchor = dog.status_started_at ?? dog.updated_at ?? dog.id;
+  const dogKey = dog.gingr_reservation_id ?? dog.gingr_animal_id ?? dog.id;
+  return `checkout:${dogKey}:${anchor}`;
 }
 
 function getDevDemoBoard(): LiveBoardResponse | null {
@@ -121,12 +139,21 @@ function getDevDemoBoard(): LiveBoardResponse | null {
   };
 }
 
-export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boolean }) {
+export function BoardClient({
+  castKeeperMode = false,
+  overlaysEnabled
+}: {
+  castKeeperMode?: boolean;
+  /** Force staff overlays (push notices, cast videos, grooming/trainer alerts) on/off. Defaults to on unless in castKeeperMode. */
+  overlaysEnabled?: boolean;
+}) {
   const searchParams = useSearchParams();
   const castKeeper = useCastKeeperContext();
+  const overlaysActive = overlaysEnabled ?? !castKeeperMode;
   const staffMode = !castKeeperMode && searchParams.get("staff") === "1";
   const tvMode = castKeeperMode || searchParams.get("display") === "tv";
   const debugBoard = searchParams.get("debugBoard") === "1";
+  const castMode = castKeeperMode || tvMode || searchParams.get("castMode") === "1" || searchParams.get("chromecast") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? "";
   const displayDepartment = searchParams.get("dept")?.trim() || "staff_whiteboard";
 
@@ -145,6 +172,9 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const [useDevDemo, setUseDevDemo] = useState(false);
   const checkoutBasketFilteredRef = useRef(false);
   const checkoutBasketEmptyRef = useRef(false);
+  const checkoutPollSourceRef = useRef<"fast" | "full">("full");
+  const emptyBasketStreakRef = useRef(0);
+  const [stickyCheckoutState, setStickyCheckoutState] = useState<StickyCheckoutState>(() => new Map());
   const { status: localWakeLockStatus, requestWakeLock } = useScreenWakeLock({
     enabled: !castKeeperMode && tvMode,
     persistent: tvMode,
@@ -153,20 +183,27 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   const wakeLockStatus = castKeeperMode
     ? ((castKeeper?.wakeLockStatus ?? "idle") as typeof localWakeLockStatus)
     : localWakeLockStatus;
-  const activePushNotice = useStaffPushNotice();
   const {
-    activeNotice: emergencyCastVideo,
-    queue: emergencyCastQueue,
-    reload: reloadEmergencyCast,
+    activePushNotice,
+    emergencyCastVideo,
+    emergencyCastQueue,
+    activeCastVideo,
+    castVideoQueue,
+    activeGroomingNotice,
+    groomingQueue,
+    activeTrainerNotice,
+    trainerQueue,
+    reload: reloadOverlays,
     viewerKey: castViewerKey
-  } = useCastVideoNotices({ department: displayDepartment, emergencyOnly: true });
-  const {
-    activeNotice: activeCastVideo,
-    queue: castVideoQueue,
-    reload: reloadCastVideo
-  } = useCastVideoNotices({ department: displayDepartment, emergencyOnly: false });
-  const { activeNotice: activeGroomingNotice, queue: groomingQueue } = useGroomingPushNotices();
-  const { activeNotice: activeTrainerNotice, queue: trainerQueue } = useTrainerPushNotices();
+  } = useStaffBoardOverlays({
+    department: displayDepartment,
+    debug: debugBoard,
+    // Laptop staff board and the remote cast receiver use aggregated overlays;
+    // legacy Chromecast cast-lite path leaves them off (whiteboard-state driven).
+    enabled: overlaysActive
+  });
+  const reloadEmergencyCast = reloadOverlays;
+  const reloadCastVideo = reloadOverlays;
   const effectiveGroomingNotice =
     activeGroomingNotice && isTimedPushStillActive(activeGroomingNotice.expires_at, nowMs)
       ? activeGroomingNotice
@@ -181,12 +218,12 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
     emergencyCastVideo && isTimedPushStillActive(emergencyCastVideo.expires_at, nowMs)
       ? emergencyCastVideo
       : null;
-  const activeAlertKey =
-    effectiveEmergencyCastVideo?.id ??
-    effectiveCastVideo?.id ??
-    effectiveGroomingNotice?.id ??
-    effectiveTrainerNotice?.id ??
-    activePushNotice?.id ??
+  const activeNoticeAlertKey =
+    effectiveEmergencyCastVideo ? `emergency-video:${effectiveEmergencyCastVideo.id}` :
+    effectiveCastVideo ? `video:${effectiveCastVideo.id}` :
+    effectiveGroomingNotice ? `grooming:${effectiveGroomingNotice.id}` :
+    effectiveTrainerNotice ? `trainer:${effectiveTrainerNotice.id}` :
+    activePushNotice ? `push:${activePushNotice.id}` :
     null;
   const isEmergencyStaffPush = Boolean(
     activePushNotice && (activePushNotice.priority === "urgent" || activePushNotice.display_mode === "urgent")
@@ -207,12 +244,15 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   useEffect(() => {
     const activeIds = [effectiveEmergencyCastVideo?.id, effectiveCastVideo?.id].filter(Boolean) as string[];
     if (!activeIds.length) return;
-    setMinimizedCastIds((current) => {
-      const next = current.filter((id) => activeIds.includes(id));
-      if (next.length === current.length) return current;
-      writeMinimizedCastIds(next);
-      return next;
-    });
+    const timer = window.setTimeout(() => {
+      setMinimizedCastIds((current) => {
+        const next = current.filter((id) => activeIds.includes(id));
+        if (next.length === current.length) return current;
+        writeMinimizedCastIds(next);
+        return next;
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [effectiveCastVideo?.id, effectiveEmergencyCastVideo?.id]);
 
   const showEmergencyCastFullscreen =
@@ -257,7 +297,6 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       : hasActiveCast
         ? "Video Cast Active"
         : "Push Notice Active";
-  useFitdogAlertSound(activeAlertKey);
   const {
     castUrl,
     isCasting,
@@ -298,27 +337,72 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
   const { visibleCheckingInDogs: activeCheckingInDogs } = useCheckinDisplayTimers(board.checking_in, nowMs);
 
-  const stickyCheckoutDogs = useMemo(() => {
-    stickyCheckoutRef.current = mergeStickyCheckoutDogs(
+  const syncStickyCheckouts = useCallback((source: "fast" | "full") => {
+    const next = mergeStickyCheckoutDogs(
       stickyCheckoutRef.current,
-      board.checking_out,
-      new Date(nowMs),
-      { basketAuthoritative: checkoutBasketFilteredRef.current }
+      boardRef.current.checking_out,
+      new Date(),
+      {
+        basketAuthoritative: checkoutBasketFilteredRef.current,
+        basketConfirmedEmpty: checkoutBasketEmptyRef.current,
+        pruneMissingFromBasket: source === "full",
+        skipExpiry: true
+      }
     );
-    return stickyCheckoutStateToDogs(stickyCheckoutRef.current);
-  }, [board.checking_out, nowMs]);
+
+    if (!areStickyCheckoutStatesEqual(stickyCheckoutRef.current, next)) {
+      stickyCheckoutRef.current = next;
+      setStickyCheckoutState(next);
+    }
+  }, []);
+
+  useEffect(() => {
+    syncStickyCheckouts(checkoutPollSourceRef.current);
+  }, [board.checking_out, syncStickyCheckouts]);
+
+  useEffect(() => {
+    const next = expireStickyCheckoutDogs(stickyCheckoutRef.current, new Date(nowMs));
+    if (!areStickyCheckoutStatesEqual(stickyCheckoutRef.current, next)) {
+      stickyCheckoutRef.current = next;
+      setStickyCheckoutState(next);
+    }
+  }, [nowMs]);
+
+  const stickyCheckoutDogs = useMemo(
+    () => stickyCheckoutStateToDogs(stickyCheckoutState),
+    [stickyCheckoutState]
+  );
+
+  const checkoutDisplayMetaByKey = useMemo(
+    () => stickyCheckoutDisplayMetaByKey(stickyCheckoutState),
+    [stickyCheckoutState]
+  );
 
   const checkoutFirstSeenByKey = useMemo(
-    () => stickyCheckoutFirstSeenByKey(stickyCheckoutRef.current),
-    [stickyCheckoutDogs]
+    () => stickyCheckoutFirstSeenByKey(stickyCheckoutState),
+    [stickyCheckoutState]
   );
 
   const { visibleCheckingInDogs } = useNewCheckingInAlerts(activeCheckingInDogs);
   const { visibleCheckoutDogs, manuallyExpireCheckout } = useCheckoutDisplayTimers(
     stickyCheckoutDogs,
     nowMs,
-    checkoutFirstSeenByKey
+    checkoutFirstSeenByKey,
+    checkoutDisplayMetaByKey
   );
+  const castDogPhotoUrls = useMemo(
+    () => [
+      ...visibleCheckingInDogs.slice(0, 4).map((entry) => entry.dog.photo_url ?? resolveDogPhotoUrl(entry.dog)),
+      ...visibleCheckoutDogs.slice(0, 4).map((entry) => entry.dog.photo_url ?? resolveDogPhotoUrl(entry.dog))
+    ],
+    [visibleCheckingInDogs, visibleCheckoutDogs]
+  );
+  useDogPhotoPreloader(castDogPhotoUrls, { enabled: castMode, debugBoard, width: 640 });
+  const checkoutAlertSoundKey = useMemo(
+    () => newestCheckoutAlertSoundKey(visibleCheckoutDogs),
+    [visibleCheckoutDogs]
+  );
+  useFitdogAlertSound(activeNoticeAlertKey ?? checkoutAlertSoundKey);
 
   const apiEndpoint = debugBoard ? "/api/live-board?debugBoard=1" : "/api/live-board";
   const fastCheckoutEndpoint = debugBoard ? "/api/board/checkouts?debugBoard=1" : "/api/board/checkouts";
@@ -331,49 +415,67 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
   const loadFastCheckouts = useCallback(async () => {
     await runFastPoll(async () => {
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), BOARD_FAST_FETCH_TIMEOUT_MS);
-
-      try {
-        const response = await fetch(fastCheckoutEndpoint, { cache: "no-store", signal: controller.signal });
-        const data = (await response.json()) as LiveBoardResponse & {
+      const result = await fetchBoardJson<
+        LiveBoardResponse & {
           checking_out: LiveDog[];
           counts?: { checking_out: number };
           basket_filtered?: boolean;
-        };
+          stale?: boolean;
+        }
+      >({
+        url: fastCheckoutEndpoint,
+        timeoutMs: BOARD_FAST_FETCH_TIMEOUT_MS,
+        debug: debugBoard,
+        cacheKey: "staff-fast-checkouts",
+        keepLastGood: true
+      });
 
-        if (!response.ok || data.error) return;
+      const data = result.data;
+      if (!data || (data.error && !data.checking_out && !result.fromCache)) return;
+      // Never blank the board on a soft/stale error payload.
+      if (data.error && !Array.isArray(data.checking_out)) return;
 
-        checkoutBasketFilteredRef.current = Boolean(data.basket_filtered);
-        checkoutBasketEmptyRef.current = Boolean(data.basket_filtered && data.checking_out.length === 0);
-
-        setBoard((previous) => {
-          const nextCheckouts = data.basket_filtered
-            ? data.checking_out
-            : mergeCheckoutDogs(previous.checking_out, data.checking_out);
-
-          return {
-            ...previous,
-            checking_out: nextCheckouts,
-            counts: {
-              checking_in: previous.counts.checking_in,
-              checking_out: nextCheckouts.length,
-              total: previous.counts.checking_in + nextCheckouts.length
-            },
-            last_updated: data.last_updated ?? previous.last_updated,
-            debug: data.debug ?? previous.debug
-          };
-        });
-        setLastFetchAt(new Date().toISOString());
-        hasSuccessfulLoadRef.current = true;
-        castKeeper?.markDataFresh();
-      } catch {
-        // Keep the last good board data when a fast refresh fails.
-      } finally {
-        window.clearTimeout(timeout);
+      checkoutPollSourceRef.current = "fast";
+      checkoutBasketFilteredRef.current = Boolean(data.basket_filtered);
+      if (data.basket_filtered && data.checking_out.length === 0) {
+        emptyBasketStreakRef.current += 1;
+      } else {
+        emptyBasketStreakRef.current = 0;
       }
+      checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2;
+
+      setBoard((previous) => {
+        // When Gingr basket filtering is authoritative, replace (don't ghost-merge) after empty streak.
+        const nextRaw =
+          data.basket_filtered && checkoutBasketEmptyRef.current
+            ? data.checking_out
+            : data.basket_filtered
+              ? data.checking_out.length
+                ? data.checking_out
+                : previous.checking_out
+              : mergeCheckoutDogs(previous.checking_out, data.checking_out);
+        const nextCheckouts = preserveDogPhotos(previous.checking_out, nextRaw);
+        if (areCheckoutListsEquivalent(previous.checking_out, nextCheckouts)) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          checking_out: nextCheckouts,
+          counts: {
+            checking_in: previous.counts.checking_in,
+            checking_out: nextCheckouts.length,
+            total: previous.counts.checking_in + nextCheckouts.length
+          },
+          last_updated: data.last_updated ?? previous.last_updated,
+          debug: data.debug ?? previous.debug
+        };
+      });
+      setLastFetchAt(new Date().toISOString());
+      hasSuccessfulLoadRef.current = true;
+      castKeeper?.markDataFresh();
     });
-  }, [fastCheckoutEndpoint, castKeeper, runFastPoll]);
+  }, [fastCheckoutEndpoint, castKeeper, debugBoard, runFastPoll]);
 
   const loadFastCheckoutsRef = useRef(loadFastCheckouts);
   useEffect(() => {
@@ -381,72 +483,94 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   }, [loadFastCheckouts]);
 
   const loadBoard = useCallback(
-    async (mode: ConnectionState = "polling") => {
+    async (mode: ConnectionState = "polling", options: { silent?: boolean } = {}) => {
       await runFullPoll(async () => {
-      setFetchStatus("loading");
-      const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), BOARD_FETCH_TIMEOUT_MS);
+      if (!options.silent) {
+        setFetchStatus("loading");
+      }
 
-      try {
-        const response = await fetch(apiEndpoint, { cache: "no-store", signal: controller.signal });
-        const data = (await response.json()) as LiveBoardResponse;
-        setLastFetchAt(new Date().toISOString());
+      const result = await fetchBoardJson<LiveBoardResponse & { stale?: boolean }>({
+        url: apiEndpoint,
+        timeoutMs: BOARD_FETCH_TIMEOUT_MS,
+        debug: debugBoard,
+        cacheKey: "staff-live-board",
+        keepLastGood: true
+      });
+      setLastFetchAt(new Date().toISOString());
 
-        if (!response.ok || data.error) {
-          throw new Error(data.error ?? `Board request failed (${response.status}).`);
-        }
-
-        if (data.basket_filtered) {
-          checkoutBasketFilteredRef.current = true;
-          checkoutBasketEmptyRef.current = data.checking_out.length === 0;
-        }
-
-        const hasLiveDogs = data.checking_in.length > 0 || data.checking_out.length > 0;
-
-        if (!hasLiveDogs && process.env.NODE_ENV === "development") {
-          const demo = getDevDemoBoard();
-          if (demo) {
-            setBoard(demo);
-            setUseDevDemo(true);
-            setFetchError(null);
-            setFetchStatus("ok");
-            setLastSuccessAt(demo.last_updated);
-            setConnection((current) => (current === "live" ? "live" : mode));
-            return;
-          }
-        }
-
-        setUseDevDemo(false);
-        setBoard(data);
-        setFetchError(null);
-        setFetchStatus("ok");
-        setLastSuccessAt(data.last_updated);
-        hasSuccessfulLoadRef.current = true;
-        setConnection((current) => (castKeeperMode ? "polling" : current === "live" ? "live" : mode));
-        castKeeper?.markDataFresh();
-      } catch (error) {
-        const message = error instanceof Error ? error.message : "Live board data is not loading.";
+      const data = result.data;
+      if (!data || (!result.ok && !result.fromCache)) {
+        const message = result.error ?? "Live board data is not loading.";
         const hasData =
           boardRef.current.checking_in.length > 0 || boardRef.current.checking_out.length > 0;
-        setFetchError(message);
-        setFetchStatus(hasData ? "ok" : "error");
+        // Keep last-good UI; only surface error when we have never loaded dogs.
+        setFetchError(hasData || hasSuccessfulLoadRef.current ? null : message);
+        setFetchStatus(hasData || hasSuccessfulLoadRef.current ? "ok" : "error");
         if (castKeeperMode && (hasSuccessfulLoadRef.current || hasData)) {
           setConnection("polling");
         } else {
           setConnection(hasData ? (mode === "connecting" ? "polling" : mode) : "offline");
         }
-      } finally {
-        window.clearTimeout(timeout);
+        return;
       }
+
+      if (data.error && !result.fromCache && !data.checking_in?.length && !data.checking_out?.length) {
+        const message = data.error;
+        const hasData =
+          boardRef.current.checking_in.length > 0 || boardRef.current.checking_out.length > 0;
+        setFetchError(hasData || hasSuccessfulLoadRef.current ? null : message);
+        setFetchStatus(hasData || hasSuccessfulLoadRef.current ? "ok" : "error");
+        return;
+      }
+
+      if (data.basket_filtered) {
+        checkoutPollSourceRef.current = "full";
+        checkoutBasketFilteredRef.current = true;
+        if (data.checking_out.length === 0) {
+          emptyBasketStreakRef.current += 1;
+        } else {
+          emptyBasketStreakRef.current = 0;
+        }
+        checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2;
+      } else {
+        checkoutPollSourceRef.current = "full";
+        checkoutBasketFilteredRef.current = false;
+        emptyBasketStreakRef.current = 0;
+        checkoutBasketEmptyRef.current = false;
+      }
+
+      const hasLiveDogs = data.checking_in.length > 0 || data.checking_out.length > 0;
+
+      if (!hasLiveDogs && process.env.NODE_ENV === "development") {
+        const demo = getDevDemoBoard();
+        if (demo) {
+          setBoard(demo);
+          setUseDevDemo(true);
+          setFetchError(null);
+          setFetchStatus("ok");
+          setLastSuccessAt(demo.last_updated);
+          setConnection((current) => (current === "live" ? "live" : mode));
+          return;
+        }
+      }
+
+      setUseDevDemo(false);
+      setBoard((previous) => mergeBoardResponse(previous, data));
+      setFetchError(null);
+      setFetchStatus("ok");
+      setLastSuccessAt(data.last_updated);
+      hasSuccessfulLoadRef.current = true;
+      setConnection((current) => (castKeeperMode ? "polling" : current === "live" ? "live" : mode));
+      castKeeper?.markDataFresh();
       });
     },
-    [apiEndpoint, castKeeper, runFullPoll]
+    [apiEndpoint, castKeeper, castKeeperMode, debugBoard, runFullPoll]
   );
 
   useEffect(() => {
     if (!castKeeperMode) return;
     const handleRefresh = () => {
-      void loadBoard("polling");
+      void loadBoard("polling", { silent: true });
       void loadFastCheckouts();
     };
     window.addEventListener("fitdog-cast-keeper-refresh", handleRefresh);
@@ -456,7 +580,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
   useDisplaySync({
     enabled: !castKeeperMode,
     onContentUpdate: () => {
-      void loadBoard("polling");
+      void loadBoard("polling", { silent: true });
     }
   });
 
@@ -492,10 +616,19 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       void loadFastCheckouts();
     }, 0);
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
-    const clockTimer = window.setInterval(() => setClock(new Date()), 1000);
-    const nowTimer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    const fastPollTimer = window.setInterval(() => void loadFastCheckouts(), BOARD_CHECKOUT_POLL_MS);
-    const fullPollTimer = window.setInterval(() => void loadBoard("polling"), BOARD_FULL_SYNC_POLL_MS);
+
+    const clockIntervalMs = castKeeperMode ? 60_000 : 1000;
+    const nowIntervalMs = castKeeperMode ? 5_000 : 1000;
+    const fastPollIntervalMs = castKeeperMode ? 12_000 : BOARD_CHECKOUT_POLL_MS;
+    const fullPollIntervalMs = castKeeperMode ? 25_000 : BOARD_FULL_SYNC_POLL_MS;
+
+    const clockTimer = window.setInterval(() => setClock(new Date()), clockIntervalMs);
+    const nowTimer = window.setInterval(() => setNowMs(Date.now()), nowIntervalMs);
+    const fastPollTimer = window.setInterval(() => void loadFastCheckouts(), fastPollIntervalMs);
+    const fullPollTimer = window.setInterval(
+      () => void loadBoard("polling", { silent: true }),
+      fullPollIntervalMs
+    );
 
     return () => {
       window.clearTimeout(initialLoad);
@@ -505,16 +638,9 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       window.clearInterval(fastPollTimer);
       window.clearInterval(fullPollTimer);
     };
-  }, [loadBoard, loadFastCheckouts]);
+  }, [castKeeperMode, loadBoard, loadFastCheckouts]);
 
   useEffect(() => {
-    if (castKeeperMode) {
-      const timer = window.setTimeout(() => {
-        setConnection(hasSuccessfulLoadRef.current ? "polling" : "connecting");
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-
     const supabase = getBrowserSupabase();
     if (!supabase) {
       const fallbackTimer = window.setTimeout(() => setConnection("polling"), 0);
@@ -553,7 +679,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
           }
 
           setConnection("polling");
-          if (castKeeperMode) {
+          if (castMode) {
             if (reconnectTimer) window.clearTimeout(reconnectTimer);
             reconnectTimer = window.setTimeout(() => {
               if (channel) void supabase.removeChannel(channel);
@@ -571,7 +697,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
       if (channel) void supabase.removeChannel(channel);
     };
-  }, [castKeeperMode]);
+  }, [castKeeperMode, castMode]);
 
   useEffect(() => {
     if (!toast) return;
@@ -585,6 +711,16 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
       if (entry) {
         manuallyExpireCheckout(entry.dog);
         stickyCheckoutRef.current.delete(getCheckoutMergeKey(entry.dog));
+        void fetch("/api/integrations/shelly/flash", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "clear",
+            reason: `staff_checkout_clear:${entry.dog.gingr_animal_id ?? entry.dog.id}`
+          })
+        }).catch(() => {
+          // The checkout still clears locally if the alert-light request is unavailable.
+        });
       }
     },
     [manuallyExpireCheckout, visibleCheckoutDogs]
@@ -599,12 +735,30 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
 
   const hasBoardData = board.checking_in.length > 0 || board.checking_out.length > 0;
   const hasVisibleDogs = visibleCheckingInDogs.length > 0 || visibleCheckoutDogs.length > 0;
+  const castHealth: CastModeStatus =
+    connection === "offline" || (fetchStatus === "error" && !hasBoardData)
+      ? "offline"
+      : connection === "connecting" || Boolean(fetchError)
+        ? "reconnecting"
+        : "live";
+  useCastModeRuntime({
+    enabled: castMode,
+    boardType: "staff",
+    debugBoard,
+    health: castHealth,
+    onFallbackRefresh: () => window.location.reload()
+  });
   const showEmptyState = fetchStatus === "ok" && !fetchError;
   const expiredCheckoutCount = Math.max(0, stickyCheckoutDogs.length - visibleCheckoutDogs.length);
+  // Only urgent/emergency pushes (or empty board) take over fullscreen — never hide dogs for routine notices on TV.
+  const showActivePushFullscreen = Boolean(
+    activePushNotice && (isEmergencyStaffPush || !hasVisibleDogs)
+  );
 
   return (
-    <main className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white ${castKeeperMode ? "cast-keeper-board" : ""}`}>
+    <main className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""}`}>
       <PushNoticeBoardVeil active={pushVeilActive} tone={pushVeilTone} label={pushVeilLabel} />
+      {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
 
       {!tvMode ? (
         <StaffCastButton
@@ -683,8 +837,8 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
             onMinimize={() => minimizeCast(effectiveCastVideo!.id)}
             onDismiss={() => void reloadCastVideo()}
           />
-        ) : activePushNotice && !hasVisibleDogs ? (
-          <StaffPushNoticeFullscreen notice={activePushNotice} />
+        ) : showActivePushFullscreen ? (
+          <StaffPushNoticeFullscreen notice={activePushNotice!} />
         ) : (
           <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
             <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">
@@ -747,7 +901,7 @@ export function BoardClient({ castKeeperMode = false }: { castKeeperMode?: boole
         </div>
       ) : null}
 
-      {debugBoard && !castKeeperMode ? (
+      {debugBoard ? (
         <BoardDebugPanel
           endpoint={apiEndpoint}
           fetchStatus={fetchStatus}
