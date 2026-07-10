@@ -114,7 +114,7 @@ async function loadSupabaseBoardRows(supabase: SupabaseClient) {
 /** Same dog merge rules as /api/live-board — server-side only, uses cached Gingr when available. */
 export async function loadStaffBoardDogsForDisplay(supabase: SupabaseClient, now = new Date()) {
   const [gingrBoardResult, activeCheckinRows, promptedCheckoutRows] = await Promise.all([
-    timeoutResult(fetchGingrBackOfHouse().catch(() => null), 2500, null),
+    timeoutResult(fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => null), 2500, null),
     timeoutResult(loadActiveCheckinRows(supabase, now), 2500, { visible: [] as LiveDog[], rawCheckinRows: 0 }),
     timeoutResult(loadPromptedCheckoutRows(supabase, now), 2500, {
       visible: [] as LiveDog[],

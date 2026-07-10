@@ -4,11 +4,13 @@ import {
   getCachedGingrBasketCheckoutKeys
 } from "@/lib/basket-cleared-checkout";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
+import { buildGingrCheckoutKeySet, mergeCheckoutDogs, sortCheckoutDogs } from "@/lib/board-checkout-merge";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
-import { sortCheckoutDogs } from "@/lib/board-checkout-merge";
+import { mapGingrBoardToLiveDogs } from "@/lib/gingr-board-sync";
+import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 import type { LiveDog } from "@/lib/types";
 
@@ -38,6 +40,36 @@ function enrichDogs(dogs: LiveDog[]) {
     ...dog,
     photo_url: dog.photo_url ?? resolveDogPhotoUrl(dog)
   }));
+}
+
+function loadCachedGingrCheckoutDogs(now: Date) {
+  const cachedBoard = getCachedBackOfHouseBoard(now.getTime(), true);
+  if (!cachedBoard) return [];
+
+  return enrichDogs(mapGingrBoardToLiveDogs(cachedBoard)).filter(
+    (dog) => dog.display_status === "checking_out" && !shouldExpireCheckoutDog(dog, now)
+  );
+}
+
+function resolveGingrCheckoutBasketKeys(now: Date, gingrCheckouts: LiveDog[]) {
+  if (gingrCheckouts.length) {
+    return buildGingrCheckoutKeySet(gingrCheckouts);
+  }
+  return getCachedGingrBasketCheckoutKeys(now.getTime(), true);
+}
+
+function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[]) {
+  const gingrCheckouts = loadCachedGingrCheckoutDogs(now);
+  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now, gingrCheckouts);
+  let visibleCheckouts = mergeCheckoutDogs(gingrCheckouts, promptedCheckouts);
+  let basketFiltered = false;
+
+  if (gingrCheckoutKeys) {
+    basketFiltered = true;
+    visibleCheckouts = filterCheckoutsToGingrBasket(visibleCheckouts, gingrCheckoutKeys);
+  }
+
+  return { visibleCheckouts, basketFiltered };
 }
 
 function newestCheckoutTimestamp(dogs: LiveDog[]) {
@@ -78,14 +110,10 @@ export async function loadFastPromptedCheckouts(
   const rows = enrichDogs((data ?? []) as LiveDog[]);
   const prompted = rows.filter(isPromptedCheckoutDog);
   const expiredCount = prompted.filter((dog) => shouldExpireCheckoutDog(dog, now)).length;
-  let visible = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
-  let basketFiltered = false;
-
-  const gingrCheckoutKeys = getCachedGingrBasketCheckoutKeys(now.getTime(), true);
-  if (gingrCheckoutKeys) {
-    basketFiltered = true;
-    visible = filterCheckoutsToGingrBasket(visible, gingrCheckoutKeys);
-  }
+  const { visibleCheckouts: visible, basketFiltered } = mergeVisibleCheckouts(
+    now,
+    prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now))
+  );
 
   let withPhotos = applyCachedBackOfHousePhotos(visible);
   try {
@@ -149,14 +177,10 @@ export async function loadFastBoardTransitions(
   const checkoutRows = rows.filter((dog) => dog.display_status === "checking_out");
   const prompted = checkoutRows.filter(isPromptedCheckoutDog);
   const expiredCount = prompted.filter((dog) => shouldExpireCheckoutDog(dog, now)).length;
-  let visibleCheckouts = prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now));
-  let basketFiltered = false;
-
-  const gingrCheckoutKeys = getCachedGingrBasketCheckoutKeys(now.getTime(), true);
-  if (gingrCheckoutKeys) {
-    basketFiltered = true;
-    visibleCheckouts = filterCheckoutsToGingrBasket(visibleCheckouts, gingrCheckoutKeys);
-  }
+  const { visibleCheckouts, basketFiltered } = mergeVisibleCheckouts(
+    now,
+    prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now))
+  );
 
   let visible = applyCachedBackOfHousePhotos([...visibleCheckins, ...visibleCheckouts]);
   try {

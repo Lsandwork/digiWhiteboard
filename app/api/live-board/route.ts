@@ -193,7 +193,7 @@ export async function GET(request: Request) {
     let gingrError: string | null = null;
 
     const [gingrBoardResult, activeCheckinRows, promptedCheckoutRows] = await Promise.all([
-      fetchGingrBackOfHouse().catch((error) => {
+      fetchGingrBackOfHouse({ allReservationTypes: true }).catch((error) => {
         gingrError = error instanceof Error ? error.message : "Gingr fetch failed.";
         if (debugBoard) {
           console.error("[Fitdog Board API] Gingr fetch failed, using Supabase fallback:", gingrError);

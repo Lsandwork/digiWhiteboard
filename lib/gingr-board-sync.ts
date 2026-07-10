@@ -309,7 +309,7 @@ export async function syncGingrBoardState(
   supabase: ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>,
   board?: Awaited<ReturnType<typeof fetchGingrBackOfHouse>>
 ) {
-  const resolvedBoard = board ?? (await fetchGingrBackOfHouse());
+  const resolvedBoard = board ?? (await fetchGingrBackOfHouse({ allReservationTypes: true }));
   if (resolvedBoard.source === "disabled") {
     return { synced: false, reason: "GINGR_API_KEY missing", checking_in: 0, checking_out: 0 };
   }
