@@ -119,7 +119,13 @@ const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "cast_videos",
   "emergency_alerts"
 ];
-const FRONT_DESK_TABS: AdminTab[] = ["crossover_communication", "owner_follow_up", "active_issues", "trainer_entry"];
+const FRONT_DESK_TABS: AdminTab[] = [
+  "crossover_communication",
+  "owner_follow_up",
+  "active_issues",
+  "trainer_entry",
+  "walks_board"
+];
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
 const SUPPORT_INBOX_TABS: AdminTab[] = [...ADMIN_SUPPORT_TABS, "package_commissions"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
@@ -219,7 +225,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["walks_board", "management_support", "handler_shift_entry", "bulk_photo_upload", "write_ups"], visible)
+          ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload", "write_ups"], visible)
         ])
       )
     );

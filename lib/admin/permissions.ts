@@ -789,6 +789,9 @@ export function canAccessAdminTab(
   // (owner/manager are handled by the early return above).
   if (tab === "remote_cast") return false;
 
+  // Walks Board is available to every authenticated staff user on the staff board.
+  if (tab === "walks_board") return board === "staff";
+
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
 
   if (

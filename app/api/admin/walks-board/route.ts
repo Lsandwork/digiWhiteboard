@@ -3,7 +3,6 @@ import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth"
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { normalizeAdminUserId } from "@/lib/admin/users";
 import { getRequestUserAccess } from "@/lib/auth/permissions";
-import { hasPermission } from "@/lib/admin/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { summarizeWalkBoardEntries, sortWalkBoardEntries } from "@/lib/walks-board/display";
 import {
@@ -19,10 +18,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function forbiddenResponse(message = "You do not have permission to access the Walks Board.") {
-  return NextResponse.json({ error: message }, { status: 403 });
-}
-
 function actorFromRequest(request: Request) {
   const session = getAdminSessionFromRequest(request);
   return {
@@ -36,8 +31,9 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session } = actorFromRequest(request);
-  const access = await getRequestUserAccess(request);
-  if (!hasPermission(access, "view_admin_panel")) return forbiddenResponse();
+  if (!session?.adminUserId) {
+    return NextResponse.json({ error: "Signed-in staff account required." }, { status: 401 });
+  }
 
   const supabase = getServiceSupabase();
   const url = new URL(request.url);
@@ -77,7 +73,6 @@ export async function POST(request: Request) {
   }
 
   const access = await getRequestUserAccess(request);
-  if (!hasPermission(access, "view_admin_panel")) return forbiddenResponse();
 
   const body = await request.json().catch(() => ({}));
   const action = String(body.action ?? "").trim();

@@ -11,6 +11,7 @@ import {
 } from "../lib/walks-board/display";
 import {
   accessFromLegacyRole,
+  canAccessAdminTab,
   hasPermission,
   permissionsForRoles
 } from "../lib/admin/permissions";
@@ -163,10 +164,15 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
   const permissions = readFileSync(join(process.cwd(), "lib/admin/permissions.ts"), "utf8");
   assert.match(permissions, /walks_board/);
   assert.match(permissions, /receive_walks_board_reminders/);
+  assert.match(permissions, /if \(tab === "walks_board"\) return board === "staff"/);
+
+  const nav = readFileSync(join(process.cwd(), "lib/admin/nav-groups.ts"), "utf8");
+  assert.match(nav, /FRONT_DESK_TABS:[\s\S]*"walks_board"/);
+  assert.doesNotMatch(nav, /singles\(\["walks_board"/);
 
   const api = readFileSync(join(process.cwd(), "app/api/admin/walks-board/route.ts"), "utf8");
   assert.match(api, /isAdminRequest/);
-  assert.match(api, /view_admin_panel/);
+  assert.doesNotMatch(api, /view_admin_panel/);
   assert.match(api, /canSnoozeWalkBoard|snoozeWalkBoardEntry/);
 
   const lobby = readFileSync(join(process.cwd(), "components/lobby/LobbyCheckoutBoard.tsx"), "utf8");
@@ -174,6 +180,24 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
 
   const cron = readFileSync(join(process.cwd(), "app/api/cron/walk-board-reminders/route.ts"), "utf8");
   assert.match(cron, /processWalkBoardReminders/);
+}
+
+// Every staff role can open the Walks Board tab on the staff board.
+{
+  const roles = ["groomer", "trainer", "daycare", "viewer"] as const;
+  for (const role of roles) {
+    const access = accessFromLegacyRole(`walk-${role}`, `${role}@fitdog.test`, role);
+    assert.equal(
+      canAccessAdminTab(access, "walks_board", role, "staff"),
+      true,
+      `${role} can access walks_board on staff board`
+    );
+    assert.equal(
+      canAccessAdminTab(access, "walks_board", role, "lobby"),
+      false,
+      `${role} cannot access walks_board on lobby board`
+    );
+  }
 }
 
 // Reminder message content

@@ -196,4 +196,21 @@ function layout(
   );
 }
 
+// Cast/TV display uses the full BoardClient (not cast-lite) so layout and name fixes apply on TV.
+{
+  const pageClientSource = readFileSync(join(process.cwd(), "components/StaffBoardPageClient.tsx"), "utf8");
+  assert.match(pageClientSource, /CastKeeperProvider/);
+  assert.match(pageClientSource, /BoardClient castKeeperMode overlaysEnabled/);
+  assert.doesNotMatch(pageClientSource, /StaffCastLiteBoard/);
+}
+
+// Cast-lite staff path must not always mount both panels when reused elsewhere.
+{
+  const castLiteSource = readFileSync(join(process.cwd(), "components/cast-lite/StaffCastLiteBoard.tsx"), "utf8");
+  assert.doesNotMatch(
+    castLiteSource,
+    /getStaffBoardLayoutState|StaffBoardEmptyState|staffBoardLayoutClass/
+  );
+}
+
 console.log("test-staff-board-layout: all assertions passed");

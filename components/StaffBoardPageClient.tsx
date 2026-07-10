@@ -2,13 +2,12 @@
 
 import { useSearchParams } from "next/navigation";
 import { BoardClient } from "@/components/BoardClient";
-import { StaffCastLiteBoard } from "@/components/cast-lite/StaffCastLiteBoard";
-import { defaultCastLiteOptions, parseCastLiteOptions } from "@/lib/whiteboard/cast-options";
+import { CastKeeperProvider } from "@/hooks/useCastKeeper";
 
 /**
- * Laptop staff board uses BoardClient (live-board + aggregated overlays).
- * Cast/TV uses cast-lite + /api/whiteboard/state as the single source of truth
- * so Chromecast does not hammer Supabase with per-feature polls.
+ * Staff board — same rich layout everywhere (laptop, cast target, direct display URL).
+ * Cast/TV wraps the full board in the cast keeper for wake-lock, heartbeat, and
+ * stale auto-reload reliability, then renders in TV layout via castKeeperMode.
  */
 export function StaffBoardPageClient() {
   const searchParams = useSearchParams();
@@ -21,12 +20,14 @@ export function StaffBoardPageClient() {
     return <BoardClient />;
   }
 
-  const parsed = parseCastLiteOptions(searchParams);
-  const options = {
-    ...defaultCastLiteOptions("staff"),
-    ...parsed,
-    lowMotion: parsed.lowMotion !== false
-  };
-
-  return <StaffCastLiteBoard options={options} />;
+  return (
+    <CastKeeperProvider
+      displayType="staff_whiteboard"
+      route="/staff-cast"
+      enabled
+      allowStaleReload={!chromecastReceiver}
+    >
+      <BoardClient castKeeperMode overlaysEnabled />
+    </CastKeeperProvider>
+  );
 }
