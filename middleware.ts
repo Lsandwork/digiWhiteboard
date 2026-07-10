@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
 import { firstAccessibleAdminTab, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 
 export async function middleware(request: NextRequest) {
   try {
@@ -15,6 +16,17 @@ export async function middleware(request: NextRequest) {
 
 async function runMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Lobby custom domain (lobby.ruffops.com/) → serve the Lobby Digital Whiteboard
+  // via an internal rewrite. The browser URL stays on lobby.ruffops.com and the
+  // Staff board is never rendered on this subdomain. Only "/" is rewritten, so
+  // /lobby/checkouts, /api/*, /_next/*, and static assets are untouched.
+  if (shouldRewriteLobbyRoot(request.headers.get("host"), pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = LOBBY_REWRITE_TARGET;
+    return NextResponse.rewrite(url);
+  }
+
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
   const session = await verifyAdminSessionTokenEdge(token);
 
@@ -80,5 +92,7 @@ async function runMiddleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin", "/admin/:path*"]
+  // "/" is matched so the lobby custom-domain rewrite can run at the root.
+  // Non-lobby hosts fall through to the normal Staff board at "/".
+  matcher: ["/", "/admin", "/admin/:path*"]
 };
