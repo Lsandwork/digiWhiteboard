@@ -86,6 +86,7 @@ export function useWhiteboardCastState({
   debug = false
 }: UseWhiteboardCastStateOptions) {
   const [state, setState] = useState<WhiteboardStateResponse | null>(null);
+  const [showReconnecting, setShowReconnecting] = useState(false);
   const [health, setHealth] = useState<CastHealthStatus>({
     lastSuccessAt: null,
     version: null,
@@ -202,12 +203,21 @@ export function useWhiteboardCastState({
     };
   }, [board, enabled, realtime, refresh]);
 
-  const showReconnecting =
-    Boolean(health.lastError) &&
-    (!health.lastSuccessAt || Date.now() - new Date(health.lastSuccessAt).getTime() > 30_000);
+  useEffect(() => {
+    const updateReconnecting = () => {
+      const reconnecting =
+        Boolean(health.lastError) &&
+        (!health.lastSuccessAt || Date.now() - new Date(health.lastSuccessAt).getTime() > 30_000);
+      setShowReconnecting(reconnecting);
+    };
+
+    updateReconnecting();
+    const timer = window.setInterval(updateReconnecting, 5000);
+    return () => window.clearInterval(timer);
+  }, [health.lastError, health.lastSuccessAt]);
 
   return {
-    state: state ?? lastGoodRef.current,
+    state,
     health,
     showReconnecting,
     refresh

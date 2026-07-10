@@ -80,10 +80,13 @@ export function RemoteCastPanel() {
 
   useEffect(() => {
     mountedRef.current = true;
-    void load();
+    const initialTimer = window.setTimeout(() => {
+      void load();
+    }, 0);
     const timer = window.setInterval(() => void load(true), ADMIN_RECEIVERS_POLL_MS);
     return () => {
       mountedRef.current = false;
+      window.clearTimeout(initialTimer);
       window.clearInterval(timer);
     };
   }, [load]);
