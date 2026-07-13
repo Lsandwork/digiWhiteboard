@@ -10,7 +10,6 @@ import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
-import { LobbyCastButton } from "@/components/lobby/LobbyCastButton";
 import { LobbyDebugPanel } from "@/components/lobby/LobbyDebugPanel";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
@@ -46,7 +45,6 @@ import {
 import { rememberLobbyBoardHealthyState } from "@/components/lobby/LobbyErrorBoundary";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { useLobbyCheckoutTimers } from "@/hooks/useLobbyCheckoutTimers";
-import { useLobbyTvCast } from "@/hooks/useLobbyTvCast";
 import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
@@ -99,39 +97,7 @@ export function LobbyCheckoutBoard({
   const tvModeFromUrl = searchParams.get("display") !== "desktop";
   const castMode = castKeeperMode || searchParams.get("castMode") === "1" || searchParams.get("chromecast") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
-  const tvLayoutRequested = castKeeperMode || tvModeFromUrl;
-  const {
-    isTvLayout,
-    showCastActive,
-    castError,
-    canCast,
-    castUrl,
-    castMethod,
-    toggleTvCast,
-    startChromecast,
-    startWirelessCast,
-    startAirPlayCast,
-    copyCastUrl,
-    stopTvCast,
-    setCastError
-  } = useLobbyTvCast(tvLayoutRequested, displayToken, castKeeperMode);
-  const showTvLayout = castKeeperMode || isTvLayout;
-
-  const runCastAction = useCallback(async (action: () => Promise<void>) => {
-    try {
-      await action();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to start casting.";
-      const cancelled = /cancel|abort|denied/i.test(message);
-      const patternError = /did not match the expected pattern/i.test(message);
-      if (!cancelled) {
-        setCastError(patternError ? "Cast URL was invalid for this browser. Refresh and try again." : message);
-      }
-      if (debugBoard) {
-        debugBoardClient(true, "lobby-cast", "cast action failed", { message, patternError });
-      }
-    }
-  }, [debugBoard, setCastError]);
+  const showTvLayout = castKeeperMode || tvModeFromUrl;
 
   const [clock, setClock] = useState<Date | null>(null);
   const [nowMs, setNowMs] = useState(0);
@@ -565,22 +531,6 @@ export function LobbyCheckoutBoard({
     >
       <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
       {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
-
-      {!castKeeperMode ? (
-        <LobbyCastButton
-          castUrl={castUrl}
-          isCasting={showCastActive}
-          castError={castError}
-          canCast={canCast}
-          castMethod={castMethod}
-          onToggle={() => void runCastAction(toggleTvCast)}
-          onChromecast={() => void runCastAction(startChromecast)}
-          onWireless={() => void runCastAction(startWirelessCast)}
-          onAirPlay={() => void runCastAction(startAirPlayCast)}
-          onCopyUrl={() => void runCastAction(copyCastUrl)}
-          onStop={() => void runCastAction(stopTvCast)}
-        />
-      ) : null}
 
       <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby">
         <div className={`lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""}`}>
