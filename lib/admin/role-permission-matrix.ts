@@ -89,7 +89,7 @@ export async function saveRolePermissionMatrix(supabase: SupabaseClient, matrix:
 
 export function permissionsForRoleFromMatrix(role: RoleKey, matrix: RolePermissionMatrix): PermissionKey[] {
   if (role === "super_admin") {
-    return [...ALL_CATALOG_PERMISSION_KEYS];
+    return [...ROLE_PERMISSIONS.super_admin];
   }
   const roleMap = matrix[role];
   if (!roleMap) {

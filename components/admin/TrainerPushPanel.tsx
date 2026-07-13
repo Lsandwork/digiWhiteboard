@@ -9,7 +9,7 @@ import {
   type TrainerDogOption,
   type TrainerPushNotice
 } from "@/lib/staff/trainer-push-notices";
-import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
+import { canUseTrainerPush, canClearTrainerPush, type UserAccess } from "@/lib/admin/permissions";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 
 type TrainerPayload = {
@@ -66,14 +66,12 @@ export function TrainerPushPanel() {
 
   const canPush = useMemo(() => {
     if (!data) return false;
-    return hasPermission(data.currentUser.access ?? null, "push_trainer_request")
-      || ["owner_admin", "manager_admin", "trainer"].includes(data.currentUser.role ?? "");
+    return canUseTrainerPush(data.currentUser.access ?? null, data.currentUser.role);
   }, [data]);
 
   const canClear = useMemo(() => {
     if (!data) return false;
-    return hasPermission(data.currentUser.access ?? null, "clear_trainer_request")
-      || ["owner_admin", "manager_admin", "trainer"].includes(data.currentUser.role ?? "");
+    return canClearTrainerPush(data.currentUser.access ?? null, data.currentUser.role);
   }, [data]);
 
   function selectDog(dog: TrainerDogOption) {

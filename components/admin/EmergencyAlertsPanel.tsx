@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Send, ShieldAlert, XCircle } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import { canAccessPushNotices } from "@/lib/admin/users";
+import { canUseStandardOrEmergencyPush } from "@/lib/admin/permissions";
+import type { UserAccess } from "@/lib/admin/permissions";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 
 type PushNoticesPayload = {
   activeNotice: StaffPushNotice | null;
   notices: StaffPushNotice[];
-  currentUser: { email: string | null; adminUserId: string | null; role: string };
+  currentUser: { email: string | null; adminUserId: string | null; role: string; access?: UserAccess | null };
 };
 
 const QUICK_ALERTS = [
@@ -63,7 +64,7 @@ export function EmergencyAlertsPanel() {
 
   const canPush = useMemo(() => {
     if (!data) return false;
-    return canAccessPushNotices(data.currentUser.role);
+    return canUseStandardOrEmergencyPush(data.currentUser.access ?? null, data.currentUser.role);
   }, [data]);
 
   const urgentNotices = useMemo(

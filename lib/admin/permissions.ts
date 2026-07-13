@@ -764,6 +764,60 @@ export function isSuperAdminAccess(access: UserAccess | null | undefined) {
   return hasRole(access, "super_admin");
 }
 
+/** Super Admin accounts always retain every staff push notice capability. */
+export function hasSuperAdminPushAccess(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  return isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access);
+}
+
+export function canUseGroomingPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "push_grooming_request")) return true;
+  return (
+    legacyRole === "front_desk_coordinator" ||
+    legacyRole === "team_leader" ||
+    legacyRole === "groomer"
+  );
+}
+
+export function canClearGroomingPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "clear_grooming_request")) return true;
+  return canUseGroomingPush(access, legacyRole);
+}
+
+export function canUseTrainerPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "push_trainer_request")) return true;
+  return legacyRole === "trainer";
+}
+
+export function canClearTrainerPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "clear_trainer_request")) return true;
+  return canUseTrainerPush(access, legacyRole);
+}
+
+export function canUseStandardOrEmergencyPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "manage_push_notices")) return true;
+  return legacyRole === "front_desk_coordinator" || legacyRole === "team_leader";
+}
+
+export function canUseYardPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "push_yard_notice")) return true;
+  return (
+    legacyRole === "assistant_manager" ||
+    legacyRole === "front_desk_coordinator" ||
+    legacyRole === "team_leader"
+  );
+}
+
+export function canManageCastVideoPush(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminPushAccess(access, legacyRole) || isFullAdminLegacyRole(legacyRole)) return true;
+  return hasPermission(access, "manage_cast_videos");
+}
+
 export function canManageSuperAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null) {
   return isSuperAdminAccess(actorAccess) || isSuperAdminLegacyRole(actorLegacyRole);
 }

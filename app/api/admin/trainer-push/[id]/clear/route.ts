@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { hasPermission } from "@/lib/admin/permissions";
+import { canClearTrainerPush } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { clearTrainerPushNotice, loadTrainerPushBoardState } from "@/lib/staff/trainer-push-notices";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -10,8 +10,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 function canClear(access: Awaited<ReturnType<typeof getUserAccess>> | null, role?: string | null) {
-  if (hasPermission(access, "clear_trainer_request")) return true;
-  return role === "owner_admin" || role === "manager_admin" || role === "trainer" || !role;
+  return canClearTrainerPush(access, role);
 }
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {

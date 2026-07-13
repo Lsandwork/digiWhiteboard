@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { hasPermission } from "@/lib/admin/permissions";
+import { canUseYardPush } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { loadCastVideoBoardState } from "@/lib/staff/cast-video-notices";
@@ -26,14 +26,7 @@ async function actorAccess(request: Request) {
 }
 
 function canPushYardNotice(access: Awaited<ReturnType<typeof actorAccess>>["access"], role?: string | null) {
-  if (hasPermission(access, "push_yard_notice")) return true;
-  return (
-    role === "owner_admin" ||
-    role === "manager_admin" ||
-    role === "management" ||
-    role === "front_desk_coordinator" ||
-    role === "team_leader"
-  );
+  return canUseYardPush(access, role);
 }
 
 export async function GET(request: Request) {

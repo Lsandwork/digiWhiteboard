@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { MonitorPlay, Send, Video, XCircle } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
+import { canUseYardPush, type UserAccess } from "@/lib/admin/permissions";
 import type { CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import {
   yardPushSideFromNotice,
@@ -55,12 +55,7 @@ export function YardPushNoticesPanel() {
 
   const canPush = useMemo(() => {
     if (!data) return false;
-    return (
-      hasPermission(data.currentUser.access ?? null, "push_yard_notice") ||
-      ["owner_admin", "manager_admin", "management", "front_desk_coordinator", "team_leader"].includes(
-        data.currentUser.role ?? ""
-      )
-    );
+    return canUseYardPush(data.currentUser.access ?? null, data.currentUser.role);
   }, [data]);
 
   const activeSide = data?.activeNotice ? yardPushSideFromNotice(data.activeNotice) : null;

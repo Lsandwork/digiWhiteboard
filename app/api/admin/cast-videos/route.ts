@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { hasPermission } from "@/lib/admin/permissions";
+import { canManageCastVideoPush } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import {
@@ -28,8 +28,7 @@ async function actorAccess(request: Request) {
 }
 
 function canManageCastVideos(access: Awaited<ReturnType<typeof actorAccess>>["access"], role?: string | null) {
-  if (hasPermission(access, "manage_cast_videos")) return true;
-  return role === "owner_admin" || role === "manager_admin";
+  return canManageCastVideoPush(access, role);
 }
 
 export async function GET(request: Request) {

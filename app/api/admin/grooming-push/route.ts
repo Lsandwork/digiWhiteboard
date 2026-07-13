@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { hasPermission } from "@/lib/admin/permissions";
+import { canUseGroomingPush } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import {
   createGroomingPushNotice,
@@ -31,8 +31,7 @@ async function actorAccess(request: Request) {
 }
 
 function canPush(access: Awaited<ReturnType<typeof actorAccess>>["access"], role?: string | null) {
-  if (hasPermission(access, "push_grooming_request")) return true;
-  return role === "owner_admin" || role === "manager_admin" || role === "front_desk_coordinator" || role === "team_leader" || role === "groomer" || !role;
+  return canUseGroomingPush(access, role);
 }
 
 export async function GET(request: Request) {

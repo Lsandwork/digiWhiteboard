@@ -11,7 +11,7 @@ import {
 } from "@/lib/staff/grooming-push-notices";
 import { GroomingDogPicker, GroomingManualOverrideFields } from "@/components/admin/GroomingDogPicker";
 import type { GroomingPushActiveDog } from "@/lib/grooming-push-active-dogs";
-import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
+import { canUseGroomingPush, canClearGroomingPush, type UserAccess } from "@/lib/admin/permissions";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 
 type GroomingPayload = {
@@ -64,14 +64,12 @@ export function GroomingPushPanel() {
 
   const canPush = useMemo(() => {
     if (!data) return false;
-    return hasPermission(data.currentUser.access ?? null, "push_grooming_request")
-      || ["owner_admin", "manager_admin", "front_desk_coordinator", "team_leader", "groomer"].includes(data.currentUser.role ?? "");
+    return canUseGroomingPush(data.currentUser.access ?? null, data.currentUser.role);
   }, [data]);
 
   const canClear = useMemo(() => {
     if (!data) return false;
-    return hasPermission(data.currentUser.access ?? null, "clear_grooming_request")
-      || ["owner_admin", "manager_admin", "front_desk_coordinator", "team_leader", "groomer"].includes(data.currentUser.role ?? "");
+    return canClearGroomingPush(data.currentUser.access ?? null, data.currentUser.role);
   }, [data]);
 
   const canManualOverride = useMemo(() => canPush, [canPush]);

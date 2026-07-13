@@ -4,7 +4,9 @@ import {
   legacyRoleToRoleKey,
   roleKeyToLegacyRole,
   ROLE_LABELS,
+  ROLE_PERMISSIONS,
   type DepartmentKey,
+  type PermissionKey,
   type RoleKey,
   type UserAccess
 } from "@/lib/admin/permissions";
@@ -74,6 +76,19 @@ async function loadState(supabase: SupabaseClient): Promise<UserAccessState> {
   return parseState(settings[SETTINGS_STORE_KEY]);
 }
 
+function resolveUserPermissions(
+  roles: RoleKey[],
+  matrix: Awaited<ReturnType<typeof loadRolePermissionMatrix>>,
+  legacyRole?: string | null
+): PermissionKey[] {
+  const permissions = permissionsForRolesFromMatrix(roles, matrix);
+  const legacyKey = legacyRoleToRoleKey(legacyRole);
+  if (legacyKey === "super_admin" || roles.includes("super_admin")) {
+    return [...new Set([...permissions, ...ROLE_PERMISSIONS.super_admin])];
+  }
+  return permissions;
+}
+
 async function saveState(supabase: SupabaseClient, state: UserAccessState) {
   const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
   if (error) throw error;
@@ -107,7 +122,7 @@ export async function getUserAccess(
       email,
       primaryRole,
       roles,
-      permissions: permissionsForRolesFromMatrix(roles, matrix)
+      permissions: resolveUserPermissions(roles, matrix, legacyRole)
     });
   }
 
@@ -118,7 +133,7 @@ export async function getUserAccess(
     primaryRole: assignment.primaryRole,
     roles: assignment.roles,
     departments: assignment.departments,
-    permissions: permissionsForRolesFromMatrix(roles, matrix)
+    permissions: resolveUserPermissions(roles, matrix, legacyRole)
   });
 }
 
