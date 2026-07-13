@@ -659,6 +659,8 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   hr_consult: "use_hr_consult",
   bulk_photo_upload: "view_admin_panel",
   write_ups: "submit_write_up",
+  write_up_review: "review_write_ups",
+  complaint_review: "review_management_support",
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
@@ -845,6 +847,12 @@ export function canViewOwnWriteUpsForUser(access: UserAccess | null | undefined,
   return legacyRole === "daycare";
 }
 
+export function canReviewManagementSupportForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminHrAccess(access, legacyRole) || isAdminOrManagementLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "review_management_support")) return true;
+  return hasAnyRole(access, ["admin", "management"]);
+}
+
 export function canManageSuperAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null) {
   return isSuperAdminAccess(actorAccess) || isSuperAdminLegacyRole(actorLegacyRole);
 }
@@ -919,6 +927,14 @@ export function canAccessAdminTab(
     );
   }
 
+  if (tab === "write_up_review" && board === "staff") {
+    return canReviewWriteUpsForUser(effective, legacyRole);
+  }
+
+  if (tab === "complaint_review" && board === "staff") {
+    return canReviewManagementSupportForUser(effective, legacyRole);
+  }
+
   if (
     tab === "templates" &&
     (isTeamLeaderLegacyRole(legacyRole) || isFrontDeskCoordinatorLegacyRole(legacyRole))
@@ -961,7 +977,7 @@ export function canAccessAdminTab(
   if (ADMIN_SUPPORT_TAB_SET.has(tab)) {
     if (board !== "staff") return false;
     if (isGroomerLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole) || isTrainerLegacyRole(legacyRole)) return false;
-    return hasPermission(effective, "review_management_support");
+    return canReviewManagementSupportForUser(effective, legacyRole);
   }
 
   if (ADMIN_HR_TAB_SET.has(tab) || tab === "hr_pip") {

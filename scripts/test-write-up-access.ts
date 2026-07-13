@@ -5,6 +5,7 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab,
   canAccessHrPanelsForUser,
+  canReviewManagementSupportForUser,
   canReviewWriteUpsForUser,
   canSubmitWriteUpForUser,
   hasPermission,
@@ -36,16 +37,22 @@ import {
   const superAccess = accessFromLegacyRole("super-1", "super@fitdog.test", "owner_admin");
   assert.equal(canAccessAdminTab(superAccess, "hr_hub", "owner_admin", "staff"), true);
   assert.equal(canAccessAdminTab(superAccess, "write_ups", "owner_admin", "staff"), true);
+  assert.equal(canAccessAdminTab(superAccess, "write_up_review", "owner_admin", "staff"), true);
+  assert.equal(canAccessAdminTab(superAccess, "complaint_review", "owner_admin", "staff"), true);
   assert.equal(canSubmitWriteUpForUser(superAccess, "owner_admin"), true);
   assert.equal(canReviewWriteUpsForUser(superAccess, "owner_admin"), true);
+  assert.equal(canReviewManagementSupportForUser(superAccess, "owner_admin"), true);
   assert.equal(canAccessHrPanelsForUser(superAccess, "owner_admin"), true);
 
   const rbacSuperOnly = accessFromLegacyRole("rbac-super", "rbac@fitdog.test", "assistant_manager");
   rbacSuperOnly.roles = ["super_admin"];
   rbacSuperOnly.primaryRole = "super_admin";
   assert.equal(canSubmitWriteUpForUser(rbacSuperOnly, "assistant_manager"), true);
+  assert.equal(canReviewWriteUpsForUser(rbacSuperOnly, "assistant_manager"), true);
+  assert.equal(canReviewManagementSupportForUser(rbacSuperOnly, "assistant_manager"), true);
   assert.equal(canAccessHrPanelsForUser(rbacSuperOnly, "assistant_manager"), true);
-  assert.equal(canAccessAdminTab(rbacSuperOnly, "write_ups", "assistant_manager", "staff"), true);
+  assert.equal(canAccessAdminTab(rbacSuperOnly, "write_up_review", "assistant_manager", "staff"), true);
+  assert.equal(canAccessAdminTab(rbacSuperOnly, "complaint_review", "assistant_manager", "staff"), true);
 }
 
 // Team leads can submit but not view write-ups.
@@ -88,6 +95,9 @@ import {
   assert.match(route, /canSubmitWriteUpForUser\(access, role\)/);
   assert.match(route, /role: role \?\? "daycare"/);
   assert.doesNotMatch(route, /listWriteUpsForCreator\(supabase, actor, 100\);[\s\S]{0,120}role: role \?\? "team_leader"/);
+
+  const hubRoute = readFileSync(join(process.cwd(), "app/api/admin/management-support-hub/route.ts"), "utf8");
+  assert.match(hubRoute, /canReviewManagementSupportWithAccess\(access, session\?\.role\)/);
 }
 
 console.log("test-write-up-access: all assertions passed");

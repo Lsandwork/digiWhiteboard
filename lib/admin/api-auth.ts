@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import {
   canCreateFrontDeskLogForRole,
   canAccessHrPanelsForUser,
+  canReviewManagementSupportForUser,
   canReviewWriteUpsForUser,
   canSubmitWriteUpForUser,
   type UserAccess
@@ -176,6 +177,10 @@ export function canReviewWriteUpsWithAccess(access: UserAccess | null | undefine
 
 export function canAccessHrPanelsWithAccess(access: UserAccess | null | undefined, role?: string | null) {
   return canAccessHrPanelsForUser(access, role) || !role;
+}
+
+export function canReviewManagementSupportWithAccess(access: UserAccess | null | undefined, role?: string | null) {
+  return canReviewManagementSupportForUser(access, role) || !role;
 }
 
 export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

@@ -65,6 +65,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   hr_consult: "HR Consult",
   bulk_photo_upload: "Bulk Photo Upload",
   write_ups: "Write Ups",
+  write_up_review: "Write Up Review",
+  complaint_review: "Complaint Review",
   handler_shift_entry: "Handler Shift Entry Log",
   hr_pip: "P.I.P",
   remote_cast: "Remote Whiteboard Cast",
@@ -108,6 +110,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   demo_push: "Try push notices in demo mode.",
   bulk_photo_upload: "Upload and verify dog photos in batches.",
   write_ups: "Submit and review your own write-up forms.",
+  write_up_review: "Review all submitted employee write-ups.",
+  complaint_review: "Review groomer, trainer, and staff complaints.",
   handler_shift_entry: "Create handler shift log entries sent to Front Desk Log.",
   hr_pip: "View your performance improvement plan records.",
   remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."

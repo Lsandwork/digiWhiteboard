@@ -55,6 +55,7 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab,
   canAccessHrPanelsForUser,
+  canReviewManagementSupportForUser,
   canReviewWriteUpsForUser,
   canSubmitWriteUpForUser,
   firstAccessibleAdminTab,
@@ -312,7 +313,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -327,6 +328,7 @@ export function AdminDashboard() {
   const canAccessHrPanels = canAccessHrPanelsForUser(userAccess, currentRole);
   const canSubmitWriteUps = canSubmitWriteUpForUser(userAccess, currentRole);
   const canReviewWriteUps = canReviewWriteUpsForUser(userAccess, currentRole);
+  const canReviewComplaints = canReviewManagementSupportForUser(userAccess, currentRole);
 
   const preview = (
     <div className="space-y-4">
@@ -531,6 +533,10 @@ export function AdminDashboard() {
             <ManagementSupportPanel mode="team_leader" />
           ) : null
         ) : null}
+        {tab === "write_up_review" ? (
+          canReviewWriteUps ? <ManagementSupportPanel mode="admin" initialSubTab="review" /> : null
+        ) : null}
+        {tab === "complaint_review" ? (canReviewComplaints ? <ManagementSupportHubPanel /> : null) : null}
         {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
         {tab === "hr_pip" ? (canAccessHrPanels ? <HrHubPanel /> : null) : null}
 

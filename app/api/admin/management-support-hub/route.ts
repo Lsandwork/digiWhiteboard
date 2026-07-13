@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { canReviewManagementSupport, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canReviewManagementSupportWithAccess, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
 import {
   applySupportItemAction,
   loadStaffSupportInbox,
@@ -31,10 +32,19 @@ function parseFilters(searchParams: URLSearchParams): SupportInboxFilter {
   };
 }
 
+async function actorContext(request: Request) {
+  const session = getAdminSessionFromRequest(request);
+  const supabase = getServiceSupabase();
+  const access = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    : null;
+  return { session, access };
+}
+
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const session = getAdminSessionFromRequest(request);
-  if (!canReviewManagementSupport(session?.role)) {
+  const { session, access } = await actorContext(request);
+  if (!canReviewManagementSupportWithAccess(access, session?.role)) {
     return NextResponse.json({ error: "You do not have permission to review management support." }, { status: 403 });
   }
 
@@ -73,8 +83,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const session = getAdminSessionFromRequest(request);
-  if (!canReviewManagementSupport(session?.role)) {
+  const { session, access } = await actorContext(request);
+  if (!canReviewManagementSupportWithAccess(access, session?.role)) {
     return NextResponse.json({ error: "You do not have permission to manage support items." }, { status: 403 });
   }
 
@@ -107,8 +117,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const session = getAdminSessionFromRequest(request);
-  if (!canReviewManagementSupport(session?.role)) {
+  const { session, access } = await actorContext(request);
+  if (!canReviewManagementSupportWithAccess(access, session?.role)) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
