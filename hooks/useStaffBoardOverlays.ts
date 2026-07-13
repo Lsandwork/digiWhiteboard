@@ -6,6 +6,7 @@ import type { CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import type { GroomingPushNotice } from "@/lib/staff/grooming-push-notices";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 import type { TrainerPushNotice } from "@/lib/staff/trainer-push-notices";
+import type { MarketingMediaRequest } from "@/lib/marketing/media-requests";
 
 const BOARD_OVERLAY_POLL_MS = 12_000;
 const BOARD_OVERLAY_TIMEOUT_MS = 5_000;
@@ -16,12 +17,14 @@ export type StaffBoardOverlaysClient = {
   trainer: { activeNotice: TrainerPushNotice | null; queue: TrainerPushNotice[] };
   castVideo: { activeNotice: CastVideoNotice | null; queue: CastVideoNotice[] };
   emergencyCastVideo: { activeNotice: CastVideoNotice | null; queue: CastVideoNotice[] };
+  mediaRequest?: { activeRequest: MarketingMediaRequest | null; queue: MarketingMediaRequest[] };
   healthy?: {
     push: boolean;
     grooming: boolean;
     trainer: boolean;
     castVideo: boolean;
     emergencyCastVideo: boolean;
+    mediaRequest?: boolean;
   };
   loadedAt?: string;
 };
@@ -31,7 +34,8 @@ const emptyOverlays: StaffBoardOverlaysClient = {
   grooming: { activeNotice: null, queue: [] },
   trainer: { activeNotice: null, queue: [] },
   castVideo: { activeNotice: null, queue: [] },
-  emergencyCastVideo: { activeNotice: null, queue: [] }
+  emergencyCastVideo: { activeNotice: null, queue: [] },
+  mediaRequest: { activeRequest: null, queue: [] }
 };
 
 function getViewerKey() {
@@ -91,6 +95,8 @@ export function useStaffBoardOverlays(options?: {
     groomingQueue: overlays.grooming.queue,
     activeTrainerNotice: overlays.trainer.activeNotice,
     trainerQueue: overlays.trainer.queue,
+    activeMediaRequest: overlays.mediaRequest?.activeRequest ?? null,
+    mediaRequestQueue: overlays.mediaRequest?.queue ?? [],
     reload: load,
     viewerKey: getViewerKey()
   };

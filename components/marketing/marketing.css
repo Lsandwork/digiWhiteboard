@@ -1,0 +1,424 @@
+.marketing-app {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+  background: var(--marketing-surface-muted, #f8fafc);
+  color: var(--marketing-text, #0f172a);
+}
+
+.marketing-app--collapsed {
+  grid-template-columns: 88px 1fr;
+}
+
+.marketing-sidebar {
+  background: var(--marketing-sidebar-bg, #1e1b4b);
+  color: var(--marketing-sidebar-text, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0.75rem;
+  gap: 1rem;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
+}
+
+.marketing-sidebar__brand {
+  padding: 0 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.marketing-sidebar__subtitle {
+  margin-top: 0.35rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.marketing-sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.marketing-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--marketing-radius-sm, 8px);
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+
+.marketing-nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.marketing-nav-item--active {
+  background: var(--marketing-sidebar-active, #7c3aed);
+  color: #fff;
+}
+
+.marketing-nav-item__badge,
+.marketing-header__bell-badge {
+  margin-left: auto;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  background: var(--marketing-primary, #6d28d9);
+  color: #fff;
+  font-size: 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;
+}
+
+.marketing-sidebar__quick {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.marketing-sidebar__section-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  padding: 0 0.5rem;
+}
+
+.marketing-quick-action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--marketing-radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.82rem;
+}
+
+.marketing-quick-action strong {
+  font-size: 0.88rem;
+}
+
+.marketing-quick-action span {
+  opacity: 0.75;
+}
+
+.marketing-sidebar__collapse {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.marketing-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.marketing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--marketing-surface, #fff);
+  border-bottom: 1px solid var(--marketing-border, #e2e8f0);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.marketing-header__left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.marketing-header__left h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.marketing-header__menu {
+  display: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.marketing-header__right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.marketing-header__bell {
+  position: relative;
+  color: inherit;
+  display: inline-flex;
+  padding: 0.4rem;
+}
+
+.marketing-header__user {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.marketing-header__avatar {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  background: var(--marketing-primary-soft, #ede9fe);
+  color: var(--marketing-primary, #6d28d9);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.marketing-header__name {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.marketing-header__role {
+  font-size: 0.75rem;
+  color: var(--marketing-text-muted, #64748b);
+}
+
+.marketing-header__logout {
+  border: 1px solid var(--marketing-border, #e2e8f0);
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.45rem;
+  cursor: pointer;
+}
+
+.marketing-content {
+  padding: 1.25rem 1.5rem 2rem;
+}
+
+.marketing-card {
+  background: var(--marketing-surface, #fff);
+  border: 1px solid var(--marketing-border, #e2e8f0);
+  border-radius: var(--marketing-radius-md, 12px);
+  box-shadow: var(--marketing-shadow-sm);
+  padding: 1rem;
+}
+
+.marketing-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.marketing-card__title {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.marketing-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.marketing-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.marketing-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.marketing-kpi {
+  background: #fff;
+  border: 1px solid var(--marketing-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 0.9rem;
+}
+
+.marketing-kpi__value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--marketing-primary, #6d28d9);
+}
+
+.marketing-kpi__label {
+  font-size: 0.82rem;
+  color: var(--marketing-text-muted, #64748b);
+}
+
+.marketing-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.marketing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  padding: 0.55rem 0.9rem;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.marketing-btn--primary {
+  background: var(--marketing-primary, #6d28d9);
+  color: #fff;
+}
+
+.marketing-btn--secondary {
+  background: #fff;
+  border-color: var(--marketing-border, #e2e8f0);
+  color: var(--marketing-text, #0f172a);
+}
+
+.marketing-form-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.marketing-form-grid label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.marketing-form-grid input,
+.marketing-form-grid select,
+.marketing-form-grid textarea {
+  border: 1px solid var(--marketing-border, #e2e8f0);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  font: inherit;
+}
+
+.marketing-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--marketing-text-muted, #64748b);
+}
+
+.marketing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.marketing-table th,
+.marketing-table td {
+  padding: 0.65rem 0.5rem;
+  border-bottom: 1px solid var(--marketing-border, #e2e8f0);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.marketing-dog-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.marketing-dog-chip img,
+.marketing-dog-chip__fallback {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #f1f5f9;
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.marketing-upload-zone {
+  border: 2px dashed var(--marketing-border, #e2e8f0);
+  border-radius: 16px;
+  padding: 2rem;
+  text-align: center;
+  background: #fff;
+}
+
+.marketing-upload-zone--active {
+  border-color: var(--marketing-primary, #6d28d9);
+  background: var(--marketing-primary-soft, #ede9fe);
+}
+
+.marketing-progress {
+  height: 0.5rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.marketing-progress__bar {
+  height: 100%;
+  background: var(--marketing-primary, #6d28d9);
+}
+
+@media (max-width: 1200px) {
+  .marketing-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .marketing-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .marketing-app,
+  .marketing-app--collapsed {
+    grid-template-columns: 1fr;
+  }
+  .marketing-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(88vw, 300px);
+    transform: translateX(-105%);
+    z-index: 40;
+    transition: transform 0.2s ease;
+  }
+  .marketing-sidebar--open {
+    transform: translateX(0);
+  }
+  .marketing-header__menu {
+    display: inline-flex;
+  }
+  .marketing-grid-2,
+  .marketing-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

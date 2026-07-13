@@ -21,7 +21,8 @@ export type AdminUserRole =
   | "groomer"
   | "trainer"
   | "daycare"
-  | "viewer";
+  | "viewer"
+  | "marketing";
 export type AdminUserStatus = "active" | "disabled";
 
 export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
@@ -33,7 +34,8 @@ export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   groomer: "Groomer",
   trainer: "Trainer",
   daycare: "Dog Handler",
-  viewer: "Viewer"
+  viewer: "Viewer",
+  marketing: "Marketing"
 };
 
 /** Sidebar user card — uses hyphenated front desk label per staff admin UX. */
@@ -46,7 +48,8 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
   groomer: "Groomer",
   trainer: "Trainer",
   daycare: "Dog Handler",
-  viewer: "Viewer"
+  viewer: "Viewer",
+  marketing: "Marketing"
 };
 
 export function getAdminSidebarRoleLabel(role?: string | null, email?: string | null): string {
@@ -233,6 +236,10 @@ export function canReviewWriteUps(role?: string | null) {
 
 export function isStaffPanelLimitedRole(role?: string | null) {
   return isStaffOpsLimitedRole(role) || isCrossoverStaffRole(role);
+}
+
+export function isMarketingRole(role?: string | null) {
+  return role === "marketing";
 }
 
 export function isFullAdminRole(role?: string | null) {

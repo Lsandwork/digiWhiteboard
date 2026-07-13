@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
-import { firstAccessibleAdminTab, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import { firstAccessibleAdminTab, isFullAdminLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 
 export async function middleware(request: NextRequest) {
@@ -40,6 +40,9 @@ async function runMiddleware(request: NextRequest) {
         const tab = firstAccessibleAdminTab(null, role, "staff");
         return NextResponse.redirect(new URL(`/admin?board=staff&tab=${tab}`, request.url));
       }
+      if (role === "marketing") {
+        return NextResponse.redirect(new URL("/marketing", request.url));
+      }
       return NextResponse.redirect(new URL("/admin", request.url));
     }
     return NextResponse.next();
@@ -58,6 +61,9 @@ async function runMiddleware(request: NextRequest) {
     }
 
     const role = session.role ?? "";
+    if (!session.isDemo && role === "marketing" && !pathname.startsWith("/admin/login")) {
+      return NextResponse.redirect(new URL("/marketing", request.url));
+    }
     if (!session.isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
       if (url.searchParams.get("board") !== "staff") {
@@ -88,11 +94,29 @@ async function runMiddleware(request: NextRequest) {
     }
   }
 
+  if (pathname === "/marketing" || pathname.startsWith("/marketing/")) {
+    if (!session) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (session.mustChangePassword) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    const role = session.role ?? "";
+    const canAccessMarketing = role === "marketing" || isFullAdminLegacyRole(role);
+    if (!canAccessMarketing) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   // "/" is matched so the lobby custom-domain rewrite can run at the root.
   // Non-lobby hosts fall through to the normal Staff board at "/".
-  matcher: ["/", "/admin", "/admin/:path*"]
+  matcher: ["/", "/admin", "/admin/:path*", "/marketing", "/marketing/:path*"]
 };

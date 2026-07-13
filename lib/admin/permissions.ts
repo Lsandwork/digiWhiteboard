@@ -75,7 +75,14 @@ export type PermissionKey =
   | "view_analytics"
   | "export_reports"
   | "view_admin_logs"
-  | "receive_walks_board_reminders";
+  | "receive_walks_board_reminders"
+  | "view_marketing_panel"
+  | "manage_marketing_requests"
+  | "manage_marketing_uploads"
+  | "manage_marketing_storage"
+  | "manage_marketing_campaigns"
+  | "manage_marketing_calendar"
+  | "respond_marketing_media_request";
 
 export type RoleKey =
   | "super_admin"
@@ -91,7 +98,8 @@ export type RoleKey =
   | "overnight"
   | "maintenance"
   | "staff"
-  | "viewer";
+  | "viewer"
+  | "marketing";
 
 export type DepartmentKey =
   | "front_desk"
@@ -128,7 +136,8 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   overnight: "Overnight",
   maintenance: "Maintenance",
   staff: "Staff",
-  viewer: "Viewer"
+  viewer: "Viewer",
+  marketing: "Marketing"
 };
 
 export const DEPARTMENT_LABELS: Record<DepartmentKey, string> = {
@@ -218,7 +227,14 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_analytics",
   "export_reports",
   "view_admin_logs",
-  "receive_walks_board_reminders"
+  "receive_walks_board_reminders",
+  "view_marketing_panel",
+  "manage_marketing_requests",
+  "manage_marketing_uploads",
+  "manage_marketing_storage",
+  "manage_marketing_campaigns",
+  "manage_marketing_calendar",
+  "respond_marketing_media_request"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -466,21 +482,33 @@ export const DOG_HANDLER_TABS = [
   "help"
 ] as const;
 
+const MARKETING_PERMISSIONS: PermissionKey[] = [
+  "view_marketing_panel",
+  "manage_marketing_requests",
+  "manage_marketing_uploads",
+  "manage_marketing_storage",
+  "manage_marketing_campaigns",
+  "manage_marketing_calendar",
+  "view_notifications",
+  "respond_to_notifications"
+];
+
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: withoutStaffSubmissions([...ALL_PERMISSIONS]),
   admin: [...ADMIN_OPERATIONAL_PERMISSIONS],
   management: [...MANAGEMENT_PERMISSIONS],
-  front_desk_coordinator: COORDINATOR_PERMISSIONS,
-  team_leader: TEAM_LEADER_PERMISSIONS,
+  front_desk_coordinator: [...COORDINATOR_PERMISSIONS, "respond_marketing_media_request"],
+  team_leader: [...TEAM_LEADER_PERMISSIONS, "respond_marketing_media_request"],
   groomer: GROOMER_PERMISSIONS,
   trainer: TRAINER_PERMISSIONS,
-  daycare: DOG_HANDLER_PERMISSIONS,
+  daycare: [...DOG_HANDLER_PERMISSIONS, "respond_marketing_media_request"],
   driver: STAFF_VIEWER_PERMISSIONS,
   hiker: STAFF_VIEWER_PERMISSIONS,
   overnight: STAFF_VIEWER_PERMISSIONS,
   maintenance: STAFF_VIEWER_PERMISSIONS,
   staff: STAFF_VIEWER_PERMISSIONS,
-  viewer: STAFF_VIEWER_PERMISSIONS
+  viewer: STAFF_VIEWER_PERMISSIONS,
+  marketing: MARKETING_PERMISSIONS
 };
 
 /** Map legacy admin_users.role values to RBAC role keys. */
@@ -505,6 +533,8 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
       return "groomer";
     case "trainer":
       return "trainer";
+    case "marketing":
+      return "marketing";
     case "viewer":
       return "viewer";
     default:
@@ -531,6 +561,8 @@ export function roleKeyToLegacyRole(role: RoleKey): string {
       return "groomer";
     case "trainer":
       return "trainer";
+    case "marketing":
+      return "marketing";
     default:
       return "viewer";
   }

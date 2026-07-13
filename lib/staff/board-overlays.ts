@@ -5,6 +5,8 @@ import { loadGroomingPushBoardState, type GroomingPushNotice } from "@/lib/staff
 import { loadCastVideoBoardState, type CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import { loadActiveStaffPushNotice, type StaffPushNotice } from "@/lib/staff/push-notices";
 import { loadTrainerPushBoardState, type TrainerPushNotice } from "@/lib/staff/trainer-push-notices";
+import { loadMarketingMediaRequestBoardState } from "@/lib/marketing/media-requests";
+import type { MarketingMediaRequest } from "@/lib/marketing/media-requests";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -16,12 +18,14 @@ export type StaffBoardOverlays = {
   trainer: { activeNotice: TrainerPushNotice | null; queue: TrainerPushNotice[] };
   castVideo: { activeNotice: CastVideoNotice | null; queue: CastVideoNotice[] };
   emergencyCastVideo: { activeNotice: CastVideoNotice | null; queue: CastVideoNotice[] };
+  mediaRequest: { activeRequest: MarketingMediaRequest | null; queue: MarketingMediaRequest[] };
   healthy: {
     push: boolean;
     grooming: boolean;
     trainer: boolean;
     castVideo: boolean;
     emergencyCastVideo: boolean;
+    mediaRequest: boolean;
   };
   loadedAt: string;
 };
@@ -32,12 +36,14 @@ const emptyOverlays = (): StaffBoardOverlays => ({
   trainer: { activeNotice: null, queue: [] },
   castVideo: { activeNotice: null, queue: [] },
   emergencyCastVideo: { activeNotice: null, queue: [] },
+  mediaRequest: { activeRequest: null, queue: [] },
   healthy: {
     push: false,
     grooming: false,
     trainer: false,
     castVideo: false,
-    emergencyCastVideo: false
+    emergencyCastVideo: false,
+    mediaRequest: false
   },
   loadedAt: new Date().toISOString()
 });
@@ -77,7 +83,12 @@ export async function loadStaffBoardOverlays(
       queue: [] as CastVideoNotice[]
     };
 
-    const [push, grooming, trainer, castVideo, emergencyCastVideo] = await Promise.all([
+    const emptyMediaRequest = {
+      activeRequest: null as MarketingMediaRequest | null,
+      queue: [] as MarketingMediaRequest[]
+    };
+
+    const [push, grooming, trainer, castVideo, emergencyCastVideo, mediaRequest] = await Promise.all([
       safeLoad(
         () => loadActiveStaffPushNotice(supabase, { mutate: false }),
         null as StaffPushNotice | null,
@@ -94,7 +105,8 @@ export async function loadStaffBoardOverlays(
         () => loadCastVideoBoardState(supabase, { department, emergencyOnly: true, mutate: false }),
         emptyCast,
         "emergency-cast-video"
-      )
+      ),
+      safeLoad(() => loadMarketingMediaRequestBoardState(supabase), emptyMediaRequest, "media-request")
     ]);
 
     return {
@@ -103,12 +115,14 @@ export async function loadStaffBoardOverlays(
       trainer: trainer.value,
       castVideo: castVideo.value,
       emergencyCastVideo: emergencyCastVideo.value,
+      mediaRequest: mediaRequest.value,
       healthy: {
         push: push.ok,
         grooming: grooming.ok,
         trainer: trainer.ok,
         castVideo: castVideo.ok,
-        emergencyCastVideo: emergencyCastVideo.ok
+        emergencyCastVideo: emergencyCastVideo.ok,
+        mediaRequest: mediaRequest.ok
       },
       loadedAt: new Date().toISOString()
     };
