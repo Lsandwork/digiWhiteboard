@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
-import { firstAccessibleAdminTab, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import { firstAccessibleAdminTab, isLobbyDigiBoardOnlyLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 
 export async function middleware(request: NextRequest) {
@@ -65,6 +65,18 @@ async function runMiddleware(request: NextRequest) {
         url.searchParams.set("board", "staff");
         if (!url.searchParams.get("tab")) {
           url.searchParams.set("tab", firstAccessibleAdminTab(null, role, "staff"));
+        }
+        return NextResponse.redirect(url);
+      }
+    }
+
+    if (!session.isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
+      const url = request.nextUrl.clone();
+      if (url.searchParams.get("board") !== "lobby") {
+        url.pathname = "/admin";
+        url.searchParams.set("board", "lobby");
+        if (!url.searchParams.get("tab")) {
+          url.searchParams.set("tab", firstAccessibleAdminTab(null, role, "lobby"));
         }
         return NextResponse.redirect(url);
       }

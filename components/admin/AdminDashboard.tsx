@@ -56,12 +56,13 @@ import {
   canAccessAdminTab,
   firstAccessibleAdminTab,
   hasPermission,
+  isLobbyDigiBoardOnlyLegacyRole,
   isStaffDigiBoardOnlyLegacyRole,
   isSuperAdminLegacyRole,
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { isGroomerRole, isTeamLeaderRole, isTrainerRole, isFullAdminRole, isFrontDeskCoordinatorRole, isAdminOrManagementRole } from "@/lib/admin/users";
+import { isGroomerRole, isTeamLeaderRole, isTrainerRole, isMarketingRole, isFullAdminRole, isFrontDeskCoordinatorRole, isAdminOrManagementRole } from "@/lib/admin/users";
 import { DemoPushPanel } from "@/components/demo/DemoPushPanel";
 import { getEffectiveDemoRole } from "@/lib/demo/session";
 import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, HandlerWriteUpsPanel } from "@/components/admin/HandlerBasicPanels";
@@ -147,7 +148,8 @@ export function AdminDashboard() {
     const access = session.access
       ?? accessFromLegacyRole(session.adminUserId ?? null, data?.username ?? null, effectiveRole);
     const staffOnly = !isDemo && isStaffDigiBoardOnlyLegacyRole(effectiveRole);
-    const effectiveBoard = staffOnly ? "staff" : board;
+    const lobbyOnly = !isDemo && isLobbyDigiBoardOnlyLegacyRole(effectiveRole);
+    const effectiveBoard = staffOnly ? "staff" : lobbyOnly ? "lobby" : board;
 
     if (staffOnly && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
@@ -155,10 +157,22 @@ export function AdminDashboard() {
       return;
     }
 
+    if (lobbyOnly && board !== "lobby") {
+      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "lobby");
+      router.replace(`/admin?board=lobby&tab=${tab}`);
+      return;
+    }
+
     if (!canAccessAdminTab(access, tab, effectiveRole, effectiveBoard, { isDemo })) {
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
       const fallbackBoard =
-        effectiveBoard === "staff" && fallbackTab === "users" ? "lobby" : staffOnly ? "staff" : effectiveBoard;
+        effectiveBoard === "staff" && fallbackTab === "users"
+          ? "lobby"
+          : staffOnly
+            ? "staff"
+            : lobbyOnly
+              ? "lobby"
+              : effectiveBoard;
       if (typeof window !== "undefined" && fallbackBoard === "staff") {
         window.localStorage.setItem("fitdog_admin_board", "staff");
       }
@@ -300,7 +314,9 @@ export function AdminDashboard() {
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
   const isHandlerPanel = !isDemo && currentRole === "daycare";
   const isCoordinatorPanel = !isDemo && isFrontDeskCoordinatorRole(currentRole);
-  const isLimitedStaffPanel = isTeamLeadPanel || isGroomerPanel || isTrainerPanel || isHandlerPanel || isCoordinatorPanel;
+  const isMarketingPanel = !isDemo && isMarketingRole(currentRole);
+  const isLimitedStaffPanel =
+    isTeamLeadPanel || isGroomerPanel || isTrainerPanel || isHandlerPanel || isCoordinatorPanel || isMarketingPanel;
   const canSeeAdminUtilities = isFullAdminRole(currentRole) || currentRole === "assistant_manager";
   const canViewUserGroupsPermissions =
     isSuperAdminLegacyRole(currentRole) || hasPermission(userAccess, "view_user_groups_permissions");
@@ -470,7 +486,9 @@ export function AdminDashboard() {
                     ? "trainer"
                     : isCoordinatorPanel
                       ? "coordinator"
-                      : "team_leader"
+                      : isAdminOrManagementRole(currentRole)
+                        ? "admin"
+                        : "team_leader"
             }
           />
         ) : null}
@@ -493,7 +511,15 @@ export function AdminDashboard() {
         {tab === "hr_consult" ? (isAdminOrManagementRole(currentRole) ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null) : null}
         {tab === "remote_cast" ? <RemoteCastPanel /> : null}
         {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel /> : null}
-        {tab === "write_ups" ? (isHandlerPanel ? <HandlerWriteUpsPanel /> : <ManagementSupportPanel mode="team_leader" />) : null}
+        {tab === "write_ups" ? (
+          isHandlerPanel ? (
+            <HandlerWriteUpsPanel />
+          ) : isAdminOrManagementRole(currentRole) ? (
+            <ManagementSupportPanel mode="admin" />
+          ) : (
+            <ManagementSupportPanel mode="team_leader" />
+          )
+        ) : null}
         {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
         {tab === "hr_pip" ? (isAdminOrManagementRole(currentRole) ? <HrHubPanel /> : null) : null}
 

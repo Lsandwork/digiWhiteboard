@@ -88,7 +88,8 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     label: "Whiteboards",
     permissions: [
       p("view_staff_whiteboard", "View Staff Whiteboard", "Preview and view the staff digital whiteboard."),
-      p("manage_staff_whiteboard", "Manage Staff Whiteboard", "Publish and manage staff board content.")
+      p("manage_staff_whiteboard", "Manage Staff Whiteboard", "Publish and manage staff board content."),
+      p("manage_lobby_board", "Manage Lobby Whiteboard", "Edit lobby messages, promotions, and class schedule.")
     ]
   },
   {

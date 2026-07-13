@@ -75,7 +75,8 @@ export type PermissionKey =
   | "view_analytics"
   | "export_reports"
   | "view_admin_logs"
-  | "receive_walks_board_reminders";
+  | "receive_walks_board_reminders"
+  | "manage_lobby_board";
 
 export type RoleKey =
   | "super_admin"
@@ -91,6 +92,7 @@ export type RoleKey =
   | "overnight"
   | "maintenance"
   | "staff"
+  | "marketing"
   | "viewer";
 
 export type DepartmentKey =
@@ -128,6 +130,7 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   overnight: "Overnight",
   maintenance: "Maintenance",
   staff: "Staff",
+  marketing: "Marketing Account",
   viewer: "Viewer"
 };
 
@@ -218,7 +221,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_analytics",
   "export_reports",
   "view_admin_logs",
-  "receive_walks_board_reminders"
+  "receive_walks_board_reminders",
+  "manage_lobby_board"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -374,6 +378,13 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
+/** Lobby marketing panel — board messages, promotions, and class schedule only. */
+const MARKETING_PERMISSIONS: PermissionKey[] = [
+  "view_admin_panel",
+  "manage_lobby_board",
+  "view_staff_whiteboard"
+];
+
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
 const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
@@ -466,6 +477,15 @@ export const DOG_HANDLER_TABS = [
   "help"
 ] as const;
 
+export const MARKETING_TABS = [
+  "content",
+  "promotions",
+  "schedule",
+  "whiteboard_preview",
+  "settings",
+  "help"
+] as const;
+
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: withoutStaffSubmissions([...ALL_PERMISSIONS]),
   admin: [...ADMIN_OPERATIONAL_PERMISSIONS],
@@ -480,6 +500,7 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   overnight: STAFF_VIEWER_PERMISSIONS,
   maintenance: STAFF_VIEWER_PERMISSIONS,
   staff: STAFF_VIEWER_PERMISSIONS,
+  marketing: MARKETING_PERMISSIONS,
   viewer: STAFF_VIEWER_PERMISSIONS
 };
 
@@ -505,6 +526,8 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
       return "groomer";
     case "trainer":
       return "trainer";
+    case "marketing":
+      return "marketing";
     case "viewer":
       return "viewer";
     default:
@@ -531,6 +554,8 @@ export function roleKeyToLegacyRole(role: RoleKey): string {
       return "groomer";
     case "trainer":
       return "trainer";
+    case "marketing":
+      return "marketing";
     default:
       return "viewer";
   }
@@ -757,6 +782,10 @@ export function isTrainerLegacyRole(legacyRole?: string | null) {
   return legacyRole === "trainer";
 }
 
+export function isMarketingLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "marketing";
+}
+
 export function isDogHandlerLegacyRole(legacyRole?: string | null) {
   return legacyRole === "daycare" || legacyRole === "dog_handler";
 }
@@ -770,6 +799,11 @@ export function isStaffDigiBoardOnlyLegacyRole(legacyRole?: string | null) {
     isDogHandlerLegacyRole(legacyRole) ||
     isFrontDeskCoordinatorLegacyRole(legacyRole)
   );
+}
+
+/** Marketing accounts — lobby whiteboard admin only (not staff board). */
+export function isLobbyDigiBoardOnlyLegacyRole(legacyRole?: string | null) {
+  return isMarketingLegacyRole(legacyRole);
 }
 
 export function canAccessAdminTab(
@@ -830,6 +864,11 @@ export function canAccessAdminTab(
   if (isDogHandlerLegacyRole(legacyRole)) {
     if (board !== "staff") return false;
     return (DOG_HANDLER_TABS as readonly string[]).includes(tab);
+  }
+
+  if (isMarketingLegacyRole(legacyRole)) {
+    if (board !== "lobby") return false;
+    return (MARKETING_TABS as readonly string[]).includes(tab);
   }
 
   if (ADMIN_SUPPORT_TAB_SET.has(tab)) {
@@ -894,6 +933,7 @@ export function canAccessAdminTab(
   if (LOBBY_ONLY_TABS.has(tab)) {
     return (
       canManageAdminUsers(effective, legacyRole) ||
+      hasPermission(effective, "manage_lobby_board") ||
       hasAnyPermission(effective, ["configure_integrations", "view_integrations", "manage_staff_whiteboard"])
     );
   }
@@ -926,7 +966,11 @@ export function firstAccessibleAdminTab(
 ): string {
   if (options?.isDemo && board === "staff") return "demo_push";
 
-  const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(legacyRole) ? "staff" : board;
+  const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(legacyRole)
+    ? "staff"
+    : isLobbyDigiBoardOnlyLegacyRole(legacyRole)
+      ? "lobby"
+      : board;
 
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
     return board === "staff" ? "overview" : "overview";
@@ -965,6 +1009,13 @@ export function firstAccessibleAdminTab(
       if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
     return "whiteboard_preview";
+  }
+
+  if (isMarketingLegacyRole(legacyRole) && resolvedBoard === "lobby") {
+    for (const tab of MARKETING_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
+    }
+    return "content";
   }
 
   const tabs =

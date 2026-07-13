@@ -3,6 +3,7 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab,
   firstAccessibleAdminTab,
+  isLobbyDigiBoardOnlyLegacyRole,
   isStaffDigiBoardOnlyLegacyRole
 } from "../lib/admin/permissions";
 import { ADMIN_TABS } from "../lib/admin/types";
@@ -17,6 +18,7 @@ const roles: AdminUserRole[] = [
   "groomer",
   "trainer",
   "daycare",
+  "marketing",
   "viewer"
 ];
 
@@ -24,7 +26,11 @@ for (const role of roles) {
   const access = accessFromLegacyRole(`audit-${role}`, `${role}@fitdog.test`, role);
 
   for (const requestedBoard of ["staff", "lobby"] as const) {
-    const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(role) ? "staff" : requestedBoard;
+    const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(role)
+      ? "staff"
+      : isLobbyDigiBoardOnlyLegacyRole(role)
+        ? "lobby"
+        : requestedBoard;
     const firstTab = firstAccessibleAdminTab(access, role, requestedBoard);
 
     assert.equal(

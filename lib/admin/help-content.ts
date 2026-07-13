@@ -606,7 +606,7 @@ function getArticleAudiences(article: HelpArticle): HelpAudience[] {
 export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole): boolean {
   if (isFullAdminRole(role)) return true;
   const audiences = getArticleAudiences(article);
-  if (role === "viewer") return audiences.includes("viewer");
+  if (role === "viewer" || role === "marketing") return audiences.includes("viewer");
   if (isStaffOpsLimitedRole(role)) return audiences.includes("staff_ops");
   if (isCrossoverStaffRole(role)) {
     return article.id === "groomer-trainer-crossover" || article.id === "troubleshoot-login" || article.id === "change-password";

@@ -14,6 +14,7 @@ export const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "overnight", description: "Overnight staff board access." },
   { value: "maintenance", description: "Maintenance staff board access." },
   { value: "staff", description: "Basic staff board access." },
+  { value: "marketing", description: "Lobby whiteboard content: board messages, promotions, and class schedule." },
   { value: "viewer", description: "Read-only dashboard access." }
 ];
 

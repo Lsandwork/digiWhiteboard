@@ -34,6 +34,7 @@ const staffStatusOptions: StaffMemberForm["status"][] = ["Active", "Inactive"];
 
 const dashboardRoleOptions: { value: AdminUserRole; label: string }[] = [
   { value: "viewer", label: "Viewer" },
+  { value: "marketing", label: "Marketing Account" },
   { value: "groomer", label: "Groomer" },
   { value: "trainer", label: "Trainer" },
   { value: "daycare", label: "Dog Handler" },

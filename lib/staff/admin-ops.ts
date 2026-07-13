@@ -182,6 +182,7 @@ export const STAFF_DEPARTMENTS = [
   "Grooming",
   "Training",
   "Management",
+  "Marketing",
   "Maintenance",
   "Transportation"
 ] as const;
@@ -194,6 +195,7 @@ export function departmentForDashboardRole(role?: AdminUserRole | null) {
   if (role === "front_desk_coordinator") return FRONT_DESK_DEPARTMENT;
   if (role === "groomer") return "Grooming";
   if (role === "trainer") return "Training";
+  if (role === "marketing") return "Marketing";
   return null;
 }
 

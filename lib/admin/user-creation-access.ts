@@ -17,6 +17,7 @@ const OPERATIONAL_ROLE_KEYS: RoleKey[] = [
   "overnight",
   "maintenance",
   "staff",
+  "marketing",
   "viewer"
 ];
 

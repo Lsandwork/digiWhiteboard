@@ -177,6 +177,8 @@ function defaultDepartmentsForRole(role: RoleKey): DepartmentKey[] {
       return ["management", "admin"];
     case "daycare":
       return ["daycare"];
+    case "marketing":
+      return ["admin"];
     case "driver":
     case "hiker":
       return ["transportation"];
@@ -196,6 +198,7 @@ const STAFF_DIRECTORY_DEPARTMENT_TO_RBAC: Record<string, DepartmentKey> = {
   overnight: "overnight",
   maintenance: "maintenance",
   transportation: "transportation",
+  marketing: "admin",
   admin: "admin"
 };
 

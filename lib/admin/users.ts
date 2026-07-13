@@ -21,6 +21,7 @@ export type AdminUserRole =
   | "groomer"
   | "trainer"
   | "daycare"
+  | "marketing"
   | "viewer";
 export type AdminUserStatus = "active" | "disabled";
 
@@ -33,6 +34,7 @@ export const ADMIN_USER_ROLE_LABELS: Record<AdminUserRole, string> = {
   groomer: "Groomer",
   trainer: "Trainer",
   daycare: "Dog Handler",
+  marketing: "Marketing Account",
   viewer: "Viewer"
 };
 
@@ -46,6 +48,7 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
   groomer: "Groomer",
   trainer: "Trainer",
   daycare: "Dog Handler",
+  marketing: "Marketing Account",
   viewer: "Viewer"
 };
 
@@ -137,6 +140,10 @@ export function isGroomerRole(role?: string | null) {
 
 export function isTrainerRole(role?: string | null) {
   return role === "trainer";
+}
+
+export function isMarketingRole(role?: string | null) {
+  return role === "marketing";
 }
 
 /** Team leads and admin/management can submit employee write-ups. */
