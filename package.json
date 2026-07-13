@@ -23,6 +23,7 @@
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
     "test:commissions-nav": "tsx scripts/test-commissions-nav.ts",
     "test:walks-board": "tsx scripts/test-walks-board.ts",
+    "test:marketing-panel": "tsx scripts/test-marketing-panel.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "check:display-health": "tsx scripts/check-display-health.ts",

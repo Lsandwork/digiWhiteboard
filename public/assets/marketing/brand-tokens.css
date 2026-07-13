@@ -1,0 +1,23 @@
+:root {
+  --marketing-primary: #6d28d9;
+  --marketing-primary-hover: #5b21b6;
+  --marketing-primary-soft: #ede9fe;
+  --marketing-accent: #f97316;
+  --marketing-accent-soft: #ffedd5;
+  --marketing-surface: #ffffff;
+  --marketing-surface-muted: #f8fafc;
+  --marketing-border: #e2e8f0;
+  --marketing-text: #0f172a;
+  --marketing-text-muted: #64748b;
+  --marketing-success: #10b981;
+  --marketing-warning: #f59e0b;
+  --marketing-danger: #ef4444;
+  --marketing-radius-sm: 8px;
+  --marketing-radius-md: 12px;
+  --marketing-radius-lg: 16px;
+  --marketing-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --marketing-shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --marketing-sidebar-bg: #1e1b4b;
+  --marketing-sidebar-text: #e2e8f0;
+  --marketing-sidebar-active: #7c3aed;
+}

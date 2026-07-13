@@ -1,0 +1,11 @@
+{
+  "awaiting_handler": { "label": "Awaiting Handler", "color": "#6366F1", "bg": "#EEF2FF" },
+  "handler_acknowledged": { "label": "Handler Acknowledged", "color": "#0EA5E9", "bg": "#E0F2FE" },
+  "dog_being_retrieved": { "label": "Dog Being Retrieved", "color": "#F59E0B", "bg": "#FEF3C7" },
+  "dog_ready": { "label": "Dog Ready", "color": "#10B981", "bg": "#D1FAE5" },
+  "in_session": { "label": "In Photo Session", "color": "#8B5CF6", "bg": "#EDE9FE" },
+  "completed": { "label": "Completed", "color": "#64748B", "bg": "#F1F5F9" },
+  "delayed": { "label": "Delayed", "color": "#F97316", "bg": "#FFEDD5" },
+  "unavailable": { "label": "Unavailable", "color": "#EF4444", "bg": "#FEE2E2" },
+  "canceled": { "label": "Canceled", "color": "#94A3B8", "bg": "#F8FAFC" }
+}

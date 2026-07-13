@@ -171,6 +171,8 @@ function defaultDepartmentsForRole(role: RoleKey): DepartmentKey[] {
       return ["grooming"];
     case "trainer":
       return ["training"];
+    case "marketing":
+      return ["admin"];
     case "management":
     case "admin":
     case "super_admin":

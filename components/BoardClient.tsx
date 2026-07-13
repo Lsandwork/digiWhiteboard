@@ -19,6 +19,7 @@ import {
 import { PushNoticeBoardVeil } from "@/components/board/PushNoticeFlashLayers";
 import { CastVideoOverlay } from "@/components/board/CastVideoOverlay";
 import { GroomingPushNoticeOverlay, groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverlay";
+import { MediaRequestOverlay } from "@/components/board/MediaRequestOverlay";
 import { TrainerPushNoticeOverlay } from "@/components/board/TrainerPushNoticeOverlay";
 import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
 import { useCheckinDisplayTimers } from "@/hooks/useCheckinDisplayTimers";
@@ -199,6 +200,8 @@ export function BoardClient({
     groomingQueue,
     activeTrainerNotice,
     trainerQueue,
+    activeMediaRequest,
+    mediaRequestQueue,
     reload: reloadOverlays,
     viewerKey: castViewerKey
   } = useStaffBoardOverlays({
@@ -224,11 +227,13 @@ export function BoardClient({
     emergencyCastVideo && isTimedPushStillActive(emergencyCastVideo.expires_at, nowMs)
       ? emergencyCastVideo
       : null;
+  const effectiveMediaRequest = activeMediaRequest ?? null;
   const activeNoticeAlertKey =
     effectiveEmergencyCastVideo ? `emergency-video:${effectiveEmergencyCastVideo.id}` :
     effectiveCastVideo ? `video:${effectiveCastVideo.id}` :
     effectiveGroomingNotice ? `grooming:${effectiveGroomingNotice.id}` :
     effectiveTrainerNotice ? `trainer:${effectiveTrainerNotice.id}` :
+    effectiveMediaRequest ? `media-request:${effectiveMediaRequest.id}` :
     activePushNotice ? `push:${activePushNotice.id}` :
     null;
   const isEmergencyStaffPush = Boolean(
@@ -278,6 +283,7 @@ export function BoardClient({
     Boolean(minimizedCastNotice) &&
     !effectiveGroomingNotice &&
     !effectiveTrainerNotice &&
+    !effectiveMediaRequest &&
     !isEmergencyStaffPush;
   const pushVeilActive = Boolean(
     showEmergencyCastFullscreen ||
@@ -285,6 +291,7 @@ export function BoardClient({
       showMinimizedCast ||
       effectiveGroomingNotice ||
       effectiveTrainerNotice ||
+      effectiveMediaRequest ||
       activePushNotice
   );
   const pushVeilTone = effectiveGroomingNotice
@@ -853,6 +860,21 @@ export function BoardClient({
             nowMs={nowMs}
             clockTime={groomingClock.clockTime}
             clockDate={groomingClock.clockDate}
+          />
+        ) : effectiveMediaRequest ? (
+          <MediaRequestOverlay
+            request={effectiveMediaRequest}
+            queue={mediaRequestQueue}
+            onAction={async (requestId, action) => {
+              const response = await fetch("/api/staff/media-requests", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ requestId, action })
+              });
+              const body = await response.json();
+              if (!response.ok) throw new Error(body.error ?? "Action failed.");
+              await reloadOverlays();
+            }}
           />
         ) : showCastFullscreen ? (
           <CastVideoOverlay
