@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
-import { firstAccessibleAdminTab, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import {
+  firstAccessibleAdminTab,
+  isAdminOrManagementLegacyRole,
+  isStaffDigiBoardOnlyLegacyRole
+} from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 
 export async function middleware(request: NextRequest) {
@@ -78,8 +82,7 @@ async function runMiddleware(request: NextRequest) {
     const isAdminSupportRoute = adminSupportPaths.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
     );
-    const isFullAdmin = role === "owner_admin" || role === "manager_admin";
-    if (isAdminSupportRoute && !isFullAdmin) {
+    if (isAdminSupportRoute && !isAdminOrManagementLegacyRole(role)) {
       return NextResponse.redirect(new URL("/admin?board=staff", request.url));
     }
 

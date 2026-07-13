@@ -2,6 +2,7 @@
 
 import type { CrossoverReply } from "@/lib/staff/admin-ops";
 import type { ManagementReport, SupportComment } from "@/lib/staff/management-reports";
+import { isManagementTierUserRole } from "@/lib/admin/users";
 
 export type ThreadEntry = {
   id: string;
@@ -18,7 +19,7 @@ function formatTime(value: string) {
 }
 
 function roleLabel(role: string) {
-  if (role === "admin" || role === "management" || role === "owner_admin" || role === "manager_admin") return "Management";
+  if (isManagementTierUserRole(role)) return "Management";
   if (role === "team_leader") return "Team Lead";
   if (role === "groomer") return "Groomer";
   if (role === "trainer") return "Trainer";
