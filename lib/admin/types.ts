@@ -47,6 +47,7 @@ export type AdminTab =
   | "content"
   | "promotions"
   | "schedule"
+  | "lobby_slideshow"
   | "display"
   | "push_notices"
   | "yard_push_notices"
@@ -94,6 +95,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "content",
   "promotions",
   "schedule",
+  "lobby_slideshow",
   "display",
   "push_notices",
   "yard_push_notices",

@@ -2,6 +2,7 @@ import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import { LOBBY_IDLE_SLIDESHOW } from "@/lib/lobby/slideshow";
+import { buildLobbySlideshowSlides } from "@/lib/lobby/slideshow-uploads";
 import { SOCIAL_MOMENTS } from "@/lib/lobby/social-moments";
 import {
   getDefaultLobbySettings,
@@ -27,7 +28,7 @@ export type LobbyBoardStatePayload = {
     error?: string;
   };
   socialMoments: SocialMoment[];
-  serviceSlides: Array<{ src: string; alt: string }>;
+  serviceSlides: Array<{ src: string; alt: string; mediaType?: "image" | "video"; poster?: string | null }>;
   healthy: boolean;
   updatedAt: string;
 };
@@ -50,11 +51,25 @@ function sanitizeSocialMoments(debugBoard: boolean): SocialMoment[] {
   })).filter((clip) => clip.src && clip.poster);
 }
 
-function sanitizeServiceSlides(debugBoard: boolean) {
-  return LOBBY_IDLE_SLIDESHOW.map((slide) => ({
-    src: sanitizeSocialMomentAsset(slide.src, slide.src, debugBoard, "service-slide"),
-    alt: slide.alt
-  })).filter((slide) => slide.src);
+async function loadServiceSlides(supabase: SupabaseClient, debugBoard: boolean) {
+  try {
+    const slides = await buildLobbySlideshowSlides(supabase);
+    return slides
+      .map((slide) => ({
+        src: sanitizeSocialMomentAsset(slide.src, slide.src, debugBoard, "service-slide"),
+        alt: slide.alt,
+        mediaType: slide.mediaType ?? "image",
+        poster: slide.poster ? sanitizeSocialMomentAsset(slide.poster, slide.poster, debugBoard, "service-slide-poster") : null
+      }))
+      .filter((slide) => slide.src);
+  } catch {
+    return LOBBY_IDLE_SLIDESHOW.map((slide) => ({
+      src: sanitizeSocialMomentAsset(slide.src, slide.src, debugBoard, "service-slide"),
+      alt: slide.alt,
+      mediaType: "image" as const,
+      poster: null
+    })).filter((slide) => slide.src);
+  }
 }
 
 export async function buildLobbyBoardState(
@@ -107,12 +122,14 @@ export async function buildLobbyBoardState(
 
   const healthy = !checkoutError && sanitizedCheckouts.counts.active >= 0;
 
+  const serviceSlides = await loadServiceSlides(supabase, debugBoard);
+
   return {
     board: "lobby",
     settings,
     checkouts: sanitizedCheckouts,
     socialMoments: sanitizeSocialMoments(debugBoard),
-    serviceSlides: sanitizeServiceSlides(debugBoard),
+    serviceSlides,
     healthy,
     updatedAt: nowIso
   };
@@ -157,7 +174,7 @@ export async function loadLobbyBoardState(
         error: message
       },
       socialMoments: sanitizeSocialMoments(Boolean(options.debugBoard)),
-      serviceSlides: sanitizeServiceSlides(Boolean(options.debugBoard)),
+      serviceSlides: await loadServiceSlides(supabase, Boolean(options.debugBoard)),
       healthy: false,
       updatedAt: new Date().toISOString()
     };

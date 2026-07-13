@@ -28,6 +28,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   content: "Board Messages",
   promotions: "Promotions",
   schedule: "Class Schedule",
+  lobby_slideshow: "Slideshow Upload",
   display: "TV & Cast Setup",
   push_notices: "Standard Notices",
   yard_push_notices: "Yard Camera Push",
@@ -76,6 +77,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   content: "Edit the messages guests and staff see on the whiteboard.",
   promotions: "Manage lobby promotion cards shown during idle time.",
   schedule: "Edit the weekly class schedule on the lobby display.",
+  lobby_slideshow: "Upload photos and videos that are added to the lobby idle slideshow.",
   display: "Cast display URLs, TV setup checklist, and board refresh settings.",
   push_notices: "Send live reminders and alerts to the staff whiteboard.",
   yard_push_notices: "Push yard camera feeds to the staff whiteboard.",
@@ -111,7 +113,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
 };
 
-const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "display", "whiteboard_preview"];
+const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "lobby_slideshow", "display", "whiteboard_preview"];
 const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "push_notices",
   "grooming_push",

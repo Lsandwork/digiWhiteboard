@@ -27,6 +27,7 @@ assert.equal(canAccessAdminTab(access, "push_notices", "marketing", "staff"), fa
 assert.equal(canAccessAdminTab(access, "content", "marketing", "staff"), false);
 assert.equal(canAccessAdminTab(access, "integrations", "marketing", "lobby"), false);
 assert.equal(canAccessAdminTab(access, "remote_cast", "marketing", "lobby"), false);
+assert.equal(canAccessAdminTab(access, "lobby_slideshow", "marketing", "lobby"), true);
 
 assert.equal(firstAccessibleAdminTab(access, "marketing", "lobby"), "content");
 assert.equal(firstAccessibleAdminTab(access, "marketing", "staff"), "content");

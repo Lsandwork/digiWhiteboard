@@ -68,6 +68,7 @@ import { getEffectiveDemoRole } from "@/lib/demo/session";
 import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, HandlerWriteUpsPanel } from "@/components/admin/HandlerBasicPanels";
 import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 import { WalksBoardPanel } from "@/components/admin/WalksBoardPanel";
+import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -433,6 +434,10 @@ export function AdminDashboard() {
             onChange={(next) => void saveBoardSettings({ class_schedule: next })}
             onReset={() => showToast("Schedule reset to defaults.", "success")}
           />
+        ) : null}
+
+        {tab === "lobby_slideshow" && board === "lobby" ? (
+          <LobbySlideshowUploadPanel onToast={showToast} />
         ) : null}
 
         {tab === "users" ? <AdminUsersPage /> : null}

@@ -3,6 +3,10 @@ export const LOBBY_SLIDESHOW_BASE = "/assets/fitdog-lobby-whiteboard/slideshow";
 export type LobbySlideshowSlide = {
   src: string;
   alt: string;
+  mediaType?: "image" | "video";
+  poster?: string | null;
+  id?: string;
+  uploaded?: boolean;
 };
 
 export const LOBBY_IDLE_SLIDESHOW: LobbySlideshowSlide[] = [

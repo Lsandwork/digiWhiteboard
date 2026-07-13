@@ -481,6 +481,7 @@ export const MARKETING_TABS = [
   "content",
   "promotions",
   "schedule",
+  "lobby_slideshow",
   "whiteboard_preview",
   "settings",
   "help"
@@ -662,7 +663,8 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
   settings: "view_admin_panel",
-  help: "view_admin_panel"
+  help: "view_admin_panel",
+  lobby_slideshow: "manage_lobby_board"
 };
 
 export function canAccessTab(access: UserAccess | null | undefined, tab: string, legacyRole?: string | null): boolean {
