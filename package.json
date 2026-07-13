@@ -21,6 +21,7 @@
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
+    "test:admin-account-roles": "tsx scripts/test-admin-account-roles.ts",
     "test:commissions-nav": "tsx scripts/test-commissions-nav.ts",
     "test:walks-board": "tsx scripts/test-walks-board.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",

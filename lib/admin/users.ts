@@ -249,6 +249,18 @@ export function isAdminOrManagementRole(role?: string | null) {
   return isFullAdminRole(role) || isManagementRole(role);
 }
 
+/** Legacy session roles and stored comment roles that represent management-tier staff. */
+export function isManagementTierUserRole(role?: string | null) {
+  if (!role) return false;
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "admin" ||
+    role === "management"
+  );
+}
+
 /** HR Records and HR Consult — admin and management only. */
 export function canAccessHrPanels(role?: string | null) {
   return isAdminOrManagementRole(role);
@@ -381,7 +393,7 @@ export async function findAdminUserByEmail(supabase: SupabaseClient, email: stri
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
   const { data, error } = await supabase
     .from("admin_users")
-    .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
+    .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by, avatar_url")
     .order("created_at", { ascending: true });
   if (error) {
     if (isMissingAdminUsersTable(error)) {

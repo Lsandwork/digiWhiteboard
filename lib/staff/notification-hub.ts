@@ -1,4 +1,4 @@
-import { canReviewManagementSupport, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { canReviewManagementSupport, isFullAdminRole, isManagementTierUserRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 import type { CrossoverMessage, CrossoverReply, OwnerFollowUp, StaffOpsState } from "@/lib/staff/admin-ops";
 import type { ManagementReport, SupportAdminStatus } from "@/lib/staff/management-reports";
 import {
@@ -206,13 +206,13 @@ function reportNeedsReply(report: ManagementReport, session: NotificationSession
   const lastVisible = visibleComments.at(-1);
   if (canReview) {
     if (status === "Submitted") return true;
-    if (lastVisible && lastVisible.user_role !== "admin" && lastVisible.user_role !== "management") return true;
+    if (lastVisible && !isManagementTierUserRole(lastVisible.user_role)) return true;
     return status === "Needs More Info";
   }
   if (isSubmitter) {
     if (!report.management_response && visibleComments.length === 0) return false;
     if (status === "Needs More Info") return true;
-    if (lastVisible && (lastVisible.user_role === "admin" || lastVisible.user_role === "management")) return true;
+    if (lastVisible && isManagementTierUserRole(lastVisible.user_role)) return true;
     if (report.management_response && !lastVisible) return true;
   }
   return false;

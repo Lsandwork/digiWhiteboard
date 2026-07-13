@@ -57,7 +57,7 @@ export function YardPushNoticesPanel() {
     if (!data) return false;
     return (
       hasPermission(data.currentUser.access ?? null, "push_yard_notice") ||
-      ["owner_admin", "manager_admin", "management", "front_desk_coordinator", "team_leader"].includes(
+      ["owner_admin", "manager_admin", "assistant_manager", "front_desk_coordinator", "team_leader"].includes(
         data.currentUser.role ?? ""
       )
     );
