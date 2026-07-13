@@ -54,6 +54,9 @@ import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-clie
 import {
   accessFromLegacyRole,
   canAccessAdminTab,
+  canAccessHrPanelsForUser,
+  canReviewWriteUpsForUser,
+  canSubmitWriteUpForUser,
   firstAccessibleAdminTab,
   hasPermission,
   isLobbyDigiBoardOnlyLegacyRole,
@@ -321,6 +324,9 @@ export function AdminDashboard() {
   const canSeeAdminUtilities = isFullAdminRole(currentRole) || currentRole === "assistant_manager";
   const canViewUserGroupsPermissions =
     isSuperAdminLegacyRole(currentRole) || hasPermission(userAccess, "view_user_groups_permissions");
+  const canAccessHrPanels = canAccessHrPanelsForUser(userAccess, currentRole);
+  const canSubmitWriteUps = canSubmitWriteUpForUser(userAccess, currentRole);
+  const canReviewWriteUps = canReviewWriteUpsForUser(userAccess, currentRole);
 
   const preview = (
     <div className="space-y-4">
@@ -508,25 +514,25 @@ export function AdminDashboard() {
         {tab === "package_commissions" ? <PackageCommissionsPanel /> : null}
 
         {tab === "hr_hub" ? (
-          isAdminOrManagementRole(currentRole) ? (
+          canAccessHrPanels ? (
             <HrHubPanel onOpenConsult={(recordId) => setActiveTab("hr_consult", { record: recordId })} />
           ) : null
         ) : null}
 
-        {tab === "hr_consult" ? (isAdminOrManagementRole(currentRole) ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null) : null}
+        {tab === "hr_consult" ? (canAccessHrPanels ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null) : null}
         {tab === "remote_cast" ? <RemoteCastPanel /> : null}
         {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel /> : null}
         {tab === "write_ups" ? (
           isHandlerPanel ? (
             <HandlerWriteUpsPanel />
-          ) : isAdminOrManagementRole(currentRole) ? (
+          ) : canReviewWriteUps ? (
             <ManagementSupportPanel mode="admin" />
-          ) : (
+          ) : canSubmitWriteUps ? (
             <ManagementSupportPanel mode="team_leader" />
-          )
+          ) : null
         ) : null}
         {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
-        {tab === "hr_pip" ? (isAdminOrManagementRole(currentRole) ? <HrHubPanel /> : null) : null}
+        {tab === "hr_pip" ? (canAccessHrPanels ? <HrHubPanel /> : null) : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">

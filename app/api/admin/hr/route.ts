@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { isAdminRequest, unauthorizedAdminResponse, canAccessHrPanels } from "@/lib/admin/api-auth";
+import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canAccessHrPanelsForUser } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
 import { buildHrHubStats, isHrRecord, toHrRecord } from "@/lib/hr/records";
 import { listAllManagementReports, getManagementReportById } from "@/lib/staff/management-reports";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -13,14 +15,18 @@ function forbiddenResponse() {
 
 async function actorAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
-  return { session };
+  const supabase = getServiceSupabase();
+  const access = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    : null;
+  return { session, access };
 }
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session } = await actorAccess(request);
-  if (!canAccessHrPanels(session?.role)) return forbiddenResponse();
+  const { session, access } = await actorAccess(request);
+  if (!canAccessHrPanelsForUser(access, session?.role)) return forbiddenResponse();
 
   try {
     const url = new URL(request.url);

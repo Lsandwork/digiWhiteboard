@@ -138,7 +138,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "walks_board"
 ];
 
-export const ADMIN_HR_TABS = ["hr_hub", "hr_consult"] as const;
+export const ADMIN_HR_TABS = ["write_ups", "hr_hub", "hr_consult"] as const;
 
 export const ADMIN_SUPPORT_TABS = [
   "ms_hub",

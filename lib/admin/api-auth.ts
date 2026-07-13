@@ -1,7 +1,13 @@
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { demoWriteBlockedMessage, isDemoSession } from "@/lib/demo/session";
 import { NextResponse } from "next/server";
-import { canCreateFrontDeskLogForRole } from "@/lib/admin/permissions";
+import {
+  canCreateFrontDeskLogForRole,
+  canAccessHrPanelsForUser,
+  canReviewWriteUpsForUser,
+  canSubmitWriteUpForUser,
+  type UserAccess
+} from "@/lib/admin/permissions";
 import {
   canAccessCrossoverCommunication,
   canAccessFrontDeskLog,
@@ -17,6 +23,7 @@ import {
   canViewOwnTrainerSubmissions as userCanViewOwnTrainerSubmissions,
   canManagePackageCommissions as userCanManagePackageCommissions,
   canReviewManagementSupport as userCanReviewManagementSupport,
+  canReviewWriteUps as userCanReviewWriteUps,
   canAccessHrPanels as userCanAccessHrPanels,
   canViewPackageCommissions as userCanViewPackageCommissions,
   canViewOwnWriteUps as userCanViewOwnWriteUps,
@@ -151,8 +158,24 @@ export function canReviewManagementSupport(role?: string | null) {
   return userCanReviewManagementSupport(role) || !role;
 }
 
+export function canReviewWriteUps(role?: string | null) {
+  return userCanReviewWriteUps(role) || !role;
+}
+
 export function canAccessHrPanels(role?: string | null) {
   return userCanAccessHrPanels(role) || !role;
+}
+
+export function canSubmitWriteUpWithAccess(access: UserAccess | null | undefined, role?: string | null) {
+  return canSubmitWriteUpForUser(access, role) || !role;
+}
+
+export function canReviewWriteUpsWithAccess(access: UserAccess | null | undefined, role?: string | null) {
+  return canReviewWriteUpsForUser(access, role) || !role;
+}
+
+export function canAccessHrPanelsWithAccess(access: UserAccess | null | undefined, role?: string | null) {
+  return canAccessHrPanelsForUser(access, role) || !role;
 }
 
 export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

@@ -229,7 +229,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload", "write_ups"], visible)
+          ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload"], visible)
         ])
       )
     );

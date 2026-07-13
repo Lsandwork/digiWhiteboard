@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { isAdminRequest, unauthorizedAdminResponse, canAccessHrPanels } from "@/lib/admin/api-auth";
+import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
+import { canAccessHrPanelsForUser } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
 import { loadAdminSettings } from "@/lib/admin/settings";
 import { appendHrConsultMessages, clearHrConsultThread, loadHrConsultThread } from "@/lib/hr/consult-store";
 import { consultGeminiHr } from "@/lib/hr/gemini-consult";
@@ -19,14 +21,17 @@ function forbiddenResponse() {
 async function actorAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
   const supabase = getServiceSupabase();
-  return { session, supabase };
+  const access = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    : null;
+  return { session, supabase, access };
 }
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, supabase } = await actorAccess(request);
-  if (!canAccessHrPanels(session?.role)) return forbiddenResponse();
+  const { session, supabase, access } = await actorAccess(request);
+  if (!canAccessHrPanelsForUser(access, session?.role)) return forbiddenResponse();
 
   const email = session?.email ?? "admin";
   const [thread, settings] = await Promise.all([loadHrConsultThread(supabase, email), loadAdminSettings(supabase)]);
@@ -49,8 +54,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, supabase } = await actorAccess(request);
-  if (!canAccessHrPanels(session?.role)) return forbiddenResponse();
+  const { session, supabase, access } = await actorAccess(request);
+  if (!canAccessHrPanelsForUser(access, session?.role)) return forbiddenResponse();
 
   const email = session?.email ?? "admin";
   const actor = session?.email ?? session?.adminUserId ?? "admin";

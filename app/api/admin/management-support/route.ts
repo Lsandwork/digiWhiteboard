@@ -4,14 +4,20 @@ import {
   canAccessManagementReports,
   canSubmitGroomerComplaint,
   canSubmitTrainerComplaint,
-  canSubmitWriteUp,
-  canViewOwnGroomerSubmissions,
-  canViewOwnTrainerSubmissions,
-  canViewOwnWriteUps,
   isAdminRequest,
   unauthorizedAdminResponse
 } from "@/lib/admin/api-auth";
+import {
+  canReviewWriteUpsForUser,
+  canSubmitWriteUpForUser,
+  canViewOwnWriteUpsForUser
+} from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
+import {
+  canViewOwnGroomerSubmissions,
+  canViewOwnTrainerSubmissions
+} from "@/lib/admin/users";
 import { dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
 import {
   createEmployeeWriteUpReport,
@@ -42,6 +48,15 @@ function actorFromRequest(request: Request) {
   };
 }
 
+async function actorContext(request: Request) {
+  const { session, actor } = actorFromRequest(request);
+  const supabase = getServiceSupabase();
+  const access = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    : null;
+  return { session, actor, access, role: session?.role };
+}
+
 const ADMIN_REPORT_TYPES = new Set([
   "employee_write_up",
   "owner_complaint_dog_handler",
@@ -53,14 +68,13 @@ const ADMIN_REPORT_TYPES = new Set([
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, actor } = actorFromRequest(request);
-  const role = session?.role;
+  const { session, actor, access, role } = await actorContext(request);
 
   try {
     const url = new URL(request.url);
     const view = url.searchParams.get("view");
     const supabase = getServiceSupabase();
-    if (canAccessManagementReports(role)) {
+    if (canAccessManagementReports(role) || canReviewWriteUpsForUser(access, role)) {
       const reports = await listManagementReports(supabase, 100);
       return NextResponse.json({
         reports: reports.filter((report) => ADMIN_REPORT_TYPES.has(report.report_type)),
@@ -72,40 +86,55 @@ export async function GET(request: Request) {
       });
     }
 
-    if (view === "write_ups" && canViewOwnWriteUps(role)) {
-      let reports = await listWriteUpsForCreator(supabase, actor, 100);
+    if (view === "write_ups") {
+      if (canViewOwnWriteUpsForUser(access, role)) {
+        let reports = await listWriteUpsForCreator(supabase, actor, 100);
 
-      // Dog handlers can only view write-ups where they are the employee subject.
-      if (role === "daycare") {
-        let actorName: string | null = null;
-        if (session?.adminUserId) {
-          const { data } = await supabase
-            .from("admin_users")
-            .select("full_name")
-            .eq("id", session.adminUserId)
-            .maybeSingle();
-          actorName = (data?.full_name ?? "").trim() || null;
+        // Dog handlers can only view write-ups where they are the employee subject.
+        if (role === "daycare") {
+          let actorName: string | null = null;
+          if (session?.adminUserId) {
+            const { data } = await supabase
+              .from("admin_users")
+              .select("full_name")
+              .eq("id", session.adminUserId)
+              .maybeSingle();
+            actorName = (data?.full_name ?? "").trim() || null;
+          }
+          const actorEmail = (session?.email ?? "").trim().toLowerCase();
+          const normalizedName = (actorName ?? "").trim().toLowerCase();
+          const all = await listManagementReports(supabase, 200);
+          reports = all.filter((report) => {
+            if (report.report_type !== "employee_write_up") return false;
+            const employeeName = (report.employee_name ?? "").trim().toLowerCase();
+            if (!employeeName) return false;
+            if (normalizedName && employeeName === normalizedName) return true;
+            return Boolean(actorEmail) && employeeName === actorEmail;
+          });
         }
-        const actorEmail = (session?.email ?? "").trim().toLowerCase();
-        const normalizedName = (actorName ?? "").trim().toLowerCase();
-        const all = await listManagementReports(supabase, 200);
-        reports = all.filter((report) => {
-          if (report.report_type !== "employee_write_up") return false;
-          const employeeName = (report.employee_name ?? "").trim().toLowerCase();
-          if (!employeeName) return false;
-          if (normalizedName && employeeName === normalizedName) return true;
-          return Boolean(actorEmail) && employeeName === actorEmail;
+
+        return NextResponse.json({
+          reports,
+          currentUser: {
+            email: session?.email ?? null,
+            adminUserId: session?.adminUserId ?? null,
+            role: role ?? "daycare"
+          }
         });
       }
 
-      return NextResponse.json({
-        reports,
-        currentUser: {
-          email: session?.email ?? null,
-          adminUserId: session?.adminUserId ?? null,
-          role: role ?? "team_leader"
-        }
-      });
+      if (canSubmitWriteUpForUser(access, role)) {
+        return NextResponse.json({
+          reports: [],
+          currentUser: {
+            email: session?.email ?? null,
+            adminUserId: session?.adminUserId ?? null,
+            role: role ?? "team_leader"
+          }
+        });
+      }
+
+      return NextResponse.json({ error: "You do not have permission to view write-ups." }, { status: 403 });
     }
 
     if (canViewOwnGroomerSubmissions(role)) {
@@ -142,18 +171,6 @@ export async function GET(request: Request) {
       });
     }
 
-    if (canViewOwnWriteUps(role)) {
-      const reports = await listWriteUpsForCreator(supabase, actor, 100);
-      return NextResponse.json({
-        reports,
-        currentUser: {
-          email: session?.email ?? null,
-          adminUserId: session?.adminUserId ?? null,
-          role: role ?? "team_leader"
-        }
-      });
-    }
-
     return NextResponse.json({ error: "You do not have permission to view management support." }, { status: 403 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load management support.";
@@ -163,7 +180,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, actor } = actorFromRequest(request);
+  const { session, actor, access } = await actorContext(request);
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
@@ -171,7 +188,7 @@ export async function POST(request: Request) {
     const supabase = getServiceSupabase();
 
     if (action === "create_write_up") {
-      if (!canSubmitWriteUp(session?.role)) {
+      if (!canSubmitWriteUpForUser(access, session?.role)) {
         return NextResponse.json({ error: "You do not have permission to submit write-ups." }, { status: 403 });
       }
 

@@ -818,6 +818,33 @@ export function canManageCastVideoPush(access: UserAccess | null | undefined, le
   return hasPermission(access, "manage_cast_videos");
 }
 
+/** Super Admin accounts always retain HR hub and write-up capabilities. */
+export function hasSuperAdminHrAccess(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  return isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access);
+}
+
+export function canAccessHrPanelsForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminHrAccess(access, legacyRole) || isAdminOrManagementLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "view_hr_hub")) return true;
+  return hasAnyRole(access, ["admin", "management"]);
+}
+
+export function canSubmitWriteUpForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminHrAccess(access, legacyRole) || isAdminOrManagementLegacyRole(legacyRole)) return true;
+  if (hasPermission(access, "submit_write_up")) return true;
+  return legacyRole === "team_leader";
+}
+
+export function canReviewWriteUpsForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasSuperAdminHrAccess(access, legacyRole) || isAdminOrManagementLegacyRole(legacyRole)) return true;
+  return hasPermission(access, "review_write_ups");
+}
+
+export function canViewOwnWriteUpsForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
+  if (hasPermission(access, "view_own_write_ups")) return true;
+  return legacyRole === "daycare";
+}
+
 export function canManageSuperAdminUsers(actorAccess: UserAccess | null, actorLegacyRole?: string | null) {
   return isSuperAdminAccess(actorAccess) || isSuperAdminLegacyRole(actorLegacyRole);
 }
@@ -885,7 +912,11 @@ export function canAccessAdminTab(
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
 
   if (tab === "write_ups" && board === "staff") {
-    return hasAnyPermission(effective, ["submit_write_up", "review_write_ups", "view_own_write_ups"]);
+    return (
+      canSubmitWriteUpForUser(effective, legacyRole) ||
+      canReviewWriteUpsForUser(effective, legacyRole) ||
+      canViewOwnWriteUpsForUser(effective, legacyRole)
+    );
   }
 
   if (
@@ -935,10 +966,7 @@ export function canAccessAdminTab(
 
   if (ADMIN_HR_TAB_SET.has(tab) || tab === "hr_pip") {
     if (board !== "staff") return false;
-    return (
-      isAdminOrManagementLegacyRole(legacyRole) ||
-      hasAnyRole(effective, ["super_admin", "admin", "management"])
-    );
+    return canAccessHrPanelsForUser(effective, legacyRole);
   }
 
   if (
