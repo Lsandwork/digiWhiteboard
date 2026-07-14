@@ -292,11 +292,12 @@ export function SocialMomentsCarousel({
 
       <div className="social-moments-header">
         <div>
-          <p className="social-moments-eyebrow">Social Moments</p>
-          <h2>From the Fitdog Pack</h2>
+          <p className="social-moments-eyebrow">Social Media Moments</p>
+          <h2>@fitdogclub</h2>
         </div>
         <div className="social-moments-paw" aria-hidden="true">
-          🐾
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/lobby-whiteboard/light-v2/icons/teal/social-heart-bubble-128.png" alt="" className="h-9 w-9 object-contain" />
         </div>
       </div>
 
@@ -369,6 +370,19 @@ export function SocialMomentsCarousel({
             />
           );
         })}
+      </div>
+
+      <div className="social-moments-footer">
+        <span>Tag us @fitdogclub</span>
+        <span className="social-moments-footer__icons" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/lobby-whiteboard/light-v2/icons/teal/instagram-128.png" alt="" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/lobby-whiteboard/light-v2/icons/teal/facebook-128.png" alt="" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/lobby-whiteboard/light-v2/icons/teal/tiktok-128.png" alt="" />
+        </span>
+        <span className="social-moments-footer__hash">#fitdogfamily</span>
       </div>
 
       <p className="sr-only">

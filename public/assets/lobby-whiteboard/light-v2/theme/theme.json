@@ -1,0 +1,32 @@
+{
+  "name": "Fitdog Lobby Whiteboard Light Beach Theme",
+  "canvas": {
+    "width": 1448,
+    "height": 1086
+  },
+  "colors": {
+    "background": "#FBFAF6",
+    "navy": "#102E66",
+    "orange": "#F46A27",
+    "teal": "#1BAFC8",
+    "teal_dark": "#1099B3",
+    "sand": "#F3EBDD",
+    "soft_grey": "#E8E1D8",
+    "white": "#FFFFFF"
+  },
+  "fonts": {
+    "headline": "Montserrat ExtraBold or League Spartan Bold",
+    "ui": "Avenir Next / Inter / Nunito Sans Semibold",
+    "script": "Caveat / Allura / Pacifico style script"
+  },
+  "radius": {
+    "panel": 26,
+    "pill": 16,
+    "card": 18
+  },
+  "notes": [
+    "Use the provided exact dog logo PNG as the source of truth for the top-left corner mark.",
+    "Maintain a very light cream background with teal/orange/navy Fitdog accents.",
+    "Keep social media moments, class schedule, and dog checkout panel visible at all times."
+  ]
+}

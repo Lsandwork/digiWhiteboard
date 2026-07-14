@@ -1,68 +1,86 @@
 "use client";
 
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import Image from "next/image";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
-import { lobbyAssets } from "@/lib/lobby/assets";
-import { formatBoardDateTime } from "@/lib/board-utils";
+import { LobbyStatusClock } from "@/components/lobby/LobbyStatusClock";
+import { lobbyAssets, lobbyLightAssets } from "@/lib/lobby/assets";
 
 type LobbyHeaderProps = {
-  clock: Date | null;
   healthy: boolean;
   hasCheckout?: boolean;
 };
 
-export function LobbyHeader({ clock, healthy, hasCheckout = false }: LobbyHeaderProps) {
-  const { time, date } = clock ? formatBoardDateTime(clock) : { time: "--:--", date: "LOADING" };
-
+export function LobbyHeader({ healthy, hasCheckout = false }: LobbyHeaderProps) {
   return (
-    <header className="lobby-header mb-1 grid grid-cols-[200px_1fr_auto] items-center gap-6">
-      <div>
-        <Link href="/admin" aria-label="Open Fitdog admin" title="Fitdog Admin" className="inline-block rounded-full transition hover:ring-2 hover:ring-lobby-orange/70">
+    <header className="lobby-header lobby-header--light">
+      <div className="lobby-header__brand">
+        <Link href="/admin" aria-label="Open Fitdog admin" title="Fitdog Admin" className="lobby-header__brand-link">
           <LobbyAssetImage
-            src={lobbyAssets.logoBadge}
-            alt="Fitdog Health and Social Club"
-            width={96}
-            height={96}
-            className="h-[3.25rem] w-[3.25rem] rounded-full ring-2 ring-lobby-teal/50"
+            src={lobbyLightAssets.dogLogoExact}
+            alt="Fitdog"
+            width={128}
+            height={128}
+            className="lobby-header__dog-logo"
             priority
+          />
+          <Image
+            src={lobbyAssets.wordmark}
+            alt="fitdog Health & Social Club"
+            width={220}
+            height={64}
+            className="lobby-header__wordmark"
+            priority
+            unoptimized
           />
         </Link>
       </div>
 
-      <div className="text-center">
+      <div className="lobby-header__center">
         {hasCheckout ? (
-          <h1 className="text-[2.75rem] font-black uppercase leading-none tracking-wide text-white">Now Checking Out</h1>
-        ) : null}
-
-        {!hasCheckout ? (
+          <h1 className="lobby-header__title">
+            <span className="lobby-header__title-navy">NOW </span>
+            <span className="lobby-header__title-orange">CHECKING</span>
+            <span className="lobby-header__title-navy"> OUT</span>
+            <span className="lobby-header__motion" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </span>
+          </h1>
+        ) : (
           <div className="lobby-header-tagline lobby-header-tagline--idle">
             <span className="lobby-header-tagline__line" aria-hidden />
             <p className="lobby-header-tagline__text">Your Dog&apos;s Best Life</p>
             <span className="lobby-header-tagline__line" aria-hidden />
           </div>
-        ) : null}
+        )}
 
-        <p className={`lobby-header-subtitle ${hasCheckout ? "mt-1.5 text-lg" : "mt-2 text-xl"}`}>
-          Thank you for letting us <span className="font-semibold text-lobby-teal">play, care &amp; connect!</span>
+        <p className="lobby-header-subtitle">
+          Thank you for letting us play, care &amp; connect!
+          <Image
+            src={lobbyLightAssets.heartOrange}
+            alt=""
+            width={22}
+            height={22}
+            className="lobby-header__heart"
+            unoptimized
+          />
         </p>
       </div>
 
-      <div className="flex flex-col items-end gap-2">
-        <div className="flex items-center gap-2">
-          <div className="lobby-checkout-sync-btn" aria-label="Live checkout sync status">
-            <RefreshCw className="h-4 w-4 shrink-0 text-lobby-teal" strokeWidth={2.5} />
-            <span>Live Checkout Sync</span>
-          </div>
+      <div className="lobby-header__status">
+        <div className="lobby-header__status-row">
           <span className={`lobby-live-indicator ${healthy ? "lobby-live-indicator--on" : "lobby-live-indicator--refresh"}`}>
             <span className="lobby-live-indicator__dot" aria-hidden />
-            {healthy ? "Live" : "Refreshing"}
+            {healthy ? "LIVE" : "Refreshing"}
           </span>
+          <div className="lobby-checkout-sync-btn" aria-label="Live checkout sync status">
+            <Image src={lobbyLightAssets.syncTeal} alt="" width={18} height={18} className="h-4 w-4 object-contain" unoptimized />
+            <span>Live Checkout Sync</span>
+          </div>
         </div>
-        <div className="text-right">
-          <p className="text-4xl font-bold tabular-nums leading-none text-white">{time}</p>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-lobby-teal">{date}</p>
-        </div>
+        <LobbyStatusClock />
       </div>
     </header>
   );
