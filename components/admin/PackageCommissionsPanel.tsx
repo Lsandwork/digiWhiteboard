@@ -5,9 +5,14 @@ import { CheckCircle2, Download, ExternalLink, MessageSquarePlus, Pencil, Plus, 
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type {
+  PackageCommissionMode,
   PackageCommissionRow,
   PackageCommissionSaleCategory,
   PackageCommissionStatus
+} from "@/lib/staff/package-commissions";
+import {
+  calculatePercentCommission,
+  formatCommissionCurrency
 } from "@/lib/staff/package-commissions";
 
 type TrainerOption = {
@@ -44,6 +49,9 @@ const emptyForm = {
   sale_category: "package" as PackageCommissionSaleCategory,
   package_type: "",
   gingr_transaction_url: "",
+  package_sale_amount: "",
+  commission_mode: "amount" as PackageCommissionMode,
+  commission_percent: "",
   commission_amount: "",
   sold_at: "",
   status: "Pending" as PackageCommissionStatus,
@@ -128,10 +136,18 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   async function saveRow() {
     setBusy(true);
     try {
+      const payload = { ...form };
+      if (payload.commission_mode === "percent") {
+        const computed = calculatePercentCommission(payload.package_sale_amount, payload.commission_percent);
+        if (computed == null) {
+          throw new Error("Enter a valid package sale total and percentage to calculate commission.");
+        }
+        payload.commission_amount = formatCommissionCurrency(computed);
+      }
       await postAction({
         action: editingId ? "update" : "create",
         id: editingId,
-        ...form
+        ...payload
       });
       showToast(editingId ? "Commission record updated." : "Commission record added.", "success");
       setForm(emptyForm);
@@ -267,6 +283,11 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     });
   }, [rows, filter]);
 
+  const percentCommissionPreview = useMemo(() => {
+    if (form.commission_mode !== "percent") return null;
+    return calculatePercentCommission(form.package_sale_amount, form.commission_percent);
+  }, [form.commission_mode, form.commission_percent, form.package_sale_amount]);
+
   const filterButtons: { key: FilterKey; label: string }[] = [
     { key: "all", label: "All" },
     { key: "package", label: "Packages" },
@@ -355,7 +376,68 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             <label className="block"><span className="admin-label">Dog name</span><input className="admin-input" value={form.dog_name} onChange={(e) => setForm({ ...form, dog_name: e.target.value })} /></label>
             <label className="block"><span className="admin-label">Owner name</span><input className="admin-input" value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} /></label>
             <label className="block"><span className="admin-label">Package / class type</span><input className="admin-input" value={form.package_type} onChange={(e) => setForm({ ...form, package_type: e.target.value })} placeholder="6-Session Private, Group Class 4-pack" /></label>
-            <label className="block"><span className="admin-label">Commission</span><input className="admin-input" value={form.commission_amount} onChange={(e) => setForm({ ...form, commission_amount: e.target.value })} placeholder="$120" /></label>
+            <div className="block">
+              <span className="admin-label">Commission entry</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className={`crossover-btn ${form.commission_mode === "amount" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+                  onClick={() => setForm({ ...form, commission_mode: "amount" })}
+                >
+                  Dollar amount
+                </button>
+                <button
+                  type="button"
+                  className={`crossover-btn ${form.commission_mode === "percent" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+                  onClick={() => setForm({ ...form, commission_mode: "percent" })}
+                >
+                  Percentage
+                </button>
+              </div>
+            </div>
+            {form.commission_mode === "percent" ? (
+              <>
+                <label className="block">
+                  <span className="admin-label">Package / class total sold</span>
+                  <input
+                    className="admin-input"
+                    value={form.package_sale_amount}
+                    onChange={(e) => setForm({ ...form, package_sale_amount: e.target.value })}
+                    placeholder="$1,200"
+                    inputMode="decimal"
+                  />
+                </label>
+                <label className="block">
+                  <span className="admin-label">Trainer commission %</span>
+                  <input
+                    className="admin-input"
+                    value={form.commission_percent}
+                    onChange={(e) => setForm({ ...form, commission_percent: e.target.value })}
+                    placeholder="10"
+                    inputMode="decimal"
+                  />
+                </label>
+                <div className="block md:col-span-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-admin-muted">Calculated trainer commission</p>
+                  <p className="mt-1 text-2xl font-black text-white">
+                    {percentCommissionPreview != null ? formatCommissionCurrency(percentCommissionPreview) : "—"}
+                  </p>
+                  <p className="mt-1 text-sm text-admin-muted">
+                    Auto-calculates from the package/class sale total × percentage. This amount is what the trainer receives.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <label className="block">
+                <span className="admin-label">Commission amount</span>
+                <input
+                  className="admin-input"
+                  value={form.commission_amount}
+                  onChange={(e) => setForm({ ...form, commission_amount: e.target.value })}
+                  placeholder="$120"
+                />
+              </label>
+            )}
             <label className="block md:col-span-2"><span className="admin-label">Gingr transaction URL</span><input className="admin-input" value={form.gingr_transaction_url} onChange={(e) => setForm({ ...form, gingr_transaction_url: e.target.value })} placeholder="https://..." /></label>
             <label className="block"><span className="admin-label">Date sold</span><input className="admin-input" type="date" value={form.sold_at.slice(0, 10)} onChange={(e) => setForm({ ...form, sold_at: e.target.value })} /></label>
             <label className="block">
@@ -438,7 +520,14 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       </a>
                     ) : "—"}
                   </td>
-                  <td>{row.commission_amount}</td>
+                  <td>
+                    <div>{row.commission_amount}</div>
+                    {row.commission_mode === "percent" && row.commission_percent ? (
+                      <div className="text-xs text-admin-muted">
+                        {row.commission_percent}% of {row.package_sale_amount ?? "sale"}
+                      </div>
+                    ) : null}
+                  </td>
                   <td>
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
                       {row.status}
@@ -486,6 +575,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                                 sale_category: row.sale_category,
                                 package_type: row.package_type,
                                 gingr_transaction_url: row.gingr_transaction_url,
+                                package_sale_amount: row.package_sale_amount ?? "",
+                                commission_mode: row.commission_mode ?? (row.commission_percent ? "percent" : "amount"),
+                                commission_percent: row.commission_percent ?? "",
                                 commission_amount: row.commission_amount,
                                 sold_at: row.sold_at.slice(0, 10),
                                 status: row.status,

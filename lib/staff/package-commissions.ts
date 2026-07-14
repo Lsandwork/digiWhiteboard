@@ -2,6 +2,7 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 export type PackageCommissionStatus = "Pending" | "Approved" | "Paid" | "Needs Review" | "Disputed";
 export type PackageCommissionSaleCategory = "package" | "class";
+export type PackageCommissionMode = "amount" | "percent";
 
 export type PackageCommissionComment = {
   id: string;
@@ -21,7 +22,13 @@ export type PackageCommissionRow = {
   sale_category: PackageCommissionSaleCategory;
   package_type: string;
   gingr_transaction_url: string;
+  /** Total price of the package/class sold (used for percent commissions). */
+  package_sale_amount: string | null;
+  /** Trainer commission payout — always stored as the final dollar amount. */
   commission_amount: string;
+  /** Optional percent of package_sale_amount that produced commission_amount. */
+  commission_percent: string | null;
+  commission_mode: PackageCommissionMode;
   sold_at: string;
   status: PackageCommissionStatus;
   notes: string | null;
@@ -43,7 +50,10 @@ export type PackageCommissionInput = {
   sale_category?: unknown;
   package_type?: unknown;
   gingr_transaction_url?: unknown;
+  package_sale_amount?: unknown;
   commission_amount?: unknown;
+  commission_percent?: unknown;
+  commission_mode?: unknown;
   sold_at?: unknown;
   status?: unknown;
   notes?: unknown;
@@ -89,6 +99,32 @@ function normalizeSaleCategory(value: unknown): PackageCommissionSaleCategory {
   return token === "class" ? "class" : "package";
 }
 
+function normalizeCommissionMode(value: unknown): PackageCommissionMode {
+  const token = sanitizeText(value, 20).toLowerCase();
+  return token === "percent" || token === "percentage" || token === "%" ? "percent" : "amount";
+}
+
+/** Strip currency noise → number (empty / invalid → 0). */
+export function parseCommissionAmount(value: string) {
+  const cleaned = String(value ?? "").replace(/[^0-9.\-]/g, "");
+  if (!cleaned) return 0;
+  const parsed = Number.parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function formatCommissionCurrency(amount: number) {
+  if (!Number.isFinite(amount)) return "$0.00";
+  return `$${amount.toFixed(2)}`;
+}
+
+/** Compute trainer commission dollars from package sale total × percent. */
+export function calculatePercentCommission(saleTotal: string | null | undefined, percent: string | null | undefined) {
+  const sale = parseCommissionAmount(String(saleTotal ?? ""));
+  const pct = parseCommissionAmount(String(percent ?? ""));
+  if (sale <= 0 || pct < 0) return null;
+  return Math.round(sale * (pct / 100) * 100) / 100;
+}
+
 type PackageCommissionState = { rows: PackageCommissionRow[] };
 
 async function loadState(supabase: SupabaseClient): Promise<PackageCommissionState> {
@@ -129,7 +165,10 @@ function normalizeInput(input: PackageCommissionInput) {
   const sale_category = normalizeSaleCategory(input.sale_category);
   const package_type = sanitizeText(input.package_type, 120);
   const gingr_transaction_url = sanitizeUrl(input.gingr_transaction_url);
-  const commission_amount = sanitizeText(input.commission_amount, 40);
+  const commission_mode = normalizeCommissionMode(input.commission_mode);
+  const package_sale_amount_raw = sanitizeText(input.package_sale_amount, 40);
+  const commission_percent_raw = sanitizeText(input.commission_percent, 20);
+  let commission_amount = sanitizeText(input.commission_amount, 40);
   const sold_at = sanitizeText(input.sold_at, 40);
   const statusRaw = sanitizeText(input.status, 40);
   const status = (["Pending", "Approved", "Paid", "Needs Review", "Disputed"] as const).includes(statusRaw as PackageCommissionStatus)
@@ -141,8 +180,32 @@ function normalizeInput(input: PackageCommissionInput) {
   if (!dog_name) throw new Error("Dog name is required.");
   if (!owner_name) throw new Error("Owner name is required.");
   if (!package_type) throw new Error("Package type is required.");
-  if (!commission_amount) throw new Error("Commission amount is required.");
   if (!sold_at) throw new Error("Date sold is required.");
+
+  let package_sale_amount: string | null = package_sale_amount_raw || null;
+  let commission_percent: string | null = commission_percent_raw || null;
+
+  if (commission_mode === "percent") {
+    if (!package_sale_amount_raw) throw new Error("Package / class sale total is required for percentage commissions.");
+    if (!commission_percent_raw) throw new Error("Commission percentage is required.");
+    const sale = parseCommissionAmount(package_sale_amount_raw);
+    const pct = parseCommissionAmount(commission_percent_raw);
+    if (sale <= 0) throw new Error("Package / class sale total must be greater than zero.");
+    if (pct < 0 || pct > 100) throw new Error("Commission percentage must be between 0 and 100.");
+    const computed = calculatePercentCommission(package_sale_amount_raw, commission_percent_raw);
+    if (computed == null) throw new Error("Unable to calculate commission from percentage.");
+    commission_amount = formatCommissionCurrency(computed);
+    package_sale_amount = formatCommissionCurrency(sale);
+    commission_percent = String(pct);
+  } else {
+    if (!commission_amount) throw new Error("Commission amount is required.");
+    // Keep optional sale total / percent if provided for context, otherwise clear percent-only noise.
+    if (package_sale_amount_raw) {
+      const sale = parseCommissionAmount(package_sale_amount_raw);
+      package_sale_amount = sale > 0 ? formatCommissionCurrency(sale) : package_sale_amount_raw;
+    }
+    if (!commission_percent_raw) commission_percent = null;
+  }
 
   return {
     dog_name,
@@ -153,7 +216,10 @@ function normalizeInput(input: PackageCommissionInput) {
     sale_category,
     package_type,
     gingr_transaction_url,
+    package_sale_amount,
     commission_amount,
+    commission_percent,
+    commission_mode,
     sold_at,
     status,
     notes,
@@ -168,6 +234,9 @@ export function normalizePackageCommissionRow(row: PackageCommissionRow): Packag
     trainer_name: row.trainer_name ?? "Unassigned",
     trainer_email: row.trainer_email ?? null,
     sale_category: normalizeSaleCategory(row.sale_category),
+    package_sale_amount: row.package_sale_amount ?? null,
+    commission_percent: row.commission_percent ?? null,
+    commission_mode: normalizeCommissionMode(row.commission_mode ?? (row.commission_percent ? "percent" : "amount")),
     status: row.status ?? "Pending",
     notes: row.notes ?? null,
     created_by: row.created_by ?? null,
@@ -391,6 +460,9 @@ export function parsePackageCommissionCsv(text: string): PackageCommissionInput[
         trainer_user_id: record.trainer_user_id ?? "",
         sale_category: record.sale_category ?? record.category ?? record.type ?? "package",
         package_type: record.package_type ?? record.package ?? record["package type"] ?? "",
+        package_sale_amount: record.package_sale_amount ?? record.sale_total ?? record["package sale amount"] ?? "",
+        commission_mode: record.commission_mode ?? record.mode ?? "",
+        commission_percent: record.commission_percent ?? record.percent ?? record.percentage ?? "",
         gingr_transaction_url: record.gingr_transaction_url ?? record.gingr_transaction_link ?? record.gingr_url ?? record.url ?? record.link ?? "",
         commission_amount: record.commission_amount ?? record.commission ?? "",
         sold_at: record.sold_at ?? record.date_package_sold ?? record.date ?? record["date sold"] ?? "",
@@ -421,7 +493,7 @@ export async function importPackageCommissionCsv(supabase: SupabaseClient, text:
 
 export function exportPackageCommissionsCsv(rows: PackageCommissionRow[]) {
   const header =
-    "dog_name,owner_name,trainer_name,trainer_email,sale_category,package_type,gingr_transaction_link,commission_amount,date_package_sold,status,notes,confirmed_at,confirmed_by";
+    "dog_name,owner_name,trainer_name,trainer_email,sale_category,package_type,package_sale_amount,commission_mode,commission_percent,gingr_transaction_link,commission_amount,date_package_sold,status,notes,confirmed_at,confirmed_by";
   const body = rows.map((row) =>
     [
       row.dog_name,
@@ -430,6 +502,9 @@ export function exportPackageCommissionsCsv(rows: PackageCommissionRow[]) {
       row.trainer_email ?? "",
       row.sale_category,
       row.package_type,
+      row.package_sale_amount ?? "",
+      row.commission_mode ?? "amount",
+      row.commission_percent ?? "",
       row.gingr_transaction_url,
       row.commission_amount,
       row.sold_at,
@@ -442,12 +517,6 @@ export function exportPackageCommissionsCsv(rows: PackageCommissionRow[]) {
       .join(",")
   );
   return [header, ...body].join("\n");
-}
-
-export function parseCommissionAmount(value: string) {
-  const normalized = String(value).replace(/[^0-9.-]+/g, "");
-  const amount = Number.parseFloat(normalized);
-  return Number.isFinite(amount) ? amount : 0;
 }
 
 export function summarizeCommissionRows(rows: PackageCommissionRow[]) {
