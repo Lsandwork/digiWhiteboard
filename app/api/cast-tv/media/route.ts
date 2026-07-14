@@ -1,17 +1,16 @@
 import { NextResponse } from "next/server";
 import { buildCastTvPlaylist, loadCastTvMedia } from "@/lib/cast-tv/media";
-import { canManageCastTv } from "@/lib/cast-tv/permissions";
-import { castTvActorAccess } from "@/lib/cast-tv/api-auth";
+import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    const { session, access } = await castTvActorAccess(request);
-    if (session?.adminUserId && canManageCastTv(access, session.role)) {
-      const media = await loadCastTvMedia(getServiceSupabase());
-      return NextResponse.json({ media });
+    const manager = await resolveCastTvManager(request);
+    if (manager) {
+      const media = await loadCastTvMedia(manager.supabase);
+      return NextResponse.json({ media, admin: true });
     }
 
     const playlist = await buildCastTvPlaylist(getServiceSupabase());

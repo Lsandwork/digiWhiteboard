@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { blockDemoWrite } from "@/lib/admin/api-auth";
 import { updateCastTvSettings, isCastTvOnline, loadCastTvHeartbeat, loadCastTvSettings } from "@/lib/cast-tv/media";
-import { castTvActorAccess, requireCastTvManager } from "@/lib/cast-tv/api-auth";
-import { canManageCastTv } from "@/lib/cast-tv/permissions";
+import { resolveCastTvManager, requireCastTvManager } from "@/lib/cast-tv/api-auth";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +18,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ settings });
     }
 
-    const { session, access } = await castTvActorAccess(request);
-    if (!session?.adminUserId || !canManageCastTv(access, session.role)) {
+    const manager = await resolveCastTvManager(request);
+    if (!manager) {
       return NextResponse.json({ settings });
     }
 

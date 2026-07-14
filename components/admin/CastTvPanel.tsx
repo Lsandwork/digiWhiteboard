@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { uploadCastTvMedia, replaceCastTvMedia } from "@/lib/cast-tv/upload-client";
+import { getBrowserSupabase } from "@/lib/supabase/browser";
 import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 import {
   CAST_TV_IMAGE_DURATION_OPTIONS,
@@ -69,8 +70,8 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const loadData = useCallback(async () => {
     try {
       const [mediaResponse, settingsResponse] = await Promise.all([
-        fetch("/api/cast-tv/media", { cache: "no-store" }),
-        fetch("/api/cast-tv/settings?heartbeat=1", { cache: "no-store" })
+        fetch("/api/cast-tv/media", { cache: "no-store", credentials: "include" }),
+        fetch("/api/cast-tv/settings?heartbeat=1", { cache: "no-store", credentials: "include" })
       ]);
       const mediaBody = await mediaResponse.json();
       const settingsBody = await settingsResponse.json();
@@ -78,7 +79,40 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       if (!mediaResponse.ok) throw new Error(mediaBody.error ?? "Unable to load CAST-TV media.");
       if (!settingsResponse.ok) throw new Error(settingsBody.error ?? "Unable to load CAST-TV settings.");
 
-      setMedia(mediaBody.media ?? []);
+      if (Array.isArray(mediaBody.media)) {
+        setMedia(mediaBody.media);
+      } else if (Array.isArray(mediaBody.playlist) && mediaBody.playlist.length > 0) {
+        setMedia(
+          mediaBody.playlist.map((item: {
+            id: string;
+            displayName?: string;
+            mediaType: "image" | "video";
+            src: string;
+            imageDisplaySeconds?: number;
+            updatedAt?: string;
+          }) => ({
+            id: item.id,
+            display_name: item.displayName ?? null,
+            file_name: item.displayName ?? "CAST-TV media",
+            storage_path: "",
+            public_url: item.src,
+            media_type: item.mediaType,
+            mime_type: null,
+            file_size_bytes: null,
+            duration_seconds: null,
+            image_display_seconds: item.imageDisplaySeconds ?? 10,
+            display_order: 0,
+            is_enabled: true,
+            uploaded_by: null,
+            uploaded_by_name: null,
+            created_at: item.updatedAt ?? new Date().toISOString(),
+            updated_at: item.updatedAt ?? new Date().toISOString()
+          }))
+        );
+        onToast("Loaded playlist from the TV feed. Refresh the page if delete controls fail.", "info");
+      } else {
+        setMedia([]);
+      }
       setSettings(settingsBody.settings ?? null);
       if (settingsBody.heartbeat) {
         setHeartbeat({
@@ -99,6 +133,22 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       void loadData();
     }, 30_000);
     return () => window.clearInterval(timer);
+  }, [loadData]);
+
+  useEffect(() => {
+    const supabase = getBrowserSupabase();
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel(`cast-tv-admin-media-${Date.now()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cast_tv_media" }, () => {
+        void loadData();
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [loadData]);
 
   async function handleFiles(fileList: FileList | File[] | null) {
