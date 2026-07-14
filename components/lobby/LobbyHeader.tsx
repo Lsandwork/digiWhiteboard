@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
 import { LobbyStatusClock } from "@/components/lobby/LobbyStatusClock";
-import { lobbyAssets, lobbyLightAssets } from "@/lib/lobby/assets";
+import { lobbyLightAssets } from "@/lib/lobby/assets";
 
 type LobbyHeaderProps = {
   healthy: boolean;
@@ -16,19 +15,11 @@ export function LobbyHeader({ healthy, hasCheckout = false }: LobbyHeaderProps) 
     <header className="lobby-header lobby-header--light">
       <div className="lobby-header__brand">
         <Link href="/admin" aria-label="Open Fitdog admin" title="Fitdog Admin" className="lobby-header__brand-link">
-          <LobbyAssetImage
-            src={lobbyLightAssets.dogLogoExact}
-            alt="Fitdog"
-            width={128}
-            height={128}
-            className="lobby-header__dog-logo"
-            priority
-          />
           <Image
-            src={lobbyAssets.wordmark}
-            alt="fitdog Health & Social Club"
-            width={220}
-            height={64}
+            src={lobbyLightAssets.wordmark}
+            alt="Fitdog"
+            width={340}
+            height={90}
             className="lobby-header__wordmark"
             priority
             unoptimized

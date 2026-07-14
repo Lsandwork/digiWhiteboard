@@ -308,7 +308,7 @@ export function SocialMomentsCarousel({
             alt=""
             fill
             className="social-video-poster object-cover"
-            sizes="(max-width: 768px) 100vw, 390px"
+            sizes="(max-width: 768px) 100vw, 520px"
             priority
           />
         ) : null}
@@ -319,7 +319,7 @@ export function SocialMomentsCarousel({
             alt=""
             fill
             className="object-cover"
-            sizes="(max-width: 768px) 100vw, 390px"
+            sizes="(max-width: 768px) 100vw, 520px"
             priority
           />
         ) : currentClip && staticPosterMode ? (
@@ -329,7 +329,7 @@ export function SocialMomentsCarousel({
               alt={currentClip.title}
               fill
               className="object-cover"
-              sizes="(max-width: 768px) 100vw, 390px"
+              sizes="(max-width: 768px) 100vw, 520px"
             />
             <div className="social-video-static-controls">
               <button type="button" className="social-moments-nav-btn" onClick={goPrevious} aria-label="Previous video">

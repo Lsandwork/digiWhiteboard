@@ -555,7 +555,7 @@ export function LobbyCheckoutBoard({
             {checkoutActive ? <LobbyQueueList dogs={queue} /> : null}
 
             {settings.show_events ? (
-              <LobbyClassSchedule compact={checkoutActive} schedule={settings.class_schedule} />
+              <LobbyClassSchedule compact={checkoutActive || showTvLayout} schedule={settings.class_schedule} />
             ) : null}
           </div>
 
