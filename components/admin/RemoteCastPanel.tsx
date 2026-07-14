@@ -202,6 +202,10 @@ export function RemoteCastPanel() {
       <header className="admin-card p-5">
         <h2 className="admin-page-title">Remote Whiteboard Cast</h2>
         <p className="admin-page-subtitle">Control Fitdog lobby and staff whiteboards from anywhere.</p>
+        <p className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+          Schedule: displays auto-wake 5:00 AM–10:00 PM Pacific, 7 days a week, and go to standby overnight.
+          No manual refresh is required for the morning power-on (receiver page must stay open on the TV).
+        </p>
         <p className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-admin-muted">
           Remote Cast works when the TV/display has the Fitdog receiver page open at{" "}
           <span className="font-mono text-white">/cast/receiver</span>. This does not require the admin to be on the

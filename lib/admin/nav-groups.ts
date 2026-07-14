@@ -71,7 +71,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   handler_shift_entry: "Handler Shift Entry Log",
   hr_pip: "P.I.P",
   remote_cast: "Remote Whiteboard Cast",
-  walks_board: "Walks Board"
+  walks_board: "Walks Board",
+  browser: "Browser"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -116,7 +117,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   complaint_review: "Review groomer, trainer, and staff complaints.",
   handler_shift_entry: "Create handler shift log entries sent to Front Desk Log.",
   hr_pip: "View your performance improvement plan records.",
-  remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
+  remote_cast: "Control lobby and staff whiteboards on building displays from anywhere.",
+  browser: "Browse the web inside the staff admin panel — Gingr, tools, and more in one place."
 };
 
 const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "lobby_slideshow", "display", "whiteboard_preview"];
@@ -236,7 +238,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_dashboard",
         "Dashboard",
-        singles(["demo_push", "overview", "whiteboard_preview", "display", "remote_cast", "content", "analytics", "checklist"], visible)
+        singles(["demo_push", "overview", "whiteboard_preview", "display", "remote_cast", "browser", "content", "analytics", "checklist"], visible)
       )
     );
 
@@ -349,7 +351,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_comms",
       "Communications",
-      compactEntries([...singles(["notifications", "yard_links", "walks_board"], visible)])
+      compactEntries([...singles(["notifications", "yard_links", "walks_board", "browser"], visible)])
     )
   );
 

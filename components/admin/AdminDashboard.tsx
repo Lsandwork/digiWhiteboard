@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -75,6 +76,18 @@ import { getEffectiveDemoRole } from "@/lib/demo/session";
 import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, HandlerWriteUpsPanel } from "@/components/admin/HandlerBasicPanels";
 import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 import { WalksBoardPanel } from "@/components/admin/WalksBoardPanel";
+
+const BrowserPanel = dynamic(
+  () => import("@/components/admin/BrowserPanel").then((mod) => mod.BrowserPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="browser-panel browser-panel--loading flex min-h-[420px] items-center justify-center p-8 text-sm text-admin-muted">
+        Loading browser…
+      </div>
+    )
+  }
+);
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
 
@@ -343,7 +356,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "walks_board", "browser", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -523,6 +536,7 @@ export function AdminDashboard() {
 
         {tab === "yard_links" ? <YardLinksPanel /> : null}
         {tab === "walks_board" ? <WalksBoardPanel /> : null}
+        {board === "staff" && tab === "browser" ? <BrowserPanel /> : null}
 
         {tab === "management_support" ? (
           <ManagementSupportPanel

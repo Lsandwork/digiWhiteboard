@@ -9,6 +9,7 @@ import {
   type RemoteCastReceiverState,
   type RemoteCastScreen
 } from "@/lib/remote-cast/types";
+import { isCastDisplayOpenHours } from "@/lib/remote-cast/hours";
 
 const RECEIVERS_TABLE = "remote_cast_receivers";
 const COMMANDS_TABLE = "remote_cast_commands";
@@ -271,6 +272,19 @@ export async function pairReceiver(
     status: "executed",
     executed_at: new Date().toISOString()
   });
+
+  // During building hours, bring newly paired displays online immediately
+  // so staff do not need a manual Wake/Cast after pairing.
+  if (isCastDisplayOpenHours()) {
+    const woke = await issueCommand(supabase, {
+      receiverId: row.id,
+      command: "WAKE",
+      createdBy: options.createdBy ?? null
+    });
+    if (woke.ok && woke.receiver) {
+      return { ok: true, receiver: woke.receiver };
+    }
+  }
 
   return { ok: true, receiver: toPublicReceiver(updated as ReceiverRow) };
 }

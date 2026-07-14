@@ -45,7 +45,8 @@ export const FITDOG_UI_PACK = {
   bulkPhotoUpload: "/assets/fitdog/ui-pack/bulk-photo-upload.svg",
   writeUps: "/assets/fitdog/ui-pack/write-ups.svg",
   handlerShiftEntry: "/assets/fitdog/ui-pack/handler-shift-entry.svg",
-  hrPip: "/assets/fitdog/ui-pack/hr-pip.svg"
+  hrPip: "/assets/fitdog/ui-pack/hr-pip.svg",
+  browserWorld: "/assets/fitdog/ui-pack/browser-world.svg"
 } as const;
 
 /** Reusable button icon set aligned to dashboard style. */
@@ -118,5 +119,6 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   demo_push: FITDOG_UI.pushNotices,
   notifications: FITDOG_UI.notifications,
   walks_board: FITDOG_UI.frontDeskLog,
-  remote_cast: FITDOG_UI_PACK.castVideos
+  remote_cast: FITDOG_UI_PACK.castVideos,
+  browser: FITDOG_UI_PACK.browserWorld
 };

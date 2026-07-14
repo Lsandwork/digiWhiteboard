@@ -119,6 +119,10 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
               Use Cast Mode URLs for Chromecast and Google TV Streamer. These lightweight pages stay smooth for long
               sessions. Open directly on the TV browser for best reliability.
             </p>
+            <p className="mt-3 max-w-2xl rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+              Auto schedule: boards soft-refresh around 5:00 AM Pacific so overnight freezes clear without a manual Hard
+              Refresh. Keep the cast URL open on each TV.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="admin-btn-primary inline-flex items-center gap-2" onClick={openCastDisplay}>
