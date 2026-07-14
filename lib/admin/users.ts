@@ -298,9 +298,7 @@ const ADMIN_USERS_STATE_SOURCE = "admin_users_fallback";
 
 function adminUserErrorMessage(error: { code?: string; message?: string }) {
   const message = error.message ?? "Admin user request failed.";
-  if (error.code === "42P01" || error.code === "PGRST205" || message.includes("admin_users")) {
-    return "Admin user storage is not available.";
-  }
+  // Unique / duplicate must win over substring matches on "admin_users" (constraint names include it).
   if (message.includes("duplicate") || error.code === "23505") {
     return "That email is already in use.";
   }
@@ -310,6 +308,9 @@ function adminUserErrorMessage(error: { code?: string; message?: string }) {
   if (error.code === "23514" && message.includes("check constraint")) {
     return "That dashboard role is not enabled in the database yet. Apply the latest Supabase migrations.";
   }
+  if (error.code === "42P01" || error.code === "PGRST205" || isMissingRelationMessage(message)) {
+    return "Admin user storage is not available.";
+  }
   return message;
 }
 
@@ -317,8 +318,22 @@ function throwAdminUserError(error: { code?: string; message?: string }): never 
   throw new Error(adminUserErrorMessage(error));
 }
 
+function isMissingRelationMessage(message: string) {
+  return (
+    /relation ["']?admin_users["']? does not exist/i.test(message) ||
+    /could not find the table ['"]?public\.admin_users/i.test(message) ||
+    (/schema cache/i.test(message) && /admin_users/i.test(message))
+  );
+}
+
+/** True only when the admin_users table/relation is actually missing — not unique or check violations. */
 function isMissingAdminUsersTable(error: { code?: string; message?: string } | null) {
-  return error?.code === "42P01" || error?.code === "PGRST205" || Boolean(error?.message?.includes("admin_users"));
+  if (!error) return false;
+  if (error.code === "23505" || error.code === "23514") return false;
+  if (error.code === "42P01" || error.code === "PGRST205") return true;
+  const message = error.message ?? "";
+  if (/duplicate|unique constraint|check constraint/i.test(message)) return false;
+  return isMissingRelationMessage(message);
 }
 
 async function loadFallbackAdminUserByEmail(supabase: SupabaseClient, email: string) {
@@ -601,6 +616,40 @@ export async function deleteAdminUser(supabase: SupabaseClient, id: string) {
       return;
     }
     throwAdminUserError(error);
+  }
+
+  // Also drop any legacy fallback copy so the email can be reused after staff deletes.
+  try {
+    const state = await loadFallbackAdminUsersState(supabase);
+    if (state.users.some((user) => user.id === id)) {
+      await saveFallbackAdminUsersState(supabase, {
+        users: state.users.filter((user) => user.id !== id)
+      });
+    }
+  } catch {
+    // Fallback storage is best-effort cleanup.
+  }
+}
+
+/** Remove a dashboard login by email from the real table and any fallback store. */
+export async function deleteAdminUserByEmail(supabase: SupabaseClient, email: string) {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return;
+
+  const existing = await findAdminUserByEmail(supabase, normalized);
+  if (existing) {
+    await deleteAdminUser(supabase, existing.id);
+  }
+
+  try {
+    const state = await loadFallbackAdminUsersState(supabase);
+    if (state.users.some((user) => user.email === normalized)) {
+      await saveFallbackAdminUsersState(supabase, {
+        users: state.users.filter((user) => user.email !== normalized)
+      });
+    }
+  } catch {
+    // Fallback storage is best-effort cleanup.
   }
 }
 

@@ -1,4 +1,5 @@
 import type { AdminUserRole } from "@/lib/admin/users";
+import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
 import { priorityRank, shouldAlertManagement, shiftLogDetails } from "@/lib/staff/front-desk-log";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
@@ -1336,6 +1337,19 @@ export async function deleteStaffDirectoryMember(supabase: SupabaseClient, id: s
   const state = await loadState(supabase);
   const existing = state.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
+
+  // Staff directory delete must free the dashboard login email so the person can be re-added.
+  if (existing.admin_user_id && isAdminUserUuid(existing.admin_user_id)) {
+    try {
+      await deleteAdminUser(supabase, existing.admin_user_id);
+    } catch {
+      // Fall through to email-based cleanup below.
+    }
+  }
+  if (existing.email) {
+    await deleteAdminUserByEmail(supabase, existing.email);
+  }
+
   const next = createActivityLog({ ...state, staff_directory: state.staff_directory.filter((member) => member.id !== id) }, {
     activity_type: "staff_directory.deleted",
     title: `Deleted staff member: ${existing.name}`,

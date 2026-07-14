@@ -2,6 +2,7 @@ import type { AdminUserRole, AdminUserRecord } from "@/lib/admin/users";
 import {
   changeAdminUserPassword,
   createAdminUser,
+  deleteAdminUserByEmail,
   findAdminUserByEmail,
   getAdminUserById,
   isAdminUserUuid,
@@ -132,6 +133,7 @@ export async function syncStaffDirectoryLoginAccount(
 
   if (hasTempPassword && email) {
     if (linkedUser) {
+      // Reclaim orphaned login left behind after a prior staff-directory delete.
       await applyTempPasswordToLinkedUser(supabase, linkedUser, {
         name: input.name,
         email,
@@ -152,21 +154,31 @@ export async function syncStaffDirectoryLoginAccount(
         result = { admin_user_id: user.id, dashboard_role: role };
       } catch (error) {
         const message = error instanceof Error ? error.message : "";
-        if (message.includes("already in use")) {
-          const existing = await findAdminUserByEmail(supabase, email);
-          if (existing) {
-            await applyTempPasswordToLinkedUser(supabase, existing, {
-              name: input.name,
-              email,
-              role,
-              tempPassword
-            });
-            result = { admin_user_id: existing.id, dashboard_role: role };
-          } else {
-            throw error;
-          }
-        } else {
+        if (!(message.includes("already in use") || /duplicate|unique/i.test(message))) {
           throw error;
+        }
+
+        const existing = await findAdminUserByEmail(supabase, email);
+        if (existing) {
+          await applyTempPasswordToLinkedUser(supabase, existing, {
+            name: input.name,
+            email,
+            role,
+            tempPassword
+          });
+          result = { admin_user_id: existing.id, dashboard_role: role };
+        } else {
+          // Clear a leftover fallback/ghost login so the email can be used again.
+          await deleteAdminUserByEmail(supabase, email);
+          const user = await createAdminUser(supabase, {
+            full_name: input.name.trim(),
+            email,
+            password: tempPassword,
+            role,
+            force_password_change: true,
+            created_by: normalizeAdminUserId(createdByAdminId)
+          });
+          result = { admin_user_id: user.id, dashboard_role: role };
         }
       }
     }
