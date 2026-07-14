@@ -38,9 +38,11 @@ export function CastDisplaySession({ receiver = false }: CastDisplaySessionProps
     const touchTimer = window.setInterval(touchSession, CAST_SESSION_TOUCH_MS);
 
     return () => {
-      if (receiver) return;
       window.clearInterval(touchTimer);
-      stopKeepalive();
+      // Ref-counted: stay up across remounts on Chromecast receivers, but never leak timers.
+      if (!receiver) {
+        stopKeepalive();
+      }
     };
   }, [castKeeper, receiver]);
 

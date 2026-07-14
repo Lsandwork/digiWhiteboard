@@ -35,25 +35,26 @@ export function useScreenWakeLock(options: UseScreenWakeLockOptions = {}) {
   const [status, setStatus] = useState<WakeLockStatus>("idle");
   const [error, setError] = useState<string | null>(null);
 
+  const ensureFallback = useCallback(() => {
+    if (!aggressive) return;
+    // Keep a single long-lived silent video — never tear it down on renews.
+    if (stopFallbackRef.current) return;
+    stopFallbackRef.current = startDisplayKeepaliveFallback();
+  }, [aggressive]);
+
   const requestWakeLock = useCallback(async () => {
     if (!enabled || typeof window === "undefined") return;
 
     if (!("wakeLock" in navigator) || !navigator.wakeLock) {
       setStatus("unsupported");
-      if (aggressive) {
-        stopFallbackRef.current?.();
-        stopFallbackRef.current = startDisplayKeepaliveFallback();
-      }
+      ensureFallback();
       return;
     }
 
     try {
       if (sentinelRef.current && !sentinelRef.current.released) {
         setStatus("active");
-        if (aggressive) {
-          stopFallbackRef.current?.();
-          stopFallbackRef.current = startDisplayKeepaliveFallback();
-        }
+        ensureFallback();
         return;
       }
 
@@ -61,11 +62,7 @@ export function useScreenWakeLock(options: UseScreenWakeLockOptions = {}) {
       sentinelRef.current = sentinel;
       setStatus("active");
       setError(null);
-
-      if (aggressive) {
-        stopFallbackRef.current?.();
-        stopFallbackRef.current = startDisplayKeepaliveFallback();
-      }
+      ensureFallback();
 
       sentinel.addEventListener("release", () => {
         sentinelRef.current = null;
@@ -80,12 +77,9 @@ export function useScreenWakeLock(options: UseScreenWakeLockOptions = {}) {
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Wake lock request failed");
-      if (aggressive) {
-        stopFallbackRef.current?.();
-        stopFallbackRef.current = startDisplayKeepaliveFallback();
-      }
+      ensureFallback();
     }
-  }, [aggressive, enabled]);
+  }, [enabled, ensureFallback]);
 
   const releaseWakeLock = useCallback(async () => {
     try {
@@ -161,6 +155,7 @@ export function useScreenWakeLock(options: UseScreenWakeLockOptions = {}) {
     if (!persistent) return;
 
     const handleUnload = () => {
+      stopFallbackRef.current = null;
       stopDisplayKeepaliveFallback();
     };
 

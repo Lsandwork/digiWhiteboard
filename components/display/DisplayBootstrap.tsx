@@ -7,7 +7,7 @@ import { startDisplayKeepaliveFallback } from "@/lib/display-keepalive-fallback"
 export function DisplayBootstrap() {
   useEffect(() => {
     document.documentElement.classList.add("cast-keeper-display");
-    startDisplayKeepaliveFallback();
+    const stopKeepalive = startDisplayKeepaliveFallback();
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
     if (siteUrl) {
@@ -27,6 +27,7 @@ export function DisplayBootstrap() {
 
     return () => {
       document.documentElement.classList.remove("cast-keeper-display");
+      stopKeepalive();
     };
   }, []);
 

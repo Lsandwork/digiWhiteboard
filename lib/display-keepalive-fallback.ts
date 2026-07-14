@@ -10,42 +10,58 @@ type KeepaliveHandle = {
 let activeHandle: KeepaliveHandle | null = null;
 let activeConsumers = 0;
 
+/** Light canvas tick — enough to count as activity without a 60fps RAF loop. */
+const CANVAS_TICK_MS = 10_000;
+/** Re-assert muted silent playback if the browser pauses it. */
+const VIDEO_WATCHDOG_MS = 20_000;
+
 function createHiddenVideo() {
   const video = document.createElement("video");
   video.setAttribute("title", "Display keepalive");
   video.setAttribute("playsinline", "true");
   video.setAttribute("muted", "true");
   video.setAttribute("loop", "true");
+  video.setAttribute("aria-hidden", "true");
   video.muted = true;
+  video.defaultMuted = true;
   video.playsInline = true;
+  video.autoplay = true;
+  video.loop = true;
+  video.volume = 0;
   video.style.cssText =
-    "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+    "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;visibility:hidden;";
   video.src = NO_SLEEP_WEBM;
   document.body.appendChild(video);
   return video;
 }
 
+/**
+ * Low-frequency canvas activity instead of requestAnimationFrame.
+ * Avoids burning CPU/GPU on lobby TVs while still defeating idle sleep heuristics.
+ */
 function createCanvasTicker() {
   const canvas = document.createElement("canvas");
   canvas.width = 2;
   canvas.height = 2;
+  canvas.setAttribute("aria-hidden", "true");
   canvas.style.cssText =
-    "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;";
+    "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;visibility:hidden;";
   document.body.appendChild(canvas);
-  const ctx = canvas.getContext("2d");
-  let rafId = 0;
+  const ctx = canvas.getContext("2d", { alpha: false });
+  let frame = 0;
 
-  const tick = () => {
-    if (ctx) {
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, 2, 2);
-    }
-    rafId = requestAnimationFrame(tick);
+  const paint = () => {
+    if (!ctx) return;
+    frame = (frame + 1) % 2;
+    ctx.fillStyle = frame ? "#000" : "#010101";
+    ctx.fillRect(0, 0, 2, 2);
   };
-  rafId = requestAnimationFrame(tick);
+
+  paint();
+  const timer = window.setInterval(paint, CANVAS_TICK_MS);
 
   return () => {
-    cancelAnimationFrame(rafId);
+    window.clearInterval(timer);
     canvas.remove();
   };
 }
@@ -56,23 +72,42 @@ function startKeepaliveEngine() {
   let videoRetryTimer: number | null = null;
 
   const playVideo = () => {
+    if (videoRetryTimer) {
+      window.clearTimeout(videoRetryTimer);
+      videoRetryTimer = null;
+    }
     void video.play().catch(() => {
       videoRetryTimer = window.setTimeout(playVideo, 2000);
     });
   };
 
-  playVideo();
-
-  const watchdogTimer = window.setInterval(() => {
-    if (video.paused && !video.ended) {
+  const onVisibility = () => {
+    if (document.visibilityState === "visible") {
       playVideo();
     }
-  }, 30_000);
+  };
+
+  playVideo();
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("pageshow", playVideo);
+  window.addEventListener("focus", playVideo);
+
+  const watchdogTimer = window.setInterval(() => {
+    if (document.visibilityState !== "visible") return;
+    if (video.paused || video.ended) {
+      playVideo();
+    }
+  }, VIDEO_WATCHDOG_MS);
 
   const stop = () => {
     if (videoRetryTimer) window.clearTimeout(videoRetryTimer);
     window.clearInterval(watchdogTimer);
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("pageshow", playVideo);
+    window.removeEventListener("focus", playVideo);
     video.pause();
+    video.removeAttribute("src");
+    video.load();
     video.remove();
     stopCanvas();
     activeHandle = null;
@@ -82,6 +117,10 @@ function startKeepaliveEngine() {
   return stop;
 }
 
+/**
+ * Start (or join) the shared display keepalive engine.
+ * Ref-counted so multiple wake-lock consumers share one silent video.
+ */
 export function startDisplayKeepaliveFallback(): () => void {
   if (typeof window === "undefined") return () => {};
 
@@ -90,7 +129,10 @@ export function startDisplayKeepaliveFallback(): () => void {
     startKeepaliveEngine();
   }
 
+  let released = false;
   return () => {
+    if (released) return;
+    released = true;
     activeConsumers = Math.max(0, activeConsumers - 1);
     if (activeConsumers === 0) {
       activeHandle?.stop();
@@ -98,7 +140,17 @@ export function startDisplayKeepaliveFallback(): () => void {
   };
 }
 
+/** Force-stop the shared engine (pagehide / hard teardown). */
 export function stopDisplayKeepaliveFallback() {
   activeConsumers = 0;
   activeHandle?.stop();
+}
+
+/** Test helpers — not used by the app runtime. */
+export function __displayKeepaliveConsumerCountForTests() {
+  return activeConsumers;
+}
+
+export function __displayKeepaliveActiveForTests() {
+  return activeHandle != null;
 }

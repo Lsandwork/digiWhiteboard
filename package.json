@@ -27,6 +27,7 @@
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "test:cast-display-schedule": "tsx scripts/test-cast-display-schedule.ts",
+    "test:display-keepalive": "tsx scripts/test-display-keepalive.ts",
     "check:display-health": "tsx scripts/check-display-health.ts",
     "test:whiteboard-state": "tsx scripts/test-whiteboard-state.ts",
     "test:shelly-alert": "tsx scripts/test-shelly-alert.ts",

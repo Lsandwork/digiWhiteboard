@@ -2,6 +2,8 @@
 
 import { useSearchParams } from "next/navigation";
 import { BoardRenderErrorBoundary } from "@/components/board/BoardRenderErrorBoundary";
+import { CastDisplaySession } from "@/components/cast-lite/CastDisplaySession";
+import { DisplayBootstrap } from "@/components/display/DisplayBootstrap";
 import { LobbyCheckoutBoard } from "@/components/lobby/LobbyCheckoutBoard";
 import { LobbyErrorBoundary } from "@/components/lobby/LobbyErrorBoundary";
 import { CastKeeperProvider } from "@/hooks/useCastKeeper";
@@ -33,12 +35,14 @@ export function LobbyBoardPageClient({ embeddedDisplayToken }: { embeddedDisplay
   return (
     <BoardRenderErrorBoundary label="Lobby Board" debugBoard={debugBoard}>
       <LobbyErrorBoundary debugBoard={debugBoard}>
+        <DisplayBootstrap />
         <CastKeeperProvider
           displayType="lobby_whiteboard"
           route="/lobby/checkouts"
           enabled
           allowStaleReload={!chromecastReceiver}
         >
+          <CastDisplaySession receiver={chromecastReceiver || tvDisplay || castMode} />
           <LobbyCheckoutBoard embeddedDisplayToken={embeddedDisplayToken} castKeeperMode />
         </CastKeeperProvider>
       </LobbyErrorBoundary>

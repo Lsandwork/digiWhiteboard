@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { BoardClient } from "@/components/BoardClient";
 import { BoardRenderErrorBoundary } from "@/components/board/BoardRenderErrorBoundary";
+import { CastDisplaySession } from "@/components/cast-lite/CastDisplaySession";
 import { LobbyCheckoutBoard } from "@/components/lobby/LobbyCheckoutBoard";
 import { LobbyErrorBoundary } from "@/components/lobby/LobbyErrorBoundary";
 import { useRemoteCastReceiver } from "@/hooks/useRemoteCastReceiver";
@@ -53,7 +54,8 @@ export function RemoteCastReceiver() {
   const runtime = useRemoteCastReceiver(debugBoard);
 
   // Persistent, aggressive wake lock — this display stays on for hours.
-  useScreenWakeLock({ enabled: true, persistent: true, aggressive: true });
+  // Renews wake lock only; silent video is started once and kept alive.
+  useScreenWakeLock({ enabled: true, persistent: true, aggressive: true, renewIntervalMs: 8_000 });
 
   if (!runtime.ready) {
     return (
@@ -86,6 +88,7 @@ export function RemoteCastReceiver() {
   if (runtime.activeScreen === "lobby") {
     return (
       <ReceiverFrame>
+        <CastDisplaySession receiver />
         <BoardRenderErrorBoundary label="Lobby Board" debugBoard={debugBoard}>
           <LobbyErrorBoundary debugBoard={debugBoard}>
             <LobbyCheckoutBoard key={`lobby-${runtime.refreshNonce}`} castKeeperMode />
@@ -99,6 +102,7 @@ export function RemoteCastReceiver() {
   if (runtime.activeScreen === "staff") {
     return (
       <ReceiverFrame>
+        <CastDisplaySession receiver />
         <BoardRenderErrorBoundary label="Staff Board" debugBoard={debugBoard}>
           <BoardClient key={`staff-${runtime.refreshNonce}`} castKeeperMode overlaysEnabled />
         </BoardRenderErrorBoundary>
