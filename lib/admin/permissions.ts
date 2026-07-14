@@ -3,6 +3,8 @@
  * Roles grant permissions; users may hold multiple roles and departments.
  */
 
+import type { AdminBoardType } from "@/lib/admin/types";
+
 export type PermissionKey =
   | "view_admin_panel"
   | "view_staff_whiteboard"
@@ -76,7 +78,8 @@ export type PermissionKey =
   | "export_reports"
   | "view_admin_logs"
   | "receive_walks_board_reminders"
-  | "manage_lobby_board";
+  | "manage_lobby_board"
+  | "manage_cast_tv";
 
 export type RoleKey =
   | "super_admin"
@@ -222,7 +225,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "export_reports",
   "view_admin_logs",
   "receive_walks_board_reminders",
-  "manage_lobby_board"
+  "manage_lobby_board",
+  "manage_cast_tv"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -382,6 +386,7 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
 const MARKETING_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "manage_lobby_board",
+  "manage_cast_tv",
   "view_staff_whiteboard"
 ];
 
@@ -486,6 +491,9 @@ export const MARKETING_TABS = [
   "settings",
   "help"
 ] as const;
+
+/** CAST-TV digital signage board — upload and manage casttv.ruffops.com playlist. */
+export const MARKETING_BOARD_TABS = ["cast_tv", "settings", "help"] as const;
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: withoutStaffSubmissions([...ALL_PERMISSIONS]),
@@ -666,7 +674,8 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   walks_board: "view_admin_panel",
   settings: "view_admin_panel",
   help: "view_admin_panel",
-  lobby_slideshow: "manage_lobby_board"
+  lobby_slideshow: "manage_lobby_board",
+  cast_tv: "manage_cast_tv"
 };
 
 export function canAccessTab(access: UserAccess | null | undefined, tab: string, legacyRole?: string | null): boolean {
@@ -897,11 +906,50 @@ export function isLobbyDigiBoardOnlyLegacyRole(legacyRole?: string | null) {
   return isMarketingLegacyRole(legacyRole);
 }
 
+/** Boards the signed-in user may select in the admin board switcher. */
+export function accessibleAdminBoards(
+  access: UserAccess | null | undefined,
+  legacyRole?: string | null
+): AdminBoardType[] {
+  if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
+    return ["lobby", "staff", "marketing"];
+  }
+
+  if (isMarketingLegacyRole(legacyRole)) {
+    return ["lobby", "marketing"];
+  }
+
+  if (isStaffDigiBoardOnlyLegacyRole(legacyRole)) {
+    return ["staff"];
+  }
+
+  const boards: AdminBoardType[] = ["staff", "lobby"];
+  if (hasPermission(access, "manage_cast_tv")) {
+    boards.push("marketing");
+  }
+  return boards;
+}
+
+export function canAccessAdminBoard(
+  board: AdminBoardType,
+  access: UserAccess | null | undefined,
+  legacyRole?: string | null
+): boolean {
+  return accessibleAdminBoards(access, legacyRole).includes(board);
+}
+
+export function canUseAdminBoardSwitcher(
+  access: UserAccess | null | undefined,
+  legacyRole?: string | null
+): boolean {
+  return accessibleAdminBoards(access, legacyRole).length > 1;
+}
+
 export function canAccessAdminTab(
   access: UserAccess | null | undefined,
   tab: string,
   legacyRole?: string | null,
-  board: "lobby" | "staff" = "lobby",
+  board: AdminBoardType = "lobby",
   options?: { isDemo?: boolean }
 ): boolean {
   if (tab === "demo_push") return options?.isDemo === true && board === "staff";
@@ -913,6 +961,18 @@ export function canAccessAdminTab(
   // Remote Whiteboard Cast controls real building displays — full admins only
   // (owner/manager are handled by the early return above).
   if (tab === "remote_cast") return false;
+
+  if (tab === "cast_tv") {
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "manage_cast_tv")) return true;
+    return isMarketingLegacyRole(legacyRole);
+  }
+
+  if (board === "marketing") {
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (!canAccessAdminBoard("marketing", effective, legacyRole)) return false;
+    return (MARKETING_BOARD_TABS as readonly string[]).includes(tab);
+  }
 
   // Walks Board is available to every authenticated staff user on the staff board.
   if (tab === "walks_board") return board === "staff";
@@ -1061,14 +1121,21 @@ export function canCreateFrontDeskLogForRole(role?: string | null) {
 export function firstAccessibleAdminTab(
   access: UserAccess | null | undefined,
   legacyRole?: string | null,
-  board: "lobby" | "staff" = "staff",
+  board: AdminBoardType = "staff",
   options?: { isDemo?: boolean }
 ): string {
   if (options?.isDemo && board === "staff") return "demo_push";
 
+  if (board === "marketing") {
+    for (const tab of MARKETING_BOARD_TABS) {
+      if (canAccessAdminTab(access, tab, legacyRole, "marketing", options)) return tab;
+    }
+    return "cast_tv";
+  }
+
   const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(legacyRole)
     ? "staff"
-    : isLobbyDigiBoardOnlyLegacyRole(legacyRole)
+    : isMarketingLegacyRole(legacyRole) && board === "lobby"
       ? "lobby"
       : board;
 

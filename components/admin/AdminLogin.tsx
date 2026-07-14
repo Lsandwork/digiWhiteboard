@@ -5,14 +5,18 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
-import { accessFromLegacyRole, firstAccessibleAdminTab, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, firstAccessibleAdminTab, isMarketingLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
 import type { AdminTab } from "@/lib/admin/types";
 import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@/lib/demo/constants";
 
 function defaultAdminRoute(role?: string, isDemo?: boolean) {
   if (isDemo) return "/admin?board=staff&tab=demo_push";
   const access = accessFromLegacyRole(null, null, role);
-  const board = isStaffDigiBoardOnlyLegacyRole(role) ? "staff" : "lobby";
+  const board = isStaffDigiBoardOnlyLegacyRole(role)
+    ? "staff"
+    : isMarketingLegacyRole(role)
+      ? "lobby"
+      : "lobby";
   const tab = firstAccessibleAdminTab(access, role, board) as AdminTab;
   const resolvedBoard = board === "staff" && tab === "users" ? "lobby" : board;
   return `/admin?board=${resolvedBoard}&tab=${tab}`;

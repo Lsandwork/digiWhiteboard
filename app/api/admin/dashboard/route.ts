@@ -17,7 +17,9 @@ import { demoSandboxToBoard, getDemoSandbox } from "@/lib/demo/store";
 export const dynamic = "force-dynamic";
 
 function parseBoardType(value: string | null): AdminBoardType {
-  return value === "staff" ? "staff" : "lobby";
+  if (value === "staff") return "staff";
+  if (value === "marketing") return "marketing";
+  return "lobby";
 }
 
 export async function GET(request: Request) {

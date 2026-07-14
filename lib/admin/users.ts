@@ -304,6 +304,12 @@ function adminUserErrorMessage(error: { code?: string; message?: string }) {
   if (message.includes("duplicate") || error.code === "23505") {
     return "That email is already in use.";
   }
+  if (message.includes("admin_users_role_check") || message.includes("staff_directory_dashboard_role_check")) {
+    return "That dashboard role is not enabled in the database yet. Apply the latest Supabase migrations.";
+  }
+  if (error.code === "23514" && message.includes("check constraint")) {
+    return "That dashboard role is not enabled in the database yet. Apply the latest Supabase migrations.";
+  }
   return message;
 }
 
@@ -313,6 +319,16 @@ function throwAdminUserError(error: { code?: string; message?: string }): never 
 
 function isMissingAdminUsersTable(error: { code?: string; message?: string } | null) {
   return error?.code === "42P01" || error?.code === "PGRST205" || Boolean(error?.message?.includes("admin_users"));
+}
+
+async function loadFallbackAdminUserByEmail(supabase: SupabaseClient, email: string) {
+  const state = await loadFallbackAdminUsersState(supabase);
+  return state.users.find((user) => user.email === email) ?? null;
+}
+
+async function loadFallbackAdminUserById(supabase: SupabaseClient, id: string) {
+  const state = await loadFallbackAdminUsersState(supabase);
+  return state.users.find((user) => user.id === id) ?? null;
 }
 
 function newAdminUserId() {
@@ -374,15 +390,12 @@ export async function findAdminUserByEmail(supabase: SupabaseClient, email: stri
     .maybeSingle();
   if (error) {
     if (isMissingAdminUsersTable(error)) {
-      const state = await loadFallbackAdminUsersState(supabase);
-      return state.users.find((user) => user.email === normalized) ?? null;
+      return loadFallbackAdminUserByEmail(supabase, normalized);
     }
     throwAdminUserError(error);
   }
   if (data) return data as AdminUserRecord;
-
-  const state = await loadFallbackAdminUsersState(supabase);
-  return state.users.find((user) => user.email === normalized) ?? null;
+  return null;
 }
 
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
@@ -404,15 +417,12 @@ export async function getAdminUserById(supabase: SupabaseClient, id: string) {
   const { data, error } = await supabase.from("admin_users").select("*").eq("id", id).maybeSingle();
   if (error) {
     if (isMissingAdminUsersTable(error)) {
-      const state = await loadFallbackAdminUsersState(supabase);
-      return state.users.find((user) => user.id === id) ?? null;
+      return loadFallbackAdminUserById(supabase, id);
     }
     throwAdminUserError(error);
   }
   if (data) return data as AdminUserRecord;
-
-  const state = await loadFallbackAdminUsersState(supabase);
-  return state.users.find((user) => user.id === id) ?? null;
+  return null;
 }
 
 /** Update the signed-in user's own profile photo (data URL or null to clear). */
@@ -533,23 +543,7 @@ export async function updateAdminUser(
   }
 
   if (!data) {
-    const state = await loadFallbackAdminUsersState(supabase);
-    const existing = state.users.find((user) => user.id === id);
-    if (!existing) throw new Error("Admin user not found.");
-    const nextEmail = normalizedPatch.email ? normalizedPatch.email.trim().toLowerCase() : existing.email;
-    if (state.users.some((user) => user.id !== id && user.email === nextEmail)) {
-      throw new Error("That email is already in use.");
-    }
-    const updated: AdminUserRecord = {
-      ...existing,
-      ...normalizedPatch,
-      email: nextEmail,
-      updated_at: new Date().toISOString()
-    };
-    await saveFallbackAdminUsersState(supabase, {
-      users: state.users.map((user) => (user.id === id ? updated : user))
-    });
-    return sanitizeAdminUser(updated);
+    throw new Error("Admin user not found.");
   }
 
   return data as AdminUserPublic;
@@ -592,18 +586,7 @@ export async function changeAdminUserPassword(
   }
 
   if (!data) {
-    const state = await loadFallbackAdminUsersState(supabase);
-    const existing = state.users.find((user) => user.id === id);
-    if (!existing) throw new Error("Admin user not found.");
-    const updated: AdminUserRecord = {
-      ...existing,
-      password_hash,
-      force_password_change: forcePasswordChange ?? false,
-      updated_at: new Date().toISOString()
-    };
-    await saveFallbackAdminUsersState(supabase, {
-      users: state.users.map((user) => (user.id === id ? updated : user))
-    });
+    throw new Error("Admin user not found.");
   }
 }
 

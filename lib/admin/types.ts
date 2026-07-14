@@ -5,7 +5,7 @@ import type { AdminGlobalSettings } from "@/lib/admin/settings";
 import type { AdminUserPublic } from "@/lib/admin/users";
 import type { AdminSession } from "@/lib/admin/session";
 
-export type AdminBoardType = "lobby" | "staff";
+export type AdminBoardType = "lobby" | "staff" | "marketing";
 
 export type StaffBoardSettings = {
   refresh_interval_ms: number;
@@ -48,6 +48,7 @@ export type AdminTab =
   | "promotions"
   | "schedule"
   | "lobby_slideshow"
+  | "cast_tv"
   | "display"
   | "push_notices"
   | "yard_push_notices"
@@ -98,6 +99,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "promotions",
   "schedule",
   "lobby_slideshow",
+  "cast_tv",
   "display",
   "push_notices",
   "yard_push_notices",
@@ -152,6 +154,12 @@ export const ADMIN_SUPPORT_TABS = [
   "ms_trainer_requests",
   "admin_trainer_entries"
 ] as const;
+
+export function parseAdminBoardType(value: string | null | undefined): AdminBoardType {
+  if (value === "staff") return "staff";
+  if (value === "marketing") return "marketing";
+  return "lobby";
+}
 
 export function parseAdminTab(value: string | null): AdminTab {
   if (value && ADMIN_TABS.includes(value as AdminTab)) return value as AdminTab;

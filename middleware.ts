@@ -4,6 +4,7 @@ import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
 import { firstAccessibleAdminTab, isLobbyDigiBoardOnlyLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
+import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
 
 export async function middleware(request: NextRequest) {
   try {
@@ -24,6 +25,15 @@ async function runMiddleware(request: NextRequest) {
   if (shouldRewriteLobbyRoot(request.headers.get("host"), pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = LOBBY_REWRITE_TARGET;
+    return NextResponse.rewrite(url);
+  }
+
+  // CAST-TV custom domain (casttv.ruffops.com/) → serve the slideshow via an
+  // internal rewrite. The browser URL stays on casttv.ruffops.com. Only "/" is
+  // rewritten, so /cast-tv, /api/*, /_next/*, and static assets are untouched.
+  if (shouldRewriteCastTvRoot(request.headers.get("host"), pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = CAST_TV_REWRITE_TARGET;
     return NextResponse.rewrite(url);
   }
 
@@ -72,7 +82,16 @@ async function runMiddleware(request: NextRequest) {
 
     if (!session.isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
-      if (url.searchParams.get("board") !== "lobby") {
+      const board = url.searchParams.get("board");
+      if (board === "staff") {
+        url.pathname = "/admin";
+        url.searchParams.set("board", "marketing");
+        if (!url.searchParams.get("tab")) {
+          url.searchParams.set("tab", "cast_tv");
+        }
+        return NextResponse.redirect(url);
+      }
+      if (board !== "lobby" && board !== "marketing") {
         url.pathname = "/admin";
         url.searchParams.set("board", "lobby");
         if (!url.searchParams.get("tab")) {
@@ -104,7 +123,7 @@ async function runMiddleware(request: NextRequest) {
 }
 
 export const config = {
-  // "/" is matched so the lobby custom-domain rewrite can run at the root.
-  // Non-lobby hosts fall through to the normal Staff board at "/".
+  // "/" is matched so lobby and CAST-TV custom-domain rewrites can run at the root.
+  // Non-custom hosts fall through to the normal Staff board at "/".
   matcher: ["/", "/admin", "/admin/:path*"]
 };

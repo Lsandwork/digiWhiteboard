@@ -49,10 +49,12 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
-import { parseAdminTab } from "@/lib/admin/types";
+import { parseAdminBoardType, parseAdminTab } from "@/lib/admin/types";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
 import {
   accessFromLegacyRole,
+  accessibleAdminBoards,
+  canAccessAdminBoard,
   canAccessAdminTab,
   canAccessHrPanelsForUser,
   canReviewManagementSupportForUser,
@@ -63,6 +65,7 @@ import {
   isLobbyDigiBoardOnlyLegacyRole,
   isStaffDigiBoardOnlyLegacyRole,
   isSuperAdminLegacyRole,
+  canUseAdminBoardSwitcher,
   type UserAccess
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
@@ -73,6 +76,7 @@ import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, Ha
 import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 import { WalksBoardPanel } from "@/components/admin/WalksBoardPanel";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
+import { CastTvPanel } from "@/components/admin/CastTvPanel";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -101,15 +105,15 @@ export function AdminDashboard() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmResetBoard, setConfirmResetBoard] = useState(false);
 
-  const board = (searchParams.get("board") === "staff" ? "staff" : "lobby") as AdminBoardType;
+  const board = parseAdminBoardType(searchParams.get("board"));
   const tab = parseAdminTab(searchParams.get("tab"));
   const hrConsultRecordId = searchParams.get("record");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("fitdog_admin_board");
-    if (!searchParams.get("board") && stored === "staff") {
-      router.replace("/admin?board=staff");
+    if (!searchParams.get("board") && (stored === "staff" || stored === "marketing")) {
+      router.replace(`/admin?board=${stored}`);
     }
   }, [router, searchParams]);
 
@@ -153,8 +157,8 @@ export function AdminDashboard() {
     const access = session.access
       ?? accessFromLegacyRole(session.adminUserId ?? null, data?.username ?? null, effectiveRole);
     const staffOnly = !isDemo && isStaffDigiBoardOnlyLegacyRole(effectiveRole);
-    const lobbyOnly = !isDemo && isLobbyDigiBoardOnlyLegacyRole(effectiveRole);
-    const effectiveBoard = staffOnly ? "staff" : lobbyOnly ? "lobby" : board;
+    const marketingAccount = !isDemo && isLobbyDigiBoardOnlyLegacyRole(effectiveRole);
+    const effectiveBoard = staffOnly ? "staff" : board;
 
     if (staffOnly && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
@@ -162,9 +166,25 @@ export function AdminDashboard() {
       return;
     }
 
-    if (lobbyOnly && board !== "lobby") {
-      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "lobby");
-      router.replace(`/admin?board=lobby&tab=${tab}`);
+    if (marketingAccount && board === "staff") {
+      const fallbackBoard = accessibleAdminBoards(access, effectiveRole).includes("marketing") ? "marketing" : "lobby";
+      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
+      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
+      router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
+      return;
+    }
+
+    if (!canAccessAdminBoard(effectiveBoard, access, effectiveRole)) {
+      const allowedBoards = accessibleAdminBoards(access, effectiveRole);
+      const fallbackBoard = allowedBoards[0] ?? "lobby";
+      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
+      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
+      router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
+      return;
+    }
+
+    if (board === "marketing" && !["cast_tv", "settings", "help"].includes(tab)) {
+      router.replace("/admin?board=marketing&tab=cast_tv");
       return;
     }
 
@@ -175,11 +195,9 @@ export function AdminDashboard() {
           ? "lobby"
           : staffOnly
             ? "staff"
-            : lobbyOnly
-              ? "lobby"
-              : effectiveBoard;
-      if (typeof window !== "undefined" && fallbackBoard === "staff") {
-        window.localStorage.setItem("fitdog_admin_board", "staff");
+            : effectiveBoard;
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
       }
       router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
     }
@@ -199,7 +217,13 @@ export function AdminDashboard() {
 
   function setBoard(nextBoard: AdminBoardType) {
     if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", nextBoard);
-    router.replace(`/admin?board=${nextBoard}&tab=${tab}`);
+    let nextTab: AdminTab = tab;
+    if (nextBoard === "marketing") {
+      nextTab = "cast_tv";
+    } else if (tab === "cast_tv") {
+      nextTab = nextBoard === "staff" ? "overview" : "content";
+    }
+    router.replace(`/admin?board=${nextBoard}&tab=${nextTab}`);
   }
 
   function setActiveTab(nextTab: AdminTab, extraParams?: Record<string, string>) {
@@ -289,7 +313,13 @@ export function AdminDashboard() {
 
   function openBoard() {
     const isDemo = Boolean((data?.session as { isDemo?: boolean } | undefined)?.isDemo);
-    const url = isDemo ? "/demo/board" : board === "staff" ? "/" : "/lobby/checkouts";
+    const url = isDemo
+      ? "/demo/board"
+      : board === "marketing"
+        ? "https://casttv.ruffops.com"
+        : board === "staff"
+          ? "/"
+          : "/lobby/checkouts";
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
@@ -313,7 +343,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -323,6 +353,8 @@ export function AdminDashboard() {
   const isLimitedStaffPanel =
     isTeamLeadPanel || isGroomerPanel || isTrainerPanel || isHandlerPanel || isCoordinatorPanel || isMarketingPanel;
   const canSeeAdminUtilities = isFullAdminRole(currentRole) || currentRole === "assistant_manager";
+  const accessibleBoards = accessibleAdminBoards(userAccess, currentRole);
+  const canUseBoardSwitcher = canUseAdminBoardSwitcher(userAccess, currentRole);
   const canViewUserGroupsPermissions =
     isSuperAdminLegacyRole(currentRole) || hasPermission(userAccess, "view_user_groups_permissions");
   const canAccessHrPanels = canAccessHrPanelsForUser(userAccess, currentRole);
@@ -381,8 +413,10 @@ export function AdminDashboard() {
           router.refresh();
         }}
         canSeeAdminUtilities={canSeeAdminUtilities}
+        canUseBoardSwitcher={canUseBoardSwitcher}
+        accessibleBoards={accessibleBoards}
         preview={preview}
-        showPreview={showPreview && !isDemo && canSeeAdminUtilities}
+        showPreview={showPreview && !isDemo && canSeeAdminUtilities && board !== "marketing"}
       >
         {error ? <p className="admin-error">{error}</p> : null}
 
@@ -447,6 +481,8 @@ export function AdminDashboard() {
         {tab === "lobby_slideshow" && board === "lobby" ? (
           <LobbySlideshowUploadPanel onToast={showToast} />
         ) : null}
+
+        {board === "marketing" && tab === "cast_tv" ? <CastTvPanel onToast={showToast} /> : null}
 
         {tab === "users" ? <AdminUsersPage /> : null}
 

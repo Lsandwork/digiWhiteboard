@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { AuditLogEntry } from "@/lib/admin/types";
+import type { AdminBoardType, AuditLogEntry } from "@/lib/admin/types";
 import type { WebhookEvent } from "@/lib/types";
 import { AdminTable } from "@/components/admin/ui/AdminTable";
 
@@ -10,10 +10,11 @@ type AdminLogsPanelProps = {
   webhookUrl: string;
   events: WebhookEvent[];
   failedEvents: WebhookEvent[];
-  board: "lobby" | "staff";
+  board: AdminBoardType;
 };
 
 export function AdminLogsPanel({ webhookUrl, events, failedEvents, board }: AdminLogsPanelProps) {
+  const logBoard = board === "marketing" ? "lobby" : board;
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState("");
@@ -23,7 +24,7 @@ export function AdminLogsPanel({ webhookUrl, events, failedEvents, board }: Admi
   const loadLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ board, limit: "50" });
+      const params = new URLSearchParams({ board: logBoard, limit: "50" });
       if (actionFilter) params.set("action", actionFilter);
       if (actorFilter) params.set("actor", actorFilter);
       if (search) params.set("search", search);

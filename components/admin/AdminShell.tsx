@@ -40,6 +40,8 @@ type AdminShellProps = {
   onOpenHelp?: () => void;
   onDemoRoleSwitched?: () => void;
   canSeeAdminUtilities?: boolean;
+  canUseBoardSwitcher?: boolean;
+  accessibleBoards?: AdminBoardType[];
   children: React.ReactNode;
   preview?: React.ReactNode;
   showPreview?: boolean;
@@ -67,13 +69,20 @@ export function AdminShell({
   onOpenHelp,
   onDemoRoleSwitched,
   canSeeAdminUtilities = false,
+  canUseBoardSwitcher = false,
+  accessibleBoards = ["lobby", "staff"],
   children,
   preview,
   showPreview = true
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const title = board === "staff" ? "Staff Digital Whiteboard Admin" : "Lobby Whiteboard Admin";
+  const title =
+    board === "staff"
+      ? "Staff Digital Whiteboard Admin"
+      : board === "marketing"
+        ? "Marketing — CAST-TV"
+        : "Lobby Whiteboard Admin";
   const effectiveRole = isDemo ? (demoRole ?? role) : role;
 
   const visibleTabs = ADMIN_TABS.filter((item) =>
@@ -140,7 +149,9 @@ export function AdminShell({
               <div className="min-w-0">
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                   <MobileMenuButton onClick={() => setMobileOpen(true)} />
-                  {canSeeAdminUtilities ? <BoardSwitcher board={board} onChange={handleBoardChange} /> : null}
+                  {canUseBoardSwitcher ? (
+                    <BoardSwitcher board={board} boards={accessibleBoards} onChange={handleBoardChange} />
+                  ) : null}
                   <span className="admin-status-dot" aria-hidden />
                   <span className="text-xs font-semibold text-emerald-400">Online</span>
                 </div>
@@ -177,7 +188,13 @@ export function AdminShell({
                   ) : null}
                   <button type="button" className="admin-btn-primary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none" onClick={onOpenBoard}>
                     <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
-                    {isDemo ? "Open Demo Whiteboard" : board === "staff" ? "Open Staff Whiteboard" : "Open Lobby Whiteboard"}
+                    {isDemo
+                      ? "Open Demo Whiteboard"
+                      : board === "marketing"
+                        ? "Open CAST-TV"
+                        : board === "staff"
+                          ? "Open Staff Whiteboard"
+                          : "Open Lobby Whiteboard"}
                   </button>
                 </div>
               </div>

@@ -29,6 +29,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   promotions: "Promotions",
   schedule: "Class Schedule",
   lobby_slideshow: "Slideshow Upload",
+  cast_tv: "CAST-TV",
   display: "TV & Cast Setup",
   push_notices: "Standard Notices",
   yard_push_notices: "Yard Camera Push",
@@ -80,6 +81,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   promotions: "Manage lobby promotion cards shown during idle time.",
   schedule: "Edit the weekly class schedule on the lobby display.",
   lobby_slideshow: "Upload photos and videos that are added to the lobby idle slideshow.",
+  cast_tv: "Manage the photo and video playlist shown on the CAST-TV display.",
   display: "Cast display URLs, TV setup checklist, and board refresh settings.",
   push_notices: "Send live reminders and alerts to the staff whiteboard.",
   yard_push_notices: "Push yard camera feeds to the staff whiteboard.",
@@ -118,6 +120,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
 };
 
 const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "lobby_slideshow", "display", "whiteboard_preview"];
+const MARKETING_BOARD_NAV_TABS: AdminTab[] = ["cast_tv", "settings", "help"];
 const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "push_notices",
   "grooming_push",
@@ -176,9 +179,28 @@ function flattenSingleChildGroups(entries: NavEntry[]): NavEntry[] {
   });
 }
 
+/** Build sidebar nav for the CAST-TV / Marketing admin board. */
+export function buildMarketingAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
+  const visible = new Set(visibleTabs);
+  return sectionEntries(
+    "marketing_board",
+    "CAST-TV",
+    compactEntries([
+      ...singles(["cast_tv"], visible),
+      group("marketing_settings", "Settings", ["settings", "help"], visible)
+    ]),
+    true
+  );
+}
+
 /** Build a grouped sidebar nav from the tabs the user can access. */
 export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): NavEntry[] {
   const visible = new Set(visibleTabs);
+
+  if (board === "marketing") {
+    return buildMarketingAdminNav(visibleTabs);
+  }
+
   const entries: NavEntry[] = [];
 
   if (board === "lobby") {
@@ -356,6 +378,9 @@ export function getTabDescription(tab: AdminTab, board: AdminBoardType) {
     return board === "lobby"
       ? "Cast display URLs, TV setup, and lobby board refresh settings."
       : "Cast display URLs, TV setup, and staff board refresh settings.";
+  }
+  if (board === "marketing" && tab === "cast_tv") {
+    return "Manage the photo and video playlist shown on casttv.ruffops.com.";
   }
   return TAB_DESCRIPTIONS[tab] ?? "Manage this area of the Fitdog admin center.";
 }
