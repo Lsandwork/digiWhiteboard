@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none"><defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<circle cx="128" cy="128" r="102" fill="#F8F8F4" stroke="#FF6A21" stroke-width="8" filter="url(#glow)"/>
+<circle cx="128" cy="128" r="90" stroke="#D7DBDE" stroke-width="3"/>
+<g stroke="#FF6A21" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none">
+<path d="M83 112c-18-2-26-14-27-31 15 1 27 7 34 20M173 112c18-2 26-14 27-31-15 1-27 7-34 20"/>
+<path d="M85 103c13-18 31-27 43-27s30 9 43 27c8 12 10 31 5 47-7 23-24 39-48 39s-41-16-48-39c-5-16-3-35 5-47Z"/>
+<path d="M99 76c11-15 23-22 37-23 10-1 18 3 26 7"/>
+<circle cx="105" cy="126" r="3" fill="#FF6A21"/><circle cx="151" cy="126" r="3" fill="#FF6A21"/>
+<path d="M116 143c8-6 16-6 24 0-2 9-7 13-12 13s-10-4-12-13ZM111 164c10 9 24 9 34 0"/>
+<path d="M79 92 68 78l20 1M177 92l11-14-20 1"/>
+</g></svg>

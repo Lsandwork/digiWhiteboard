@@ -1,18 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { LobbyClassSchedule } from "@/components/lobby/LobbyClassSchedule";
 import { LobbyFeaturedCard } from "@/components/lobby/LobbyFeaturedCard";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
+import { LobbyValuesFooter } from "@/components/lobby/LobbyValuesFooter";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
 import { LobbyDebugPanel } from "@/components/lobby/LobbyDebugPanel";
 import { LobbyIdleSlideshow } from "@/components/lobby/LobbyIdleSlideshow";
 import { LobbyAssetImage } from "@/components/lobby/LobbyAssetImage";
+import { lobbyLightAssets } from "@/lib/lobby/assets";
 import {
   BOARD_CHECKOUT_POLL_MS,
   BOARD_FAST_FETCH_TIMEOUT_MS,
@@ -34,7 +35,6 @@ import {
   stickyLobbyStateToResponse,
   type StickyLobbyCheckoutState
 } from "@/lib/lobby-sticky-checkout";
-import { lobbyAssets } from "@/lib/lobby/assets";
 import { debugBoardClient } from "@/lib/board-debug";
 import {
   getDefaultLobbySettings,
@@ -99,7 +99,6 @@ export function LobbyCheckoutBoard({
   const displayToken = searchParams.get("token")?.trim() ?? embeddedDisplayToken?.trim() ?? "";
   const showTvLayout = castKeeperMode || tvModeFromUrl;
 
-  const [clock, setClock] = useState<Date | null>(null);
   const [nowMs, setNowMs] = useState(0);
   const [settings, setSettings] = useState<LobbySettings>(defaultSettings);
   const [rawCheckouts, setRawCheckouts] = useState<LobbyCheckoutsResponse>(emptyCheckouts);
@@ -367,11 +366,9 @@ export function LobbyCheckoutBoard({
 
   useEffect(() => {
     const initialClock = window.setTimeout(() => {
-      setClock(new Date());
       setNowMs(Date.now());
     }, 0);
     const clockTimer = window.setInterval(() => {
-      setClock(new Date());
       setNowMs(Date.now());
     }, 1000);
     return () => {
@@ -527,65 +524,54 @@ export function LobbyCheckoutBoard({
 
   return (
     <main
-      className={`lobby-shell ${showTvLayout ? "lobby-tv-mode" : ""} ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""} ${checkoutActive ? "lobby-has-checkout" : "lobby-idle-state"}`}
+      className={`lobby-shell lobby-shell--light ${showTvLayout ? "lobby-tv-mode" : ""} ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""} ${checkoutActive ? "lobby-has-checkout" : "lobby-idle-state"}`}
     >
-      <Image src={lobbyAssets.background} alt="" fill priority className="lobby-background object-cover" unoptimized />
+      <div className="lobby-background lobby-background--light" aria-hidden />
       {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
 
       <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby">
-        <div className={`lobby-content relative z-10 flex min-h-screen flex-col px-8 py-5 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""}`}>
-        <LobbyHeader clock={clock} healthy={healthy && !refreshMessage} hasCheckout={checkoutActive} />
+        <div className={`lobby-content relative z-10 flex min-h-screen flex-col px-6 py-4 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""}`}>
+        <LobbyHeader healthy={healthy && !refreshMessage} hasCheckout={checkoutActive} />
 
         {refreshMessage ? (
-          <div className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-center text-sm text-amber-100">
+          <div className="lobby-refresh-banner mt-2 rounded-lg px-4 py-2 text-center text-sm">
             {refreshMessage}
           </div>
         ) : null}
 
-        {checkoutActive ? (
-          <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
-            <div
-              className="lobby-checkout-column flex min-h-0 flex-col gap-4"
-              data-queue-size={queue.length}
-            >
-              {featured ? (
-                <LobbyFeaturedCard key={featured.gingr_animal_id ?? featured.id} dog={featured} />
-              ) : null}
+        <div className="lobby-main-grid mt-3 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-4">
+          <div
+            className="lobby-checkout-column flex min-h-0 flex-col gap-3"
+            data-queue-size={queue.length}
+          >
+            {checkoutActive && featured ? (
+              <LobbyFeaturedCard key={featured.gingr_animal_id ?? featured.id} dog={featured} />
+            ) : (
+              <section className="lobby-panel lobby-idle-checkout-slot overflow-hidden">
+                <LobbyIdleSlideshow tvMode={showTvLayout} />
+              </section>
+            )}
 
-              <LobbyQueueList dogs={queue} />
+            {checkoutActive ? <LobbyQueueList dogs={queue} /> : null}
 
-              {settings.show_events ? (
-                <LobbyClassSchedule compact schedule={settings.class_schedule} />
-              ) : null}
-            </div>
-
-            {settings.show_promotions ? <SocialMomentsCarousel paused={idleCarouselPaused} performanceMode={castMode} /> : null}
+            {settings.show_events ? (
+              <LobbyClassSchedule compact={checkoutActive} schedule={settings.class_schedule} />
+            ) : null}
           </div>
-        ) : (
-          <div className="lobby-main-grid mt-4 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-5">
-            <div className="flex min-h-0 flex-col gap-4">
-              <LobbyIdleSlideshow tvMode={showTvLayout} />
 
-              {settings.show_events ? (
-                <LobbyClassSchedule schedule={settings.class_schedule} />
-              ) : null}
-            </div>
+          {settings.show_promotions ? (
+            <SocialMomentsCarousel paused={idleCarouselPaused} performanceMode={castMode} />
+          ) : (
+            <section className="lobby-panel flex items-center justify-center p-6 text-center text-lobby-navy">
+              <div>
+                <LobbyAssetImage src={lobbyLightAssets.dogLogoExact} alt="" width={96} height={96} className="mx-auto h-20 w-20 object-contain" />
+                <p className="mt-3 font-semibold">Social Media Moments</p>
+              </div>
+            </section>
+          )}
+        </div>
 
-            {settings.show_promotions ? <SocialMomentsCarousel performanceMode={castMode} /> : null}
-          </div>
-        )}
-
-        <footer className="lobby-footer mt-4 flex h-14 shrink-0 items-center gap-4 px-8">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center">
-            <LobbyAssetImage src={lobbyAssets.pawIcon} alt="" width={20} height={20} className="h-5 w-5 opacity-95" />
-          </div>
-          <p className="flex-1 text-center text-base font-semibold text-white">{footerMessage}</p>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center" aria-hidden>
-            <svg viewBox="0 0 24 24" className="h-5 w-5 text-white/90" fill="currentColor">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-            </svg>
-          </div>
-        </footer>
+        <LobbyValuesFooter footerMessage={footerMessage} />
         </div>
       </TvLayoutCanvas>
 

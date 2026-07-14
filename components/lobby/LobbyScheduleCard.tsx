@@ -6,15 +6,15 @@ type LobbyScheduleCardProps = {
 };
 
 export function LobbyScheduleCard({ day, classes }: LobbyScheduleCardProps) {
+  const shortDay = day.length > 3 ? day.slice(0, 3).toUpperCase() : day.toUpperCase();
+
   return (
-    <article className="lobby-schedule-day flex min-w-0 flex-col rounded-lg bg-lobby-card/55 p-2">
-      <h4 className="border-b border-lobby-teal/30 pb-1.5 text-sm font-black uppercase tracking-[0.08em] text-lobby-teal">
-        {day}
-      </h4>
-      <ul className="mt-2 space-y-1.5">
+    <article className="lobby-schedule-day lobby-schedule-day--light flex min-w-0 flex-col">
+      <h4 className="lobby-schedule-day__label">{shortDay}</h4>
+      <ul className="lobby-schedule-day__list">
         {classes.map((className) => (
-          <li key={className} className="flex items-start gap-1.5 text-[11px] font-medium leading-snug text-white">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-lobby-orange" aria-hidden />
+          <li key={className}>
+            <span className="lobby-schedule-day__dot" aria-hidden />
             <span>{className}</span>
           </li>
         ))}

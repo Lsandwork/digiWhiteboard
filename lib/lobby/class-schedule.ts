@@ -18,7 +18,7 @@ export const LOBBY_CLASS_SCHEDULE: LobbyScheduleDay[] = [
   },
   {
     day: "Thursday",
-    classes: ["Adventure Hike", "Trainer-led Hike"]
+    classes: ["Adventure Hike", "Beach Excursion", "Trainer-led Hike"]
   },
   {
     day: "Friday",

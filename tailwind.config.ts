@@ -17,13 +17,15 @@ const config: Config = {
           violet: "#b77cff"
         },
         lobby: {
-          orange: "#F15F2A",
-          teal: "#64B9DC",
-          card: "#171E24",
-          "card-2": "#222B32",
-          cream: "#FFF8EF",
-          muted: "#B9C2CC",
-          navy: "#0a1724"
+          orange: "#F46A27",
+          teal: "#1BAFC8",
+          "teal-dark": "#1099B3",
+          card: "#FFFFFF",
+          "card-2": "#F3EBDD",
+          cream: "#FBFAF6",
+          sand: "#F3EBDD",
+          muted: "#5B6B82",
+          navy: "#102E66"
         }
       },
       boxShadow: {

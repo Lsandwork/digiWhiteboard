@@ -31,7 +31,6 @@ export const LobbyDogAvatar = memo(function LobbyDogAvatar({
   const lastGoodUrlRef = useRef(resolvedPhotoUrl);
   const [photoFailed, setPhotoFailed] = useState(false);
   const [castOptimized, setCastOptimized] = useState(false);
-  const initial = dogName.trim().slice(0, 1).toUpperCase() || "?";
 
   useEffect(() => {
     if (resolvedPhotoUrl) {
@@ -57,7 +56,7 @@ export const LobbyDogAvatar = memo(function LobbyDogAvatar({
   return (
     <div
       className={clsx(
-        "lobby-dog-avatar relative shrink-0 overflow-hidden rounded-full border-2 border-lobby-orange/70 bg-lobby-card shadow-lobbyGlow",
+        "lobby-dog-avatar relative shrink-0 overflow-hidden rounded-full border-[3px] border-lobby-orange bg-lobby-cream",
         size === "featured" ? "lobby-dog-avatar--featured" : "lobby-dog-avatar--queue"
       )}
     >
@@ -67,16 +66,20 @@ export const LobbyDogAvatar = memo(function LobbyDogAvatar({
           key={photoKey}
           src={displayUrl ?? undefined}
           alt={`Photo of ${dogName}`}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-cover object-center"
           loading={size === "featured" ? "eager" : "lazy"}
           decoding="async"
           draggable={false}
           onError={() => setPhotoFailed(true)}
         />
       ) : (
-        <div className="lobby-dog-avatar__fallback grid h-full w-full place-items-center bg-lobby-orange/15 font-black text-orange-50">
-          {initial}
-        </div>
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src="/assets/lobby-whiteboard/light-v2/branding/fitdog-dog-logo-exact.png"
+          alt=""
+          className="lobby-dog-avatar__fallback-logo h-full w-full object-contain p-[12%]"
+          draggable={false}
+        />
       )}
     </div>
   );
