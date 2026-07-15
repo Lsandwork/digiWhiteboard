@@ -143,7 +143,10 @@ function parseListFilters(url: URL): CommissionListFilters {
     missingRequired: url.searchParams.get("missingRequired") === "1" ? true : undefined,
     possibleDuplicate: url.searchParams.get("possibleDuplicate") === "1" ? true : undefined,
     page: Number(url.searchParams.get("page") ?? 1),
-    pageSize: Number(url.searchParams.get("pageSize") ?? 25),
+    pageSize:
+      url.searchParams.get("pageSize") === "all"
+        ? 5000
+        : Number(url.searchParams.get("pageSize") ?? 25),
     sortBy: url.searchParams.get("sortBy") ?? "sale_date",
     sortDir: (url.searchParams.get("sortDir") as "asc" | "desc") ?? "desc"
   };

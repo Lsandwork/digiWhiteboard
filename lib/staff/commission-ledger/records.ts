@@ -152,7 +152,7 @@ export async function listCommissionRecords(
   await ensureCommissionLedgerBackfill(supabase);
 
   const page = Math.max(1, filters.page ?? 1);
-  const pageSize = Math.min(100, Math.max(10, filters.pageSize ?? 25));
+  const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const sortBy = SORTABLE[filters.sortBy ?? "sale_date"] ?? "sale_date";

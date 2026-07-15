@@ -170,6 +170,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const tab = (searchParams.get("pcTab") as TabKey) || "ledger";
   const reportType = (searchParams.get("pcReport") as ReportTypeKey) || "trainer_statement";
   const page = Number(searchParams.get("page") ?? 1);
+  const pageSizeParam = searchParams.get("pageSize") ?? "25";
+  const pageSize = pageSizeParam === "all" ? 5000 : Number(pageSizeParam);
+  const isViewAll = pageSizeParam === "all" || pageSize >= 5000;
   const q = searchParams.get("q") ?? "";
   const dateFrom = searchParams.get("dateFrom") ?? "";
   const dateTo = searchParams.get("dateTo") ?? "";
@@ -735,15 +738,17 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </table>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-sm text-admin-muted">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-admin-muted">
             <span>
-              Page {data?.page ?? page} · {data?.total ?? 0} records
+              {isViewAll
+                ? `Showing all ${data?.total ?? 0} records`
+                : `Page ${data?.page ?? page} · ${data?.total ?? 0} records`}
             </span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 className="crossover-btn crossover-btn--ghost"
-                disabled={page <= 1}
+                disabled={page <= 1 || isViewAll}
                 onClick={() => setParams({ page: String(Math.max(1, page - 1)) })}
               >
                 Previous
@@ -751,11 +756,28 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
               <button
                 type="button"
                 className="crossover-btn crossover-btn--ghost"
-                disabled={(data?.page ?? 1) * (data?.pageSize ?? 25) >= (data?.total ?? 0)}
+                disabled={isViewAll || (data?.page ?? 1) * (data?.pageSize ?? 25) >= (data?.total ?? 0)}
                 onClick={() => setParams({ page: String(page + 1) })}
               >
                 Next
               </button>
+              {!isViewAll ? (
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  onClick={() => setParams({ pageSize: "all", page: "1" })}
+                >
+                  View all
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  onClick={() => setParams({ pageSize: "25", page: "1" })}
+                >
+                  Paged view
+                </button>
+              )}
             </div>
           </div>
           </>
