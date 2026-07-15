@@ -230,7 +230,7 @@ export function LobbyCheckoutBoard({
       } finally {
         window.clearTimeout(timeout);
       }
-    });
+    }, { rerunIfBusy: Boolean(options.fresh) });
   }, [applyCheckoutUpdate, castKeeper, castKeeperMode, fastCheckoutEndpoint, requestHeaders, runFastPoll]);
 
   const loadLobbyCheckouts = useCallback(async () => {

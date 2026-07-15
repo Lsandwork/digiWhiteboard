@@ -2,7 +2,7 @@ import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import {
   buildGingrCheckoutKeySet,
-  isDogInGingrCheckoutBasket,
+  includePromptedCheckoutInBoard,
   mergeCheckoutDogs,
   sortCheckoutDogs
 } from "@/lib/board-checkout-merge";
@@ -132,7 +132,7 @@ export async function loadStaffBoardDogsForDisplay(supabase: SupabaseClient, now
     const visible = filterVisibleDogs(liveDogs, now);
     const gingrCheckoutKeys = buildGingrCheckoutKeySet(visible.checkingOut);
     const basketMatchedPromptedCheckouts = promptedCheckoutRows.visible.filter((dog) =>
-      isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)
+      includePromptedCheckoutInBoard(dog, gingrCheckoutKeys)
     );
     // Prefer the webhook's immediate transition signal while retaining any
     // dogs already present in Gingr's back-of-house response.

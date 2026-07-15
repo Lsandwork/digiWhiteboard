@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { enrichStaffBoardAnimalPhotos } from "@/lib/board-animal-photos";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
-import { buildGingrCheckoutKeySet, isDogInGingrCheckoutBasket, mergeCheckoutDogs, sortCheckoutDogs } from "@/lib/board-checkout-merge";
+import {
+  buildGingrCheckoutKeySet,
+  includePromptedCheckoutInBoard,
+  mergeCheckoutDogs,
+  sortCheckoutDogs
+} from "@/lib/board-checkout-merge";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
@@ -51,14 +56,6 @@ function filterVisibleDogs(
       !shouldExpireCheckoutDog(dog, now)
   );
   return { checkingIn, checkingOut };
-}
-
-function isFastWebhookCheckout(dog: LiveDog) {
-  return dog.raw_payload?.source === "gingr_webhook";
-}
-
-function includePromptedCheckoutInLiveBoard(dog: LiveDog, gingrCheckoutKeys: Set<string>) {
-  return isFastWebhookCheckout(dog) || isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys);
 }
 
 function isStoredLiveTriggeredDog(dog: LiveDog) {
@@ -243,7 +240,7 @@ export async function GET(request: Request) {
       const visible = filterVisibleDogs(liveDogs, now);
       const gingrCheckoutKeys = buildGingrCheckoutKeySet(visible.checkingOut);
       const basketMatchedPromptedCheckouts = promptedCheckoutRows.visible.filter((dog) =>
-        includePromptedCheckoutInLiveBoard(dog, gingrCheckoutKeys)
+        includePromptedCheckoutInBoard(dog, gingrCheckoutKeys)
       );
       // Webhook rows are the fastest signal that a check-in started. Merge them
       // with the Gingr basket instead of waiting for Gingr's back-of-house feed

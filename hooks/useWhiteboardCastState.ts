@@ -26,7 +26,6 @@ type UseWhiteboardCastStateOptions = {
 };
 
 const FETCH_TIMEOUT_MS = 6000;
-const CAST_REALTIME_DEBOUNCE_MS = 100;
 
 function debugLog(enabled: boolean, message: string, details?: Record<string, unknown>) {
   if (!enabled) return;
@@ -41,7 +40,8 @@ async function fetchWhiteboardState(
   board: CastBoardType,
   noVideo: boolean,
   etag?: string | null,
-  debug = false
+  debug = false,
+  fresh = false
 ) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -50,8 +50,9 @@ async function fetchWhiteboardState(
     const params = new URLSearchParams({ board });
     if (noVideo) params.set("noVideo", "1");
     if (debug) params.set("debugBoard", "1");
+    if (fresh) params.set("fresh", "1");
     const headers: Record<string, string> = {};
-    if (etag) headers["if-none-match"] = `"${etag}"`;
+    if (etag && !fresh) headers["if-none-match"] = `"${etag}"`;
 
     const response = await fetch(`/api/whiteboard/state?${params.toString()}`, {
       cache: "no-store",
@@ -98,6 +99,7 @@ export function useWhiteboardCastState({
 
   const etagRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
+  const pendingFreshRef = useRef(false);
   const reconnectCountRef = useRef(0);
   const backoffUntilRef = useRef(0);
   const failureCountRef = useRef(0);
@@ -126,8 +128,12 @@ export function useWhiteboardCastState({
     }));
   }, []);
 
-  const refresh = useCallback(async () => {
-    if (!enabled || inFlightRef.current) return;
+  const refresh = useCallback(async (options: { fresh?: boolean } = {}) => {
+    if (!enabled) return;
+    if (inFlightRef.current) {
+      if (options.fresh) pendingFreshRef.current = true;
+      return;
+    }
     const now = Date.now();
     if (backoffUntilRef.current > now) {
       debugLog(debugRef.current, "cast state backoff skip", {
@@ -138,7 +144,13 @@ export function useWhiteboardCastState({
 
     inFlightRef.current = true;
     try {
-      const result = await fetchWhiteboardState(board, noVideo, etagRef.current, debugRef.current);
+      const result = await fetchWhiteboardState(
+        board,
+        noVideo,
+        options.fresh ? null : etagRef.current,
+        debugRef.current,
+        options.fresh
+      );
       if (!result.unchanged && result.state) {
         applyState(result.state);
       } else if (result.unchanged) {
@@ -167,6 +179,10 @@ export function useWhiteboardCastState({
       }));
     } finally {
       inFlightRef.current = false;
+      if (pendingFreshRef.current) {
+        pendingFreshRef.current = false;
+        void refresh({ fresh: true });
+      }
     }
   }, [applyState, board, enabled, noVideo]);
 
@@ -182,24 +198,17 @@ export function useWhiteboardCastState({
     const supabase = getBrowserSupabase();
     if (!supabase) return;
 
-    let debounceTimer: number | null = null;
     let cancelled = false;
-
-    const scheduleRefresh = () => {
-      if (debounceTimer) window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => {
-        if (!cancelled) void refresh();
-      }, CAST_REALTIME_DEBOUNCE_MS);
-    };
 
     const channel = supabase
       .channel(`cast-lite-${board}-${Date.now()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "live_transition_dogs" }, () => {
+        if (!cancelled) void refresh({ fresh: true });
+      })
       .subscribe();
 
     return () => {
       cancelled = true;
-      if (debounceTimer) window.clearTimeout(debounceTimer);
       void supabase.removeChannel(channel);
     };
   }, [board, enabled, realtime, refresh]);

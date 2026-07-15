@@ -36,7 +36,7 @@ const query = buildCastLiteQuery({ noVideo: true, debugBoard: true });
 assert.match(query, /noVideo=1/);
 assert.match(query, /debugBoard=1/);
 
-assert.equal(WHITEBOARD_STATE_POLL_MS, 15_000);
-assert.ok(WHITEBOARD_STATE_POLL_MS >= 10_000);
+assert.equal(WHITEBOARD_STATE_POLL_MS, 6000);
+assert.ok(WHITEBOARD_STATE_POLL_MS >= 4000);
 
 console.log("whiteboard state tests passed");

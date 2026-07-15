@@ -2,9 +2,9 @@ import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
-export const BOARD_CHECKOUT_POLL_MIN_MS = 2000;
+export const BOARD_CHECKOUT_POLL_MIN_MS = 1500;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
-export const BOARD_CHECKOUT_POLL_MS = 2000;
+export const BOARD_CHECKOUT_POLL_MS = 1500;
 export const BOARD_FULL_SYNC_POLL_MS = 20_000;
 export const BOARD_REALTIME_DEBOUNCE_MS = 0;
 
@@ -112,6 +112,15 @@ export function buildGingrCheckoutKeySet(dogs: LiveDog[]) {
 
 export function isDogInGingrCheckoutBasket(dog: LiveDog, gingrCheckoutKeys: Set<string>) {
   return checkoutKeysForDog(dog).some((key) => gingrCheckoutKeys.has(key));
+}
+
+export function isFastWebhookTransition(dog: LiveDog) {
+  return dog.raw_payload?.source === "gingr_webhook";
+}
+
+/** Webhook rows appear immediately; Gingr-sourced rows still require basket membership. */
+export function includePromptedCheckoutInBoard(dog: LiveDog, gingrCheckoutKeys: Set<string>) {
+  return isFastWebhookTransition(dog) || isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys);
 }
 
 /** Drop Gingr-sourced rows cleared from the checkout basket; keep webhook rows for fast display. */

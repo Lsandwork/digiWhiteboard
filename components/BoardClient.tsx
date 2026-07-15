@@ -33,6 +33,7 @@ import { useStaffTvCast } from "@/hooks/useStaffTvCast";
 import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
+import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
 import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
@@ -488,7 +489,7 @@ export function BoardClient({
       setLastFetchAt(new Date().toISOString());
       hasSuccessfulLoadRef.current = true;
       castKeeper?.markDataFresh();
-    });
+    }, { rerunIfBusy: Boolean(options.fresh) });
   }, [fastCheckoutEndpoint, castKeeper, debugBoard, runFastPoll]);
 
   const loadFastCheckoutsRef = useRef(loadFastCheckouts);
@@ -682,6 +683,10 @@ export function BoardClient({
             if (dogName && next?.display_status === "checking_out" && !next.hidden) setToast(`${dogName} is checking out.`);
             if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
             if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
+            setBoard((previous) => {
+              const optimistic = applyOptimisticLiveBoardTransition(previous, next);
+              return optimistic ?? previous;
+            });
             // Realtime events must bypass the short server caches; otherwise an
             // immediate request can receive the pre-event snapshot and wait for
             // the next poll. The fast endpoint covers both check-ins and

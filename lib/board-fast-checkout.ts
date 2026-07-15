@@ -18,8 +18,8 @@ import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-const FAST_CHECKOUT_QUERY_TIMEOUT_MS = 2500;
-const FAST_CHECKOUT_PHOTO_TIMEOUT_MS = 1200;
+const FAST_CHECKOUT_QUERY_TIMEOUT_MS = 1500;
+const FAST_CHECKOUT_PHOTO_TIMEOUT_MS = 800;
 
 export type FastCheckoutLoadResult = {
   checking_out: LiveDog[];

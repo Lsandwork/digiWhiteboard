@@ -34,12 +34,13 @@ export async function GET(request: Request) {
   }
 
   const debugBoard = url.searchParams.get("debugBoard") === "1";
+  const fresh = url.searchParams.get("fresh") === "1";
   const lastGoodKey = `whiteboard-state:last-good:${board}:video-${allowVideo ? "1" : "0"}`;
   const startedAt = Date.now();
 
   try {
     const supabase = getServiceSupabase();
-    const state = await withTimeout(loadWhiteboardState(supabase, board, { allowVideo }), API_TIMEOUT_MS);
+    const state = await withTimeout(loadWhiteboardState(supabase, board, { allowVideo, fresh }), API_TIMEOUT_MS);
     setTtlCache(lastGoodKey, state, 120_000);
 
     void persistWhiteboardState(supabase, state).catch(() => {

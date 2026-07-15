@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { cachedLoadLobbySettings, WHITEBOARD_STATE_CACHE_TTL_MS } from "@/lib/board-settings-cache";
-import { loadStaffBoardDogsForDisplay } from "@/lib/staff/board-display-load";
+import { loadFastBoardTransitions } from "@/lib/board-fast-checkout";
 import { loadDisplaySyncState } from "@/lib/display-sync-server";
 import { loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import type { LobbyCheckoutDog, LobbySettings } from "@/lib/lobby/types";
@@ -10,7 +10,7 @@ import { loadGroomingPushBoardState, type GroomingPushNotice } from "@/lib/staff
 import { loadCastVideoBoardState, type CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import { isDailyReminderPushNotice, loadActiveStaffPushNotice, type StaffPushNotice } from "@/lib/staff/push-notices";
 import { isYardPushCastNotice } from "@/lib/staff/yard-push-notices";
-import { getOrLoadTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { getOrLoadTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import type { LiveDog } from "@/lib/types";
 import type { CastBoardType } from "@/lib/whiteboard/cast-options";
 
@@ -18,8 +18,8 @@ const FEATURE_TIMEOUT_MS = 2500;
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-export const WHITEBOARD_STATE_POLL_MS = 12_000;
-export const WHITEBOARD_STATE_ALERT_POLL_MS = 8_000;
+export const WHITEBOARD_STATE_POLL_MS = 6000;
+export const WHITEBOARD_STATE_ALERT_POLL_MS = 4000;
 
 export type CastLiteDog = {
   id: string;
@@ -194,8 +194,9 @@ function toCastLiteVideoPush(notice: CastVideoNotice | null, allowVideo: boolean
 }
 
 function hashStatePayload(payload: WhiteboardStatePayload, syncRevision: number) {
+  const { lastUpdated: _lastUpdated, ...stablePayload } = payload;
   return createHash("sha256")
-    .update(JSON.stringify({ syncRevision, payload }))
+    .update(JSON.stringify({ syncRevision, payload: stablePayload }))
     .digest("hex")
     .slice(0, 16);
 }
@@ -210,7 +211,6 @@ export async function buildStaffWhiteboardState(
   // Never block cast state on the reminder scheduler.
   void runDailyReminderDisplayScheduler(supabase).catch(() => undefined);
 
-  const emptyDogs = { checkingIn: [] as LiveDog[], checkingOut: [] as LiveDog[] };
   const emptyGrooming = {
     activeNotice: null as GroomingPushNotice | null,
     queue: [] as GroomingPushNotice[]
@@ -224,8 +224,25 @@ export async function buildStaffWhiteboardState(
     staff_published_version: "v1.0.0"
   };
 
+  const emptyFastTransitions = {
+    checking_in: [] as LiveDog[],
+    checking_out: [] as LiveDog[],
+    newest_checkout_at: null,
+    prompted_count: 0,
+    raw_checkout_rows: 0,
+    filtered_unprompted_rows: 0,
+    expired_checkout_rows: 0,
+    basket_filtered: false,
+    basket_cleared_rows: 0,
+    data_source: "supabase_live_transition_dogs" as const
+  };
+
   const [boardDogs, activePushNotice, groomingState, castVideoState, sync] = await Promise.all([
-    withTimeoutFallback(loadStaffBoardDogsForDisplay(supabase, now).catch(() => emptyDogs), 4000, emptyDogs),
+    withTimeoutFallback(
+      loadFastBoardTransitions(supabase, now).catch(() => emptyFastTransitions),
+      2500,
+      emptyFastTransitions
+    ),
     withTimeoutFallback(
       loadActiveStaffPushNotice(supabase, { mutate: false }).catch(() => null),
       FEATURE_TIMEOUT_MS,
@@ -248,8 +265,8 @@ export async function buildStaffWhiteboardState(
     withTimeoutFallback(loadDisplaySyncState(supabase).catch(() => emptySync), FEATURE_TIMEOUT_MS, emptySync)
   ]);
 
-  const checkingInDogs = boardDogs.checkingIn.map((dog) => toCastLiteDog(dog, "checking_in"));
-  const checkingOutDogs = boardDogs.checkingOut.map((dog) => toCastLiteDog(dog, "checking_out"));
+  const checkingInDogs = boardDogs.checking_in.map((dog) => toCastLiteDog(dog, "checking_in"));
+  const checkingOutDogs = boardDogs.checking_out.map((dog) => toCastLiteDog(dog, "checking_out"));
 
   const pushLite = toCastLitePushNotice(activePushNotice);
   const dailyReminder = pushLite?.is_daily_reminder ? pushLite : null;
@@ -325,16 +342,24 @@ export async function buildLobbyWhiteboardState(supabase: SupabaseClient): Promi
 export async function loadWhiteboardState(
   supabase: SupabaseClient,
   board: CastBoardType,
-  options: { allowVideo?: boolean } = {}
+  options: { allowVideo?: boolean; fresh?: boolean } = {}
 ) {
   const allowVideo = options.allowVideo !== false;
   const cacheKey = `whiteboard-state:${board}:video-${allowVideo ? "1" : "0"}`;
-  return getOrLoadTtlCache(cacheKey, WHITEBOARD_STATE_CACHE_TTL_MS, async () => {
+  const loader = async () => {
     if (board === "lobby") {
       return buildLobbyWhiteboardState(supabase);
     }
     return buildStaffWhiteboardState(supabase, options);
-  });
+  };
+
+  if (options.fresh) {
+    const value = await loader();
+    setTtlCache(cacheKey, value, WHITEBOARD_STATE_CACHE_TTL_MS);
+    return value;
+  }
+
+  return getOrLoadTtlCache(cacheKey, WHITEBOARD_STATE_CACHE_TTL_MS, loader);
 }
 
 export async function persistWhiteboardState(supabase: SupabaseClient, state: WhiteboardStateResponse) {
