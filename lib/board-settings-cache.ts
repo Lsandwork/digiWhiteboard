@@ -10,9 +10,9 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 /** Short TTLs cut Supabase REST storms from board polling without going stale for staff. */
 export const SETTINGS_CACHE_TTL_MS = 8_000;
 export const BOARD_OVERLAY_CACHE_TTL_MS = 5_000;
-export const FAST_CHECKOUT_CACHE_TTL_MS = 1_500;
-export const LIVE_BOARD_CACHE_TTL_MS = 4_000;
-export const WHITEBOARD_STATE_CACHE_TTL_MS = 4_000;
+export const FAST_CHECKOUT_CACHE_TTL_MS = 500;
+export const LIVE_BOARD_CACHE_TTL_MS = 2_000;
+export const WHITEBOARD_STATE_CACHE_TTL_MS = 2_000;
 export const DISPLAY_SYNC_CACHE_TTL_MS = 5_000;
 
 export function cachedLoadAdminSettings(supabase: SupabaseClient) {
@@ -41,6 +41,14 @@ export function invalidateBoardSettingsCaches() {
   invalidateTtlCache("settings:");
   invalidateTtlCache("display-sync");
   invalidateTtlCache("board-overlays:");
+  invalidateTtlCache("whiteboard-state:");
+}
+
+/** Drop in-memory board snapshots after a live_transition_dogs webhook write. */
+export function invalidateBoardTransitionCaches() {
+  invalidateTtlCache("board-checkouts:");
+  invalidateTtlCache("live-board:");
+  invalidateTtlCache("lobby-checkouts:");
   invalidateTtlCache("whiteboard-state:");
 }
 

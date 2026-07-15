@@ -53,6 +53,14 @@ function filterVisibleDogs(
   return { checkingIn, checkingOut };
 }
 
+function isFastWebhookCheckout(dog: LiveDog) {
+  return dog.raw_payload?.source === "gingr_webhook";
+}
+
+function includePromptedCheckoutInLiveBoard(dog: LiveDog, gingrCheckoutKeys: Set<string>) {
+  return isFastWebhookCheckout(dog) || isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys);
+}
+
 function isStoredLiveTriggeredDog(dog: LiveDog) {
   return dog.raw_payload?.source !== "gingr_back_of_house";
 }
@@ -235,7 +243,7 @@ export async function GET(request: Request) {
       const visible = filterVisibleDogs(liveDogs, now);
       const gingrCheckoutKeys = buildGingrCheckoutKeySet(visible.checkingOut);
       const basketMatchedPromptedCheckouts = promptedCheckoutRows.visible.filter((dog) =>
-        isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)
+        includePromptedCheckoutInLiveBoard(dog, gingrCheckoutKeys)
       );
       // Webhook rows are the fastest signal that a check-in started. Merge them
       // with the Gingr basket instead of waiting for Gingr's back-of-house feed

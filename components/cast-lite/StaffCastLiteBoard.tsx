@@ -148,7 +148,7 @@ function StaffCastLiteContent({
     noVideo: options.noVideo,
     pollMs,
     enabled: true,
-    realtime: false,
+    realtime: true,
     debug: options.debugBoard
   });
 

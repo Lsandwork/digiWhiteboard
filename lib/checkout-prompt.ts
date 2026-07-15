@@ -40,6 +40,9 @@ const promptEventTypes = new Set([
   "add_to_cart"
 ]);
 
+const liveWebhookCheckoutTypes = new Set(["checking out", "checking_out"]);
+const liveWebhookSources = new Set(["gingr webhook", "gingr_webhook"]);
+
 const promptBoardActions = new Set(["added to basket", "add to basket", "checkout basket added"]);
 const promptSources = new Set(["gingr basket", "checkout basket"]);
 const scheduledOnlyStatuses = new Set([
@@ -123,7 +126,15 @@ export function isPromptedCheckoutRecord(record: UnknownRecord | null | undefine
     const eventType = firstToken(item, ["gingr_event_type", "event_type", "webhook_type", "action"]);
     const boardAction = firstToken(item, ["board_action"]);
     const source = firstToken(item, ["source"]);
-    return promptEventTypes.has(eventType) || promptBoardActions.has(boardAction) || promptSources.has(source);
+    if (promptEventTypes.has(eventType) || promptBoardActions.has(boardAction) || promptSources.has(source)) {
+      return true;
+    }
+    // Gingr's checking_out webhook is the staff prompt — show immediately without
+    // waiting for back-of-house basket sync or a separate basket event payload.
+    return (
+      liveWebhookSources.has(source) &&
+      (liveWebhookCheckoutTypes.has(eventType) || promptEventTypes.has(eventType))
+    );
   });
 
   if (hasPromptBoolean || hasPromptEvent) return true;

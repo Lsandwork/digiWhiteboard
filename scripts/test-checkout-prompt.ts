@@ -52,6 +52,14 @@ assert.equal(isPromptedCheckoutRecord({ gingr_event_type: "added_to_basket" }), 
 assert.equal(isPromptedCheckoutRecord({ checkout_basket_added: true }), true);
 assert.equal(
   isPromptedCheckoutRecord({
+    source: "gingr_webhook",
+    webhook_type: "checking_out",
+    entity_data: { reservation_id: "res-1" }
+  }),
+  true
+);
+assert.equal(
+  isPromptedCheckoutRecord({
     checkout_basket_added_at: "2026-07-01T12:00:00.000Z",
     checkout_basket_added_by_user_id: "123"
   }),
@@ -59,6 +67,16 @@ assert.equal(
 );
 
 assert.equal(isPromptedCheckoutDog(checkoutDog({ source: "gingr_back_of_house", record: { status_string: "Checking Out Soon" } })), false);
+assert.equal(
+  isPromptedCheckoutDog(
+    checkoutDog({
+      source: "gingr_webhook",
+      webhook_type: "checking_out",
+      entity_data: { reservation_id: "res-1" }
+    })
+  ),
+  true
+);
 assert.equal(
   isPromptedCheckoutDog(
     checkoutDog({

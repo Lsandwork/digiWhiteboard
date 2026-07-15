@@ -26,6 +26,7 @@ type UseWhiteboardCastStateOptions = {
 };
 
 const FETCH_TIMEOUT_MS = 6000;
+const CAST_REALTIME_DEBOUNCE_MS = 100;
 
 function debugLog(enabled: boolean, message: string, details?: Record<string, unknown>) {
   if (!enabled) return;
@@ -188,7 +189,7 @@ export function useWhiteboardCastState({
       if (debounceTimer) window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(() => {
         if (!cancelled) void refresh();
-      }, 1500);
+      }, CAST_REALTIME_DEBOUNCE_MS);
     };
 
     const channel = supabase

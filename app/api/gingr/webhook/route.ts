@@ -1,6 +1,8 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { resolveActiveCheckinDisplayUntil, shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/lib/checkout-display";
+import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
@@ -155,12 +157,16 @@ export async function POST(request: Request) {
       });
 
       if (!continuing) {
-        if (webhookType === "checking_in") {
-          await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
-        } else if (webhookType === "checking_out") {
-          await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
-        }
+        after(async () => {
+          if (webhookType === "checking_in") {
+            await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
+          } else if (webhookType === "checking_out") {
+            await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
+          }
+        });
       }
+
+      invalidateBoardTransitionCaches();
     }
 
     if (acceptedPassiveTypes.has(webhookType)) {
@@ -222,6 +228,8 @@ export async function POST(request: Request) {
           })
           .eq("id", existing.id);
         if (error) throw error;
+
+        invalidateBoardTransitionCaches();
 
         await supabase.from("board_activity_log").insert({
           gingr_reservation_id: existing.gingr_reservation_id,

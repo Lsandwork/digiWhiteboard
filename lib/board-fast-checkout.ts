@@ -1,10 +1,12 @@
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
-import {
-  filterCheckoutsToGingrBasket,
-  getCachedGingrBasketCheckoutKeys
-} from "@/lib/basket-cleared-checkout";
+import { getCachedGingrBasketCheckoutKeys } from "@/lib/basket-cleared-checkout";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
-import { buildGingrCheckoutKeySet, mergeCheckoutDogs, sortCheckoutDogs } from "@/lib/board-checkout-merge";
+import {
+  buildGingrCheckoutKeySet,
+  mergeCheckoutDogs,
+  reconcileGingrSourcedCheckouts,
+  sortCheckoutDogs
+} from "@/lib/board-checkout-merge";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
@@ -66,7 +68,8 @@ function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[]) {
 
   if (gingrCheckoutKeys) {
     basketFiltered = true;
-    visibleCheckouts = filterCheckoutsToGingrBasket(visibleCheckouts, gingrCheckoutKeys);
+    // Keep webhook rows visible while Gingr basket cache catches up.
+    visibleCheckouts = reconcileGingrSourcedCheckouts(visibleCheckouts, gingrCheckouts);
   }
 
   return { visibleCheckouts, basketFiltered };
