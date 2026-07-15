@@ -233,16 +233,29 @@ export async function POST(request: Request) {
     }
 
     if (action === "import_csv") {
-      const created = await importPackageCommissionCsv(supabase, String(body.csv ?? ""));
+      const trainers = (await listAdminUsers(supabase))
+        .filter((user) => user.role === "trainer" && user.status !== "disabled")
+        .map((user) => ({
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email
+        }));
+      const result = await importPackageCommissionCsv(supabase, String(body.csv ?? ""), { trainers });
       await writeAdminAuditLog({
         actorAdminId: session?.adminUserId ?? null,
         actorEmail: session?.email ?? null,
         action: "staff.package_commissions.import",
         targetType: "package_commissions",
         targetId: undefined,
-        details: { count: created.length }
+        details: { count: result.created.length, error_count: result.errors.length }
       });
-      return NextResponse.json({ ok: true, rows: created });
+      return NextResponse.json({
+        ok: true,
+        rows: result.created,
+        errors: result.errors,
+        imported: result.created.length,
+        failed: result.errors.length
+      });
     }
 
     if (action === "export_csv") {

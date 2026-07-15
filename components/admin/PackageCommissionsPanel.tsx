@@ -100,7 +100,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const [commentBody, setCommentBody] = useState("");
   const [commentConcern, setCommentConcern] = useState<"note" | "dispute">("note");
   const [csvText, setCsvText] = useState("");
+  const [csvFileName, setCsvFileName] = useState<string | null>(null);
   const [showCsvImport, setShowCsvImport] = useState(false);
+  const [csvImportErrors, setCsvImportErrors] = useState<string[]>([]);
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const load = useCallback(async () => {
@@ -227,17 +229,48 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   }
 
   async function importCsv() {
+    if (!csvText.trim()) return;
     setBusy(true);
+    setCsvImportErrors([]);
     try {
       const body = await postAction({ action: "import_csv", csv: csvText });
-      showToast(`Imported ${body.rows?.length ?? 0} commission row(s).`, "success");
-      setCsvText("");
-      setShowCsvImport(false);
+      const imported = Number(body.imported ?? body.rows?.length ?? 0);
+      const failed = Number(body.failed ?? body.errors?.length ?? 0);
+      const errors = Array.isArray(body.errors)
+        ? body.errors.map((entry: { line?: number; message?: string }) =>
+            `Row ${entry.line ?? "?"}: ${entry.message ?? "Unable to import"}`
+          )
+        : [];
+      setCsvImportErrors(errors);
+
+      if (imported > 0 && failed === 0) {
+        showToast(`Imported ${imported} commission row(s).`, "success");
+        setCsvText("");
+        setCsvFileName(null);
+        setShowCsvImport(false);
+        setCsvImportErrors([]);
+      } else if (imported > 0) {
+        showToast(`Imported ${imported} row(s); ${failed} failed.`, "success");
+      } else {
+        showToast(errors[0] ?? "Unable to import CSV.", "error");
+      }
       await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to import CSV.", "error");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function onCsvFileChosen(file: File | null) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      setCsvText(text);
+      setCsvFileName(file.name);
+      setCsvImportErrors([]);
+    } catch {
+      showToast("Unable to read that CSV file.", "error");
     }
   }
 
@@ -636,14 +669,85 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         </div>
       </Modal>
 
-      <Modal open={showCsvImport} title="Import Package & Class Commissions CSV" onClose={() => setShowCsvImport(false)}>
-        <p className="mb-3 text-sm text-admin-muted">
-          Expected columns: dog_name, owner_name, trainer_name, trainer_email, sale_category, package_type, gingr_transaction_link, commission_amount, date_package_sold, status, notes
-        </p>
-        <textarea className="crossover-input min-h-48 font-mono text-xs" value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="dog_name,owner_name,trainer_name,trainer_email,sale_category,package_type,gingr_transaction_link,commission_amount,date_package_sold,status,notes" />
+      <Modal
+        open={showCsvImport}
+        title="Import Trainer Commissions CSV"
+        onClose={() => {
+          setShowCsvImport(false);
+          setCsvImportErrors([]);
+        }}
+      >
+        <div className="space-y-3 text-sm text-admin-muted">
+          <p>
+            Upload a Gingr <strong className="text-admin-text">Trainers Invoice Report</strong> CSV (trainer name on its
+            own line, then Date / Owner&apos;s Name / Dog&apos;s Name / Class/Program / Sales / Trainer Commission (%) /
+            Trainer Share ($)). Multi-trainer sections and $0 share rows are supported.
+          </p>
+          <p>You can also paste the same CSV, or a Fitdog export CSV with the older column headers.</p>
+        </div>
+
+        <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-admin-border bg-admin-panel/40 px-4 py-6 text-center transition hover:border-fitdog-orange/50">
+          <Upload className="h-5 w-5 text-fitdog-orange" />
+          <span className="text-sm font-semibold text-admin-text">
+            {csvFileName ? `Selected: ${csvFileName}` : "Choose CSV file"}
+          </span>
+          <span className="text-xs text-admin-muted">.csv only — PDF import is not supported yet</span>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            className="sr-only"
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              void onCsvFileChosen(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
+
+        <label className="mt-4 grid gap-2">
+          <span className="admin-label">Or paste CSV</span>
+          <textarea
+            className="crossover-input min-h-48 font-mono text-xs"
+            value={csvText}
+            onChange={(e) => {
+              setCsvText(e.target.value);
+              setCsvFileName(null);
+              setCsvImportErrors([]);
+            }}
+            placeholder={"Amanda Smith Nguyen\nDate,Owner's Name,Dog's Name,Class/Program,Price ($),Discount ($),Sales ($),Trainer Commission (%),Trainer Share ($)\n07/02/2026,Owner,Dog,Cool Tricks,$55.00,$0.00,$55.00,50.00%,$27.50"}
+          />
+        </label>
+
+        {csvImportErrors.length ? (
+          <div className="mt-3 max-h-32 overflow-auto rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+            <p className="mb-1 font-semibold">Some rows could not be imported:</p>
+            <ul className="list-disc space-y-0.5 pl-4">
+              {csvImportErrors.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setShowCsvImport(false)}>Cancel</button>
-          <button type="button" className="crossover-btn crossover-btn--primary" disabled={busy || !csvText.trim()} onClick={() => void importCsv()}>Import</button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--ghost"
+            onClick={() => {
+              setShowCsvImport(false);
+              setCsvImportErrors([]);
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            disabled={busy || !csvText.trim()}
+            onClick={() => void importCsv()}
+          >
+            Import
+          </button>
         </div>
       </Modal>
     </div>
