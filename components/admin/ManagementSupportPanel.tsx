@@ -246,7 +246,7 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={`crossover-btn ${section === "complaint" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+          className={`crossover-btn ${section === "complaint" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
           onClick={() => {
             setSection("complaint");
             setSubTab("file");
@@ -257,7 +257,7 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
         {showRequests ? (
           <button
             type="button"
-            className={`crossover-btn ${section === "request" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+            className={`crossover-btn ${section === "request" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
             onClick={() => {
               setSection("request");
               setSubTab("file");
@@ -412,8 +412,8 @@ function TrainerManagementSupportPanel() {
       </header>
 
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={`crossover-btn ${section === "complaint" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => { setSection("complaint"); setSubTab("file"); }}>Complaints</button>
-        <button type="button" className={`crossover-btn ${section === "request" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => { setSection("request"); setSubTab("file"); }}>Requests</button>
+        <button type="button" className={`crossover-btn ${section === "complaint" ? "crossover-btn--active" : "crossover-btn--ghost"}`} onClick={() => { setSection("complaint"); setSubTab("file"); }}>Complaints</button>
+        <button type="button" className={`crossover-btn ${section === "request" ? "crossover-btn--active" : "crossover-btn--ghost"}`} onClick={() => { setSection("request"); setSubTab("file"); }}>Requests</button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -617,14 +617,14 @@ function TeamLeadManagementSupportPanel({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={`crossover-btn ${panelSection === "write_up" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+          className={`crossover-btn ${panelSection === "write_up" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
           onClick={() => setPanelSection("write_up")}
         >
           Write-Ups
         </button>
         <button
           type="button"
-          className={`crossover-btn ${panelSection === "complaint" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+          className={`crossover-btn ${panelSection === "complaint" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
           onClick={() => setPanelSection("complaint")}
         >
           Complaints
@@ -676,7 +676,7 @@ function TeamLeadManagementSupportPanel({
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className={`crossover-btn ${subTab === "submit" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+          className={`crossover-btn ${subTab === "submit" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
           onClick={() => setSubTab("submit")}
         >
           <FilePenLine className="h-4 w-4" />
@@ -685,7 +685,7 @@ function TeamLeadManagementSupportPanel({
         {allowWriteUpReview ? (
           <button
             type="button"
-            className={`crossover-btn ${subTab === "review" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+            className={`crossover-btn ${subTab === "review" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
             onClick={() => setSubTab("review")}
           >
             <ClipboardList className="h-4 w-4" />

@@ -493,7 +493,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           <button
             key={entry.key}
             type="button"
-            className={`crossover-btn ${tab === entry.key ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+            className={`crossover-btn ${tab === entry.key ? "crossover-btn--active" : "crossover-btn--ghost"}`}
             onClick={() => setParams({ pcTab: entry.key, page: "1" })}
           >
             {entry.label}
@@ -867,7 +867,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                     <button
                       key={field}
                       type="button"
-                      className={`crossover-btn ${commentField === field ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+                      className={`crossover-btn ${commentField === field ? "crossover-btn--active" : "crossover-btn--ghost"}`}
                       onClick={() => setCommentField(field)}
                     >
                       {field.replace(/_/g, " ")}

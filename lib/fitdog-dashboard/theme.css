@@ -152,8 +152,8 @@
 
 .admin-btn-primary {
   border: 1px solid rgba(255, 111, 38, 0.55);
-  background: linear-gradient(180deg, #ff8a4c, var(--fitdog-orange) 58%, #e85a12);
-  color: #0b1118;
+  background: linear-gradient(180deg, #ff8a4c, #ff6f26 58%, #e85a12);
+  color: #ffffff;
   box-shadow: 0 10px 24px rgba(255, 111, 38, 0.28);
 }
 
@@ -294,8 +294,8 @@
 
 .crossover-btn--primary {
   border-color: rgba(255, 111, 38, 0.55);
-  background: linear-gradient(180deg, #ff8a4c, var(--fitdog-orange) 58%, #e85a12);
-  color: #0b1118;
+  background: linear-gradient(180deg, #ff8a4c, #ff6f26 58%, #e85a12);
+  color: #ffffff;
 }
 
 .crossover-btn--outline,

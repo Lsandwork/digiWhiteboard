@@ -181,7 +181,7 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
               <button
                 key={value}
                 type="button"
-                className={`crossover-btn ${filter === value ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+                className={`crossover-btn ${filter === value ? "crossover-btn--active" : "crossover-btn--ghost"}`}
                 onClick={() => setFilter(value)}
               >
                 {value === "all" ? "All" : value === "write_up" ? "Write-Ups" : "Complaints"}

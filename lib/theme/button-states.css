@@ -1,0 +1,137 @@
+/* Highlighted / selected controls — readable in both dark and light themes */
+
+/* Tab & segment selection (outline highlight, not solid fill) */
+.crossover-btn--active {
+  border-color: rgba(255, 111, 38, 0.55);
+  background: var(--surface-active, rgba(255, 111, 38, 0.14));
+  color: var(--text-primary, #f8fafc);
+  box-shadow:
+    0 0 0 1px rgba(255, 111, 38, 0.22),
+    0 4px 14px rgba(255, 111, 38, 0.12);
+}
+
+html[data-theme="light"] .crossover-btn--active {
+  background: var(--brand-soft);
+  color: var(--brand);
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
+}
+
+/* Solid primary CTAs — always show brand fill + high-contrast label */
+html[data-theme="dark"] .admin-theme .crossover-btn--primary,
+html:not([data-theme]) .admin-theme .crossover-btn--primary,
+html[data-theme="dark"] .admin-theme .admin-btn-primary,
+html:not([data-theme]) .admin-theme .admin-btn-primary {
+  border-color: rgba(255, 111, 38, 0.55);
+  background: linear-gradient(180deg, #ff8a4c 0%, #ff6f26 58%, #e85a12 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(255, 111, 38, 0.28);
+}
+
+html[data-theme="dark"] .admin-theme .crossover-btn--primary:hover:not(:disabled),
+html:not([data-theme]) .admin-theme .crossover-btn--primary:hover:not(:disabled),
+html[data-theme="dark"] .admin-theme .admin-btn-primary:hover:not(:disabled),
+html:not([data-theme]) .admin-theme .admin-btn-primary:hover:not(:disabled) {
+  color: #ffffff;
+}
+
+html[data-theme="light"] .admin-theme .crossover-btn--primary,
+html[data-theme="light"] .admin-theme .admin-btn-primary {
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 58%, #ea580c 100%);
+  color: #ffffff;
+}
+
+/* Filter chips */
+.admin-filter-chip--active {
+  border-color: rgba(255, 111, 38, 0.45);
+  background: var(--surface-active, rgba(255, 111, 38, 0.14));
+  color: var(--text-primary, #f8fafc);
+  box-shadow: 0 0 0 1px rgba(255, 111, 38, 0.15);
+}
+
+html[data-theme="light"] .admin-filter-chip--active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+/* Sidebar & tabs */
+html[data-theme="dark"] .admin-nav-item--active,
+html:not([data-theme]) .admin-nav-item--active {
+  color: var(--text-primary, #f8fafc);
+}
+
+html[data-theme="dark"] .admin-tab--active,
+html:not([data-theme]) .admin-tab--active {
+  color: var(--text-primary, #f8fafc);
+}
+
+/* Help center categories */
+.admin-help-category--active {
+  border-color: rgba(241, 95, 42, 0.45);
+  background: rgba(241, 95, 42, 0.16);
+  color: var(--text-primary, #ffffff);
+}
+
+html[data-theme="light"] .admin-help-category--active {
+  color: var(--brand);
+}
+
+/* Notification hub */
+.notif-hub-sidebar__item--active,
+.notif-hub-toolbar__tab--active {
+  color: var(--text-primary, #ffffff);
+}
+
+/* Browser mode toggle */
+.browser-panel__mode-btn--active {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: var(--text-primary, #fde68a);
+}
+
+html[data-theme="light"] .browser-panel__mode-btn--active {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* Walks board */
+.walks-board-filter--active,
+.walks-board-type-option--active {
+  border-color: rgba(255, 159, 28, 0.55);
+  background: rgba(255, 111, 38, 0.12);
+  color: var(--text-primary, #ffffff);
+  box-shadow: 0 0 0 1px rgba(255, 159, 28, 0.12);
+}
+
+html[data-theme="light"] .walks-board-filter--active,
+html[data-theme="light"] .walks-board-type-option--active {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* Grooming dog picker */
+.grooming-dog-picker__option--active {
+  border-color: rgba(255, 111, 38, 0.35);
+  background: rgba(255, 111, 38, 0.12);
+  color: var(--text-primary, #f8fafc);
+}
+
+html[data-theme="light"] .grooming-dog-picker__option--active {
+  color: var(--text-primary);
+}
+
+/* Fitdog AI tabs */
+.fitdog-ai-window__tabs button.is-active {
+  background: rgba(255, 166, 0, 0.12);
+  color: var(--text-primary, #ffd7a1);
+}
+
+html[data-theme="light"] .fitdog-ai-window__tabs button.is-active {
+  color: var(--brand);
+  background: var(--brand-soft);
+}
+
+/* Demo role switcher */
+.demo-role-switcher__item--active {
+  background: rgba(153, 27, 27, 0.45);
+  color: var(--text-primary, #ffffff);
+}

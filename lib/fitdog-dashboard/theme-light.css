@@ -261,17 +261,10 @@ html[data-theme="light"] .admin-filter-chip,
   color: var(--text-primary);
 }
 
-html[data-theme="light"] .admin-filter-chip--active,
-.admin-filter-chip--active {
-  border-color: rgba(249, 115, 22, 0.45);
+html[data-theme="light"] .admin-filter-chip--active {
   background: var(--brand-soft);
   color: var(--brand);
   box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
-}
-
-html[data-theme="dark"] .admin-filter-chip--active,
-html:not([data-theme]) .admin-filter-chip--active {
-  color: var(--text-primary);
 }
 
 html[data-theme="light"] .admin-badge {
