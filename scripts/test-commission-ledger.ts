@@ -15,6 +15,7 @@ import {
   sanitizeCsvCell,
   trainerOwnsRecord,
   parseCommissionDate,
+  listCommissionTrainerOptions,
   type CommissionViewer
 } from "../lib/staff/commission-ledger";
 
@@ -120,5 +121,13 @@ assert.equal(original - fullRefund, 0);
 assert.equal(parseCommissionDate("07142026"), "2026-07-14");
 assert.equal(parseCommissionDate("07/14/2026"), "2026-07-14");
 assert.equal(parseCommissionDate("2026-07-02"), "2026-07-02");
+
+const trainerOptions = listCommissionTrainerOptions([
+  { id: "1", full_name: "Ivonne Campuzano", email: "ivonne@test.com", role: "trainer", status: "active" },
+  { id: "2", full_name: "Trainer Demo", email: "demo-trainer@demo.com", role: "trainer", status: "active" },
+  { id: "3", full_name: "Disabled Trainer", email: "off@test.com", role: "trainer", status: "disabled" }
+]);
+assert.equal(trainerOptions.length, 1);
+assert.equal(trainerOptions[0]?.full_name, "Ivonne Campuzano");
 
 console.log("commission ledger: ok");

@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
 import { accessFromLegacyRole, firstAccessibleAdminTab, isMarketingLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
 import type { AdminTab } from "@/lib/admin/types";
@@ -126,12 +127,15 @@ export function AdminLogin() {
   }
 
   return (
-    <main className="admin-theme grid min-h-screen place-items-center p-6">
+    <main className="admin-theme relative grid min-h-screen place-items-center p-6">
+      <div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+        <ThemeToggle />
+      </div>
       <form onSubmit={mustChangePassword ? submitPasswordChange : submit} className="admin-card w-full max-w-md rounded-2xl p-8">
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
           <Image src={FITDOG_BRAND.logoBadge256} alt="Fitdog" width={72} height={72} className="rounded-full ring-2 ring-fitdog-orange/40" />
           <div>
-            <h1 className="text-2xl font-black text-white">{mustChangePassword ? "Set New Password" : "Fitdog Admin"}</h1>
+            <h1 className="text-2xl font-black text-[var(--text-primary)]">{mustChangePassword ? "Set New Password" : "Fitdog Admin"}</h1>
             <p className="mt-1 text-sm text-admin-muted">
               {mustChangePassword
                 ? "Your temporary password must be changed before you can continue."

@@ -421,7 +421,7 @@ export function CastVideosPanel() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-amber-300">Live on displays</p>
-              <h3 className="text-xl font-bold text-white">{data.activeNotice.title}</h3>
+              <h3 className="text-xl font-bold admin-text-emphasis">{data.activeNotice.title}</h3>
               <p className="text-sm text-admin-muted">
                 Priority: {data.activeNotice.priority} • Queue: {data.queue.length}
               </p>
@@ -499,7 +499,7 @@ export function CastVideosPanel() {
                     <button
                       key={department.value}
                       type="button"
-                      className={`rounded-full border px-3 py-1.5 text-sm ${active ? "border-fitdog-orange bg-fitdog-orange/15 text-white" : "border-admin-border text-admin-muted"}`}
+                      className={`rounded-full border px-3 py-1.5 text-sm ${active ? "border-fitdog-orange bg-fitdog-orange/15 admin-text-emphasis" : "border-admin-border text-admin-muted"}`}
                       onClick={() => toggleDepartment(department.value)}
                     >
                       {department.label}
@@ -614,16 +614,16 @@ export function CastVideosPanel() {
                 <article key={notice.id} className="rounded-xl border border-admin-border p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-semibold text-white">{notice.title}</p>
+                      <p className="font-semibold admin-text-emphasis">{notice.title}</p>
                       <p className="text-xs uppercase tracking-wide text-admin-muted">{notice.status}</p>
                     </div>
                     <Video className="h-4 w-4 shrink-0 text-fitdog-orange" />
                   </div>
                   {stats ? (
                     <div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs">
-                      <div><p className="text-lg font-bold text-white">{stats.viewed}</p><p className="text-admin-muted">Viewed</p></div>
-                      <div><p className="text-lg font-bold text-white">{stats.pending}</p><p className="text-admin-muted">Pending</p></div>
-                      <div><p className="text-lg font-bold text-white">{formatDuration(stats.average_watch_ms)}</p><p className="text-admin-muted">Avg watch</p></div>
+                      <div><p className="text-lg font-bold admin-text-emphasis">{stats.viewed}</p><p className="text-admin-muted">Viewed</p></div>
+                      <div><p className="text-lg font-bold admin-text-emphasis">{stats.pending}</p><p className="text-admin-muted">Pending</p></div>
+                      <div><p className="text-lg font-bold admin-text-emphasis">{formatDuration(stats.average_watch_ms)}</p><p className="text-admin-muted">Avg watch</p></div>
                     </div>
                   ) : null}
                 </article>
@@ -649,7 +649,7 @@ export function CastVideosPanel() {
             <tbody>
               {(data?.notices ?? []).map((notice) => (
                 <tr key={notice.id} className="border-t border-admin-border/60">
-                  <td className="py-3 pr-4 font-medium text-white">{notice.title}</td>
+                  <td className="py-3 pr-4 font-medium admin-text-emphasis">{notice.title}</td>
                   <td className="py-3 pr-4 capitalize">{notice.priority}</td>
                   <td className="py-3 pr-4 capitalize">{notice.status}</td>
                   <td className="py-3 pr-4">{notice.departments.join(", ")}</td>

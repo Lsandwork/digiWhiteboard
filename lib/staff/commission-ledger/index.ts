@@ -11,4 +11,5 @@ export * from "./audit";
 export * from "./backfill";
 export * from "./dates";
 export * from "./reports";
+export * from "./trainers";
 export { listRecordAudit } from "./audit";

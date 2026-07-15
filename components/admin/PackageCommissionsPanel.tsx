@@ -103,7 +103,7 @@ function statusPill(
     green: "bg-emerald-500/15 text-emerald-100 border-emerald-400/30",
     sky: "bg-sky-500/15 text-sky-100 border-sky-400/30",
     rose: "bg-rose-500/15 text-rose-100 border-rose-400/30",
-    slate: "bg-white/10 text-white/80 border-white/15",
+    slate: "border-[var(--border)] bg-[var(--surface-hover)] text-[var(--text-secondary)]",
     orange: "bg-orange-500/15 text-orange-100 border-orange-400/30"
   };
   return (
@@ -179,6 +179,11 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const trainerIds = searchParams.get("trainerIds") ?? "";
 
   const isTrainer = Boolean(data?.currentUser?.isTrainerOnly);
+  const ledgerBodyText = isTrainer ? "text-2xl leading-snug" : "text-3xl leading-snug";
+  const ledgerHeadText = isTrainer ? "text-base" : "text-lg";
+  const ledgerTypeText = isTrainer ? "text-lg" : "text-xl";
+  const ledgerPillLarge = !isTrainer;
+  const ledgerCommentIcon = isTrainer ? "h-6 w-6" : "h-8 w-8";
   const canManage = Boolean(data?.canManage);
   const pageRowIds = useMemo(() => (data?.rows ?? []).map((row) => row.id), [data?.rows]);
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
@@ -414,10 +419,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     <div className={embedded ? "" : "admin-page"}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-white">
+          <h2 className={`font-black admin-text-emphasis ${isTrainer ? "text-lg" : "text-xl"}`}>
             {isTrainer ? "My Commissions" : "Package & Class Commissions"}
           </h2>
-          <p className="mt-1 text-sm text-admin-muted">
+          <p className={`mt-1 text-admin-muted ${isTrainer ? "text-xs" : "text-sm"}`}>
             {isTrainer
               ? "Review your package and class earnings, ask questions on specific fields, and download statements."
               : "Ledger, approvals, payroll, CSV imports, rules, and trainer questions — fully integrated."}
@@ -475,9 +480,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             ["Refunded", summary.refunded],
             ["Open Questions", String(summary.openQuestions)]
           ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
+            <div key={label} className="admin-surface-panel px-3 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-admin-muted">{label}</p>
-              <p className="mt-1 text-lg font-black text-white">{value}</p>
+              <p className={`mt-1 font-black admin-text-emphasis ${isTrainer ? "text-base" : "text-lg"}`}>{value}</p>
             </div>
           ))}
         </div>
@@ -498,7 +503,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
       {(tab === "ledger" || tab === "needs_review" || tab === "approval" || tab === "reports") && (
         <>
-          <div className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-black/20 p-3">
+          <div className="admin-ledger-filter-bar mb-3 flex flex-wrap items-end gap-2 p-3">
             <label className="grid gap-1 text-xs">
               <span className="text-admin-muted">Search</span>
               <input
@@ -575,8 +580,8 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           {tab !== "reports" ? (
           <>
           {canManage ? (
-            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#0b1220]/95 p-3 backdrop-blur">
-              <label className="inline-flex items-center gap-2 text-sm text-white">
+            <div className="admin-ledger-bulk-bar sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 p-3">
+              <label className="inline-flex items-center gap-2 text-sm admin-text-emphasis">
                 <input
                   type="checkbox"
                   className="h-6 w-6"
@@ -622,10 +627,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </div>
           ) : null}
 
-          <div className="overflow-auto rounded-xl border border-white/10">
+          <div className="admin-ledger-table-wrap">
             <table className="min-w-[1800px] w-full border-collapse text-left">
-              <thead className="sticky top-0 z-10 bg-[#0b1220]">
-                <tr className="border-b border-white/10 text-lg uppercase tracking-wide text-admin-muted">
+              <thead className="admin-ledger-table-head">
+                <tr className={`border-b border-[var(--border)] uppercase tracking-wide text-admin-muted ${ledgerHeadText}`}>
                   {canManage ? (
                     <th className="px-4 py-4">
                       <input
@@ -653,7 +658,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                   <th className="px-4 py-4">Comments</th>
                 </tr>
               </thead>
-              <tbody className="text-3xl leading-snug">
+              <tbody className={ledgerBodyText}>
                 {loading ? (
                   <tr>
                     <td colSpan={12} className="px-4 py-8 text-admin-muted">
@@ -672,7 +677,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                     return (
                     <tr
                       key={row.id}
-                      className={`cursor-pointer border-b border-white/5 hover:bg-white/5 ${isSelected ? "bg-fitdog-orange/10" : ""}`}
+                      className={`admin-ledger-row ${isSelected ? "admin-ledger-row--selected" : ""}`}
                       onClick={(e) => {
                         if (canManage && e.shiftKey) {
                           e.preventDefault();
@@ -702,19 +707,19 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       ) : null}
                       <td className="px-4 py-4">
                         <div className="flex flex-col gap-2">
-                          {statusPill(row.approval_status.replace(/_/g, " "), row.approval_status === "approved" ? "green" : row.approval_status === "rejected" ? "rose" : "amber", true)}
-                          {statusPill(row.payment_status.replace(/_/g, " "), row.payment_status === "paid" ? "sky" : "slate", true)}
+                          {statusPill(row.approval_status.replace(/_/g, " "), row.approval_status === "approved" ? "green" : row.approval_status === "rejected" ? "rose" : "amber", ledgerPillLarge)}
+                          {statusPill(row.payment_status.replace(/_/g, " "), row.payment_status === "paid" ? "sky" : "slate", ledgerPillLarge)}
                           {row.review_status === "needs_review" || row.has_open_comments
-                            ? statusPill("needs review", "orange", true)
+                            ? statusPill("needs review", "orange", ledgerPillLarge)
                             : null}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-white">{row.trainer_name}</td>
+                      <td className="px-4 py-4 admin-text-emphasis">{row.trainer_name}</td>
                       <td className="px-4 py-4">{row.sale_date ?? "—"}</td>
                       <td className="px-4 py-4">{row.client_name}</td>
-                      <td className="px-4 py-4 font-semibold text-white">{row.dog_name}</td>
+                      <td className="px-4 py-4 font-semibold admin-text-emphasis">{row.dog_name}</td>
                       <td className="px-4 py-4">
-                        <div className="text-xl uppercase text-admin-muted">{row.commission_type.replace(/_/g, " ")}</div>
+                        <div className={`uppercase text-admin-muted ${ledgerTypeText}`}>{row.commission_type.replace(/_/g, " ")}</div>
                         <div>{row.package_or_class}</div>
                       </td>
                       <td className="px-4 py-4">{centsToDisplay(row.gross_amount_cents)}</td>
@@ -724,7 +729,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       <td className="px-4 py-4">
                         {row.has_open_comments ? (
                           <span className="inline-flex items-center gap-2 text-amber-200">
-                            <MessageSquare className="h-8 w-8" /> Open
+                            <MessageSquare className={ledgerCommentIcon} /> Open
                           </span>
                         ) : (
                           "—"
@@ -826,14 +831,14 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
       {/* Drawer */}
       {drawerId && drawer ? (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={() => { setDrawerId(null); setDrawer(null); }}>
+        <div className="admin-drawer-backdrop" onClick={() => { setDrawerId(null); setDrawer(null); }}>
           <aside
-            className="h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[#0b1220] p-5 shadow-2xl"
+            className="admin-drawer-panel"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-black text-white">{drawer.record.dog_name}</h3>
+                <h3 className="text-lg font-black admin-text-emphasis">{drawer.record.dog_name}</h3>
                 <p className="text-sm text-admin-muted">
                   {drawer.record.client_name} · {drawer.record.package_or_class}
                 </p>
@@ -855,7 +860,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </div>
 
             {data?.canComment ? (
-              <div className="mb-4 rounded-xl border border-white/10 p-3">
+              <div className="mb-4 rounded-xl border border-[var(--border)] p-3">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-admin-muted">Ask about a field</p>
                 <div className="mb-2 flex flex-wrap gap-2">
                   {["final_commission", "gross_amount", "commission_rate", "sale_date", "client", "dog", "package_or_class"].map((field) => (
@@ -906,21 +911,21 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             ) : null}
 
             <section className="mb-4">
-              <h4 className="mb-2 text-sm font-bold text-white">Comment threads</h4>
+              <h4 className="mb-2 text-sm font-bold admin-text-emphasis">Comment threads</h4>
               {(drawer.threads as Array<Record<string, unknown>>).length === 0 ? (
                 <p className="text-sm text-admin-muted">No comments yet.</p>
               ) : (
                 (drawer.threads as Array<Record<string, unknown>>).map((thread) => (
-                  <div key={String(thread.id)} className="mb-3 rounded-lg border border-white/10 p-3 text-sm">
+                  <div key={String(thread.id)} className="mb-3 rounded-lg border border-[var(--border)] p-3 text-sm">
                     <div className="mb-1 flex justify-between gap-2">
-                      <strong className="text-white">{String(thread.field_name).replace(/_/g, " ")}</strong>
+                      <strong className="admin-text-emphasis">{String(thread.field_name).replace(/_/g, " ")}</strong>
                       {statusPill(String(thread.status).replace(/_/g, " "), thread.status === "resolved" ? "green" : "amber")}
                     </div>
                     <p className="text-xs text-admin-muted">Value when commented: {String(thread.field_value_at_comment ?? "—")}</p>
                     <ul className="mt-2 space-y-1">
                       {((thread.replies as Array<Record<string, unknown>>) ?? []).map((reply) => (
-                        <li key={String(reply.id)} className="rounded bg-white/5 px-2 py-1">
-                          <span className="font-semibold text-white">{String(reply.author_name)}:</span> {String(reply.body)}
+                        <li key={String(reply.id)} className="rounded bg-[var(--surface-hover)] px-2 py-1">
+                          <span className="font-semibold admin-text-emphasis">{String(reply.author_name)}:</span> {String(reply.body)}
                         </li>
                       ))}
                     </ul>
@@ -996,7 +1001,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             ) : null}
 
             <section>
-              <h4 className="mb-2 text-sm font-bold text-white">Audit history</h4>
+              <h4 className="mb-2 text-sm font-bold admin-text-emphasis">Audit history</h4>
               <ul className="space-y-1 text-xs text-admin-muted">
                 {(drawer.audit as Array<Record<string, unknown>>).slice(0, 40).map((event) => (
                   <li key={String(event.id)}>
@@ -1057,9 +1062,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         <p className="mb-3 text-sm text-admin-muted">
           Upload a Gingr trainers invoice export or Fitdog commission CSV. Valid rows become editable ledger records.
         </p>
-        <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-6">
+        <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--border)] px-4 py-6">
           <FileSpreadsheet className="h-5 w-5 text-fitdog-orange" />
-          <span className="text-sm font-semibold text-white">{csvFileName ?? "Choose CSV file"}</span>
+          <span className="text-sm font-semibold admin-text-emphasis">{csvFileName ?? "Choose CSV file"}</span>
           <input
             type="file"
             accept=".csv,text/csv"
@@ -1198,9 +1203,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-hover)] px-3 py-2">
       <p className="text-[10px] font-bold uppercase tracking-wide text-admin-muted">{label}</p>
-      <p className="text-white">{value}</p>
+      <p className="admin-text-emphasis">{value}</p>
     </div>
   );
 }
@@ -1225,8 +1230,8 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-white/10 p-4">
-        <h3 className="mb-3 font-bold text-white">Create payroll period</h3>
+      <div className="rounded-xl border border-[var(--border)] p-4">
+        <h3 className="mb-3 font-bold admin-text-emphasis">Create payroll period</h3>
         <div className="flex flex-wrap gap-2">
           <input className="admin-input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
           <input type="date" className="admin-input" value={start} onChange={(e) => setStart(e.target.value)} />
@@ -1255,10 +1260,10 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
           </button>
         </div>
       </div>
-      <div className="overflow-auto rounded-xl border border-white/10">
+      <div className="overflow-auto rounded-xl border border-[var(--border)]">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-left text-admin-muted">
+            <tr className="border-b border-[var(--border)] text-left text-admin-muted">
               <th className="px-3 py-2">Name</th>
               <th className="px-3 py-2">Dates</th>
               <th className="px-3 py-2">Status</th>
@@ -1267,8 +1272,8 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
           </thead>
           <tbody>
             {periods.map((period) => (
-              <tr key={String(period.id)} className="border-b border-white/5">
-                <td className="px-3 py-2 text-white">{String(period.name)}</td>
+              <tr key={String(period.id)} className="border-b border-[var(--divider)]">
+                <td className="px-3 py-2 admin-text-emphasis">{String(period.name)}</td>
                 <td className="px-3 py-2">
                   {String(period.start_date)} → {String(period.end_date)}
                 </td>
@@ -1331,10 +1336,10 @@ function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
       <button type="button" className="crossover-btn crossover-btn--primary" onClick={onOpenImport}>
         <Upload className="h-4 w-4" /> Upload new CSV
       </button>
-      <div className="overflow-auto rounded-xl border border-white/10">
+      <div className="overflow-auto rounded-xl border border-[var(--border)]">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-left text-admin-muted">
+            <tr className="border-b border-[var(--border)] text-left text-admin-muted">
               <th className="px-3 py-2">File</th>
               <th className="px-3 py-2">Uploaded</th>
               <th className="px-3 py-2">Imported</th>
@@ -1345,8 +1350,8 @@ function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
           </thead>
           <tbody>
             {batches.map((batch) => (
-              <tr key={String(batch.id)} className="border-b border-white/5">
-                <td className="px-3 py-2 text-white">{String(batch.original_filename)}</td>
+              <tr key={String(batch.id)} className="border-b border-[var(--divider)]">
+                <td className="px-3 py-2 admin-text-emphasis">{String(batch.original_filename)}</td>
                 <td className="px-3 py-2">{String(batch.uploaded_at)}</td>
                 <td className="px-3 py-2">{String(batch.imported_rows)}</td>
                 <td className="px-3 py-2">{String(batch.failed_rows)}</td>
@@ -1406,8 +1411,8 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-white/10 p-4">
-        <h3 className="mb-3 font-bold text-white">Create commission rule</h3>
+      <div className="rounded-xl border border-[var(--border)] p-4">
+        <h3 className="mb-3 font-bold admin-text-emphasis">Create commission rule</h3>
         <div className="flex flex-wrap gap-2">
           <input className="admin-input" placeholder="Rule name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <input className="admin-input" placeholder="Rate %" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} />
@@ -1441,10 +1446,10 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
         </div>
         <p className="mt-2 text-xs text-admin-muted">{trainers.length} trainers available for trainer-specific rules.</p>
       </div>
-      <div className="overflow-auto rounded-xl border border-white/10">
+      <div className="overflow-auto rounded-xl border border-[var(--border)]">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-left text-admin-muted">
+            <tr className="border-b border-[var(--border)] text-left text-admin-muted">
               <th className="px-3 py-2">Name</th>
               <th className="px-3 py-2">Type</th>
               <th className="px-3 py-2">Calc</th>
@@ -1454,8 +1459,8 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
           </thead>
           <tbody>
             {rules.map((rule) => (
-              <tr key={String(rule.id)} className="border-b border-white/5">
-                <td className="px-3 py-2 text-white">{String(rule.name)}</td>
+              <tr key={String(rule.id)} className="border-b border-[var(--divider)]">
+                <td className="px-3 py-2 admin-text-emphasis">{String(rule.name)}</td>
                 <td className="px-3 py-2">{String(rule.commission_type)}</td>
                 <td className="px-3 py-2">{String(rule.calculation_type)}</td>
                 <td className="px-3 py-2">{rule.rate_bps != null ? bpsToDisplay(Number(rule.rate_bps)) : "—"}</td>
@@ -1500,7 +1505,7 @@ function ReportsTab({
 }) {
   return (
     <div id="commission-report-print" className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-hover)] p-4">
         <label className="grid gap-1 text-sm">
           <span className="text-admin-muted">Report type</span>
           <select
@@ -1529,15 +1534,15 @@ function ReportsTab({
       </div>
 
       {loading ? (
-        <div className="rounded-xl border border-white/10 p-8 text-admin-muted">Generating report…</div>
+        <div className="rounded-xl border border-[var(--border)] p-8 text-admin-muted">Generating report…</div>
       ) : !report || report.rows.length === 0 ? (
-        <div className="rounded-xl border border-white/10 p-8 text-admin-muted">
+        <div className="rounded-xl border border-[var(--border)] p-8 text-admin-muted">
           No commission records match the current filters. Adjust trainer or date filters above, then click Generate.
         </div>
       ) : (
         <>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <h3 className="text-lg font-black text-white">{report.title}</h3>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-hover)] p-4">
+            <h3 className="text-lg font-black admin-text-emphasis">{report.title}</h3>
             <p className="mt-1 text-sm text-admin-muted">
               Generated {new Date(report.generatedAt).toLocaleString()}
               {report.dateRange.from || report.dateRange.to
@@ -1551,20 +1556,20 @@ function ReportsTab({
                 ["Total Commission", report.totals.commission],
                 ["Refunds", report.totals.refund]
               ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-white/10 px-3 py-2">
+                <div key={label} className="rounded-lg border border-[var(--border)] px-3 py-2">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-admin-muted">{label}</p>
-                  <p className="text-lg font-black text-white">{value}</p>
+                  <p className="text-lg font-black admin-text-emphasis">{value}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {report.byTrainer.length > 0 ? (
-            <div className="overflow-auto rounded-xl border border-white/10">
-              <h4 className="border-b border-white/10 px-4 py-3 text-sm font-bold text-white">By trainer</h4>
+            <div className="overflow-auto rounded-xl border border-[var(--border)]">
+              <h4 className="border-b border-[var(--border)] px-4 py-3 text-sm font-bold admin-text-emphasis">By trainer</h4>
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left text-admin-muted">
+                  <tr className="border-b border-[var(--border)] text-left text-admin-muted">
                     <th className="px-3 py-2">Trainer</th>
                     <th className="px-3 py-2">Records</th>
                     <th className="px-3 py-2">Gross</th>
@@ -1573,8 +1578,8 @@ function ReportsTab({
                 </thead>
                 <tbody>
                   {report.byTrainer.map((row) => (
-                    <tr key={`${row.trainerName}-${row.trainerEmail ?? ""}`} className="border-b border-white/5">
-                      <td className="px-3 py-2 text-white">
+                    <tr key={`${row.trainerName}-${row.trainerEmail ?? ""}`} className="border-b border-[var(--divider)]">
+                      <td className="px-3 py-2 admin-text-emphasis">
                         {row.trainerName}
                         {row.trainerEmail ? <span className="block text-xs text-admin-muted">{row.trainerEmail}</span> : null}
                       </td>
@@ -1588,11 +1593,11 @@ function ReportsTab({
             </div>
           ) : null}
 
-          <div className="overflow-auto rounded-xl border border-white/10">
-            <h4 className="border-b border-white/10 px-4 py-3 text-sm font-bold text-white">Detail lines</h4>
+          <div className="overflow-auto rounded-xl border border-[var(--border)]">
+            <h4 className="border-b border-[var(--border)] px-4 py-3 text-sm font-bold admin-text-emphasis">Detail lines</h4>
             <table className="min-w-[1200px] w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-admin-muted">
+                <tr className="border-b border-[var(--border)] text-left text-admin-muted">
                   <th className="px-3 py-2">Trainer</th>
                   <th className="px-3 py-2">Sale Date</th>
                   <th className="px-3 py-2">Client</th>
@@ -1606,8 +1611,8 @@ function ReportsTab({
               </thead>
               <tbody>
                 {report.rows.map((row) => (
-                  <tr key={row.id} className="border-b border-white/5">
-                    <td className="px-3 py-2 text-white">{row.trainer_name}</td>
+                  <tr key={row.id} className="border-b border-[var(--divider)]">
+                    <td className="px-3 py-2 admin-text-emphasis">{row.trainer_name}</td>
                     <td className="px-3 py-2">{row.sale_date ?? "—"}</td>
                     <td className="px-3 py-2">{row.client_name}</td>
                     <td className="px-3 py-2">{row.dog_name}</td>

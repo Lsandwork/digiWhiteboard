@@ -16,6 +16,7 @@ import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
 type AdminShellProps = {
@@ -160,43 +161,59 @@ export function AdminShell({
                 <p className="admin-page-subtitle mt-1 max-w-2xl">{pageDescription}</p>
               </div>
 
-              <div className="flex flex-col items-start gap-2 lg:items-end">
-                <div className="admin-header-brand">
-                  <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
-                  <div>
-                    <p className="admin-header-brand__label">FITDOG</p>
-                    <p className="text-xs font-bold text-white">Admin Center</p>
+              <div className="flex w-full flex-col items-start gap-2 lg:w-auto lg:items-end">
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:gap-3">
+                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                    {canSeeAdminUtilities ? (
+                      <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>
+                        Preview Live
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="admin-btn-secondary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none"
+                      onClick={onRefresh}
+                      disabled={refreshing}
+                    >
+                      <FitdogDashboardIcon src={FITDOG_UI.refresh} size={18} alt="" />
+                      {refreshing ? "Refreshing…" : "Refresh"}
+                    </button>
+                    {canSeeAdminUtilities ? (
+                      <button
+                        type="button"
+                        className="admin-btn-secondary flex-1 sm:flex-none"
+                        onClick={onCastRefresh}
+                        disabled={castRefreshing || !onCastRefresh}
+                        title="Force a hard reload on every active Chromecast and TV display"
+                      >
+                        {castRefreshing ? "Refreshing TVs…" : "Hard Refresh Cast TVs"}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="admin-btn-primary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none"
+                      onClick={onOpenBoard}
+                    >
+                      <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
+                      {isDemo
+                        ? "Open Demo Whiteboard"
+                        : board === "marketing"
+                          ? "Open CAST-TV"
+                          : board === "staff"
+                            ? "Open Staff Whiteboard"
+                            : "Open Lobby Whiteboard"}
+                    </button>
+                  </div>
+                  <ThemeToggle />
+                  <div className="admin-header-brand">
+                    <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
+                    <div>
+                      <p className="admin-header-brand__label">FITDOG</p>
+                      <p className="text-xs font-bold text-white">Admin Center</p>
+                    </div>
                   </div>
                 </div>
                 <p className="text-xs text-admin-muted">{savedLabel}</p>
-                <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
-                  {canSeeAdminUtilities ? <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>Preview Live</button> : null}
-                  <button type="button" className="admin-btn-secondary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none" onClick={onRefresh} disabled={refreshing}>
-                    <FitdogDashboardIcon src={FITDOG_UI.refresh} size={18} alt="" />
-                    {refreshing ? "Refreshing…" : "Refresh"}
-                  </button>
-                  {canSeeAdminUtilities ? (
-                    <button
-                      type="button"
-                      className="admin-btn-secondary flex-1 sm:flex-none"
-                      onClick={onCastRefresh}
-                      disabled={castRefreshing || !onCastRefresh}
-                      title="Force a hard reload on every active Chromecast and TV display"
-                    >
-                      {castRefreshing ? "Refreshing TVs…" : "Hard Refresh Cast TVs"}
-                    </button>
-                  ) : null}
-                  <button type="button" className="admin-btn-primary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none" onClick={onOpenBoard}>
-                    <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
-                    {isDemo
-                      ? "Open Demo Whiteboard"
-                      : board === "marketing"
-                        ? "Open CAST-TV"
-                        : board === "staff"
-                          ? "Open Staff Whiteboard"
-                          : "Open Lobby Whiteboard"}
-                  </button>
-                </div>
               </div>
             </div>
           </header>

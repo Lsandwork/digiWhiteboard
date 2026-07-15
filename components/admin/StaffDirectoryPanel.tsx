@@ -291,7 +291,7 @@ export function StaffDirectoryPanel() {
                     </td>
                     <td className="px-4 py-3">
                       {member.admin_user_id ? (
-                        <span className="admin-badge admin-badge--green">{dashboardRoleLabels[member.dashboard_role ?? "viewer"]}</span>
+                        <span className="admin-badge admin-badge--info">{dashboardRoleLabels[member.dashboard_role ?? "viewer"]}</span>
                       ) : (
                         <span className="admin-badge opacity-70">No login</span>
                       )}
@@ -333,13 +333,13 @@ export function StaffDirectoryPanel() {
 
           <div className="grid gap-3 p-4 md:hidden">
             {members.map((member) => (
-              <article key={member.id} className="rounded-2xl border border-admin-border bg-white/[0.03] p-4">
+              <article key={member.id} className="rounded-2xl border border-admin-border bg-[var(--surface)] p-4 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-fitdog-orange/20 text-fitdog-orange">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-fitdog-orange/15 text-fitdog-orange">
                     <UserRound className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-white">{member.name}</p>
+                    <p className="font-bold text-[var(--text-primary)]">{member.name}</p>
                     <p className="text-sm text-admin-muted">{member.role ?? "Staff Member"} • {member.department}</p>
                     <p className="mt-2 text-xs text-admin-muted">{member.email ?? "No email"} • {member.phone ?? "No phone"}</p>
                     <p className="mt-2 text-xs text-admin-muted">
@@ -360,13 +360,13 @@ export function StaffDirectoryPanel() {
         </div>
 
         <section className="admin-card p-5">
-          <h3 className="text-lg font-black text-white">Recent Directory Activity</h3>
+          <h3 className="text-lg font-black text-[var(--text-primary)]">Recent Directory Activity</h3>
           <div className="mt-4 grid gap-3">
             {(data?.activity_logs ?? []).filter((item) => item.activity_type.startsWith("staff_directory")).slice(0, 8).map((item) => (
               <div key={item.id} className="flex gap-3 text-sm">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
                 <div>
-                  <p className="font-semibold text-white">{item.title}</p>
+                  <p className="font-semibold text-[var(--text-primary)]">{item.title}</p>
                   <p className="text-xs text-admin-muted">{item.created_by ?? "Admin"} • {formatDateTime(item.created_at)}</p>
                 </div>
               </div>
@@ -741,7 +741,5 @@ function FilterButtonGroup({ label, value, options, allLabel, onChange }: { labe
 }
 
 function choiceButtonClass(selected: boolean) {
-  return selected
-    ? "rounded-xl border border-fitdog-orange bg-fitdog-orange/15 px-3 py-2 text-sm font-bold text-white shadow-[0_0_0_1px_rgba(241,95,42,0.25)]"
-    : "rounded-xl border border-admin-border bg-white/[0.03] px-3 py-2 text-sm font-bold text-admin-muted transition hover:border-fitdog-orange/60 hover:text-white";
+  return selected ? "admin-filter-chip admin-filter-chip--active shrink-0" : "admin-filter-chip shrink-0";
 }

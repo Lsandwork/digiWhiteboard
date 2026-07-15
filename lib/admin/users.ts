@@ -283,6 +283,7 @@ export type AdminUserRecord = {
   updated_at: string;
   created_by: string | null;
   avatar_url?: string | null;
+  theme_preference?: "light" | "dark";
 };
 
 export type AdminUserPublic = Omit<AdminUserRecord, "password_hash">;

@@ -10,6 +10,7 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { hasPermission, hasRole, legacyRoleToRoleKey } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { listAdminUsers } from "@/lib/admin/users";
+import { listCommissionTrainerOptions } from "@/lib/staff/commission-ledger/trainers";
 import {
   acknowledgeTrainerStatement,
   bulkUpdateCommissionRecords,
@@ -164,11 +165,7 @@ export async function GET(request: Request) {
   const view = url.searchParams.get("view") ?? "ledger";
 
   try {
-    const trainers = canManage
-      ? (await listAdminUsers(supabase))
-          .filter((user) => user.role === "trainer" && user.status !== "disabled")
-          .map((user) => ({ id: user.id, full_name: user.full_name, email: user.email }))
-      : [];
+    const trainers = canManage ? listCommissionTrainerOptions(await listAdminUsers(supabase)) : [];
 
     if (view === "record") {
       const id = url.searchParams.get("id") ?? "";
@@ -366,9 +363,7 @@ export async function POST(request: Request) {
 
     if (action === "import_csv") {
       if (!canManage) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-      const trainers = (await listAdminUsers(supabase))
-        .filter((user) => user.role === "trainer" && user.status !== "disabled")
-        .map((user) => ({ id: user.id, full_name: user.full_name, email: user.email }));
+      const trainers = listCommissionTrainerOptions(await listAdminUsers(supabase));
       const result = await importCommissionCsvToLedger(supabase, viewer, actor, {
         csvText: String(body.csv ?? ""),
         filename: body.filename != null ? String(body.filename) : "upload.csv",

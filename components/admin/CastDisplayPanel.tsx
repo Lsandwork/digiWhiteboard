@@ -145,7 +145,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
         </div>
 
         <p className="mt-4 rounded-xl border border-admin-border bg-ink-950/40 px-4 py-3 text-sm text-admin-muted">
-          <span className="font-semibold text-white">{displayTypeLabel(displayType)} — Cast Mode</span>
+          <span className="font-semibold admin-text-emphasis">{displayTypeLabel(displayType)} — Cast Mode</span>
           <span className="mx-2 text-admin-muted">·</span>
           <code className="text-xs text-emerald-300">{castLiteUrl}</code>
         </p>
@@ -155,7 +155,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
       </section>
 
       <section className="admin-card p-5">
-        <h3 className="text-lg font-black text-white">Keep Cast From Disconnecting</h3>
+        <h3 className="text-lg font-black admin-text-emphasis">Keep Cast From Disconnecting</h3>
         <p className="mt-2 text-sm text-admin-muted">
           To prevent disconnection, keep the casting computer awake, keep Chrome open, keep this tab active when
           possible, and use strong Wi-Fi. For best reliability, open the display URL directly on the Google TV
@@ -163,7 +163,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
         </p>
         <ul className="mt-4 grid gap-2 sm:grid-cols-2">
           {SETUP_CHECKLIST.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-sm text-slate-200">
+            <li key={item} className="flex items-start gap-2 text-sm text-[var(--text-secondary)]">
               <span className="mt-0.5 text-fitdog-orange" aria-hidden>
                 ✓
               </span>
@@ -176,7 +176,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
       <section className="admin-card p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-black text-white">Connected Displays</h3>
+            <h3 className="text-lg font-black admin-text-emphasis">Connected Displays</h3>
             <p className="text-sm text-admin-muted">Cast Keeper heartbeat status for {displayTypeLabel(displayType)}.</p>
           </div>
           <button
@@ -215,7 +215,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
                         <div className="flex items-center gap-2">
                           <MonitorPlay className="h-4 w-4 text-fitdog-orange" />
                           <div>
-                            <p className="font-semibold text-white">{device.name ?? "Cast display"}</p>
+                            <p className="font-semibold admin-text-emphasis">{device.name ?? "Cast display"}</p>
                             <p className="text-xs text-admin-muted">{device.current_route ?? "—"}</p>
                           </div>
                         </div>

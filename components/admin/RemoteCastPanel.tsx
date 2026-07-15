@@ -206,9 +206,9 @@ export function RemoteCastPanel() {
           Schedule: displays auto-wake 5:00 AM–10:00 PM Pacific, 7 days a week, and go to standby overnight.
           No manual refresh is required for the morning power-on (receiver page must stay open on the TV).
         </p>
-        <p className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-admin-muted">
+        <p className="mt-3 admin-surface-inset p-3 text-sm text-admin-muted">
           Remote Cast works when the TV/display has the Fitdog receiver page open at{" "}
-          <span className="font-mono text-white">/cast/receiver</span>. This does not require the admin to be on the
+          <span className="font-mono admin-text-emphasis">/cast/receiver</span>. This does not require the admin to be on the
           same Wi-Fi.
         </p>
       </header>
@@ -216,7 +216,7 @@ export function RemoteCastPanel() {
       <section className="admin-card p-5">
         <div className="mb-4 flex items-center gap-2">
           <Plus className="h-5 w-5 text-fitdog-orange" />
-          <h3 className="text-lg font-black text-white">Pair New Display</h3>
+          <h3 className="text-lg font-black admin-text-emphasis">Pair New Display</h3>
         </div>
         <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
           <div>
@@ -252,7 +252,7 @@ export function RemoteCastPanel() {
 
       <section className="admin-card p-5">
         <div className="mb-4 flex items-center justify-between gap-2">
-          <h3 className="text-lg font-black text-white">Quick Actions</h3>
+          <h3 className="text-lg font-black admin-text-emphasis">Quick Actions</h3>
           <span className="text-sm text-admin-muted">{onlineCount} online</span>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -273,7 +273,7 @@ export function RemoteCastPanel() {
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-black text-white">Paired Displays</h3>
+          <h3 className="text-lg font-black admin-text-emphasis">Paired Displays</h3>
           <button type="button" className="admin-btn-ghost text-sm" onClick={() => void load()}>
             <RefreshCw className="mr-1 inline h-4 w-4" /> Refresh list
           </button>
@@ -284,7 +284,7 @@ export function RemoteCastPanel() {
         {!loading && !receivers.length && !loadError ? (
           <div className="admin-card p-8 text-center">
             <MonitorSmartphone className="mx-auto h-10 w-10 text-admin-muted" />
-            <p className="mt-3 text-white">No displays yet.</p>
+            <p className="mt-3 admin-text-emphasis">No displays yet.</p>
             <p className="mt-1 text-sm text-admin-muted">
               Open <span className="font-mono">/cast/receiver</span> on a TV or mini-PC, then pair it with the code
               shown.
@@ -316,10 +316,10 @@ export function RemoteCastPanel() {
                         </button>
                       </div>
                     ) : (
-                      <p className="truncate text-xl font-black text-white">{receiver.displayName ?? "Unnamed Display"}</p>
+                      <p className="truncate text-xl font-black admin-text-emphasis">{receiver.displayName ?? "Unnamed Display"}</p>
                     )}
                     <p className="mt-1 text-sm text-admin-muted">
-                      Showing: <span className="font-semibold text-white">{screenLabel(receiver.activeScreen)}</span>
+                      Showing: <span className="font-semibold admin-text-emphasis">{screenLabel(receiver.activeScreen)}</span>
                     </p>
                     <p className="text-xs text-admin-muted">Last seen {timeAgo(receiver.lastSeenAt)}</p>
                   </div>
