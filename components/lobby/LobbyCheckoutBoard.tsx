@@ -20,6 +20,7 @@ import {
   BOARD_FULL_SYNC_POLL_MS,
   BOARD_REALTIME_DEBOUNCE_MS,
   BOARD_SETTINGS_POLL_MS,
+  EMPTY_BASKET_CONFIRM_POLLS,
   clampCheckoutPollMs
 } from "@/lib/board-checkout-merge";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
@@ -62,7 +63,7 @@ const emptyCheckouts: LobbyCheckoutsResponse = {
 
 type LobbyDisplayMode = "IDLE" | "CHECKOUT_ACTIVE";
 
-const LOBBY_EMPTY_CHECKOUT_GRACE_MS = 25_000;
+const LOBBY_EMPTY_CHECKOUT_GRACE_MS = 4000;
 
 function freshBoardUrl(url: string) {
   return `${url}${url.includes("?") ? "&" : "?"}fresh=1`;
@@ -169,7 +170,8 @@ export function LobbyCheckoutBoard({
       incomingDogs.length === 0 &&
       lastEmptySyncAtMsRef.current != null &&
       now - lastEmptySyncAtMsRef.current < LOBBY_EMPTY_CHECKOUT_GRACE_MS;
-    checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2 && !emptyGraceActive;
+    checkoutBasketEmptyRef.current =
+      emptyBasketStreakRef.current >= EMPTY_BASKET_CONFIRM_POLLS && !emptyGraceActive;
 
     const nextSticky = mergeStickyLobbyCheckouts(
       stickyCheckoutRef.current,
@@ -178,7 +180,7 @@ export function LobbyCheckoutBoard({
       {
         basketAuthoritative: checkoutBasketFilteredRef.current,
         basketConfirmedEmpty: checkoutBasketEmptyRef.current,
-        pruneMissingFromBasket: source === "full" && !emptyGraceActive,
+        pruneMissingFromBasket: checkoutBasketFilteredRef.current && !emptyGraceActive,
         skipExpiry: true
       }
     );

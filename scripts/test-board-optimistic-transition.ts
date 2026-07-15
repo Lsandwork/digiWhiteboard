@@ -35,14 +35,27 @@ const emptyBoard: LiveBoardResponse = {
   last_updated: "2026-07-01T12:00:00.000Z"
 };
 
+const recentMs = Date.now();
+
 const webhookCheckout = dog({
-  id: "dog-out",
   current_status: "checking_out",
   display_status: "checking_out",
+  status_started_at: new Date(recentMs).toISOString(),
+  updated_at: new Date(recentMs).toISOString(),
   raw_payload: { source: "gingr_webhook", webhook_type: "checking_out" }
 });
 
-assert.equal(includePromptedCheckoutInBoard(webhookCheckout, new Set()), true);
+assert.equal(includePromptedCheckoutInBoard(webhookCheckout, new Set(), recentMs), true);
+
+const staleCheckout = dog({
+  current_status: "checking_out",
+  display_status: "checking_out",
+  status_started_at: "2020-01-01T12:00:00.000Z",
+  updated_at: "2020-01-01T12:00:00.000Z",
+  raw_payload: { source: "gingr_webhook", webhook_type: "checking_out" }
+});
+assert.equal(includePromptedCheckoutInBoard(staleCheckout, new Set(), recentMs), false);
+assert.equal(includePromptedCheckoutInBoard(staleCheckout, new Set(["res:res-1"]), recentMs), true);
 assert.equal(
   includePromptedCheckoutInBoard(
     dog({

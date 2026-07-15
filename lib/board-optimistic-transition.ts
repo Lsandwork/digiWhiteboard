@@ -13,7 +13,7 @@ export function applyOptimisticLiveBoardTransition(
 ): LiveBoardResponse | null {
   if (!next?.id) return null;
 
-  if (next.hidden || next.display_status === "removed") {
+  if (next.hidden || next.display_status === "removed" || next.current_status === "basket_cleared") {
     const checkingIn = withoutDog(previous.checking_in, next.id);
     const checkingOut = withoutDog(previous.checking_out, next.id);
     if (checkingIn.length === previous.checking_in.length && checkingOut.length === previous.checking_out.length) {

@@ -34,7 +34,7 @@ import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
   expireStickyCheckoutDogs,
@@ -352,7 +352,7 @@ export function BoardClient({
       {
         basketAuthoritative: checkoutBasketFilteredRef.current,
         basketConfirmedEmpty: checkoutBasketEmptyRef.current,
-        pruneMissingFromBasket: source === "full",
+        pruneMissingFromBasket: checkoutBasketFilteredRef.current,
         skipExpiry: true
       }
     );
@@ -449,22 +449,16 @@ export function BoardClient({
       } else {
         emptyBasketStreakRef.current = 0;
       }
-      checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2;
+      checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= EMPTY_BASKET_CONFIRM_POLLS;
 
       setBoard((previous) => {
         // The fast endpoint includes webhook-sourced check-ins as well as
         // prompted checkouts, so both columns can update without waiting for
         // the heavier Gingr-backed full-board request.
         const nextCheckins = preserveDogPhotos(previous.checking_in, data.checking_in ?? []);
-        // When Gingr basket filtering is authoritative, replace (don't ghost-merge) after empty streak.
-        const nextRaw =
-          data.basket_filtered && checkoutBasketEmptyRef.current
-            ? data.checking_out
-            : data.basket_filtered
-              ? data.checking_out.length
-                ? data.checking_out
-                : previous.checking_out
-              : mergeCheckoutDogs(previous.checking_out, data.checking_out);
+        const nextRaw = data.basket_filtered
+          ? data.checking_out
+          : mergeCheckoutDogs(previous.checking_out, data.checking_out);
         const nextCheckouts = preserveDogPhotos(previous.checking_out, nextRaw);
         if (
           areCheckoutListsEquivalent(previous.checking_in, nextCheckins) &&
@@ -546,7 +540,7 @@ export function BoardClient({
         } else {
           emptyBasketStreakRef.current = 0;
         }
-        checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= 2;
+        checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= EMPTY_BASKET_CONFIRM_POLLS;
       } else {
         checkoutPollSourceRef.current = "full";
         checkoutBasketFilteredRef.current = false;

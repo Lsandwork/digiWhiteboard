@@ -15,6 +15,12 @@ export const BOARD_SETTINGS_POLL_MS = 30_000;
 export const BOARD_FETCH_TIMEOUT_MS = 10000;
 export const BOARD_FAST_FETCH_TIMEOUT_MS = 4000;
 
+/** Consecutive empty basket polls before clearing all checkout rows (1 = immediate). */
+export const EMPTY_BASKET_CONFIRM_POLLS = 1;
+
+/** Webhook checkouts may show briefly before the Gingr basket cache includes them. */
+export const WEBHOOK_BASKET_ADD_GRACE_MS = 12_000;
+
 export function sortCheckoutDogs(dogs: LiveDog[]) {
   return [...dogs].sort(
     (a, b) => new Date(a.status_started_at ?? a.updated_at).getTime() - new Date(b.status_started_at ?? b.updated_at).getTime()
@@ -118,9 +124,23 @@ export function isFastWebhookTransition(dog: LiveDog) {
   return dog.raw_payload?.source === "gingr_webhook";
 }
 
-/** Webhook rows appear immediately; Gingr-sourced rows still require basket membership. */
-export function includePromptedCheckoutInBoard(dog: LiveDog, gingrCheckoutKeys: Set<string>) {
-  return isFastWebhookTransition(dog) || isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys);
+export function isWebhookCheckoutWithinAddGrace(dog: LiveDog, nowMs = Date.now()) {
+  if (!isFastWebhookTransition(dog) || dog.display_status !== "checking_out") return false;
+  const started = dog.status_started_at ?? dog.updated_at;
+  if (!started) return false;
+  const startedMs = new Date(started).getTime();
+  return Number.isFinite(startedMs) && nowMs - startedMs <= WEBHOOK_BASKET_ADD_GRACE_MS;
+}
+
+/** Show when in basket, or briefly after webhook prompt while basket cache catches up. */
+export function shouldShowCheckoutAgainstBasket(dog: LiveDog, gingrCheckoutKeys: Set<string>, nowMs = Date.now()) {
+  if (isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)) return true;
+  return isWebhookCheckoutWithinAddGrace(dog, nowMs);
+}
+
+/** Webhook rows appear immediately on prompt; drop once cleared from basket. */
+export function includePromptedCheckoutInBoard(dog: LiveDog, gingrCheckoutKeys: Set<string>, nowMs = Date.now()) {
+  return shouldShowCheckoutAgainstBasket(dog, gingrCheckoutKeys, nowMs);
 }
 
 /** Drop Gingr-sourced rows cleared from the checkout basket; keep webhook rows for fast display. */

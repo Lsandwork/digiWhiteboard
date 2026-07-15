@@ -5,8 +5,10 @@ import {
   buildGingrCheckoutKeySet,
   mergeCheckoutDogs,
   reconcileGingrSourcedCheckouts,
+  shouldShowCheckoutAgainstBasket,
   sortCheckoutDogs
 } from "@/lib/board-checkout-merge";
+import { hideBasketClearedCheckoutRows } from "@/lib/basket-cleared-checkout";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
@@ -68,8 +70,13 @@ function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[]) {
 
   if (gingrCheckoutKeys) {
     basketFiltered = true;
-    // Keep webhook rows visible while Gingr basket cache catches up.
+    // Keep webhook rows visible while Gingr basket cache catches up on add;
+    // drop them immediately once the basket no longer includes the dog.
     visibleCheckouts = reconcileGingrSourcedCheckouts(visibleCheckouts, gingrCheckouts);
+    const nowMs = now.getTime();
+    visibleCheckouts = visibleCheckouts.filter(
+      (dog) => dog.display_status !== "checking_out" || shouldShowCheckoutAgainstBasket(dog, gingrCheckoutKeys, nowMs)
+    );
   }
 
   return { visibleCheckouts, basketFiltered };
@@ -213,4 +220,14 @@ export async function loadFastBoardTransitions(
     basket_cleared_rows: 0,
     data_source: "supabase_live_transition_dogs"
   };
+}
+
+/** Hide Supabase checkout rows cleared from the cached Gingr basket (no live Gingr call). */
+export async function reconcileCachedBasketClears(
+  supabase: SupabaseClient,
+  now = new Date()
+) {
+  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now, loadCachedGingrCheckoutDogs(now));
+  if (!gingrCheckoutKeys) return { hidden_count: 0 };
+  return hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, now);
 }

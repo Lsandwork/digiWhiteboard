@@ -1,5 +1,7 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import { reconcileCachedBasketClears } from "@/lib/board-fast-checkout";
+import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import { sanitizeLobbyCheckouts } from "@/lib/lobby/validate";
@@ -66,6 +68,16 @@ export async function GET(request: Request) {
 
     if (fresh) setTtlCache(cacheKey, checkout, FAST_CHECKOUT_CACHE_TTL_MS);
     setTtlCache(lastGoodKey, payload, 120_000);
+
+    if (fast) {
+      after(async () => {
+        const cleared = await reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 }));
+        if (cleared.hidden_count > 0) {
+          invalidateBoardTransitionCaches();
+        }
+      });
+    }
+
     debugBoardLog(debugBoard, "lobby checkouts ok", {
       fast,
       durationMs: Date.now() - startedAt,

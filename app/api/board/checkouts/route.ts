@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { loadFastBoardTransitions } from "@/lib/board-fast-checkout";
-import { FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import { loadFastBoardTransitions, reconcileCachedBasketClears } from "@/lib/board-fast-checkout";
+import { FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -56,6 +56,14 @@ export async function GET(request: Request) {
 
     if (fresh) setTtlCache("board-checkouts:fast", result, FAST_CHECKOUT_CACHE_TTL_MS);
     setTtlCache(LAST_GOOD_KEY, payload, 120_000);
+
+    after(async () => {
+      const supabase = getServiceSupabase();
+      const cleared = await reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 }));
+      if (cleared.hidden_count > 0) {
+        invalidateBoardTransitionCaches();
+      }
+    });
 
     if (result.checking_out.length) {
       after(async () => {
