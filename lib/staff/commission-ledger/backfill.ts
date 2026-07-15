@@ -4,6 +4,18 @@ import { computeMissingRequired } from "./map";
 
 const LEGACY_KEY = "package_commissions";
 
+function isMissingLedgerTableError(message: string) {
+  return (
+    /relation .* does not exist/i.test(message) ||
+    /schema cache/i.test(message) ||
+    /package_commission_records/i.test(message)
+  );
+}
+
+export function missingLedgerTablesMessage() {
+  return "Package commission ledger tables are missing. Apply migration 034_package_commissions_ledger.sql to Supabase, then refresh.";
+}
+
 function mapLegacyStatus(status: string): {
   review_status: string;
   approval_status: string;
@@ -46,10 +58,8 @@ export async function ensureCommissionLedgerBackfill(supabase: SupabaseClient) {
 
   // If table missing, caller surfaces error.
   if (countError) {
-    if (/relation .* does not exist/i.test(countError.message)) {
-      throw new Error(
-        "Package commission ledger tables are missing. Apply migration 034_package_commissions_ledger.sql."
-      );
+    if (isMissingLedgerTableError(countError.message)) {
+      throw new Error(missingLedgerTablesMessage());
     }
     throw new Error(countError.message);
   }
@@ -147,7 +157,12 @@ export async function ensureCommissionLedgerBackfill(supabase: SupabaseClient) {
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize);
     const { error } = await supabase.from("package_commission_records").insert(chunk);
-    if (error) throw new Error(`Backfill failed: ${error.message}`);
+    if (error) {
+      if (isMissingLedgerTableError(error.message)) {
+        throw new Error(missingLedgerTablesMessage());
+      }
+      throw new Error(`Backfill failed: ${error.message}`);
+    }
     inserted += chunk.length;
   }
 
