@@ -115,6 +115,7 @@ export type CommissionListFilters = {
   packageOrClass?: string;
   importBatchId?: string;
   payrollPeriodId?: string;
+  trainerNames?: string[];
   source?: CommissionSource[];
   hasComments?: boolean;
   hasOpenComments?: boolean;

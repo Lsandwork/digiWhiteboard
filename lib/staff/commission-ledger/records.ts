@@ -104,8 +104,19 @@ function applyListFilters(
       q = q.eq("trainer_user_id", "00000000-0000-0000-0000-000000000000");
     }
   }
-  if (filters.trainerIds?.length) {
-    q = q.in("trainer_user_id", filters.trainerIds);
+  if (filters.trainerIds?.length || filters.trainerNames?.length) {
+    const parts: string[] = [];
+    if (filters.trainerIds?.length) {
+      parts.push(`trainer_user_id.in.(${filters.trainerIds.join(",")})`);
+    }
+    for (const name of filters.trainerNames ?? []) {
+      parts.push(`trainer_name.ilike.%${name.replace(/,/g, "").trim()}%`);
+    }
+    if (parts.length === 1 && filters.trainerIds?.length && !(filters.trainerNames?.length)) {
+      q = q.in("trainer_user_id", filters.trainerIds);
+    } else if (parts.length > 0) {
+      q = q.or(parts.join(","));
+    }
   }
   const dateField = filters.dateField ?? "sale_date";
   if (filters.dateFrom) q = q.gte(dateField, filters.dateFrom);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle2,
@@ -39,6 +39,7 @@ type LedgerPayload = {
   trainers?: TrainerOption[];
   canManage: boolean;
   canComment: boolean;
+  report?: CommissionReportPayload;
   currentUser?: {
     email: string | null;
     role: string | null;
@@ -57,7 +58,46 @@ type TabKey =
   | "rules"
   | "reports";
 
-function statusPill(label: string, tone: "amber" | "green" | "sky" | "rose" | "slate" | "orange") {
+type CommissionReportPayload = {
+  reportType: string;
+  title: string;
+  generatedAt: string;
+  dateRange: { from: string | null; to: string | null; field: string };
+  totals: {
+    records: number;
+    grossSales: string;
+    commission: string;
+    refund: string;
+  };
+  byTrainer: Array<{
+    trainerName: string;
+    trainerEmail: string | null;
+    records: number;
+    grossSales: string;
+    commission: string;
+  }>;
+  byType: Array<{
+    commissionType: string;
+    records: number;
+    grossSales: string;
+    commission: string;
+  }>;
+  rows: PackageCommissionRecord[];
+};
+
+type ReportTypeKey =
+  | "trainer_statement"
+  | "package_summary"
+  | "class_summary"
+  | "pending_approval"
+  | "refund_report"
+  | "date_range";
+
+function statusPill(
+  label: string,
+  tone: "amber" | "green" | "sky" | "rose" | "slate" | "orange",
+  large = false
+) {
   const tones = {
     amber: "bg-amber-500/15 text-amber-100 border-amber-400/30",
     green: "bg-emerald-500/15 text-emerald-100 border-emerald-400/30",
@@ -67,7 +107,11 @@ function statusPill(label: string, tone: "amber" | "green" | "sky" | "rose" | "s
     orange: "bg-orange-500/15 text-orange-100 border-orange-400/30"
   };
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tones[tone]}`}>
+    <span
+      className={`inline-flex rounded-full border font-bold uppercase tracking-wide ${tones[tone]} ${
+        large ? "px-3 py-1 text-base" : "px-2 py-0.5 text-[10px]"
+      }`}
+    >
       {label}
     </span>
   );
@@ -90,6 +134,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     ids: string[];
   } | null>(null);
   const [bulkReason, setBulkReason] = useState("");
+  const lastSelectedRowIndexRef = useRef<number | null>(null);
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<{
     record: PackageCommissionRecord;
@@ -123,6 +168,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   });
 
   const tab = (searchParams.get("pcTab") as TabKey) || "ledger";
+  const reportType = (searchParams.get("pcReport") as ReportTypeKey) || "trainer_statement";
   const page = Number(searchParams.get("page") ?? 1);
   const q = searchParams.get("q") ?? "";
   const dateFrom = searchParams.get("dateFrom") ?? "";
@@ -135,9 +181,23 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
   const somePageSelected = pageRowIds.some((id) => selected.includes(id)) && !allPageSelected;
 
-  const toggleRowSelection = useCallback((id: string, checked: boolean) => {
-    setSelected((current) => (checked ? [...new Set([...current, id])] : current.filter((rowId) => rowId !== id)));
-  }, []);
+  const toggleRowSelection = useCallback(
+    (rowId: string, rowIndex: number, checked: boolean, shiftKey: boolean) => {
+      if (!canManage) return;
+      setSelected((current) => {
+        if (shiftKey && lastSelectedRowIndexRef.current !== null) {
+          const anchor = lastSelectedRowIndexRef.current;
+          const start = Math.min(anchor, rowIndex);
+          const end = Math.max(anchor, rowIndex);
+          const rangeIds = pageRowIds.slice(start, end + 1);
+          return [...new Set([...current, ...rangeIds])];
+        }
+        lastSelectedRowIndexRef.current = rowIndex;
+        return checked ? [...new Set([...current, rowId])] : current.filter((id) => id !== rowId);
+      });
+    },
+    [canManage, pageRowIds]
+  );
 
   const toggleSelectAllOnPage = useCallback(
     (checked: boolean) => {
@@ -180,11 +240,40 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
       if (tab === "rules" || tab === "payroll" || tab === "imports") {
         params.set("view", tab === "rules" ? "rules" : tab === "payroll" ? "payroll" : "imports");
       }
+      if (tab === "reports") {
+        params.set("view", "report");
+        params.set("reportType", reportType);
+        params.set("pageSize", "5000");
+      }
 
       const response = await fetch(`/api/admin/package-commissions?${params.toString()}`, { cache: "no-store" });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load commissions.");
-      if (tab === "ledger" || tab === "needs_review" || tab === "approval" || tab === "reports") {
+      if (tab === "reports") {
+        setData({
+          rows: body.report?.rows ?? [],
+          total: body.report?.rows?.length ?? 0,
+          page: 1,
+          pageSize: body.report?.rows?.length ?? 0,
+          summaryDisplay: body.report
+            ? {
+                grossSales: body.report.totals.grossSales,
+                totalCommissions: body.report.totals.commission,
+                pendingReview: "$0.00",
+                approved: "$0.00",
+                readyForPayroll: "$0.00",
+                paid: "$0.00",
+                refunded: body.report.totals.refund,
+                openQuestions: 0
+              }
+            : undefined,
+          report: body.report,
+          trainers: body.trainers ?? [],
+          canManage: body.canManage ?? false,
+          canComment: false,
+          currentUser: data?.currentUser
+        });
+      } else if (tab === "ledger" || tab === "needs_review" || tab === "approval") {
         setData(body as LedgerPayload);
       } else {
         setData((current) => ({
@@ -206,7 +295,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     } finally {
       setLoading(false);
     }
-  }, [searchParams, showToast, tab]);
+  }, [searchParams, showToast, tab, reportType]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -215,6 +304,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
   useEffect(() => {
     setSelected([]);
+    lastSelectedRowIndexRef.current = null;
   }, [page, tab]);
 
   async function postAction(payload: Record<string, unknown>) {
@@ -479,11 +569,14 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </button>
           </div>
 
+          {tab !== "reports" ? (
+          <>
           {canManage ? (
             <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#0b1220]/95 p-3 backdrop-blur">
               <label className="inline-flex items-center gap-2 text-sm text-white">
                 <input
                   type="checkbox"
+                  className="h-6 w-6"
                   checked={allPageSelected}
                   ref={(el) => {
                     if (el) el.indeterminate = somePageSelected;
@@ -494,7 +587,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 <span>
                   {selected.length > 0
                     ? `${selected.length} selected`
-                    : "Select rows for bulk actions"}
+                    : "Select rows · Shift+click a second row to select the range"}
                 </span>
               </label>
               {bulkActions.map((entry) => (
@@ -527,13 +620,14 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           ) : null}
 
           <div className="overflow-auto rounded-xl border border-white/10">
-            <table className="min-w-[1400px] w-full border-collapse text-left text-sm">
+            <table className="min-w-[1800px] w-full border-collapse text-left">
               <thead className="sticky top-0 z-10 bg-[#0b1220]">
-                <tr className="border-b border-white/10 text-[11px] uppercase tracking-wide text-admin-muted">
+                <tr className="border-b border-white/10 text-lg uppercase tracking-wide text-admin-muted">
                   {canManage ? (
-                    <th className="px-3 py-3">
+                    <th className="px-4 py-4">
                       <input
                         type="checkbox"
+                        className="h-6 w-6"
                         checked={allPageSelected}
                         ref={(el) => {
                           if (el) el.indeterminate = somePageSelected;
@@ -543,20 +637,20 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       />
                     </th>
                   ) : null}
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Trainer</th>
-                  <th className="px-3 py-3">Sale Date</th>
-                  <th className="px-3 py-3">Client</th>
-                  <th className="px-3 py-3">Dog</th>
-                  <th className="px-3 py-3">Type / Package</th>
-                  <th className="px-3 py-3">Gross</th>
-                  <th className="px-3 py-3">Rate</th>
-                  <th className="px-3 py-3">Final</th>
-                  <th className="px-3 py-3">Source</th>
-                  <th className="px-3 py-3">Comments</th>
+                  <th className="px-4 py-4">Status</th>
+                  <th className="px-4 py-4">Trainer</th>
+                  <th className="px-4 py-4">Sale Date</th>
+                  <th className="px-4 py-4">Client</th>
+                  <th className="px-4 py-4">Dog</th>
+                  <th className="px-4 py-4">Type / Package</th>
+                  <th className="px-4 py-4">Gross</th>
+                  <th className="px-4 py-4">Rate</th>
+                  <th className="px-4 py-4">Final</th>
+                  <th className="px-4 py-4">Source</th>
+                  <th className="px-4 py-4">Comments</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="text-3xl leading-snug">
                 {loading ? (
                   <tr>
                     <td colSpan={12} className="px-4 py-8 text-admin-muted">
@@ -570,49 +664,64 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                     </td>
                   </tr>
                 ) : (
-                  data.rows.map((row) => {
+                  data.rows.map((row, rowIndex) => {
                     const isSelected = selected.includes(row.id);
                     return (
                     <tr
                       key={row.id}
                       className={`cursor-pointer border-b border-white/5 hover:bg-white/5 ${isSelected ? "bg-fitdog-orange/10" : ""}`}
-                      onClick={() => void openDrawer(row.id)}
+                      onClick={(e) => {
+                        if (canManage && e.shiftKey) {
+                          e.preventDefault();
+                          toggleRowSelection(row.id, rowIndex, true, true);
+                          return;
+                        }
+                        void openDrawer(row.id);
+                      }}
                     >
                       {canManage ? (
-                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
+                            className="h-6 w-6"
                             checked={isSelected}
                             aria-label={`Select commission for ${row.dog_name}`}
-                            onChange={(e) => toggleRowSelection(row.id, e.target.checked)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (e.shiftKey) {
+                                toggleRowSelection(row.id, rowIndex, true, true);
+                                return;
+                              }
+                              toggleRowSelection(row.id, rowIndex, !isSelected, false);
+                            }}
                           />
                         </td>
                       ) : null}
-                      <td className="px-3 py-3">
-                        <div className="flex flex-col gap-1">
-                          {statusPill(row.approval_status.replace(/_/g, " "), row.approval_status === "approved" ? "green" : row.approval_status === "rejected" ? "rose" : "amber")}
-                          {statusPill(row.payment_status.replace(/_/g, " "), row.payment_status === "paid" ? "sky" : "slate")}
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col gap-2">
+                          {statusPill(row.approval_status.replace(/_/g, " "), row.approval_status === "approved" ? "green" : row.approval_status === "rejected" ? "rose" : "amber", true)}
+                          {statusPill(row.payment_status.replace(/_/g, " "), row.payment_status === "paid" ? "sky" : "slate", true)}
                           {row.review_status === "needs_review" || row.has_open_comments
-                            ? statusPill("needs review", "orange")
+                            ? statusPill("needs review", "orange", true)
                             : null}
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-white">{row.trainer_name}</td>
-                      <td className="px-3 py-3">{row.sale_date ?? "—"}</td>
-                      <td className="px-3 py-3">{row.client_name}</td>
-                      <td className="px-3 py-3 font-semibold text-white">{row.dog_name}</td>
-                      <td className="px-3 py-3">
-                        <div className="text-[11px] uppercase text-admin-muted">{row.commission_type.replace(/_/g, " ")}</div>
+                      <td className="px-4 py-4 text-white">{row.trainer_name}</td>
+                      <td className="px-4 py-4">{row.sale_date ?? "—"}</td>
+                      <td className="px-4 py-4">{row.client_name}</td>
+                      <td className="px-4 py-4 font-semibold text-white">{row.dog_name}</td>
+                      <td className="px-4 py-4">
+                        <div className="text-xl uppercase text-admin-muted">{row.commission_type.replace(/_/g, " ")}</div>
                         <div>{row.package_or_class}</div>
                       </td>
-                      <td className="px-3 py-3">{centsToDisplay(row.gross_amount_cents)}</td>
-                      <td className="px-3 py-3">{bpsToDisplay(row.commission_rate_bps) || "—"}</td>
-                      <td className="px-3 py-3 font-bold text-fitdog-orange">{centsToDisplay(row.final_commission_cents)}</td>
-                      <td className="px-3 py-3">{row.source}</td>
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-4">{centsToDisplay(row.gross_amount_cents)}</td>
+                      <td className="px-4 py-4">{bpsToDisplay(row.commission_rate_bps) || "—"}</td>
+                      <td className="px-4 py-4 font-bold text-fitdog-orange">{centsToDisplay(row.final_commission_cents)}</td>
+                      <td className="px-4 py-4">{row.source}</td>
+                      <td className="px-4 py-4">
                         {row.has_open_comments ? (
-                          <span className="inline-flex items-center gap-1 text-amber-200">
-                            <MessageSquare className="h-3.5 w-3.5" /> Open
+                          <span className="inline-flex items-center gap-2 text-amber-200">
+                            <MessageSquare className="h-8 w-8" /> Open
                           </span>
                         ) : (
                           "—"
@@ -649,19 +758,44 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
               </button>
             </div>
           </div>
+          </>
+          ) : null}
         </>
       )}
 
       {tab === "reports" && !isTrainer ? (
-        <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-admin-muted">
-          <p className="mb-2 font-semibold text-white">Reports use the active ledger filters above.</p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>Export CSV from the toolbar for a filter-aware ledger dump.</li>
-            <li>Trainer Commission Statement / Payroll Summary: open Payroll Periods and use export after assigning records.</li>
-            <li>Open Trainer Questions: switch to Needs Review (includes disputed / open comments).</li>
-            <li>Pending Approval: switch to Approval Queue.</li>
-          </ul>
-        </div>
+        <ReportsTab
+          report={data?.report ?? null}
+          reportType={reportType}
+          loading={loading}
+          busy={busy}
+          filters={Object.fromEntries(searchParams.entries())}
+          onReportTypeChange={(next) => setParams({ pcReport: next })}
+          onExport={async () => {
+            setBusy(true);
+            try {
+              const body = await postAction({
+                action: "export_csv",
+                report_type: reportType,
+                filters: Object.fromEntries(searchParams.entries())
+              });
+              const blob = new Blob([body.csv ?? ""], { type: "text/csv;charset=utf-8" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `commission-report-${reportType}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+              showToast("Report exported.", "success");
+            } catch (error) {
+              showToast(error instanceof Error ? error.message : "Export failed.", "error");
+            } finally {
+              setBusy(false);
+            }
+          }}
+          onPrint={() => window.print()}
+          onRefresh={() => void load()}
+        />
       ) : null}
 
       {tab === "payroll" && canManage ? <PayrollTab onRefresh={() => void load()} /> : null}
@@ -1309,6 +1443,166 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+const REPORT_OPTIONS: { key: ReportTypeKey; label: string }[] = [
+  { key: "trainer_statement", label: "Trainer Commission Statement" },
+  { key: "package_summary", label: "Package Commission Summary" },
+  { key: "class_summary", label: "Class Commission Summary" },
+  { key: "pending_approval", label: "Pending Approval Report" },
+  { key: "refund_report", label: "Refund and Reversal Report" },
+  { key: "date_range", label: "Commission by Date Range" }
+];
+
+function ReportsTab({
+  report,
+  reportType,
+  loading,
+  busy,
+  onReportTypeChange,
+  onExport,
+  onPrint,
+  onRefresh
+}: {
+  report: CommissionReportPayload | null;
+  reportType: ReportTypeKey;
+  loading: boolean;
+  busy: boolean;
+  filters: Record<string, string>;
+  onReportTypeChange: (type: ReportTypeKey) => void;
+  onExport: () => void;
+  onPrint: () => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div id="commission-report-print" className="space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-4">
+        <label className="grid gap-1 text-sm">
+          <span className="text-admin-muted">Report type</span>
+          <select
+            className="admin-input min-w-[16rem]"
+            value={reportType}
+            onChange={(e) => onReportTypeChange(e.target.value as ReportTypeKey)}
+          >
+            {REPORT_OPTIONS.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={onRefresh} disabled={loading}>
+            <RefreshCw className="h-4 w-4" /> Generate
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={onExport} disabled={busy || !report?.rows?.length}>
+            <Download className="h-4 w-4" /> Export CSV
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--primary" onClick={onPrint} disabled={!report?.rows?.length}>
+            Print report
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="rounded-xl border border-white/10 p-8 text-admin-muted">Generating report…</div>
+      ) : !report || report.rows.length === 0 ? (
+        <div className="rounded-xl border border-white/10 p-8 text-admin-muted">
+          No commission records match the current filters. Adjust trainer or date filters above, then click Generate.
+        </div>
+      ) : (
+        <>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <h3 className="text-lg font-black text-white">{report.title}</h3>
+            <p className="mt-1 text-sm text-admin-muted">
+              Generated {new Date(report.generatedAt).toLocaleString()}
+              {report.dateRange.from || report.dateRange.to
+                ? ` · ${report.dateRange.from ?? "…"} to ${report.dateRange.to ?? "…"} (${report.dateRange.field})`
+                : ""}
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                ["Records", String(report.totals.records)],
+                ["Gross Sales", report.totals.grossSales],
+                ["Total Commission", report.totals.commission],
+                ["Refunds", report.totals.refund]
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-white/10 px-3 py-2">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-admin-muted">{label}</p>
+                  <p className="text-lg font-black text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {report.byTrainer.length > 0 ? (
+            <div className="overflow-auto rounded-xl border border-white/10">
+              <h4 className="border-b border-white/10 px-4 py-3 text-sm font-bold text-white">By trainer</h4>
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-left text-admin-muted">
+                    <th className="px-3 py-2">Trainer</th>
+                    <th className="px-3 py-2">Records</th>
+                    <th className="px-3 py-2">Gross</th>
+                    <th className="px-3 py-2">Commission</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.byTrainer.map((row) => (
+                    <tr key={`${row.trainerName}-${row.trainerEmail ?? ""}`} className="border-b border-white/5">
+                      <td className="px-3 py-2 text-white">
+                        {row.trainerName}
+                        {row.trainerEmail ? <span className="block text-xs text-admin-muted">{row.trainerEmail}</span> : null}
+                      </td>
+                      <td className="px-3 py-2">{row.records}</td>
+                      <td className="px-3 py-2">{row.grossSales}</td>
+                      <td className="px-3 py-2 font-semibold text-fitdog-orange">{row.commission}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
+          <div className="overflow-auto rounded-xl border border-white/10">
+            <h4 className="border-b border-white/10 px-4 py-3 text-sm font-bold text-white">Detail lines</h4>
+            <table className="min-w-[1200px] w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-admin-muted">
+                  <th className="px-3 py-2">Trainer</th>
+                  <th className="px-3 py-2">Sale Date</th>
+                  <th className="px-3 py-2">Client</th>
+                  <th className="px-3 py-2">Dog</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Package / Class</th>
+                  <th className="px-3 py-2">Gross</th>
+                  <th className="px-3 py-2">Commission</th>
+                  <th className="px-3 py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.rows.map((row) => (
+                  <tr key={row.id} className="border-b border-white/5">
+                    <td className="px-3 py-2 text-white">{row.trainer_name}</td>
+                    <td className="px-3 py-2">{row.sale_date ?? "—"}</td>
+                    <td className="px-3 py-2">{row.client_name}</td>
+                    <td className="px-3 py-2">{row.dog_name}</td>
+                    <td className="px-3 py-2">{row.commission_type.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-2">{row.package_or_class}</td>
+                    <td className="px-3 py-2">{centsToDisplay(row.gross_amount_cents)}</td>
+                    <td className="px-3 py-2 font-semibold text-fitdog-orange">{centsToDisplay(row.final_commission_cents)}</td>
+                    <td className="px-3 py-2">
+                      {row.approval_status} / {row.payment_status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

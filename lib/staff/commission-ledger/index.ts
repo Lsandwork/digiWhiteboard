@@ -9,4 +9,6 @@ export * from "./imports";
 export * from "./adjustments";
 export * from "./audit";
 export * from "./backfill";
+export * from "./dates";
+export * from "./reports";
 export { listRecordAudit } from "./audit";

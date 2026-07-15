@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 import { parseMoneyToCents, parsePercentToBps } from "./money";
+import { parseCommissionDate } from "./dates";
 import { computeMissingRequired } from "./map";
 
 const LEGACY_KEY = "package_commissions";
@@ -36,15 +37,7 @@ function mapLegacyStatus(status: string): {
 }
 
 function parseLegacyDate(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const raw = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (!m) return null;
-  const month = m[1].padStart(2, "0");
-  const day = m[2].padStart(2, "0");
-  const year = m[3].length === 2 ? `20${m[3]}` : m[3];
-  return `${year}-${month}-${day}`;
+  return parseCommissionDate(value);
 }
 
 /**

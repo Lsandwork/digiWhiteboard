@@ -14,6 +14,7 @@ import {
   previewCommissionRule,
   sanitizeCsvCell,
   trainerOwnsRecord,
+  parseCommissionDate,
   type CommissionViewer
 } from "../lib/staff/commission-ledger";
 
@@ -115,5 +116,9 @@ const partialRefund = 2000;
 assert.equal(original - partialRefund, 3000);
 const fullRefund = 5000;
 assert.equal(original - fullRefund, 0);
+
+assert.equal(parseCommissionDate("07142026"), "2026-07-14");
+assert.equal(parseCommissionDate("07/14/2026"), "2026-07-14");
+assert.equal(parseCommissionDate("2026-07-02"), "2026-07-02");
 
 console.log("commission ledger: ok");

@@ -39,7 +39,10 @@ import {
   undoImportBatch,
   updateCommissionRecord,
   updateCommissionRule,
+  buildCommissionReport,
+  commissionReportToCsv,
   type CommissionListFilters,
+  type CommissionReportType,
   type CommentableField,
   type ResolutionCode
 } from "@/lib/staff/commission-ledger";
@@ -191,7 +194,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ batches, canManage });
     }
 
+    if (view === "report") {
+      const filters = parseListFilters(url);
+      if (filters.trainerIds?.length && trainers.length) {
+        filters.trainerNames = trainers
+          .filter((trainer) => filters.trainerIds!.includes(trainer.id))
+          .map((trainer) => trainer.full_name);
+      }
+      const reportType = (url.searchParams.get("reportType") ?? "trainer_statement") as CommissionReportType;
+      const report = await buildCommissionReport(supabase, viewer, filters, reportType);
+      return NextResponse.json({ report, canManage, trainers });
+    }
+
     const filters = parseListFilters(url);
+    if (filters.trainerIds?.length && trainers.length) {
+      filters.trainerNames = trainers
+        .filter((trainer) => filters.trainerIds!.includes(trainer.id))
+        .map((trainer) => trainer.full_name);
+    }
     const result = await listCommissionRecords(supabase, viewer, filters);
 
     return NextResponse.json({
@@ -376,6 +396,15 @@ export async function POST(request: Request) {
 
     if (action === "export_csv") {
       const filters = (body.filters ?? {}) as CommissionListFilters;
+      if (body.report_type) {
+        const report = await buildCommissionReport(
+          supabase,
+          viewer,
+          filters,
+          String(body.report_type) as CommissionReportType
+        );
+        return NextResponse.json({ ok: true, csv: commissionReportToCsv(report), report });
+      }
       const result = await listCommissionRecords(supabase, viewer, {
         ...filters,
         page: 1,

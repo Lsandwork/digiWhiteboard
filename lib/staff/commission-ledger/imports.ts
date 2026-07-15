@@ -8,6 +8,7 @@ import {
   type PackageCommissionTrainerOption
 } from "@/lib/staff/package-commissions-csv";
 import { parseMoneyToCents, parsePercentToBps } from "./money";
+import { parseCommissionDate } from "./dates";
 import type { CommissionActor, CommissionViewer } from "./types";
 
 export type ImportStageResult = {
@@ -25,13 +26,7 @@ function saleCategoryToType(category: unknown) {
 }
 
 function parseSoldDate(value: unknown): string | null {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-  const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
-  if (!m) return null;
-  const year = m[3].length === 2 ? `20${m[3]}` : m[3];
-  return `${year}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  return parseCommissionDate(value);
 }
 
 /**
