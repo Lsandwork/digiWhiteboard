@@ -25,7 +25,8 @@ export type StaffNotificationSourceTab =
   | "active_issues"
   | "push_notices"
   | "notifications"
-  | "walks_board";
+  | "walks_board"
+  | "package_commissions";
 
 export type NotificationThreadStatus =
   | "open"

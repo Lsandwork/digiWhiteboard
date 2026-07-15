@@ -1,123 +1,187 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Download, ExternalLink, MessageSquarePlus, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  Filter,
+  MessageSquare,
+  RefreshCw,
+  Upload,
+  X
+} from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import type {
-  PackageCommissionMode,
-  PackageCommissionRow,
-  PackageCommissionSaleCategory,
-  PackageCommissionStatus
-} from "@/lib/staff/package-commissions";
-import {
-  calculatePercentCommission,
-  formatCommissionCurrency
-} from "@/lib/staff/package-commissions";
+import { centsToDisplay, bpsToDisplay } from "@/lib/staff/commission-ledger/money";
+import type { PackageCommissionRecord } from "@/lib/staff/commission-ledger/types";
 
-type TrainerOption = {
-  id: string;
-  full_name: string;
-  email: string;
+type TrainerOption = { id: string; full_name: string; email: string };
+
+type SummaryDisplay = {
+  grossSales: string;
+  totalCommissions: string;
+  pendingReview: string;
+  approved: string;
+  readyForPayroll: string;
+  paid: string;
+  refunded: string;
+  openQuestions: number;
 };
 
-type Summary = {
-  pending: number;
-  approved: number;
-  paid: number;
-  needsReview: number;
-  disputed: number;
-};
-
-type Payload = {
-  rows: PackageCommissionRow[];
-  summary?: Summary;
+type LedgerPayload = {
+  rows: PackageCommissionRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  summaryDisplay?: SummaryDisplay;
   trainers?: TrainerOption[];
   canManage: boolean;
   canComment: boolean;
-  currentUser: { email: string | null; role: string | null; adminUserId?: string | null };
+  currentUser?: {
+    email: string | null;
+    role: string | null;
+    roleKey?: string | null;
+    isTrainerOnly?: boolean;
+    isSuperAdmin?: boolean;
+  };
 };
 
-type FilterKey = "all" | "package" | "class" | "pending_review";
+type TabKey =
+  | "ledger"
+  | "needs_review"
+  | "approval"
+  | "payroll"
+  | "imports"
+  | "rules"
+  | "reports";
 
-const emptyForm = {
-  dog_name: "",
-  owner_name: "",
-  trainer_user_id: "",
-  trainer_name: "",
-  trainer_email: "",
-  sale_category: "package" as PackageCommissionSaleCategory,
-  package_type: "",
-  gingr_transaction_url: "",
-  package_sale_amount: "",
-  commission_mode: "amount" as PackageCommissionMode,
-  commission_percent: "",
-  commission_amount: "",
-  sold_at: "",
-  status: "Pending" as PackageCommissionStatus,
-  notes: ""
-};
-
-function formatSoldDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString();
-}
-
-function formatCurrency(value: number) {
-  return value.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
-
-function statusBadgeClass(status: PackageCommissionStatus) {
-  switch (status) {
-    case "Pending":
-      return "bg-amber-500/15 text-amber-200 border-amber-400/30";
-    case "Approved":
-      return "bg-emerald-500/15 text-emerald-200 border-emerald-400/30";
-    case "Paid":
-      return "bg-sky-500/15 text-sky-200 border-sky-400/30";
-    case "Needs Review":
-      return "bg-orange-500/15 text-orange-200 border-orange-400/30";
-    case "Disputed":
-      return "bg-rose-500/15 text-rose-200 border-rose-400/30";
-    default:
-      return "bg-white/10 text-white border-white/10";
-  }
-}
-
-function saleCategoryLabel(category: PackageCommissionSaleCategory) {
-  return category === "class" ? "Class" : "Package";
+function statusPill(label: string, tone: "amber" | "green" | "sky" | "rose" | "slate" | "orange") {
+  const tones = {
+    amber: "bg-amber-500/15 text-amber-100 border-amber-400/30",
+    green: "bg-emerald-500/15 text-emerald-100 border-emerald-400/30",
+    sky: "bg-sky-500/15 text-sky-100 border-sky-400/30",
+    rose: "bg-rose-500/15 text-rose-100 border-rose-400/30",
+    slate: "bg-white/10 text-white/80 border-white/15",
+    orange: "bg-orange-500/15 text-orange-100 border-orange-400/30"
+  };
+  return (
+    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tones[tone]}`}>
+      {label}
+    </span>
+  );
 }
 
 export function PackageCommissionsPanel({ embedded = false }: { embedded?: boolean }) {
   const { showToast } = useToast();
-  const [data, setData] = useState<Payload | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [data, setData] = useState<LedgerPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState(emptyForm);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [commentRowId, setCommentRowId] = useState<string | null>(null);
-  const [commentBody, setCommentBody] = useState("");
-  const [commentConcern, setCommentConcern] = useState<"note" | "dispute">("note");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [drawerId, setDrawerId] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<{
+    record: PackageCommissionRecord;
+    threads: unknown[];
+    audit: unknown[];
+  } | null>(null);
+  const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
-  const [showCsvImport, setShowCsvImport] = useState(false);
-  const [csvImportErrors, setCsvImportErrors] = useState<string[]>([]);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [commentField, setCommentField] = useState<string | null>(null);
+  const [commentBody, setCommentBody] = useState("");
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState({
+    trainer_user_id: "",
+    trainer_name: "",
+    trainer_email: "",
+    sale_date: "",
+    service_date: "",
+    client_name: "",
+    dog_name: "",
+    commission_type: "package_sale",
+    package_or_class: "",
+    quantity: "1",
+    gross_amount: "",
+    discount_amount: "",
+    commission_rate: "50",
+    final_commission: "",
+    is_manual_override: false,
+    override_reason: "",
+    internal_notes: ""
+  });
+
+  const tab = (searchParams.get("pcTab") as TabKey) || "ledger";
+  const page = Number(searchParams.get("page") ?? 1);
+  const q = searchParams.get("q") ?? "";
+  const dateFrom = searchParams.get("dateFrom") ?? "";
+  const dateTo = searchParams.get("dateTo") ?? "";
+  const trainerIds = searchParams.get("trainerIds") ?? "";
+
+  const isTrainer = Boolean(data?.currentUser?.isTrainerOnly);
+  const canManage = Boolean(data?.canManage);
+
+  const setParams = useCallback(
+    (patch: Record<string, string | null>) => {
+      const next = new URLSearchParams(searchParams.toString());
+      for (const [key, value] of Object.entries(patch)) {
+        if (value == null || value === "") next.delete(key);
+        else next.set(key, value);
+      }
+      if (!next.get("board")) next.set("board", "staff");
+      if (!next.get("tab")) next.set("tab", "package_commissions");
+      router.replace(`${pathname}?${next.toString()}`);
+    },
+    [pathname, router, searchParams]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/admin/package-commissions", { cache: "no-store" });
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("view", "ledger");
+      if (tab === "needs_review") {
+        params.set("reviewStatus", "needs_review,disputed");
+        params.delete("approvalStatus");
+      }
+      if (tab === "approval") {
+        params.set("approvalStatus", "pending");
+        params.delete("reviewStatus");
+      }
+      if (tab === "rules" || tab === "payroll" || tab === "imports") {
+        params.set("view", tab === "rules" ? "rules" : tab === "payroll" ? "payroll" : "imports");
+      }
+
+      const response = await fetch(`/api/admin/package-commissions?${params.toString()}`, { cache: "no-store" });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to load package commissions.");
-      setData(body as Payload);
+      if (!response.ok) throw new Error(body.error ?? "Unable to load commissions.");
+      if (tab === "ledger" || tab === "needs_review" || tab === "approval" || tab === "reports") {
+        setData(body as LedgerPayload);
+      } else {
+        setData((current) => ({
+          rows: current?.rows ?? [],
+          total: current?.total ?? 0,
+          page: current?.page ?? 1,
+          pageSize: current?.pageSize ?? 25,
+          summaryDisplay: current?.summaryDisplay,
+          trainers: body.trainers ?? current?.trainers,
+          canManage: body.canManage ?? current?.canManage ?? false,
+          canComment: body.canComment ?? current?.canComment ?? false,
+          currentUser: body.currentUser ?? current?.currentUser,
+          // stash extras
+          ...(body as object)
+        }));
+      }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load package commissions.", "error");
+      showToast(error instanceof Error ? error.message : "Unable to load commissions.", "error");
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [searchParams, showToast, tab]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -131,625 +195,1009 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
       body: JSON.stringify(payload)
     });
     const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "Unable to update package commission row.");
+    if (!response.ok) throw new Error(body.error ?? "Request failed.");
     return body;
   }
 
-  async function saveRow() {
-    setBusy(true);
+  async function openDrawer(id: string) {
+    setDrawerId(id);
     try {
-      const payload = { ...form };
-      if (payload.commission_mode === "percent") {
-        const computed = calculatePercentCommission(payload.package_sale_amount, payload.commission_percent);
-        if (computed == null) {
-          throw new Error("Enter a valid package sale total and percentage to calculate commission.");
-        }
-        payload.commission_amount = formatCommissionCurrency(computed);
-      }
-      await postAction({
-        action: editingId ? "update" : "create",
-        id: editingId,
-        ...payload
+      const response = await fetch(`/api/admin/package-commissions?view=record&id=${encodeURIComponent(id)}`, {
+        cache: "no-store"
       });
-      showToast(editingId ? "Commission record updated." : "Commission record added.", "success");
-      setForm(emptyForm);
-      setEditingId(null);
-      await load();
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to load record.");
+      setDrawer({ record: body.record, threads: body.threads ?? [], audit: body.audit ?? [] });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to save commission record.", "error");
-    } finally {
-      setBusy(false);
+      showToast(error instanceof Error ? error.message : "Unable to open record.", "error");
+      setDrawerId(null);
     }
   }
 
-  async function deleteRow(id: string) {
-    setBusy(true);
-    try {
-      await postAction({ action: "delete", id });
-      showToast("Commission record deleted.", "success");
-      await load();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to delete row.", "error");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const tabs = useMemo(() => {
+    if (isTrainer) return [{ key: "ledger" as TabKey, label: "My Commissions" }];
+    return [
+      { key: "ledger" as TabKey, label: "Commission Ledger" },
+      { key: "needs_review" as TabKey, label: "Needs Review" },
+      { key: "approval" as TabKey, label: "Approval Queue" },
+      { key: "payroll" as TabKey, label: "Payroll Periods" },
+      { key: "imports" as TabKey, label: "CSV Imports" },
+      { key: "rules" as TabKey, label: "Commission Rules" },
+      { key: "reports" as TabKey, label: "Reports" }
+    ];
+  }, [isTrainer]);
 
-  async function confirmRow(id: string) {
-    setBusy(true);
-    try {
-      await postAction({ action: "confirm", id });
-      showToast("Commission confirmed and approved.", "success");
-      await load();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to confirm commission.", "error");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const summary = data?.summaryDisplay;
 
-  async function markPaid(id: string) {
-    setBusy(true);
-    try {
-      await postAction({ action: "mark_paid", id });
-      showToast("Commission marked as paid.", "success");
-      await load();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to mark commission paid.", "error");
-    } finally {
-      setBusy(false);
+  async function runBulk(bulkAction: string, extra: Record<string, unknown> = {}) {
+    if (!selected.length) return;
+    const reason =
+      ["reject", "hold", "void"].includes(bulkAction) || extra.requireReason
+        ? window.prompt("Reason (required):") ?? ""
+        : undefined;
+    if ((["reject", "hold", "void"].includes(bulkAction) || extra.requireReason) && !reason?.trim()) {
+      showToast("A reason is required.", "error");
+      return;
     }
-  }
-
-  async function submitComment() {
-    if (!commentRowId || !commentBody.trim()) return;
     setBusy(true);
     try {
-      await postAction({
-        action: "comment",
-        row_id: commentRowId,
-        body: commentBody,
-        concern_type: commentConcern === "dispute" ? "dispute" : null
+      const result = await postAction({
+        action: "bulk",
+        bulk_action: bulkAction,
+        ids: selected,
+        reason,
+        ...extra
       });
-      showToast(
-        commentConcern === "dispute"
-          ? "Dispute sent to admin and management for review."
-          : "Comment sent to admin and management.",
-        "success"
-      );
-      setCommentBody("");
-      setCommentConcern("note");
-      setCommentRowId(null);
+      showToast(`Updated ${result.results?.length ?? 0} record(s).`, "success");
+      setSelected([]);
       await load();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to submit comment.", "error");
+      showToast(error instanceof Error ? error.message : "Bulk update failed.", "error");
     } finally {
       setBusy(false);
     }
   }
-
-  async function importCsv() {
-    if (!csvText.trim()) return;
-    setBusy(true);
-    setCsvImportErrors([]);
-    try {
-      const body = await postAction({ action: "import_csv", csv: csvText });
-      const imported = Number(body.imported ?? body.rows?.length ?? 0);
-      const failed = Number(body.failed ?? body.errors?.length ?? 0);
-      const errors = Array.isArray(body.errors)
-        ? body.errors.map((entry: { line?: number; message?: string }) =>
-            `Row ${entry.line ?? "?"}: ${entry.message ?? "Unable to import"}`
-          )
-        : [];
-      setCsvImportErrors(errors);
-
-      if (imported > 0 && failed === 0) {
-        showToast(`Imported ${imported} commission row(s).`, "success");
-        setCsvText("");
-        setCsvFileName(null);
-        setShowCsvImport(false);
-        setCsvImportErrors([]);
-      } else if (imported > 0) {
-        showToast(`Imported ${imported} row(s); ${failed} failed.`, "success");
-      } else {
-        showToast(errors[0] ?? "Unable to import CSV.", "error");
-      }
-      await load();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to import CSV.", "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onCsvFileChosen(file: File | null) {
-    if (!file) return;
-    try {
-      const text = await file.text();
-      setCsvText(text);
-      setCsvFileName(file.name);
-      setCsvImportErrors([]);
-    } catch {
-      showToast("Unable to read that CSV file.", "error");
-    }
-  }
-
-  async function exportCsv() {
-    setBusy(true);
-    try {
-      const body = await postAction({ action: "export_csv" });
-      const blob = new Blob([body.csv ?? ""], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "package-class-commissions.csv";
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to export CSV.", "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function selectTrainer(trainerUserId: string) {
-    const trainer = (data?.trainers ?? []).find((entry) => entry.id === trainerUserId);
-    setForm((current) => ({
-      ...current,
-      trainer_user_id: trainerUserId,
-      trainer_name: trainer?.full_name ?? "",
-      trainer_email: trainer?.email ?? ""
-    }));
-  }
-
-  const rows = data?.rows ?? [];
-  const canManage = data?.canManage ?? false;
-  const canComment = data?.canComment ?? false;
-  const summary = data?.summary;
-
-  const filteredRows = useMemo(() => {
-    return rows.filter((row) => {
-      if (filter === "package") return row.sale_category === "package";
-      if (filter === "class") return row.sale_category === "class";
-      if (filter === "pending_review") return row.status === "Pending" || row.status === "Needs Review" || row.status === "Disputed";
-      return true;
-    });
-  }, [rows, filter]);
-
-  const percentCommissionPreview = useMemo(() => {
-    if (form.commission_mode !== "percent") return null;
-    return calculatePercentCommission(form.package_sale_amount, form.commission_percent);
-  }, [form.commission_mode, form.commission_percent, form.package_sale_amount]);
-
-  const filterButtons: { key: FilterKey; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "package", label: "Packages" },
-    { key: "class", label: "Classes" },
-    { key: "pending_review", label: "Pending Review" }
-  ];
 
   return (
-    <div className={embedded ? "space-y-5" : "crossover-dashboard space-y-5"}>
-      {!embedded ? (
-        <header className="admin-page-header">
-          <div>
-            <h2 className="admin-page-title">Package &amp; Class Commissions</h2>
-            <p className="admin-page-subtitle">
-              Track packages and classes sold, confirm commissions with management, and let trainers review their earnings.
-            </p>
-          </div>
+    <div className={embedded ? "" : "admin-page"}>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-white">
+            {isTrainer ? "My Commissions" : "Package & Class Commissions"}
+          </h2>
+          <p className="mt-1 text-sm text-admin-muted">
+            {isTrainer
+              ? "Review your package and class earnings, ask questions on specific fields, and download statements."
+              : "Ledger, approvals, payroll, CSV imports, rules, and trainer questions — fully integrated."}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className="h-4 w-4" /> Refresh
+          </button>
           {canManage ? (
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy} onClick={() => setShowCsvImport(true)}>
+            <>
+              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setShowImport(true)}>
                 <Upload className="h-4 w-4" /> Import CSV
               </button>
-              <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy} onClick={() => void exportCsv()}>
-                <Download className="h-4 w-4" /> Export CSV
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost"
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const body = await postAction({ action: "export_csv", filters: Object.fromEntries(searchParams.entries()) });
+                    const blob = new Blob([body.csv ?? ""], { type: "text/csv;charset=utf-8" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "commission-ledger.csv";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (error) {
+                    showToast(error instanceof Error ? error.message : "Export failed.", "error");
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <Download className="h-4 w-4" /> Export
               </button>
-            </div>
+              <button type="button" className="crossover-btn crossover-btn--primary" onClick={() => setManualOpen(true)}>
+                Add Record
+              </button>
+            </>
           ) : null}
-        </header>
-      ) : null}
+        </div>
+      </div>
 
       {summary ? (
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
           {[
-            { label: "Pending", value: summary.pending, tone: "text-amber-200" },
-            { label: "Approved", value: summary.approved, tone: "text-emerald-200" },
-            { label: "Paid", value: summary.paid, tone: "text-sky-200" },
-            { label: "Needs Review", value: summary.needsReview, tone: "text-orange-200" },
-            { label: "Disputed", value: summary.disputed, tone: "text-rose-200" }
-          ].map((card) => (
-            <article key={card.label} className="crossover-card p-4">
-              <p className="text-xs uppercase tracking-wide text-admin-muted">{card.label}</p>
-              <p className={`mt-1 text-2xl font-bold ${card.tone}`}>{formatCurrency(card.value)}</p>
-            </article>
-          ))}
-        </section>
-      ) : null}
-
-      {canManage ? (
-        <section className="crossover-card p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="crossover-card__title">{editingId ? "Edit Commission Record" : "Add Commission Record"}</h3>
-            {embedded ? (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy} onClick={() => setShowCsvImport(true)}>
-                  <Upload className="h-4 w-4" /> Import CSV
-                </button>
-                <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy} onClick={() => void exportCsv()}>
-                  <Download className="h-4 w-4" /> Export CSV
-                </button>
-              </div>
-            ) : null}
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="block">
-              <span className="admin-label">Sale type</span>
-              <select
-                className="admin-input"
-                value={form.sale_category}
-                onChange={(e) => setForm({ ...form, sale_category: e.target.value as PackageCommissionSaleCategory })}
-              >
-                <option value="package">Package</option>
-                <option value="class">Class</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="admin-label">Trainer</span>
-              <select className="admin-input" value={form.trainer_user_id} onChange={(e) => selectTrainer(e.target.value)}>
-                <option value="">Select trainer</option>
-                {(data?.trainers ?? []).map((trainer) => (
-                  <option key={trainer.id} value={trainer.id}>
-                    {trainer.full_name} ({trainer.email})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block"><span className="admin-label">Dog name</span><input className="admin-input" value={form.dog_name} onChange={(e) => setForm({ ...form, dog_name: e.target.value })} /></label>
-            <label className="block"><span className="admin-label">Owner name</span><input className="admin-input" value={form.owner_name} onChange={(e) => setForm({ ...form, owner_name: e.target.value })} /></label>
-            <label className="block"><span className="admin-label">Package / class type</span><input className="admin-input" value={form.package_type} onChange={(e) => setForm({ ...form, package_type: e.target.value })} placeholder="6-Session Private, Group Class 4-pack" /></label>
-            <div className="block">
-              <span className="admin-label">Commission entry</span>
-              <div className="mt-1 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className={`crossover-btn ${form.commission_mode === "amount" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
-                  onClick={() => setForm({ ...form, commission_mode: "amount" })}
-                >
-                  Dollar amount
-                </button>
-                <button
-                  type="button"
-                  className={`crossover-btn ${form.commission_mode === "percent" ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
-                  onClick={() => setForm({ ...form, commission_mode: "percent" })}
-                >
-                  Percentage
-                </button>
-              </div>
+            ["Gross Sales", summary.grossSales],
+            ["Total Commissions", summary.totalCommissions],
+            ["Pending Review", summary.pendingReview],
+            ["Approved", summary.approved],
+            ["Ready for Payroll", summary.readyForPayroll],
+            ["Paid", summary.paid],
+            ["Refunded", summary.refunded],
+            ["Open Questions", String(summary.openQuestions)]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-admin-muted">{label}</p>
+              <p className="mt-1 text-lg font-black text-white">{value}</p>
             </div>
-            {form.commission_mode === "percent" ? (
-              <>
-                <label className="block">
-                  <span className="admin-label">Package / class total sold</span>
-                  <input
-                    className="admin-input"
-                    value={form.package_sale_amount}
-                    onChange={(e) => setForm({ ...form, package_sale_amount: e.target.value })}
-                    placeholder="$1,200"
-                    inputMode="decimal"
-                  />
-                </label>
-                <label className="block">
-                  <span className="admin-label">Trainer commission %</span>
-                  <input
-                    className="admin-input"
-                    value={form.commission_percent}
-                    onChange={(e) => setForm({ ...form, commission_percent: e.target.value })}
-                    placeholder="10"
-                    inputMode="decimal"
-                  />
-                </label>
-                <div className="block md:col-span-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-admin-muted">Calculated trainer commission</p>
-                  <p className="mt-1 text-2xl font-black text-white">
-                    {percentCommissionPreview != null ? formatCommissionCurrency(percentCommissionPreview) : "—"}
-                  </p>
-                  <p className="mt-1 text-sm text-admin-muted">
-                    Auto-calculates from the package/class sale total × percentage. This amount is what the trainer receives.
-                  </p>
-                </div>
-              </>
-            ) : (
-              <label className="block">
-                <span className="admin-label">Commission amount</span>
-                <input
-                  className="admin-input"
-                  value={form.commission_amount}
-                  onChange={(e) => setForm({ ...form, commission_amount: e.target.value })}
-                  placeholder="$120"
-                />
-              </label>
-            )}
-            <label className="block md:col-span-2"><span className="admin-label">Gingr transaction URL</span><input className="admin-input" value={form.gingr_transaction_url} onChange={(e) => setForm({ ...form, gingr_transaction_url: e.target.value })} placeholder="https://..." /></label>
-            <label className="block"><span className="admin-label">Date sold</span><input className="admin-input" type="date" value={form.sold_at.slice(0, 10)} onChange={(e) => setForm({ ...form, sold_at: e.target.value })} /></label>
-            <label className="block">
-              <span className="admin-label">Status</span>
-              <select className="admin-input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as PackageCommissionStatus })}>
-                <option value="Pending">Pending</option>
-                <option value="Approved">Approved</option>
-                <option value="Paid">Paid</option>
-                <option value="Needs Review">Needs Review</option>
-                <option value="Disputed">Disputed</option>
-              </select>
-            </label>
-            <label className="block md:col-span-2">
-              <span className="admin-label">Notes</span>
-              <textarea className="crossover-input min-h-24" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </label>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" disabled={busy} onClick={() => void saveRow()}>
-              <Plus className="h-4 w-4" /> {editingId ? "Save Changes" : "Add Row"}
-            </button>
-            {editingId ? (
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => { setEditingId(null); setForm(emptyForm); }}>
-                Cancel edit
-              </button>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
-
-      <section className="crossover-card p-5">
-        <div className="crossover-card__header crossover-card__header--compact">
-          <h3 className="crossover-card__title">Commission Records</h3>
-          <span className="crossover-link-btn">{filteredRows.length} shown</span>
-        </div>
-
-        <div className="mb-4 flex flex-wrap gap-2">
-          {filterButtons.map((button) => (
-            <button
-              key={button.key}
-              type="button"
-              className={`crossover-btn ${filter === button.key ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
-              onClick={() => setFilter(button.key)}
-            >
-              {button.label}
-            </button>
           ))}
         </div>
+      ) : null}
 
-        {loading ? <p className="text-sm text-admin-muted">Loading commission records…</p> : null}
-        <div className="overflow-x-auto">
-          <table className="crossover-table w-full min-w-[980px]">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Dog</th>
-                <th>Owner</th>
-                <th>Trainer</th>
-                <th>Package / Class</th>
-                <th>Gingr</th>
-                <th>Commission</th>
-                <th>Status</th>
-                <th>Sold</th>
-                <th>Confirmed</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredRows.map((row) => (
-                <tr key={row.id}>
-                  <td>{saleCategoryLabel(row.sale_category)}</td>
-                  <td>{row.dog_name}</td>
-                  <td>{row.owner_name}</td>
-                  <td>{row.trainer_name}</td>
-                  <td>{row.package_type}</td>
-                  <td>
-                    {row.gingr_transaction_url ? (
-                      <a href={row.gingr_transaction_url} target="_blank" rel="noopener noreferrer" className="crossover-link-btn inline-flex items-center gap-1">
-                        View <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ) : "—"}
-                  </td>
-                  <td>
-                    <div>{row.commission_amount}</div>
-                    {row.commission_mode === "percent" && row.commission_percent ? (
-                      <div className="text-xs text-admin-muted">
-                        {row.commission_percent}% of {row.package_sale_amount ?? "sale"}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td>
-                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${statusBadgeClass(row.status)}`}>
-                      {row.status}
-                    </span>
-                  </td>
-                  <td>{formatSoldDate(row.sold_at)}</td>
-                  <td>
-                    {row.confirmed_at ? (
-                      <div className="text-xs text-admin-muted">
-                        <p>{row.confirmed_by ?? "Confirmed"}</p>
-                        <p>{formatSoldDate(row.confirmed_at)}</p>
-                      </div>
-                    ) : "—"}
-                  </td>
-                  <td>
-                    <div className="flex flex-wrap gap-2">
-                      {canComment ? (
-                        <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-1" onClick={() => setCommentRowId(row.id)}>
-                          <MessageSquarePlus className="h-4 w-4" /> Comment
-                        </button>
-                      ) : null}
-                      {canManage ? (
-                        <>
-                          {row.status !== "Approved" && row.status !== "Paid" ? (
-                            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-1" disabled={busy} onClick={() => void confirmRow(row.id)}>
-                              <CheckCircle2 className="h-4 w-4" /> Confirm
-                            </button>
-                          ) : null}
-                          {row.status !== "Paid" ? (
-                            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-1" disabled={busy} onClick={() => void markPaid(row.id)}>
-                              Mark Paid
-                            </button>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="crossover-btn crossover-btn--ghost inline-flex items-center gap-1"
-                            onClick={() => {
-                              setEditingId(row.id);
-                              setForm({
-                                dog_name: row.dog_name,
-                                owner_name: row.owner_name,
-                                trainer_user_id: row.trainer_user_id ?? "",
-                                trainer_name: row.trainer_name,
-                                trainer_email: row.trainer_email ?? "",
-                                sale_category: row.sale_category,
-                                package_type: row.package_type,
-                                gingr_transaction_url: row.gingr_transaction_url,
-                                package_sale_amount: row.package_sale_amount ?? "",
-                                commission_mode: row.commission_mode ?? (row.commission_percent ? "percent" : "amount"),
-                                commission_percent: row.commission_percent ?? "",
-                                commission_amount: row.commission_amount,
-                                sold_at: row.sold_at.slice(0, 10),
-                                status: row.status,
-                                notes: row.notes ?? ""
-                              });
-                            }}
-                          >
-                            <Pencil className="h-4 w-4" /> Edit
-                          </button>
-                          <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-1" disabled={busy} onClick={() => void deleteRow(row.id)}>
-                            <Trash2 className="h-4 w-4" /> Delete
-                          </button>
-                        </>
-                      ) : null}
-                    </div>
-                    {row.comments.length ? (
-                      <div className="mt-2 space-y-1 text-xs text-admin-muted">
-                        {row.comments.map((comment) => (
-                          <p key={comment.id}>
-                            <span className="font-bold text-white">{comment.author}:</span> {comment.body}
-                            {comment.concern_type === "dispute" ? <span className="ml-1 text-rose-200">(Dispute)</span> : null}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!loading && !filteredRows.length ? (
-            <p className="mt-4 text-sm text-admin-muted">
-              {canManage ? "No commission records yet." : "No commission records assigned to you yet."}
-            </p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {tabs.map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            className={`crossover-btn ${tab === entry.key ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+            onClick={() => setParams({ pcTab: entry.key, page: "1" })}
+          >
+            {entry.label}
+          </button>
+        ))}
+      </div>
+
+      {(tab === "ledger" || tab === "needs_review" || tab === "approval" || tab === "reports") && (
+        <>
+          <div className="mb-3 flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-black/20 p-3">
+            <label className="grid gap-1 text-xs">
+              <span className="text-admin-muted">Search</span>
+              <input
+                className="admin-input min-w-[12rem]"
+                defaultValue={q}
+                placeholder="Client, dog, package…"
+                onBlur={(e) => setParams({ q: e.target.value || null, page: "1" })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setParams({ q: (e.target as HTMLInputElement).value || null, page: "1" });
+                  }
+                }}
+              />
+            </label>
+            {!isTrainer ? (
+              <label className="grid gap-1 text-xs">
+                <span className="text-admin-muted">Trainers (multi-select)</span>
+                <select
+                  className="admin-input min-h-[5.5rem]"
+                  multiple
+                  value={trainerIds ? trainerIds.split(",").filter(Boolean) : []}
+                  onChange={(e) => {
+                    const values = Array.from(e.target.selectedOptions).map((o) => o.value);
+                    setParams({ trainerIds: values.length ? values.join(",") : null, page: "1" });
+                  }}
+                >
+                  {(data?.trainers ?? []).map((trainer) => (
+                    <option key={trainer.id} value={trainer.id}>
+                      {trainer.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <label className="grid gap-1 text-xs">
+              <span className="text-admin-muted">From</span>
+              <input
+                type="date"
+                className="admin-input"
+                value={dateFrom}
+                onChange={(e) => setParams({ dateFrom: e.target.value || null, page: "1" })}
+              />
+            </label>
+            <label className="grid gap-1 text-xs">
+              <span className="text-admin-muted">To</span>
+              <input
+                type="date"
+                className="admin-input"
+                value={dateTo}
+                onChange={(e) => setParams({ dateTo: e.target.value || null, page: "1" })}
+              />
+            </label>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--ghost"
+              onClick={() =>
+                setParams({
+                  q: null,
+                  trainerIds: null,
+                  dateFrom: null,
+                  dateTo: null,
+                  reviewStatus: null,
+                  approvalStatus: null,
+                  paymentStatus: null,
+                  hasOpenComments: null,
+                  page: "1"
+                })
+              }
+            >
+              <Filter className="h-4 w-4" /> Clear filters
+            </button>
+          </div>
+
+          {selected.length > 0 && canManage ? (
+            <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-fitdog-orange/30 bg-fitdog-orange/10 p-3">
+              <span className="text-sm font-semibold text-white">{selected.length} selected</span>
+              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("approve")}>
+                Approve
+              </button>
+              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("reject")}>
+                Reject
+              </button>
+              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("hold")}>
+                Hold
+              </button>
+              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("mark_reviewed")}>
+                Mark Reviewed
+              </button>
+              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("ready_for_payroll")}>
+                Ready for Payroll
+              </button>
+              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("mark_paid")}>
+                Mark Paid
+              </button>
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost"
+                disabled={busy}
+                onClick={() => {
+                  const periodId = window.prompt("Payroll period ID:") ?? "";
+                  if (!periodId.trim()) return;
+                  void runBulk("assign_payroll", { payroll_period_id: periodId.trim() });
+                }}
+              >
+                Assign Period
+              </button>
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost"
+                disabled={busy}
+                onClick={() => {
+                  if (!window.confirm("Archive selected records?")) return;
+                  void runBulk("archive", { requireReason: true });
+                }}
+              >
+                Archive
+              </button>
+              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setSelected([])}>
+                Clear selection
+              </button>
+            </div>
           ) : null}
-        </div>
-      </section>
 
-      <Modal open={Boolean(commentRowId)} title="Add Comment" onClose={() => { setCommentRowId(null); setCommentBody(""); setCommentConcern("note"); }}>
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button type="button" className={`crossover-btn ${commentConcern === "note" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => setCommentConcern("note")}>
-            General note
-          </button>
-          <button type="button" className={`crossover-btn ${commentConcern === "dispute" ? "crossover-btn--primary" : "crossover-btn--ghost"}`} onClick={() => setCommentConcern("dispute")}>
-            Dispute
-          </button>
-        </div>
-        <label className="grid gap-2">
-          <span className="admin-label">{commentConcern === "dispute" ? "Describe the dispute" : "Your note"}</span>
-          <textarea className="crossover-input min-h-32" value={commentBody} maxLength={800} onChange={(e) => setCommentBody(e.target.value)} placeholder={commentConcern === "dispute" ? "Explain why this commission needs review." : "Add a note for admin and management."} />
-        </label>
-        <div className="mt-4 flex justify-end">
-          <button type="button" className="crossover-btn crossover-btn--primary" disabled={busy || !commentBody.trim()} onClick={() => void submitComment()}>
-            Send to Admin &amp; Management
-          </button>
-        </div>
-      </Modal>
+          <div className="overflow-auto rounded-xl border border-white/10">
+            <table className="min-w-[1400px] w-full border-collapse text-left text-sm">
+              <thead className="sticky top-0 z-10 bg-[#0b1220]">
+                <tr className="border-b border-white/10 text-[11px] uppercase tracking-wide text-admin-muted">
+                  {canManage ? <th className="px-3 py-3">Sel</th> : null}
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Trainer</th>
+                  <th className="px-3 py-3">Sale Date</th>
+                  <th className="px-3 py-3">Client</th>
+                  <th className="px-3 py-3">Dog</th>
+                  <th className="px-3 py-3">Type / Package</th>
+                  <th className="px-3 py-3">Gross</th>
+                  <th className="px-3 py-3">Rate</th>
+                  <th className="px-3 py-3">Final</th>
+                  <th className="px-3 py-3">Source</th>
+                  <th className="px-3 py-3">Comments</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={12} className="px-4 py-8 text-admin-muted">
+                      Loading commission ledger…
+                    </td>
+                  </tr>
+                ) : !data?.rows?.length ? (
+                  <tr>
+                    <td colSpan={12} className="px-4 py-8 text-admin-muted">
+                      No commission records match these filters.
+                    </td>
+                  </tr>
+                ) : (
+                  data.rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      className="cursor-pointer border-b border-white/5 hover:bg-white/5"
+                      onClick={() => void openDrawer(row.id)}
+                    >
+                      {canManage ? (
+                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(row.id)}
+                            onChange={(e) => {
+                              setSelected((current) =>
+                                e.target.checked ? [...current, row.id] : current.filter((id) => id !== row.id)
+                              );
+                            }}
+                          />
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-3">
+                        <div className="flex flex-col gap-1">
+                          {statusPill(row.approval_status.replace(/_/g, " "), row.approval_status === "approved" ? "green" : row.approval_status === "rejected" ? "rose" : "amber")}
+                          {statusPill(row.payment_status.replace(/_/g, " "), row.payment_status === "paid" ? "sky" : "slate")}
+                          {row.review_status === "needs_review" || row.has_open_comments
+                            ? statusPill("needs review", "orange")
+                            : null}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-white">{row.trainer_name}</td>
+                      <td className="px-3 py-3">{row.sale_date ?? "—"}</td>
+                      <td className="px-3 py-3">{row.client_name}</td>
+                      <td className="px-3 py-3 font-semibold text-white">{row.dog_name}</td>
+                      <td className="px-3 py-3">
+                        <div className="text-[11px] uppercase text-admin-muted">{row.commission_type.replace(/_/g, " ")}</div>
+                        <div>{row.package_or_class}</div>
+                      </td>
+                      <td className="px-3 py-3">{centsToDisplay(row.gross_amount_cents)}</td>
+                      <td className="px-3 py-3">{bpsToDisplay(row.commission_rate_bps) || "—"}</td>
+                      <td className="px-3 py-3 font-bold text-fitdog-orange">{centsToDisplay(row.final_commission_cents)}</td>
+                      <td className="px-3 py-3">{row.source}</td>
+                      <td className="px-3 py-3">
+                        {row.has_open_comments ? (
+                          <span className="inline-flex items-center gap-1 text-amber-200">
+                            <MessageSquare className="h-3.5 w-3.5" /> Open
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-      <Modal
-        open={showCsvImport}
-        title="Import Trainer Commissions CSV"
-        onClose={() => {
-          setShowCsvImport(false);
-          setCsvImportErrors([]);
-        }}
-      >
-        <div className="space-y-3 text-sm text-admin-muted">
-          <p>
-            Upload a Gingr <strong className="text-admin-text">Trainers Invoice Report</strong> CSV (trainer name on its
-            own line, then Date / Owner&apos;s Name / Dog&apos;s Name / Class/Program / Sales / Trainer Commission (%) /
-            Trainer Share ($)). Multi-trainer sections and $0 share rows are supported.
-          </p>
-          <p>You can also paste the same CSV, or a Fitdog export CSV with the older column headers.</p>
-        </div>
+          <div className="mt-3 flex items-center justify-between text-sm text-admin-muted">
+            <span>
+              Page {data?.page ?? page} · {data?.total ?? 0} records
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost"
+                disabled={page <= 1}
+                onClick={() => setParams({ page: String(Math.max(1, page - 1)) })}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost"
+                disabled={(data?.page ?? 1) * (data?.pageSize ?? 25) >= (data?.total ?? 0)}
+                onClick={() => setParams({ page: String(page + 1) })}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
-        <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-admin-border bg-admin-panel/40 px-4 py-6 text-center transition hover:border-fitdog-orange/50">
-          <Upload className="h-5 w-5 text-fitdog-orange" />
-          <span className="text-sm font-semibold text-admin-text">
-            {csvFileName ? `Selected: ${csvFileName}` : "Choose CSV file"}
-          </span>
-          <span className="text-xs text-admin-muted">.csv only — PDF import is not supported yet</span>
+      {tab === "reports" && !isTrainer ? (
+        <div className="mb-4 rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-admin-muted">
+          <p className="mb-2 font-semibold text-white">Reports use the active ledger filters above.</p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>Export CSV from the toolbar for a filter-aware ledger dump.</li>
+            <li>Trainer Commission Statement / Payroll Summary: open Payroll Periods and use export after assigning records.</li>
+            <li>Open Trainer Questions: switch to Needs Review (includes disputed / open comments).</li>
+            <li>Pending Approval: switch to Approval Queue.</li>
+          </ul>
+        </div>
+      ) : null}
+
+      {tab === "payroll" && canManage ? <PayrollTab onRefresh={() => void load()} /> : null}
+      {tab === "imports" && canManage ? <ImportsTab onOpenImport={() => setShowImport(true)} /> : null}
+      {tab === "rules" && canManage ? <RulesTab trainers={data?.trainers ?? []} /> : null}
+
+      {/* Drawer */}
+      {drawerId && drawer ? (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={() => { setDrawerId(null); setDrawer(null); }}>
+          <aside
+            className="h-full w-full max-w-xl overflow-y-auto border-l border-white/10 bg-[#0b1220] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-white">{drawer.record.dog_name}</h3>
+                <p className="text-sm text-admin-muted">
+                  {drawer.record.client_name} · {drawer.record.package_or_class}
+                </p>
+              </div>
+              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => { setDrawerId(null); setDrawer(null); }}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mb-4 grid grid-cols-2 gap-2 text-sm">
+              <Info label="Trainer" value={drawer.record.trainer_name} />
+              <Info label="Sale date" value={drawer.record.sale_date ?? "—"} />
+              <Info label="Gross" value={centsToDisplay(drawer.record.gross_amount_cents)} />
+              <Info label="Rate" value={bpsToDisplay(drawer.record.commission_rate_bps) || "—"} />
+              <Info label="Calculated" value={centsToDisplay(drawer.record.calculated_commission_cents)} />
+              <Info label="Final" value={centsToDisplay(drawer.record.final_commission_cents)} />
+              <Info label="Approval" value={drawer.record.approval_status} />
+              <Info label="Payment" value={drawer.record.payment_status} />
+            </div>
+
+            {data?.canComment ? (
+              <div className="mb-4 rounded-xl border border-white/10 p-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-admin-muted">Ask about a field</p>
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {["final_commission", "gross_amount", "commission_rate", "sale_date", "client", "dog", "package_or_class"].map((field) => (
+                    <button
+                      key={field}
+                      type="button"
+                      className={`crossover-btn ${commentField === field ? "crossover-btn--primary" : "crossover-btn--ghost"}`}
+                      onClick={() => setCommentField(field)}
+                    >
+                      {field.replace(/_/g, " ")}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  className="crossover-input min-h-24"
+                  value={commentBody}
+                  onChange={(e) => setCommentBody(e.target.value)}
+                  placeholder="Describe the question or correction request…"
+                />
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--primary mt-2"
+                  disabled={busy || !commentField || !commentBody.trim()}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      await postAction({
+                        action: "comment_cell",
+                        record_id: drawer.record.id,
+                        field_name: commentField,
+                        body: commentBody
+                      });
+                      showToast("Comment submitted for review.", "success");
+                      setCommentBody("");
+                      setCommentField(null);
+                      await openDrawer(drawer.record.id);
+                      await load();
+                    } catch (error) {
+                      showToast(error instanceof Error ? error.message : "Unable to comment.", "error");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Submit comment
+                </button>
+              </div>
+            ) : null}
+
+            <section className="mb-4">
+              <h4 className="mb-2 text-sm font-bold text-white">Comment threads</h4>
+              {(drawer.threads as Array<Record<string, unknown>>).length === 0 ? (
+                <p className="text-sm text-admin-muted">No comments yet.</p>
+              ) : (
+                (drawer.threads as Array<Record<string, unknown>>).map((thread) => (
+                  <div key={String(thread.id)} className="mb-3 rounded-lg border border-white/10 p-3 text-sm">
+                    <div className="mb-1 flex justify-between gap-2">
+                      <strong className="text-white">{String(thread.field_name).replace(/_/g, " ")}</strong>
+                      {statusPill(String(thread.status).replace(/_/g, " "), thread.status === "resolved" ? "green" : "amber")}
+                    </div>
+                    <p className="text-xs text-admin-muted">Value when commented: {String(thread.field_value_at_comment ?? "—")}</p>
+                    <ul className="mt-2 space-y-1">
+                      {((thread.replies as Array<Record<string, unknown>>) ?? []).map((reply) => (
+                        <li key={String(reply.id)} className="rounded bg-white/5 px-2 py-1">
+                          <span className="font-semibold text-white">{String(reply.author_name)}:</span> {String(reply.body)}
+                        </li>
+                      ))}
+                    </ul>
+                    {canManage && thread.status !== "resolved" ? (
+                      <button
+                        type="button"
+                        className="crossover-btn crossover-btn--ghost mt-2"
+                        onClick={async () => {
+                          const note = window.prompt("Resolution note (required):") ?? "";
+                          if (!note.trim()) return;
+                          await postAction({
+                            action: "comment_resolve",
+                            thread_id: thread.id,
+                            resolution_code: "other",
+                            resolution_note: note
+                          });
+                          showToast("Thread resolved.", "success");
+                          await openDrawer(drawer.record.id);
+                          await load();
+                        }}
+                      >
+                        <CheckCircle2 className="h-4 w-4" /> Resolve
+                      </button>
+                    ) : null}
+                  </div>
+                ))
+              )}
+            </section>
+
+            {canManage ? (
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void postAction({ action: "approve", id: drawer.record.id }).then(load)}>
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  onClick={() => {
+                    const reason = window.prompt("Rejection reason:") ?? "";
+                    if (!reason.trim()) return;
+                    void postAction({ action: "reject", id: drawer.record.id, reason }).then(load);
+                  }}
+                >
+                  Reject
+                </button>
+                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void postAction({ action: "ready_for_payroll", id: drawer.record.id }).then(load)}>
+                  Ready for payroll
+                </button>
+                <button type="button" className="crossover-btn crossover-btn--primary" onClick={() => void postAction({ action: "mark_paid", id: drawer.record.id }).then(load)}>
+                  Mark paid
+                </button>
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  onClick={() => {
+                    const amount = window.prompt("Refund amount (dollars):") ?? "";
+                    const reason = window.prompt("Refund reason:") ?? "";
+                    if (!amount || !reason.trim()) return;
+                    void postAction({
+                      action: "refund",
+                      original_record_id: drawer.record.id,
+                      amount,
+                      reason
+                    }).then(() => {
+                      showToast("Refund adjustment created.", "success");
+                      return load();
+                    });
+                  }}
+                >
+                  Process refund
+                </button>
+              </div>
+            ) : null}
+
+            <section>
+              <h4 className="mb-2 text-sm font-bold text-white">Audit history</h4>
+              <ul className="space-y-1 text-xs text-admin-muted">
+                {(drawer.audit as Array<Record<string, unknown>>).slice(0, 40).map((event) => (
+                  <li key={String(event.id)}>
+                    {String(event.created_at)} · {String(event.action)}
+                    {event.reason ? ` — ${String(event.reason)}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </aside>
+        </div>
+      ) : null}
+
+      <Modal open={showImport} title="Import Trainers Invoice CSV" onClose={() => setShowImport(false)}>
+        <p className="mb-3 text-sm text-admin-muted">
+          Upload a Gingr trainers invoice export or Fitdog commission CSV. Valid rows become editable ledger records.
+        </p>
+        <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-white/20 px-4 py-6">
+          <FileSpreadsheet className="h-5 w-5 text-fitdog-orange" />
+          <span className="text-sm font-semibold text-white">{csvFileName ?? "Choose CSV file"}</span>
           <input
             type="file"
             accept=".csv,text/csv"
             className="sr-only"
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
-              void onCsvFileChosen(file);
-              event.target.value = "";
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setCsvText(await file.text());
+              setCsvFileName(file.name);
             }}
           />
         </label>
-
-        <label className="mt-4 grid gap-2">
-          <span className="admin-label">Or paste CSV</span>
-          <textarea
-            className="crossover-input min-h-48 font-mono text-xs"
-            value={csvText}
-            onChange={(e) => {
-              setCsvText(e.target.value);
-              setCsvFileName(null);
-              setCsvImportErrors([]);
-            }}
-            placeholder={"Amanda Smith Nguyen\nDate,Owner's Name,Dog's Name,Class/Program,Price ($),Discount ($),Sales ($),Trainer Commission (%),Trainer Share ($)\n07/02/2026,Owner,Dog,Cool Tricks,$55.00,$0.00,$55.00,50.00%,$27.50"}
-          />
-        </label>
-
-        {csvImportErrors.length ? (
-          <div className="mt-3 max-h-32 overflow-auto rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
-            <p className="mb-1 font-semibold">Some rows could not be imported:</p>
-            <ul className="list-disc space-y-0.5 pl-4">
-              {csvImportErrors.map((message) => (
-                <li key={message}>{message}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
+        <textarea className="crossover-input min-h-40 font-mono text-xs" value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="Paste CSV…" />
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            className="crossover-btn crossover-btn--ghost"
-            onClick={() => {
-              setShowCsvImport(false);
-              setCsvImportErrors([]);
-            }}
-          >
+          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setShowImport(false)}>
             Cancel
           </button>
           <button
             type="button"
             className="crossover-btn crossover-btn--primary"
             disabled={busy || !csvText.trim()}
-            onClick={() => void importCsv()}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const body = await postAction({ action: "import_csv", csv: csvText, filename: csvFileName ?? "paste.csv" });
+                showToast(`Imported ${body.imported ?? 0} row(s).`, "success");
+                setShowImport(false);
+                setCsvText("");
+                setCsvFileName(null);
+                await load();
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : "Import failed.", "error");
+              } finally {
+                setBusy(false);
+              }
+            }}
           >
-            Import
+            Import to ledger
           </button>
         </div>
       </Modal>
+
+      <Modal open={manualOpen} title="Add commission record" onClose={() => setManualOpen(false)}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="grid gap-1 text-sm sm:col-span-2">
+            <span className="admin-label">Trainer</span>
+            <select
+              className="admin-input"
+              value={manualForm.trainer_user_id}
+              onChange={(e) => {
+                const trainer = (data?.trainers ?? []).find((t) => t.id === e.target.value);
+                setManualForm((f) => ({
+                  ...f,
+                  trainer_user_id: e.target.value,
+                  trainer_name: trainer?.full_name ?? "",
+                  trainer_email: trainer?.email ?? ""
+                }));
+              }}
+            >
+              <option value="">Select trainer</option>
+              {(data?.trainers ?? []).map((trainer) => (
+                <option key={trainer.id} value={trainer.id}>
+                  {trainer.full_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {(
+            [
+              ["sale_date", "Sale date", "date"],
+              ["service_date", "Service date", "date"],
+              ["client_name", "Client", "text"],
+              ["dog_name", "Dog", "text"],
+              ["package_or_class", "Package / Class", "text"],
+              ["gross_amount", "Gross amount", "text"],
+              ["discount_amount", "Discount", "text"],
+              ["commission_rate", "Rate %", "text"],
+              ["final_commission", "Final commission (optional override)", "text"]
+            ] as const
+          ).map(([key, label, type]) => (
+            <label key={key} className="grid gap-1 text-sm">
+              <span className="admin-label">{label}</span>
+              <input
+                type={type}
+                className="admin-input"
+                value={manualForm[key]}
+                onChange={(e) => setManualForm((f) => ({ ...f, [key]: e.target.value }))}
+              />
+            </label>
+          ))}
+          <label className="grid gap-1 text-sm sm:col-span-2">
+            <span className="admin-label">Internal notes</span>
+            <textarea
+              className="crossover-input min-h-20"
+              value={manualForm.internal_notes}
+              onChange={(e) => setManualForm((f) => ({ ...f, internal_notes: e.target.value }))}
+            />
+          </label>
+        </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setManualOpen(false)}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                const override = Boolean(manualForm.final_commission.trim());
+                await postAction({
+                  action: "create",
+                  ...manualForm,
+                  quantity: Number(manualForm.quantity || 1),
+                  is_manual_override: override,
+                  override_reason: override ? manualForm.override_reason || "Manual override on create" : null
+                });
+                showToast("Commission record created.", "success");
+                setManualOpen(false);
+                await load();
+              } catch (error) {
+                showToast(error instanceof Error ? error.message : "Unable to create record.", "error");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Save
+          </button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-admin-muted">{label}</p>
+      <p className="text-white">{value}</p>
+    </div>
+  );
+}
+
+function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
+  const { showToast } = useToast();
+  const [periods, setPeriods] = useState<Array<Record<string, unknown>>>([]);
+  const [name, setName] = useState("");
+  const [start, setStart] = useState("");
+  const [end, setEnd] = useState("");
+
+  const load = useCallback(async () => {
+    const response = await fetch("/api/admin/package-commissions?view=payroll", { cache: "no-store" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "Unable to load payroll.");
+    setPeriods(body.periods ?? []);
+  }, []);
+
+  useEffect(() => {
+    void load().catch((error) => showToast(error instanceof Error ? error.message : "Payroll load failed.", "error"));
+  }, [load, showToast]);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-white/10 p-4">
+        <h3 className="mb-3 font-bold text-white">Create payroll period</h3>
+        <div className="flex flex-wrap gap-2">
+          <input className="admin-input" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input type="date" className="admin-input" value={start} onChange={(e) => setStart(e.target.value)} />
+          <input type="date" className="admin-input" value={end} onChange={(e) => setEnd(e.target.value)} />
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            onClick={async () => {
+              const response = await fetch("/api/admin/package-commissions", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "payroll_create", name, start_date: start, end_date: end })
+              });
+              const body = await response.json();
+              if (!response.ok) {
+                showToast(body.error ?? "Unable to create period.", "error");
+                return;
+              }
+              showToast("Payroll period created.", "success");
+              setName("");
+              await load();
+              onRefresh();
+            }}
+          >
+            Create
+          </button>
+        </div>
+      </div>
+      <div className="overflow-auto rounded-xl border border-white/10">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-left text-admin-muted">
+              <th className="px-3 py-2">Name</th>
+              <th className="px-3 py-2">Dates</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {periods.map((period) => (
+              <tr key={String(period.id)} className="border-b border-white/5">
+                <td className="px-3 py-2 text-white">{String(period.name)}</td>
+                <td className="px-3 py-2">
+                  {String(period.start_date)} → {String(period.end_date)}
+                </td>
+                <td className="px-3 py-2">{String(period.status)}</td>
+                <td className="px-3 py-2">
+                  <div className="flex flex-wrap gap-1">
+                    {["under_review", "ready_for_payroll", "paid", "locked"].map((status) => (
+                      <button
+                        key={status}
+                        type="button"
+                        className="crossover-btn crossover-btn--ghost"
+                        onClick={async () => {
+                          const reason =
+                            period.status === "locked"
+                              ? window.prompt("Reason to change locked period (Super Admin):") ?? ""
+                              : undefined;
+                          const response = await fetch("/api/admin/package-commissions", {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ action: "payroll_status", id: period.id, status, reason })
+                          });
+                          const body = await response.json();
+                          if (!response.ok) showToast(body.error ?? "Failed", "error");
+                          else {
+                            showToast(`Period marked ${status}.`, "success");
+                            await load();
+                          }
+                        }}
+                      >
+                        {status.replace(/_/g, " ")}
+                      </button>
+                    ))}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
+  const { showToast } = useToast();
+  const [batches, setBatches] = useState<Array<Record<string, unknown>>>([]);
+
+  useEffect(() => {
+    void fetch("/api/admin/package-commissions?view=imports", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((body) => {
+        if (body.error) throw new Error(body.error);
+        setBatches(body.batches ?? []);
+      })
+      .catch((error) => showToast(error instanceof Error ? error.message : "Unable to load imports.", "error"));
+  }, [showToast]);
+
+  return (
+    <div className="space-y-3">
+      <button type="button" className="crossover-btn crossover-btn--primary" onClick={onOpenImport}>
+        <Upload className="h-4 w-4" /> Upload new CSV
+      </button>
+      <div className="overflow-auto rounded-xl border border-white/10">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-left text-admin-muted">
+              <th className="px-3 py-2">File</th>
+              <th className="px-3 py-2">Uploaded</th>
+              <th className="px-3 py-2">Imported</th>
+              <th className="px-3 py-2">Failed</th>
+              <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {batches.map((batch) => (
+              <tr key={String(batch.id)} className="border-b border-white/5">
+                <td className="px-3 py-2 text-white">{String(batch.original_filename)}</td>
+                <td className="px-3 py-2">{String(batch.uploaded_at)}</td>
+                <td className="px-3 py-2">{String(batch.imported_rows)}</td>
+                <td className="px-3 py-2">{String(batch.failed_rows)}</td>
+                <td className="px-3 py-2">{String(batch.status)}</td>
+                <td className="px-3 py-2">
+                  {batch.status !== "undone" ? (
+                    <button
+                      type="button"
+                      className="crossover-btn crossover-btn--ghost"
+                      onClick={async () => {
+                        if (!window.confirm("Undo this import? Unpaid imported rows will be archived.")) return;
+                        const response = await fetch("/api/admin/package-commissions", {
+                          method: "POST",
+                          headers: { "content-type": "application/json" },
+                          body: JSON.stringify({ action: "undo_import", batch_id: batch.id })
+                        });
+                        const body = await response.json();
+                        if (!response.ok) showToast(body.error ?? "Undo failed.", "error");
+                        else {
+                          showToast(`Archived ${body.archived ?? 0} imported row(s).`, "success");
+                          setBatches((current) =>
+                            current.map((item) => (item.id === batch.id ? { ...item, status: "undone" } : item))
+                          );
+                        }
+                      }}
+                    >
+                      Undo import
+                    </button>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
+  const { showToast } = useToast();
+  const [rules, setRules] = useState<Array<Record<string, unknown>>>([]);
+  const [form, setForm] = useState({ name: "", rate: "50", commission_type: "package_sale", calculation_type: "percentage_of_gross" });
+
+  const load = useCallback(async () => {
+    const response = await fetch("/api/admin/package-commissions?view=rules", { cache: "no-store" });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error ?? "Unable to load rules.");
+    setRules(body.rules ?? []);
+  }, []);
+
+  useEffect(() => {
+    void load().catch((error) => showToast(error instanceof Error ? error.message : "Rules failed.", "error"));
+  }, [load, showToast]);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-white/10 p-4">
+        <h3 className="mb-3 font-bold text-white">Create commission rule</h3>
+        <div className="flex flex-wrap gap-2">
+          <input className="admin-input" placeholder="Rule name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input className="admin-input" placeholder="Rate %" value={form.rate} onChange={(e) => setForm({ ...form, rate: e.target.value })} />
+          <select className="admin-input" value={form.commission_type} onChange={(e) => setForm({ ...form, commission_type: e.target.value })}>
+            <option value="package_sale">Package sale</option>
+            <option value="group_class">Group class</option>
+            <option value="private_session">Private session</option>
+            <option value="evaluation">Evaluation</option>
+            <option value="bonus">Bonus</option>
+          </select>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            onClick={async () => {
+              const response = await fetch("/api/admin/package-commissions", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action: "rule_create", ...form })
+              });
+              const body = await response.json();
+              if (!response.ok) showToast(body.error ?? "Unable to create rule.", "error");
+              else {
+                showToast("Rule created.", "success");
+                setForm({ name: "", rate: "50", commission_type: "package_sale", calculation_type: "percentage_of_gross" });
+                await load();
+              }
+            }}
+          >
+            Save rule
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-admin-muted">{trainers.length} trainers available for trainer-specific rules.</p>
+      </div>
+      <div className="overflow-auto rounded-xl border border-white/10">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="border-b border-white/10 text-left text-admin-muted">
+              <th className="px-3 py-2">Name</th>
+              <th className="px-3 py-2">Type</th>
+              <th className="px-3 py-2">Calc</th>
+              <th className="px-3 py-2">Rate</th>
+              <th className="px-3 py-2">Active</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rules.map((rule) => (
+              <tr key={String(rule.id)} className="border-b border-white/5">
+                <td className="px-3 py-2 text-white">{String(rule.name)}</td>
+                <td className="px-3 py-2">{String(rule.commission_type)}</td>
+                <td className="px-3 py-2">{String(rule.calculation_type)}</td>
+                <td className="px-3 py-2">{rule.rate_bps != null ? bpsToDisplay(Number(rule.rate_bps)) : "—"}</td>
+                <td className="px-3 py-2">{rule.is_active ? "Yes" : "No"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

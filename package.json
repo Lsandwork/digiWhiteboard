@@ -23,6 +23,7 @@
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
     "test:package-commission-percent": "tsx scripts/test-package-commission-percent.ts",
     "test:package-commission-invoice-csv": "tsx scripts/test-package-commission-invoice-csv.ts",
+    "test:commission-ledger": "tsx scripts/test-commission-ledger.ts",
     "test:commissions-nav": "tsx scripts/test-commissions-nav.ts",
     "test:walks-board": "tsx scripts/test-walks-board.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
