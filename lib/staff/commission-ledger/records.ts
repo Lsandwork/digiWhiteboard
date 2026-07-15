@@ -542,11 +542,21 @@ export async function bulkUpdateCommissionRecords(
           .select("*")
           .single();
         if (error) throw new Error(error.message);
-        results.push(mapDbRecord(data as Record<string, unknown>));
+        const record = mapDbRecord(data as Record<string, unknown>);
+        results.push(record);
+        await writeCommissionAudit(supabase, {
+          recordId: id,
+          action: "review_marked",
+          actor,
+          reason: reason ?? null,
+          newValue: "reviewed"
+        });
       } else if (action === "ready_for_payroll") {
         results.push(await setPaymentStatus(supabase, viewer, actor, id, "ready_for_payroll", reason));
       } else if (action === "mark_paid") {
         results.push(await setPaymentStatus(supabase, viewer, actor, id, "paid", reason));
+      } else if (action === "void") {
+        results.push(await setPaymentStatus(supabase, viewer, actor, id, "voided", reason));
       } else if (action === "assign_payroll") {
         const periodId = String(payload.payroll_period_id ?? "");
         if (!periodId) throw new Error("Payroll period is required.");

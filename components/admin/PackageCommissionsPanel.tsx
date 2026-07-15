@@ -83,6 +83,13 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [bulkModal, setBulkModal] = useState<{
+    action: string;
+    label: string;
+    requiresReason: boolean;
+    ids: string[];
+  } | null>(null);
+  const [bulkReason, setBulkReason] = useState("");
   const [drawerId, setDrawerId] = useState<string | null>(null);
   const [drawer, setDrawer] = useState<{
     record: PackageCommissionRecord;
@@ -124,6 +131,24 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
   const isTrainer = Boolean(data?.currentUser?.isTrainerOnly);
   const canManage = Boolean(data?.canManage);
+  const pageRowIds = useMemo(() => (data?.rows ?? []).map((row) => row.id), [data?.rows]);
+  const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
+  const somePageSelected = pageRowIds.some((id) => selected.includes(id)) && !allPageSelected;
+
+  const toggleRowSelection = useCallback((id: string, checked: boolean) => {
+    setSelected((current) => (checked ? [...new Set([...current, id])] : current.filter((rowId) => rowId !== id)));
+  }, []);
+
+  const toggleSelectAllOnPage = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setSelected((current) => current.filter((id) => !pageRowIds.includes(id)));
+        return;
+      }
+      setSelected((current) => [...new Set([...current, ...pageRowIds])]);
+    },
+    [pageRowIds]
+  );
 
   const setParams = useCallback(
     (patch: Record<string, string | null>) => {
@@ -188,6 +213,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  useEffect(() => {
+    setSelected([]);
+  }, [page, tab]);
+
   async function postAction(payload: Record<string, unknown>) {
     const response = await fetch("/api/admin/package-commissions", {
       method: "POST",
@@ -229,27 +258,57 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
   const summary = data?.summaryDisplay;
 
-  async function runBulk(bulkAction: string, extra: Record<string, unknown> = {}) {
-    if (!selected.length) return;
-    const reason =
-      ["reject", "hold", "void"].includes(bulkAction) || extra.requireReason
-        ? window.prompt("Reason (required):") ?? ""
-        : undefined;
-    if ((["reject", "hold", "void"].includes(bulkAction) || extra.requireReason) && !reason?.trim()) {
-      showToast("A reason is required.", "error");
+  const bulkActions = useMemo(
+    () => [
+      { action: "approve", label: "Approve", requiresReason: false },
+      { action: "reject", label: "Reject", requiresReason: true },
+      { action: "hold", label: "Put on Hold", requiresReason: true },
+      { action: "mark_reviewed", label: "Mark Reviewed", requiresReason: false },
+      { action: "ready_for_payroll", label: "Ready for Payroll", requiresReason: false },
+      { action: "mark_paid", label: "Mark Paid", requiresReason: false },
+      { action: "void", label: "Void", requiresReason: true }
+    ],
+    []
+  );
+
+  function openBulkModal(
+    action: string,
+    label: string,
+    requiresReason: boolean,
+    ids: string[] = selected
+  ) {
+    if (!ids.length) {
+      showToast("Select one or more commission rows first.", "error");
+      return;
+    }
+    setBulkReason("");
+    setBulkModal({ action, label, requiresReason, ids });
+  }
+
+  async function confirmBulkAction() {
+    if (!bulkModal || !bulkModal.ids.length) return;
+    if (bulkModal.requiresReason && !bulkReason.trim()) {
+      showToast("A reason is required for this action.", "error");
       return;
     }
     setBusy(true);
     try {
       const result = await postAction({
         action: "bulk",
-        bulk_action: bulkAction,
-        ids: selected,
-        reason,
-        ...extra
+        bulk_action: bulkModal.action,
+        ids: bulkModal.ids,
+        reason: bulkModal.requiresReason ? bulkReason.trim() : undefined
       });
-      showToast(`Updated ${result.results?.length ?? 0} record(s).`, "success");
+      const updated = result.results?.length ?? 0;
+      const failed = result.errors?.length ?? 0;
+      if (failed > 0) {
+        showToast(`Updated ${updated} record(s). ${failed} could not be updated.`, "error");
+      } else {
+        showToast(`Updated ${updated} record(s).`, "success");
+      }
       setSelected([]);
+      setBulkModal(null);
+      setBulkReason("");
       await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Bulk update failed.", "error");
@@ -420,53 +479,50 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </button>
           </div>
 
-          {selected.length > 0 && canManage ? (
-            <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-fitdog-orange/30 bg-fitdog-orange/10 p-3">
-              <span className="text-sm font-semibold text-white">{selected.length} selected</span>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("approve")}>
-                Approve
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("reject")}>
-                Reject
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("hold")}>
-                Hold
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("mark_reviewed")}>
-                Mark Reviewed
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("ready_for_payroll")}>
-                Ready for Payroll
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void runBulk("mark_paid")}>
-                Mark Paid
-              </button>
-              <button
-                type="button"
-                className="crossover-btn crossover-btn--ghost"
-                disabled={busy}
-                onClick={() => {
-                  const periodId = window.prompt("Payroll period ID:") ?? "";
-                  if (!periodId.trim()) return;
-                  void runBulk("assign_payroll", { payroll_period_id: periodId.trim() });
-                }}
-              >
-                Assign Period
-              </button>
-              <button
-                type="button"
-                className="crossover-btn crossover-btn--ghost"
-                disabled={busy}
-                onClick={() => {
-                  if (!window.confirm("Archive selected records?")) return;
-                  void runBulk("archive", { requireReason: true });
-                }}
-              >
-                Archive
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setSelected([])}>
-                Clear selection
-              </button>
+          {canManage ? (
+            <div className="sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#0b1220]/95 p-3 backdrop-blur">
+              <label className="inline-flex items-center gap-2 text-sm text-white">
+                <input
+                  type="checkbox"
+                  checked={allPageSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = somePageSelected;
+                  }}
+                  onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                  aria-label="Select all rows on this page"
+                />
+                <span>
+                  {selected.length > 0
+                    ? `${selected.length} selected`
+                    : "Select rows for bulk actions"}
+                </span>
+              </label>
+              {bulkActions.map((entry) => (
+                <button
+                  key={entry.action}
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  disabled={busy || selected.length === 0}
+                  onClick={() => openBulkModal(entry.action, entry.label, entry.requiresReason)}
+                >
+                  {entry.label}
+                </button>
+              ))}
+              {tab === "approval" && selected.length === 0 && pageRowIds.length > 0 ? (
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--primary"
+                  disabled={busy}
+                  onClick={() => openBulkModal("approve", "Approve all on page", false, pageRowIds)}
+                >
+                  Approve all on page
+                </button>
+              ) : null}
+              {selected.length > 0 ? (
+                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setSelected([])}>
+                  Clear selection
+                </button>
+              ) : null}
             </div>
           ) : null}
 
@@ -474,7 +530,19 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             <table className="min-w-[1400px] w-full border-collapse text-left text-sm">
               <thead className="sticky top-0 z-10 bg-[#0b1220]">
                 <tr className="border-b border-white/10 text-[11px] uppercase tracking-wide text-admin-muted">
-                  {canManage ? <th className="px-3 py-3">Sel</th> : null}
+                  {canManage ? (
+                    <th className="px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={allPageSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = somePageSelected;
+                        }}
+                        onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                        aria-label="Select all rows on this page"
+                      />
+                    </th>
+                  ) : null}
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Trainer</th>
                   <th className="px-3 py-3">Sale Date</th>
@@ -502,22 +570,21 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                     </td>
                   </tr>
                 ) : (
-                  data.rows.map((row) => (
+                  data.rows.map((row) => {
+                    const isSelected = selected.includes(row.id);
+                    return (
                     <tr
                       key={row.id}
-                      className="cursor-pointer border-b border-white/5 hover:bg-white/5"
+                      className={`cursor-pointer border-b border-white/5 hover:bg-white/5 ${isSelected ? "bg-fitdog-orange/10" : ""}`}
                       onClick={() => void openDrawer(row.id)}
                     >
                       {canManage ? (
                         <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
-                            checked={selected.includes(row.id)}
-                            onChange={(e) => {
-                              setSelected((current) =>
-                                e.target.checked ? [...current, row.id] : current.filter((id) => id !== row.id)
-                              );
-                            }}
+                            checked={isSelected}
+                            aria-label={`Select commission for ${row.dog_name}`}
+                            onChange={(e) => toggleRowSelection(row.id, e.target.checked)}
                           />
                         </td>
                       ) : null}
@@ -552,7 +619,8 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                         )}
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -785,6 +853,49 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           </aside>
         </div>
       ) : null}
+
+      <Modal
+        open={Boolean(bulkModal)}
+        title={bulkModal ? `${bulkModal.label} (${bulkModal.ids.length} records)` : "Bulk action"}
+        onClose={() => {
+          setBulkModal(null);
+          setBulkReason("");
+        }}
+      >
+        <p className="mb-3 text-sm text-admin-muted">
+          {bulkModal?.requiresReason
+            ? "This action will apply to every selected commission row. A reason is required."
+            : `Apply ${bulkModal?.label ?? "this action"} to ${bulkModal?.ids.length ?? 0} selected commission row(s)?`}
+        </p>
+        {bulkModal?.requiresReason ? (
+          <textarea
+            className="crossover-input min-h-24 w-full"
+            value={bulkReason}
+            onChange={(e) => setBulkReason(e.target.value)}
+            placeholder="Reason (required)"
+          />
+        ) : null}
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--ghost"
+            onClick={() => {
+              setBulkModal(null);
+              setBulkReason("");
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            disabled={busy || (bulkModal?.requiresReason && !bulkReason.trim())}
+            onClick={() => void confirmBulkAction()}
+          >
+            Confirm
+          </button>
+        </div>
+      </Modal>
 
       <Modal open={showImport} title="Import Trainers Invoice CSV" onClose={() => setShowImport(false)}>
         <p className="mb-3 text-sm text-admin-muted">

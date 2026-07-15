@@ -96,7 +96,10 @@ async function resolveAccess(request: Request) {
     hasPermission(access, "view_package_commissions") ||
     hasPermission(access, "manage_package_commissions");
   const canManage =
-    canManagePackageCommissions(role) || hasPermission(access, "manage_package_commissions");
+    canManagePackageCommissions(role) ||
+    hasPermission(access, "manage_package_commissions") ||
+    hasRole(access, "super_admin") ||
+    hasRole(access, "admin");
   const canComment =
     role === "trainer" || hasPermission(access, "comment_package_commissions") || canManage;
 
