@@ -31,6 +31,15 @@ const nextConfig = {
       {
         source: "/sw-social-moments.js",
         headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }]
+      },
+      {
+        source: "/gingr",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "frame-src 'self' https://fitdog.gingrapp.com https://*.gingrapp.com;"
+          }
+        ]
       }
     ];
   }

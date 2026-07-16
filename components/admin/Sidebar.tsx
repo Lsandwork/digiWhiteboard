@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronsLeft, ChevronsRight, HelpCircle, Menu, X } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
@@ -8,6 +9,7 @@ import { ADMIN_TABS } from "@/lib/admin/types";
 import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
+import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
 import { buildStaffPanelNav, findNavGroupForTab, findNavSectionForTab, getTabDescription, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
 
@@ -125,24 +127,63 @@ function SidebarNavSection({ label }: { label: string }) {
   );
 }
 
+function SidebarNavRouteItem({
+  href,
+  label,
+  active,
+  onNavigate
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  onNavigate: () => void;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`admin-nav-item ${active ? "admin-nav-item--active" : ""}`}
+      title={label}
+      onClick={onNavigate}
+    >
+      <Image src={GINGR_NAV_ICON} alt="" width={20} height={20} className="admin-nav-item__icon shrink-0 rounded-sm" />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
 function NavEntryList({
   entries,
   activeTab,
+  activePath,
   expandedGroups,
   onToggleGroup,
-  onSelect
+  onSelect,
+  onNavigate
 }: {
   entries: NavEntry[];
   activeTab: AdminTab;
+  activePath?: string | null;
   expandedGroups: Set<string>;
   onToggleGroup: (id: string) => void;
   onSelect: (tab: AdminTab) => void;
+  onNavigate: () => void;
 }) {
   return (
     <>
       {entries.map((entry) => {
         if (entry.type === "section") {
           return <SidebarNavSection key={entry.id} label={entry.label} />;
+        }
+        if (entry.type === "route") {
+          return (
+            <SidebarNavRouteItem
+              key={entry.id}
+              href={entry.href}
+              label={entry.label}
+              active={activePath === entry.href}
+              onNavigate={onNavigate}
+            />
+          );
         }
         if (entry.type === "group") {
           return (
@@ -172,6 +213,7 @@ function NavEntryList({
 
 type SidebarProps = {
   activeTab: AdminTab;
+  activePath?: string | null;
   board: AdminBoardType;
   username: string;
   role?: string | null;
@@ -188,6 +230,7 @@ type SidebarProps = {
 
 export function Sidebar({
   activeTab,
+  activePath = null,
   board,
   username,
   role,
@@ -271,9 +314,11 @@ export function Sidebar({
           <NavEntryList
             entries={navEntries}
             activeTab={activeTab}
+            activePath={activePath}
             expandedGroups={expandedGroups}
             onToggleGroup={toggleGroup}
             onSelect={handleSelect}
+            onNavigate={onMobileClose}
           />
         </nav>
 

@@ -7,6 +7,13 @@ export type NavLeaf = {
   label: string;
 };
 
+export type NavRouteLeaf = {
+  type: "route";
+  id: "gingr";
+  href: "/gingr";
+  label: string;
+};
+
 export type NavGroup = {
   type: "group";
   id: string;
@@ -20,7 +27,24 @@ export type NavSection = {
   label: string;
 };
 
-export type NavEntry = NavLeaf | NavGroup | NavSection;
+export type NavEntry = NavLeaf | NavRouteLeaf | NavGroup | NavSection;
+
+/** Shared authenticated routes visible to every signed-in role. */
+export const GINGR_NAV_ROUTE: NavRouteLeaf = {
+  type: "route",
+  id: "gingr",
+  href: "/gingr",
+  label: "Gingr"
+};
+
+export function appendAuthenticatedGlobalRoutes(entries: NavEntry[]): NavEntry[] {
+  const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE];
+  const helpIndex = entries.findIndex((entry) => entry.type === "section" && entry.id === "help");
+  if (helpIndex >= 0) {
+    return [...entries.slice(0, helpIndex), ...globalSection, ...entries.slice(helpIndex)];
+  }
+  return [...entries, ...globalSection];
+}
 
 const TAB_LABELS: Record<AdminTab, string> = {
   checklist: "Check List",
@@ -487,10 +511,12 @@ export function buildStaffPanelNav(
   board: AdminBoardType,
   role?: string | null
 ): NavEntry[] {
-  if (role === "trainer") return buildTrainerNav(visibleTabs);
-  if (role === "team_leader") return buildTeamLeadNav(visibleTabs);
-  if (role === "groomer") return buildGroomerNav(visibleTabs);
-  return buildAdminNav(visibleTabs, board);
+  let entries: NavEntry[];
+  if (role === "trainer") entries = buildTrainerNav(visibleTabs);
+  else if (role === "team_leader") entries = buildTeamLeadNav(visibleTabs);
+  else if (role === "groomer") entries = buildGroomerNav(visibleTabs);
+  else entries = buildAdminNav(visibleTabs, board);
+  return appendAuthenticatedGlobalRoutes(entries);
 }
 
 export function getTabLabel(tab: AdminTab) {

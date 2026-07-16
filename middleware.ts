@@ -130,11 +130,24 @@ async function runMiddleware(request: NextRequest) {
     }
   }
 
+  if (pathname === "/gingr" || pathname.startsWith("/gingr/")) {
+    if (!session) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (session.mustChangePassword) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   // "/" is matched so lobby and CAST-TV custom-domain rewrites can run at the root.
   // Non-custom hosts fall through to the normal Staff board at "/".
-  matcher: ["/", "/admin", "/admin/:path*"]
+  matcher: ["/", "/admin", "/admin/:path*", "/gingr"]
 };
