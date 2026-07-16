@@ -223,10 +223,18 @@ export async function loadFastBoardTransitions(
 }
 
 /** Hide Supabase checkout rows cleared from the cached Gingr basket (no live Gingr call). */
+const BASKET_RECONCILE_DEBOUNCE_MS = 8_000;
+let lastBasketReconcileAt = 0;
+
 export async function reconcileCachedBasketClears(
   supabase: SupabaseClient,
   now = new Date()
 ) {
+  const elapsed = Date.now() - lastBasketReconcileAt;
+  if (elapsed < BASKET_RECONCILE_DEBOUNCE_MS) {
+    return { hidden_count: 0, skipped: true as const };
+  }
+  lastBasketReconcileAt = Date.now();
   const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now, loadCachedGingrCheckoutDogs(now));
   if (!gingrCheckoutKeys) return { hidden_count: 0 };
   return hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, now);

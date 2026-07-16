@@ -124,8 +124,9 @@ export async function GET(request: Request) {
       }
 
       if (canSubmitWriteUpForUser(access, role)) {
+        const reports = await listWriteUpsForCreator(supabase, actor, 100);
         return NextResponse.json({
-          reports: [],
+          reports,
           currentUser: {
             email: session?.email ?? null,
             adminUserId: session?.adminUserId ?? null,

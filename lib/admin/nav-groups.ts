@@ -379,7 +379,8 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
       "team_lead_push",
       "Push to Whiteboard",
       compactEntries([
-        group("push_to_board", "Live Alerts", ["push_notices", "yard_push_notices", "grooming_push"], visible)
+        group("push_to_board", "Live Alerts", ["push_notices", "yard_push_notices", "grooming_push"], visible),
+        ...singles(["whiteboard_preview"], visible)
       ])
     )
   );
@@ -424,6 +425,62 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
   return entries;
 }
 
+/** Groomer panel nav — grooming workflows without empty admin review sections. */
+export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
+  const visible = new Set(visibleTabs);
+  const entries: NavEntry[] = [];
+
+  entries.push(
+    ...sectionEntries(
+      "groomer_push",
+      "Push to Whiteboard",
+      compactEntries([
+        group("groomer_live_alerts", "Live Alerts", ["grooming_push"], visible),
+        ...singles(["whiteboard_preview"], visible)
+      ])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "groomer_operations",
+      "Front Desk & Floor",
+      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "groomer_support",
+      "Management Support",
+      compactEntries([...singles(["management_support"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "groomer_comms",
+      "Communications",
+      compactEntries([...singles(["notifications", "yard_links", "walks_board"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "groomer_admin",
+      "Settings",
+      compactEntries([...singles(["settings"], visible)])
+    )
+  );
+
+  if (visible.has("help")) {
+    entries.push(section("help", "Support"));
+    entries.push(leaf("help"));
+  }
+
+  return entries;
+}
+
 /** Pick the staff-panel sidebar layout for the signed-in role. */
 export function buildStaffPanelNav(
   visibleTabs: AdminTab[],
@@ -432,6 +489,7 @@ export function buildStaffPanelNav(
 ): NavEntry[] {
   if (role === "trainer") return buildTrainerNav(visibleTabs);
   if (role === "team_leader") return buildTeamLeadNav(visibleTabs);
+  if (role === "groomer") return buildGroomerNav(visibleTabs);
   return buildAdminNav(visibleTabs, board);
 }
 

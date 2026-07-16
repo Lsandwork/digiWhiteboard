@@ -66,6 +66,7 @@ import {
   assert.equal(hasPermission(teamLeadAccess, "view_own_write_ups"), false);
   assert.equal(hasPermission(teamLeadAccess, "review_write_ups"), false);
   assert.equal(canAccessAdminTab(teamLeadAccess, "management_support", "team_leader", "staff"), true);
+  assert.equal(canAccessAdminTab(teamLeadAccess, "whiteboard_preview", "team_leader", "staff"), true);
   assert.equal(canAccessAdminTab(teamLeadAccess, "ms_hub", "team_leader", "staff"), false);
 }
 
@@ -96,7 +97,7 @@ import {
   const route = readFileSync(join(process.cwd(), "app/api/admin/management-support/route.ts"), "utf8");
   assert.match(route, /canSubmitWriteUpForUser\(access, role\)/);
   assert.match(route, /role: role \?\? "daycare"/);
-  assert.doesNotMatch(route, /listWriteUpsForCreator\(supabase, actor, 100\);[\s\S]{0,120}role: role \?\? "team_leader"/);
+  assert.doesNotMatch(route, /reports: \[\][\s\S]{0,80}role: role \?\? "team_leader"/);
 
   const hubRoute = readFileSync(join(process.cwd(), "app/api/admin/management-support-hub/route.ts"), "utf8");
   assert.match(hubRoute, /canReviewManagementSupportWithAccess\(access, session\?\.role\)/);

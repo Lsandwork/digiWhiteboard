@@ -6,6 +6,8 @@ export const BOARD_CHECKOUT_POLL_MIN_MS = 1500;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
 export const BOARD_CHECKOUT_POLL_MS = 1500;
 export const BOARD_FULL_SYNC_POLL_MS = 20_000;
+/** Full board sync interval when Supabase Realtime is connected. */
+export const BOARD_FULL_SYNC_POLL_LIVE_MS = 60_000;
 export const BOARD_REALTIME_DEBOUNCE_MS = 0;
 
 export function clampCheckoutPollMs(intervalMs: number) {
@@ -15,8 +17,8 @@ export const BOARD_SETTINGS_POLL_MS = 30_000;
 export const BOARD_FETCH_TIMEOUT_MS = 10000;
 export const BOARD_FAST_FETCH_TIMEOUT_MS = 4000;
 
-/** Consecutive empty basket polls before clearing all checkout rows (1 = immediate). */
-export const EMPTY_BASKET_CONFIRM_POLLS = 1;
+/** Consecutive empty basket polls before clearing all checkout rows. */
+export const EMPTY_BASKET_CONFIRM_POLLS = 2;
 
 /** Webhook checkouts may show briefly before the Gingr basket cache includes them. */
 export const WEBHOOK_BASKET_ADD_GRACE_MS = 12_000;

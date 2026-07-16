@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { buildAdminNav, buildTeamLeadNav, buildTrainerNav, findNavGroupForTab, findNavSectionForTab } from "../lib/admin/nav-groups";
+import { buildAdminNav, buildGroomerNav, buildTeamLeadNav, buildTrainerNav, findNavGroupForTab, findNavSectionForTab } from "../lib/admin/nav-groups";
 import type { AdminTab } from "../lib/admin/types";
 
 const trainerTabs: AdminTab[] = [
@@ -54,6 +54,23 @@ const teamLeadFrontDeskHasSubmit = teamLeadNav.some(
     entry.children.some((child) => child.tab === "management_support")
 );
 assert.equal(teamLeadFrontDeskHasSubmit, false, "management_support should not live under Front Desk & Floor for team leads");
+
+const groomerTabs: AdminTab[] = [
+  "grooming_push",
+  "crossover_communication",
+  "whiteboard_preview",
+  "management_support",
+  "notifications",
+  "yard_links",
+  "walks_board",
+  "settings",
+  "help"
+];
+const groomerNav = buildGroomerNav(groomerTabs);
+assert.equal(findNavSectionForTab(groomerNav, "management_support"), "Management Support");
+assert.equal(findNavSectionForTab(groomerNav, "grooming_push"), "Push to Whiteboard");
+const groomerAdminSection = groomerNav.find((entry) => entry.type === "section" && entry.label === "Management Review");
+assert.equal(groomerAdminSection, undefined, "groomer nav should not include empty Management Review section");
 
 assert.equal(findNavSectionForTab(trainerNav, "package_commissions"), "Commissions");
 assert.equal(findNavGroupForTab(trainerNav, "package_commissions"), "commissions");

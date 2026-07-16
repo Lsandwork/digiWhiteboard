@@ -6,8 +6,9 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import { EMPTY_WARNING_NOTICE_FORM, WarningNoticeForm } from "@/components/admin/WarningNoticeForm";
 import type { WarningNoticeFormData } from "@/lib/staff/warning-notice-constants";
 import type { ManagementReport } from "@/lib/staff/management-reports";
+import { useManagementSupportFetch } from "@/hooks/useManagementSupportFetch";
 
-type ManagementSupportSubTab = "submit" | "review";
+type ManagementSupportSubTab = "submit" | "review" | "filed";
 type GroomerSection = "complaint" | "request";
 type GroomerSubTab = "file" | "filed";
 type TrainerSection = "complaint" | "request";
@@ -170,25 +171,8 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
   const { showToast } = useToast();
   const [section, setSection] = useState<GroomerSection>("complaint");
   const [subTab, setSubTab] = useState<GroomerSubTab>("file");
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, load, setError } = useManagementSupportFetch();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/admin/management-support", { cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
-      setData(body as Payload);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load management support.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -338,25 +322,8 @@ function TrainerManagementSupportPanel() {
   const { showToast } = useToast();
   const [section, setSection] = useState<TrainerSection>("complaint");
   const [subTab, setSubTab] = useState<TrainerSubTab>("file");
-  const [data, setData] = useState<Payload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, load, setError } = useManagementSupportFetch();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/admin/management-support", { cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
-      setData(body as Payload);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load management support.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -590,8 +557,10 @@ function TeamLeadManagementSupportPanel({
       });
       if (allowWriteUpReview) {
         setSubTab("review");
-        await load();
+      } else {
+        setSubTab("filed");
       }
+      await load();
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Unable to submit write-up.";
       setError(message);
@@ -691,7 +660,16 @@ function TeamLeadManagementSupportPanel({
             <ClipboardList className="h-4 w-4" />
             Write Up Review
           </button>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            className={`crossover-btn ${subTab === "filed" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
+            onClick={() => setSubTab("filed")}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Submitted
+          </button>
+        )}
       </div>
 
       {error ? <p className="admin-error">{error}</p> : null}

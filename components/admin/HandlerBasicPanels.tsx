@@ -87,31 +87,65 @@ export function HandlerChecklistPanel() {
   }, [showToast]);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("fitdog_handler_checklist");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as Record<string, boolean | ChecklistItemState>;
-      const now = new Date().toISOString();
-      const normalized: ChecklistState = {};
-      for (const item of items) {
-        const value = parsed[item];
-        if (value && typeof value === "object" && "checked" in value && "timestamp" in value) {
-          normalized[item] = {
-            checked: Boolean(value.checked),
-            timestamp: typeof value.timestamp === "string" ? value.timestamp : now
-          };
-          continue;
+    let active = true;
+    const loadSavedState = async () => {
+      try {
+        const response = await fetch("/api/admin/handler-checklist", { cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Unable to load checklist progress.");
+        if (!active) return;
+        const parsed = (body.checklist_state ?? {}) as ChecklistState;
+        window.setTimeout(() => setChecked(parsed), 0);
+      } catch {
+        try {
+          const raw = window.localStorage.getItem("fitdog_handler_checklist");
+          if (!raw || !active) return;
+          const parsed = JSON.parse(raw) as Record<string, boolean | ChecklistItemState>;
+          const now = new Date().toISOString();
+          const normalized: ChecklistState = {};
+          for (const item of items) {
+            const value = parsed[item];
+            if (value && typeof value === "object" && "checked" in value && "timestamp" in value) {
+              normalized[item] = {
+                checked: Boolean(value.checked),
+                timestamp: typeof value.timestamp === "string" ? value.timestamp : now
+              };
+              continue;
+            }
+            normalized[item] = {
+              checked: Boolean(value),
+              timestamp: now
+            };
+          }
+          window.setTimeout(() => setChecked(normalized), 0);
+        } catch {
+          // ignore parse issues
         }
-        normalized[item] = {
-          checked: Boolean(value),
-          timestamp: now
-        };
       }
-      window.setTimeout(() => setChecked(normalized), 0);
-    } catch {
-      // ignore parse issues
-    }
+    };
+    void loadSavedState();
+    return () => {
+      active = false;
+    };
   }, [items]);
+
+  async function persistChecklistState(next: ChecklistState) {
+    setChecked(next);
+    try {
+      window.localStorage.setItem("fitdog_handler_checklist", JSON.stringify(next));
+    } catch {
+      // ignore storage failures
+    }
+    try {
+      await fetch("/api/admin/handler-checklist", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ checklist_state: next })
+      });
+    } catch {
+      // local copy remains; server sync can retry on next toggle
+    }
+  }
 
   function toggle(item: string) {
     const next: ChecklistState = {
@@ -121,8 +155,7 @@ export function HandlerChecklistPanel() {
         timestamp: new Date().toISOString()
       }
     };
-    setChecked(next);
-    window.localStorage.setItem("fitdog_handler_checklist", JSON.stringify(next));
+    void persistChecklistState(next);
   }
 
   return (

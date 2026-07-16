@@ -1,5 +1,15 @@
 import bcrypt from "bcryptjs";
-import { canAccessFrontDeskLogForRole, canCreateFrontDeskLogForRole } from "@/lib/admin/permissions";
+import {
+  accessFromLegacyRole,
+  canAccessFrontDeskLogForRole,
+  canAccessHrPanelsForUser,
+  canCreateFrontDeskLogForRole,
+  canReviewManagementSupportForUser,
+  canReviewWriteUpsForUser,
+  canSubmitWriteUpForUser,
+  canViewOwnWriteUpsForUser,
+  hasPermission
+} from "@/lib/admin/permissions";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -148,12 +158,13 @@ export function isMarketingRole(role?: string | null) {
 
 /** Team leads and admin/management can submit employee write-ups. */
 export function canSubmitWriteUp(role?: string | null) {
-  return role === "team_leader" || isAdminOrManagementRole(role);
+  return canSubmitWriteUpForUser(accessFromLegacyRole(null, null, role), role);
 }
 
 /** Dog handlers can view write-ups where they are the named employee. */
 export function canViewOwnWriteUps(role?: string | null) {
-  return role === "daycare";
+  if (isAdminOrManagementRole(role)) return false;
+  return canViewOwnWriteUpsForUser(accessFromLegacyRole(null, null, role), role);
 }
 
 /** Operational staff (not admin/management) can file complaints. */
@@ -184,12 +195,7 @@ export function canSubmitGroomerRequest(role?: string | null) {
 /** Groomers and dog handlers can review their own filed complaints and requests. */
 export function canViewOwnGroomerSubmissions(role?: string | null) {
   if (isAdminOrManagementRole(role)) return false;
-  return (
-    role === "groomer" ||
-    role === "daycare" ||
-    role === "front_desk_coordinator" ||
-    role === "team_leader"
-  );
+  return hasPermission(accessFromLegacyRole(null, null, role), "view_own_groomer_submissions");
 }
 
 /** Trainers can file complaints for admin and management review. */
@@ -205,7 +211,8 @@ export function canSubmitTrainerRequest(role?: string | null) {
 
 /** Trainers can review their own filed complaints and requests. */
 export function canViewOwnTrainerSubmissions(role?: string | null) {
-  return role === "trainer";
+  const access = accessFromLegacyRole(null, null, role);
+  return hasPermission(access, "view_own_trainer_submissions");
 }
 
 /** Trainers, admin, and management can view package commission records. */
@@ -230,12 +237,12 @@ export function canManagePackageCommissions(role?: string | null) {
 
 /** Admin and management can review all management support submissions (including write-ups). */
 export function canReviewManagementSupport(role?: string | null) {
-  return isAdminOrManagementRole(role);
+  return canReviewManagementSupportForUser(accessFromLegacyRole(null, null, role), role);
 }
 
 /** Admin and management can review employee write-up submissions. */
 export function canReviewWriteUps(role?: string | null) {
-  return isAdminOrManagementRole(role);
+  return canReviewWriteUpsForUser(accessFromLegacyRole(null, null, role), role);
 }
 
 export function isStaffPanelLimitedRole(role?: string | null) {
@@ -258,7 +265,7 @@ export function isAdminOrManagementRole(role?: string | null) {
 
 /** HR Records and HR Consult — admin and management only. */
 export function canAccessHrPanels(role?: string | null) {
-  return isAdminOrManagementRole(role);
+  return canAccessHrPanelsForUser(accessFromLegacyRole(null, null, role), role);
 }
 
 /** View Staff Directory — coordinators and full admins; mutations remain full-admin only. */

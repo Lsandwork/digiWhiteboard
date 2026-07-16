@@ -34,7 +34,7 @@ import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
   expireStickyCheckoutDogs,
@@ -629,7 +629,11 @@ export function BoardClient({
     const clockIntervalMs = castKeeperMode ? 60_000 : 1000;
     const nowIntervalMs = castKeeperMode ? 5_000 : 1000;
     const fastPollIntervalMs = BOARD_CHECKOUT_POLL_MS;
-    const fullPollIntervalMs = castKeeperMode ? 25_000 : BOARD_FULL_SYNC_POLL_MS;
+    const fullPollIntervalMs = castKeeperMode
+      ? 25_000
+      : connection === "live"
+        ? BOARD_FULL_SYNC_POLL_LIVE_MS
+        : BOARD_FULL_SYNC_POLL_MS;
 
     const clockTimer = window.setInterval(() => setClock(new Date()), clockIntervalMs);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), nowIntervalMs);
@@ -647,7 +651,7 @@ export function BoardClient({
       window.clearInterval(fastPollTimer);
       window.clearInterval(fullPollTimer);
     };
-  }, [castKeeperMode, loadBoard, loadFastCheckouts]);
+  }, [castKeeperMode, connection, loadBoard, loadFastCheckouts]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();

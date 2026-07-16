@@ -81,18 +81,6 @@ html[data-theme="light"] .admin-help-category--active {
   color: var(--text-primary, #ffffff);
 }
 
-/* Browser mode toggle */
-.browser-panel__mode-btn--active {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: rgba(245, 158, 11, 0.45);
-  color: var(--text-primary, #fde68a);
-}
-
-html[data-theme="light"] .browser-panel__mode-btn--active {
-  color: var(--brand);
-  background: var(--brand-soft);
-}
-
 /* Walks board */
 .walks-board-filter--active,
 .walks-board-type-option--active {

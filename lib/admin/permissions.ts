@@ -398,12 +398,14 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_request",
   "view_own_groomer_submissions",
   "view_own_write_ups",
-  "create_trainer_entry"
+  "create_trainer_entry",
+  ...STAFF_NOTIFICATION_PERMISSIONS
 ];
 
 /** Team Lead DigiBoard panel — push, grooming, front desk log, video links, notifications, write-ups, profile. */
 const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
+  "view_staff_whiteboard",
   "manage_push_notices",
   "manage_cast_videos",
   "push_grooming_request",
@@ -440,6 +442,7 @@ export const TEAM_LEADER_TABS = [
   "yard_push_notices",
   "grooming_push",
   "crossover_communication",
+  "whiteboard_preview",
   "yard_links",
   "walks_board",
   "notifications",
@@ -451,6 +454,7 @@ export const TEAM_LEADER_TABS = [
 export const GROOMER_TABS = [
   "grooming_push",
   "crossover_communication",
+  "whiteboard_preview",
   "yard_links",
   "walks_board",
   "notifications",
@@ -475,6 +479,7 @@ export const DOG_HANDLER_TABS = [
   "checklist",
   "yard_links",
   "walks_board",
+  "notifications",
   "management_support",
   "bulk_photo_upload",
   "write_ups",

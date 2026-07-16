@@ -45,8 +45,7 @@ export const FITDOG_UI_PACK = {
   bulkPhotoUpload: "/assets/fitdog/ui-pack/bulk-photo-upload.svg",
   writeUps: "/assets/fitdog/ui-pack/write-ups.svg",
   handlerShiftEntry: "/assets/fitdog/ui-pack/handler-shift-entry.svg",
-  hrPip: "/assets/fitdog/ui-pack/hr-pip.svg",
-  browserWorld: "/assets/fitdog/ui-pack/browser-world.svg"
+  hrPip: "/assets/fitdog/ui-pack/hr-pip.svg"
 } as const;
 
 /** Reusable button icon set aligned to dashboard style. */
