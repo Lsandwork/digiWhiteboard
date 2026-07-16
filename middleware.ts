@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
-import { firstAccessibleAdminTab, isLobbyDigiBoardOnlyLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
+import {
+  firstAccessibleAdminTab,
+  isAdminOrManagementLegacyRole,
+  isFullAdminLegacyRole,
+  isLobbyDigiBoardOnlyLegacyRole,
+  isStaffDigiBoardOnlyLegacyRole
+} from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
 
@@ -109,9 +115,14 @@ async function runMiddleware(request: NextRequest) {
     const isAdminSupportRoute = adminSupportPaths.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
     );
-    const isFullAdmin = role === "owner_admin" || role === "manager_admin";
-    if (isAdminSupportRoute && !isFullAdmin) {
-      return NextResponse.redirect(new URL("/admin?board=staff", request.url));
+    if (isAdminSupportRoute) {
+      const canAccessReviewRoutes =
+        isFullAdminLegacyRole(role) || isAdminOrManagementLegacyRole(role);
+      const canAccessWriteUpSubmitRoute =
+        role === "team_leader" && pathname === "/admin/management-support";
+      if (!canAccessReviewRoutes && !canAccessWriteUpSubmitRoute) {
+        return NextResponse.redirect(new URL("/admin?board=staff", request.url));
+      }
     }
 
     if (pathname.startsWith("/admin/settings/user-groups-permissions") && role !== "owner_admin") {

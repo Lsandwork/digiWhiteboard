@@ -988,6 +988,10 @@ export function canAccessAdminTab(
 
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
 
+  if (tab === "management_support" && board === "staff") {
+    if (canSubmitWriteUpForUser(effective, legacyRole)) return true;
+  }
+
   if (tab === "write_ups" && board === "staff") {
     return (
       canSubmitWriteUpForUser(effective, legacyRole) ||
@@ -1208,6 +1212,7 @@ export function firstAccessibleAdminTab(
           "templates",
           "notifications",
           "package_commissions",
+          "management_support",
           "ms_hub",
           "help"
         ]

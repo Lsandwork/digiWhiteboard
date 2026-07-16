@@ -65,6 +65,8 @@ import {
   assert.equal(hasPermission(teamLeadAccess, "submit_write_up"), true);
   assert.equal(hasPermission(teamLeadAccess, "view_own_write_ups"), false);
   assert.equal(hasPermission(teamLeadAccess, "review_write_ups"), false);
+  assert.equal(canAccessAdminTab(teamLeadAccess, "management_support", "team_leader", "staff"), true);
+  assert.equal(canAccessAdminTab(teamLeadAccess, "ms_hub", "team_leader", "staff"), false);
 }
 
 // Dog handlers can view write-ups about themselves only.

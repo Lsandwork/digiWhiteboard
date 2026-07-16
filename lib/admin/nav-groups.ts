@@ -371,6 +371,72 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
   return entries;
 }
 
+/** Team Lead panel nav — write-up submit lives under Management Support, not Front Desk & Floor. */
+export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
+  const visible = new Set(visibleTabs);
+  const entries: NavEntry[] = [];
+
+  entries.push(
+    ...sectionEntries(
+      "team_lead_push",
+      "Push to Whiteboard",
+      compactEntries([
+        group("push_to_board", "Live Alerts", ["push_notices", "yard_push_notices", "grooming_push"], visible)
+      ])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "team_lead_operations",
+      "Front Desk & Floor",
+      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "team_lead_management_support",
+      "Management Support",
+      compactEntries([...singles(["management_support"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "team_lead_comms",
+      "Communications",
+      compactEntries([...singles(["notifications", "yard_links", "walks_board", "browser"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
+      "team_lead_admin",
+      "Settings",
+      compactEntries([...singles(["settings"], visible)])
+    )
+  );
+
+  if (visible.has("help")) {
+    entries.push(section("help", "Support"));
+    entries.push(leaf("help"));
+  }
+
+  return entries;
+}
+
+/** Pick the staff-panel sidebar layout for the signed-in role. */
+export function buildStaffPanelNav(
+  visibleTabs: AdminTab[],
+  board: AdminBoardType,
+  role?: string | null
+): NavEntry[] {
+  if (role === "trainer") return buildTrainerNav(visibleTabs);
+  if (role === "team_leader") return buildTeamLeadNav(visibleTabs);
+  return buildAdminNav(visibleTabs, board);
+}
+
 export function getTabLabel(tab: AdminTab) {
   return TAB_LABELS[tab];
 }
