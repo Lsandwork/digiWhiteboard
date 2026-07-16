@@ -65,8 +65,17 @@ const STAFF_SUPPORT_TYPES: ManagementReportType[] = [
   "groomer_complaint",
   "groomer_request",
   "trainer_complaint",
-  "trainer_request"
+  "trainer_request",
+  "team_lead_request"
 ];
+
+const GENERIC_SUPPORT_TITLES = new Set([
+  "Groomer Complaint",
+  "Groomer Request",
+  "Trainer Complaint",
+  "Trainer Request",
+  "Team Lead Request"
+]);
 
 function newId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -78,7 +87,7 @@ function detailsText(report: ManagementReport) {
 }
 
 function subjectForReport(report: ManagementReport) {
-  if (report.title && report.title !== "Groomer Complaint" && report.title !== "Groomer Request" && report.title !== "Trainer Complaint" && report.title !== "Trainer Request") {
+  if (report.title && !GENERIC_SUPPORT_TITLES.has(report.title)) {
     return report.title;
   }
   const text = detailsText(report);

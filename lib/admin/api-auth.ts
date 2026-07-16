@@ -30,7 +30,9 @@ import {
   canViewOwnWriteUps as userCanViewOwnWriteUps,
   canViewStaffDirectory,
   hasCoordinatorAccess,
-  isFullAdminRole
+  isAdminOrManagementRole,
+  isFullAdminRole,
+  isTeamLeaderRole
 } from "@/lib/admin/users";
 
 export function isAdminRequest(request: Request) {
@@ -141,6 +143,11 @@ export function canCreateTrainerEntry(role?: string | null) {
 
 export function canSubmitTrainerComplaint(role?: string | null) {
   return userCanSubmitTrainerComplaint(role) || !role;
+}
+
+/** Team leads (and admin/management) can file supply/accommodation requests. */
+export function canSubmitTeamLeadRequest(role?: string | null) {
+  return isTeamLeaderRole(role) || isAdminOrManagementRole(role);
 }
 
 export function canViewOwnTrainerSubmissions(role?: string | null) {

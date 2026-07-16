@@ -11,7 +11,8 @@ export type ManagementReportType =
   | "groomer_complaint"
   | "groomer_request"
   | "trainer_complaint"
-  | "trainer_request";
+  | "trainer_request"
+  | "team_lead_request";
 
 import type { PreviousWarningRow, WarningNoticeViolationType } from "@/lib/staff/warning-notice-constants";
 
@@ -212,6 +213,7 @@ function departmentForReportType(reportType: ManagementReportType): SupportDepar
   if (reportType.startsWith("groomer")) return "Grooming";
   if (reportType.startsWith("trainer")) return "Training";
   if (reportType === "owner_complaint_dog_handler") return "Front Desk";
+  if (reportType.startsWith("team_lead")) return "Front Desk";
   return "Other";
 }
 
@@ -224,6 +226,7 @@ function itemTypeForReportType(reportType: ManagementReportType): "complaint" | 
 function roleForReportType(reportType: ManagementReportType): string | null {
   if (reportType.startsWith("groomer")) return "groomer";
   if (reportType.startsWith("trainer")) return "trainer";
+  if (reportType.startsWith("team_lead")) return "team_leader";
   if (reportType === "employee_write_up") return "team_leader";
   return null;
 }
@@ -478,6 +481,54 @@ export async function createTrainerRequestReport(
     description,
     actor
   });
+}
+
+export async function listTeamLeadSubmissionsForCreator(
+  supabase: SupabaseClient,
+  actor: string,
+  reportType: "team_lead_request",
+  limit = 50
+): Promise<ManagementReport[]> {
+  const state = await loadState(supabase);
+  return sortNewest(state.reports)
+    .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
+    .slice(0, limit);
+}
+
+export async function createTeamLeadRequestReport(
+  supabase: SupabaseClient,
+  description: string,
+  actor: string | null
+): Promise<ManagementReport> {
+  const trimmed = trimField(description, MAX_FIELD_LENGTH);
+  if (!trimmed) throw new Error("Please enter details before submitting.");
+
+  const now = new Date().toISOString();
+  const report: ManagementReport = {
+    id: newId(),
+    report_type: "team_lead_request",
+    title: "Team Lead Request",
+    dog_handler_name: null,
+    complaint_category: null,
+    employee_name: null,
+    summary: trimmed.slice(0, MAX_SUMMARY_LENGTH),
+    write_up_details: null,
+    groomer_submission_details: { description: trimmed },
+    source: "team_lead_form",
+    status: "Needs Review",
+    visibility: "admin_management",
+    push_notice_id: null,
+    related_notes: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    created_by: actor,
+    created_at: now,
+    updated_at: now
+  };
+
+  const state = await loadState(supabase);
+  await saveState(supabase, { reports: sortNewest([report, ...state.reports]) });
+  return report;
 }
 
 export async function createDogHandlerComplaintReport(

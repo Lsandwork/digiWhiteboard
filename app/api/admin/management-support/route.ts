@@ -3,6 +3,7 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import {
   canAccessManagementReports,
   canSubmitGroomerComplaint,
+  canSubmitTeamLeadRequest,
   canSubmitTrainerComplaint,
   isAdminRequest,
   unauthorizedAdminResponse
@@ -23,9 +24,11 @@ import {
   createEmployeeWriteUpReport,
   createGroomerComplaintReport,
   createGroomerRequestReport,
+  createTeamLeadRequestReport,
   createTrainerComplaintReport,
   createTrainerRequestReport,
   listGroomerSubmissionsForCreator,
+  listTeamLeadSubmissionsForCreator,
   listTrainerSubmissionsForCreator,
   listManagementReports,
   listWriteUpsForCreator,
@@ -63,7 +66,8 @@ const ADMIN_REPORT_TYPES = new Set([
   "groomer_complaint",
   "groomer_request",
   "trainer_complaint",
-  "trainer_request"
+  "trainer_request",
+  "team_lead_request"
 ]);
 
 export async function GET(request: Request) {
@@ -74,6 +78,24 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const view = url.searchParams.get("view");
     const supabase = getServiceSupabase();
+
+    // Team leads (and admin/management) fetch their own filed supply/accommodation requests.
+    if (view === "team_lead_requests") {
+      if (!canSubmitTeamLeadRequest(role)) {
+        return NextResponse.json({ error: "You do not have permission to view requests." }, { status: 403 });
+      }
+      const requests = await listTeamLeadSubmissionsForCreator(supabase, actor, "team_lead_request", 100);
+      return NextResponse.json({
+        reports: requests,
+        requests,
+        currentUser: {
+          email: session?.email ?? null,
+          adminUserId: session?.adminUserId ?? null,
+          role: role ?? "team_leader"
+        }
+      });
+    }
+
     if (canAccessManagementReports(role) || canReviewWriteUpsForUser(access, role)) {
       const reports = await listManagementReports(supabase, 100);
       return NextResponse.json({
@@ -338,6 +360,39 @@ export async function POST(request: Request) {
         actorAdminId: session?.adminUserId ?? null,
         actorEmail: session?.email ?? null,
         action: action === "create_trainer_complaint" ? "staff.trainer_complaint.submit" : "staff.trainer_request.submit",
+        targetType: "management_report",
+        targetId: report.id,
+        details: { status: report.status }
+      });
+
+      return NextResponse.json({ ok: true, report });
+    }
+
+    if (action === "create_team_lead_request") {
+      if (!canSubmitTeamLeadRequest(session?.role)) {
+        return NextResponse.json({ error: "You do not have permission to submit this form." }, { status: 403 });
+      }
+
+      const description = String(body.description ?? "").trim();
+      const report = await createTeamLeadRequestReport(supabase, description, actor);
+
+      await dispatchStaffOpsNotificationEvent(supabase, {
+        eventType: "auto_issue",
+        sourceTable: "management_reports",
+        sourceId: report.id,
+        sourceTab: "push_notices",
+        title: report.title,
+        body: report.summary,
+        priority: "Urgent",
+        urgent: true,
+        needsManagementReview: true,
+        actor
+      });
+
+      await writeAdminAuditLog({
+        actorAdminId: session?.adminUserId ?? null,
+        actorEmail: session?.email ?? null,
+        action: "staff.team_lead_request.submit",
         targetType: "management_report",
         targetId: report.id,
         details: { status: report.status }
