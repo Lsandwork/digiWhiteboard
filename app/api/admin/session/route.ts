@@ -31,6 +31,9 @@ export async function GET(request: Request) {
     isDemo: session.isDemo ?? false,
     demoRole: session.demoRole ?? null,
     mustChangePassword,
-    access
+    access,
+    impersonator: session.impersonatorEmail
+      ? { email: session.impersonatorEmail, role: session.impersonatorRole ?? null }
+      : null
   });
 }

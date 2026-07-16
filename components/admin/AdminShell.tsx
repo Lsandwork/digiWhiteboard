@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin/permissions";
 import { FITDOG_BRAND, FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
 import { Sidebar, MobileMenuButton } from "@/components/admin/Sidebar";
+import { ImpersonationBanner } from "@/components/admin/ImpersonationBanner";
 import { buildStaffPanelNav, findNavSectionForTab, getTabDescription, getTabLabel } from "@/lib/admin/nav-groups";
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
@@ -124,6 +125,7 @@ export function AdminShell({
 
   return (
     <div className="admin-theme">
+      <ImpersonationBanner />
       <div className={`admin-layout ${sidebarCollapsed ? "admin-layout--collapsed" : ""}`}>
         <Sidebar
           activeTab={tab}

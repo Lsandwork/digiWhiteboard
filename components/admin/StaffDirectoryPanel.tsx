@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, KeyRound, Pencil, Plus, Search, Trash2, UserRound, XCircle } from "lucide-react";
+import { CheckCircle2, KeyRound, LogIn, Pencil, Plus, Search, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { ADMIN_USER_ROLE_LABELS, canManageStaffDirectory } from "@/lib/admin/users";
+import { ADMIN_USER_ROLE_LABELS, canManageStaffDirectory, isAdminOrManagementRole } from "@/lib/admin/users";
 import type { StaffActivityLog, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { STAFF_DEPARTMENTS, departmentForDashboardRole } from "@/lib/staff/admin-ops";
 
@@ -179,6 +179,36 @@ export function StaffDirectoryPanel() {
   const activeCount = (data?.staff_directory ?? []).filter((member) => member.status === "Active").length;
   const inactiveCount = (data?.staff_directory ?? []).filter((member) => member.status === "Inactive").length;
   const canManageDirectory = canManageStaffDirectory(data?.currentUser.role);
+  const canImpersonate = isAdminOrManagementRole(data?.currentUser.role);
+  const currentAdminUserId = data?.currentUser.adminUserId ?? null;
+  const [impersonateTarget, setImpersonateTarget] = useState<StaffDirectoryMember | null>(null);
+  const [impersonating, setImpersonating] = useState(false);
+
+  function canLogInAsMember(member: StaffDirectoryMember) {
+    return Boolean(
+      canImpersonate && member.admin_user_id && member.admin_user_id !== currentAdminUserId && member.status === "Active"
+    );
+  }
+
+  async function logInAsMember(member: StaffDirectoryMember) {
+    if (!member.admin_user_id) return;
+    setImpersonating(true);
+    try {
+      const response = await fetch("/api/admin/impersonate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ targetAdminUserId: member.admin_user_id })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Unable to log in as this employee.");
+      showToast(`Logging in as ${member.name}…`, "success");
+      window.location.assign("/admin");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to log in as this employee.", "error");
+      setImpersonating(false);
+      setImpersonateTarget(null);
+    }
+  }
   const [selectedChecklistUserId, setSelectedChecklistUserId] = useState<string>("");
   const selectedChecklistMember = useMemo(
     () => (data?.staff_directory ?? []).find((member) => member.id === selectedChecklistUserId) ?? null,
@@ -302,6 +332,18 @@ export function StaffDirectoryPanel() {
                     {canManageDirectory ? (
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
+                          {canLogInAsMember(member) ? (
+                            <button
+                              type="button"
+                              className="admin-icon-btn admin-icon-btn--accent"
+                              disabled={busy || impersonating}
+                              aria-label={`Log in as ${member.name}`}
+                              title="Log In As Employee"
+                              onClick={() => setImpersonateTarget(member)}
+                            >
+                              <LogIn className="h-4 w-4" />
+                            </button>
+                          ) : null}
                           <button type="button" className="admin-icon-btn" disabled={busy} aria-label={`Edit ${member.name}`} onClick={() => setEditing(member)}>
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -345,6 +387,18 @@ export function StaffDirectoryPanel() {
                     <p className="mt-2 text-xs text-admin-muted">
                       Dashboard: {member.admin_user_id ? dashboardRoleLabels[member.dashboard_role ?? "viewer"] : "No login"}
                     </p>
+                    {canLogInAsMember(member) ? (
+                      <div className="mt-3">
+                        <button
+                          type="button"
+                          className="admin-btn-primary inline-flex items-center gap-2"
+                          disabled={busy || impersonating}
+                          onClick={() => setImpersonateTarget(member)}
+                        >
+                          <LogIn className="h-4 w-4" /> Log In As Employee
+                        </button>
+                      </div>
+                    ) : null}
                     {canManageDirectory ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button type="button" className="admin-btn-secondary" disabled={busy} onClick={() => setEditing(member)}>Edit</button>
@@ -465,6 +519,18 @@ export function StaffDirectoryPanel() {
               }}
             />
           ) : null}
+
+          <ConfirmDialog
+            open={Boolean(impersonateTarget)}
+            title="Log in as this employee?"
+            description={`You will switch into ${impersonateTarget?.name ?? "this employee"}'s dashboard and see exactly what they see. You can return to your own account at any time using the banner at the top.`}
+            confirmLabel="Log In As Employee"
+            busy={impersonating}
+            onCancel={() => setImpersonateTarget(null)}
+            onConfirm={() => {
+              if (impersonateTarget) void logInAsMember(impersonateTarget);
+            }}
+          />
 
           <ConfirmDialog
             open={Boolean(deleteMember)}

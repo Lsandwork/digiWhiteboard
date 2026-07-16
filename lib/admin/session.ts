@@ -11,6 +11,11 @@ export type SessionPayload = {
   mustChangePassword?: boolean;
   isDemo?: boolean;
   demoRole?: string;
+  // Impersonation ("Log In As Employee"): original admin identity so the
+  // impersonated session can be reverted. Signed server-side, never trusted from client.
+  impEmail?: string;
+  impId?: string;
+  impRole?: string;
   exp: number;
 };
 
@@ -21,6 +26,9 @@ export type AdminSession = {
   mustChangePassword?: boolean;
   isDemo?: boolean;
   demoRole?: string;
+  impersonatorEmail?: string;
+  impersonatorAdminId?: string;
+  impersonatorRole?: string;
 };
 
 function signPayload(encoded: string) {
@@ -35,6 +43,9 @@ export function createAdminSessionToken(session: AdminSession, ttlMs = SESSION_T
     mustChangePassword: session.mustChangePassword ?? false,
     isDemo: session.isDemo ?? false,
     demoRole: session.demoRole,
+    impEmail: session.impersonatorEmail,
+    impId: session.impersonatorAdminId,
+    impRole: session.impersonatorRole,
     exp: Date.now() + ttlMs
   };
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -61,7 +72,10 @@ export function verifyAdminSessionToken(token: string | undefined | null): Admin
       role: payload.role,
       mustChangePassword: payload.mustChangePassword ?? false,
       isDemo: payload.isDemo ?? false,
-      demoRole: payload.demoRole
+      demoRole: payload.demoRole,
+      impersonatorEmail: payload.impEmail,
+      impersonatorAdminId: payload.impId,
+      impersonatorRole: payload.impRole
     };
   } catch {
     return null;
