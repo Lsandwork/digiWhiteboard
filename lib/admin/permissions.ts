@@ -429,7 +429,6 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "staff_directory",
   "yard_links",
   "walks_board",
-  "browser",
   "notifications",
   "management_support",
   "settings",
@@ -443,7 +442,6 @@ export const TEAM_LEADER_TABS = [
   "crossover_communication",
   "yard_links",
   "walks_board",
-  "browser",
   "notifications",
   "management_support",
   "settings",
@@ -455,7 +453,6 @@ export const GROOMER_TABS = [
   "crossover_communication",
   "yard_links",
   "walks_board",
-  "browser",
   "notifications",
   "management_support",
   "settings",
@@ -468,7 +465,6 @@ export const TRAINER_TABS = [
   "package_commissions",
   "yard_links",
   "walks_board",
-  "browser",
   "notifications",
   "management_support",
   "settings",
@@ -479,7 +475,6 @@ export const DOG_HANDLER_TABS = [
   "checklist",
   "yard_links",
   "walks_board",
-  "browser",
   "management_support",
   "bulk_photo_upload",
   "write_ups",
@@ -677,7 +672,6 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
-  browser: "view_admin_panel",
   settings: "view_admin_panel",
   help: "view_admin_panel",
   lobby_slideshow: "manage_lobby_board",
@@ -982,9 +976,6 @@ export function canAccessAdminTab(
 
   // Walks Board is available to every authenticated staff user on the staff board.
   if (tab === "walks_board") return board === "staff";
-
-  // In-app browser — staff board only, all authenticated staff panel users.
-  if (tab === "browser") return board === "staff";
 
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
 

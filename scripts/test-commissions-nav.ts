@@ -33,7 +33,6 @@ const teamLeadTabs: AdminTab[] = [
   "notifications",
   "yard_links",
   "walks_board",
-  "browser",
   "settings",
   "help"
 ];
