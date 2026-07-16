@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BellRing, CheckCheck, RefreshCw } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { canReviewManagementSupport } from "@/lib/admin/users";
@@ -70,6 +70,8 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
   const [statusFilter, setStatusFilter] = useState("all");
   const [assignedFilter, setAssignedFilter] = useState("");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const lastSelectedRowIndexRef = useRef<number | null>(null);
 
   const session = useMemo(
     () => ({
@@ -134,6 +136,40 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
   );
 
   const canManage = canReviewManagementSupport(session.role);
+
+  const pageRowIds = useMemo(() => filtered.map((item) => item.id), [filtered]);
+
+  const toggleRowSelection = useCallback(
+    (rowId: string, rowIndex: number, checked: boolean, shiftKey: boolean) => {
+      setSelected((current) => {
+        if (shiftKey && lastSelectedRowIndexRef.current !== null) {
+          const anchor = lastSelectedRowIndexRef.current;
+          const start = Math.min(anchor, rowIndex);
+          const end = Math.max(anchor, rowIndex);
+          const rangeIds = pageRowIds.slice(start, end + 1);
+          return [...new Set([...current, ...rangeIds])];
+        }
+        lastSelectedRowIndexRef.current = rowIndex;
+        return checked ? [...new Set([...current, rowId])] : current.filter((id) => id !== rowId);
+      });
+    },
+    [pageRowIds]
+  );
+
+  const toggleSelectAllOnPage = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setSelected((current) => current.filter((id) => !pageRowIds.includes(id)));
+        return;
+      }
+      setSelected((current) => [...new Set([...current, ...pageRowIds])]);
+    },
+    [pageRowIds]
+  );
+
+  useEffect(() => {
+    setSelected((current) => current.filter((id) => pageRowIds.includes(id)));
+  }, [pageRowIds]);
 
   const loadModalDetail = useCallback(async (notificationId: string, markRead = true) => {
     setModalLoading(true);
@@ -200,9 +236,37 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to mark all read.");
+      setSelected([]);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to mark all read.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleMarkSelectedRead() {
+    if (!selected.length) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await Promise.all(
+        selected.map(async (notificationId) => {
+          const response = await fetch("/api/admin/staff-operations", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ action: "mark_notification_read", notification_id: notificationId })
+          });
+          if (!response.ok) {
+            const body = await response.json();
+            throw new Error(body.error ?? "Unable to mark notification read.");
+          }
+        })
+      );
+      setSelected([]);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to mark selected notifications read.");
     } finally {
       setBusy(false);
     }
@@ -320,7 +384,37 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
               <p className="notif-hub-list__empty-text">Loading notifications…</p>
             </div>
           ) : (
-            <NotificationTable items={filtered} onOpen={(item) => void handleOpen(item)} />
+            <>
+              {filtered.length > 0 ? (
+                <div className="admin-ledger-bulk-bar sticky top-0 z-20 mb-3 flex flex-wrap items-center gap-2 p-3">
+                  <span className="text-sm admin-text-emphasis">
+                    {selected.length > 0
+                      ? `${selected.length} selected`
+                      : "Select rows · Shift+click a second row to select the range"}
+                  </span>
+                  <button
+                    type="button"
+                    className="crossover-btn crossover-btn--ghost"
+                    disabled={busy || selected.length === 0}
+                    onClick={() => void handleMarkSelectedRead()}
+                  >
+                    Mark selected read
+                  </button>
+                  {selected.length > 0 ? (
+                    <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setSelected([])}>
+                      Clear selection
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              <NotificationTable
+                items={filtered}
+                selected={selected}
+                onToggleRow={toggleRowSelection}
+                onToggleAll={toggleSelectAllOnPage}
+                onOpen={(item) => void handleOpen(item)}
+              />
+            </>
           )
         }
       />

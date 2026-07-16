@@ -4746,6 +4746,16 @@ html.lobby-tv-display .social-video-shell {
     background: rgba(241, 95, 42, 0.06);
   }
 
+  .notif-response-list__row--selected {
+    background: var(--brand-soft, rgba(255, 111, 38, 0.1));
+  }
+
+  .notif-response-list__select-col {
+    width: 2.75rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
   .notif-response-list td {
     padding: 0.8rem 0.85rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
