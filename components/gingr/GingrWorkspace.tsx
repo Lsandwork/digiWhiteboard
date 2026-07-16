@@ -2,17 +2,16 @@
 
 import { useCallback, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, LoaderCircle, RefreshCw, ShieldAlert } from "lucide-react";
+import { ExternalLink, LoaderCircle, RefreshCw } from "lucide-react";
 import { GINGR_EMPLOYEE_URL, GINGR_NAV_ICON } from "@/lib/gingr/constants";
+import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 
 type GingrWorkspaceProps = {
   embedAllowed: boolean;
-  embedBlockReason?: string | null;
 };
 
-export function GingrWorkspace({ embedAllowed, embedBlockReason }: GingrWorkspaceProps) {
+export function GingrWorkspace({ embedAllowed }: GingrWorkspaceProps) {
   const [status, setStatus] = useState<"loading" | "loaded">("loading");
-  const showIframe = embedAllowed;
 
   const refreshIframe = useCallback(() => {
     const iframe = document.getElementById("gingr-iframe") as HTMLIFrameElement | null;
@@ -33,46 +32,46 @@ export function GingrWorkspace({ embedAllowed, embedBlockReason }: GingrWorkspac
         </div>
 
         <div className="gingr-toolbar-actions">
-          {showIframe ? (
+          {embedAllowed ? (
             <button type="button" className="admin-btn-secondary inline-flex items-center gap-2" onClick={refreshIframe}>
               <RefreshCw aria-hidden="true" className="h-4 w-4" />
               Refresh
             </button>
           ) : null}
 
-          <a
-            href={GINGR_EMPLOYEE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
             className="admin-btn-primary inline-flex items-center gap-2"
+            onClick={() => openGingrSecurely()}
           >
             <ExternalLink aria-hidden="true" className="h-4 w-4" />
-            {showIframe ? "Open separately" : "Open Gingr Securely"}
-          </a>
+            {embedAllowed ? "Open separately" : "Open Gingr Securely"}
+          </button>
         </div>
       </header>
 
       <div className="gingr-frame-shell">
-        {!showIframe ? (
-          <div className="gingr-fallback" role="status">
-            <div className="gingr-fallback__icon" aria-hidden="true">
-              <ShieldAlert className="h-10 w-10" />
+        {!embedAllowed ? (
+          <div className="gingr-launch" role="region" aria-label="Open Gingr">
+            <div className="gingr-launch__brand" aria-hidden="true">
+              <Image src={GINGR_NAV_ICON} alt="" width={72} height={72} className="gingr-launch__logo" />
             </div>
-            <h2>Gingr could not be embedded in this page</h2>
+            <h2>Open Gingr in a secure tab</h2>
             <p>
-              Gingr could not be displayed inside this page because of Gingr or browser security settings. Open Gingr
-              securely in a separate tab to continue.
+              Gingr runs in its own browser tab so you can log in, manage reservations, view customer and pet profiles,
+              use schedules, upload files, and open reports with full functionality.
             </p>
-            {embedBlockReason ? <p className="gingr-fallback__detail">{embedBlockReason}</p> : null}
-            <a
-              href={GINGR_EMPLOYEE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="admin-btn-primary gingr-fallback__cta inline-flex items-center gap-2"
+            <p className="gingr-launch__note">
+              Use the Applications menu anytime to return here. Your Digital Whiteboards stay fast and unaffected.
+            </p>
+            <button
+              type="button"
+              className="admin-btn-primary gingr-launch__cta inline-flex items-center gap-2"
+              onClick={() => openGingrSecurely()}
             >
               <ExternalLink aria-hidden="true" className="h-5 w-5" />
               Open Gingr Securely
-            </a>
+            </button>
           </div>
         ) : (
           <>

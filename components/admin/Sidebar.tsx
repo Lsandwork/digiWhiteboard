@@ -10,6 +10,7 @@ import type { AdminBoardType } from "@/lib/admin/types";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
 import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
+import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
 import { buildStaffPanelNav, findNavGroupForTab, findNavSectionForTab, getTabDescription, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
 
@@ -143,7 +144,10 @@ function SidebarNavRouteItem({
       href={href}
       className={`admin-nav-item ${active ? "admin-nav-item--active" : ""}`}
       title={label}
-      onClick={onNavigate}
+      onClick={() => {
+        openGingrSecurely();
+        onNavigate();
+      }}
     >
       <Image src={GINGR_NAV_ICON} alt="" width={20} height={20} className="admin-nav-item__icon shrink-0 rounded-sm" />
       <span>{label}</span>

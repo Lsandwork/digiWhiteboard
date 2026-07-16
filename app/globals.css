@@ -11344,7 +11344,7 @@ html.lobby-tv-display .lobby-header__title {
   font-weight: 600;
 }
 
-.gingr-fallback {
+.gingr-launch {
   display: flex;
   height: 100%;
   min-height: 600px;
@@ -11356,40 +11356,45 @@ html.lobby-tv-display .lobby-header__title {
   text-align: center;
 }
 
-.gingr-fallback__icon {
+.gingr-launch__brand {
   display: grid;
   place-items: center;
-  width: 4.5rem;
-  height: 4.5rem;
-  border-radius: 999px;
-  background: rgba(255, 122, 0, 0.12);
-  color: var(--fitdog-orange, #ff7a00);
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
-.gingr-fallback h2 {
+.gingr-launch__logo {
+  border-radius: 0.35rem;
+}
+
+.gingr-launch h2 {
   margin: 0;
   max-width: 34rem;
   color: var(--crossover-text, #fff);
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 800;
 }
 
-.gingr-fallback p {
+.gingr-launch p {
   margin: 0;
-  max-width: 36rem;
+  max-width: 38rem;
   color: var(--admin-muted);
-  font-size: 0.92rem;
-  line-height: 1.55;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
-.gingr-fallback__detail {
-  font-size: 0.78rem !important;
-  opacity: 0.85;
+.gingr-launch__note {
+  max-width: 32rem !important;
+  font-size: 0.82rem !important;
+  opacity: 0.9;
 }
 
-.gingr-fallback__cta {
-  margin-top: 0.35rem;
-  padding-inline: 1.25rem;
+.gingr-launch__cta {
+  margin-top: 0.5rem;
+  padding-inline: 1.35rem;
   font-size: 1rem;
 }
 
@@ -11398,7 +11403,7 @@ html[data-theme="light"] .gingr-workspace {
 }
 
 html[data-theme="light"] .gingr-toolbar h1,
-html[data-theme="light"] .gingr-fallback h2 {
+html[data-theme="light"] .gingr-launch h2 {
   color: #1a120d;
 }
 

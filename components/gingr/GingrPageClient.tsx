@@ -28,16 +28,9 @@ type GingrPageClientProps = {
   role: string;
   access: UserAccess | null;
   embedAllowed: boolean;
-  embedBlockReason?: string | null;
 };
 
-export function GingrPageClient({
-  username,
-  role,
-  access,
-  embedAllowed,
-  embedBlockReason
-}: GingrPageClientProps) {
+export function GingrPageClient({ username, role, access, embedAllowed }: GingrPageClientProps) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -126,7 +119,7 @@ export function GingrPageClient({
             <MobileMenuButton onClick={() => setMobileOpen(true)} />
             <ThemeToggle />
           </div>
-          <GingrWorkspace embedAllowed={embedAllowed} embedBlockReason={embedBlockReason} />
+          <GingrWorkspace embedAllowed={embedAllowed} />
         </div>
       </div>
     </div>

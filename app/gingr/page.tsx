@@ -32,7 +32,6 @@ export default async function GingrRoutePage() {
           role={session.role ?? "staff"}
           access={access}
           embedAllowed={embedPolicy.allowed}
-          embedBlockReason={embedPolicy.reason}
         />
       </main>
     </ToastProvider>
