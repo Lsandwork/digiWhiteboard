@@ -237,6 +237,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     try {
       const params = new URLSearchParams(searchParams.toString());
       params.set("view", "ledger");
+      if (tab === "ledger" || tab === "reports") {
+        params.delete("reviewStatus");
+        params.delete("approvalStatus");
+      }
       if (tab === "needs_review") {
         params.set("reviewStatus", "needs_review,disputed");
         params.delete("approvalStatus");

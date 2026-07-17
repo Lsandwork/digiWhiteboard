@@ -48,6 +48,7 @@ import {
   type ResolutionCode
 } from "@/lib/staff/commission-ledger";
 import { centsToDisplay, sanitizeCsvCell } from "@/lib/staff/commission-ledger/money";
+import { normalizeCommissionDateFilter } from "@/lib/staff/commission-ledger/dates";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -118,12 +119,24 @@ function parseListFilters(url: URL): CommissionListFilters {
     return single ? single.split(",").map((v) => v.trim()).filter(Boolean) : undefined;
   };
 
+  const allowedDateFields = new Set([
+    "sale_date",
+    "service_date",
+    "created_at",
+    "confirmed_at",
+    "paid_at"
+  ]);
+  const rawDateField = url.searchParams.get("dateField");
+  const dateField = allowedDateFields.has(rawDateField ?? "")
+    ? (rawDateField as CommissionListFilters["dateField"])
+    : "sale_date";
+
   return {
     q: url.searchParams.get("q") ?? undefined,
     trainerIds: getList("trainerIds") ?? getList("trainer"),
-    dateField: (url.searchParams.get("dateField") as CommissionListFilters["dateField"]) ?? "sale_date",
-    dateFrom: url.searchParams.get("dateFrom") ?? undefined,
-    dateTo: url.searchParams.get("dateTo") ?? undefined,
+    dateField,
+    dateFrom: normalizeCommissionDateFilter(url.searchParams.get("dateFrom") ?? undefined),
+    dateTo: normalizeCommissionDateFilter(url.searchParams.get("dateTo") ?? undefined),
     reviewStatus: getList("reviewStatus") as CommissionListFilters["reviewStatus"],
     approvalStatus: getList("approvalStatus") as CommissionListFilters["approvalStatus"],
     paymentStatus: getList("paymentStatus") as CommissionListFilters["paymentStatus"],

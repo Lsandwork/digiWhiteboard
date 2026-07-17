@@ -196,7 +196,8 @@ export async function importCommissionCsvToLedger(
         internal_notes: row.notes ? String(row.notes) : null,
         rule_snapshot: {
           import_mode: "amount_from_trainer_share",
-          commission_percent: row.commission_percent ?? null
+          commission_percent: row.commission_percent ?? null,
+          sold_at: row.sold_at ?? null
         }
       });
       records.push({ id: created.id });

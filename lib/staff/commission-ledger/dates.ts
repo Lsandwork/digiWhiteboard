@@ -1,5 +1,17 @@
 /** Parse commission sale/service dates from legacy JSON, Gingr CSV, and manual entry. */
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isIsoCommissionDate(value: unknown): value is string {
+  return typeof value === "string" && ISO_DATE.test(value);
+}
+
+/** Normalize filter inputs and stored values to YYYY-MM-DD for Postgres date columns. */
+export function normalizeCommissionDateFilter(value: unknown): string | undefined {
+  const parsed = parseCommissionDate(value);
+  return parsed ?? undefined;
+}
+
 export function parseCommissionDate(value: unknown): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;

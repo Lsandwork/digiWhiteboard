@@ -15,6 +15,8 @@ import {
   sanitizeCsvCell,
   trainerOwnsRecord,
   parseCommissionDate,
+  normalizeCommissionDateFilter,
+  isIsoCommissionDate,
   listCommissionTrainerOptions,
   type CommissionViewer
 } from "../lib/staff/commission-ledger";
@@ -121,6 +123,10 @@ assert.equal(original - fullRefund, 0);
 assert.equal(parseCommissionDate("07142026"), "2026-07-14");
 assert.equal(parseCommissionDate("07/14/2026"), "2026-07-14");
 assert.equal(parseCommissionDate("2026-07-02"), "2026-07-02");
+assert.equal(normalizeCommissionDateFilter("07/02/2026"), "2026-07-02");
+assert.equal(normalizeCommissionDateFilter("2026-07-02"), "2026-07-02");
+assert.equal(isIsoCommissionDate("2026-07-02"), true);
+assert.equal(isIsoCommissionDate("07/02/2026"), false);
 
 const trainerOptions = listCommissionTrainerOptions([
   { id: "1", full_name: "Ivonne Campuzano", email: "ivonne@test.com", role: "trainer", status: "active" },

@@ -1,8 +1,9 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 import { assertCanManage, assertNotManagementDestructive, trainerOwnsRecord } from "./auth";
 import { writeCommissionAudit } from "./audit";
-import { ensureCommissionLedgerBackfill } from "./backfill";
+import { ensureCommissionLedgerBackfill, ensureCommissionSaleDatesRepaired } from "./backfill";
 import { mapDbRecord, computeMissingRequired } from "./map";
+import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import {
   calculatePercentCommissionCents,
   parseMoneyToCents,
@@ -119,8 +120,30 @@ function applyListFilters(
     }
   }
   const dateField = filters.dateField ?? "sale_date";
-  if (filters.dateFrom) q = q.gte(dateField, filters.dateFrom);
-  if (filters.dateTo) q = q.lte(dateField, filters.dateTo);
+  const dateFrom = normalizeCommissionDateFilter(filters.dateFrom);
+  const dateTo = normalizeCommissionDateFilter(filters.dateTo);
+  if (dateFrom || dateTo) {
+    const buildRange = (field: "sale_date" | "service_date") => {
+      const parts: string[] = [];
+      if (dateFrom) parts.push(`${field}.gte.${dateFrom}`);
+      if (dateTo) parts.push(`${field}.lte.${dateTo}`);
+      return parts.length ? `and(${parts.join(",")})` : null;
+    };
+
+    if (dateField === "sale_date" || dateField === "service_date") {
+      const primaryRange = buildRange(dateField);
+      const fallbackField = dateField === "sale_date" ? "service_date" : "sale_date";
+      const fallbackRange = buildRange(fallbackField);
+      if (primaryRange && fallbackRange) {
+        q = q.or(`${primaryRange},${fallbackRange}`);
+      } else if (primaryRange) {
+        q = q.or(primaryRange);
+      }
+    } else {
+      if (dateFrom) q = q.gte(dateField, dateFrom);
+      if (dateTo) q = q.lte(dateField, dateTo);
+    }
+  }
   if (filters.reviewStatus?.length) q = q.in("review_status", filters.reviewStatus);
   if (filters.approvalStatus?.length) q = q.in("approval_status", filters.approvalStatus);
   if (filters.paymentStatus?.length) q = q.in("payment_status", filters.paymentStatus);
@@ -150,6 +173,7 @@ export async function listCommissionRecords(
   filters: CommissionListFilters = {}
 ): Promise<CommissionListResult> {
   await ensureCommissionLedgerBackfill(supabase);
+  await ensureCommissionSaleDatesRepaired(supabase);
 
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
@@ -263,12 +287,14 @@ export async function createCommissionRecord(
   if (!client) throw new Error("Client name is required.");
   if (!dog) throw new Error("Dog name is required.");
   if (!packageOrClass) throw new Error("Package or class is required.");
-  if (!input.sale_date) throw new Error("Sale date is required.");
+  const saleDate = parseCommissionDate(input.sale_date);
+  const serviceDate = parseCommissionDate(input.service_date) ?? saleDate;
+  if (!saleDate) throw new Error("Sale date is required.");
 
   const warnings = computeMissingRequired({
     trainer_name: trainerName,
     trainer_user_id: input.trainer_user_id ?? null,
-    sale_date: input.sale_date,
+    sale_date: saleDate,
     package_or_class: packageOrClass,
     gross_amount_cents: gross,
     commission_rate_bps: rateBps,
@@ -279,8 +305,8 @@ export async function createCommissionRecord(
     trainer_user_id: input.trainer_user_id ?? null,
     trainer_name: trainerName,
     trainer_email: input.trainer_email ?? null,
-    sale_date: input.sale_date,
-    service_date: input.service_date ?? input.sale_date,
+    sale_date: saleDate,
+    service_date: serviceDate,
     client_name: client,
     dog_name: dog,
     commission_type: input.commission_type ?? "package_sale",
@@ -381,12 +407,19 @@ export async function updateCommissionRecord(
     throw new Error("Override reason is required.");
   }
 
+  const nextSaleDate =
+    patch.sale_date !== undefined ? parseCommissionDate(patch.sale_date) : parseCommissionDate(existing.sale_date);
+  const nextServiceDate =
+    patch.service_date !== undefined
+      ? parseCommissionDate(patch.service_date)
+      : parseCommissionDate(existing.service_date) ?? nextSaleDate;
+
   const updates: Record<string, unknown> = {
     trainer_user_id: patch.trainer_user_id !== undefined ? patch.trainer_user_id : existing.trainer_user_id,
     trainer_name: patch.trainer_name ?? existing.trainer_name,
     trainer_email: patch.trainer_email !== undefined ? patch.trainer_email : existing.trainer_email,
-    sale_date: patch.sale_date ?? existing.sale_date,
-    service_date: patch.service_date ?? existing.service_date,
+    sale_date: nextSaleDate,
+    service_date: nextServiceDate,
     client_name: patch.client_name ?? existing.client_name,
     dog_name: patch.dog_name ?? existing.dog_name,
     commission_type: patch.commission_type ?? existing.commission_type,

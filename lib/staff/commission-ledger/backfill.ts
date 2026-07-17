@@ -209,3 +209,70 @@ export async function ensureCommissionLedgerBackfill(supabase: SupabaseClient) {
 
   return { inserted, skipped };
 }
+
+type LegacyCommissionRow = Record<string, unknown>;
+
+function legacySoldAtById(rows: LegacyCommissionRow[]) {
+  const byLegacyId = new Map<string, string | null>();
+  for (const row of rows) {
+    const id = String(row.id ?? "");
+    if (!id) continue;
+    byLegacyId.set(id, parseCommissionDate(row.sold_at));
+  }
+  return byLegacyId;
+}
+
+/**
+ * Repair ledger rows missing sale_date (legacy backfill / compact CSV dates).
+ * Idempotent — safe to run before each list query.
+ */
+export async function ensureCommissionSaleDatesRepaired(supabase: SupabaseClient) {
+  const { data: missing, error } = await supabase
+    .from("package_commission_records")
+    .select("id, legacy_id, sale_date, service_date, rule_snapshot")
+    .is("archived_at", null)
+    .is("sale_date", null)
+    .limit(250);
+  if (error || !missing?.length) return { repaired: 0 };
+
+  const legacyIds = missing.map((row) => String((row as { legacy_id?: string }).legacy_id ?? "")).filter(Boolean);
+  let legacyById = new Map<string, string | null>();
+  if (legacyIds.length) {
+    const { data: settingsRow } = await supabase
+      .from("admin_settings")
+      .select("settings")
+      .eq("id", "default")
+      .maybeSingle();
+    const settings = (settingsRow?.settings ?? {}) as Record<string, unknown>;
+    const store = settings[LEGACY_KEY] as { rows?: LegacyCommissionRow[] } | undefined;
+    legacyById = legacySoldAtById(Array.isArray(store?.rows) ? store!.rows! : []);
+  }
+
+  let repaired = 0;
+  for (const row of missing) {
+    const record = row as {
+      id: string;
+      legacy_id?: string | null;
+      service_date?: string | null;
+      rule_snapshot?: Record<string, unknown> | null;
+    };
+
+    const parsed =
+      parseCommissionDate(record.service_date) ??
+      (record.legacy_id ? legacyById.get(String(record.legacy_id)) ?? null : null) ??
+      parseCommissionDate(record.rule_snapshot?.sold_at);
+    if (!parsed) continue;
+
+    const { error: updateError } = await supabase
+      .from("package_commission_records")
+      .update({
+        sale_date: parsed,
+        service_date: record.service_date ? parseCommissionDate(record.service_date) ?? parsed : parsed,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", record.id);
+    if (!updateError) repaired += 1;
+  }
+
+  return { repaired };
+}
