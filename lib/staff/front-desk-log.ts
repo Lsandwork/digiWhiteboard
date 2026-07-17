@@ -141,6 +141,17 @@ export function isLoggedToday(value: string | null | undefined) {
   return isDueToday(value);
 }
 
+/** Super Admin / Admin (and RBAC equivalents) see past + current-day Front Desk Log history. */
+export function canViewFullFrontDeskLogHistory(role?: string | null) {
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "super_admin" ||
+    role === "admin" ||
+    !role
+  );
+}
+
 export function formatShiftLogDayLabel(date = new Date()) {
   return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }

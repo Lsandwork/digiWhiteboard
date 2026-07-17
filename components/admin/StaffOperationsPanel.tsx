@@ -57,6 +57,7 @@ import {
   type TemplateFieldValues
 } from "@/lib/frontDeskLog/logTemplates";
 import {
+  canViewFullFrontDeskLogHistory,
   formatShiftLogDayLabel,
   isDueToday,
   isLoggedToday,
@@ -574,10 +575,15 @@ function CrossoverPage(props: {
     return filterShiftLogRows(all, filters, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
-  const dailyRows = useMemo(
-    () => filteredRows.filter((item) => isLoggedToday(item.created_at)),
-    [filteredRows]
-  );
+  const canViewFullHistory = canViewFullFrontDeskLogHistory(props.data?.currentUser.role);
+  const dailyRows = useMemo(() => {
+    if (canViewFullHistory) {
+      // Admins see past + today. Keep archived items in Archived Log unless explicitly filtered.
+      if (filters.status === "Archived") return filteredRows;
+      return filteredRows.filter((item) => item.status !== "Archived");
+    }
+    return filteredRows.filter((item) => isLoggedToday(item.created_at));
+  }, [canViewFullHistory, filteredRows, filters.status]);
 
   const openRows = useMemo(
     () => filteredRows.filter((item) => isOpenShiftLogStatus(item.status)),
@@ -652,7 +658,9 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Daily log entries for today appear on top, with all unresolved open items in the full-width table below.
+          {canViewFullHistory
+            ? "Past and current-day log entries appear on top, with unresolved open items in the full-width table below."
+            : "Daily log entries for today appear on top, with all unresolved open items in the full-width table below."}
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
@@ -681,11 +689,19 @@ function CrossoverPage(props: {
             onDetail={props.onDetail}
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
-            title={`Daily Log — ${todayLabel}`}
-            subtitle="All entries logged today, including resolved items from the current shift."
+            title={canViewFullHistory ? "Activity Log — Past & Today" : `Daily Log — ${todayLabel}`}
+            subtitle={
+              canViewFullHistory
+                ? "All past and current-day entries, including resolved items. Archived items are listed below."
+                : "All entries logged today, including resolved items from the current shift."
+            }
             headingId="shift-log-daily-heading"
-            emptyTitle="No entries logged today"
-            emptyText="New shift log entries for today will appear here."
+            emptyTitle={canViewFullHistory ? "No log entries" : "No entries logged today"}
+            emptyText={
+              canViewFullHistory
+                ? "Shift log entries will appear here as they are created."
+                : "New shift log entries for today will appear here."
+            }
             showFilterBar={false}
             showRefresh={false}
           />
