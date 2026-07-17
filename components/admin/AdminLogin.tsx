@@ -8,8 +8,6 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
 import { accessFromLegacyRole, firstAccessibleAdminTab, isMarketingLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
 import type { AdminTab } from "@/lib/admin/types";
-import { DEMO_ACCOUNTS, DEMO_PASSWORD } from "@/lib/demo/constants";
-
 function defaultAdminRoute(role?: string, isDemo?: boolean) {
   if (isDemo) return "/admin?board=staff&tab=demo_push";
   const access = accessFromLegacyRole(null, null, role);
@@ -187,29 +185,7 @@ export function AdminLogin() {
             <ShieldCheck className="h-3.5 w-3.5 text-fitdog-orange" />
             Temporary passwords must be replaced before dashboard access is granted.
           </p>
-        ) : (
-          <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-4 text-left">
-            <p className="text-xs font-semibold uppercase tracking-wide text-fitdog-orange">Investor demo logins</p>
-            <p className="mt-1 text-xs text-admin-muted">Password for all accounts: {DEMO_PASSWORD}</p>
-            <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto text-xs text-admin-muted">
-              {DEMO_ACCOUNTS.map((account) => (
-                <li key={account.email}>
-                  <button
-                    type="button"
-                    className="w-full rounded-md px-2 py-1 text-left hover:bg-white/10 hover:text-white"
-                    onClick={() => {
-                      setUsername(account.email);
-                      setPassword(DEMO_PASSWORD);
-                    }}
-                  >
-                    <span className="font-medium text-white">{account.label}</span>
-                    <span className="ml-2 text-admin-muted">{account.email}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        ) : null}
       </form>
     </main>
   );
