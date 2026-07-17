@@ -43,7 +43,6 @@ import {
   filterShiftLogRows,
   QuickLogTemplatesSidebar,
   ShiftLogFilterBar,
-  ShiftLogRecentActivitySidebar,
   type ShiftLogFilters,
   type ShiftLogFormShape
 } from "@/components/admin/front-desk/FrontDeskLogUI";
@@ -361,7 +360,6 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
         data={data}
         loading={loading}
         busy={busy}
-        recentActivity={recentActivity}
         staffOptions={staffOptions}
         onMutate={mutate}
         onRefresh={load}
@@ -503,7 +501,6 @@ function CrossoverPage(props: {
   data: StaffOpsPayload | null;
   loading: boolean;
   busy: boolean;
-  recentActivity: StaffActivityLog[];
   staffOptions: string[];
   onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -516,12 +513,14 @@ function CrossoverPage(props: {
   const [filters, setFilters] = useState<ShiftLogFilters>(emptyShiftLogFilters);
   const [dailyPage, setDailyPage] = useState(1);
   const [openPage, setOpenPage] = useState(1);
+  const [archivedPage, setArchivedPage] = useState(1);
   const todayLabel = useMemo(() => formatShiftLogDayLabel(), []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDailyPage(1);
       setOpenPage(1);
+      setArchivedPage(1);
     }, 0);
     return () => window.clearTimeout(timer);
   }, [filters]);
@@ -585,8 +584,19 @@ function CrossoverPage(props: {
     [filteredRows]
   );
 
+  const archivedRows = useMemo(
+    () =>
+      filterShiftLogRows(
+        props.data?.crossover_messages ?? [],
+        { ...filters, status: "Archived", openOnly: false },
+        queryFields
+      ),
+    [filters, props.data?.crossover_messages, queryFields]
+  );
+
   const pagedDaily = paginate(dailyRows, dailyPage);
   const pagedOpen = paginate(openRows, openPage);
+  const pagedArchived = paginate(archivedRows, archivedPage);
   const allMessages = props.data?.crossover_messages ?? [];
   const openMessages = allMessages.filter((item) => isOpenShiftLogStatus(item.status));
   const kpiCards = shiftLogKpiCards({
@@ -729,8 +739,34 @@ function CrossoverPage(props: {
         <div className="crossover-dashboard__workspace-templates">
           <QuickLogTemplatesSidebar selectedTemplateId={form.template_id} onPick={pickTemplate} />
         </div>
-        <div className="crossover-dashboard__workspace-activity">
-          <ShiftLogRecentActivitySidebar items={props.recentActivity} formatDateTime={formatDateTime} />
+        <div className="crossover-dashboard__workspace-archived">
+          <ActiveShiftLogCard
+            rows={pagedArchived.rows}
+            total={archivedRows.length}
+            page={pagedArchived.page}
+            maxPage={pagedArchived.maxPage}
+            pageSize={PAGE_SIZE}
+            busy={props.busy}
+            loading={props.loading}
+            canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
+            directory={props.data?.staff_directory}
+            filters={filters}
+            setFilters={setFilters}
+            assignOptions={assignOptions}
+            onPage={setArchivedPage}
+            onRefresh={props.onRefresh}
+            onMutate={props.onMutate}
+            onDetail={props.onDetail}
+            onEdit={props.onEdit}
+            formatDateTime={formatDateTime}
+            title="Archived Log"
+            subtitle="Archived shift log entries kept for reference after follow-up is complete."
+            headingId="shift-log-archived-heading"
+            emptyTitle="No archived log entries"
+            emptyText="Archived items will appear here when a log is marked archived."
+            showFilterBar={false}
+            showRefresh={false}
+          />
         </div>
       </div>
       <DetailModal data={props.data} detail={props.detail} busy={props.busy} staffOptions={props.staffOptions} onMutate={props.onMutate} onClose={props.onCloseDetail} />

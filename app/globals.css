@@ -5786,19 +5786,9 @@ html.lobby-tv-display .social-video-shell {
   align-items: start;
 }
 
-@media (min-width: 1280px) {
+@media (min-width: 768px) {
   .crossover-dashboard__workspace {
-    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr) minmax(280px, 1fr);
-  }
-}
-
-@media (min-width: 768px) and (max-width: 1279px) {
-  .crossover-dashboard__workspace {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  }
-
-  .crossover-dashboard__workspace-form {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
   }
 }
 
@@ -5810,12 +5800,15 @@ html.lobby-tv-display .social-video-shell {
 
 .crossover-dashboard__workspace-form,
 .crossover-dashboard__workspace-templates,
-.crossover-dashboard__workspace-activity {
+.crossover-dashboard__workspace-archived {
   min-width: 0;
 }
 
-.crossover-dashboard__workspace-templates .crossover-card,
-.crossover-dashboard__workspace-activity .crossover-card {
+.crossover-dashboard__workspace-archived {
+  grid-column: 1 / -1;
+}
+
+.crossover-dashboard__workspace-templates .crossover-card {
   height: 100%;
 }
 

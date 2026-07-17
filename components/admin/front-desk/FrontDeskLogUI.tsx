@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ClipboardList, Plus } from "lucide-react";
-import type { CrossoverMessage, CrossoverReply, StaffActivityLog, StaffDirectoryMember, StaffOpsPriority, StaffOpsStatus } from "@/lib/staff/admin-ops";
+import type { CrossoverMessage, CrossoverReply, StaffDirectoryMember, StaffOpsPriority, StaffOpsStatus } from "@/lib/staff/admin-ops";
 import { STAFF_PRIORITIES } from "@/lib/staff/admin-ops";
 import { CROSSOVER_ASSETS } from "@/lib/admin/crossover-assets";
 import { FITDOG_UI } from "@/lib/fitdog-dashboard/assets";
@@ -698,38 +698,6 @@ export function QuickLogTemplatesSidebar({
             </button>
           );
         })}
-      </div>
-    </section>
-  );
-}
-
-export function ShiftLogRecentActivitySidebar({ items, formatDateTime }: { items: StaffActivityLog[]; formatDateTime: (value: string | null) => string }) {
-  const trackingItems = useMemo(
-    () =>
-      items.filter((item) =>
-        item.activity_type.startsWith("shift_log.") ||
-        item.activity_type.startsWith("follow_up.created_from_log") ||
-        item.activity_type.includes("management_alerted")
-      ),
-    [items]
-  );
-
-  return (
-    <section className="crossover-card crossover-card--sidebar" aria-labelledby="shift-log-activity-heading">
-      <header className="crossover-card__header crossover-card__header--compact">
-        <div className="crossover-card__header-main">
-          <IconTile src={CROSSOVER_ASSETS.refresh} alt="Recent activity" size={48} />
-          <h3 id="shift-log-activity-heading" className="crossover-card__title">Recent Activity</h3>
-        </div>
-      </header>
-      <div className="crossover-activity-list">
-        {trackingItems.length ? trackingItems.slice(0, 12).map((item) => (
-          <article key={item.id} className="crossover-activity-row">
-            <p className="crossover-activity-row__title">{item.title}</p>
-            {item.description ? <p className="crossover-activity-row__text">{item.description}</p> : null}
-            <p className="crossover-activity-row__meta">{formatDateTime(item.created_at)}</p>
-          </article>
-        )) : <p className="crossover-empty__text">Activity will appear here as logs are created and updated.</p>}
       </div>
     </section>
   );
