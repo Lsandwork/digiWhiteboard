@@ -24,7 +24,7 @@ function defaultAdminRoute(role?: string, isDemo?: boolean) {
 export function AdminLogin() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [username, setUsername] = useState("admin");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
