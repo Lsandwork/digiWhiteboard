@@ -112,8 +112,126 @@ html[data-theme="light"] .admin-header-brand__title {
   color: var(--fitdog-text);
 }
 
-html[data-theme="light"] .admin-theme .text-emerald-400 {
-  color: #059669;
+/* Remap dark-theme pastel Tailwind text colors so they stay readable on white */
+html[data-theme="light"] .admin-theme [class*="text-emerald-50"],
+html[data-theme="light"] .admin-theme [class*="text-emerald-100"],
+html[data-theme="light"] .admin-theme [class*="text-emerald-200"],
+html[data-theme="light"] .admin-theme [class*="text-emerald-300"],
+html[data-theme="light"] .admin-theme [class*="text-green-50"],
+html[data-theme="light"] .admin-theme [class*="text-green-100"],
+html[data-theme="light"] .admin-theme [class*="text-green-200"],
+html[data-theme="light"] .admin-theme [class*="text-green-300"],
+html[data-theme="light"] .admin-theme [class*="text-lime-100"],
+html[data-theme="light"] .admin-theme [class*="text-lime-200"],
+html[data-theme="light"] .admin-theme [class*="text-lime-300"] {
+  color: #166534 !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-emerald-400"],
+html[data-theme="light"] .admin-theme [class*="text-emerald-500"],
+html[data-theme="light"] .admin-theme [class*="text-green-400"],
+html[data-theme="light"] .admin-theme [class*="text-green-500"] {
+  color: #047857 !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-rose-50"],
+html[data-theme="light"] .admin-theme [class*="text-rose-100"],
+html[data-theme="light"] .admin-theme [class*="text-rose-200"],
+html[data-theme="light"] .admin-theme [class*="text-rose-300"],
+html[data-theme="light"] .admin-theme [class*="text-red-50"],
+html[data-theme="light"] .admin-theme [class*="text-red-100"],
+html[data-theme="light"] .admin-theme [class*="text-red-200"],
+html[data-theme="light"] .admin-theme [class*="text-red-300"] {
+  color: #991b1b !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-rose-400"],
+html[data-theme="light"] .admin-theme [class*="text-red-400"],
+html[data-theme="light"] .admin-theme [class*="text-red-500"] {
+  color: #b91c1c !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-amber-50"],
+html[data-theme="light"] .admin-theme [class*="text-amber-100"],
+html[data-theme="light"] .admin-theme [class*="text-amber-200"],
+html[data-theme="light"] .admin-theme [class*="text-amber-300"],
+html[data-theme="light"] .admin-theme [class*="text-yellow-50"],
+html[data-theme="light"] .admin-theme [class*="text-yellow-100"],
+html[data-theme="light"] .admin-theme [class*="text-yellow-200"],
+html[data-theme="light"] .admin-theme [class*="text-yellow-300"] {
+  color: #92400e !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-amber-400"],
+html[data-theme="light"] .admin-theme [class*="text-yellow-400"],
+html[data-theme="light"] .admin-theme [class*="text-orange-200"],
+html[data-theme="light"] .admin-theme [class*="text-orange-300"] {
+  color: #c2410c !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-sky-50"],
+html[data-theme="light"] .admin-theme [class*="text-sky-100"],
+html[data-theme="light"] .admin-theme [class*="text-sky-200"],
+html[data-theme="light"] .admin-theme [class*="text-sky-300"],
+html[data-theme="light"] .admin-theme [class*="text-blue-50"],
+html[data-theme="light"] .admin-theme [class*="text-blue-100"],
+html[data-theme="light"] .admin-theme [class*="text-blue-200"],
+html[data-theme="light"] .admin-theme [class*="text-blue-300"],
+html[data-theme="light"] .admin-theme [class*="text-cyan-100"],
+html[data-theme="light"] .admin-theme [class*="text-cyan-200"],
+html[data-theme="light"] .admin-theme [class*="text-cyan-300"] {
+  color: #1d4ed8 !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-sky-400"],
+html[data-theme="light"] .admin-theme [class*="text-blue-400"],
+html[data-theme="light"] .admin-theme [class*="text-cyan-400"] {
+  color: #2563eb !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-violet-100"],
+html[data-theme="light"] .admin-theme [class*="text-violet-200"],
+html[data-theme="light"] .admin-theme [class*="text-violet-300"],
+html[data-theme="light"] .admin-theme [class*="text-purple-100"],
+html[data-theme="light"] .admin-theme [class*="text-purple-200"],
+html[data-theme="light"] .admin-theme [class*="text-purple-300"],
+html[data-theme="light"] .admin-theme [class*="text-fuchsia-100"],
+html[data-theme="light"] .admin-theme [class*="text-fuchsia-200"],
+html[data-theme="light"] .admin-theme [class*="text-fuchsia-300"] {
+  color: #6d28d9 !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-slate-100"],
+html[data-theme="light"] .admin-theme [class*="text-slate-200"],
+html[data-theme="light"] .admin-theme [class*="text-gray-100"],
+html[data-theme="light"] .admin-theme [class*="text-gray-200"],
+html[data-theme="light"] .admin-theme [class*="text-zinc-100"],
+html[data-theme="light"] .admin-theme [class*="text-zinc-200"] {
+  color: #12213a !important;
+}
+
+html[data-theme="light"] .admin-theme [class*="text-slate-300"],
+html[data-theme="light"] .admin-theme [class*="text-gray-300"],
+html[data-theme="light"] .admin-theme [class*="text-zinc-300"] {
+  color: #334155 !important;
+}
+
+/* Soft tinted callout boxes: keep readable text on pale fills */
+html[data-theme="light"] .admin-theme [class*="bg-emerald-"][class*="text-emerald-"],
+html[data-theme="light"] .admin-theme [class*="bg-green-"][class*="text-emerald-"],
+html[data-theme="light"] .admin-theme [class*="bg-green-"][class*="text-green-"] {
+  color: #166534 !important;
+}
+
+html[data-theme="light"] .admin-callout--success,
+html[data-theme="light"] .admin-theme .admin-callout--success {
+  border: 1px solid rgba(22, 163, 74, 0.35);
+  background: #dcfce7;
+  color: #166534;
+}
+
+html[data-theme="light"] .admin-theme code {
+  color: inherit;
 }
 
 html[data-theme="light"] .admin-input,
@@ -382,6 +500,91 @@ html[data-theme="light"] .crossover-urgent-pill {
   border-color: var(--border);
   background: var(--surface);
   color: var(--text-secondary);
+}
+
+html[data-theme="light"] .crossover-urgent-pill--on,
+html[data-theme="light"] .crossover-badge--urgent,
+html[data-theme="light"] .admin-notif-priority--urgent,
+html[data-theme="light"] .notif-hub-priority--high {
+  border-color: rgba(185, 28, 28, 0.4);
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+html[data-theme="light"] .crossover-badge--status-active,
+html[data-theme="light"] .notif-hub-status--resolved,
+html[data-theme="light"] .admin-badge--green {
+  background: #dcfce7;
+  color: #166534;
+  border-color: rgba(22, 163, 74, 0.35);
+}
+
+html[data-theme="light"] .crossover-badge--status-pending,
+html[data-theme="light"] .admin-notif-priority--medium,
+html[data-theme="light"] .notif-hub-priority--medium,
+html[data-theme="light"] .notif-hub-status--review,
+html[data-theme="light"] .notif-hub-type--writeup {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+html[data-theme="light"] .shift-log-badge--type-complaint,
+html[data-theme="light"] .shift-log-badge--type-medical,
+html[data-theme="light"] .shift-log-badge--type-staff,
+html[data-theme="light"] .notif-hub-type--complaint {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+html[data-theme="light"] .shift-log-badge--type-request,
+html[data-theme="light"] .shift-log-badge--type-schedule {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.35);
+}
+
+html[data-theme="light"] .shift-log-badge--type-dog,
+html[data-theme="light"] .shift-log-badge--type-daycare {
+  background: #dcfce7;
+  color: #166534;
+  border-color: rgba(22, 163, 74, 0.35);
+}
+
+html[data-theme="light"] .shift-log-badge--type-billing {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: rgba(217, 119, 6, 0.4);
+}
+
+html[data-theme="light"] .cast-tv-admin__status .is-online,
+html[data-theme="light"] .cast-tv-admin-card__status.is-enabled {
+  color: #047857;
+}
+
+html[data-theme="light"] .cast-tv-admin__status .is-offline,
+html[data-theme="light"] .cast-tv-admin-card__status.is-disabled {
+  color: #b91c1c;
+}
+
+html[data-theme="light"] .cast-tv-admin__last-seen {
+  color: #64748b;
+}
+
+html[data-theme="light"] .cast-tv-admin-card {
+  background: #fff;
+  border-color: var(--border);
+}
+
+html[data-theme="light"] .cast-tv-admin-card__name-input {
+  background: #fff;
+  border-color: var(--input-border);
+  color: var(--text-primary);
+}
+
+html[data-theme="light"] .admin-theme a:not(.admin-btn-primary):not(.admin-btn-secondary):not(.crossover-btn):not(.crossover-btn--primary):not(.crossover-btn--outline):not(.crossover-btn--ghost):not(.admin-nav-item) {
+  color: #c2410c;
 }
 
 html[data-theme="light"] .admin-icon-btn {

@@ -40,6 +40,13 @@
   color: var(--fitdog-text);
 }
 
+/* Semantic callouts — dark defaults; light theme remaps in theme-light.css */
+.admin-callout--success {
+  border: 1px solid rgba(41, 205, 98, 0.35);
+  background: rgba(41, 205, 98, 0.12);
+  color: #bbf7d0;
+}
+
 .admin-sidebar {
   border-right: 1px solid var(--fitdog-border);
   background: var(--fitdog-sidebar);

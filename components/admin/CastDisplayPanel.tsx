@@ -119,7 +119,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
               Use Cast Mode URLs for Chromecast and Google TV Streamer. These lightweight pages stay smooth for long
               sessions. Open directly on the TV browser for best reliability.
             </p>
-            <p className="mt-3 max-w-2xl rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">
+            <p className="admin-callout--success mt-3 max-w-2xl rounded-xl border border-emerald-600/30 bg-emerald-500/10 p-3 text-sm font-semibold text-emerald-100">
               Auto schedule: boards soft-refresh around 5:00 AM Pacific so overnight freezes clear without a manual Hard
               Refresh. Keep the cast URL open on each TV.
             </p>
@@ -144,13 +144,14 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
           </div>
         </div>
 
-        <p className="mt-4 rounded-xl border border-admin-border bg-ink-950/40 px-4 py-3 text-sm text-admin-muted">
+        <p className="mt-4 rounded-xl border border-admin-border bg-[var(--surface-hover)] px-4 py-3 text-sm text-admin-muted">
           <span className="font-semibold admin-text-emphasis">{displayTypeLabel(displayType)} — Cast Mode</span>
           <span className="mx-2 text-admin-muted">·</span>
-          <code className="text-xs text-emerald-300">{castLiteUrl}</code>
+          <code className="break-all text-xs font-semibold text-emerald-300">{castLiteUrl}</code>
         </p>
         <p className="mt-2 text-xs text-admin-muted">
-          Legacy display URL: <code className="text-emerald-300/80">{legacyCastUrl}</code>
+          Legacy display URL:{" "}
+          <code className="break-all font-semibold text-emerald-300/80">{legacyCastUrl}</code>
         </p>
       </section>
 
