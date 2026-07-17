@@ -1,6 +1,7 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
 import {
+  canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
   priorityRank,
   shouldAlertManagement,
@@ -1006,6 +1007,36 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
 
   await saveState(supabase, next);
   return updatedRecord;
+}
+
+export async function deleteCrossoverMessage(
+  supabase: SupabaseClient,
+  id: string,
+  actor: string | null,
+  options: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  const state = await loadState(supabase);
+  const existing = state.crossover_messages.find((item) => item.id === id);
+  if (!existing) throw new Error("Shift log entry not found.");
+  if (!canDeleteFrontDeskLogEntry(existing, options)) {
+    throw new Error("You can only delete Front Desk Log entries that you created.");
+  }
+
+  let next: StaffOpsState = {
+    ...state,
+    crossover_messages: state.crossover_messages.filter((item) => item.id !== id),
+    crossover_message_replies: state.crossover_message_replies.filter((reply) => reply.crossover_message_id !== id)
+  };
+  next = createActivityLog(next, {
+    activity_type: "shift_log.deleted",
+    title: `Log deleted: ${existing.subject}`,
+    description: `Deleted by ${actor ?? "Staff"}`,
+    source_table: "crossover_messages",
+    source_id: id,
+    created_by: actor
+  });
+  await saveState(supabase, next);
+  return { id };
 }
 
 export async function createOwnerFollowUp(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {

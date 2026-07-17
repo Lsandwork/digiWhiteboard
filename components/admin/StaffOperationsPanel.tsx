@@ -673,6 +673,7 @@ function CrossoverPage(props: {
             busy={props.busy}
             loading={props.loading}
             canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
+            currentUser={props.data?.currentUser ?? null}
             directory={props.data?.staff_directory}
             filters={filters}
             setFilters={setFilters}
@@ -700,6 +701,7 @@ function CrossoverPage(props: {
             busy={props.busy}
             loading={props.loading}
             canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
+            currentUser={props.data?.currentUser ?? null}
             directory={props.data?.staff_directory}
             filters={filters}
             setFilters={setFilters}
@@ -751,6 +753,7 @@ function CrossoverPage(props: {
             busy={props.busy}
             loading={props.loading}
             canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
+            currentUser={props.data?.currentUser ?? null}
             directory={props.data?.staff_directory}
             filters={filters}
             setFilters={setFilters}

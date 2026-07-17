@@ -22,6 +22,7 @@ import {
 } from "@/lib/frontDeskLog/logTemplates";
 import {
   ASSIGNMENT_TEAMS,
+  canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
   isDueToday,
   isOpenShiftLogStatus,
@@ -112,6 +113,7 @@ export function ShiftLogStatusBadge({ status }: { status: StaffOpsStatus }) {
 function ShiftLogRowMenu({
   busy,
   canPushToWhiteboard,
+  canDelete,
   resolveLabel,
   onDetail,
   onEdit,
@@ -119,10 +121,12 @@ function ShiftLogRowMenu({
   onArchive,
   onInProgress,
   onFollowUp,
-  onIssue
+  onIssue,
+  onDelete
 }: {
   busy: boolean;
   canPushToWhiteboard: boolean;
+  canDelete: boolean;
   resolveLabel: string;
   onDetail: () => void;
   onEdit: () => void;
@@ -131,6 +135,7 @@ function ShiftLogRowMenu({
   onInProgress: () => void;
   onFollowUp: () => void;
   onIssue: () => void;
+  onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -164,6 +169,19 @@ function ShiftLogRowMenu({
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onFollowUp(); }}>Create Owner Follow Up</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onIssue(); }}>Create Active Issue</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onArchive(); }}>Archive</button>
+            {canDelete ? (
+              <button
+                type="button"
+                className="crossover-more-menu__item crossover-more-menu__item--danger"
+                disabled={busy}
+                onClick={() => {
+                  setOpen(false);
+                  onDelete();
+                }}
+              >
+                Delete
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -251,6 +269,7 @@ export function ActiveShiftLogCard({
   busy,
   loading,
   canPushToWhiteboard,
+  currentUser,
   directory,
   filters,
   setFilters,
@@ -277,6 +296,7 @@ export function ActiveShiftLogCard({
   busy: boolean;
   loading: boolean;
   canPushToWhiteboard: boolean;
+  currentUser?: { email: string | null; adminUserId: string | null; role: string } | null;
   directory?: StaffDirectoryMember[];
   filters: ShiftLogFilters;
   setFilters: (filters: ShiftLogFilters) => void;
@@ -300,6 +320,41 @@ export function ActiveShiftLogCard({
     if (item.reminder_at) return formatDateTime(item.reminder_at);
     return "—";
   };
+
+  const actor = {
+    email: currentUser?.email ?? null,
+    adminUserId: currentUser?.adminUserId ?? null,
+    role: currentUser?.role ?? null
+  };
+
+  const deleteEntry = (item: CrossoverMessage) => {
+    if (!window.confirm(`Delete this Front Desk Log entry?\n\n"${item.subject}"\n\nThis cannot be undone.`)) return;
+    void onMutate("Unable to delete log entry.", { action: "delete_crossover", id: item.id }, "Log entry deleted.");
+  };
+
+  const renderRowMenu = (item: CrossoverMessage) => (
+    <ShiftLogRowMenu
+      busy={busy}
+      canPushToWhiteboard={canPushToWhiteboard}
+      canDelete={canDeleteFrontDeskLogEntry(item, actor)}
+      resolveLabel={isAssessmentDogLog(item) ? "Mark Check Out" : "Mark Resolved"}
+      onDetail={() => onDetail(item)}
+      onEdit={() => onEdit(item)}
+      onResolve={() => {
+        const status = resolveStatusForShiftLog(item);
+        void onMutate(
+          status === "Check Out" ? "Unable to check out." : "Unable to resolve.",
+          { action: "update_crossover", id: item.id, status },
+          status === "Check Out" ? "Assessment marked Check Out." : "Log marked resolved."
+        );
+      }}
+      onArchive={() => void onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Log archived.")}
+      onInProgress={() => void onMutate("Unable to update.", { action: "update_crossover", id: item.id, status: "In Progress" }, "Marked in progress.")}
+      onFollowUp={() => void onMutate("Unable to create follow up.", { action: "update_crossover", id: item.id, create_owner_follow_up: true }, "Owner Follow Up created.")}
+      onIssue={() => void onMutate("Unable to create issue.", { action: "update_crossover", id: item.id, create_active_issue: true }, "Active Issue created.")}
+      onDelete={() => deleteEntry(item)}
+    />
+  );
 
   return (
     <section className="crossover-card crossover-card--conversations shift-log-card" aria-labelledby={headingId}>
@@ -362,27 +417,7 @@ export function ActiveShiftLogCard({
                     )}
                   </td>
                   <td><ShiftLogStatusBadge status={item.status} /></td>
-                  <td>
-                    <ShiftLogRowMenu
-                      busy={busy}
-                      canPushToWhiteboard={canPushToWhiteboard}
-                      resolveLabel={isAssessmentDogLog(item) ? "Mark Check Out" : "Mark Resolved"}
-                      onDetail={() => onDetail(item)}
-                      onEdit={() => onEdit(item)}
-                      onResolve={() => {
-                        const status = resolveStatusForShiftLog(item);
-                        void onMutate(
-                          status === "Check Out" ? "Unable to check out." : "Unable to resolve.",
-                          { action: "update_crossover", id: item.id, status },
-                          status === "Check Out" ? "Assessment marked Check Out." : "Log marked resolved."
-                        );
-                      }}
-                      onArchive={() => void onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Log archived.")}
-                      onInProgress={() => void onMutate("Unable to update.", { action: "update_crossover", id: item.id, status: "In Progress" }, "Marked in progress.")}
-                      onFollowUp={() => void onMutate("Unable to create follow up.", { action: "update_crossover", id: item.id, create_owner_follow_up: true }, "Owner Follow Up created.")}
-                      onIssue={() => void onMutate("Unable to create issue.", { action: "update_crossover", id: item.id, create_active_issue: true }, "Active Issue created.")}
-                    />
-                  </td>
+                  <td>{renderRowMenu(item)}</td>
                 </tr>
               ))}
             </tbody>
@@ -410,25 +445,7 @@ export function ActiveShiftLogCard({
             <p className="crossover-mobile-card__preview">{shiftLogDetails(item)}</p>
             <div className="crossover-mobile-card__footer">
               <ShiftLogStatusBadge status={item.status} />
-              <ShiftLogRowMenu
-                busy={busy}
-                canPushToWhiteboard={canPushToWhiteboard}
-                resolveLabel={isAssessmentDogLog(item) ? "Mark Check Out" : "Mark Resolved"}
-                onDetail={() => onDetail(item)}
-                onEdit={() => onEdit(item)}
-                onResolve={() => {
-                  const status = resolveStatusForShiftLog(item);
-                  void onMutate(
-                    status === "Check Out" ? "Unable to check out." : "Unable to resolve.",
-                    { action: "update_crossover", id: item.id, status },
-                    status === "Check Out" ? "Assessment marked Check Out." : "Log marked resolved."
-                  );
-                }}
-                onArchive={() => void onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Log archived.")}
-                onInProgress={() => void onMutate("Unable to update.", { action: "update_crossover", id: item.id, status: "In Progress" }, "Marked in progress.")}
-                onFollowUp={() => void onMutate("Unable to create follow up.", { action: "update_crossover", id: item.id, create_owner_follow_up: true }, "Owner Follow Up created.")}
-                onIssue={() => void onMutate("Unable to create issue.", { action: "update_crossover", id: item.id, create_active_issue: true }, "Active Issue created.")}
-              />
+              {renderRowMenu(item)}
             </div>
           </article>
         )) : (

@@ -207,6 +207,38 @@ export function canViewFullFrontDeskLogHistory(role?: string | null) {
   );
 }
 
+function normalizeActorKey(value?: string | null) {
+  return value?.trim().toLowerCase() ?? "";
+}
+
+/** Super Admin, Admin, and Management may delete any Front Desk Log entry. */
+export function canDeleteAnyFrontDeskLog(role?: string | null) {
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "super_admin" ||
+    role === "admin" ||
+    role === "management" ||
+    !role
+  );
+}
+
+/**
+ * Creators can delete their own entries.
+ * Super Admin / Admin / Management can delete any entry.
+ */
+export function canDeleteFrontDeskLogEntry(
+  item: Pick<CrossoverMessage, "created_by" | "submitted_by">,
+  actor: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  if (canDeleteAnyFrontDeskLog(actor.role)) return true;
+  const actorKeys = [actor.email, actor.adminUserId].map(normalizeActorKey).filter(Boolean);
+  if (!actorKeys.length) return false;
+  const creators = [item.created_by, item.submitted_by].map(normalizeActorKey).filter(Boolean);
+  return creators.some((creator) => actorKeys.includes(creator));
+}
+
 export function formatShiftLogDayLabel(date = new Date()) {
   return date.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }

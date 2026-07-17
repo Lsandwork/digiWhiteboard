@@ -6330,6 +6330,15 @@ html.lobby-tv-display .social-video-shell {
   color: var(--crossover-text);
 }
 
+.crossover-more-menu__item--danger {
+  color: #fca5a5;
+}
+
+.crossover-more-menu__item--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.14);
+  color: #fecaca;
+}
+
 .crossover-badge {
   display: inline-flex;
   align-items: center;

@@ -17,6 +17,7 @@ import {
   createActiveIssue,
   createCrossoverMessage,
   createStaffDirectoryMember,
+  deleteCrossoverMessage,
   deleteStaffDirectoryMember,
   createOwnerFollowUp,
   listStaffOps,
@@ -41,7 +42,7 @@ function staffOpsForbiddenResponse() {
   return NextResponse.json({ error: "You do not have permission to manage Staff Admin records." }, { status: 403 });
 }
 
-const CROSSOVER_ACTIONS = new Set(["create_crossover", "update_crossover", "reply_crossover"]);
+const CROSSOVER_ACTIONS = new Set(["create_crossover", "update_crossover", "reply_crossover", "delete_crossover"]);
 const NOTIFICATION_ACTIONS = new Set(["mark_notification_read", "mark_all_notifications_read"]);
 const STAFF_OPS_VIEW_PERMISSIONS = ["view_front_desk_log", "view_owner_follow_up", "view_active_issues"] as const;
 
@@ -109,7 +110,7 @@ export async function POST(request: Request) {
     if (action === "create_crossover" && !canCreateShiftLogEntry(session)) {
       return crossoverForbiddenResponse();
     }
-    if ((action === "update_crossover" || action === "reply_crossover") && !canUseFrontDeskLog(session)) {
+    if ((action === "update_crossover" || action === "reply_crossover" || action === "delete_crossover") && !canUseFrontDeskLog(session)) {
       return crossoverForbiddenResponse();
     }
     if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
@@ -136,6 +137,15 @@ export async function POST(request: Request) {
       const id = String(body.id ?? "");
       result = await updateCrossoverMessage(supabase, id, body, actor);
       auditAction = "staff.crossover.update";
+    } else if (action === "delete_crossover") {
+      const id = String(body.id ?? "");
+      if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
+      result = await deleteCrossoverMessage(supabase, id, actor, {
+        email: session?.email ?? null,
+        adminUserId: session?.adminUserId ?? null,
+        role: session?.role ?? null
+      });
+      auditAction = "staff.crossover.delete";
     } else if (action === "reply_crossover") {
       const id = String(body.id ?? "");
       result = await replyToCrossoverMessage(supabase, id, body.message, actor, String(body.update_type ?? "Internal Note"));
@@ -214,6 +224,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to save Staff Admin record.";
+    if (message.includes("only delete Front Desk Log entries")) {
+      return NextResponse.json({ error: message }, { status: 403 });
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
