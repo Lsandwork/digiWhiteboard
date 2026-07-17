@@ -59,6 +59,7 @@ import {
 import {
   canViewFullFrontDeskLogHistory,
   formatShiftLogDayLabel,
+  isClosedShiftLogStatus,
   isDueToday,
   isLoggedToday,
   isOpenShiftLogStatus,
@@ -578,9 +579,11 @@ function CrossoverPage(props: {
   const canViewFullHistory = canViewFullFrontDeskLogHistory(props.data?.currentUser.role);
   const dailyRows = useMemo(() => {
     if (canViewFullHistory) {
-      // Admins see past + today. Keep archived items in Archived Log unless explicitly filtered.
-      if (filters.status === "Archived") return filteredRows;
-      return filteredRows.filter((item) => item.status !== "Archived");
+      // Admins see past + today. Closed history lives in Archived Log unless status filter requests it.
+      if (filters.status === "Resolved" || filters.status === "Archived" || filters.status === "Completed") {
+        return filteredRows;
+      }
+      return filteredRows.filter((item) => !isClosedShiftLogStatus(item.status));
     }
     return filteredRows.filter((item) => isLoggedToday(item.created_at));
   }, [canViewFullHistory, filteredRows, filters.status]);
@@ -590,15 +593,11 @@ function CrossoverPage(props: {
     [filteredRows]
   );
 
-  const archivedRows = useMemo(
-    () =>
-      filterShiftLogRows(
-        props.data?.crossover_messages ?? [],
-        { ...filters, status: "Archived", openOnly: false },
-        queryFields
-      ),
-    [filters, props.data?.crossover_messages, queryFields]
-  );
+  const archivedRows = useMemo(() => {
+    // Past CSV imports were stored as Resolved; Archived Log should show that closed history.
+    const closed = (props.data?.crossover_messages ?? []).filter((item) => isClosedShiftLogStatus(item.status));
+    return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
+  }, [filters, props.data?.crossover_messages, queryFields]);
 
   const pagedDaily = paginate(dailyRows, dailyPage);
   const pagedOpen = paginate(openRows, openPage);
@@ -692,7 +691,7 @@ function CrossoverPage(props: {
             title={canViewFullHistory ? "Activity Log — Past & Today" : `Daily Log — ${todayLabel}`}
             subtitle={
               canViewFullHistory
-                ? "All past and current-day entries, including resolved items. Archived items are listed below."
+                ? "Past and current-day open activity. Resolved and archived history is listed in Archived Log below."
                 : "All entries logged today, including resolved items from the current shift."
             }
             headingId="shift-log-daily-heading"
@@ -776,10 +775,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title="Archived Log"
-            subtitle="Archived shift log entries kept for reference after follow-up is complete."
+            subtitle="Resolved, completed, and archived entries — including past imported shift notes."
             headingId="shift-log-archived-heading"
-            emptyTitle="No archived log entries"
-            emptyText="Archived items will appear here when a log is marked archived."
+            emptyTitle="No archived or resolved log entries"
+            emptyText="Resolved and archived items will appear here for reference."
             showFilterBar={false}
             showRefresh={false}
           />

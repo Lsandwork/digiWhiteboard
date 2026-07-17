@@ -9,7 +9,7 @@
  * Rules:
  * - submitted_by / created_by = "Front Desk"
  * - assigned_to / assigned_team = null (Unassigned)
- * - past dates → status Resolved (not open)
+ * - past dates → status Resolved (shown in Front Desk Archived Log)
  * - today's date (America/Los_Angeles) → status Open in today's Daily Log
  * - no management alerts, follow-ups, or active issues
  */

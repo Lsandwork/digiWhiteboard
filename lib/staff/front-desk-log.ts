@@ -118,6 +118,11 @@ export function isOpenShiftLogStatus(status: StaffOpsStatus) {
   return OPEN_SHIFT_LOG_STATUSES.includes(status);
 }
 
+/** Closed history shown in the Front Desk Archived Log (includes imported past Resolved rows). */
+export function isClosedShiftLogStatus(status: StaffOpsStatus) {
+  return status === "Resolved" || status === "Archived" || status === "Completed";
+}
+
 export function shouldAlertManagement(priority: StaffOpsPriority, urgent?: boolean, needsReview?: boolean) {
   if (needsReview) return true;
   if (urgent) return true;
