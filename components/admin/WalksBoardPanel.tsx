@@ -356,8 +356,8 @@ export function WalksBoardPanel() {
                 <Footprints className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-2xl font-black text-white sm:text-3xl">Walks Board</h1>
-                <p className="mt-1 max-w-2xl text-sm text-slate-400 sm:text-base">
+                <h1 className="text-2xl font-black admin-text-emphasis sm:text-3xl">Walks Board</h1>
+                <p className="mt-1 max-w-2xl text-sm text-admin-muted sm:text-base">
                   Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.
                 </p>
               </div>
@@ -434,8 +434,8 @@ export function WalksBoardPanel() {
       ) : filteredEntries.length === 0 ? (
         <div className="walks-board-empty admin-card p-8 sm:p-10">
           <Footprints className="mx-auto h-10 w-10 text-fitdog-orange/80" aria-hidden="true" />
-          <h2 className="mt-4 text-2xl font-black text-white">No dogs currently need tracked walks.</h2>
-          <p className="mt-2 text-slate-400">Add a No Plays, Groomed, or Break Dog to begin hourly walk reminders.</p>
+          <h2 className="mt-4 text-2xl font-black admin-text-emphasis">No dogs currently need tracked walks.</h2>
+          <p className="mt-2 text-admin-muted">Add a No Plays, Groomed, or Break Dog to begin hourly walk reminders.</p>
           <button type="button" className="crossover-btn crossover-btn--primary mt-6" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4" />
             Add Dog
