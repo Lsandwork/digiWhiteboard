@@ -120,7 +120,7 @@ export function buildWalkDueNotificationMessage(
 ): string {
   const typeLabel = walkBoardTypeLabel(walkType);
   if (snoozeUsed) {
-    return `${dogName} is due for a walk — ${typeLabel}. Snooze already used.`;
+    return `ALERT: ${dogName} needs to be walked now (${typeLabel}). Snooze already used once — mark walked or clear.`;
   }
-  return `${dogName} is due for a walk — ${typeLabel}.`;
+  return `ALERT: ${dogName} needs to be walked now (${typeLabel}). You can snooze once for 1 hour.`;
 }

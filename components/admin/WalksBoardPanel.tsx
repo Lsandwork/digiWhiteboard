@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlarmClock,
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Clock3,
@@ -16,6 +17,7 @@ import {
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
+import { playStaffPushNoticeAlarm, unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { WALK_BOARD_TYPE_LABELS } from "@/lib/walks-board/constants";
 import {
   formatWalkBoardClock,
@@ -87,6 +89,7 @@ export function WalksBoardPanel() {
   const [history, setHistory] = useState<Record<string, WalkBoardActivityItem>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [hasLoaded, setHasLoaded] = useState(false);
+  const lastAlertSignatureRef = useRef<string>("");
 
   async function fetchActivity(entryId: string): Promise<WalkBoardActivityItem> {
     const response = await fetch(`/api/admin/walks-board?entryId=${encodeURIComponent(entryId)}`, { cache: "no-store" });
@@ -126,6 +129,34 @@ export function WalksBoardPanel() {
     const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const unlock = () => {
+      void unlockStaffPushNoticeAudio();
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    return () => window.removeEventListener("pointerdown", unlock);
+  }, []);
+
+  useEffect(() => {
+    const entries = data?.entries ?? [];
+    const alerts = entries.filter((entry) => {
+      const urgency = getWalkBoardUrgency(entry, nowMs);
+      return urgency === "walk_due" || urgency === "overdue";
+    });
+    const signature = alerts
+      .map((entry) => `${entry.id}:${getWalkBoardUrgency(entry, nowMs)}:${entry.next_due_at}`)
+      .sort()
+      .join("|");
+    if (!signature) {
+      lastAlertSignatureRef.current = "";
+      return;
+    }
+    if (signature === lastAlertSignatureRef.current) return;
+    const isFirst = lastAlertSignatureRef.current === "";
+    lastAlertSignatureRef.current = signature;
+    if (!isFirst) void playStaffPushNoticeAlarm();
+  }, [data?.entries, nowMs]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -172,6 +203,13 @@ export function WalksBoardPanel() {
       groomed: entries.filter((entry) => entry.walk_type === "groomed").length,
       break_dog: entries.filter((entry) => entry.walk_type === "break_dog").length
     };
+  }, [data?.entries, nowMs]);
+
+  const alertDogs = useMemo(() => {
+    return (data?.entries ?? []).filter((entry) => {
+      const urgency = getWalkBoardUrgency(entry, nowMs);
+      return urgency === "walk_due" || urgency === "overdue";
+    });
   }, [data?.entries, nowMs]);
 
   async function postAction(body: Record<string, unknown>) {
@@ -233,7 +271,7 @@ export function WalksBoardPanel() {
     setBusyId(entry.id);
     try {
       await postAction({ action: "snooze", entryId: entry.id, version: entry.version });
-      showToast(`${entry.dog_name} snoozed for one hour.`, "success");
+      showToast(`${entry.dog_name} snoozed for one hour (once only this cycle).`, "success");
       await load({ silent: true });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to snooze.", "error");
@@ -275,9 +313,41 @@ export function WalksBoardPanel() {
 
   const summary = data?.summary;
   const permissions = data?.permissions;
+  const dueAlertCount = filterCounts.due_now;
 
   return (
     <section className="walks-board-page">
+      {dueAlertCount > 0 ? (
+        <div className="walks-board-alert-banner" role="alert" aria-live="assertive">
+          <div className="walks-board-alert-banner__icon" aria-hidden="true">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <div className="walks-board-alert-banner__copy">
+            <p className="walks-board-alert-banner__title">
+              {dueAlertCount === 1
+                ? "1 dog needs to be walked now"
+                : `${dueAlertCount} dogs need to be walked now`}
+            </p>
+            <p className="walks-board-alert-banner__detail">
+              {alertDogs
+                .slice(0, 4)
+                .map((entry) => `${entry.dog_name} (${formatWalkBoardCountdown(entry, nowMs)})`)
+                .join(" · ")}
+              {alertDogs.length > 4 ? ` · +${alertDogs.length - 4} more` : ""}
+              {" · "}
+              You can snooze each dog once for 1 hour; after that, mark walked or clear.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            onClick={() => setFilter("due_now")}
+          >
+            Show Due Now
+          </button>
+        </div>
+      ) : null}
+
       <header className="walks-board-header admin-card p-5 sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -308,11 +378,11 @@ export function WalksBoardPanel() {
             <span className="walks-board-stat__label">Active Dogs</span>
             <strong>{summary?.activeCount ?? 0}</strong>
           </div>
-          <div className="walks-board-stat">
+          <div className={`walks-board-stat ${filterCounts.due_now > 0 ? "walks-board-stat--alert" : ""}`}>
             <span className="walks-board-stat__label">Due Now</span>
             <strong>{summary?.dueNowCount ?? 0}</strong>
           </div>
-          <div className="walks-board-stat">
+          <div className={`walks-board-stat ${(summary?.overdueCount ?? 0) > 0 ? "walks-board-stat--overdue" : ""}`}>
             <span className="walks-board-stat__label">Overdue</span>
             <strong>{summary?.overdueCount ?? 0}</strong>
           </div>
@@ -393,7 +463,14 @@ export function WalksBoardPanel() {
                       {entry.snooze_used ? <span className="admin-badge admin-badge--amber">Snooze Used</span> : null}
                     </div>
 
-                    <p className="walks-board-card__status">{formatWalkBoardCountdown(entry, nowMs)}</p>
+                    <p className={`walks-board-card__status walks-board-card__status--${urgency}`}>
+                      {(urgency === "walk_due" || urgency === "overdue") && (
+                        <AlertTriangle className="walks-board-card__alert-icon" aria-hidden="true" />
+                      )}
+                      {urgency === "overdue" || urgency === "walk_due"
+                        ? `${formatWalkBoardCountdown(entry, nowMs)} — dog needs a walk`
+                        : formatWalkBoardCountdown(entry, nowMs)}
+                    </p>
                     <p className="walks-board-card__meta">
                       Next due {formatWalkBoardDateTime(entry.next_due_at, data?.timezone)}
                       {entry.last_walked_at
@@ -420,10 +497,15 @@ export function WalksBoardPanel() {
                         type="button"
                         className="crossover-btn crossover-btn--outline"
                         disabled={isBusy || entry.snooze_used}
+                        title={
+                          entry.snooze_used
+                            ? "Already snoozed once this cycle — mark walked or clear"
+                            : "Snooze for 1 hour (only once per walk cycle)"
+                        }
                         onClick={() => void handleSnooze(entry)}
                       >
                         <AlarmClock className="h-4 w-4" />
-                        {entry.snooze_used ? "Snooze Used" : "Snooze 1 Hour"}
+                        {entry.snooze_used ? "Snooze Used (Once)" : "Snooze 1 Hour (Once)"}
                       </button>
                     ) : null}
                     <button

@@ -17,6 +17,7 @@ import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { NotificationBell } from "@/components/admin/NotificationBell";
 import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
 type AdminShellProps = {
@@ -203,6 +204,7 @@ export function AdminShell({
                             : "Open Lobby Whiteboard"}
                     </button>
                   </div>
+                  <NotificationBell onOpenTab={onTabChange} />
                   <ThemeToggle />
                   <div className="admin-header-brand">
                     <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
