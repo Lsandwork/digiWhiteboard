@@ -57,12 +57,13 @@ import {
   type TemplateFieldValues
 } from "@/lib/frontDeskLog/logTemplates";
 import {
-  canViewFullFrontDeskLogHistory,
+  belongsInCrossoverLog,
   formatShiftLogDayLabel,
+  isAssessmentDogLog,
   isClosedShiftLogStatus,
   isDueToday,
-  isLoggedToday,
   isOpenShiftLogStatus,
+  resolveStatusForShiftLog,
   shiftLogDetails,
   shiftLogSubmittedBy,
   shiftLogType
@@ -211,7 +212,7 @@ function isToday(value: string | null) {
 }
 
 function isOverdue(value: string | null, status: StaffOpsStatus, nowMs: number) {
-  if (!value || status === "Resolved" || status === "Archived") return false;
+  if (!value || status === "Resolved" || status === "Archived" || status === "Check Out" || status === "Completed") return false;
   return new Date(value).getTime() < nowMs;
 }
 
@@ -222,7 +223,7 @@ function priorityClass(priority: StaffOpsPriority) {
 }
 
 function statusClass(status: StaffOpsStatus) {
-  if (status === "Resolved") return "crossover-badge crossover-badge--status-resolved";
+  if (status === "Resolved" || status === "Completed" || status === "Check Out") return "crossover-badge crossover-badge--status-resolved";
   if (status === "Archived") return "crossover-badge crossover-badge--status-muted";
   if (status === "Pending Review") return "crossover-badge crossover-badge--status-pending";
   if (status === "In Progress") return "crossover-badge crossover-badge--status-active";
@@ -576,17 +577,10 @@ function CrossoverPage(props: {
     return filterShiftLogRows(all, filters, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
-  const canViewFullHistory = canViewFullFrontDeskLogHistory(props.data?.currentUser.role);
   const dailyRows = useMemo(() => {
-    if (canViewFullHistory) {
-      // Admins see past + today. Closed history lives in Archived Log unless status filter requests it.
-      if (filters.status === "Resolved" || filters.status === "Archived" || filters.status === "Completed") {
-        return filteredRows;
-      }
-      return filteredRows.filter((item) => !isClosedShiftLogStatus(item.status));
-    }
-    return filteredRows.filter((item) => isLoggedToday(item.created_at));
-  }, [canViewFullHistory, filteredRows, filters.status]);
+    // Crossover Log = current-day activity for handoff (includes today's Check Out assessments).
+    return filteredRows.filter((item) => belongsInCrossoverLog(item));
+  }, [filteredRows]);
 
   const openRows = useMemo(
     () => filteredRows.filter((item) => isOpenShiftLogStatus(item.status)),
@@ -594,8 +588,11 @@ function CrossoverPage(props: {
   );
 
   const archivedRows = useMemo(() => {
-    // Past CSV imports were stored as Resolved; Archived Log should show that closed history.
-    const closed = (props.data?.crossover_messages ?? []).filter((item) => isClosedShiftLogStatus(item.status));
+    // Closed history from prior days (Resolved / Completed / Check Out / Archived).
+    // Today's Check Out / archived assessment items stay on Crossover Log until tomorrow.
+    const closed = (props.data?.crossover_messages ?? []).filter(
+      (item) => isClosedShiftLogStatus(item.status) && !belongsInCrossoverLog(item)
+    );
     return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
@@ -657,9 +654,7 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          {canViewFullHistory
-            ? "Past and current-day log entries appear on top, with unresolved open items in the full-width table below."
-            : "Daily log entries for today appear on top, with all unresolved open items in the full-width table below."}
+          Use Crossover Log for today&apos;s handoff activity. Assessment dogs marked Resolved become Check Out and stay here for the day, then move to Archived Log tomorrow.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
@@ -688,19 +683,11 @@ function CrossoverPage(props: {
             onDetail={props.onDetail}
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
-            title={canViewFullHistory ? "Activity Log — Past & Today" : `Daily Log — ${todayLabel}`}
-            subtitle={
-              canViewFullHistory
-                ? "Past and current-day open activity. Resolved and archived history is listed in Archived Log below."
-                : "All entries logged today, including resolved items from the current shift."
-            }
+            title={`Crossover Log — ${todayLabel}`}
+            subtitle="Current-day activity for shift crossover, including assessment Check Outs for today."
             headingId="shift-log-daily-heading"
-            emptyTitle={canViewFullHistory ? "No log entries" : "No entries logged today"}
-            emptyText={
-              canViewFullHistory
-                ? "Shift log entries will appear here as they are created."
-                : "New shift log entries for today will appear here."
-            }
+            emptyTitle="No crossover entries today"
+            emptyText="Log entries from today will appear here for crossover handoff."
             showFilterBar={false}
             showRefresh={false}
           />
@@ -775,10 +762,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title="Archived Log"
-            subtitle="Resolved, completed, and archived entries — including past imported shift notes."
+            subtitle="Prior-day resolved, completed, Check Out, and archived entries — including past imported shift notes."
             headingId="shift-log-archived-heading"
             emptyTitle="No archived or resolved log entries"
-            emptyText="Resolved and archived items will appear here for reference."
+            emptyText="Closed items from previous days will appear here for reference."
             showFilterBar={false}
             showRefresh={false}
           />
@@ -1156,8 +1143,12 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
         ? item.follow_up_notes
         : item.notes;
   const replies = detail.type === "crossover" ? (data?.crossover_message_replies ?? []).filter((entry) => entry.crossover_message_id === item.id) : [];
+  const resolveStatus =
+    detail.type === "crossover" ? resolveStatusForShiftLog(item as CrossoverMessage) : ("Resolved" as const);
+  const resolveLabel =
+    detail.type === "crossover" && isAssessmentDogLog(item as CrossoverMessage) ? "Check Out" : "Resolve";
   return (
-    <Modal open={Boolean(detail)} title={title} description="View details and update this record without leaving the page." onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2"><button className="admin-btn-secondary" type="button" onClick={onClose}>Close</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark in progress.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "In Progress" }, "Marked in progress.")}>Mark In Progress</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark pending review.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Pending Review" }, "Marked pending review.")}>Pending Review</button><button className="admin-btn-primary" type="button" disabled={busy} onClick={() => void onMutate("Unable to resolve.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Resolved", resolution_notes: resolution }, "Record resolved.")}>Resolve</button></div>}>
+    <Modal open={Boolean(detail)} title={title} description="View details and update this record without leaving the page." onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2"><button className="admin-btn-secondary" type="button" onClick={onClose}>Close</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark in progress.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "In Progress" }, "Marked in progress.")}>Mark In Progress</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark pending review.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Pending Review" }, "Marked pending review.")}>Pending Review</button><button className="admin-btn-primary" type="button" disabled={busy} onClick={() => void onMutate(resolveStatus === "Check Out" ? "Unable to check out." : "Unable to resolve.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: resolveStatus, resolution_notes: resolution }, resolveStatus === "Check Out" ? "Assessment marked Check Out." : "Record resolved.")}>{resolveLabel}</button></div>}>
       <div className="grid gap-4">
         {detail.type === "crossover" && "subject" in item ? (
           <div className="grid gap-2 rounded-2xl border border-admin-border bg-white/[0.03] p-4 text-sm text-admin-muted md:grid-cols-2">

@@ -22,9 +22,11 @@ import {
 } from "@/lib/frontDeskLog/logTemplates";
 import {
   ASSIGNMENT_TEAMS,
+  isAssessmentDogLog,
   isDueToday,
   isOpenShiftLogStatus,
   OPEN_SHIFT_LOG_STATUSES,
+  resolveStatusForShiftLog,
   SHIFT_LOG_STATUSES,
   SHIFT_LOG_TYPES,
   SHIFT_LOG_TYPE_TONES,
@@ -101,7 +103,7 @@ export function ShiftLogStatusBadge({ status }: { status: StaffOpsStatus }) {
       ? "active"
       : status === "Waiting on Owner" || status === "Waiting on Staff" || status === "Needs Management Review" || status === "Scheduled" || status === "Pending Review"
         ? "pending"
-        : status === "Resolved" || status === "Completed"
+        : status === "Resolved" || status === "Completed" || status === "Check Out"
           ? "resolved"
           : "muted";
   return <span className={`crossover-badge crossover-badge--status-${tone}`}>{status.toUpperCase()}</span>;
@@ -110,6 +112,7 @@ export function ShiftLogStatusBadge({ status }: { status: StaffOpsStatus }) {
 function ShiftLogRowMenu({
   busy,
   canPushToWhiteboard,
+  resolveLabel,
   onDetail,
   onEdit,
   onResolve,
@@ -120,6 +123,7 @@ function ShiftLogRowMenu({
 }: {
   busy: boolean;
   canPushToWhiteboard: boolean;
+  resolveLabel: string;
   onDetail: () => void;
   onEdit: () => void;
   onResolve: () => void;
@@ -154,7 +158,7 @@ function ShiftLogRowMenu({
         </button>
         {open ? (
           <div className="crossover-more-menu__panel" role="menu">
-            <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onResolve(); }}>Mark Resolved</button>
+            <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onResolve(); }}>{resolveLabel}</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onEdit(); }}>Edit</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onInProgress(); }}>Mark In Progress</button>
             <button type="button" className="crossover-more-menu__item" disabled={busy} onClick={() => { setOpen(false); onFollowUp(); }}>Create Owner Follow Up</button>
@@ -362,9 +366,17 @@ export function ActiveShiftLogCard({
                     <ShiftLogRowMenu
                       busy={busy}
                       canPushToWhiteboard={canPushToWhiteboard}
+                      resolveLabel={isAssessmentDogLog(item) ? "Mark Check Out" : "Mark Resolved"}
                       onDetail={() => onDetail(item)}
                       onEdit={() => onEdit(item)}
-                      onResolve={() => void onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Log marked resolved.")}
+                      onResolve={() => {
+                        const status = resolveStatusForShiftLog(item);
+                        void onMutate(
+                          status === "Check Out" ? "Unable to check out." : "Unable to resolve.",
+                          { action: "update_crossover", id: item.id, status },
+                          status === "Check Out" ? "Assessment marked Check Out." : "Log marked resolved."
+                        );
+                      }}
                       onArchive={() => void onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Log archived.")}
                       onInProgress={() => void onMutate("Unable to update.", { action: "update_crossover", id: item.id, status: "In Progress" }, "Marked in progress.")}
                       onFollowUp={() => void onMutate("Unable to create follow up.", { action: "update_crossover", id: item.id, create_owner_follow_up: true }, "Owner Follow Up created.")}
@@ -398,7 +410,25 @@ export function ActiveShiftLogCard({
             <p className="crossover-mobile-card__preview">{shiftLogDetails(item)}</p>
             <div className="crossover-mobile-card__footer">
               <ShiftLogStatusBadge status={item.status} />
-              <ShiftLogRowMenu busy={busy} canPushToWhiteboard={canPushToWhiteboard} onDetail={() => onDetail(item)} onEdit={() => onEdit(item)} onResolve={() => void onMutate("Unable to resolve.", { action: "update_crossover", id: item.id, status: "Resolved" }, "Log marked resolved.")} onArchive={() => void onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Log archived.")} onInProgress={() => void onMutate("Unable to update.", { action: "update_crossover", id: item.id, status: "In Progress" }, "Marked in progress.")} onFollowUp={() => void onMutate("Unable to create follow up.", { action: "update_crossover", id: item.id, create_owner_follow_up: true }, "Owner Follow Up created.")} onIssue={() => void onMutate("Unable to create issue.", { action: "update_crossover", id: item.id, create_active_issue: true }, "Active Issue created.")} />
+              <ShiftLogRowMenu
+                busy={busy}
+                canPushToWhiteboard={canPushToWhiteboard}
+                resolveLabel={isAssessmentDogLog(item) ? "Mark Check Out" : "Mark Resolved"}
+                onDetail={() => onDetail(item)}
+                onEdit={() => onEdit(item)}
+                onResolve={() => {
+                  const status = resolveStatusForShiftLog(item);
+                  void onMutate(
+                    status === "Check Out" ? "Unable to check out." : "Unable to resolve.",
+                    { action: "update_crossover", id: item.id, status },
+                    status === "Check Out" ? "Assessment marked Check Out." : "Log marked resolved."
+                  );
+                }}
+                onArchive={() => void onMutate("Unable to archive.", { action: "update_crossover", id: item.id, status: "Archived" }, "Log archived.")}
+                onInProgress={() => void onMutate("Unable to update.", { action: "update_crossover", id: item.id, status: "In Progress" }, "Marked in progress.")}
+                onFollowUp={() => void onMutate("Unable to create follow up.", { action: "update_crossover", id: item.id, create_owner_follow_up: true }, "Owner Follow Up created.")}
+                onIssue={() => void onMutate("Unable to create issue.", { action: "update_crossover", id: item.id, create_active_issue: true }, "Active Issue created.")}
+              />
             </div>
           </article>
         )) : (

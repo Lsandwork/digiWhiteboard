@@ -1,6 +1,11 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
-import { priorityRank, shouldAlertManagement, shiftLogDetails } from "@/lib/staff/front-desk-log";
+import {
+  isAssessmentDogLog,
+  priorityRank,
+  shouldAlertManagement,
+  shiftLogDetails
+} from "@/lib/staff/front-desk-log";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
@@ -24,6 +29,7 @@ export type StaffOpsStatus =
   | "Scheduled"
   | "Completed"
   | "Resolved"
+  | "Check Out"
   | "Archived"
   | "Active"
   | "Pending Review";
@@ -305,6 +311,7 @@ export const STAFF_STATUSES: StaffOpsStatus[] = [
   "Scheduled",
   "Completed",
   "Resolved",
+  "Check Out",
   "Archived",
   "Active",
   "Pending Review"
@@ -880,19 +887,31 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
       if (item.id !== id) return item;
       const needsReview =
         patch.needs_management_review !== undefined ? Boolean(patch.needs_management_review) : item.needs_management_review ?? false;
-      const status = normalizeStatus(patch.status, item.status);
+      let status = normalizeStatus(patch.status, item.status);
       const details =
         patch.details !== undefined
           ? cleanString(patch.details)
           : patch.message !== undefined
             ? cleanString(patch.message)
             : item.details ?? item.message;
-      updated = {
+      const nextLogType = patch.log_type !== undefined ? cleanString(patch.log_type, "General Shift Note") : item.log_type ?? "General Shift Note";
+      const candidate: CrossoverMessage = {
         ...item,
         subject: patch.subject !== undefined ? cleanString(patch.subject) : item.subject,
         message: details,
         details,
-        log_type: patch.log_type !== undefined ? cleanString(patch.log_type, "General Shift Note") : item.log_type ?? "General Shift Note",
+        log_type: nextLogType
+      };
+      // Assessment-dog "Resolved" becomes Check Out so it stays on today's Crossover Log.
+      if (patch.status !== undefined && (status === "Resolved" || status === "Completed") && isAssessmentDogLog(candidate)) {
+        status = "Check Out";
+      }
+      updated = {
+        ...item,
+        subject: candidate.subject,
+        message: details,
+        details,
+        log_type: nextLogType,
         priority: patch.priority !== undefined ? normalizePriority(patch.priority) : item.priority,
         status,
         related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name ?? patch.dog_name) : item.related_dog_name,
@@ -912,7 +931,11 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
           patch.linked_active_issue_id !== undefined ? optionalString(patch.linked_active_issue_id) : item.linked_active_issue_id ?? null,
         updated_at: now,
         resolved_at:
-          status === "Resolved" || status === "Completed" ? item.resolved_at ?? now : status === "Archived" ? item.resolved_at : null,
+          status === "Resolved" || status === "Completed" || status === "Check Out"
+            ? item.resolved_at ?? now
+            : status === "Archived"
+              ? item.resolved_at
+              : null,
         archived_at: status === "Archived" ? item.archived_at ?? now : item.archived_at ?? null
       };
       return updated;
@@ -920,7 +943,7 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
   };
   if (!updated) throw new Error("Shift log entry not found.");
   const updatedRecord = updated as CrossoverMessage;
-  if (updatedRecord.status === "Resolved" || updatedRecord.status === "Completed") {
+  if (updatedRecord.status === "Resolved" || updatedRecord.status === "Completed" || updatedRecord.status === "Check Out") {
     next = markLinkedIssuePendingReview(next, "crossover_messages", updatedRecord.id, actor);
   }
   if (Boolean(patch.create_active_issue)) next = maybeCreateActiveIssueFromCrossover(next, updatedRecord, actor);

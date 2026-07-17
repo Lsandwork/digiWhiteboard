@@ -56,10 +56,13 @@ export const SHIFT_LOG_STATUSES = [
   "Scheduled",
   "Completed",
   "Resolved",
+  "Check Out",
   "Archived",
   "Active",
   "Pending Review"
 ] as const;
+
+const FITDOG_TIMEZONE = "America/Los_Angeles";
 
 export const OPEN_SHIFT_LOG_STATUSES: StaffOpsStatus[] = [
   "Open",
@@ -120,7 +123,54 @@ export function isOpenShiftLogStatus(status: StaffOpsStatus) {
 
 /** Closed history shown in the Front Desk Archived Log (includes imported past Resolved rows). */
 export function isClosedShiftLogStatus(status: StaffOpsStatus) {
-  return status === "Resolved" || status === "Archived" || status === "Completed";
+  return status === "Resolved" || status === "Archived" || status === "Completed" || status === "Check Out";
+}
+
+export function pacificDateKey(value: string | Date | null | undefined) {
+  if (!value) return null;
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: FITDOG_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+export function isPacificToday(value: string | null | undefined) {
+  const key = pacificDateKey(value);
+  return key != null && key === pacificDateKey(new Date());
+}
+
+/** Assessment / new-dog assessment entries resolve to Check Out instead of Resolved. */
+export function isAssessmentDogLog(item: Pick<CrossoverMessage, "subject" | "message" | "details" | "log_type"> & { template_title?: string | null }) {
+  const type = shiftLogType(item as CrossoverMessage).toLowerCase();
+  if (type.includes("assessment")) return true;
+  const haystack = [item.subject, shiftLogDetails(item as CrossoverMessage), item.template_title ?? ""].join(" ").toLowerCase();
+  return /\bassessment\b/.test(haystack);
+}
+
+export function resolveStatusForShiftLog(item: Parameters<typeof isAssessmentDogLog>[0]): StaffOpsStatus {
+  return isAssessmentDogLog(item) ? "Check Out" : "Resolved";
+}
+
+/**
+ * Crossover Log (current day): all of today's activity, including Check Out
+ * assessment dogs for the day they were checked out — even if also archived.
+ * Prior-day Check Out / closed items move to Archived Log.
+ */
+export function belongsInCrossoverLog(item: CrossoverMessage) {
+  if (isPacificToday(item.created_at)) return true;
+  if (item.status === "Check Out" && (isPacificToday(item.resolved_at) || isPacificToday(item.updated_at))) return true;
+  if (
+    isAssessmentDogLog(item) &&
+    item.status === "Archived" &&
+    (isPacificToday(item.archived_at) || isPacificToday(item.updated_at) || isPacificToday(item.resolved_at))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function shouldAlertManagement(priority: StaffOpsPriority, urgent?: boolean, needsReview?: boolean) {
