@@ -638,7 +638,7 @@ function CrossoverPage(props: {
   }
 
   return (
-    <div className="crossover-dashboard space-y-5">
+    <div className="crossover-dashboard shift-log-readable space-y-6">
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">

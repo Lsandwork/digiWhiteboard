@@ -179,7 +179,7 @@ export function ShiftLogFilterBar({
   onClear?: () => void;
 }) {
   return (
-    <div className="crossover-filters shift-log-filters">
+    <div className="crossover-filters shift-log-filters shift-log-filters--readable">
       <label className="crossover-search">
         <Image src={CROSSOVER_ASSETS.search} alt="" width={22} height={22} aria-hidden className="crossover-search__icon" />
         <input className="crossover-input crossover-search__input" placeholder="Search logs, notes, dog or owner..." value={filters.query} onChange={(e) => setFilters({ ...filters, query: e.target.value })} aria-label="Search logs" />
@@ -298,7 +298,7 @@ export function ActiveShiftLogCard({
   };
 
   return (
-    <section className="crossover-card crossover-card--conversations" aria-labelledby={headingId}>
+    <section className="crossover-card crossover-card--conversations shift-log-card" aria-labelledby={headingId}>
       <header className="crossover-card__header">
         <div className="crossover-card__header-main">
           <IconTile src={CROSSOVER_ASSETS.chat} alt={title} />
@@ -317,9 +317,9 @@ export function ActiveShiftLogCard({
 
       {showFilterBar ? <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} /> : null}
 
-      <div className="crossover-table-wrap hidden md:block">
+      <div className="crossover-table-wrap shift-log-table-wrap hidden md:block">
         {rows.length ? (
-          <table className="crossover-table">
+          <table className="crossover-table shift-log-table">
             <thead>
               <tr>
                 <th>Subject / Log Type</th>
