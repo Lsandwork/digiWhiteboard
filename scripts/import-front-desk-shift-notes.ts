@@ -1,14 +1,16 @@
 /**
- * Import historical Front Desk / Team Lead shift notes into Front Desk Log.
+ * Import Front Desk / Team Lead shift notes into Front Desk Log.
  *
  * Usage:
  *   npx tsx scripts/import-front-desk-shift-notes.ts --dry-run
  *   npx tsx scripts/import-front-desk-shift-notes.ts --write
+ *   npx tsx scripts/import-front-desk-shift-notes.ts --write --file "/path/to.csv"
  *
  * Rules:
  * - submitted_by / created_by = "Front Desk"
  * - assigned_to / assigned_team = null (Unassigned)
- * - status = Resolved (past / not open)
+ * - past dates → status Resolved (not open)
+ * - today's date (America/Los_Angeles) → status Open in today's Daily Log
  * - no management alerts, follow-ups, or active issues
  */
 import { createHash, randomUUID } from "node:crypto";
@@ -71,9 +73,10 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
-const IMPORT_MARKER = "csv-import:front-desk-shift-notes:v1";
+const IMPORT_MARKER = "csv-import:front-desk-shift-notes:v2";
 const ACTOR = "Front Desk";
 const SETTINGS_STORE_KEY = "staff_admin_ops";
+const DEFAULT_SHEET_PATH = "/Users/fitdog/Downloads/Untitled spreadsheet - Sheet1.csv";
 
 type ParsedNote = {
   source: "team_lead" | "front_desk";
@@ -86,14 +89,39 @@ type ParsedNote = {
   dogsToWatch: string | null;
   ownersToCall: string | null;
   managementFollowUp: string | null;
+  reminderFlag: boolean;
   createdAt: string;
   importKey: string;
+  isToday: boolean;
 };
 
 function parseArgs(argv: string[]) {
   const write = argv.includes("--write");
   const dryRun = !write || argv.includes("--dry-run");
-  return { write: write && !argv.includes("--dry-run"), dryRun };
+  const fileFlagIndex = argv.indexOf("--file");
+  const file =
+    fileFlagIndex >= 0 && argv[fileFlagIndex + 1] ? resolve(argv[fileFlagIndex + 1]!) : DEFAULT_SHEET_PATH;
+  return { write: write && !argv.includes("--dry-run"), dryRun, file };
+}
+
+function pacificTodayParts() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
+  }).formatToParts(new Date());
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  return { year, month, day };
+}
+
+function isPacificToday(dateLabel: string) {
+  const parts = parseDateParts(dateLabel);
+  if (!parts) return false;
+  const today = pacificTodayParts();
+  return parts.year === today.year && parts.month === today.month && parts.day === today.day;
 }
 
 function normalizeWhitespace(value: string) {
@@ -183,11 +211,20 @@ function shouldSkipNote(note: string) {
   if (token === "incomplete") return true;
   if (token === "no notes") return true;
   if (token === "nothing to report") return true;
+  if (token === "nothing:)" || token === "nothing :)") return true;
+  if (token === "all good!" || token === "all good") return true;
+  if (token === "no issues w any dogs for am shift") return true;
   if (token === "n/a" || token === "na" || token === "-") return true;
+  if (token === "true" || token === "false") return true;
   return false;
 }
 
-function importKeyFor(parts: Omit<ParsedNote, "importKey" | "createdAt">) {
+function truthyFlag(value: string) {
+  const token = value.trim().toLowerCase();
+  return token === "true" || token === "yes" || token === "y" || token === "1";
+}
+
+function importKeyFor(parts: Omit<ParsedNote, "importKey" | "createdAt" | "isToday">) {
   return createHash("sha1")
     .update(
       [
@@ -258,12 +295,17 @@ function parseTeamLeadCsv(filePath: string): ParsedNote[] {
       priorityRaw,
       dogsToWatch,
       ownersToCall: null,
-      managementFollowUp
+      managementFollowUp,
+      reminderFlag: false
     };
+    const isToday = isPacificToday(currentDate);
 
     notes.push({
       ...base,
-      createdAt: toHistoricalIso(currentDate, currentShift, indexInDay),
+      isToday,
+      createdAt: isToday
+        ? new Date(Date.now() + indexInDay * 1000).toISOString()
+        : toHistoricalIso(currentDate, currentShift, indexInDay),
       importKey: importKeyFor(base)
     });
   }
@@ -285,8 +327,13 @@ function parseFrontDeskCsv(filePath: string): ParsedNote[] {
   for (let i = 0; i < rows.length; i += 1) {
     const row = rows[i] ?? [];
     const col0 = cleanCell(row[0]);
-    if (i === 0 && /crossover/i.test(col0)) continue;
-    if (i === 1 && /^date$/i.test(col0)) continue;
+    // Header row for this spreadsheet / legacy crossover export
+    if (
+      i === 0 &&
+      (/^date$/i.test(col0) || /crossover/i.test(col0) || /important notes/i.test(cleanCell(row[3])))
+    ) {
+      continue;
+    }
 
     const dateCell = cleanCell(row[0]);
     const shiftCell = cleanCell(row[1]);
@@ -316,8 +363,10 @@ function parseFrontDeskCsv(filePath: string): ParsedNote[] {
       indexInDay += 1;
     }
 
+    const reminderFlag = truthyFlag(reminder);
     const categoryBits = [
-      reminder && reminder.toUpperCase() !== "FALSE" && reminder.toUpperCase() !== "TRUE" ? `Reminder: ${reminder}` : null,
+      reminderFlag ? "Reminder" : null,
+      reminder && !reminderFlag && reminder.toUpperCase() !== "FALSE" ? `Reminder: ${reminder}` : null,
       operationalIssues ? `Ops: ${operationalIssues}` : null
     ]
       .filter(Boolean)
@@ -333,12 +382,17 @@ function parseFrontDeskCsv(filePath: string): ParsedNote[] {
       priorityRaw: null,
       dogsToWatch,
       ownersToCall,
-      managementFollowUp
+      managementFollowUp,
+      reminderFlag
     };
+    const isToday = isPacificToday(currentDate);
 
     notes.push({
       ...base,
-      createdAt: toHistoricalIso(currentDate, currentShift, indexInDay),
+      isToday,
+      createdAt: isToday
+        ? new Date(Date.now() + indexInDay * 1000).toISOString()
+        : toHistoricalIso(currentDate, currentShift, indexInDay),
       importKey: importKeyFor(base)
     });
   }
@@ -354,6 +408,9 @@ function buildSubject(note: ParsedNote) {
 }
 
 function buildDetails(note: ParsedNote) {
+  const footer = note.isToday
+    ? "Imported from shift spreadsheet into today's Front Desk Log. Unassigned."
+    : "Imported historical shift note. Closed / resolved (not open). Unassigned.";
   const lines = [
     note.note,
     "",
@@ -364,7 +421,7 @@ function buildDetails(note: ParsedNote) {
     note.ownersToCall ? `Owners to call: ${note.ownersToCall}` : null,
     note.managementFollowUp ? `Management follow-up (original): ${note.managementFollowUp}` : null,
     "",
-    "Imported historical shift note. Closed / not open. Unassigned."
+    footer
   ].filter((line) => line !== null) as string[];
 
   return lines.join("\n").slice(0, 4000);
@@ -373,8 +430,11 @@ function buildDetails(note: ParsedNote) {
 function toCrossoverMessage(note: ParsedNote): CrossoverMessage {
   const details = buildDetails(note);
   const priority = mapPriority(note.priorityRaw, note.managementFollowUp);
-  const logType = mapLogType(note.source, note.category, note.note);
+  const logType = note.reminderFlag
+    ? "Reminder"
+    : mapLogType(note.source, note.category, note.note);
   const createdAt = note.createdAt;
+  const status = note.isToday ? "Open" : "Resolved";
 
   return {
     id: randomUUID(),
@@ -385,12 +445,12 @@ function toCrossoverMessage(note: ParsedNote): CrossoverMessage {
     from_department: "Front Desk",
     to_department: "Front Desk Team",
     priority,
-    status: "Resolved",
+    status,
     related_dog_name: note.dogsToWatch ? note.dogsToWatch.slice(0, 200) : null,
     related_owner_name: note.ownersToCall ? note.ownersToCall.slice(0, 200) : null,
     related_route: null,
     traffic_weather_issue: null,
-    template_title: "Historical Shift Notes Import",
+    template_title: note.isToday ? "Today's Shift Notes Import" : "Historical Shift Notes Import",
     template_id: `${IMPORT_MARKER}:${note.importKey}`,
     template_field_values: {
       import_marker: IMPORT_MARKER,
@@ -398,10 +458,11 @@ function toCrossoverMessage(note: ParsedNote): CrossoverMessage {
       source_file: note.source,
       original_author: note.author,
       shift_date: note.dateLabel,
-      shift: note.shift
+      shift: note.shift,
+      is_today: note.isToday ? "1" : "0"
     },
     created_by: ACTOR,
-    submitted_by: ACTOR,
+    submitted_by: note.author || ACTOR,
     assigned_to: null,
     assigned_team: null,
     reported_to: null,
@@ -415,7 +476,7 @@ function toCrossoverMessage(note: ParsedNote): CrossoverMessage {
     urgent: false,
     created_at: createdAt,
     updated_at: createdAt,
-    resolved_at: createdAt,
+    resolved_at: note.isToday ? null : createdAt,
     archived_at: null
   };
 }
@@ -437,14 +498,39 @@ async function saveState(supabase: ReturnType<typeof getServiceSupabase>, state:
 
 async function main() {
   loadEnvFiles();
-  const { write, dryRun } = parseArgs(process.argv.slice(2));
+  const { write, dryRun, file } = parseArgs(process.argv.slice(2));
 
-  const tlPath = resolve(
-    "/Users/fitdog/Downloads/TEAM LEAD CROSSOVER _ COMMUNICATIONS  - TL SHIFT NOTES.csv"
-  );
-  const fdPath = resolve("/Users/fitdog/Downloads/Front_desk_operations_log - SHIFT NOTES.csv");
+  const includeLegacy = process.argv.includes("--include-legacy");
+  let parsed: ParsedNote[] = [];
+  try {
+    parsed = parseFrontDeskCsv(file);
+    console.log(`Parsed front-desk sheet: ${file} (${parsed.length} note(s))`);
+  } catch (error) {
+    throw new Error(`Unable to read CSV ${file}: ${error instanceof Error ? error.message : error}`);
+  }
 
-  const parsed = [...parseTeamLeadCsv(tlPath), ...parseFrontDeskCsv(fdPath)];
+  // Optional legacy sources only when explicitly requested.
+  if (includeLegacy) {
+    const legacyTl = resolve(
+      "/Users/fitdog/Downloads/TEAM LEAD CROSSOVER _ COMMUNICATIONS  - TL SHIFT NOTES.csv"
+    );
+    const legacyFd = resolve("/Users/fitdog/Downloads/Front_desk_operations_log - SHIFT NOTES.csv");
+    for (const [label, path, parser] of [
+      ["team_lead", legacyTl, parseTeamLeadCsv],
+      ["front_desk_legacy", legacyFd, parseFrontDeskCsv]
+    ] as const) {
+      try {
+        const extra = parser(path);
+        if (extra.length) {
+          parsed = [...parsed, ...extra];
+          console.log(`Also parsed ${label}: ${extra.length} note(s)`);
+        }
+      } catch {
+        // Optional legacy files may not exist.
+      }
+    }
+  }
+
   const uniqueByKey = new Map<string, ParsedNote>();
   for (const note of parsed) {
     if (!uniqueByKey.has(note.importKey)) uniqueByKey.set(note.importKey, note);
@@ -455,35 +541,56 @@ async function main() {
   const state = await listStaffOps(supabase);
   const existingKeys = new Set(
     state.crossover_messages
-      .map((item) => item.template_id?.replace(`${IMPORT_MARKER}:`, "") ?? item.template_field_values?.import_key)
+      .map((item) => {
+        const fromTemplate = item.template_id?.includes(":")
+          ? item.template_id.split(":").slice(-1)[0]
+          : null;
+        return fromTemplate || item.template_field_values?.import_key || null;
+      })
       .filter(Boolean) as string[]
   );
 
-  const toInsert = uniqueNotes.filter((note) => !existingKeys.has(note.importKey)).map(toCrossoverMessage);
+  const toInsertNotes = uniqueNotes.filter((note) => !existingKeys.has(note.importKey));
+  const toInsert = toInsertNotes.map(toCrossoverMessage);
+  const todayCount = toInsertNotes.filter((note) => note.isToday).length;
+  const pastCount = toInsertNotes.length - todayCount;
 
   console.log(
     JSON.stringify(
       {
         mode: write ? "write" : "dry-run",
+        file,
+        pacific_today: pacificTodayParts(),
         actor: ACTOR,
-        status: "Resolved",
         assigned_to: null,
         parsed_rows: parsed.length,
         unique_notes: uniqueNotes.length,
         already_imported: uniqueNotes.length - toInsert.length,
         will_insert: toInsert.length,
+        will_insert_today_open: todayCount,
+        will_insert_past_resolved: pastCount,
         by_source: {
           team_lead: uniqueNotes.filter((n) => n.source === "team_lead").length,
           front_desk: uniqueNotes.filter((n) => n.source === "front_desk").length
         },
-        sample: toInsert.slice(0, 3).map((item) => ({
-          subject: item.subject,
-          log_type: item.log_type,
-          submitted_by: item.submitted_by,
-          assigned_to: item.assigned_to,
-          status: item.status,
-          created_at: item.created_at
-        }))
+        today_sample: toInsert
+          .filter((item) => item.status === "Open")
+          .slice(0, 5)
+          .map((item) => ({
+            subject: item.subject,
+            log_type: item.log_type,
+            status: item.status,
+            created_at: item.created_at
+          })),
+        past_sample: toInsert
+          .filter((item) => item.status === "Resolved")
+          .slice(0, 3)
+          .map((item) => ({
+            subject: item.subject,
+            log_type: item.log_type,
+            status: item.status,
+            created_at: item.created_at
+          }))
       },
       null,
       2
@@ -509,8 +616,8 @@ async function main() {
       {
         id: randomUUID(),
         activity_type: "shift_log.imported",
-        title: `Imported ${toInsert.length} historical Front Desk logs`,
-        description: `${IMPORT_MARKER} • submitted by ${ACTOR} • unassigned • Resolved`,
+        title: `Imported ${toInsert.length} Front Desk logs (${todayCount} today open, ${pastCount} past resolved)`,
+        description: `${IMPORT_MARKER} • submitted by ${ACTOR} • unassigned`,
         source_table: "crossover_messages",
         source_id: null,
         created_by: ACTOR,
@@ -521,7 +628,9 @@ async function main() {
   };
 
   await saveState(supabase, nextState);
-  console.log(`Imported ${toInsert.length} closed Front Desk logs as ${ACTOR}, unassigned.`);
+  console.log(
+    `Imported ${toInsert.length} Front Desk logs (${todayCount} open for today, ${pastCount} resolved past).`
+  );
 }
 
 main().catch((error) => {
