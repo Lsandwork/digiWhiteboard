@@ -133,7 +133,7 @@ export function AdminLogin() {
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
           <Image src={FITDOG_BRAND.logoBadge256} alt="Fitdog" width={72} height={72} className="rounded-full ring-2 ring-fitdog-orange/40" />
           <div>
-            <h1 className="text-2xl font-black text-[var(--text-primary)]">{mustChangePassword ? "Set New Password" : "Fitdog Admin"}</h1>
+            <h1 className="text-2xl font-black text-[var(--text-primary)]">{mustChangePassword ? "Set New Password" : "Fitdog Digi-Board"}</h1>
             <p className="mt-1 text-sm text-admin-muted">
               {mustChangePassword
                 ? "Your temporary password must be changed before you can continue."
