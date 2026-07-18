@@ -29,21 +29,36 @@ for (const role of roles) {
     const resolvedBoard = isStaffDigiBoardOnlyLegacyRole(role)
       ? "staff"
       : isLobbyDigiBoardOnlyLegacyRole(role)
-        ? "lobby"
+        ? requestedBoard === "staff"
+          ? "staff"
+          : "lobby"
         : requestedBoard;
     const firstTab = firstAccessibleAdminTab(access, role, requestedBoard);
+    const accessBoard =
+      firstTab === "crossover_communication" ? "staff" : resolvedBoard;
 
     assert.equal(
       (ADMIN_TABS as readonly string[]).includes(firstTab),
       true,
-      `${role} resolves to a known ${resolvedBoard} tab`
+      `${role} resolves to a known tab (${firstTab})`
     );
     assert.equal(
-      canAccessAdminTab(access, firstTab, role, resolvedBoard),
+      canAccessAdminTab(access, firstTab, role, accessBoard),
       true,
-      `${role} can access its first ${resolvedBoard} tab (${firstTab})`
+      `${role} can access its first tab (${firstTab}) on ${accessBoard}`
     );
   }
+
+  assert.equal(
+    canAccessAdminTab(access, "crossover_communication", role, "staff"),
+    true,
+    `${role} can open Front Desk Log`
+  );
+  assert.equal(
+    firstAccessibleAdminTab(access, role, "staff"),
+    "crossover_communication",
+    `${role} staff landing tab is Front Desk Log`
+  );
 }
 
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), true);

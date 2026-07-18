@@ -346,6 +346,14 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
 
   entries.push(
     ...sectionEntries(
+      "trainer_operations",
+      "Front Desk & Floor",
+      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
       "trainer_training",
       "Training",
       compactEntries([...singles(["trainer_entry"], visible)])

@@ -167,6 +167,7 @@ export function AdminDashboard() {
     }
 
     if (marketingAccount && board === "staff") {
+      if (tab === "crossover_communication") return;
       const fallbackBoard = accessibleAdminBoards(access, effectiveRole).includes("marketing") ? "marketing" : "lobby";
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);

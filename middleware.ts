@@ -74,12 +74,31 @@ async function runMiddleware(request: NextRequest) {
     }
 
     const role = session.role ?? "";
+
+    // Bare /admin (or staff board with no tab) → Front Desk Log for every account.
+    if (pathname === "/admin") {
+      const url = request.nextUrl.clone();
+      const board = url.searchParams.get("board");
+      const tab = url.searchParams.get("tab");
+      if (!tab && board !== "marketing" && board !== "lobby") {
+        url.searchParams.set("board", "staff");
+        url.searchParams.set("tab", "crossover_communication");
+        return NextResponse.redirect(url);
+      }
+      if (!tab && board === "staff") {
+        url.searchParams.set("tab", "crossover_communication");
+        return NextResponse.redirect(url);
+      }
+    }
+
     if (!session.isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
-      if (url.searchParams.get("board") !== "staff") {
+      const board = url.searchParams.get("board");
+      const tab = url.searchParams.get("tab");
+      if (board !== "staff" || !tab) {
         url.pathname = "/admin";
         url.searchParams.set("board", "staff");
-        if (!url.searchParams.get("tab")) {
+        if (!tab) {
           url.searchParams.set("tab", firstAccessibleAdminTab(null, role, "staff"));
         }
         return NextResponse.redirect(url);
@@ -89,6 +108,17 @@ async function runMiddleware(request: NextRequest) {
     if (!session.isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
+      const tab = url.searchParams.get("tab");
+      // Marketing accounts still land on Front Desk Log after login.
+      if (board === "staff" && (tab === "crossover_communication" || !tab)) {
+        if (!tab) {
+          url.pathname = "/admin";
+          url.searchParams.set("board", "staff");
+          url.searchParams.set("tab", "crossover_communication");
+          return NextResponse.redirect(url);
+        }
+        return NextResponse.next();
+      }
       if (board === "staff") {
         url.pathname = "/admin";
         url.searchParams.set("board", "marketing");

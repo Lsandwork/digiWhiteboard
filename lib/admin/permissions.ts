@@ -344,6 +344,9 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
 const TRAINER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
+  "view_front_desk_log",
+  "create_front_desk_log",
+  "edit_front_desk_log",
   "push_trainer_request",
   "clear_trainer_request",
   "create_trainer_entry",
@@ -382,18 +385,22 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
-/** Lobby marketing panel — board messages, promotions, and class schedule only. */
+/** Lobby marketing panel — lobby content plus Front Desk Log landing access. */
 const MARKETING_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "manage_lobby_board",
   "manage_cast_tv",
-  "view_staff_whiteboard"
+  "view_staff_whiteboard",
+  "view_front_desk_log",
+  "create_front_desk_log"
 ];
 
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
 const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
+  "view_front_desk_log",
   "create_front_desk_log",
+  "edit_front_desk_log",
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
@@ -423,9 +430,9 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 ];
 
 export const FRONT_DESK_COORDINATOR_TABS = [
+  "crossover_communication",
   "push_notices",
   "grooming_push",
-  "crossover_communication",
   "owner_follow_up",
   "active_issues",
   "staff_directory",
@@ -438,10 +445,10 @@ export const FRONT_DESK_COORDINATOR_TABS = [
 ] as const;
 
 export const TEAM_LEADER_TABS = [
+  "crossover_communication",
   "push_notices",
   "yard_push_notices",
   "grooming_push",
-  "crossover_communication",
   "whiteboard_preview",
   "yard_links",
   "walks_board",
@@ -452,8 +459,8 @@ export const TEAM_LEADER_TABS = [
 ] as const;
 
 export const GROOMER_TABS = [
-  "grooming_push",
   "crossover_communication",
+  "grooming_push",
   "whiteboard_preview",
   "yard_links",
   "walks_board",
@@ -464,6 +471,7 @@ export const GROOMER_TABS = [
 ] as const;
 
 export const TRAINER_TABS = [
+  "crossover_communication",
   "trainer_push",
   "trainer_entry",
   "package_commissions",
@@ -476,6 +484,7 @@ export const TRAINER_TABS = [
 ] as const;
 
 export const DOG_HANDLER_TABS = [
+  "crossover_communication",
   "checklist",
   "yard_links",
   "walks_board",
@@ -921,7 +930,7 @@ export function accessibleAdminBoards(
   }
 
   if (isMarketingLegacyRole(legacyRole)) {
-    return ["lobby", "marketing"];
+    return ["staff", "lobby", "marketing"];
   }
 
   if (isStaffDigiBoardOnlyLegacyRole(legacyRole)) {
@@ -1039,6 +1048,9 @@ export function canAccessAdminTab(
   }
 
   if (isMarketingLegacyRole(legacyRole)) {
+    if (board === "staff") {
+      return tab === "crossover_communication" || tab === "help";
+    }
     if (board !== "lobby") return false;
     return (MARKETING_TABS as readonly string[]).includes(tab);
   }
@@ -1148,8 +1160,16 @@ export function firstAccessibleAdminTab(
       ? "lobby"
       : board;
 
+  // Every staff-board session lands on Front Desk Log whenever the role can open it.
+  if (
+    resolvedBoard === "staff" &&
+    canAccessAdminTab(access, "crossover_communication", legacyRole, "staff", options)
+  ) {
+    return "crossover_communication";
+  }
+
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
-    return board === "staff" ? "overview" : "overview";
+    return "overview";
   }
 
   if (isFrontDeskCoordinatorLegacyRole(legacyRole) && resolvedBoard === "staff") {
@@ -1184,7 +1204,7 @@ export function firstAccessibleAdminTab(
     for (const tab of DOG_HANDLER_TABS) {
       if (canAccessAdminTab(access, tab, legacyRole, resolvedBoard, options)) return tab;
     }
-    return "whiteboard_preview";
+    return "checklist";
   }
 
   if (isMarketingLegacyRole(legacyRole) && resolvedBoard === "lobby") {
@@ -1197,9 +1217,9 @@ export function firstAccessibleAdminTab(
   const tabs =
     resolvedBoard === "staff"
       ? [
+          "crossover_communication",
           "push_notices",
           "grooming_push",
-          "crossover_communication",
           "owner_follow_up",
           "active_issues",
           "staff_directory",

@@ -5,24 +5,14 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { accessFromLegacyRole, firstAccessibleAdminTab, isMarketingLegacyRole, isStaffDigiBoardOnlyLegacyRole } from "@/lib/admin/permissions";
-import type { AdminTab } from "@/lib/admin/types";
 import "@/app/login-screen.css";
 
 const REMEMBER_USERNAME_KEY = "fitdog.login.rememberUsername";
 const HELP_EMAIL = "Lonnie@fitdog.com";
 
-function defaultAdminRoute(role?: string, isDemo?: boolean) {
+function defaultAdminRoute(_role?: string, isDemo?: boolean) {
   if (isDemo) return "/admin?board=staff&tab=demo_push";
-  const access = accessFromLegacyRole(null, null, role);
-  const board = isStaffDigiBoardOnlyLegacyRole(role)
-    ? "staff"
-    : isMarketingLegacyRole(role)
-      ? "lobby"
-      : "lobby";
-  const tab = firstAccessibleAdminTab(access, role, board) as AdminTab;
-  const resolvedBoard = board === "staff" && tab === "users" ? "lobby" : board;
-  return `/admin?board=${resolvedBoard}&tab=${tab}`;
+  return "/admin?board=staff&tab=crossover_communication";
 }
 
 const FEATURES = [
