@@ -100,7 +100,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   checklist: "Personal handler checklist for daily shift tasks.",
-  overview: "Sync health, checkout counts, and quick board settings.",
+  overview: "Live snapshot of alerts, HR, PIP, tasks, staffing, and board health.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   promotions: "Manage lobby promotion cards shown during idle time.",
   schedule: "Edit the weekly class schedule on the lobby display.",

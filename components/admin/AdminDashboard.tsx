@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { StatusCards } from "@/components/admin/StatusCards";
 import { BoardSettings } from "@/components/admin/BoardSettings";
+import { OverviewPanel } from "@/components/admin/OverviewPanel";
+import { PipPanel } from "@/components/admin/PipPanel";
 import { ContentEditor } from "@/components/admin/ContentEditor";
 import { PromotionsManager } from "@/components/admin/PromotionsManager";
 import { ClassScheduleEditor } from "@/components/admin/ClassScheduleEditor";
@@ -425,22 +427,26 @@ export function AdminDashboard() {
         {tab === "checklist" ? <HandlerChecklistPanel /> : null}
 
         {tab === "overview" ? (
-          <>
-            <StatusCards
-              syncStatus={data.sync_status}
-              lastSynced={data.last_synced_at}
-              activeCheckouts={data.active_checkouts}
-              dataSource={data.data_source}
-            />
-            <BoardSettings
-              board={board}
-              lobbySettings={lobbySettings}
-              staffSettings={staffSettings}
-              onSaveLobby={(patch) => void saveBoardSettings(patch)}
-              onSaveStaff={(patch) => void saveBoardSettings(patch)}
-              onReset={() => setConfirmResetBoard(true)}
-            />
-          </>
+          board === "lobby" ? (
+            <>
+              <StatusCards
+                syncStatus={data.sync_status}
+                lastSynced={data.last_synced_at}
+                activeCheckouts={data.active_checkouts}
+                dataSource={data.data_source}
+              />
+              <BoardSettings
+                board={board}
+                lobbySettings={lobbySettings}
+                staffSettings={staffSettings}
+                onSaveLobby={(patch) => void saveBoardSettings(patch)}
+                onSaveStaff={(patch) => void saveBoardSettings(patch)}
+                onReset={() => setConfirmResetBoard(true)}
+              />
+            </>
+          ) : (
+            <OverviewPanel onNavigate={(nextTab) => setActiveTab(nextTab)} />
+          )
         ) : null}
 
         {tab === "content" ? (
@@ -575,7 +581,7 @@ export function AdminDashboard() {
         ) : null}
         {tab === "complaint_review" ? (canReviewComplaints ? <ManagementSupportHubPanel /> : null) : null}
         {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
-        {tab === "hr_pip" ? (canAccessHrPanels ? <HrHubPanel /> : null) : null}
+        {tab === "hr_pip" ? (canAccessHrPanels ? <PipPanel /> : null) : null}
 
         {tab === "analytics" ? (
           <section className="admin-card p-5">
