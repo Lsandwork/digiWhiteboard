@@ -166,7 +166,12 @@ export function BulkPhotoLibrary() {
       if (ids.length === 1) {
         const only = items.find((item) => item.id === ids[0]);
         if (only?.original_url) {
-          triggerBrowserDownload(only.original_url, only.original_filename);
+          triggerBrowserDownload(
+            only.original_url.includes("?")
+              ? `${only.original_url}&download=1`
+              : `${only.original_url}?download=1`,
+            only.original_filename
+          );
           showToast("Download started.", "success");
           return;
         }
@@ -186,7 +191,12 @@ export function BulkPhotoLibrary() {
   async function downloadOne(item: PhotoUploadItem) {
     if (!canDownload) return;
     if (item.original_url) {
-      triggerBrowserDownload(item.original_url, item.original_filename);
+      triggerBrowserDownload(
+        item.original_url.includes("?")
+          ? `${item.original_url}&download=1`
+          : `${item.original_url}?download=1`,
+        item.original_filename
+      );
       return;
     }
     if (!batch) return;
@@ -309,12 +319,27 @@ export function BulkPhotoLibrary() {
                 <button type="button" className="block w-full" onClick={() => toggleSelect(item.id)}>
                   {item.thumbnail_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.thumbnail_url} alt="" className="aspect-square w-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="flex aspect-square items-center justify-center bg-black/30 text-admin-muted">
-                      <ImagePlus className="h-8 w-8" />
-                    </div>
-                  )}
+                    <img
+                      src={item.thumbnail_url}
+                      alt=""
+                      className="aspect-square w-full object-cover"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                        const fallback = event.currentTarget.nextElementSibling;
+                        if (fallback instanceof HTMLElement) fallback.hidden = false;
+                      }}
+                    />
+                  ) : null}
+                  <div
+                    className={`flex aspect-square items-center justify-center bg-black/30 text-admin-muted ${
+                      item.thumbnail_url ? "hidden" : ""
+                    }`}
+                    hidden={Boolean(item.thumbnail_url)}
+                  >
+                    <ImagePlus className="h-8 w-8" />
+                  </div>
                 </button>
                 <div className="space-y-2 p-3">
                   <p className="truncate text-sm font-medium text-white">{item.original_filename}</p>

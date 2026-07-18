@@ -32,6 +32,12 @@ export type PhotoQueueActor = {
   email?: string | null;
 };
 
+/** Same-origin URL so gallery images load in Safari (avoids broken cross-origin signed URLs). */
+export function photoMediaUrl(itemId: string, variant: "thumbnail" | "original" = "thumbnail") {
+  const params = new URLSearchParams({ variant });
+  return `/api/admin/photo-upload-queue/items/${encodeURIComponent(itemId)}/media?${params.toString()}`;
+}
+
 type AuditInput = {
   batchId: string;
   photoItemId?: string | null;
@@ -386,16 +392,13 @@ export async function getBatchDetail(
   const withDupes = await attachDuplicateInfo(supabase, rawItems);
   const includeOriginals = options?.includeOriginalUrls !== false;
 
-  const items = await Promise.all(
-    withDupes.map(async (item) => ({
-      ...item,
-      dogs: dogMap.get(item.id) ?? [],
-      thumbnail_url: await createPhotoSignedUrl(supabase, item.thumbnail_storage_path),
-      original_url: includeOriginals
-        ? await createPhotoSignedUrl(supabase, item.original_storage_path)
-        : null
-    }))
-  );
+  // Same-origin media URLs (not Supabase signed URLs) so Safari/admin img tags render reliably.
+  const items = withDupes.map((item) => ({
+    ...item,
+    dogs: dogMap.get(item.id) ?? [],
+    thumbnail_url: photoMediaUrl(item.id, "thumbnail"),
+    original_url: includeOriginals ? photoMediaUrl(item.id, "original") : null
+  }));
 
   const counts = await countBatchItems(supabase, batchId);
 
@@ -556,12 +559,12 @@ export async function addPhotoItem(
 
   await refreshBatchStatus(supabase, input.batchId);
 
-  const thumbnail_url = await createPhotoSignedUrl(supabase, data.thumbnail_storage_path);
   return {
     item: {
       ...(data as PhotoUploadItem),
       dogs: [],
-      thumbnail_url,
+      thumbnail_url: photoMediaUrl(data.id, "thumbnail"),
+      original_url: photoMediaUrl(data.id, "original"),
       duplicate_info: duplicate
         ? {
             previous_batch_name: duplicate.batch_name,
