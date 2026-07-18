@@ -36,7 +36,7 @@ export async function requirePhotoUploadAccess(request: Request): Promise<PhotoU
   if (!canAccessPhotoUploadQueue(access, session?.role)) {
     return {
       error: NextResponse.json(
-        { error: "You do not have permission to manage the Gingr Photo Upload Queue." },
+        { error: "You do not have permission to use Bulk Photo Upload." },
         { status: 403 }
       )
     };

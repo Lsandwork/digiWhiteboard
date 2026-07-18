@@ -81,6 +81,7 @@ export type PermissionKey =
   | "manage_lobby_board"
   | "manage_cast_tv"
   | "manage_photo_upload_queue"
+  | "download_photo_uploads"
   | "reopen_photo_upload_batches"
   | "manage_photo_upload_settings";
 
@@ -231,6 +232,7 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_lobby_board",
   "manage_cast_tv",
   "manage_photo_upload_queue",
+  "download_photo_uploads",
   "reopen_photo_upload_batches",
   "manage_photo_upload_settings"
 ] as const satisfies readonly PermissionKey[]);
@@ -301,11 +303,12 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "edit_active_issue",
   "assign_active_issue",
   "resolve_active_issue",
+  "manage_photo_upload_queue",
+  "download_photo_uploads",
   "view_staff_directory",
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
-  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -343,6 +346,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "view_analytics",
   "export_reports",
   "manage_photo_upload_queue",
+  "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   "assign_notifications",
   "view_internal_notes",
@@ -437,6 +441,8 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
   "receive_walks_board_reminders",
+  "manage_photo_upload_queue",
+  "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -448,6 +454,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "owner_follow_up",
   "active_issues",
   "staff_directory",
+  "bulk_photo_upload",
   "yard_links",
   "walks_board",
   "notifications",
@@ -462,6 +469,7 @@ export const TEAM_LEADER_TABS = [
   "yard_push_notices",
   "grooming_push",
   "whiteboard_preview",
+  "bulk_photo_upload",
   "yard_links",
   "walks_board",
   "notifications",

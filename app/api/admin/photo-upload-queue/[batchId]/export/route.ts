@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canDownloadPhotoUploads } from "@/lib/photo-upload-queue/access";
 import { prepareExport } from "@/lib/photo-upload-queue/service";
 import {
   demoWriteGuard,
@@ -18,6 +19,13 @@ export async function POST(request: Request, context: RouteContext) {
   const auth = await requirePhotoUploadAccess(request);
   if (!isPhotoUploadAuthOk(auth)) return auth.error;
 
+  if (!canDownloadPhotoUploads(auth.access, auth.session?.role)) {
+    return NextResponse.json(
+      { error: "You can upload and view photos, but downloads are limited to Team Leads, Front Desk Coordinators, Admins, Management, and Super Admins." },
+      { status: 403 }
+    );
+  }
+
   try {
     const { batchId } = await context.params;
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -35,7 +43,7 @@ export async function POST(request: Request, context: RouteContext) {
 
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to prepare export.";
+    const message = error instanceof Error ? error.message : "Unable to prepare download.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

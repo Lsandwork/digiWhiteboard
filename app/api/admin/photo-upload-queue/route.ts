@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { canDownloadPhotoUploads } from "@/lib/photo-upload-queue/access";
 import {
-  createBatch,
+  getOrCreateTodayLibraryBatch,
   listBatches,
   listCategories,
   listYards
@@ -19,7 +20,10 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const [listed, categories, yards] = await Promise.all([
+    const ensureToday = searchParams.get("ensure_today") === "1";
+    const canDownload = canDownloadPhotoUploads(auth.access, auth.session?.role);
+
+    const [listed, categories, yards, todayBatch] = await Promise.all([
       listBatches(auth.supabase, {
         status: searchParams.get("status"),
         service_date: searchParams.get("service_date"),
@@ -28,22 +32,28 @@ export async function GET(request: Request) {
         pageSize: Number(searchParams.get("pageSize") || searchParams.get("page_size") || 25)
       }),
       listCategories(auth.supabase),
-      listYards(auth.supabase)
+      listYards(auth.supabase),
+      ensureToday ? getOrCreateTodayLibraryBatch(auth.supabase, auth.actor) : Promise.resolve(null)
     ]);
 
     return NextResponse.json({
       ...listed,
       categories,
       yards,
+      today_batch: todayBatch,
+      permissions: {
+        can_download: canDownload,
+        can_upload: true,
+        can_view: true
+      },
       currentUser: {
         email: auth.session?.email ?? null,
         adminUserId: auth.session?.adminUserId ?? null,
-        role: auth.session?.role ?? null,
-        access: auth.access
+        role: auth.session?.role ?? null
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load photo upload queue.";
+    const message = error instanceof Error ? error.message : "Unable to load photo library.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -56,24 +66,16 @@ export async function POST(request: Request) {
   if (!isPhotoUploadAuthOk(auth)) return auth.error;
 
   try {
-    const body = (await request.json()) as Record<string, unknown>;
-    const batch = await createBatch(
-      auth.supabase,
-      {
-        batch_name: body.batch_name != null ? String(body.batch_name) : undefined,
-        service_date: String(body.service_date ?? ""),
-        photographer_name: String(body.photographer_name ?? ""),
-        photographer_user_id:
-          body.photographer_user_id != null ? String(body.photographer_user_id) : auth.actor.id,
-        default_yard: body.default_yard != null ? String(body.default_yard) : undefined,
-        default_category: body.default_category != null ? String(body.default_category) : undefined,
-        internal_note: body.internal_note != null ? String(body.internal_note) : null
-      },
-      auth.actor
-    );
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (body.action === "ensure_today" || body.ensure_today) {
+      const batch = await getOrCreateTodayLibraryBatch(auth.supabase, auth.actor);
+      return NextResponse.json({ batch });
+    }
+
+    const batch = await getOrCreateTodayLibraryBatch(auth.supabase, auth.actor);
     return NextResponse.json({ batch });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to create batch.";
+    const message = error instanceof Error ? error.message : "Unable to prepare photo library.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

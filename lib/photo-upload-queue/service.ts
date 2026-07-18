@@ -358,7 +358,11 @@ async function attachDuplicateInfo(
   }));
 }
 
-export async function getBatchDetail(supabase: SupabaseClient, batchId: string) {
+export async function getBatchDetail(
+  supabase: SupabaseClient,
+  batchId: string,
+  options?: { includeOriginalUrls?: boolean }
+) {
   const { data: batch, error } = await supabase
     .from("photo_upload_batches")
     .select("*")
@@ -380,13 +384,16 @@ export async function getBatchDetail(supabase: SupabaseClient, batchId: string) 
     rawItems.map((i) => i.id)
   );
   const withDupes = await attachDuplicateInfo(supabase, rawItems);
+  const includeOriginals = options?.includeOriginalUrls !== false;
 
   const items = await Promise.all(
     withDupes.map(async (item) => ({
       ...item,
       dogs: dogMap.get(item.id) ?? [],
       thumbnail_url: await createPhotoSignedUrl(supabase, item.thumbnail_storage_path),
-      original_url: await createPhotoSignedUrl(supabase, item.original_storage_path)
+      original_url: includeOriginals
+        ? await createPhotoSignedUrl(supabase, item.original_storage_path)
+        : null
     }))
   );
 
@@ -398,17 +405,48 @@ export async function getBatchDetail(supabase: SupabaseClient, batchId: string) 
     .eq("batch_id", batchId)
     .order("export_number", { ascending: false });
 
-  const exportRows = await Promise.all(
-    ((exports ?? []) as PhotoUploadExport[]).map(async (row) => ({
-      ...row,
-      zip_url: await createPhotoSignedUrl(supabase, row.zip_storage_path)
-    }))
-  );
+  const exportRows = includeOriginals
+    ? await Promise.all(
+        ((exports ?? []) as PhotoUploadExport[]).map(async (row) => ({
+          ...row,
+          zip_url: await createPhotoSignedUrl(supabase, row.zip_storage_path)
+        }))
+      )
+    : [];
 
   return {
     batch: { ...(batch as PhotoUploadBatch), counts, items },
     exports: exportRows
   };
+}
+
+/** Creates or reuses today's photo library batch for simple upload/store workflows. */
+export async function getOrCreateTodayLibraryBatch(supabase: SupabaseClient, actor: PhotoQueueActor) {
+  const serviceDate = pacificDateKey(new Date()) || new Date().toISOString().slice(0, 10);
+
+  const { data: shared } = await supabase
+    .from("photo_upload_batches")
+    .select("*")
+    .eq("service_date", serviceDate)
+    .not("status", "in", "(uploaded_to_gingr,archived)")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (shared) return shared as PhotoUploadBatch;
+
+  return createBatch(
+    supabase,
+    {
+      batch_name: `Fitdog Photos – ${serviceDate}`,
+      service_date: serviceDate,
+      photographer_name: actorName(actor),
+      photographer_user_id: actorId(actor),
+      default_yard: "other",
+      default_category: "other",
+      internal_note: null
+    },
+    actor
+  );
 }
 
 export async function findDuplicateByHash(
@@ -480,13 +518,8 @@ export async function addPhotoItem(
   }
 
   const duplicate = await findDuplicateByHash(supabase, input.sha256_hash);
-  const hasDuplicate = Boolean(duplicate);
-  const status = deriveItemStatus({
-    dogCount: 0,
-    hasDuplicate,
-    duplicateOverride: false,
-    excluded: false
-  });
+  // Library mode: photos are stored and viewable immediately. No Gingr/dog assignment required.
+  const status: PhotoItemStatus = "ready_for_gingr";
 
   const row = {
     batch_id: input.batchId,
@@ -821,7 +854,7 @@ export async function prepareExport(
     .from("photo_upload_items")
     .select("*")
     .eq("batch_id", batchId)
-    .eq("status", "ready_for_gingr")
+    .not("status", "in", "(excluded,failed,processing)")
     .order("created_at", { ascending: true });
 
   if (input.itemIds?.length) {
@@ -829,24 +862,15 @@ export async function prepareExport(
   }
 
   const { data: itemRows, error: itemsError } = await query;
-  if (itemsError) throw new Error(itemsError.message || "Unable to load export items.");
+  if (itemsError) throw new Error(itemsError.message || "Unable to load download items.");
   const items = (itemRows ?? []) as PhotoUploadItem[];
   if (!items.length) {
-    throw new Error("No ready photos to export. Assign dogs and resolve review items first.");
+    throw new Error("No photos available to download.");
   }
 
-  const dogMap = await loadDogsForItems(
-    supabase,
-    items.map((i) => i.id)
-  );
-
   for (const item of items) {
-    const dogs = dogMap.get(item.id) ?? [];
-    if (!dogs.length) {
-      throw new Error(`Photo "${item.original_filename}" has no dog assigned.`);
-    }
-    if (!item.gingr_ready_storage_path) {
-      throw new Error(`Photo "${item.original_filename}" is missing a Gingr-ready file.`);
+    if (!item.original_storage_path && !item.gingr_ready_storage_path) {
+      throw new Error(`Photo "${item.original_filename}" is missing a stored file.`);
     }
   }
 
@@ -869,17 +893,20 @@ export async function prepareExport(
     })
     .select("*")
     .single();
-  if (exportError || !exportRow) throw new Error(exportError?.message || "Unable to create export record.");
+  if (exportError || !exportRow) throw new Error(exportError?.message || "Unable to create download record.");
 
   const exportItems: Array<{ export_id: string; photo_item_id: string; exported_filename: string }> = [];
   const fileBuffers: Array<{ name: string; buffer: Buffer }> = [];
 
   let index = 1;
   for (const item of items) {
-    const dogs = dogMap.get(item.id) ?? [];
+    const baseName = String(item.original_filename || "Photo")
+      .replace(/\.[^.]+$/, "")
+      .replace(/[^a-zA-Z0-9]+/g, "")
+      .slice(0, 40) || "Photo";
     const fileName = buildExportFileName({
       serviceDate: String(batch.service_date),
-      dogNames: dogs.map((d) => d.dog_name),
+      dogNames: [baseName],
       category: item.category || batch.default_category || "Photo",
       index
     });
@@ -889,7 +916,8 @@ export async function prepareExport(
       photo_item_id: item.id,
       exported_filename: fileName
     });
-    const buffer = await downloadPhotoBuffer(supabase, item.gingr_ready_storage_path!);
+    const sourcePath = item.gingr_ready_storage_path || item.original_storage_path;
+    const buffer = await downloadPhotoBuffer(supabase, sourcePath);
     fileBuffers.push({ name: fileName, buffer });
   }
 
@@ -904,7 +932,7 @@ export async function prepareExport(
   if (fileBuffers.length === 1) {
     single_file = true;
     const only = fileBuffers[0]!;
-    // Re-upload under export folder with final Gingr filename for a clean single download.
+    // Re-upload under export folder with a clean single-file download name.
     const path = buildPhotoStoragePath({
       batchId,
       kind: "exports",

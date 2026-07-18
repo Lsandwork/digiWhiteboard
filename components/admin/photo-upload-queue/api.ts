@@ -22,6 +22,11 @@ export type PhotoQueueDetailResponse = {
   exports?: PhotoUploadExport[];
   categories?: PhotoUploadOption[];
   yards?: PhotoUploadOption[];
+  permissions?: {
+    can_download?: boolean;
+    can_upload?: boolean;
+    can_view?: boolean;
+  };
 };
 
 export type PhotoUploadFileResult = {

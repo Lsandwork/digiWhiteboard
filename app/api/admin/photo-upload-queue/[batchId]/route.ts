@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { canDownloadPhotoUploads } from "@/lib/photo-upload-queue/access";
 import { getBatchDetail, updateBatchFields } from "@/lib/photo-upload-queue/service";
 import {
   demoWriteGuard,
@@ -16,8 +17,14 @@ export async function GET(request: Request, context: RouteContext) {
 
   try {
     const { batchId } = await context.params;
-    const detail = await getBatchDetail(auth.supabase, batchId);
-    return NextResponse.json(detail);
+    const canDownload = canDownloadPhotoUploads(auth.access, auth.session?.role);
+    const detail = await getBatchDetail(auth.supabase, batchId, {
+      includeOriginalUrls: canDownload
+    });
+    return NextResponse.json({
+      ...detail,
+      permissions: { can_download: canDownload, can_upload: true, can_view: true }
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load batch.";
     const status = message === "Batch not found." ? 404 : 500;

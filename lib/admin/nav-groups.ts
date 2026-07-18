@@ -134,7 +134,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   help: "Setup guides and how-to articles.",
   analytics: "Operational metrics and board activity summary.",
   demo_push: "Try push notices in demo mode.",
-  bulk_photo_upload: "Gingr Photo Upload Queue — prepare, organize, and track report-card photos before transferring them into Gingr.",
+  bulk_photo_upload: "Upload, store, view, and download photos in Digi-Board.",
   write_ups: "Submit and review your own write-up forms.",
   write_up_review: "Review all submitted employee write-ups.",
   complaint_review: "Review groomer, trainer, and staff complaints.",
