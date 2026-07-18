@@ -265,9 +265,17 @@ function recordToMutable(record: GingrBackOfHouseRecord, now: Date, timeZone: st
 
 export async function loadActiveDogsForGroomingPush(
   supabase: SupabaseClient,
-  options?: { timeZone?: string }
+  options?: {
+    timeZone?: string;
+    /**
+     * cache_only — reuse in-memory back-of-house data only. Never call Gingr.
+     * Use for photo tagging and other non-critical UIs so Gingr stays reserved for live boards.
+     */
+    gingrMode?: "allow_fetch" | "cache_only";
+  }
 ) {
   const timeZone = options?.timeZone ?? "America/Los_Angeles";
+  const gingrMode = options?.gingrMode ?? "allow_fetch";
   const now = new Date();
   const map = new Map<string, MutableDog>();
 
@@ -285,7 +293,10 @@ export async function loadActiveDogsForGroomingPush(
   }
 
   const cachedBoard = getCachedBackOfHouseBoard(Date.now(), true);
-  const board = cachedBoard ?? (await fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => null));
+  const board =
+    gingrMode === "cache_only"
+      ? cachedBoard
+      : cachedBoard ?? (await fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => null));
   if (board) {
     for (const record of board.checking_in as GingrBackOfHouseRecord[]) {
       const mutable = recordToMutable(record, now, timeZone);
@@ -314,9 +325,17 @@ export async function loadActiveDogsForGroomingPush(
   return {
     dogs: enriched,
     meta: {
-      source: cachedBoard ? "cache_and_supabase" : "supabase_only",
+      source:
+        gingrMode === "cache_only"
+          ? cachedBoard
+            ? "cache_and_supabase"
+            : "supabase_only"
+          : cachedBoard
+            ? "cache_and_supabase"
+            : "supabase_only",
       cached_gingr_records: board?.checking_in.length ?? 0,
-      live_transition_rows: liveRows?.length ?? 0
+      live_transition_rows: liveRows?.length ?? 0,
+      gingr_mode: gingrMode
     }
   };
 }

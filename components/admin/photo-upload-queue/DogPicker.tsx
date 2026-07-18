@@ -88,6 +88,58 @@ export function DogPicker({
     onChange(selected.filter((item) => dogKey(item) !== key));
   }
 
+  const grouped = useMemo(() => {
+    const checkedIn: PhotoUploadCheckedInDog[] = [];
+    const expected: PhotoUploadCheckedInDog[] = [];
+    for (const dog of filtered) {
+      const status = `${dog.status} ${dog.displayStatus}`.toLowerCase();
+      if (status.includes("checked in") || dog.status === "checked_in") {
+        checkedIn.push(dog);
+      } else {
+        expected.push(dog);
+      }
+    }
+    return { checkedIn, expected };
+  }, [filtered]);
+
+  function renderDogRow(dog: PhotoUploadCheckedInDog) {
+    const active = isSelected(dog);
+    return (
+      <button
+        key={dog.dogId}
+        type="button"
+        className={`flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${
+          active
+            ? "border-fitdog-orange/50 bg-fitdog-orange/10"
+            : "border-transparent hover:border-admin-border hover:bg-black/20"
+        }`}
+        onClick={() => toggleDog(dog)}
+        disabled={disabled}
+      >
+        {dog.dogPhotoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={dog.dogPhotoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-sm font-bold text-admin-muted">
+            {dog.dogName.slice(0, 1).toUpperCase()}
+          </span>
+        )}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-white">{dog.dogName}</span>
+          <span className="block truncate text-xs text-admin-muted">
+            {[dog.ownerName, dog.reservationType, dog.displayStatus || dog.status].filter(Boolean).join(" · ")}
+          </span>
+        </span>
+        <span
+          className={`h-5 w-5 shrink-0 rounded border ${
+            active ? "border-fitdog-orange bg-fitdog-orange" : "border-admin-border"
+          }`}
+          aria-hidden
+        />
+      </button>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {warning ? (
@@ -115,7 +167,9 @@ export function DogPicker({
       ) : null}
 
       <label className="block">
-        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-admin-muted">Search dogs</span>
+        <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-admin-muted">
+          Search expected dogs
+        </span>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-muted" />
           <input
@@ -147,53 +201,32 @@ export function DogPicker({
         </div>
       ) : null}
 
-      <div className="max-h-56 space-y-2 overflow-y-auto rounded-xl border border-admin-border p-2">
+      <div className="max-h-64 space-y-3 overflow-y-auto rounded-xl border border-admin-border p-2">
         {!filtered.length ? (
           <p className="admin-empty-state-text px-2 py-3">
             {dogs.length
               ? "No dogs match your search."
-              : "No checked-in dogs loaded for this date. Use manual entry below."}
+              : "No expected dogs loaded for this date yet. Use manual entry below."}
           </p>
         ) : (
-          filtered.map((dog) => {
-            const active = isSelected(dog);
-            return (
-              <button
-                key={dog.dogId}
-                type="button"
-                className={`flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 py-2 text-left transition ${
-                  active
-                    ? "border-fitdog-orange/50 bg-fitdog-orange/10"
-                    : "border-transparent hover:border-admin-border hover:bg-black/20"
-                }`}
-                onClick={() => toggleDog(dog)}
-                disabled={disabled}
-              >
-                {dog.dogPhotoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={dog.dogPhotoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black/30 text-sm font-bold text-admin-muted">
-                    {dog.dogName.slice(0, 1).toUpperCase()}
-                  </span>
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold text-white">{dog.dogName}</span>
-                  <span className="block truncate text-xs text-admin-muted">
-                    {[dog.ownerName, dog.reservationType, dog.displayStatus || dog.status]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <span
-                  className={`h-5 w-5 shrink-0 rounded border ${
-                    active ? "border-fitdog-orange bg-fitdog-orange" : "border-admin-border"
-                  }`}
-                  aria-hidden
-                />
-              </button>
-            );
-          })
+          <>
+            {grouped.checkedIn.length ? (
+              <div className="space-y-2">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-admin-muted">
+                  Checked in ({grouped.checkedIn.length})
+                </p>
+                {grouped.checkedIn.map(renderDogRow)}
+              </div>
+            ) : null}
+            {grouped.expected.length ? (
+              <div className="space-y-2">
+                <p className="px-1 text-[11px] font-semibold uppercase tracking-wide text-admin-muted">
+                  Expected today / reservations ({grouped.expected.length})
+                </p>
+                {grouped.expected.map(renderDogRow)}
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 

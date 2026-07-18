@@ -169,6 +169,12 @@ export async function fetchGingrBackOfHouse(options?: FetchGingrBackOfHouseOptio
   if (!canCallGingrEndpoint("back_of_house")) {
     const cachedBoard = getCachedBackOfHouseBoard(undefined, true);
     if (cachedBoard) return cachedBoard;
+    // Cooldown active and no cache — never punch through to Gingr.
+    return {
+      checking_in: [] as GingrBackOfHouseRecord[],
+      checking_out: [] as GingrBackOfHouseRecord[],
+      source: "cooldown" as const
+    };
   }
 
   const typeIds = await getReservationTypeIds(subdomain, apiKey, options?.allReservationTypes ? [] : configuredTypeIds, {

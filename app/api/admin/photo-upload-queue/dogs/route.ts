@@ -21,10 +21,14 @@ export async function GET(request: Request) {
     return NextResponse.json({
       service_date: serviceDate,
       dogs: result.dogs,
-      warning: result.warning ?? null
+      warning: result.warning ?? null,
+      meta: {
+        includes_reservations: true,
+        gingr_calls: "never"
+      }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load checked-in dogs.";
+    const message = error instanceof Error ? error.message : "Unable to load expected dogs.";
     return NextResponse.json(
       {
         dogs: [],

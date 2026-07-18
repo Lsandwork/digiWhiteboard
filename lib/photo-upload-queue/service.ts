@@ -1228,6 +1228,37 @@ export async function updateBatchFields(
   return data as PhotoUploadBatch;
 }
 
+const PHOTO_QUEUE_DOG_CACHE_TTL_MS = 60_000;
+const photoQueueDogCache = new Map<
+  string,
+  { expiresAt: number; dogs: PhotoUploadCheckedInDog[]; warning?: string }
+>();
+
+function mapActiveDogToPhotoQueueDog(dog: {
+  dogId: string;
+  dogName: string;
+  ownerName?: string;
+  dogPhotoUrl?: string;
+  status: string;
+  displayStatus: string;
+  reservationType?: string;
+  gingrAnimalId?: string;
+  checkedInAt?: string;
+}): PhotoUploadCheckedInDog {
+  return {
+    dogId: dog.dogId,
+    dogName: dog.dogName,
+    ownerName: dog.ownerName,
+    dogPhotoUrl: dog.dogPhotoUrl,
+    status: dog.status,
+    displayStatus: dog.displayStatus,
+    reservationType: dog.reservationType,
+    gingrAnimalId: dog.gingrAnimalId,
+    checkedInAt: dog.checkedInAt
+  };
+}
+
+/** Dogs expected for a service date — checked-in + reservations/appointments. Never calls Gingr. */
 export async function loadCheckedInDogsForDate(
   supabase: SupabaseClient,
   serviceDate: string
@@ -1237,34 +1268,41 @@ export async function loadCheckedInDogsForDate(
     return { dogs: [], warning: "Invalid service date. Expected YYYY-MM-DD." };
   }
 
+  const cached = photoQueueDogCache.get(date);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { dogs: cached.dogs, warning: cached.warning };
+  }
+
   const todayPacific = pacificDateKey(new Date());
   if (date === todayPacific) {
     try {
-      const { dogs } = await loadActiveDogsForGroomingPush(supabase);
-      return {
-        dogs: dogs
-          .filter((dog) => dog.status === "checked_in" || dog.group === "checked_in")
-          .map(
-            (dog): PhotoUploadCheckedInDog => ({
-              dogId: dog.dogId,
-              dogName: dog.dogName,
-              ownerName: dog.ownerName,
-              dogPhotoUrl: dog.dogPhotoUrl,
-              status: dog.status,
-              displayStatus: dog.displayStatus,
-              reservationType: dog.reservationType,
-              gingrAnimalId: dog.gingrAnimalId,
-              checkedInAt: dog.checkedInAt
-            })
-          )
-      };
+      // cache_only: piggyback on Staff/Lobby whiteboard Gingr refreshes. Do not hit Gingr from this page.
+      const { dogs, meta } = await loadActiveDogsForGroomingPush(supabase, { gingrMode: "cache_only" });
+      const mapped = dogs.map(mapActiveDogToPhotoQueueDog);
+      const checkedInCount = dogs.filter((dog) => dog.group === "checked_in").length;
+      const expectedCount = mapped.length - checkedInCount;
+      let warning: string | undefined;
+      if (!mapped.length) {
+        warning =
+          "No dogs found for today yet. Open the Staff Whiteboard once so Digi-Board can refresh Gingr reservations, or enter dog names manually.";
+      } else if (meta.source === "supabase_only" && expectedCount === 0) {
+        warning =
+          "Showing checked-in dogs only. Expected reservations will appear after the Staff Whiteboard refreshes Gingr (this page never calls Gingr directly).";
+      }
+
+      photoQueueDogCache.set(date, {
+        expiresAt: Date.now() + PHOTO_QUEUE_DOG_CACHE_TTL_MS,
+        dogs: mapped,
+        warning
+      });
+      return { dogs: mapped, warning };
     } catch (error) {
       return {
         dogs: [],
         warning:
           error instanceof Error
-            ? `Unable to load today's checked-in dogs: ${error.message}`
-            : "Unable to load today's checked-in dogs."
+            ? `Unable to load today's expected dogs: ${error.message}`
+            : "Unable to load today's expected dogs."
       };
     }
   }
@@ -1286,7 +1324,7 @@ export async function loadCheckedInDogsForDate(
     if (error) {
       return {
         dogs: [],
-        warning: `Checked-in dog list for past dates is limited. ${error.message}`
+        warning: `Dog list for past dates is limited to board history. ${error.message}`
       };
     }
 
@@ -1302,12 +1340,20 @@ export async function loadCheckedInDogsForDate(
       checkedInAt: row.status_started_at ?? row.updated_at ?? undefined
     }));
 
+    const warning =
+      dogs.length === 0
+        ? "No dogs found for that date in board history. You can still assign dogs manually by name."
+        : "Past dates show Digi-Board history only (no live Gingr reservation lookup).";
+
+    photoQueueDogCache.set(date, {
+      expiresAt: Date.now() + PHOTO_QUEUE_DOG_CACHE_TTL_MS,
+      dogs,
+      warning: dogs.length === 0 ? warning : undefined
+    });
+
     return {
       dogs,
-      warning:
-        dogs.length === 0
-          ? "No dogs found for that date in the live board history. You can still assign dogs manually by name."
-          : undefined
+      warning: dogs.length === 0 ? warning : undefined
     };
   } catch (error) {
     return {
@@ -1315,7 +1361,7 @@ export async function loadCheckedInDogsForDate(
       warning:
         error instanceof Error
           ? error.message
-          : "Unable to load checked-in dogs for that date. You can still assign dogs manually."
+          : "Unable to load dogs for that date. You can still assign dogs manually."
     };
   }
 }

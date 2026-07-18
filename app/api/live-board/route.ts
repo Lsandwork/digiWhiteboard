@@ -232,7 +232,7 @@ export async function GET(request: Request) {
       promptedCheckoutRows.visible[promptedCheckoutRows.visible.length - 1]?.updated_at ??
       null;
 
-    if (gingrBoard && gingrBoard.source !== "disabled") {
+    if (gingrBoard && gingrBoard.source !== "disabled" && gingrBoard.source !== "cooldown") {
       const gingrPromptStats = getGingrCheckoutPromptStats(gingrBoard);
       const mappedLiveDogs = enrichDogs(mapGingrBoardToLiveDogs(gingrBoard));
       const liveDogs = await timeoutResult(applyStoredAnimalPhotos(supabase, mappedLiveDogs), 1500, mappedLiveDogs);
@@ -362,7 +362,7 @@ export async function GET(request: Request) {
         total: checkingIn.length + checkingOut.length
       },
       last_updated: now.toISOString(),
-      basket_filtered: Boolean(gingrBoard && gingrBoard.source !== "disabled"),
+      basket_filtered: Boolean(gingrBoard && gingrBoard.source !== "disabled" && gingrBoard.source !== "cooldown"),
       ...(debugBoard
         ? {
             debug: {

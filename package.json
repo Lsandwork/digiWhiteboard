@@ -39,6 +39,7 @@
     "test:help-center-roles": "tsx scripts/test-help-center-roles.ts",
     "test:handler-checklist-daily": "tsx scripts/test-handler-checklist-daily.ts",
     "test:photo-upload-queue": "tsx scripts/test-photo-upload-queue.ts",
+    "test:photo-queue-expected-dogs": "tsx scripts/test-photo-queue-expected-dogs.ts",
     "test:board-fast-path": "tsx scripts/test-board-optimistic-transition.ts && tsx scripts/test-board-checkout-merge.ts && tsx scripts/test-basket-cleared-checkout.ts && tsx scripts/test-board-sticky-checkout.ts",
     "test:all": "npm run test:role-access && npm run test:commissions-nav && npm run test:write-up-access && npm run test:board-fast-path && npm run test:checkout-prompt && npm run test:checkout-display",
     "setup:record": "playwright install chromium",

@@ -108,7 +108,7 @@ async function loadSupabaseCheckoutDogs(
 async function loadGingrCheckoutDogs(now: Date): Promise<{ dogs: LiveDog[]; gingrLive: boolean }> {
   try {
     const gingrBoard = await fetchGingrBackOfHouse({ allReservationTypes: true });
-    if (!gingrBoard || gingrBoard.source === "disabled") {
+    if (!gingrBoard || gingrBoard.source === "disabled" || gingrBoard.source === "cooldown") {
       return { dogs: [], gingrLive: false };
     }
 
