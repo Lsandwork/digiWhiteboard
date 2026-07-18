@@ -34,6 +34,8 @@ GINGR_API_KEY=
 GINGR_WEBHOOK_SIGNATURE_KEY=
 GINGR_LOCATION_ID=1
 GINGR_SYNC_SECRET=
+# Optional deep link for Gingr Bulk Photo Upload (opens in a new tab from Digi-Board)
+NEXT_PUBLIC_GINGR_BULK_PHOTO_URL=https://fitdog.gingrapp.com
 ADMIN_PASSWORD=
 ```
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckSquare, ImagePlus } from "lucide-react";
+import { CheckSquare } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { AddShiftLogEntryCard, type ShiftLogFormShape } from "@/components/admin/front-desk/FrontDeskLogUI";
+import { GingrPhotoUploadQueue } from "@/components/admin/photo-upload-queue/GingrPhotoUploadQueue";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
 import type { HandlerDailyChecklistItem } from "@/lib/staff/handler-checklist-daily";
 import type { ManagementReport } from "@/lib/staff/management-reports";
@@ -252,112 +253,7 @@ export function HandlerChecklistPanel() {
 }
 
 export function BulkPhotoUploadPanel() {
-  const { showToast } = useToast();
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [animalIdsByIndex, setAnimalIdsByIndex] = useState<Record<number, string>>({});
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<Array<{ animalId: string; fileName: string; updated: boolean; error?: string }>>([]);
-
-  function inferAnimalId(fileName: string) {
-    const match = fileName.match(/\d{3,}/);
-    return match ? match[0] : "";
-  }
-
-  async function uploadPhotos() {
-    if (!selectedFiles.length) {
-      showToast("Select at least one image.", "error");
-      return;
-    }
-
-    const missing = selectedFiles.some((_, idx) => !(animalIdsByIndex[idx] ?? "").trim());
-    if (missing) {
-      showToast("Add an animal ID for each selected image.", "error");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const formData = new FormData();
-      selectedFiles.forEach((file, index) => {
-        formData.append("files", file);
-        formData.append(`animal_id_${index}`, (animalIdsByIndex[index] ?? "").trim());
-      });
-
-      const response = await fetch("/api/admin/bulk-photo-upload", {
-        method: "POST",
-        body: formData
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Upload failed.");
-      const uploadResults = (body.results ?? []) as Array<{ animalId: string; fileName: string; updated: boolean; error?: string }>;
-      setResults(uploadResults);
-      const successCount = uploadResults.filter((item) => item.updated).length;
-      showToast(`Uploaded ${successCount}/${uploadResults.length} photo(s).`, successCount ? "success" : "error");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <section className="crossover-card p-5">
-      <header className="mb-4 flex items-center gap-3">
-        <ImagePlus className="h-5 w-5 text-fitdog-orange" />
-        <div>
-          <h2 className="admin-page-title">Bulk Photo Upload</h2>
-          <p className="admin-page-subtitle">Select one or more photos from phone/computer and map each to a Gingr animal ID.</p>
-        </div>
-      </header>
-      <input
-        type="file"
-        accept="image/*"
-        multiple
-        className="admin-input w-full"
-        onChange={(event) => {
-          const files = Array.from(event.target.files ?? []);
-          setSelectedFiles(files);
-          const mapped: Record<number, string> = {};
-          files.forEach((file, index) => {
-            mapped[index] = inferAnimalId(file.name);
-          });
-          setAnimalIdsByIndex(mapped);
-          setResults([]);
-        }}
-      />
-      {selectedFiles.length ? (
-        <div className="mt-4 grid gap-3">
-          {selectedFiles.map((file, index) => (
-            <div key={`${file.name}-${index}`} className="rounded-xl border border-admin-border p-3">
-              <p className="text-sm font-semibold text-white">{file.name}</p>
-              <input
-                className="admin-input mt-2"
-                placeholder="Gingr Animal ID"
-                value={animalIdsByIndex[index] ?? ""}
-                onChange={(event) => setAnimalIdsByIndex((current) => ({ ...current, [index]: event.target.value }))}
-              />
-            </div>
-          ))}
-        </div>
-      ) : null}
-      <div className="mt-3">
-        <button type="button" className="crossover-btn crossover-btn--primary" disabled={loading} onClick={() => void uploadPhotos()}>
-          {loading ? "Uploading..." : "Upload Photos"}
-        </button>
-      </div>
-      {results.length ? (
-        <div className="mt-4 grid gap-2">
-          {results.map((result) => (
-            <div key={`${result.fileName}-${result.animalId}`} className="rounded-xl border border-admin-border p-3 text-sm">
-              <span className="font-semibold text-white">{result.fileName}</span>
-              <span className="ml-2 text-admin-muted">→ {result.animalId || "No animal ID"}</span>
-              <span className={`ml-2 ${result.updated ? "text-emerald-300" : "text-rose-300"}`}>
-                {result.updated ? "Uploaded" : result.error ?? "Failed"}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
+  return <GingrPhotoUploadQueue />;
 }
 
 export function HandlerShiftEntryPanel() {

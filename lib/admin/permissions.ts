@@ -79,7 +79,10 @@ export type PermissionKey =
   | "view_admin_logs"
   | "receive_walks_board_reminders"
   | "manage_lobby_board"
-  | "manage_cast_tv";
+  | "manage_cast_tv"
+  | "manage_photo_upload_queue"
+  | "reopen_photo_upload_batches"
+  | "manage_photo_upload_settings";
 
 export type RoleKey =
   | "super_admin"
@@ -226,7 +229,10 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_admin_logs",
   "receive_walks_board_reminders",
   "manage_lobby_board",
-  "manage_cast_tv"
+  "manage_cast_tv",
+  "manage_photo_upload_queue",
+  "reopen_photo_upload_batches",
+  "manage_photo_upload_settings"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -241,7 +247,9 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "view_gingr_sync_settings",
   "manage_gingr_sync_settings",
   "manage_gemini_settings",
-  "manage_database_tools"
+  "manage_database_tools",
+  "reopen_photo_upload_batches",
+  "manage_photo_upload_settings"
 ]);
 
 /** Staff file complaints/requests; admin and management review (and may also submit write-ups). */
@@ -297,6 +305,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
+  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -333,6 +342,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "use_hr_consult",
   "view_analytics",
   "export_reports",
+  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   "assign_notifications",
   "view_internal_notes",
@@ -392,7 +402,8 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "manage_cast_tv",
   "view_staff_whiteboard",
   "view_front_desk_log",
-  "create_front_desk_log"
+  "create_front_desk_log",
+  "manage_photo_upload_queue"
 ];
 
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
@@ -406,6 +417,7 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_own_groomer_submissions",
   "view_own_write_ups",
   "create_trainer_entry",
+  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS
 ];
 
@@ -501,6 +513,7 @@ export const MARKETING_TABS = [
   "promotions",
   "schedule",
   "lobby_slideshow",
+  "bulk_photo_upload",
   "whiteboard_preview",
   "settings",
   "help"
@@ -679,7 +692,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   admin_trainer_entries: "review_management_support",
   hr_hub: "view_hr_hub",
   hr_consult: "use_hr_consult",
-  bulk_photo_upload: "view_admin_panel",
+  bulk_photo_upload: "manage_photo_upload_queue",
   write_ups: "submit_write_up",
   write_up_review: "review_write_ups",
   complaint_review: "review_management_support",
@@ -1049,7 +1062,11 @@ export function canAccessAdminTab(
 
   if (isMarketingLegacyRole(legacyRole)) {
     if (board === "staff") {
-      return tab === "crossover_communication" || tab === "help";
+      return (
+        tab === "crossover_communication" ||
+        tab === "bulk_photo_upload" ||
+        tab === "help"
+      );
     }
     if (board !== "lobby") return false;
     return (MARKETING_TABS as readonly string[]).includes(tab);

@@ -134,7 +134,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   help: "Setup guides and how-to articles.",
   analytics: "Operational metrics and board activity summary.",
   demo_push: "Try push notices in demo mode.",
-  bulk_photo_upload: "Upload and verify dog photos in batches.",
+  bulk_photo_upload: "Gingr Photo Upload Queue — prepare, organize, and track report-card photos before transferring them into Gingr.",
   write_ups: "Submit and review your own write-up forms.",
   write_up_review: "Review all submitted employee write-ups.",
   complaint_review: "Review groomer, trainer, and staff complaints.",
@@ -143,7 +143,15 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
 };
 
-const LOBBY_BOARD_TABS: AdminTab[] = ["content", "promotions", "schedule", "lobby_slideshow", "display", "whiteboard_preview"];
+const LOBBY_BOARD_TABS: AdminTab[] = [
+  "content",
+  "promotions",
+  "schedule",
+  "lobby_slideshow",
+  "bulk_photo_upload",
+  "display",
+  "whiteboard_preview"
+];
 const MARKETING_BOARD_NAV_TABS: AdminTab[] = ["cast_tv", "settings", "help"];
 const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "push_notices",
