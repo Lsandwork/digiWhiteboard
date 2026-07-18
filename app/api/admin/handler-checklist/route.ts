@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { normalizeAdminUserId } from "@/lib/admin/users";
+import { listHandlerDailyChecklistItems } from "@/lib/staff/handler-checklist-daily";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -44,16 +45,18 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
-    const { data, error } = await supabase
-      .from("admin_users")
-      .select("handler_checklist_state")
-      .eq("id", adminUserId)
-      .maybeSingle();
+    const [{ data, error }, daily] = await Promise.all([
+      supabase.from("admin_users").select("handler_checklist_state").eq("id", adminUserId).maybeSingle(),
+      listHandlerDailyChecklistItems(supabase)
+    ]);
 
     if (error) throw error;
 
     return NextResponse.json({
-      checklist_state: normalizeChecklistState(data?.handler_checklist_state)
+      checklist_state: normalizeChecklistState(data?.handler_checklist_state),
+      daily_items: daily.items,
+      shift_date: daily.shiftDate,
+      time_zone: daily.timeZone
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load handler checklist.";

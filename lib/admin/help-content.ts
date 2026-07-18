@@ -462,15 +462,19 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "front desk log"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Use the Staff Digital Whiteboard for live check-ins, check-outs, and handler reminders.",
+      "Open Check List first — today’s dog-handler daily recurring push notices appear there so you can mark each one completed.",
+      "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders.",
       "Open Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
       "Use Front Desk Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
       "Open Notifications for alerts assigned to you, and Help Center anytime you need a guide.",
       "Dog Handler accounts do not manage Lobby content, admin users, integrations, or global settings."
     ],
-    adminTab: "walks_board",
+    adminTab: "checklist",
     adminBoard: "staff",
-    tips: ["If a reminder or notice appears on the Staff Whiteboard, follow it and clear it only when your lead says it is done."]
+    tips: [
+      "Mark each daily push notice complete on your Check List after you finish the task.",
+      "If a notice also appears on the Staff Whiteboard, follow it and clear the TV overlay only when your lead says it is done."
+    ]
   },
   {
     id: "management-role",

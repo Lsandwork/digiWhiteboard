@@ -5,6 +5,7 @@ import { CheckSquare, ImagePlus } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { AddShiftLogEntryCard, type ShiftLogFormShape } from "@/components/admin/front-desk/FrontDeskLogUI";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
+import type { HandlerDailyChecklistItem } from "@/lib/staff/handler-checklist-daily";
 import type { ManagementReport } from "@/lib/staff/management-reports";
 import { shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
 import { serializeTemplateFieldValues } from "@/lib/frontDeskLog/logTemplates";
@@ -55,7 +56,10 @@ function formatDateTime(value: string | null) {
 export function HandlerChecklistPanel() {
   const { showToast } = useToast();
   const [items, setItems] = useState<string[]>(CHECKLIST_ITEMS);
+  const [dailyItems, setDailyItems] = useState<HandlerDailyChecklistItem[]>([]);
+  const [shiftDate, setShiftDate] = useState<string | null>(null);
   const [checked, setChecked] = useState<ChecklistState>({});
+  const [loadingDaily, setLoadingDaily] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -89,13 +93,20 @@ export function HandlerChecklistPanel() {
   useEffect(() => {
     let active = true;
     const loadSavedState = async () => {
+      setLoadingDaily(true);
       try {
         const response = await fetch("/api/admin/handler-checklist", { cache: "no-store" });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "Unable to load checklist progress.");
         if (!active) return;
         const parsed = (body.checklist_state ?? {}) as ChecklistState;
-        window.setTimeout(() => setChecked(parsed), 0);
+        const nextDaily = Array.isArray(body.daily_items) ? (body.daily_items as HandlerDailyChecklistItem[]) : [];
+        window.setTimeout(() => {
+          setChecked(parsed);
+          setDailyItems(nextDaily);
+          setShiftDate(typeof body.shift_date === "string" ? body.shift_date : null);
+          setLoadingDaily(false);
+        }, 0);
       } catch {
         try {
           const raw = window.localStorage.getItem("fitdog_handler_checklist");
@@ -117,9 +128,12 @@ export function HandlerChecklistPanel() {
               timestamp: now
             };
           }
-          window.setTimeout(() => setChecked(normalized), 0);
+          window.setTimeout(() => {
+            setChecked(normalized);
+            setLoadingDaily(false);
+          }, 0);
         } catch {
-          // ignore parse issues
+          if (active) setLoadingDaily(false);
         }
       }
     };
@@ -158,27 +172,80 @@ export function HandlerChecklistPanel() {
     void persistChecklistState(next);
   }
 
+  const dailyDoneCount = useMemo(
+    () => dailyItems.filter((item) => Boolean(checked[item.key]?.checked)).length,
+    [checked, dailyItems]
+  );
+
   return (
     <section className="crossover-card p-5">
       <header className="mb-4 flex items-center gap-3">
         <CheckSquare className="h-5 w-5 text-fitdog-orange" />
         <div>
           <h2 className="admin-page-title">Check List</h2>
-          <p className="admin-page-subtitle">Track required handler tasks for this shift.</p>
+          <p className="admin-page-subtitle">
+            Mark today&apos;s daily push notices complete, then finish your shift checklist.
+            {shiftDate ? ` (${shiftDate})` : ""}
+          </p>
         </div>
       </header>
-      <div className="grid gap-2">
-        {items.map((item) => (
-          <label key={item} className="flex items-start gap-3 rounded-xl border border-admin-border p-3 text-sm">
-            <input type="checkbox" className="mt-1" checked={Boolean(checked[item]?.checked)} onChange={() => toggle(item)} />
-            <span>
-              <span className="block">{item}</span>
-              <span className="mt-1 block text-xs text-admin-muted">
-                {formatDateTime(checked[item]?.timestamp ?? null)}
-              </span>
+
+      <div className="mb-6 space-y-3">
+        <div className="flex items-baseline justify-between gap-3">
+          <h3 className="text-sm font-semibold text-admin-ink">Today&apos;s daily push notices</h3>
+          {!loadingDaily && dailyItems.length > 0 ? (
+            <span className="text-xs text-admin-muted">
+              {dailyDoneCount}/{dailyItems.length} completed
             </span>
-          </label>
-        ))}
+          ) : null}
+        </div>
+        {loadingDaily ? (
+          <p className="text-sm text-admin-muted">Loading today&apos;s recurring notices…</p>
+        ) : dailyItems.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-admin-border p-3 text-sm text-admin-muted">
+            No dog-handler daily recurring push notices scheduled for today.
+          </p>
+        ) : (
+          <div className="grid gap-2">
+            {dailyItems.map((item) => (
+              <label key={item.key} className="flex items-start gap-3 rounded-xl border border-fitdog-orange/40 bg-fitdog-orange/5 p-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={Boolean(checked[item.key]?.checked)}
+                  onChange={() => toggle(item.key)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{item.title}</span>
+                  {item.detail ? <span className="mt-1 block text-admin-muted">{item.detail}</span> : null}
+                  <span className="mt-1 block text-xs text-admin-muted">
+                    {item.scheduled_label ? `${item.scheduled_label} · ` : ""}
+                    {item.source === "daily_reminder" ? "Daily reminder" : "Daily push notice"}
+                    {" · "}
+                    {formatDateTime(checked[item.key]?.timestamp ?? null)}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-admin-ink">Shift checklist</h3>
+        <div className="grid gap-2">
+          {items.map((item) => (
+            <label key={item} className="flex items-start gap-3 rounded-xl border border-admin-border p-3 text-sm">
+              <input type="checkbox" className="mt-1" checked={Boolean(checked[item]?.checked)} onChange={() => toggle(item)} />
+              <span>
+                <span className="block">{item}</span>
+                <span className="mt-1 block text-xs text-admin-muted">
+                  {formatDateTime(checked[item]?.timestamp ?? null)}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
       </div>
     </section>
   );
