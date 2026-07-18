@@ -76,17 +76,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: "first-login",
-    title: "How do I log in to Admin?",
-    summary: "Go to /admin/login and sign in with your admin username and password.",
+    title: "How do I log in to Fitdog Digi-Board?",
+    summary: "Open /admin/login and sign in with your assigned Digi-Board username and password.",
     category: "Start Here",
-    keywords: ["login", "password", "sign in", "access", "admin"],
+    keywords: ["login", "password", "sign in", "access", "digi-board", "welcome back", "lonnie"],
     steps: [
-      "Open the Admin login page (link below).",
-      "Enter your username (usually admin) and password.",
-      "After 5 wrong attempts, login locks for 15 minutes.",
-      "Your session stays active for about 12 hours, then you log in again."
+      "Open the Fitdog Digi-Board login page (link below).",
+      "Enter the username and password assigned to your account. The username field starts blank — do not use shared demo logins.",
+      "Optional: check Remember me to save your username on this device.",
+      "Click Sign In (or press Enter). Use the eye icon to show or hide your password.",
+      "After several failed attempts, login may temporarily lock — wait and try again, or email Lonnie@fitdog.com for help.",
+      "Your session stays active for about 12 hours, then you sign in again."
     ],
-    links: [{ label: "Admin Login", href: "/admin/login" }]
+    tips: [
+      "Need help? Email Lonnie@fitdog.com from the login screen.",
+      "If Digi-Board asks you to set a new password after login, complete that step before the dashboard opens."
+    ],
+    links: [{ label: "Digi-Board Login", href: "/admin/login" }]
   },
   {
     id: "how-data-flows",
@@ -344,20 +350,51 @@ export const HELP_ARTICLES: HelpArticle[] = [
     adminBoard: "staff"
   },
   {
-    id: "staff-ops-pages",
-    title: "How do Crossover, Owner Follow Up, and Active Issues work?",
-    summary: "Use the new Staff Admin tabs to track handoffs, client follow-ups, and urgent operational issues.",
+    id: "front-desk-log",
+    title: "How does the Front Desk Log (Crossover Log) work?",
+    summary: "Track today’s handoffs in Crossover Log, keep closed history in Archived Log, and check out assessment dogs correctly.",
     category: "Staff Board",
-    keywords: ["crossover", "owner follow up", "active issues", "urgent", "staff admin", "handoff"],
+    keywords: [
+      "front desk log",
+      "crossover log",
+      "archived log",
+      "check out",
+      "assessment",
+      "handoff",
+      "shift log",
+      "delete"
+    ],
     steps: [
-      "Open Crossover Communication to send department handoffs and operational notes.",
+      "Open Staff Digital Whiteboard → Front Desk Log.",
+      "Crossover Log shows current-day activity so every role can hand off the shift.",
+      "Open Log shows unresolved items that still need follow-up.",
+      "Archived Log shows prior-day resolved, completed, Check Out, and archived entries (including past imported notes).",
+      "Add a new entry with Add Shift Log Entry, or use Quick Templates for common log types.",
+      "For New Dog Assessment entries: choose Mark Check Out (Resolved). They stay on today’s Crossover Log — even if archived the same day — then move to Archived Log the next day.",
+      "Delete is only available for entries you created. Super Admin, Admin, and Management can delete any entry."
+    ],
+    tips: [
+      "Front Desk Log is an internal Digi-Board tool. It does not change Lobby or Staff whiteboard Gingr sync.",
+      "Use filters (log type, status, assigned to, urgent) to find items quickly during crossover."
+    ],
+    adminTab: "crossover_communication",
+    adminBoard: "staff"
+  },
+  {
+    id: "staff-ops-pages",
+    title: "How do Owner Follow Up and Active Issues work?",
+    summary: "Track client follow-ups and urgent operational issues alongside the Front Desk Log.",
+    category: "Staff Board",
+    keywords: ["owner follow up", "active issues", "urgent", "staff admin", "handoff", "front desk log"],
+    steps: [
+      "Use Front Desk Log (Crossover Log) for daily shift notes and assessment Check Outs — see the Front Desk Log help article.",
       "Open Owner Follow Up to assign client follow-up tasks with due dates and statuses.",
-      "Open Active Issues to manage urgent or critical items from front desk, crossover messages, and owner follow-ups.",
-      "High, Critical, or urgent Crossover and Owner Follow Up records automatically create an Active Issue.",
+      "Open Active Issues to manage urgent or critical items linked from Front Desk Log and Owner Follow Up.",
+      "High, Critical, or urgent Front Desk Log and Owner Follow Up records can create an Active Issue.",
       "Use Push to Staff Whiteboard only when an internal item should become a temporary Push Notice."
     ],
     tips: [
-      "These pages are internal admin tools and do not automatically display on the Staff Digital Whiteboard.",
+      "These pages are internal Digi-Board tools and do not automatically display on the Staff Digital Whiteboard.",
       "They do not call Gingr or change Staff Whiteboard polling."
     ],
     adminTab: "active_issues",
@@ -382,53 +419,107 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "front-desk-coordinator",
     title: "What can a Front Desk Coordinator or Team Lead do?",
-    summary: "Front Desk Coordinator and Team Lead accounts share staff board access including read-only Staff Directory, Push Notices, and staff operations tabs.",
+    summary: "Front Desk Coordinator and Team Lead accounts use Staff Digi-Board tools: Push Notices, Front Desk Log, follow-ups, and view-only Staff Directory.",
     category: "Users & Login",
-    keywords: ["front desk coordinator", "team leader", "role", "permissions", "push notices", "staff directory", "limited user"],
+    keywords: ["front desk coordinator", "team leader", "role", "permissions", "push notices", "staff directory", "crossover log"],
     steps: [
-      "Front Desk Coordinator and Team Lead users log in with their assigned email and password.",
-      "After login, they are routed to Staff Digital Whiteboard → Push Notices.",
-      "They can use Push Notices, Crossover Communication (main staff log), Owner Follow Up, Active Issues, and view the Staff Directory.",
-      "Crossover Communication auto-records date, time, sender, and who each message was reported to. Urgent or high priority sends alerts with full message details.",
-      "Staff Directory is view-only for coordinators — they can search and review staff records but cannot add, edit, or delete entries.",
-      "They cannot access Lobby content, settings, logs, integrations, admin Users, Gingr setup, or other full admin areas."
+      "Sign in at Fitdog Digi-Board with your assigned email and password.",
+      "After login, you are routed to Staff Digital Whiteboard → Push Notices.",
+      "Use Front Desk Log → Crossover Log for today’s handoffs, Open Log for unresolved items, and Archived Log for prior closed entries.",
+      "You can also use Owner Follow Up, Active Issues, Push Notices, Notifications, Walks Board, and Help Center.",
+      "Staff Directory is view-only — search and review staff records, but you cannot add, edit, or delete entries.",
+      "You can delete only Front Desk Log entries you created (unless you are Super Admin, Admin, or Management).",
+      "You cannot access Lobby content, global settings, logs, integrations, or the full Admin Users area."
     ],
-    adminTab: "staff_directory",
+    adminTab: "crossover_communication",
     adminBoard: "staff",
     tips: ["Use these roles for front desk or team lead staff who need live handler tools without full admin access."]
   },
   {
     id: "groomer-trainer-crossover",
     title: "What can a Groomer or Trainer do?",
-    summary: "Groomers use the Front Desk Log for handoffs. Trainers use the Trainer Panel with push alerts, shift entries, and package & class commissions.",
+    summary: "Groomers and Trainers use Digi-Board staff tools, Front Desk Log handoffs, push panels, and (for trainers) package & class commissions.",
     category: "Users & Login",
-    keywords: ["groomer", "trainer", "crossover", "grooming", "training", "handoff", "commissions", "package", "class"],
+    keywords: ["groomer", "trainer", "crossover", "grooming", "training", "handoff", "commissions", "package", "class", "check out"],
     steps: [
-      "Groomer and Trainer users log in with their assigned email and password.",
-      "Groomers land on Staff Digital Whiteboard → Grooming Push and can use the Front Desk Log for handoffs.",
+      "Sign in at Fitdog Digi-Board with your assigned email and password.",
+      "Groomers land on Staff Digital Whiteboard → Grooming Push and can use Front Desk Log for handoffs.",
       "Trainers land on Staff Digital Whiteboard → Trainer Push.",
-      "Open the Commissions tab → Package & Class Commissions to review trainer earnings.",
-      "Admin and management add sold packages/classes, then confirm commissions once verified.",
-      "Trainers can comment or dispute a commission row; disputes flag the record for management review.",
-      "Both roles also have access to Notifications, Video Links, Walks Board, and Help Center."
+      "On Front Desk Log, use Crossover Log for today’s notes. Assessment dogs use Mark Check Out so they stay on today’s log until the next day.",
+      "You can delete only Front Desk Log entries you created.",
+      "Trainers: open Commissions → Package & Class Commissions to review earnings, comment, or dispute a row.",
+      "Both roles also have Notifications, Video Links, Walks Board, and Help Center."
     ],
     adminTab: "trainer_push",
     adminBoard: "staff",
     tips: ["Assign the Groomer or Trainer dashboard role in Admin Users or Staff Directory when creating a login."]
   },
   {
-    id: "change-password",
-    title: "How do I change an admin password?",
-    summary: "Users tab → ⋯ menu → Change password.",
+    id: "dog-handler-basics",
+    title: "What can a Dog Handler do?",
+    summary: "Dog Handler accounts use Staff Digi-Board tools for yard work, walks, reminders, and Front Desk Log notes.",
     category: "Users & Login",
-    keywords: ["password", "reset", "change", "security"],
+    keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "front desk log"],
     steps: [
-      "Open the Users tab.",
-      "Find the user and click the ⋯ (more) button.",
-      "Choose Change password.",
-      "Enter and confirm the new password, then save."
+      "Sign in at Fitdog Digi-Board with your assigned email and password.",
+      "Use the Staff Digital Whiteboard for live check-ins, check-outs, and handler reminders.",
+      "Open Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
+      "Use Front Desk Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
+      "Open Notifications for alerts assigned to you, and Help Center anytime you need a guide.",
+      "Dog Handler accounts do not manage Lobby content, admin users, integrations, or global settings."
     ],
-    adminTab: "users"
+    adminTab: "walks_board",
+    adminBoard: "staff",
+    tips: ["If a reminder or notice appears on the Staff Whiteboard, follow it and clear it only when your lead says it is done."]
+  },
+  {
+    id: "management-role",
+    title: "What can an Assistant Manager (Management) do?",
+    summary: "Management can run staff Digi-Board operations, review Front Desk Log history, and delete any Front Desk Log entry when needed.",
+    category: "Users & Login",
+    keywords: ["assistant manager", "management", "role", "permissions", "front desk log", "delete"],
+    steps: [
+      "Sign in at Fitdog Digi-Board with your assigned Management credentials.",
+      "Use Staff Digital Whiteboard tools: Push Notices, Front Desk Log, Owner Follow Up, Active Issues, Staff Directory, and related staff tabs.",
+      "On Front Desk Log, review Crossover Log (today), Open Log, and Archived Log (prior closed items).",
+      "Management can delete any Front Desk Log entry — not only their own.",
+      "Help with commissions, write-ups, and management support tabs when those tools are enabled for your account.",
+      "Full Super Admin-only areas (integrations secrets, permission matrix, some global settings) may still be restricted."
+    ],
+    adminTab: "crossover_communication",
+    adminBoard: "staff",
+    tips: ["Email Lonnie@fitdog.com if you need a permission that is missing from your login."]
+  },
+  {
+    id: "marketing-account",
+    title: "What can a Marketing Account do?",
+    summary: "Marketing accounts manage lobby-facing Digi-Board content such as promotions, messages, and CAST-TV media when enabled.",
+    category: "Users & Login",
+    keywords: ["marketing", "promotions", "lobby", "cast-tv", "slideshow"],
+    steps: [
+      "Sign in at Fitdog Digi-Board with your assigned Marketing credentials.",
+      "Use Lobby Whiteboard tools for promotions, content, and schedule updates your role can access.",
+      "If CAST-TV or lobby slideshow tools are enabled for your account, upload and order media there.",
+      "Marketing accounts do not manage staff operations, Front Desk Log, Gingr integrations, or admin user security.",
+      "Use Help Center for lobby board guides, and email Lonnie@fitdog.com if login access looks wrong."
+    ],
+    adminTab: "promotions",
+    adminBoard: "lobby",
+    tips: ["Publish or save changes when your board tools show unsaved work so TVs pick up the latest content."]
+  },
+  {
+    id: "change-password",
+    title: "How do I change my password?",
+    summary: "Set a new password when Digi-Board prompts you, or ask an admin to reset it from Users.",
+    category: "Users & Login",
+    keywords: ["password", "reset", "change", "security", "temporary password"],
+    steps: [
+      "If Digi-Board shows Set New Password after sign-in, enter a new password, confirm it, and click Update Password.",
+      "You cannot continue to the dashboard until a required password change is finished.",
+      "Super Admin and Admin users can also reset another user’s password from Users → ⋯ → Change password.",
+      "If you forgot your password, email Lonnie@fitdog.com from the login screen (Forgot password?)."
+    ],
+    tips: ["Never share Digi-Board passwords. Each person should use their own assigned login."]
   },
   {
     id: "board-switcher",
@@ -502,17 +593,18 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "troubleshoot-login",
     title: "I can't log in — what should I check?",
-    summary: "Verify password, env vars on Vercel, and that you're not locked out.",
+    summary: "Confirm your Digi-Board credentials, wait out a temporary lockout, or email Lonnie@fitdog.com.",
     category: "Troubleshooting",
-    keywords: ["login failed", "locked out", "401", "unauthorized", "password wrong"],
+    keywords: ["login failed", "locked out", "401", "unauthorized", "password wrong", "digi-board", "lonnie"],
     steps: [
-      "Make sure ADMIN_PASSWORD_HASH is set in Vercel (production).",
-      "Make sure ADMIN_SESSION_SECRET is set in Vercel.",
-      "Wait 15 minutes if you hit too many failed attempts.",
-      "Try logging in locally with the same credentials in .env.local."
+      "Open /admin/login and confirm you are using your assigned Digi-Board username and password (username starts blank).",
+      "Use the eye icon to confirm the password was typed correctly.",
+      "Wait about 15 minutes if too many failed attempts temporarily locked the login.",
+      "If Digi-Board asks for a new password, complete Set New Password before trying the dashboard again.",
+      "Still stuck? Email Lonnie@fitdog.com from the login help link.",
+      "Admins only: confirm production auth env vars (ADMIN_PASSWORD_HASH, ADMIN_SESSION_SECRET) are set on Vercel if env-based login is used."
     ],
-    adminTab: "users",
-    links: [{ label: "Admin Login", href: "/admin/login" }]
+    links: [{ label: "Digi-Board Login", href: "/admin/login" }]
   },
   {
     id: "troubleshoot-no-checkouts",
@@ -580,15 +672,21 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "lobby-promotions": LOBBY_VIEWERS,
   "lobby-schedule": LOBBY_VIEWERS,
   "lobby-display-settings": ADMIN_ONLY,
+  "lobby-tv-cast": LOBBY_VIEWERS,
+  "staff-tv-cast": STAFF_OPS_AND_ADMIN,
   "staff-reminders": EVERYONE,
   "staff-display": STAFF_OPS_AND_ADMIN,
   "push-notices": STAFF_OPS_AND_ADMIN,
   "schedule-push-notices": STAFF_OPS_AND_ADMIN,
+  "front-desk-log": STAFF_OPS_AND_ADMIN,
   "staff-ops-pages": STAFF_OPS_AND_ADMIN,
   "add-admin-user": ADMIN_ONLY,
   "front-desk-coordinator": STAFF_OPS_AND_ADMIN,
   "groomer-trainer-crossover": STAFF_OPS_AND_ADMIN,
-  "change-password": ADMIN_ONLY,
+  "dog-handler-basics": STAFF_OPS_AND_ADMIN,
+  "management-role": STAFF_OPS_AND_ADMIN,
+  "marketing-account": LOBBY_VIEWERS,
+  "change-password": EVERYONE,
   "board-switcher": ADMIN_ONLY,
   "preview-and-refresh": ADMIN_ONLY,
   "integrations-check": ADMIN_ONLY,
@@ -599,6 +697,60 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "troubleshoot-users-tab": ADMIN_ONLY
 };
 
+/** Shared Digi-Board basics for every signed-in role. */
+const CORE_ACCOUNT_ARTICLE_IDS = new Set([
+  "what-is-this",
+  "first-login",
+  "change-password",
+  "troubleshoot-login",
+  "staff-reminders"
+]);
+
+const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
+  "front-desk-log",
+  "staff-ops-pages",
+  "push-notices",
+  "schedule-push-notices",
+  "staff-display",
+  "management-role",
+  "front-desk-coordinator",
+  "groomer-trainer-crossover",
+  "dog-handler-basics",
+  "publish-changes",
+  "board-switcher",
+  "preview-and-refresh",
+  "troubleshoot-no-checkouts",
+  "lobby-tv-cast",
+  "staff-tv-cast"
+]);
+
+const CROSSOVER_STAFF_ARTICLE_IDS = new Set([
+  ...CORE_ACCOUNT_ARTICLE_IDS,
+  "front-desk-log",
+  "groomer-trainer-crossover",
+  "push-notices",
+  "staff-tv-cast",
+  "troubleshoot-no-checkouts"
+]);
+
+const DOG_HANDLER_ARTICLE_IDS = new Set([
+  ...CORE_ACCOUNT_ARTICLE_IDS,
+  "front-desk-log",
+  "dog-handler-basics",
+  "staff-tv-cast",
+  "troubleshoot-no-checkouts"
+]);
+
+const MARKETING_ARTICLE_IDS = new Set([
+  ...CORE_ACCOUNT_ARTICLE_IDS,
+  "marketing-account",
+  "lobby-messages",
+  "lobby-promotions",
+  "lobby-schedule",
+  "lobby-tv-cast",
+  "troubleshoot-no-checkouts"
+]);
+
 function getArticleAudiences(article: HelpArticle): HelpAudience[] {
   return article.audiences ?? ARTICLE_AUDIENCES[article.id] ?? ADMIN_ONLY;
 }
@@ -606,11 +758,31 @@ function getArticleAudiences(article: HelpArticle): HelpAudience[] {
 export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole): boolean {
   if (isFullAdminRole(role)) return true;
   const audiences = getArticleAudiences(article);
-  if (role === "viewer" || role === "marketing") return audiences.includes("viewer");
-  if (isStaffOpsLimitedRole(role)) return audiences.includes("staff_ops");
-  if (isCrossoverStaffRole(role)) {
-    return article.id === "groomer-trainer-crossover" || article.id === "troubleshoot-login" || article.id === "change-password";
+
+  if (role === "assistant_manager") {
+    return audiences.includes("staff_ops") || audiences.includes("viewer") || MANAGEMENT_EXTRA_ARTICLE_IDS.has(article.id);
   }
+
+  if (role === "daycare") {
+    return DOG_HANDLER_ARTICLE_IDS.has(article.id);
+  }
+
+  if (role === "marketing") {
+    return MARKETING_ARTICLE_IDS.has(article.id) || audiences.includes("viewer");
+  }
+
+  if (role === "viewer") {
+    return audiences.includes("viewer");
+  }
+
+  if (isStaffOpsLimitedRole(role)) {
+    return audiences.includes("staff_ops");
+  }
+
+  if (isCrossoverStaffRole(role)) {
+    return CROSSOVER_STAFF_ARTICLE_IDS.has(article.id);
+  }
+
   return false;
 }
 

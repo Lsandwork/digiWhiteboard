@@ -15,24 +15,27 @@ import {
 } from "@/lib/admin/help-content";
 import { accessFromLegacyRole, canAccessTab } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
-import { isCrossoverStaffRole, isFullAdminRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
+import { isCrossoverStaffRole, isFullAdminRole, isManagementRole, isStaffOpsLimitedRole } from "@/lib/admin/users";
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
 
 type QuickLinkItem = {
   href: string;
   label: string;
-  roles: ("admin" | "staff_ops" | "viewer")[];
+  roles: ("admin" | "staff_ops" | "viewer" | "handler" | "marketing")[];
 };
 
 const QUICK_LINKS: QuickLinkItem[] = [
-  { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer"] },
-  { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer"] },
-  { href: "/admin?board=staff&tab=crossover_communication", label: "Front Desk Log", roles: ["admin", "staff_ops", "viewer"] },
+  { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer", "marketing"] },
+  { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer", "handler"] },
+  { href: "/admin?board=staff&tab=crossover_communication", label: "Front Desk Log / Crossover Log", roles: ["admin", "staff_ops", "handler"] },
   { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
+  { href: "/admin?board=staff&tab=walks_board", label: "Walks Board", roles: ["admin", "staff_ops", "handler"] },
   { href: "/admin?board=staff&tab=staff_directory", label: "Staff Directory", roles: ["admin", "staff_ops"] },
+  { href: "/admin?board=lobby&tab=promotions", label: "Lobby Promotions", roles: ["admin", "marketing", "viewer"] },
   { href: "/admin?tab=integrations", label: "Integrations", roles: ["admin"] },
   { href: "/admin?tab=users", label: "Admin Users", roles: ["admin"] },
-  { href: "/admin?tab=settings", label: "Settings", roles: ["admin"] }
+  { href: "/admin?tab=settings", label: "Settings", roles: ["admin"] },
+  { href: "/admin/login", label: "Digi-Board Login", roles: ["admin", "staff_ops", "viewer", "handler", "marketing"] }
 ];
 
 type AdminHelpCenterProps = {
@@ -41,10 +44,16 @@ type AdminHelpCenterProps = {
 };
 
 function quickLinkVisible(link: QuickLinkItem, role: AdminUserRole) {
-  if (isFullAdminRole(role)) return true;
+  if (isFullAdminRole(role) || isManagementRole(role)) {
+    return link.roles.includes("admin") || link.roles.includes("staff_ops") || link.roles.includes("viewer");
+  }
   if (role === "viewer") return link.roles.includes("viewer");
+  if (role === "marketing") return link.roles.includes("marketing") || link.roles.includes("viewer");
+  if (role === "daycare") return link.roles.includes("handler") || link.roles.includes("staff_ops");
   if (isStaffOpsLimitedRole(role)) return link.roles.includes("staff_ops");
-  if (isCrossoverStaffRole(role)) return link.roles.includes("viewer") || link.roles.includes("staff_ops");
+  if (isCrossoverStaffRole(role)) {
+    return link.roles.includes("staff_ops") || link.roles.includes("handler") || link.roles.includes("viewer");
+  }
   return false;
 }
 
@@ -75,11 +84,11 @@ export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
             <BookOpen className="h-6 w-6" aria-hidden />
           </div>
           <div>
-            <h2 className="admin-page-title">Fitdog Help Center</h2>
+            <h2 className="admin-page-title">Fitdog Digi-Board Help Center</h2>
             <p className="admin-page-subtitle mt-1 max-w-2xl">
               {isAdmin
-                ? "Plain-English guides for lobby board, staff board, and admin dashboard. You see all topics as an admin."
-                : `Guides for your role (${roleLabel}). Only topics you can use are shown below.`}
+                ? "Plain-English guides for Digi-Board login, lobby board, staff board, and admin tools. Admins see every topic."
+                : `Guides for your Digi-Board role (${roleLabel}). Only topics you can use are shown below. Need more help? Email Lonnie@fitdog.com.`}
             </p>
             <p className="admin-help-role-badge mt-2 inline-flex items-center gap-1.5">
               <Shield className="h-3.5 w-3.5" aria-hidden />
@@ -92,7 +101,7 @@ export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-admin-muted" aria-hidden />
           <input
             className="admin-input admin-help-search-input pl-12"
-            placeholder="Search help… e.g. cast, login, push notices, TV"
+            placeholder="Search help… e.g. login, crossover log, check out, cast, push notices"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             aria-label="Search help articles"
