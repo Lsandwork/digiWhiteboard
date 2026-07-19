@@ -121,6 +121,12 @@ export type ManagementReport = {
   hr_hub_hidden?: boolean;
   hr_hub_hidden_at?: string | null;
   hr_hub_hidden_by?: string | null;
+  /** Support Command Center acknowledgment / escalation timestamps. */
+  acknowledged_at?: string | null;
+  acknowledged_by?: string | null;
+  escalated_at?: string | null;
+  escalated_by?: string | null;
+  escalation_destination?: string | null;
 };
 
 const SETTINGS_STORE_KEY = "management_reports";
@@ -205,7 +211,12 @@ function normalizeReport(report: ManagementReport): ManagementReport {
     closed_at: report.closed_at ?? null,
     hr_hub_hidden: Boolean(report.hr_hub_hidden),
     hr_hub_hidden_at: report.hr_hub_hidden_at ?? null,
-    hr_hub_hidden_by: report.hr_hub_hidden_by ?? null
+    hr_hub_hidden_by: report.hr_hub_hidden_by ?? null,
+    acknowledged_at: report.acknowledged_at ?? null,
+    acknowledged_by: report.acknowledged_by ?? null,
+    escalated_at: report.escalated_at ?? null,
+    escalated_by: report.escalated_by ?? null,
+    escalation_destination: report.escalation_destination ?? null
   };
 }
 

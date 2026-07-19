@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, MessageSquare, RefreshCw, UserRound } from "lucide-react";
+import { SupportCommandCenter } from "@/components/admin/support-command-center/SupportCommandCenter";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import type { AdminTab } from "@/lib/admin/types";
 import type { ManagementReport, ManagementReportType } from "@/lib/staff/management-reports";
 import type { SupportHubStats, SupportInboxRow, TrainerEntryAdminRow } from "@/lib/staff/management-support-admin";
 
@@ -306,7 +308,18 @@ function useSupportHub(reportType?: ManagementReportType | ManagementReportType[
   return { data, loading, busy, filters, setFilters, selected, setSelected, load, runAction };
 }
 
-export function ManagementSupportHubPanel({ onCardFilter }: { onCardFilter?: (card: string) => void }) {
+/** Production Support Command Center (replaces the old Support Dashboard surface). */
+export function ManagementSupportHubPanel({
+  onNavigate
+}: {
+  onCardFilter?: (card: string) => void;
+  onNavigate?: (tab: AdminTab) => void;
+}) {
+  return <SupportCommandCenter onNavigate={onNavigate} />;
+}
+
+/** Classic support inbox (used by complaint review and deep links that still want the table). */
+export function ManagementSupportInboxPanel({ onCardFilter }: { onCardFilter?: (card: string) => void }) {
   const hub = useSupportHub(undefined, undefined);
   const cards = useMemo(() => [
     { id: "new_complaints", label: "New Complaints", value: hub.data?.stats.new_complaints ?? 0 },
@@ -321,7 +334,7 @@ export function ManagementSupportHubPanel({ onCardFilter }: { onCardFilter?: (ca
     <div className="space-y-5">
       <header className="admin-page-header">
         <div>
-          <h2 className="admin-page-title">Management Support</h2>
+          <h2 className="admin-page-title">Management Support Inbox</h2>
           <p className="admin-page-subtitle">Review, assign, respond to, and track all groomer and trainer support submissions.</p>
         </div>
         <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" onClick={() => void hub.load()}>

@@ -326,6 +326,25 @@ export async function applySupportItemAction(
       admin_status: "In Review",
       audit_history: appendAudit(report, "assign", report.assigned_to ?? null, assigned || null, actor)
     };
+  } else if (action === "acknowledge") {
+    patch = {
+      ...patch,
+      acknowledged_at: report.acknowledged_at ?? now,
+      acknowledged_by: report.acknowledged_by ?? actor,
+      admin_status: report.admin_status === "Submitted" ? "In Review" : report.admin_status,
+      audit_history: appendAudit(report, "acknowledge", null, actor, actor)
+    };
+  } else if (action === "escalate") {
+    const destination = String(input.escalation_destination ?? "HR / Owner").trim() || "HR / Owner";
+    patch = {
+      ...patch,
+      escalated_at: now,
+      escalated_by: actor,
+      escalation_destination: destination,
+      priority: "Urgent",
+      admin_status: "In Review",
+      audit_history: appendAudit(report, "escalate", report.escalation_destination ?? null, destination, actor)
+    };
   } else if (action === "change_status") {
     const status = String(input.status ?? "") as SupportAdminStatus;
     patch = {

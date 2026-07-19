@@ -38,6 +38,7 @@ import {
   GroomerComplaintsAdminPanel,
   GroomerRequestsAdminPanel,
   ManagementSupportHubPanel,
+  ManagementSupportInboxPanel,
   TrainerComplaintsAdminPanel,
   TrainerRequestsAdminPanel
 } from "@/components/admin/ManagementSupportHubPanels";
@@ -549,7 +550,7 @@ export function AdminDashboard() {
           />
         ) : null}
 
-        {tab === "ms_hub" ? <ManagementSupportHubPanel /> : null}
+        {tab === "ms_hub" ? <ManagementSupportHubPanel onNavigate={(nextTab) => setActiveTab(nextTab)} /> : null}
         {tab === "ms_groomer_complaints" ? <GroomerComplaintsAdminPanel /> : null}
         {tab === "ms_groomer_requests" ? <GroomerRequestsAdminPanel /> : null}
         {tab === "ms_trainer_complaints" ? <TrainerComplaintsAdminPanel /> : null}
@@ -582,7 +583,7 @@ export function AdminDashboard() {
         {tab === "write_up_review" ? (
           canReviewWriteUps ? <ManagementSupportPanel mode="admin" initialSubTab="review" /> : null
         ) : null}
-        {tab === "complaint_review" ? (canReviewComplaints ? <ManagementSupportHubPanel /> : null) : null}
+        {tab === "complaint_review" ? (canReviewComplaints ? <ManagementSupportInboxPanel /> : null) : null}
         {tab === "handler_shift_entry" ? <HandlerShiftEntryPanel /> : null}
         {tab === "hr_pip" ? (canAccessHrPanels ? <PipPanel /> : null) : null}
 

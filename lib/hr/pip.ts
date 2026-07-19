@@ -2,6 +2,28 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 export type PipStatus = "Active" | "On Hold" | "Completed" | "Cancelled";
 
+export type PipStage =
+  | "Draft"
+  | "Pending Employee Review"
+  | "Stage 1"
+  | "Stage 2"
+  | "Stage 3"
+  | "Final Review"
+  | "Successfully Completed"
+  | "Closed Unsuccessful"
+  | "Cancelled"
+  | "Archived";
+
+export type PipRiskLevel = "Low" | "Medium" | "High" | "Critical";
+
+export type PipDocumentationStatus =
+  | "Complete"
+  | "Incomplete"
+  | "Missing Employee Acknowledgment"
+  | "Missing Manager Review"
+  | "Missing Supporting File"
+  | "Overdue Review";
+
 export type PipCheckIn = {
   id: string;
   date: string;
@@ -16,6 +38,10 @@ export type PipPlan = {
   employee_name: string;
   employee_role: string | null;
   manager_name: string | null;
+  title: string | null;
+  stage: PipStage;
+  risk_level: PipRiskLevel;
+  documentation_status: PipDocumentationStatus;
   focus_area: string;
   /** Clear, measurable goals the employee is working toward. */
   goals: string[];
@@ -62,6 +88,52 @@ function normalizeStatus(value: unknown): PipStatus {
   return "Active";
 }
 
+function normalizeStage(value: unknown, status: PipStatus): PipStage {
+  const stages: PipStage[] = [
+    "Draft",
+    "Pending Employee Review",
+    "Stage 1",
+    "Stage 2",
+    "Stage 3",
+    "Final Review",
+    "Successfully Completed",
+    "Closed Unsuccessful",
+    "Cancelled",
+    "Archived"
+  ];
+  if (typeof value === "string" && stages.includes(value as PipStage)) return value as PipStage;
+  if (status === "Completed") return "Successfully Completed";
+  if (status === "Cancelled") return "Cancelled";
+  if (status === "On Hold") return "Stage 1";
+  return "Stage 1";
+}
+
+function normalizeRisk(value: unknown): PipRiskLevel {
+  if (value === "Medium" || value === "High" || value === "Critical") return value;
+  return "Low";
+}
+
+function normalizeDocStatus(value: unknown, plan: { next_review_date: string | null; check_ins: PipCheckIn[]; goals: string[] }): PipDocumentationStatus {
+  const allowed: PipDocumentationStatus[] = [
+    "Complete",
+    "Incomplete",
+    "Missing Employee Acknowledgment",
+    "Missing Manager Review",
+    "Missing Supporting File",
+    "Overdue Review"
+  ];
+  if (typeof value === "string" && allowed.includes(value as PipDocumentationStatus)) {
+    return value as PipDocumentationStatus;
+  }
+  if (plan.next_review_date) {
+    const due = new Date(`${plan.next_review_date}T12:00:00`);
+    if (due.getTime() < Date.now()) return "Overdue Review";
+  }
+  if (!plan.goals.length) return "Incomplete";
+  if (!plan.check_ins.length) return "Missing Manager Review";
+  return "Complete";
+}
+
 function normalizeStringList(value: unknown, max = 12): string[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -100,13 +172,25 @@ function normalizePlan(raw: unknown): PipPlan | null {
   if (!employee_name || !focus_area) return null;
   const now = new Date().toISOString();
   const legacyNotes = row.notes ? String(row.notes).slice(0, 4000) : null;
+  const status = normalizeStatus(row.status);
+  const check_ins = normalizeCheckIns(row.check_ins);
+  const goals = normalizeStringList(row.goals);
+  const next_review_date = row.next_review_date ? String(row.next_review_date).slice(0, 10) : null;
   return {
     id: String(row.id || newId()),
     employee_name,
     employee_role: row.employee_role ? String(row.employee_role).trim() : null,
     manager_name: row.manager_name ? String(row.manager_name).trim() : null,
+    title: row.title ? String(row.title).trim().slice(0, 160) : null,
+    stage: normalizeStage(row.stage, status),
+    risk_level: normalizeRisk(row.risk_level),
+    documentation_status: normalizeDocStatus(row.documentation_status, {
+      next_review_date,
+      check_ins,
+      goals
+    }),
     focus_area,
-    goals: normalizeStringList(row.goals),
+    goals,
     success_metrics: row.success_metrics ? String(row.success_metrics).slice(0, 2000) : null,
     support_offered: row.support_offered ? String(row.support_offered).slice(0, 2000) : null,
     employee_facing_summary: row.employee_facing_summary
@@ -116,13 +200,13 @@ function normalizePlan(raw: unknown): PipPlan | null {
       ? String(row.manager_notes).slice(0, 4000)
       : legacyNotes,
     start_date: String(row.start_date || now.slice(0, 10)).slice(0, 10),
-    next_review_date: row.next_review_date ? String(row.next_review_date).slice(0, 10) : null,
+    next_review_date,
     target_end_date: row.target_end_date ? String(row.target_end_date).slice(0, 10) : null,
     progress_percent: clampProgress(row.progress_percent),
-    status: normalizeStatus(row.status),
+    status,
     notes: legacyNotes,
     source_record_ids: normalizeStringList(row.source_record_ids, 40),
-    check_ins: normalizeCheckIns(row.check_ins),
+    check_ins,
     created_by: row.created_by ? String(row.created_by) : null,
     created_at: String(row.created_at || now),
     updated_at: String(row.updated_at || now)
@@ -177,6 +261,10 @@ export type PipPlanInput = {
   employee_name: string;
   employee_role?: string | null;
   manager_name?: string | null;
+  title?: string | null;
+  stage?: PipStage;
+  risk_level?: PipRiskLevel;
+  documentation_status?: PipDocumentationStatus;
   focus_area: string;
   goals?: string[];
   success_metrics?: string | null;
