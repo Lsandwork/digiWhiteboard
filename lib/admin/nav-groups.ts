@@ -93,7 +93,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   write_up_review: "Write Up Review",
   complaint_review: "Complaint Review",
   handler_shift_entry: "Handler Shift Entry Log",
-  hr_pip: "Performance Improvement Plan",
+  hr_pip: "Track PIP",
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board"
 };
@@ -315,7 +315,8 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         "People & HR",
         compactEntries([
           group("people_directory", "Staff", ["staff_directory", "staff_create_user"], visible),
-          group("human_resources", "Human Resources", [...ADMIN_HR_TABS, "hr_pip"], visible)
+          group("human_resources", "Human Resources", [...ADMIN_HR_TABS], visible),
+          ...singles(["hr_pip"], visible)
         ])
       )
     );
