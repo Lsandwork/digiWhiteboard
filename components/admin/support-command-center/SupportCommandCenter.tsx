@@ -21,8 +21,9 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import type { CommandCenterPayload, UrgentAlertRow } from "@/lib/admin/support-command-center/types";
+import type { ActivityEvent, CommandCenterPayload, UrgentAlertRow } from "@/lib/admin/support-command-center/types";
 import type { AdminTab } from "@/lib/admin/types";
+import type { ManagementReport } from "@/lib/staff/management-reports";
 
 type Props = {
   onNavigate?: (tab: AdminTab) => void;
@@ -70,6 +71,48 @@ function riskClass(risk: string) {
   if (risk === "Critical" || risk === "High") return "text-rose-300";
   if (risk === "Moderate" || risk === "Medium") return "text-amber-300";
   return "text-emerald-300";
+}
+
+function alertTypeFromReport(report: ManagementReport) {
+  if (report.report_type === "owner_complaint_dog_handler") return "Client complaint";
+  if (report.report_type.includes("complaint")) return "Employee complaint";
+  if (report.report_type.includes("request")) return "Employee request";
+  if (report.report_type === "employee_write_up") return "Performance concern";
+  return "Support case";
+}
+
+function severityFromReport(report: ManagementReport): UrgentAlertRow["severity"] {
+  if (report.priority === "Urgent") return report.escalated_at ? "Critical" : "Urgent";
+  if (report.priority === "High") return "High";
+  return "Medium";
+}
+
+function caseToAlertRow(report: ManagementReport): UrgentAlertRow {
+  const triggered_at = report.created_at;
+  const severity = severityFromReport(report);
+  const totalMs = (severity === "Critical" ? 30 : severity === "Urgent" ? 60 : severity === "High" ? 240 : 1440) * 60_000;
+  const due = new Date(new Date(triggered_at).getTime() + totalMs);
+  const details = report.groomer_submission_details?.description ?? report.summary;
+  return {
+    id: `case-${report.id}`,
+    source: "support_case",
+    source_id: report.id,
+    severity,
+    triggered_at,
+    sla_due_at: due.toISOString(),
+    sla_remaining_ms: due.getTime() - Date.now(),
+    sla_total_ms: totalMs,
+    employee: report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? report.created_by ?? "—",
+    department: report.department ?? "—",
+    alert_type: alertTypeFromReport(report),
+    summary: report.title || details.slice(0, 160),
+    assigned_manager: report.assigned_to ?? null,
+    acknowledged: Boolean(report.acknowledged_at),
+    acknowledged_at: report.acknowledged_at ?? null,
+    status: report.admin_status ?? report.status,
+    report,
+    pip: null
+  };
 }
 
 export function SupportCommandCenter({ onNavigate }: Props) {
@@ -158,6 +201,42 @@ export function SupportCommandCenter({ onNavigate }: Props) {
     const cat = map[activityFilter];
     return rows.filter((row) => row.category === cat);
   }, [activityFilter, data?.activity]);
+
+  const openCase = useCallback(
+    async (caseId: string) => {
+      const fromAlert = data?.alerts.find((row) => row.source === "support_case" && row.source_id === caseId);
+      if (fromAlert) {
+        setSelectedAlert(fromAlert);
+        return;
+      }
+      const fromCase = data?.cases.find((row) => row.id === caseId);
+      if (fromCase?.report) {
+        setSelectedAlert(caseToAlertRow(fromCase.report));
+        return;
+      }
+      try {
+        const response = await fetch(`/api/admin/support-command-center?case_id=${encodeURIComponent(caseId)}`, {
+          cache: "no-store"
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Case not found.");
+        setSelectedAlert(caseToAlertRow(body.case as ManagementReport));
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "Unable to open case.", "error");
+      }
+    },
+    [data?.alerts, data?.cases, showToast]
+  );
+
+  function openActivityItem(event: ActivityEvent) {
+    if (event.pip_id) {
+      onNavigate?.("hr_pip");
+      return;
+    }
+    if (event.case_id) {
+      void openCase(event.case_id);
+    }
+  }
 
   async function runCaseAction(action: string, id: string, payload: Record<string, unknown> = {}) {
     setBusyId(id);
@@ -506,10 +585,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
                       <button
                         type="button"
                         className="crossover-btn crossover-btn--ghost text-xs"
-                        onClick={() => {
-                          if (event.pip_id) onNavigate?.("hr_pip");
-                          else onNavigate?.("ms_hub");
-                        }}
+                        onClick={() => openActivityItem(event)}
                       >
                         View Case
                       </button>
@@ -653,18 +729,37 @@ export function SupportCommandCenter({ onNavigate }: Props) {
         </aside>
       </div>
 
-      <Modal open={Boolean(selectedAlert)} title={selectedAlert?.summary || "Alert details"} onClose={() => setSelectedAlert(null)}>
+      <Modal open={Boolean(selectedAlert)} title={selectedAlert?.summary || "Case details"} onClose={() => setSelectedAlert(null)}>
         {selectedAlert ? (
           <div className="space-y-4 text-sm">
             <div className="grid gap-2 md:grid-cols-2">
+              <p><span className="font-bold text-white">Case ID:</span> {selectedAlert.source_id}</p>
+              <p><span className="font-bold text-white">Type:</span> {selectedAlert.alert_type}</p>
               <p><span className="font-bold text-white">Severity:</span> {selectedAlert.severity}</p>
-              <p><span className="font-bold text-white">Employee:</span> {selectedAlert.employee}</p>
+              <p><span className="font-bold text-white">Employee / subject:</span> {selectedAlert.employee}</p>
               <p><span className="font-bold text-white">Department:</span> {selectedAlert.department}</p>
               <p><span className="font-bold text-white">SLA:</span> {formatSla(selectedAlert.sla_remaining_ms)}</p>
               <p><span className="font-bold text-white">Manager:</span> {selectedAlert.assigned_manager || "Unassigned"}</p>
               <p><span className="font-bold text-white">Status:</span> {selectedAlert.status}</p>
+              <p><span className="font-bold text-white">Opened:</span> {formatWhen(selectedAlert.triggered_at)}</p>
+              {selectedAlert.report?.created_by ? (
+                <p><span className="font-bold text-white">Submitted by:</span> {selectedAlert.report.submitted_by_name ?? selectedAlert.report.created_by}</p>
+              ) : null}
             </div>
-            <p className="rounded-xl border border-white/10 bg-black/20 p-3 text-admin-muted">{selectedAlert.summary}</p>
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="font-bold text-white">Details</p>
+              <p className="mt-2 whitespace-pre-wrap text-admin-muted">
+                {selectedAlert.report?.groomer_submission_details?.description ??
+                  selectedAlert.report?.summary ??
+                  selectedAlert.summary}
+              </p>
+            </div>
+            {selectedAlert.report?.management_response ? (
+              <div className="rounded-xl border border-fitdog-orange/30 bg-fitdog-orange/10 p-3">
+                <p className="font-bold text-white">Management response</p>
+                <p className="mt-2 whitespace-pre-wrap text-admin-muted">{selectedAlert.report.management_response}</p>
+              </div>
+            ) : null}
             {selectedAlert.source === "support_case" ? (
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="admin-btn-secondary" disabled={busyId === selectedAlert.source_id} onClick={() => void runCaseAction("acknowledge", selectedAlert.source_id)}>Acknowledge</button>

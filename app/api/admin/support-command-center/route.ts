@@ -33,6 +33,16 @@ export async function GET(request: Request) {
   }
 
   try {
+    const url = new URL(request.url);
+    const caseId = url.searchParams.get("case_id");
+    if (caseId) {
+      const report = await getManagementReportById(supabase, caseId);
+      if (!report || report.hr_hub_hidden) {
+        return NextResponse.json({ error: "Case not found." }, { status: 404 });
+      }
+      return NextResponse.json({ case: report });
+    }
+
     const payload = await buildSupportCommandCenter(supabase, {
       email: session?.email ?? null,
       role: session?.role ?? null
