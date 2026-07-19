@@ -16,7 +16,15 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 function parseFilters(searchParams: URLSearchParams): SupportInboxFilter {
-  const reportType = searchParams.get("report_type");
+  const reportTypeRaw = searchParams.get("report_type") ?? searchParams.get("report_types");
+  const reportTypes = reportTypeRaw
+    ? reportTypeRaw
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .map((value) => value as ManagementReportType)
+    : undefined;
+
   return {
     query: searchParams.get("query") ?? undefined,
     department: searchParams.get("department") ?? undefined,
@@ -28,7 +36,7 @@ function parseFilters(searchParams: URLSearchParams): SupportInboxFilter {
     card: searchParams.get("card") ?? undefined,
     date_from: searchParams.get("date_from") ?? undefined,
     date_to: searchParams.get("date_to") ?? undefined,
-    report_type: reportType ? (reportType as ManagementReportType) : undefined
+    report_type: reportTypes?.length === 1 ? reportTypes[0] : reportTypes
   };
 }
 

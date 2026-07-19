@@ -187,14 +187,23 @@ function SupportFilters({
   );
 }
 
+function sourceLabel(reportType: ManagementReportType) {
+  if (reportType.startsWith("groomer_")) return "Groomer";
+  if (reportType.startsWith("trainer_")) return "Trainer";
+  if (reportType.startsWith("team_lead_")) return "Team Lead";
+  return "Staff";
+}
+
 function SupportTable({
   rows,
   nameColumn,
-  onView
+  onView,
+  showSource = false
 }: {
   rows: SupportInboxRow[];
   nameColumn: string;
   onView: (row: SupportInboxRow) => void;
+  showSource?: boolean;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -202,6 +211,7 @@ function SupportTable({
         <thead>
           <tr>
             <th>Date</th>
+            {showSource ? <th>Source</th> : null}
             <th>{nameColumn}</th>
             <th>Subject</th>
             <th>Details</th>
@@ -216,6 +226,7 @@ function SupportTable({
           {rows.map((row) => (
             <tr key={row.id}>
               <td>{formatDateTime(row.date_submitted)}</td>
+              {showSource ? <td>{sourceLabel(row.report_type)}</td> : null}
               <td>{row.submitted_by}</td>
               <td>{row.subject}</td>
               <td className="max-w-xs truncate">{row.details_preview}</td>
@@ -237,19 +248,20 @@ function SupportTable({
   );
 }
 
-function useSupportHub(reportType?: ManagementReportType, cardFilter?: string) {
+function useSupportHub(reportType?: ManagementReportType | ManagementReportType[], cardFilter?: string) {
   const { showToast } = useToast();
   const [data, setData] = useState<HubPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<ManagementReport | null>(null);
+  const reportTypeKey = Array.isArray(reportType) ? reportType.join(",") : reportType ?? "";
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (reportType) params.set("report_type", reportType);
+      if (reportTypeKey) params.set("report_type", reportTypeKey);
       if (cardFilter) params.set("card", cardFilter);
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.set(key, value);
@@ -263,7 +275,7 @@ function useSupportHub(reportType?: ManagementReportType, cardFilter?: string) {
     } finally {
       setLoading(false);
     }
-  }, [cardFilter, filters, reportType, showToast]);
+  }, [cardFilter, filters, reportTypeKey, showToast]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -346,18 +358,48 @@ export function ManagementSupportHubPanel({ onCardFilter }: { onCardFilter?: (ca
   );
 }
 
-function AdminSupportListPage({
+const COMPLAINT_LOG_TYPES: ManagementReportType[] = ["groomer_complaint", "trainer_complaint"];
+const REQUEST_LOG_TYPES: ManagementReportType[] = ["groomer_request", "trainer_request"];
+
+function CombinedSupportLogPage({
   title,
   subtitle,
-  reportType,
+  reportTypes,
+  initialFocus,
   nameColumn
 }: {
   title: string;
   subtitle: string;
-  reportType: ManagementReportType;
+  reportTypes: ManagementReportType[];
+  /** Prefocus the log on one source while still allowing All / other sources. */
+  initialFocus?: ManagementReportType;
   nameColumn: string;
 }) {
-  const hub = useSupportHub(reportType);
+  const [sourceFocus, setSourceFocus] = useState<ManagementReportType | "all">(initialFocus ?? "all");
+  const activeTypes = sourceFocus === "all" ? reportTypes : [sourceFocus];
+  const hub = useSupportHub(activeTypes);
+
+  useEffect(() => {
+    setSourceFocus(initialFocus ?? "all");
+  }, [initialFocus]);
+
+  const sourceOptions = useMemo(() => {
+    const options: Array<{ id: ManagementReportType | "all"; label: string }> = [{ id: "all", label: "All" }];
+    if (reportTypes.some((type) => type.startsWith("groomer_"))) {
+      options.push({
+        id: reportTypes.find((type) => type.startsWith("groomer_"))!,
+        label: "Groomer"
+      });
+    }
+    if (reportTypes.some((type) => type.startsWith("trainer_"))) {
+      options.push({
+        id: reportTypes.find((type) => type.startsWith("trainer_"))!,
+        label: "Trainer"
+      });
+    }
+    return options;
+  }, [reportTypes]);
+
   return (
     <div className="space-y-5">
       <header className="admin-page-header">
@@ -370,9 +412,26 @@ function AdminSupportListPage({
         </button>
       </header>
       <section className="crossover-card p-5 space-y-4">
+        <div className="flex flex-wrap gap-2">
+          {sourceOptions.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={`crossover-btn ${sourceFocus === option.id ? "crossover-btn--active" : "crossover-btn--ghost"}`}
+              onClick={() => setSourceFocus(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
         <SupportFilters filters={hub.filters} setFilters={hub.setFilters} />
         {hub.loading ? <p className="text-sm text-admin-muted">Loading…</p> : null}
-        <SupportTable rows={hub.data?.items ?? []} nameColumn={nameColumn} onView={(row) => hub.setSelected(row.report)} />
+        <SupportTable
+          rows={hub.data?.items ?? []}
+          nameColumn={nameColumn}
+          showSource
+          onView={(row) => hub.setSelected(row.report)}
+        />
       </section>
       <SupportDetailModal open={Boolean(hub.selected)} item={hub.selected} busy={hub.busy} onClose={() => hub.setSelected(null)} onAction={hub.runAction} />
     </div>
@@ -381,44 +440,48 @@ function AdminSupportListPage({
 
 export function GroomerComplaintsAdminPanel() {
   return (
-    <AdminSupportListPage
-      title="Groomer Complaints"
-      subtitle="Review complaints submitted by groomers, assign follow-up, and respond directly to the submitter."
-      reportType="groomer_complaint"
-      nameColumn="Groomer"
-    />
-  );
-}
-
-export function GroomerRequestsAdminPanel() {
-  return (
-    <AdminSupportListPage
-      title="Groomer Requests"
-      subtitle="Review requests submitted by groomers and track resolution status."
-      reportType="groomer_request"
-      nameColumn="Groomer"
+    <CombinedSupportLogPage
+      title="Complaints"
+      subtitle="One combined log for groomer and trainer complaints. Filter by source, assign follow-up, and respond to the submitter."
+      reportTypes={COMPLAINT_LOG_TYPES}
+      initialFocus="groomer_complaint"
+      nameColumn="Submitted By"
     />
   );
 }
 
 export function TrainerComplaintsAdminPanel() {
   return (
-    <AdminSupportListPage
-      title="Trainer Complaints"
-      subtitle="Review complaints submitted by trainers, assign follow-up, and respond directly to the submitter."
-      reportType="trainer_complaint"
-      nameColumn="Trainer"
+    <CombinedSupportLogPage
+      title="Complaints"
+      subtitle="One combined log for groomer and trainer complaints. Filter by source, assign follow-up, and respond to the submitter."
+      reportTypes={COMPLAINT_LOG_TYPES}
+      initialFocus="trainer_complaint"
+      nameColumn="Submitted By"
+    />
+  );
+}
+
+export function GroomerRequestsAdminPanel() {
+  return (
+    <CombinedSupportLogPage
+      title="Requests"
+      subtitle="One combined log for groomer and trainer requests. Filter by source and track resolution status."
+      reportTypes={REQUEST_LOG_TYPES}
+      initialFocus="groomer_request"
+      nameColumn="Submitted By"
     />
   );
 }
 
 export function TrainerRequestsAdminPanel() {
   return (
-    <AdminSupportListPage
-      title="Trainer Requests"
-      subtitle="Review requests submitted by trainers and track resolution status."
-      reportType="trainer_request"
-      nameColumn="Trainer"
+    <CombinedSupportLogPage
+      title="Requests"
+      subtitle="One combined log for groomer and trainer requests. Filter by source and track resolution status."
+      reportTypes={REQUEST_LOG_TYPES}
+      initialFocus="trainer_request"
+      nameColumn="Submitted By"
     />
   );
 }

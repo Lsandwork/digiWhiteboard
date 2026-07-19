@@ -1,5 +1,5 @@
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
-import { ADMIN_HR_TABS, ADMIN_SUPPORT_TABS } from "@/lib/admin/types";
+import { ADMIN_HR_TABS } from "@/lib/admin/types";
 
 export type NavLeaf = {
   type: "item";
@@ -170,7 +170,8 @@ const FRONT_DESK_TABS: AdminTab[] = [
 ];
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
 const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
-const SUPPORT_INBOX_TABS: AdminTab[] = [...ADMIN_SUPPORT_TABS];
+const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer_complaints"];
+const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
 
@@ -295,8 +296,14 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
     entries.push(
       ...sectionEntries(
         "staff_management",
-        "Management Review",
-        compactEntries([group("support_inbox", "Support Inbox", SUPPORT_INBOX_TABS, visible)])
+        "Support Inbox",
+        compactEntries([
+          ...singles(["ms_hub"], visible),
+          group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
+          group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
+          ...singles(["admin_trainer_entries"], visible)
+        ]),
+        true
       )
     );
 

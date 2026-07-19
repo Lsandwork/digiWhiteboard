@@ -18,6 +18,11 @@ const adminTabs: AdminTab[] = [
   "overview",
   "package_commissions",
   "ms_hub",
+  "ms_groomer_complaints",
+  "ms_trainer_complaints",
+  "ms_groomer_requests",
+  "ms_trainer_requests",
+  "admin_trainer_entries",
   "help"
 ];
 
@@ -87,13 +92,27 @@ assert.ok(trainerCommissionsGroup && trainerCommissionsGroup.type === "group");
 assert.equal(trainerCommissionsGroup.children.length, 1);
 assert.equal(trainerCommissionsGroup.children[0]?.label, "Package & Class Commissions");
 
-const supportInbox = adminNav.find((entry) => entry.type === "group" && entry.id === "support_inbox");
-if (supportInbox && supportInbox.type === "group") {
-  assert.equal(
-    supportInbox.children.some((child) => child.tab === "package_commissions"),
-    false,
-    "package_commissions should not live under Support Inbox"
-  );
-}
+const supportComplaints = adminNav.find((entry) => entry.type === "group" && entry.id === "support_complaints");
+const supportRequests = adminNav.find((entry) => entry.type === "group" && entry.id === "support_requests");
+assert.ok(supportComplaints && supportComplaints.type === "group", "Complaints group should exist under Support Inbox");
+assert.ok(supportRequests && supportRequests.type === "group", "Requests group should exist under Support Inbox");
+assert.equal(
+  supportComplaints.children.some((child) => child.tab === "package_commissions"),
+  false,
+  "package_commissions should not live under Complaints"
+);
+assert.equal(
+  supportRequests.children.some((child) => child.tab === "package_commissions"),
+  false,
+  "package_commissions should not live under Requests"
+);
+assert.deepEqual(
+  supportComplaints.children.map((child) => child.tab),
+  ["ms_groomer_complaints", "ms_trainer_complaints"]
+);
+assert.deepEqual(
+  supportRequests.children.map((child) => child.tab),
+  ["ms_trainer_requests", "ms_groomer_requests"]
+);
 
 console.log("commissions nav tests passed");
