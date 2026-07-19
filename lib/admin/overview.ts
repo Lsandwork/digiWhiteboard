@@ -12,6 +12,11 @@ import {
 } from "@/lib/staff/management-support-admin";
 import { listAllManagementReports } from "@/lib/staff/management-reports";
 import { listStaffPushNotices, type StaffPushNotice } from "@/lib/staff/push-notices";
+import {
+  loadSystemHealthAudit,
+  toOverviewSystemHealth,
+  type OverviewSystemHealth
+} from "@/lib/admin/system-health-audit";
 
 export type OverviewAlertPriority = "high" | "medium" | "low";
 export type OverviewAlertStatus = "New" | "In Progress" | "Assigned" | "Escalated" | "Overdue" | "Resolved";
@@ -114,6 +119,7 @@ export type OverviewPayload = {
     total_devices: number;
     cast_tv_online: boolean;
   };
+  system_health: OverviewSystemHealth;
 };
 
 const BOARD_NOTES_KEY = "overview_board_notes";
@@ -352,15 +358,17 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
   const todayStartMs = todayStart.getTime();
   const yesterdayStartMs = todayStartMs - dayMs;
 
-  const [ops, reports, notices, pipPlans, devices, castHeartbeat, boardNotes] = await Promise.all([
-    listStaffOps(supabase),
-    listAllManagementReports(supabase),
-    listStaffPushNotices(supabase, 100),
-    listPipPlans(supabase),
-    listDisplayDevices(supabase).catch(() => []),
-    loadCastTvHeartbeat(supabase).catch(() => null),
-    loadBoardNotes(supabase)
-  ]);
+  const [ops, reports, notices, pipPlans, devices, castHeartbeat, boardNotes, systemHealthState] =
+    await Promise.all([
+      listStaffOps(supabase),
+      listAllManagementReports(supabase),
+      listStaffPushNotices(supabase, 100),
+      listPipPlans(supabase),
+      listDisplayDevices(supabase).catch(() => []),
+      loadCastTvHeartbeat(supabase).catch(() => null),
+      loadBoardNotes(supabase),
+      loadSystemHealthAudit(supabase).catch(() => null)
+    ]);
 
   const openIssues = ops.active_issues.filter((issue) => isOpenOpsStatus(issue.status));
   const openFollowUps = ops.owner_follow_ups.filter((item) => isOpenOpsStatus(item.status));
@@ -606,6 +614,17 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
       online_devices: onlineDevices.length,
       total_devices: devices.length,
       cast_tv_online: castOnline
-    }
+    },
+    system_health: toOverviewSystemHealth(
+      systemHealthState ?? {
+        version: 1,
+        last_run_at: null,
+        last_run_id: null,
+        overall_status: "never_run",
+        open_issues: [],
+        recent_rows: [],
+        runs: []
+      }
+    )
   };
 }

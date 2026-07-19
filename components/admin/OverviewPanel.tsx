@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   AlertTriangle,
   Bell,
   CheckCircle2,
@@ -12,10 +13,13 @@ import {
   MoreHorizontal,
   RefreshCw,
   Search,
-  Users
+  ShieldCheck,
+  Users,
+  Wrench
 } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { OverviewAlert, OverviewPayload } from "@/lib/admin/overview";
+import type { SystemHealthIssue } from "@/lib/admin/system-health-audit";
 import type { AdminTab } from "@/lib/admin/types";
 
 type OverviewPanelProps = {
@@ -71,17 +75,31 @@ function toneClasses(tone: string) {
 
 function statusBadge(status: string) {
   const s = status.toLowerCase();
-  if (s.includes("escalat") || s.includes("overdue") || s.includes("critical")) {
+  if (s.includes("escalat") || s.includes("overdue") || s.includes("critical") || s === "failed") {
     return "bg-rose-100 text-rose-700 border-rose-200";
   }
-  if (s.includes("review") || s.includes("pending") || s.includes("progress")) {
+  if (s.includes("review") || s.includes("pending") || s.includes("progress") || s === "open") {
     return "bg-orange-100 text-orange-700 border-orange-200";
   }
-  if (s.includes("active") || s.includes("assigned") || s.includes("open")) {
+  if (s.includes("active") || s.includes("assigned") || s === "fixed" || s.includes("all_clear") || s.includes("all clear")) {
     return "bg-emerald-100 text-emerald-700 border-emerald-200";
   }
   if (s.includes("new")) return "bg-sky-100 text-sky-700 border-sky-200";
   return "bg-slate-100 text-slate-700 border-slate-200";
+}
+
+function healthStatusLabel(status: SystemHealthIssue["status"]) {
+  if (status === "all_clear") return "All Clear";
+  if (status === "fixed") return "Fixed";
+  if (status === "failed") return "Failed";
+  return "Open";
+}
+
+function overallHealthTone(status: string) {
+  if (status === "all_clear") return "bg-emerald-500/15 text-emerald-300 border-emerald-400/30";
+  if (status === "failed_fixes") return "bg-rose-500/15 text-rose-300 border-rose-400/30";
+  if (status === "issues") return "bg-orange-500/15 text-orange-300 border-orange-400/30";
+  return "bg-white/10 text-admin-muted border-admin-border";
 }
 
 function priorityDot(priority: OverviewAlert["priority"]) {
@@ -98,6 +116,7 @@ export function OverviewPanel({ onNavigate }: OverviewPanelProps) {
   const [alertQuery, setAlertQuery] = useState("");
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
+  const [auditing, setAuditing] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -138,6 +157,39 @@ export function OverviewPanel({ onNavigate }: OverviewPanelProps) {
   function go(tab?: string) {
     if (!tab || !onNavigate) return;
     onNavigate(tab as AdminTab);
+  }
+
+  async function runSystemHealthAudit() {
+    setAuditing(true);
+    try {
+      const response = await fetch("/api/admin/overview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "run_system_health_audit", auto_fix: true })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Unable to run system health audit.");
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              system_health: body.system_health
+            }
+          : prev
+      );
+      const summary = body.system_health?.summary;
+      if (summary?.all_clear) showToast("System health audit: all clear.", "success");
+      else {
+        showToast(
+          `Audit done — ${summary?.fixed ?? 0} fixed, ${summary?.open ?? 0} open, ${summary?.failed ?? 0} failed.`,
+          summary?.failed ? "error" : "info"
+        );
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to run audit.", "error");
+    } finally {
+      setAuditing(false);
+    }
   }
 
   async function addNote() {
@@ -231,6 +283,98 @@ export function OverviewPanel({ onNavigate }: OverviewPanelProps) {
           </div>
         </section>
       ) : null}
+
+      <section className="admin-card overflow-hidden p-0">
+        <div className="flex flex-col gap-3 border-b border-admin-border px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-fitdog-orange" />
+              <h3 className="text-base font-semibold text-white">Whiteboard & Gingr Health</h3>
+              <span
+                className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${overallHealthTone(
+                  data.system_health?.overall_status || "never_run"
+                )}`}
+              >
+                {(data.system_health?.overall_status || "never_run").replace(/_/g, " ")}
+              </span>
+            </div>
+            <p className="text-xs text-admin-muted">
+              Tracks push/checkout lag, Cast Keeper heartbeats, stuck overlays, and webhook noise. Safe auto-fixes
+              never call live Gingr. {data.system_health?.next_cron_hint}
+              {data.system_health?.last_run_at
+                ? ` · Last run ${formatRelative(data.system_health.last_run_at)}`
+                : " · No audit run yet"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {data.system_health?.summary ? (
+              <span className="text-xs text-admin-muted">
+                Fixed {data.system_health.summary.fixed} · Open {data.system_health.summary.open} · Failed{" "}
+                {data.system_health.summary.failed}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className="admin-btn-primary min-h-10"
+              disabled={auditing}
+              onClick={() => void runSystemHealthAudit()}
+            >
+              {auditing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
+              {auditing ? "Auditing…" : "Run audit + auto-fix"}
+            </button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-black/20 text-xs uppercase tracking-wide text-admin-muted">
+              <tr>
+                <th className="px-3 py-2 font-semibold">Status</th>
+                <th className="px-3 py-2 font-semibold">Severity</th>
+                <th className="px-3 py-2 font-semibold">Issue</th>
+                <th className="px-3 py-2 font-semibold">Area</th>
+                <th className="px-3 py-2 font-semibold">Detail</th>
+                <th className="px-3 py-2 font-semibold">Auto-fix</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data.system_health?.rows?.length ? data.system_health.rows : []).length ? (
+                data.system_health.rows.map((row) => (
+                  <tr key={row.id} className="border-t border-admin-border/70">
+                    <td className="px-3 py-2.5">
+                      <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusBadge(row.status)}`}>
+                        {healthStatusLabel(row.status)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 capitalize text-admin-muted">{row.severity}</td>
+                    <td className="px-3 py-2.5 font-medium text-white">{row.title}</td>
+                    <td className="px-3 py-2.5 whitespace-nowrap text-admin-muted">{row.check.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-2.5 max-w-[320px] text-admin-muted">{row.detail}</td>
+                    <td className="px-3 py-2.5 text-xs text-admin-muted">
+                      {row.auto_fix ? (
+                        <span>
+                          <span className="font-semibold text-white">{row.auto_fix.result}</span>
+                          {row.auto_fix.message ? ` · ${row.auto_fix.message}` : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-admin-muted">
+                    <div className="mx-auto flex max-w-md flex-col items-center gap-2">
+                      <Activity className="h-5 w-5" />
+                      <p>No audit results yet. Run an audit now, or wait for the next twice-daily auto audit.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
