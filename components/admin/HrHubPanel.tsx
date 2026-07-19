@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, FileText, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -88,6 +88,8 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
   const [filter, setFilter] = useState<"all" | "write_up" | "complaint">("all");
   const [detailReport, setDetailReport] = useState<ManagementReport | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const lastSelectedRowIndexRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,6 +128,42 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
     });
   }, [data, filter, query]);
 
+  const pageRowIds = useMemo(() => filtered.map((row) => row.id), [filtered]);
+  const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
+  const somePageSelected = pageRowIds.some((id) => selected.includes(id)) && !allPageSelected;
+
+  useEffect(() => {
+    lastSelectedRowIndexRef.current = null;
+  }, [filter, query]);
+
+  const toggleRowSelection = useCallback(
+    (rowId: string, rowIndex: number, checked: boolean, shiftKey: boolean) => {
+      setSelected((current) => {
+        if (shiftKey && lastSelectedRowIndexRef.current !== null) {
+          const anchor = lastSelectedRowIndexRef.current;
+          const start = Math.min(anchor, rowIndex);
+          const end = Math.max(anchor, rowIndex);
+          const rangeIds = pageRowIds.slice(start, end + 1);
+          return [...new Set([...current, ...rangeIds])];
+        }
+        lastSelectedRowIndexRef.current = rowIndex;
+        return checked ? [...new Set([...current, rowId])] : current.filter((id) => id !== rowId);
+      });
+    },
+    [pageRowIds]
+  );
+
+  const toggleSelectAllOnPage = useCallback(
+    (checked: boolean) => {
+      if (!checked) {
+        setSelected((current) => current.filter((id) => !pageRowIds.includes(id)));
+        return;
+      }
+      setSelected((current) => [...new Set([...current, ...pageRowIds])]);
+    },
+    [pageRowIds]
+  );
+
   async function openDetail(id: string) {
     try {
       const response = await fetch(`/api/admin/hr?id=${encodeURIComponent(id)}`, { cache: "no-store" });
@@ -138,7 +176,28 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
     }
   }
 
+  async function copySelectedSummary() {
+    const rows = filtered.filter((row) => selected.includes(row.id));
+    if (!rows.length) {
+      showToast("Select at least one HR record first.", "error");
+      return;
+    }
+    const text = rows
+      .map(
+        (row) =>
+          `${row.kind === "write_up" ? "Write-Up" : "Complaint"} | ${row.subject_name ?? "—"} | ${row.status} | ${row.title}`
+      )
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast(`Copied ${rows.length} HR record${rows.length === 1 ? "" : "s"}.`, "success");
+    } catch {
+      showToast("Unable to copy selection.", "error");
+    }
+  }
+
   const stats = data?.stats;
+  const selectedVisibleCount = pageRowIds.filter((id) => selected.includes(id)).length;
 
   return (
     <div className="space-y-5">
@@ -191,11 +250,65 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
         </div>
       </section>
 
+      <div className="admin-ledger-bulk-bar sticky top-0 z-20 flex flex-wrap items-center gap-2 p-3">
+        <label className="inline-flex items-center gap-2 text-sm admin-text-emphasis">
+          <input
+            type="checkbox"
+            className="h-5 w-5"
+            checked={allPageSelected}
+            ref={(el) => {
+              if (el) el.indeterminate = somePageSelected;
+            }}
+            onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+            aria-label="Select all visible HR records"
+          />
+          <span>
+            {selected.length > 0
+              ? `${selected.length} selected${selectedVisibleCount !== selected.length ? ` (${selectedVisibleCount} visible)` : ""}`
+              : "Select rows · Shift+click a second row to select the range"}
+          </span>
+        </label>
+        <button
+          type="button"
+          className="crossover-btn crossover-btn--ghost"
+          disabled={selected.length === 0}
+          onClick={() => void copySelectedSummary()}
+        >
+          Copy selected
+        </button>
+        {onOpenConsult && selected.length === 1 ? (
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            onClick={() => onOpenConsult(selected[0]!)}
+          >
+            Consult selected
+          </button>
+        ) : null}
+        {selected.length > 0 ? (
+          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setSelected([])}>
+            Clear selection
+          </button>
+        ) : null}
+      </div>
+
       <section className="crossover-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="admin-table min-w-full">
             <thead>
               <tr>
+                <th className="w-12">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5"
+                    checked={allPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageSelected;
+                    }}
+                    onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                    aria-label="Select all visible HR records"
+                  />
+                </th>
                 <th>Type</th>
                 <th>Subject</th>
                 <th>Department</th>
@@ -206,34 +319,62 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
               </tr>
             </thead>
             <tbody>
-              {filtered.map((record) => (
-                <tr key={record.id}>
-                  <td>
-                    <span className={kindBadge(record.kind)}>{record.kind === "write_up" ? "Write-Up" : "Complaint"}</span>
-                    <p className="mt-1 text-xs text-admin-muted">{formatHrReportType(record.report_type)}</p>
-                  </td>
-                  <td>
-                    <p className="font-bold text-white">{record.subject_name ?? "—"}</p>
-                    <p className="mt-1 max-w-xs truncate text-xs text-admin-muted">{record.title}</p>
-                  </td>
-                  <td>{record.department ?? "—"}</td>
-                  <td><span className={statusBadge(record.status)}>{record.status}</span></td>
-                  <td>{record.priority}</td>
-                  <td className="whitespace-nowrap text-xs text-admin-muted">{formatWhen(record.created_at)}</td>
-                  <td className="whitespace-nowrap">
-                    <div className="flex gap-2">
-                      <button type="button" className="crossover-btn crossover-btn--ghost text-xs" onClick={() => void openDetail(record.id)}>
-                        View
-                      </button>
-                      {onOpenConsult ? (
-                        <button type="button" className="crossover-btn crossover-btn--primary text-xs" onClick={() => onOpenConsult(record.id)}>
-                          Consult
+              {filtered.map((record, rowIndex) => {
+                const isSelected = selected.includes(record.id);
+                return (
+                  <tr
+                    key={record.id}
+                    className={`admin-ledger-row ${isSelected ? "admin-ledger-row--selected" : ""}`}
+                    onClick={(e) => {
+                      if (e.shiftKey) {
+                        e.preventDefault();
+                        toggleRowSelection(record.id, rowIndex, true, true);
+                      }
+                    }}
+                  >
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5"
+                        checked={isSelected}
+                        aria-label={`Select HR record for ${record.subject_name ?? record.title}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (e.shiftKey) {
+                            toggleRowSelection(record.id, rowIndex, true, true);
+                            return;
+                          }
+                          toggleRowSelection(record.id, rowIndex, !isSelected, false);
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <span className={kindBadge(record.kind)}>{record.kind === "write_up" ? "Write-Up" : "Complaint"}</span>
+                      <p className="mt-1 text-xs text-admin-muted">{formatHrReportType(record.report_type)}</p>
+                    </td>
+                    <td>
+                      <p className="font-bold text-white">{record.subject_name ?? "—"}</p>
+                      <p className="mt-1 max-w-xs truncate text-xs text-admin-muted">{record.title}</p>
+                    </td>
+                    <td>{record.department ?? "—"}</td>
+                    <td><span className={statusBadge(record.status)}>{record.status}</span></td>
+                    <td>{record.priority}</td>
+                    <td className="whitespace-nowrap text-xs text-admin-muted">{formatWhen(record.created_at)}</td>
+                    <td className="whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2">
+                        <button type="button" className="crossover-btn crossover-btn--ghost text-xs" onClick={() => void openDetail(record.id)}>
+                          View
                         </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {onOpenConsult ? (
+                          <button type="button" className="crossover-btn crossover-btn--primary text-xs" onClick={() => onOpenConsult(record.id)}>
+                            Consult
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
