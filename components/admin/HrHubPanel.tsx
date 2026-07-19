@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, FileText, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { ExternalLink, FileText, RefreshCw, Search, ShieldAlert, Trash2 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { ManagementReport } from "@/lib/staff/management-reports";
@@ -80,10 +80,17 @@ function HrRecordDetailModal({
   );
 }
 
-export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: string) => void }) {
+export function HrHubPanel({
+  onOpenConsult,
+  onOpenPip
+}: {
+  onOpenConsult?: (recordId: string) => void;
+  onOpenPip?: () => void;
+}) {
   const { showToast } = useToast();
   const [data, setData] = useState<HubPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busyAction, setBusyAction] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "write_up" | "complaint">("all");
   const [detailReport, setDetailReport] = useState<ManagementReport | null>(null);
@@ -196,8 +203,70 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
     }
   }
 
+  async function patchSelected(action: string, extra?: Record<string, string>) {
+    if (!selected.length) {
+      showToast("Select at least one HR record first.", "error");
+      return;
+    }
+    setBusyAction(true);
+    try {
+      const response = await fetch("/api/admin/hr", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: selected, action, ...extra })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Unable to update HR records.");
+      showToast(`Updated ${body.updated ?? selected.length} record${selected.length === 1 ? "" : "s"}.`, "success");
+      setSelected([]);
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to update HR records.", "error");
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
+  async function removeSelected() {
+    if (!selected.length) return;
+    const ok = window.confirm(
+      `Remove ${selected.length} record${selected.length === 1 ? "" : "s"} from HR Records?\n\nThis hides them from this hub. Underlying write-ups/complaints are kept for documentation.`
+    );
+    if (!ok) return;
+    await patchSelected("remove");
+  }
+
+  async function createPipFromSelected() {
+    if (!selected.length) {
+      showToast("Select at least one HR record first.", "error");
+      return;
+    }
+    setBusyAction(true);
+    try {
+      const response = await fetch("/api/admin/hr/pip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create_from_records", record_ids: selected })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error || "Unable to create PIP.");
+      const count = Number(body.created || body.plans?.length || 0);
+      showToast(
+        `Created ${count} supportive PIP growth plan${count === 1 ? "" : "s"}. Open P.I.P to coach and refine.`,
+        "success"
+      );
+      setSelected([]);
+      onOpenPip?.();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to create PIP.", "error");
+    } finally {
+      setBusyAction(false);
+    }
+  }
+
   const stats = data?.stats;
   const selectedVisibleCount = pageRowIds.filter((id) => selected.includes(id)).length;
+  const selectionDisabled = selected.length === 0 || busyAction;
 
   return (
     <div className="space-y-5">
@@ -270,8 +339,40 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
         </label>
         <button
           type="button"
+          className="crossover-btn crossover-btn--primary"
+          disabled={selectionDisabled}
+          onClick={() => void createPipFromSelected()}
+        >
+          Create PIP
+        </button>
+        <button
+          type="button"
           className="crossover-btn crossover-btn--ghost"
-          disabled={selected.length === 0}
+          disabled={selectionDisabled}
+          onClick={() => void patchSelected("set_status", { admin_status: "In Review" })}
+        >
+          Mark in review
+        </button>
+        <button
+          type="button"
+          className="crossover-btn crossover-btn--ghost"
+          disabled={selectionDisabled}
+          onClick={() => void patchSelected("set_status", { admin_status: "Resolved" })}
+        >
+          Mark resolved
+        </button>
+        <button
+          type="button"
+          className="crossover-btn crossover-btn--ghost"
+          disabled={selectionDisabled}
+          onClick={() => void patchSelected("set_priority", { priority: "Urgent" })}
+        >
+          Flag urgent
+        </button>
+        <button
+          type="button"
+          className="crossover-btn crossover-btn--ghost"
+          disabled={selectionDisabled}
           onClick={() => void copySelectedSummary()}
         >
           Copy selected
@@ -280,11 +381,21 @@ export function HrHubPanel({ onOpenConsult }: { onOpenConsult?: (recordId: strin
           <button
             type="button"
             className="crossover-btn crossover-btn--primary"
+            disabled={busyAction}
             onClick={() => onOpenConsult(selected[0]!)}
           >
             Consult selected
           </button>
         ) : null}
+        <button
+          type="button"
+          className="crossover-btn crossover-btn--ghost inline-flex items-center gap-1 text-red-300"
+          disabled={selectionDisabled}
+          onClick={() => void removeSelected()}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Remove
+        </button>
         {selected.length > 0 ? (
           <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setSelected([])}>
             Clear selection

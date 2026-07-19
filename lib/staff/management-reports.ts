@@ -117,6 +117,10 @@ export type ManagementReport = {
   comments?: SupportComment[];
   audit_history?: SupportAuditEntry[];
   closed_at?: string | null;
+  /** Soft-hide from HR Records hub without deleting the underlying write-up/complaint. */
+  hr_hub_hidden?: boolean;
+  hr_hub_hidden_at?: string | null;
+  hr_hub_hidden_by?: string | null;
 };
 
 const SETTINGS_STORE_KEY = "management_reports";
@@ -198,7 +202,10 @@ function normalizeReport(report: ManagementReport): ManagementReport {
     submitted_by_role: report.submitted_by_role ?? roleForReportType(report.report_type),
     comments: report.comments ?? [],
     audit_history: report.audit_history ?? [],
-    closed_at: report.closed_at ?? null
+    closed_at: report.closed_at ?? null,
+    hr_hub_hidden: Boolean(report.hr_hub_hidden),
+    hr_hub_hidden_at: report.hr_hub_hidden_at ?? null,
+    hr_hub_hidden_by: report.hr_hub_hidden_by ?? null
   };
 }
 

@@ -2,17 +2,39 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 export type PipStatus = "Active" | "On Hold" | "Completed" | "Cancelled";
 
+export type PipCheckIn = {
+  id: string;
+  date: string;
+  note: string;
+  progress_percent: number;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type PipPlan = {
   id: string;
   employee_name: string;
   employee_role: string | null;
   manager_name: string | null;
   focus_area: string;
+  /** Clear, measurable goals the employee is working toward. */
+  goals: string[];
+  /** What “success” looks like by the end of the plan. */
+  success_metrics: string | null;
+  /** Coaching, training, schedule flexibility, mentoring, etc. */
+  support_offered: string | null;
+  /** Warm summary a manager can share with the employee (tone: support, not punishment). */
+  employee_facing_summary: string | null;
+  /** Internal manager notes / documentation (employer-protective). */
+  manager_notes: string | null;
   start_date: string;
   next_review_date: string | null;
+  target_end_date: string | null;
   progress_percent: number;
   status: PipStatus;
   notes: string | null;
+  source_record_ids: string[];
+  check_ins: PipCheckIn[];
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -40,24 +62,67 @@ function normalizeStatus(value: unknown): PipStatus {
   return "Active";
 }
 
+function normalizeStringList(value: unknown, max = 12): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function normalizeCheckIns(value: unknown): PipCheckIn[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((raw) => {
+      if (!raw || typeof raw !== "object") return null;
+      const row = raw as Partial<PipCheckIn>;
+      const note = String(row.note ?? "").trim();
+      if (!note) return null;
+      const now = new Date().toISOString();
+      return {
+        id: String(row.id || newId()),
+        date: String(row.date || now.slice(0, 10)).slice(0, 10),
+        note: note.slice(0, 4000),
+        progress_percent: clampProgress(row.progress_percent),
+        created_by: row.created_by ? String(row.created_by) : null,
+        created_at: String(row.created_at || now)
+      } satisfies PipCheckIn;
+    })
+    .filter((row): row is PipCheckIn => Boolean(row))
+    .slice(0, 40);
+}
+
 function normalizePlan(raw: unknown): PipPlan | null {
   if (!raw || typeof raw !== "object") return null;
-  const row = raw as Partial<PipPlan>;
+  const row = raw as Partial<PipPlan> & { notes?: string | null };
   const employee_name = String(row.employee_name ?? "").trim();
   const focus_area = String(row.focus_area ?? "").trim();
   if (!employee_name || !focus_area) return null;
   const now = new Date().toISOString();
+  const legacyNotes = row.notes ? String(row.notes).slice(0, 4000) : null;
   return {
     id: String(row.id || newId()),
     employee_name,
     employee_role: row.employee_role ? String(row.employee_role).trim() : null,
     manager_name: row.manager_name ? String(row.manager_name).trim() : null,
     focus_area,
-    start_date: String(row.start_date || now.slice(0, 10)),
+    goals: normalizeStringList(row.goals),
+    success_metrics: row.success_metrics ? String(row.success_metrics).slice(0, 2000) : null,
+    support_offered: row.support_offered ? String(row.support_offered).slice(0, 2000) : null,
+    employee_facing_summary: row.employee_facing_summary
+      ? String(row.employee_facing_summary).slice(0, 3000)
+      : null,
+    manager_notes: row.manager_notes
+      ? String(row.manager_notes).slice(0, 4000)
+      : legacyNotes,
+    start_date: String(row.start_date || now.slice(0, 10)).slice(0, 10),
     next_review_date: row.next_review_date ? String(row.next_review_date).slice(0, 10) : null,
+    target_end_date: row.target_end_date ? String(row.target_end_date).slice(0, 10) : null,
     progress_percent: clampProgress(row.progress_percent),
     status: normalizeStatus(row.status),
-    notes: row.notes ? String(row.notes).slice(0, 2000) : null,
+    notes: legacyNotes,
+    source_record_ids: normalizeStringList(row.source_record_ids, 40),
+    check_ins: normalizeCheckIns(row.check_ins),
     created_by: row.created_by ? String(row.created_by) : null,
     created_at: String(row.created_at || now),
     updated_at: String(row.updated_at || now)
@@ -108,30 +173,36 @@ async function saveState(supabase: SupabaseClient, state: PipState) {
   if (saveError) throw saveError;
 }
 
+export type PipPlanInput = {
+  employee_name: string;
+  employee_role?: string | null;
+  manager_name?: string | null;
+  focus_area: string;
+  goals?: string[];
+  success_metrics?: string | null;
+  support_offered?: string | null;
+  employee_facing_summary?: string | null;
+  manager_notes?: string | null;
+  start_date?: string;
+  next_review_date?: string | null;
+  target_end_date?: string | null;
+  progress_percent?: number;
+  status?: PipStatus;
+  notes?: string | null;
+  source_record_ids?: string[];
+};
+
 export async function listPipPlans(supabase: SupabaseClient) {
   return (await loadState(supabase)).plans;
 }
 
-export async function createPipPlan(
-  supabase: SupabaseClient,
-  input: {
-    employee_name: string;
-    employee_role?: string | null;
-    manager_name?: string | null;
-    focus_area: string;
-    start_date?: string;
-    next_review_date?: string | null;
-    progress_percent?: number;
-    status?: PipStatus;
-    notes?: string | null;
-  },
-  actor?: string | null
-) {
+export async function createPipPlan(supabase: SupabaseClient, input: PipPlanInput, actor?: string | null) {
   const state = await loadState(supabase);
   const now = new Date().toISOString();
   const plan = normalizePlan({
     ...input,
     id: newId(),
+    check_ins: [],
     created_by: actor ?? null,
     created_at: now,
     updated_at: now
@@ -142,20 +213,36 @@ export async function createPipPlan(
   return plan;
 }
 
+export async function createPipPlansBulk(
+  supabase: SupabaseClient,
+  inputs: PipPlanInput[],
+  actor?: string | null
+) {
+  const state = await loadState(supabase);
+  const now = new Date().toISOString();
+  const created: PipPlan[] = [];
+  for (const input of inputs) {
+    const plan = normalizePlan({
+      ...input,
+      id: newId(),
+      check_ins: [],
+      created_by: actor ?? null,
+      created_at: now,
+      updated_at: now
+    });
+    if (!plan) continue;
+    state.plans.unshift(plan);
+    created.push(plan);
+  }
+  if (!created.length) throw new Error("No valid PIP plans to create. Each needs an employee name and focus area.");
+  await saveState(supabase, state);
+  return created;
+}
+
 export async function updatePipPlan(
   supabase: SupabaseClient,
   id: string,
-  patch: Partial<{
-    employee_name: string;
-    employee_role: string | null;
-    manager_name: string | null;
-    focus_area: string;
-    start_date: string;
-    next_review_date: string | null;
-    progress_percent: number;
-    status: PipStatus;
-    notes: string | null;
-  }>
+  patch: Partial<PipPlanInput> & { check_ins?: PipCheckIn[] }
 ) {
   const state = await loadState(supabase);
   const index = state.plans.findIndex((plan) => plan.id === id);
@@ -175,6 +262,46 @@ export async function updatePipPlan(
   return next;
 }
 
+export async function addPipCheckIn(
+  supabase: SupabaseClient,
+  planId: string,
+  input: { note: string; date?: string; progress_percent?: number },
+  actor?: string | null
+) {
+  const state = await loadState(supabase);
+  const index = state.plans.findIndex((plan) => plan.id === planId);
+  if (index < 0) throw new Error("PIP plan not found.");
+  const current = state.plans[index]!;
+  const now = new Date().toISOString();
+  const checkIn: PipCheckIn = {
+    id: newId(),
+    date: String(input.date || now.slice(0, 10)).slice(0, 10),
+    note: String(input.note || "").trim().slice(0, 4000),
+    progress_percent: clampProgress(input.progress_percent ?? current.progress_percent),
+    created_by: actor ?? null,
+    created_at: now
+  };
+  if (!checkIn.note) throw new Error("Check-in note is required.");
+  const next = normalizePlan({
+    ...current,
+    check_ins: [checkIn, ...current.check_ins],
+    progress_percent: checkIn.progress_percent,
+    updated_at: now
+  });
+  if (!next) throw new Error("Unable to add check-in.");
+  state.plans[index] = next;
+  await saveState(supabase, state);
+  return next;
+}
+
+export async function deletePipPlan(supabase: SupabaseClient, id: string) {
+  const state = await loadState(supabase);
+  const next = state.plans.filter((plan) => plan.id !== id);
+  if (next.length === state.plans.length) throw new Error("PIP plan not found.");
+  await saveState(supabase, { plans: next });
+  return { ok: true as const };
+}
+
 export function pipReviewsDueThisWeek(plans: PipPlan[], now = new Date()) {
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
@@ -190,4 +317,16 @@ export function pipReviewsDueThisWeek(plans: PipPlan[], now = new Date()) {
 
 export function activePipPlans(plans: PipPlan[]) {
   return plans.filter((plan) => plan.status === "Active" || plan.status === "On Hold");
+}
+
+export function defaultNextReviewDate(from = new Date()) {
+  const d = new Date(from);
+  d.setDate(d.getDate() + 14);
+  return d.toISOString().slice(0, 10);
+}
+
+export function defaultTargetEndDate(from = new Date()) {
+  const d = new Date(from);
+  d.setDate(d.getDate() + 60);
+  return d.toISOString().slice(0, 10);
 }

@@ -93,7 +93,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   write_up_review: "Write Up Review",
   complaint_review: "Complaint Review",
   handler_shift_entry: "Handler Shift Entry Log",
-  hr_pip: "P.I.P",
+  hr_pip: "Performance Improvement Plan",
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board"
 };
@@ -139,7 +139,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   write_up_review: "Review all submitted employee write-ups.",
   complaint_review: "Review groomer, trainer, and staff complaints.",
   handler_shift_entry: "Create handler shift log entries sent to Front Desk Log.",
-  hr_pip: "View your performance improvement plan records.",
+  hr_pip: "Supportive growth plans with AI coaching, California-aware documentation, and manager check-ins.",
   remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
 };
 

@@ -560,7 +560,10 @@ export function AdminDashboard() {
 
         {tab === "hr_hub" ? (
           canAccessHrPanels ? (
-            <HrHubPanel onOpenConsult={(recordId) => setActiveTab("hr_consult", { record: recordId })} />
+            <HrHubPanel
+              onOpenConsult={(recordId) => setActiveTab("hr_consult", { record: recordId })}
+              onOpenPip={() => setActiveTab("hr_pip")}
+            />
           ) : null
         ) : null}
 
