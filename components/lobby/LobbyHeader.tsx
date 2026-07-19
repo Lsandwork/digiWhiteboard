@@ -14,7 +14,7 @@ export function LobbyHeader({ healthy, hasCheckout = false }: LobbyHeaderProps) 
   return (
     <header className="lobby-header lobby-header--light">
       <div className="lobby-header__brand">
-        <Link href="/admin" aria-label="Open Fitdog admin" title="Fitdog Admin" className="lobby-header__brand-link">
+        <Link href="/admin" aria-label="Open Fitdog Digi-board" title="Fitdog Digi-board" className="lobby-header__brand-link">
           <Image
             src={lobbyLightAssets.wordmark}
             alt="Fitdog"

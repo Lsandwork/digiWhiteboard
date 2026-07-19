@@ -20,14 +20,14 @@ function sidebarPanelTitle(role?: string | null) {
   if (isTeamLeaderRole(role)) return "Team Lead Panel";
   if (isGroomerRole(role)) return "Groomer Panel";
   if (isTrainerRole(role)) return "Trainer Panel";
-  return "Fitdog Admin";
+  return "Fitdog Digi-board";
 }
 
 function sidebarPanelSubtitle(role?: string | null) {
   if (isTeamLeaderRole(role)) return "Front Desk";
   if (isGroomerRole(role)) return "Grooming";
   if (isTrainerRole(role)) return "Training";
-  return "Admin Center";
+  return "Digi-board";
 }
 
 function userInitials(username: string) {

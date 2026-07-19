@@ -59,7 +59,7 @@ export function BoardHeader({
             href="/admin"
             className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue transition hover:ring-2 hover:ring-fitdog-orange/60 sm:h-24 sm:w-24 lg:h-28 lg:w-28"
             aria-label="Open Fitdog admin"
-            title="Fitdog Admin"
+            title="Fitdog Digi-board"
           >
             {logoFailed ? (
               <span className="grid h-full w-full place-items-center rounded-full bg-slate-950 text-3xl font-black text-white sm:text-4xl">

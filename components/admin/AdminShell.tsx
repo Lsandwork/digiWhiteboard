@@ -210,7 +210,7 @@ export function AdminShell({
                     <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
                     <div>
                       <p className="admin-header-brand__label">FITDOG</p>
-                      <p className="text-xs font-bold text-white">Admin Center</p>
+                      <p className="text-xs font-bold text-white">Fitdog Digi-board</p>
                     </div>
                   </div>
                 </div>
