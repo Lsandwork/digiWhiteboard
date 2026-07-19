@@ -7,6 +7,7 @@ import {
   isGeminiModelNotFoundError,
   resolveGeminiModel
 } from "@/lib/hr/gemini-config";
+import { FITDOG_ROLE_GLOSSARY } from "@/lib/hr/fitdog-roles";
 import type { PipPlan } from "@/lib/hr/pip";
 
 export { isGeminiConfigured };
@@ -30,6 +31,15 @@ Tone (non-negotiable):
 - Speak with dignity toward the employee and practical confidence toward managers, admins, and super admins.
 - Be warm, clear, and specific. Avoid corporate coldness and legal scare language.
 
+CRITICAL role accuracy (Fitdog):
+${FITDOG_ROLE_GLOSSARY}
+
+Role rules you must never break:
+- If the employee is a Dog Handler / Handler (or the HR record is an owner complaint about a dog handler), draft goals about yard safety, dog monitoring, play-group management, leash/walk-outs, dog body language, and handler standards — NEVER booking software, Gingr reservations, vaccine desk checks, client email SLAs, or front-desk handoffs.
+- "Front Desk" on an owner-complaint record often means who routed the complaint — not that the employee works front desk. Trust dog_handler / Handler signals over department labels.
+- Do NOT invent a default "Client Relations Coordinator" or booking scenario when role is unknown or when the person is a handler.
+- If role is truly unknown and there is no handler/groomer/trainer/front-desk signal, ask ONE clarifying question about the role before drafting — or draft a short role-neutral skeleton and clearly label that goals must be customized to the actual job. Never fill the gap with a fake front-desk story.
+
 California + employer-protective intelligence:
 - Ground advice in California employment context (at-will employment, documentation hygiene, consistent application of standards, interactive process awareness for disability/medical issues, anti-retaliation, wage/hour boundaries when scheduling support).
 - Always protect the employer's legitimate interests: clear expectations, objective examples, measurable goals, dated check-ins, manager follow-through, and avoiding promises the company will not keep.
@@ -43,7 +53,8 @@ ${settings.hr_company_situation.trim() || "No additional company context provide
 Output style:
 - Plain text only. No markdown bold/italics/headers.
 - Be excellent: concrete, usable, short paragraphs or labeled lines when drafting a plan.
-- For drafts, use clear labels like Goals:, Success looks like:, Support we will provide:, Review cadence:, Employee-facing summary:, Manager documentation tips:.`;
+- For drafts, use clear labels like Goals:, Success looks like:, Support we will provide:, Review cadence:, Employee-facing summary:, Manager documentation tips:.
+- Name the correct job title in the Focus area and Employee-facing summary (e.g. Dog Handler, not Client Relations Coordinator).`;
 }
 
 function planContext(plan: PipPlan | null | undefined) {
@@ -81,7 +92,7 @@ function modePrompt(mode: PipAiMode, userMessage: string, extras?: { recordConte
 
   switch (mode) {
     case "draft_plan":
-      return `Draft a supportive, California-aware PIP growth plan for this situation. Include: Focus area, 3-5 goals, success metrics, support the company will provide, 30/60-day review cadence, a warm employee-facing summary, and brief manager documentation tips that protect the employer. Keep it usable as a first draft a manager can edit.
+      return `Draft a supportive, California-aware PIP growth plan for THIS employee's actual role. Match goals to Dog Handler yard/care duties when the person is a handler — never default to front-desk booking or Client Relations. Include: Focus area, 3-5 role-correct goals, success metrics, support the company will provide, 30/60-day review cadence, a warm employee-facing summary, and brief manager documentation tips that protect the employer. Keep it usable as a first draft a manager can edit.
 ${recordBlock}${planBlock}
 Manager request: ${userMessage}`;
     case "employee_summary":

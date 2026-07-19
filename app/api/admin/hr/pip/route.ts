@@ -3,6 +3,7 @@ import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth"
 import { canAccessHrPanelsForUser } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
+import { inferEmployeeRoleFromHrSignals } from "@/lib/hr/fitdog-roles";
 import { isHrRecord, toHrRecord } from "@/lib/hr/records";
 import {
   activePipPlans,
@@ -102,7 +103,13 @@ export async function POST(request: Request) {
 
       const byEmployee = new Map<
         string,
-        { employee_name: string; department: string | null; summaries: string[]; recordIds: string[] }
+        {
+          employee_name: string;
+          employee_role: string | null;
+          summaries: string[];
+          recordIds: string[];
+          reportTypes: string[];
+        }
       >();
 
       for (const id of ids) {
@@ -111,15 +118,29 @@ export async function POST(request: Request) {
         const record = toHrRecord(report);
         const employee_name = (record.subject_name || "Team member").trim();
         const key = employee_name.toLowerCase();
+        const inferredRole = inferEmployeeRoleFromHrSignals({
+          report_type: report.report_type,
+          department: record.department,
+          subject_name: record.subject_name,
+          title: record.title,
+          summary: record.summary,
+          dog_handler_name: report.dog_handler_name,
+          employee_department: report.write_up_details?.employee_department
+        });
         const existing = byEmployee.get(key) ?? {
           employee_name,
-          department: record.department,
+          employee_role: inferredRole,
           summaries: [],
-          recordIds: []
+          recordIds: [],
+          reportTypes: []
         };
         existing.summaries.push(record.summary || record.title);
         existing.recordIds.push(record.id);
-        if (!existing.department && record.department) existing.department = record.department;
+        existing.reportTypes.push(record.report_type);
+        // Prefer Dog Handler over a misleading Front Desk department label.
+        if (inferredRole === "Dog Handler" || !existing.employee_role) {
+          existing.employee_role = inferredRole;
+        }
         byEmployee.set(key, existing);
       }
 
@@ -128,26 +149,41 @@ export async function POST(request: Request) {
       }
 
       const inputs: PipPlanInput[] = [...byEmployee.values()].map((group) => {
+        const isHandler =
+          group.employee_role === "Dog Handler" ||
+          group.reportTypes.some((type) => type === "owner_complaint_dog_handler");
         const focusSeed = group.summaries[0]?.slice(0, 160) || "Performance expectations and workplace standards";
         return {
           employee_name: group.employee_name,
-          employee_role: group.department,
+          employee_role: group.employee_role || (isHandler ? "Dog Handler" : null),
           manager_name: actor,
-          focus_area: `Growth plan: ${focusSeed}`,
-          goals: [
-            "Meet clear role expectations discussed in check-ins",
-            "Apply feedback consistently during scheduled shifts",
-            "Document questions early so support can be provided"
-          ],
-          success_metrics:
-            "Consistent improvement across scheduled check-ins, with specific examples of expectations met and support used.",
-          support_offered:
-            "Manager coaching, clear written expectations, and regular check-ins. Training or schedule clarity will be offered where needed.",
-          employee_facing_summary:
-            "This is a structured support plan. We believe in your ability to succeed here. We will set clear expectations, check in regularly, and provide coaching so you have a fair path to win.",
-          manager_notes: `Created from HR record(s): ${group.recordIds.join(", ")}. Source themes: ${group.summaries
-            .slice(0, 3)
-            .join(" | ")}`,
+          focus_area: isHandler
+            ? `Dog Handler growth plan: safe yard monitoring, dog care standards, and clear handler communication. Context: ${focusSeed}`
+            : `Growth plan: ${focusSeed}`,
+          goals: isHandler
+            ? [
+                "Maintain active, attentive yard monitoring and safe play-group management during assigned shifts",
+                "Follow Fitdog handler standards for leash transitions, walk-outs, and dog movement through the building",
+                "Escalate dog safety concerns promptly using the correct team-lead / management path",
+                "Apply coaching feedback consistently and ask for clarification early when unsure"
+              ]
+            : [
+                "Meet clear role expectations discussed in check-ins",
+                "Apply feedback consistently during scheduled shifts",
+                "Document questions early so support can be provided"
+              ],
+          success_metrics: isHandler
+            ? "Consistent safe yard presence and dog monitoring across scheduled check-ins, with specific examples of handler standards met and no unmanaged safety gaps during the review period."
+            : "Consistent improvement across scheduled check-ins, with specific examples of expectations met and support used.",
+          support_offered: isHandler
+            ? "Manager/team-lead coaching on yard standards, shadow shifts if needed, clear written handler expectations, and regular check-ins during paid work time."
+            : "Manager coaching, clear written expectations, and regular check-ins. Training or schedule clarity will be offered where needed.",
+          employee_facing_summary: isHandler
+            ? "This is a structured support plan for your work as a Dog Handler. We believe in your ability to succeed caring for and monitoring dogs on the yard and during walk-outs. We will set clear expectations, check in regularly, and coach you so you have a fair path to win."
+            : "This is a structured support plan. We believe in your ability to succeed here. We will set clear expectations, check in regularly, and provide coaching so you have a fair path to win.",
+          manager_notes: `Created from HR record(s): ${group.recordIds.join(", ")}. Role inferred: ${
+            group.employee_role || "unspecified"
+          }. Source themes: ${group.summaries.slice(0, 3).join(" | ")}`,
           start_date: new Date().toISOString().slice(0, 10),
           next_review_date: defaultNextReviewDate(),
           target_end_date: defaultTargetEndDate(),

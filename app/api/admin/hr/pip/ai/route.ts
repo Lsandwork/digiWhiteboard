@@ -4,6 +4,7 @@ import { canAccessHrPanelsForUser } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { loadAdminSettings } from "@/lib/admin/settings";
 import { getUserAccess } from "@/lib/admin/user-access";
+import { inferEmployeeRoleFromHrSignals } from "@/lib/hr/fitdog-roles";
 import { coachPipWithGemini, extractPipDraftFields, isGeminiConfigured, type PipAiMode } from "@/lib/hr/gemini-pip";
 import { listPipPlans } from "@/lib/hr/pip";
 import { isHrRecord, toHrRecord } from "@/lib/hr/records";
@@ -76,15 +77,33 @@ export async function POST(request: Request) {
       const report = await getManagementReportById(supabase, id);
       if (!report || !isHrRecord(report)) continue;
       const record = toHrRecord(report);
+      const inferredRole = inferEmployeeRoleFromHrSignals({
+        report_type: report.report_type,
+        department: record.department,
+        subject_name: record.subject_name,
+        title: record.title,
+        summary: record.summary,
+        dog_handler_name: report.dog_handler_name,
+        employee_department: report.write_up_details?.employee_department
+      });
       recordChunks.push(
         [
           `Record ${record.id}`,
-          `Type: ${record.kind}`,
-          `Subject: ${record.subject_name ?? "—"}`,
+          `Report type: ${record.report_type}`,
+          `Kind: ${record.kind}`,
+          `Subject employee: ${record.subject_name ?? "—"}`,
+          report.dog_handler_name ? `Dog handler named on record: ${report.dog_handler_name}` : null,
+          `Inferred job role for PIP goals: ${inferredRole ?? "unknown — ask manager before assuming"}`,
+          `Routing department on record (may be who filed/routed, NOT always the employee's job): ${record.department ?? "—"}`,
           `Title: ${record.title}`,
           `Status: ${record.status}`,
-          `Summary: ${record.summary}`
-        ].join("\n")
+          `Summary: ${record.summary}`,
+          inferredRole === "Dog Handler"
+            ? "IMPORTANT: This employee is a Dog Handler (yard care / dog monitoring / walk-outs). Do NOT draft front-desk booking goals."
+            : null
+        ]
+          .filter(Boolean)
+          .join("\n")
       );
     }
 

@@ -62,7 +62,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
   hr_company_region: "California",
   hr_company_country: "United States",
   hr_company_situation:
-    "Fitdog is a premium dog daycare, boarding, grooming, and training facility. We operate with a team-oriented culture and follow California employment law. HR consult is used for internal guidance on write-ups, complaints, and workplace issues — not as a substitute for licensed legal counsel.",
+    "Fitdog is a premium dog daycare, boarding, grooming, and training facility in Santa Monica, California. Dog Handlers (handlers) care for and monitor dogs on the yard, manage play groups, and walk dogs in/out of the building — they are not front-desk booking staff. Front Desk / Client Relations handle Gingr bookings, vaccines at check-in, and client communication. We operate with a team-oriented culture and follow California employment law. HR consult and PIP AI are for internal guidance on write-ups, complaints, and workplace issues — not a substitute for licensed legal counsel.",
   hr_consult_model: "gemini-3.5-flash"
 };
 

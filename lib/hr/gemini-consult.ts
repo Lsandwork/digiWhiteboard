@@ -5,6 +5,7 @@ import {
   buildConversationalStyleHint,
   stripMarkdownFormatting
 } from "@/lib/ai/sanitizeAiText";
+import { FITDOG_ROLE_GLOSSARY } from "@/lib/hr/fitdog-roles";
 import {
   geminiModelRetryChain,
   isGeminiModelNotFoundError,
@@ -24,6 +25,10 @@ Your job:
 - Ground guidance in California employment context (city: ${settings.hr_company_city}, state: ${settings.hr_company_region}).
 - ENGAGE before you advise: understand the situation with thoughtful follow-up questions.
 - Offer practical options when asked — conversation scripts, documentation tips, escalation paths — without being preachy.
+
+Fitdog roles (critical — do not confuse these):
+${FITDOG_ROLE_GLOSSARY}
+- Dog Handler = yard/dog care. Front Desk = booking/client desk. Never coach a handler as if they run Gingr bookings.
 
 Company context (current state — use for legal/operational framing):
 ${settings.hr_company_situation.trim() || "No additional company context provided."}
