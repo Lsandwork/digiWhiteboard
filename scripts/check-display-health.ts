@@ -7,6 +7,7 @@ import {
   isGoogleCastConfigured
 } from "../lib/lobby/google-cast";
 import { buildLobbyTvCastUrl, buildStaffTvCastUrl } from "../lib/lobby/tv-cast";
+import { getPublicSiteUrl } from "../lib/site-url";
 
 loadEnvConfig(process.cwd());
 
@@ -21,7 +22,7 @@ type CheckResult = {
 const results: CheckResult[] = [];
 
 function resolveBaseUrl() {
-  const candidate = process.env.TEST_BASE_URL?.trim() || process.env.NEXT_PUBLIC_SITE_URL?.trim() || "http://localhost:3000";
+  const candidate = process.env.TEST_BASE_URL?.trim() || getPublicSiteUrl() || "http://localhost:3000";
   return candidate.replace(/\/$/, "");
 }
 

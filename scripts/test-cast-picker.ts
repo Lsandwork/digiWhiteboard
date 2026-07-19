@@ -17,8 +17,9 @@ assert.doesNotMatch(buildLobbyTvCastUrl("http://localhost:3000/lobby/checkouts",
 assert.match(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /display=tv/);
 assert.match(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /chromecast=1/);
 assert.match(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /token=secret/);
+assert.match(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /^https:\/\/staff\.ruffops\.com\//);
 assert.doesNotMatch(buildStaffTvCastUrl("https://fitdog-gingr-status-board.vercel.app/", "secret"), /staff-cast/);
-assert.equal(getCastSiteOrigin("https://fitdog-gingr-status-board.vercel.app/"), "https://fitdog-gingr-status-board.vercel.app");
+assert.equal(getCastSiteOrigin("https://fitdog-gingr-status-board.vercel.app/"), "https://staff.ruffops.com");
 assert.equal(typeof isAndroidChrome(), "boolean");
 assert.equal(typeof isChromeIos(), "boolean");
 assert.equal(typeof isCastSenderSupported(), "boolean");

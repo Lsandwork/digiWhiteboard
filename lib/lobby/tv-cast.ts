@@ -1,3 +1,4 @@
+import { getPublicSiteUrl, resolvePublicSiteUrl } from "@/lib/site-url";
 import { safeCastUrl, safeOrigin } from "@/lib/safe-url";
 
 export type PresentationConnectionLike = {
@@ -21,21 +22,19 @@ function defaultCastOrigin() {
 
 export function getCastSiteOrigin(currentHref?: string) {
   if (typeof window !== "undefined") {
-    return safeOrigin(window.location.origin, defaultCastOrigin());
+    const browserOrigin = safeOrigin(window.location.origin, defaultCastOrigin());
+    return resolvePublicSiteUrl(browserOrigin) || browserOrigin;
   }
 
-  const site = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (site) {
-    const origin = safeOrigin(site, "");
-    if (origin) return origin;
-  }
+  const configured = resolvePublicSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+  if (configured) return configured;
 
   if (currentHref) {
-    const origin = safeOrigin(currentHref, "");
+    const origin = resolvePublicSiteUrl(currentHref) || safeOrigin(currentHref, "");
     if (origin) return origin;
   }
 
-  return "http://localhost:3000";
+  return getPublicSiteUrl() || "http://localhost:3000";
 }
 
 function readSearchParam(name: string) {

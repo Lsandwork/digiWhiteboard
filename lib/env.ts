@@ -1,9 +1,11 @@
+import { getPublicSiteUrl } from "@/lib/site-url";
+
 export function getGingrWebhookSignatureKey() {
   return process.env.GINGR_WEBHOOK_SIGNATURE_KEY ?? process.env.GINGR_WEBHOOK_SECRET;
 }
 
 export function getSiteUrl() {
-  return process.env.NEXT_PUBLIC_SITE_URL ?? process.env.VERCEL_URL;
+  return getPublicSiteUrl();
 }
 
 export function getBoardEnvCheck() {
