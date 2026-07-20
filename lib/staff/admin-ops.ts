@@ -203,6 +203,7 @@ export function departmentForDashboardRole(role?: AdminUserRole | null) {
   if (role === "front_desk_coordinator") return FRONT_DESK_DEPARTMENT;
   if (role === "groomer") return "Grooming";
   if (role === "trainer") return "Training";
+  if (role === "daycare") return "Daycare";
   if (role === "marketing") return "Marketing";
   return null;
 }
