@@ -767,7 +767,7 @@ export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole):
     return audiences.includes("staff_ops") || audiences.includes("viewer") || MANAGEMENT_EXTRA_ARTICLE_IDS.has(article.id);
   }
 
-  if (role === "daycare") {
+  if (role === "daycare" || role === "driver" || role === "hiker") {
     return DOG_HANDLER_ARTICLE_IDS.has(article.id);
   }
 

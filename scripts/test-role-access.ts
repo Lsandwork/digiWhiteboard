@@ -18,6 +18,8 @@ const roles: AdminUserRole[] = [
   "groomer",
   "trainer",
   "daycare",
+  "driver",
+  "hiker",
   "marketing",
   "viewer"
 ];
@@ -61,8 +63,12 @@ for (const role of roles) {
   );
 }
 
-assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), true);
+assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "hr_hub", "daycare", "staff"), false);
+assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "yard_links", "driver", "staff"), false);
+assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "walks_board", "driver", "staff"), true);
+assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "hr_hub", "driver", "staff"), false);
+assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "hiker"), "yard_links", "hiker", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "package_commissions", "trainer", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "package_commissions", "assistant_manager", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "grooming_push", "groomer", "staff"), true);

@@ -112,8 +112,8 @@ export async function GET(request: Request) {
       if (canViewOwnWriteUpsForUser(access, role)) {
         let reports = await listWriteUpsForCreator(supabase, actor, 100);
 
-        // Dog handlers can only view write-ups where they are the employee subject.
-        if (role === "daycare") {
+        // Dog handlers / driver-hikers can only view write-ups where they are the employee subject.
+        if (role === "daycare" || role === "driver" || role === "hiker") {
           let actorName: string | null = null;
           if (session?.adminUserId) {
             const { data } = await supabase

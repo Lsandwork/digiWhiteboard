@@ -49,7 +49,9 @@ function quickLinkVisible(link: QuickLinkItem, role: AdminUserRole) {
   }
   if (role === "viewer") return link.roles.includes("viewer");
   if (role === "marketing") return link.roles.includes("marketing") || link.roles.includes("viewer");
-  if (role === "daycare") return link.roles.includes("handler") || link.roles.includes("staff_ops");
+  if (role === "daycare" || role === "driver" || role === "hiker") {
+    return link.roles.includes("handler") || link.roles.includes("staff_ops");
+  }
   if (isStaffOpsLimitedRole(role)) return link.roles.includes("staff_ops");
   if (isCrossoverStaffRole(role)) {
     return link.roles.includes("staff_ops") || link.roles.includes("handler") || link.roles.includes("viewer");

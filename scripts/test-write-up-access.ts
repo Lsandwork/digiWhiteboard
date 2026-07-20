@@ -70,11 +70,14 @@ import {
   assert.equal(canAccessAdminTab(teamLeadAccess, "ms_hub", "team_leader", "staff"), false);
 }
 
-// Dog handlers can view write-ups about themselves only.
+// Dog handlers / driver-hikers can view write-ups about themselves only.
 {
   assert.equal(canSubmitWriteUp("daycare"), false);
   assert.equal(canViewOwnWriteUps("daycare"), true);
   assert.equal(canAccessAdminTab(accessFromLegacyRole("dh-1", "handler@fitdog.test", "daycare"), "write_ups", "daycare", "staff"), true);
+  assert.equal(canSubmitWriteUp("driver"), false);
+  assert.equal(canViewOwnWriteUps("driver"), true);
+  assert.equal(canAccessAdminTab(accessFromLegacyRole("dr-1", "driver@fitdog.test", "driver"), "write_ups", "driver", "staff"), true);
 }
 
 // Admin role permissions include submit + review once.

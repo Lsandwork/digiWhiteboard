@@ -132,8 +132,8 @@ export const ROLE_LABELS: Record<RoleKey, string> = {
   groomer: "Groomer",
   daycare: "Dog Handler",
   trainer: "Trainer",
-  driver: "Driver",
-  hiker: "Hiker",
+  driver: "Driver/Hiker",
+  hiker: "Driver/Hiker",
   overnight: "Overnight",
   maintenance: "Maintenance",
   staff: "Staff",
@@ -506,7 +506,6 @@ export const TRAINER_TABS = [
 export const DOG_HANDLER_TABS = [
   "crossover_communication",
   "checklist",
-  "yard_links",
   "walks_board",
   "notifications",
   "management_support",
@@ -539,8 +538,8 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   groomer: GROOMER_PERMISSIONS,
   trainer: TRAINER_PERMISSIONS,
   daycare: DOG_HANDLER_PERMISSIONS,
-  driver: STAFF_VIEWER_PERMISSIONS,
-  hiker: STAFF_VIEWER_PERMISSIONS,
+  driver: DOG_HANDLER_PERMISSIONS,
+  hiker: DOG_HANDLER_PERMISSIONS,
   overnight: STAFF_VIEWER_PERMISSIONS,
   maintenance: STAFF_VIEWER_PERMISSIONS,
   staff: STAFF_VIEWER_PERMISSIONS,
@@ -560,6 +559,10 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
     case "daycare":
     case "dog_handler":
       return "daycare";
+    case "driver":
+      return "driver";
+    case "hiker":
+      return "hiker";
     case "front_desk_coordinator":
     case "front_desk":
     case "coordinator":
@@ -590,6 +593,10 @@ export function roleKeyToLegacyRole(role: RoleKey): string {
       return "assistant_manager";
     case "daycare":
       return "daycare";
+    case "driver":
+      return "driver";
+    case "hiker":
+      return "hiker";
     case "front_desk_coordinator":
       return "front_desk_coordinator";
     case "team_leader":
@@ -888,7 +895,7 @@ export function canReviewWriteUpsForUser(access: UserAccess | null | undefined, 
 
 export function canViewOwnWriteUpsForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
   if (hasPermission(access, "view_own_write_ups")) return true;
-  return legacyRole === "daycare";
+  return isDogHandlerLegacyRole(legacyRole);
 }
 
 export function canReviewManagementSupportForUser(access: UserAccess | null | undefined, legacyRole?: string | null) {
@@ -921,8 +928,14 @@ export function isMarketingLegacyRole(legacyRole?: string | null) {
   return legacyRole === "marketing";
 }
 
+/** Dog Handler + Driver/Hiker — same staff Digi-board pages and permissions. */
 export function isDogHandlerLegacyRole(legacyRole?: string | null) {
-  return legacyRole === "daycare" || legacyRole === "dog_handler";
+  return (
+    legacyRole === "daycare" ||
+    legacyRole === "dog_handler" ||
+    legacyRole === "driver" ||
+    legacyRole === "hiker"
+  );
 }
 
 /** Staff DigiBoard roles — staff board only (not lobby admin). */

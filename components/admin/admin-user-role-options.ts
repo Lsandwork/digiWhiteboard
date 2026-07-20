@@ -8,9 +8,11 @@ export const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "team_leader", description: "Team Lead panel: push notices, grooming push, front desk log, and more." },
   { value: "groomer", description: "Groomer panel: grooming push, front desk log, notifications, and profile." },
   { value: "trainer", description: "Trainer panel: trainer push, shift log entry, and package & class commissions." },
-  { value: "daycare", description: "Daycare staff board access." },
-  { value: "driver", description: "Transportation staff board access." },
-  { value: "hiker", description: "Hiking/transportation staff board access." },
+  { value: "daycare", description: "Dog Handler staff board access." },
+  {
+    value: "driver",
+    description: "Driver/Hiker staff board — same pages and permissions as Dog Handler."
+  },
   { value: "overnight", description: "Overnight staff board access." },
   { value: "maintenance", description: "Maintenance staff board access." },
   { value: "staff", description: "Basic staff board access." },
@@ -19,7 +21,7 @@ export const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
 ];
 
 export const ADDITIONAL_ROLE_OPTIONS = PRIMARY_ROLE_OPTIONS.filter(
-  (option) => !["super_admin", "admin", "viewer"].includes(option.value)
+  (option) => !["super_admin", "admin", "viewer", "hiker"].includes(option.value)
 );
 
 export const DEPARTMENT_OPTIONS = Object.entries({

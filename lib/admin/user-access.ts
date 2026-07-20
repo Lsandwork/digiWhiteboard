@@ -210,6 +210,7 @@ const STAFF_DIRECTORY_DEPARTMENT_TO_RBAC: Record<string, DepartmentKey> = {
   training: "training",
   "dog handler": "daycare",
   daycare: "daycare",
+  hikers: "transportation",
   overnight: "overnight",
   maintenance: "maintenance",
   transportation: "transportation",

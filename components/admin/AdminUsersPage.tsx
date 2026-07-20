@@ -42,8 +42,10 @@ const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "groomer", description: "Groomer DigiBoard panel: grooming push, front desk log, video links, personal notifications, complaints/requests, and profile settings." },
   { value: "trainer", description: "Training panel with trainer push, shift log entry, and package commissions." },
   { value: "daycare", description: "Dog Handler staff board access." },
-  { value: "driver", description: "Transportation staff board access." },
-  { value: "hiker", description: "Hiking/transportation staff board access." },
+  {
+    value: "driver",
+    description: "Driver/Hiker staff board — same pages and permissions as Dog Handler."
+  },
   { value: "overnight", description: "Overnight staff board access." },
   { value: "maintenance", description: "Maintenance staff board access." },
   { value: "staff", description: "Basic staff board access." },
@@ -51,7 +53,7 @@ const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
 ];
 
 const ADDITIONAL_ROLE_OPTIONS = PRIMARY_ROLE_OPTIONS.filter(
-  (option) => !["super_admin", "admin", "viewer"].includes(option.value)
+  (option) => !["super_admin", "admin", "viewer", "hiker"].includes(option.value)
 );
 
 const DEPARTMENT_OPTIONS = Object.entries(DEPARTMENT_LABELS).map(([value, label]) => ({

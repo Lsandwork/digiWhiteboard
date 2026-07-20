@@ -15,6 +15,8 @@ const ALL_ROLES: AdminUserRole[] = [
   "groomer",
   "trainer",
   "daycare",
+  "driver",
+  "hiker",
   "marketing",
   "viewer"
 ];
@@ -30,6 +32,8 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
   groomer: ["front-desk-log", "groomer-trainer-crossover"],
   trainer: ["front-desk-log", "groomer-trainer-crossover"],
   daycare: ["front-desk-log", "dog-handler-basics"],
+  driver: ["front-desk-log", "dog-handler-basics"],
+  hiker: ["front-desk-log", "dog-handler-basics"],
   marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast"],
   viewer: ["lobby-messages", "lobby-tv-cast"]
 };
@@ -51,6 +55,12 @@ assert.equal(
   articleVisibleToRole(HELP_ARTICLES.find((a) => a.id === "env-vars")!, "daycare"),
   false,
   "dog handler must not see admin-only env-vars"
+);
+
+assert.equal(
+  articleVisibleToRole(HELP_ARTICLES.find((a) => a.id === "env-vars")!, "driver"),
+  false,
+  "driver/hiker must not see admin-only env-vars"
 );
 
 assert.equal(

@@ -351,7 +351,8 @@ export function AdminDashboard() {
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
-  const isHandlerPanel = !isDemo && currentRole === "daycare";
+  const isHandlerPanel =
+    !isDemo && (currentRole === "daycare" || currentRole === "driver" || currentRole === "hiker");
   const isCoordinatorPanel = !isDemo && isFrontDeskCoordinatorRole(currentRole);
   const isMarketingPanel = !isDemo && isMarketingRole(currentRole);
   const isLimitedStaffPanel =

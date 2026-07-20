@@ -204,6 +204,8 @@ export function departmentForDashboardRole(role?: AdminUserRole | null) {
   if (role === "groomer") return "Grooming";
   if (role === "trainer") return "Training";
   if (role === "daycare") return "Daycare";
+  if (role === "driver") return "Transportation";
+  if (role === "hiker") return "Hikers";
   if (role === "marketing") return "Marketing";
   return null;
 }

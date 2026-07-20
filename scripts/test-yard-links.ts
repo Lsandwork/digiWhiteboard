@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   accessFromLegacyRole,
   canAccessAdminTab,
+  roleKeyToLegacyRole,
   ROLE_PERMISSIONS,
   type RoleKey
 } from "../lib/admin/permissions";
@@ -10,17 +11,52 @@ import { buildYouTubeEmbedUrl, isValidYouTubeVideoId } from "../lib/yard-links/y
 
 const ALL_ROLES = Object.keys(ROLE_PERMISSIONS) as RoleKey[];
 
-for (const role of ALL_ROLES) {
-  const access = accessFromLegacyRole(`user-${role}`, `${role}@fitdog.test`, role);
+/** Dog Handler / Driver/Hiker explicitly do not get Video Links. */
+const NO_VIDEO_LINKS_ROLES = new Set<RoleKey>(["daycare", "driver", "hiker"]);
+
+/** Staff DigiBoard roles that keep Video Links. */
+const STAFF_VIDEO_LINKS_ROLES = new Set<RoleKey>([
+  "front_desk_coordinator",
+  "team_leader",
+  "groomer",
+  "trainer"
+]);
+
+for (const role of NO_VIDEO_LINKS_ROLES) {
+  const legacy = roleKeyToLegacyRole(role);
+  const access = accessFromLegacyRole(`user-${role}`, `${role}@fitdog.test`, legacy);
   assert.equal(
-    canAccessAdminTab(access, "yard_links", role, "staff"),
+    canAccessAdminTab(access, "yard_links", legacy, "staff"),
+    false,
+    `${role} must not access Video Links`
+  );
+}
+
+for (const role of STAFF_VIDEO_LINKS_ROLES) {
+  const legacy = roleKeyToLegacyRole(role);
+  const access = accessFromLegacyRole(`user-${role}`, `${role}@fitdog.test`, legacy);
+  assert.equal(
+    canAccessAdminTab(access, "yard_links", legacy, "staff"),
     true,
     `${role} should access Yard Links on staff board`
   );
   assert.equal(
-    canAccessAdminTab(access, "yard_links", role, "lobby"),
-    !["front_desk_coordinator", "groomer", "team_leader", "trainer", "daycare"].includes(role),
+    canAccessAdminTab(access, "yard_links", legacy, "lobby"),
+    false,
     `${role} lobby yard_links access`
+  );
+}
+
+for (const role of ALL_ROLES) {
+  if (NO_VIDEO_LINKS_ROLES.has(role) || STAFF_VIDEO_LINKS_ROLES.has(role) || role === "marketing") {
+    continue;
+  }
+  const legacy = roleKeyToLegacyRole(role);
+  const access = accessFromLegacyRole(`user-${role}`, `${role}@fitdog.test`, legacy);
+  assert.equal(
+    canAccessAdminTab(access, "yard_links", legacy, "staff"),
+    true,
+    `${role} should access Yard Links on staff board`
   );
 }
 

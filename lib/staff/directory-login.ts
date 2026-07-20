@@ -39,6 +39,8 @@ const dashboardRoles: AdminUserRole[] = [
   "groomer",
   "trainer",
   "daycare",
+  "driver",
+  "hiker",
   "marketing",
   "viewer"
 ];
