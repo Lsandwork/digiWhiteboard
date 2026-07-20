@@ -53,7 +53,7 @@ async function ensureHandler(name: string) {
 
   let user = await findAdminUserByEmail(supabase, email);
   if (!user) {
-    user = await createAdminUser(supabase, {
+    const created = await createAdminUser(supabase, {
       full_name: fullName,
       email,
       password: TEMP_PASSWORD,
@@ -61,6 +61,8 @@ async function ensureHandler(name: string) {
       force_password_change: true,
       created_by: null
     });
+    user = await findAdminUserByEmail(supabase, created.email);
+    if (!user) throw new Error(`Failed to load created user ${email}`);
     console.log(`  created login ${email}`);
   } else {
     await updateAdminUser(supabase, user.id, {
@@ -70,7 +72,8 @@ async function ensureHandler(name: string) {
       force_password_change: true
     });
     await changeAdminUserPassword(supabase, user.id, TEMP_PASSWORD, true);
-    user = (await findAdminUserByEmail(supabase, email))!;
+    user = await findAdminUserByEmail(supabase, email);
+    if (!user) throw new Error(`Failed to reload user ${email}`);
     console.log(`  updated login ${email} (reset password + force change)`);
   }
 
