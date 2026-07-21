@@ -37,7 +37,7 @@ const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "super_admin", description: "Full system access including integrations, API, and permissions matrix." },
   { value: "admin", description: "Manage users and day-to-day admin tools (no integrations or permissions matrix)." },
   { value: "management", description: "View and assign staff operations; receive management alerts." },
-  { value: "front_desk_coordinator", description: "Push Notices, Grooming Push, Front Desk Log, Owner Follow Up, Active Issues." },
+  { value: "front_desk_coordinator", description: "Push Notices, Yard Push, Grooming Push, Front Desk Log, Owner Follow Up, Active Issues." },
   { value: "team_leader", description: "Team Lead DigiBoard panel: push notices, grooming push, front desk log, video links, personal notifications, write-ups, and profile settings." },
   { value: "groomer", description: "Groomer DigiBoard panel: grooming push, front desk log, video links, personal notifications, complaints/requests, and profile settings." },
   { value: "trainer", description: "Training panel with trainer push, shift log entry, and package commissions." },

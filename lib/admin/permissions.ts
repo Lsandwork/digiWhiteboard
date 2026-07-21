@@ -450,6 +450,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 export const FRONT_DESK_COORDINATOR_TABS = [
   "crossover_communication",
   "push_notices",
+  "yard_push_notices",
   "grooming_push",
   "owner_follow_up",
   "active_issues",

@@ -43,6 +43,21 @@ const teamLeadTabs: AdminTab[] = [
 ];
 const teamLeadNav = buildTeamLeadNav(teamLeadTabs);
 
+const coordinatorTabs: AdminTab[] = [
+  "push_notices",
+  "yard_push_notices",
+  "grooming_push",
+  "crossover_communication",
+  "owner_follow_up",
+  "active_issues",
+  "notifications",
+  "settings",
+  "help"
+];
+const coordinatorNav = buildAdminNav(coordinatorTabs, "staff");
+assert.equal(findNavSectionForTab(coordinatorNav, "yard_push_notices"), "Push to Whiteboard");
+assert.equal(findNavGroupForTab(coordinatorNav, "yard_push_notices"), "push_to_board");
+
 assert.equal(findNavSectionForTab(teamLeadNav, "management_support"), "Management Support");
 assert.equal(
   findNavSectionForTab(adminNav, "management_support"),

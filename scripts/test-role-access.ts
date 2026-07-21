@@ -63,6 +63,11 @@ for (const role of roles) {
   );
 }
 
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "yard_push_notices", "front_desk_coordinator", "staff"),
+  true,
+  "front desk coordinator can access Yard Push"
+);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "hr_hub", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "yard_links", "driver", "staff"), false);
