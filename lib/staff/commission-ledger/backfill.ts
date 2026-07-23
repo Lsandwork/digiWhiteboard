@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
-import { parseMoneyToCents, parsePercentToBps } from "./money";
+import { detectServiceLocation, trainerRateBpsForPackage } from "./location-rate";
+import { calculatePercentCommissionCents, parseMoneyToCents } from "./money";
 import { parseCommissionDate } from "./dates";
 import { computeMissingRequired } from "./map";
 
@@ -88,15 +89,16 @@ export async function ensureCommissionLedgerBackfill(supabase: SupabaseClient) {
     const statuses = mapLegacyStatus(String(row.status ?? "Pending"));
     const saleCategory = String(row.sale_category ?? "package");
     const commissionType = saleCategory === "class" ? "group_class" : "package_sale";
+    const packageOrClass = String(row.package_type ?? "");
     const grossCents = parseMoneyToCents(row.package_sale_amount);
-    const finalCents = parseMoneyToCents(row.commission_amount);
-    const rateBps = parsePercentToBps(row.commission_percent);
+    const rateBps = trainerRateBpsForPackage(packageOrClass);
+    const finalCents = calculatePercentCommissionCents(grossCents, rateBps);
     const saleDate = parseLegacyDate(String(row.sold_at ?? ""));
     const warnings = computeMissingRequired({
       trainer_name: String(row.trainer_name ?? ""),
       trainer_user_id: row.trainer_user_id ? String(row.trainer_user_id) : null,
       sale_date: saleDate,
-      package_or_class: String(row.package_type ?? ""),
+      package_or_class: packageOrClass,
       gross_amount_cents: grossCents,
       commission_rate_bps: rateBps,
       final_commission_cents: finalCents
@@ -112,7 +114,7 @@ export async function ensureCommissionLedgerBackfill(supabase: SupabaseClient) {
       client_name: String(row.owner_name ?? ""),
       dog_name: String(row.dog_name ?? ""),
       commission_type: commissionType,
-      package_or_class: String(row.package_type ?? ""),
+      package_or_class: packageOrClass,
       quantity: 1,
       gross_amount_cents: grossCents,
       discount_amount_cents: 0,
@@ -127,13 +129,17 @@ export async function ensureCommissionLedgerBackfill(supabase: SupabaseClient) {
       source: "manual",
       gingr_transaction_url: String(row.gingr_transaction_url ?? ""),
       rule_snapshot: {
+        import_mode: "location_split",
+        location: detectServiceLocation(packageOrClass),
         legacy_mode: row.commission_mode ?? "amount",
         legacy_percent: row.commission_percent ?? null,
+        csv_trainer_share: row.commission_amount ?? null,
         migrated_from: "admin_settings.package_commissions"
       },
       calculation_input: {
         package_sale_amount: row.package_sale_amount ?? null,
-        commission_mode: row.commission_mode ?? null
+        rate_bps: rateBps,
+        location_split: true
       },
       missing_required_info: warnings.length > 0,
       validation_warnings: warnings,

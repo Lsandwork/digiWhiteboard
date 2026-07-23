@@ -15,6 +15,7 @@ import {
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh } from "@/components/admin/ui/sortable-table";
+import { trainerRatePercentForPackage } from "@/lib/staff/commission-ledger/location-rate";
 import { centsToDisplay, bpsToDisplay } from "@/lib/staff/commission-ledger/money";
 import type { PackageCommissionRecord } from "@/lib/staff/commission-ledger/types";
 
@@ -1164,8 +1165,25 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 type={type}
                 className="admin-input"
                 value={manualForm[key]}
-                onChange={(e) => setManualForm((f) => ({ ...f, [key]: e.target.value }))}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setManualForm((f) => {
+                    if (key === "package_or_class") {
+                      return {
+                        ...f,
+                        package_or_class: value,
+                        commission_rate: String(trainerRatePercentForPackage(value))
+                      };
+                    }
+                    return { ...f, [key]: value };
+                  });
+                }}
               />
+              {key === "commission_rate" ? (
+                <span className="text-xs text-slate-400">
+                  At-home packages/sessions: 70% trainer / 30% Fitdog. Facility: 50% / 50%.
+                </span>
+              ) : null}
             </label>
           ))}
           <label className="grid gap-1 text-sm sm:col-span-2">

@@ -7,7 +7,12 @@ import {
   matchTrainerByName,
   type PackageCommissionTrainerOption
 } from "@/lib/staff/package-commissions-csv";
-import { parseMoneyToCents, parsePercentToBps } from "./money";
+import {
+  detectServiceLocation,
+  trainerRateBpsForPackage,
+  trainerRatePercentForPackage
+} from "./location-rate";
+import { calculatePercentCommissionCents, parseMoneyToCents } from "./money";
 import { parseCommissionDate } from "./dates";
 import type { CommissionActor, CommissionViewer } from "./types";
 
@@ -59,7 +64,9 @@ export async function importCommissionCsvToLedger(
     const dog = String(row.dog_name ?? "").trim();
     const client = String(row.owner_name ?? "").trim();
     const pkg = String(row.package_type ?? "").trim();
-    const finalCents = parseMoneyToCents(row.commission_amount);
+    const grossCents = parseMoneyToCents(row.package_sale_amount);
+    const rateBps = trainerRateBpsForPackage(pkg);
+    const finalCents = calculatePercentCommissionCents(grossCents, rateBps);
     const issues: string[] = [];
     if (!dog) issues.push("Missing dog name");
     if (!client) issues.push("Missing client / owner name");
@@ -187,16 +194,16 @@ export async function importCommissionCsvToLedger(
         package_or_class: String(row.package_type ?? ""),
         quantity: 1,
         gross_amount: row.package_sale_amount,
-        commission_rate: row.commission_percent,
-        final_commission: row.commission_amount,
-        calculated_commission: row.commission_amount,
         gingr_transaction_url: String(row.gingr_transaction_url ?? ""),
         source: "csv_import",
         import_batch_id: batch.id,
         internal_notes: row.notes ? String(row.notes) : null,
         rule_snapshot: {
-          import_mode: "amount_from_trainer_share",
-          commission_percent: row.commission_percent ?? null,
+          import_mode: "location_split",
+          location: detectServiceLocation(String(row.package_type ?? "")),
+          trainer_rate_percent: trainerRatePercentForPackage(String(row.package_type ?? "")),
+          csv_commission_percent: row.commission_percent ?? null,
+          csv_trainer_share: row.commission_amount ?? null,
           sold_at: row.sold_at ?? null
         }
       });
@@ -311,6 +318,3 @@ export async function undoImportBatch(
 
   return { archived: ids.length };
 }
-
-// silence unused rate helper warning in some tooling
-void parsePercentToBps;

@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./money";
+export * from "./location-rate";
 export * from "./auth";
 export * from "./records";
 export * from "./comments";

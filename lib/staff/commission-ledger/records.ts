@@ -4,11 +4,8 @@ import { writeCommissionAudit } from "./audit";
 import { ensureCommissionLedgerBackfill, ensureCommissionSaleDatesRepaired } from "./backfill";
 import { mapDbRecord, computeMissingRequired } from "./map";
 import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
-import {
-  calculatePercentCommissionCents,
-  parseMoneyToCents,
-  parsePercentToBps
-} from "./money";
+import { trainerRateBpsForPackage } from "./location-rate";
+import { calculatePercentCommissionCents, parseMoneyToCents, parsePercentToBps } from "./money";
 import type {
   ApprovalStatus,
   CommissionActor,
@@ -264,22 +261,6 @@ export async function createCommissionRecord(
 ) {
   assertCanManage(viewer);
 
-  const gross = parseMoneyToCents(input.gross_amount);
-  const discount = parseMoneyToCents(input.discount_amount);
-  const refund = parseMoneyToCents(input.refund_amount);
-  const rateBps = parsePercentToBps(input.commission_rate);
-  const calculated =
-    input.calculated_commission != null
-      ? parseMoneyToCents(input.calculated_commission)
-      : rateBps != null
-        ? calculatePercentCommissionCents(Math.max(0, gross - discount), rateBps)
-        : parseMoneyToCents(input.final_commission);
-  const isOverride = Boolean(input.is_manual_override);
-  const final = isOverride ? parseMoneyToCents(input.final_commission) : calculated;
-  if (isOverride && !String(input.override_reason ?? "").trim()) {
-    throw new Error("Override reason is required when changing calculated commission.");
-  }
-
   const trainerName = String(input.trainer_name ?? "").trim() || "Unassigned";
   const packageOrClass = String(input.package_or_class ?? "").trim();
   const client = String(input.client_name ?? "").trim();
@@ -287,6 +268,25 @@ export async function createCommissionRecord(
   if (!client) throw new Error("Client name is required.");
   if (!dog) throw new Error("Dog name is required.");
   if (!packageOrClass) throw new Error("Package or class is required.");
+
+  const gross = parseMoneyToCents(input.gross_amount);
+  const discount = parseMoneyToCents(input.discount_amount);
+  const refund = parseMoneyToCents(input.refund_amount);
+  const isOverride = Boolean(input.is_manual_override);
+  const locationBps = trainerRateBpsForPackage(packageOrClass);
+  const parsedRate = parsePercentToBps(input.commission_rate);
+  // Policy split by location unless a manual override supplies an explicit rate.
+  const rateBps = isOverride && parsedRate != null ? parsedRate : locationBps;
+  const calculated =
+    isOverride && input.calculated_commission != null
+      ? parseMoneyToCents(input.calculated_commission)
+      : calculatePercentCommissionCents(Math.max(0, gross - discount), rateBps);
+  const final =
+    isOverride && input.final_commission != null ? parseMoneyToCents(input.final_commission) : calculated;
+  if (isOverride && !String(input.override_reason ?? "").trim()) {
+    throw new Error("Override reason is required when changing calculated commission.");
+  }
+
   const saleDate = parseCommissionDate(input.sale_date);
   const serviceDate = parseCommissionDate(input.service_date) ?? saleDate;
   if (!saleDate) throw new Error("Sale date is required.");
@@ -331,7 +331,8 @@ export async function createCommissionRecord(
     calculation_input: {
       gross_cents: gross,
       discount_cents: discount,
-      rate_bps: rateBps
+      rate_bps: rateBps,
+      location_split: true
     },
     is_manual_override: isOverride,
     override_reason: isOverride ? String(input.override_reason) : null,
@@ -385,19 +386,24 @@ export async function updateCommissionRecord(
     }
   }
 
+  const nextPackage = patch.package_or_class ?? existing.package_or_class;
   const nextGross =
     patch.gross_amount != null ? parseMoneyToCents(patch.gross_amount) : existing.gross_amount_cents;
   const nextDiscount =
     patch.discount_amount != null ? parseMoneyToCents(patch.discount_amount) : existing.discount_amount_cents;
-  const nextRate =
-    patch.commission_rate != null ? parsePercentToBps(patch.commission_rate) : existing.commission_rate_bps;
+  const isOverride = patch.is_manual_override ?? existing.is_manual_override;
+  const locationBps = trainerRateBpsForPackage(nextPackage);
+  const nextRate = isOverride
+    ? patch.commission_rate != null
+      ? parsePercentToBps(patch.commission_rate)
+      : existing.commission_rate_bps
+    : locationBps;
   const calculated =
-    patch.calculated_commission != null
+    isOverride && patch.calculated_commission != null
       ? parseMoneyToCents(patch.calculated_commission)
       : nextRate != null
         ? calculatePercentCommissionCents(Math.max(0, nextGross - nextDiscount), nextRate)
         : existing.calculated_commission_cents;
-  const isOverride = patch.is_manual_override ?? existing.is_manual_override;
   const final = isOverride
     ? patch.final_commission != null
       ? parseMoneyToCents(patch.final_commission)
@@ -423,7 +429,7 @@ export async function updateCommissionRecord(
     client_name: patch.client_name ?? existing.client_name,
     dog_name: patch.dog_name ?? existing.dog_name,
     commission_type: patch.commission_type ?? existing.commission_type,
-    package_or_class: patch.package_or_class ?? existing.package_or_class,
+    package_or_class: nextPackage,
     quantity: patch.quantity ?? existing.quantity,
     gross_amount_cents: nextGross,
     discount_amount_cents: nextDiscount,
