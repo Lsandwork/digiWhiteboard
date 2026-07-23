@@ -3,6 +3,8 @@ import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/
 import {
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
+  isPacificToday,
+  pacificYesterdayIso,
   priorityRank,
   shouldAlertManagement,
   shiftLogDetails
@@ -1010,6 +1012,94 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
 
   await saveState(supabase, next);
   return updatedRecord;
+}
+
+export async function moveCrossoverMessages(
+  supabase: SupabaseClient,
+  ids: string[],
+  targetLog: "crossover" | "open" | "archived",
+  actor: string | null
+) {
+  const uniqueIds = [...new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (!uniqueIds.length) throw new Error("Select at least one log entry to move.");
+  if (!["crossover", "open", "archived"].includes(targetLog)) {
+    throw new Error("Choose Crossover Log, Open Log, or Archived Log.");
+  }
+
+  const now = nowIso();
+  const state = await loadState(supabase);
+  const idSet = new Set(uniqueIds);
+  let moved = 0;
+
+  const crossover_messages = state.crossover_messages.map((item) => {
+    if (!idSet.has(item.id)) return item;
+    moved += 1;
+    if (targetLog === "open") {
+      return {
+        ...item,
+        status: "Open" as const,
+        resolved_at: null,
+        archived_at: null,
+        updated_at: now
+      };
+    }
+    if (targetLog === "archived") {
+      return {
+        ...item,
+        status: "Archived" as const,
+        archived_at: item.archived_at ?? now,
+        // Leave today's Crossover immediately so the row lands in Archived Log.
+        created_at: isPacificToday(item.created_at) ? pacificYesterdayIso() : item.created_at,
+        updated_at: now
+      };
+    }
+    return {
+      ...item,
+      status: "Open" as const,
+      created_at: now,
+      resolved_at: null,
+      archived_at: null,
+      updated_at: now
+    };
+  });
+
+  if (!moved) throw new Error("No matching log entries found to move.");
+
+  const label =
+    targetLog === "open" ? "Open Log" : targetLog === "archived" ? "Archived Log" : "Crossover Log";
+
+  let next: StaffOpsState = {
+    ...state,
+    crossover_messages: sortNewest(crossover_messages)
+  };
+  next = createActivityLog(next, {
+    activity_type: "shift_log.moved",
+    title: `Moved ${moved} log entr${moved === 1 ? "y" : "ies"} to ${label}`,
+    description: uniqueIds.slice(0, 8).join(", "),
+    source_table: "crossover_messages",
+    source_id: null,
+    created_by: actor
+  });
+
+  await saveState(supabase, next);
+  return { moved, target_log: targetLog, ids: uniqueIds };
+}
+
+export async function bulkUpdateCrossoverMessages(
+  supabase: SupabaseClient,
+  ids: string[],
+  patch: Record<string, unknown>,
+  actor: string | null
+) {
+  const uniqueIds = [...new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean))];
+  if (!uniqueIds.length) throw new Error("Select at least one log entry.");
+
+  let updatedCount = 0;
+  for (const id of uniqueIds) {
+    await updateCrossoverMessage(supabase, id, patch, actor);
+    updatedCount += 1;
+  }
+  return { updated: updatedCount, ids: uniqueIds };
 }
 
 export async function deleteCrossoverMessage(

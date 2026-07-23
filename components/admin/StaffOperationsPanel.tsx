@@ -517,6 +517,9 @@ function CrossoverPage(props: {
   const [dailyPage, setDailyPage] = useState(1);
   const [openPage, setOpenPage] = useState(1);
   const [archivedPage, setArchivedPage] = useState(1);
+  const [showAllDaily, setShowAllDaily] = useState(false);
+  const [showAllOpen, setShowAllOpen] = useState(false);
+  const [showAllArchived, setShowAllArchived] = useState(false);
   const todayLabel = useMemo(() => formatShiftLogDayLabel(), []);
 
   useEffect(() => {
@@ -596,9 +599,15 @@ function CrossoverPage(props: {
     return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
-  const pagedDaily = paginate(dailyRows, dailyPage);
-  const pagedOpen = paginate(openRows, openPage);
-  const pagedArchived = paginate(archivedRows, archivedPage);
+  const pagedDaily = showAllDaily
+    ? { page: 1, maxPage: 1, rows: dailyRows }
+    : paginate(dailyRows, dailyPage);
+  const pagedOpen = showAllOpen
+    ? { page: 1, maxPage: 1, rows: openRows }
+    : paginate(openRows, openPage);
+  const pagedArchived = showAllArchived
+    ? { page: 1, maxPage: 1, rows: archivedRows }
+    : paginate(archivedRows, archivedPage);
   const allMessages = props.data?.crossover_messages ?? [];
   const openMessages = allMessages.filter((item) => isOpenShiftLogStatus(item.status));
   const kpiCards = shiftLogKpiCards({
@@ -691,6 +700,9 @@ function CrossoverPage(props: {
             emptyText="Log entries from today will appear here for crossover handoff."
             showFilterBar={false}
             showRefresh={false}
+            logBucket="crossover"
+            showAll={showAllDaily}
+            onToggleShowAll={() => setShowAllDaily((value) => !value)}
           />
           <ActiveShiftLogCard
             rows={pagedOpen.rows}
@@ -719,6 +731,9 @@ function CrossoverPage(props: {
             emptyText="Resolved and archived items are hidden here."
             showFilterBar={false}
             showRefresh={false}
+            logBucket="open"
+            showAll={showAllOpen}
+            onToggleShowAll={() => setShowAllOpen((value) => !value)}
           />
         </div>
         <div className="mt-3 flex justify-end">
@@ -771,6 +786,9 @@ function CrossoverPage(props: {
             emptyText="Closed items from previous days will appear here for reference."
             showFilterBar={false}
             showRefresh={false}
+            logBucket="archived"
+            showAll={showAllArchived}
+            onToggleShowAll={() => setShowAllArchived((value) => !value)}
           />
         </div>
       </div>

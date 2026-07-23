@@ -6802,9 +6802,31 @@ html.lobby-tv-display .social-video-shell {
   box-shadow: inset 3px 0 0 #f97316;
 }
 
+.shift-log-table tbody tr.shift-log-row--selected,
+.crossover-mobile-card.shift-log-row--selected {
+  background: rgba(56, 189, 248, 0.12);
+  box-shadow: inset 3px 0 0 #38bdf8;
+}
+
+.shift-log-table__select-col {
+  width: 2.25rem;
+  vertical-align: middle;
+}
+
+.shift-log-bulk-bar {
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 0.9rem;
+  background: rgba(14, 165, 233, 0.08);
+}
+
 html[data-theme="light"] .shift-log-table tbody tr.shift-log-row--highlight,
 html[data-theme="light"] .crossover-mobile-card.shift-log-row--highlight {
   background: rgba(249, 115, 22, 0.12);
+}
+
+html[data-theme="light"] .shift-log-table tbody tr.shift-log-row--selected,
+html[data-theme="light"] .crossover-mobile-card.shift-log-row--selected {
+  background: rgba(14, 165, 233, 0.1);
 }
 
 /* Front Desk Log: larger type + airier spacing (scoped; other ops tables unchanged) */

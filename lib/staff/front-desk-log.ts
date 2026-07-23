@@ -173,6 +173,30 @@ export function belongsInCrossoverLog(item: CrossoverMessage) {
   return false;
 }
 
+export type FrontDeskLogBucket = "crossover" | "open" | "archived";
+
+export const FRONT_DESK_LOG_BUCKET_LABELS: Record<FrontDeskLogBucket, string> = {
+  crossover: "Crossover Log",
+  open: "Open Log",
+  archived: "Archived Log"
+};
+
+/** Pacific timestamp for “yesterday afternoon” so a row leaves today’s Crossover Log immediately. */
+export function pacificYesterdayIso() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: FITDOG_TIMEZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
+  }).formatToParts(now);
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const day = Number(parts.find((part) => part.type === "day")?.value);
+  // Yesterday 17:00 Pacific ≈ UTC hour 1 next calendar day in summer; use stable hour+8 pattern.
+  return new Date(Date.UTC(year, month - 1, day - 1, 17 + 8, 0, 0)).toISOString();
+}
+
 export function shouldAlertManagement(priority: StaffOpsPriority, urgent?: boolean, needsReview?: boolean) {
   if (needsReview) return true;
   if (urgent) return true;

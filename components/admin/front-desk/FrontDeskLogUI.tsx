@@ -23,6 +23,7 @@ import {
 import {
   ASSIGNMENT_TEAMS,
   canDeleteFrontDeskLogEntry,
+  FRONT_DESK_LOG_BUCKET_LABELS,
   isAssessmentDogLog,
   isDueToday,
   isOpenShiftLogStatus,
@@ -36,8 +37,10 @@ import {
   shiftLogDetails,
   shiftLogSubmittedBy,
   shiftLogType,
+  type FrontDeskLogBucket,
   type ShiftLogType
 } from "@/lib/staff/front-desk-log";
+import { Modal } from "@/components/admin/ui/Modal";
 
 export type ShiftLogFilters = {
   query: string;
@@ -286,7 +289,10 @@ export function ActiveShiftLogCard({
   emptyTitle = "No shift log entries",
   emptyText = "Add a shift log entry below or adjust your filters.",
   showFilterBar = true,
-  showRefresh = true
+  showRefresh = true,
+  logBucket = "open",
+  showAll = false,
+  onToggleShowAll
 }: {
   rows: CrossoverMessage[];
   total: number;
@@ -314,7 +320,46 @@ export function ActiveShiftLogCard({
   emptyText?: string;
   showFilterBar?: boolean;
   showRefresh?: boolean;
+  logBucket?: FrontDeskLogBucket;
+  showAll?: boolean;
+  onToggleShowAll?: () => void;
 }) {
+  const [selected, setSelected] = useState<string[]>([]);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState<FrontDeskLogBucket | "">("");
+  const lastSelectedRowIndexRef = useRef<number | null>(null);
+
+  const pageRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
+  const somePageSelected = pageRowIds.some((id) => selected.includes(id)) && !allPageSelected;
+  const selectedCount = selected.length;
+
+  useEffect(() => {
+    lastSelectedRowIndexRef.current = null;
+  }, [page, filters, showAll, logBucket]);
+
+  const toggleRowSelection = (rowId: string, rowIndex: number, checked: boolean, shiftKey: boolean) => {
+    setSelected((current) => {
+      if (shiftKey && lastSelectedRowIndexRef.current !== null) {
+        const anchor = lastSelectedRowIndexRef.current;
+        const start = Math.min(anchor, rowIndex);
+        const end = Math.max(anchor, rowIndex);
+        const rangeIds = pageRowIds.slice(start, end + 1);
+        return [...new Set([...current, ...rangeIds])];
+      }
+      lastSelectedRowIndexRef.current = rowIndex;
+      return checked ? [...new Set([...current, rowId])] : current.filter((id) => id !== rowId);
+    });
+  };
+
+  const toggleSelectAllOnPage = (checked: boolean) => {
+    if (!checked) {
+      setSelected((current) => current.filter((id) => !pageRowIds.includes(id)));
+      return;
+    }
+    setSelected((current) => [...new Set([...current, ...pageRowIds])]);
+  };
+
   const reminderLabel = (item: CrossoverMessage) => {
     if (item.due_at) return formatDateTime(item.due_at);
     if (item.reminder_at) return formatDateTime(item.reminder_at);
@@ -330,6 +375,28 @@ export function ActiveShiftLogCard({
   const deleteEntry = (item: CrossoverMessage) => {
     if (!window.confirm(`Delete this Front Desk Log entry?\n\n"${item.subject}"\n\nThis cannot be undone.`)) return;
     void onMutate("Unable to delete log entry.", { action: "delete_crossover", id: item.id }, "Log entry deleted.");
+  };
+
+  const runBulkStatus = async (status: StaffOpsStatus, success: string) => {
+    if (!selected.length) return;
+    await onMutate(
+      "Unable to update selected entries.",
+      { action: "bulk_update_crossover", ids: selected, status },
+      success
+    );
+    setSelected([]);
+  };
+
+  const confirmMove = async () => {
+    if (!selected.length || !moveTarget) return;
+    await onMutate(
+      "Unable to move selected entries.",
+      { action: "move_crossover", ids: selected, target_log: moveTarget },
+      `Moved ${selected.length} entr${selected.length === 1 ? "y" : "ies"} to ${FRONT_DESK_LOG_BUCKET_LABELS[moveTarget]}.`
+    );
+    setSelected([]);
+    setMoveOpen(false);
+    setMoveTarget("");
   };
 
   const renderRowMenu = (item: CrossoverMessage) => (
@@ -356,6 +423,10 @@ export function ActiveShiftLogCard({
     />
   );
 
+  const moveOptions = (Object.keys(FRONT_DESK_LOG_BUCKET_LABELS) as FrontDeskLogBucket[]).filter(
+    (bucket) => bucket !== logBucket
+  );
+
   return (
     <section className="crossover-card crossover-card--conversations shift-log-card" aria-labelledby={headingId}>
       <header className="crossover-card__header">
@@ -366,21 +437,76 @@ export function ActiveShiftLogCard({
             <p className="crossover-card__subtitle">{subtitle}</p>
           </div>
         </div>
-        {showRefresh ? (
-          <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void onRefresh()}>
-            <Image src={CROSSOVER_ASSETS.refresh} alt="" width={22} height={22} aria-hidden />
-            Refresh
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {onToggleShowAll ? (
+            <button type="button" className="crossover-btn crossover-btn--outline" onClick={onToggleShowAll}>
+              {showAll ? "Show pages" : "Show all entries"}
+            </button>
+          ) : null}
+          {showRefresh ? (
+            <button type="button" className="crossover-btn crossover-btn--outline" disabled={loading} onClick={() => void onRefresh()}>
+              <Image src={CROSSOVER_ASSETS.refresh} alt="" width={22} height={22} aria-hidden />
+              Refresh
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {showFilterBar ? <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} /> : null}
+
+      {selectedCount > 0 ? (
+        <div className="admin-ledger-bulk-bar shift-log-bulk-bar mb-3 flex flex-wrap items-center gap-2 p-3">
+          <span className="text-sm font-bold text-white">{selectedCount} selected</span>
+          <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => setMoveOpen(true)}>
+            Move…
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--outline"
+            disabled={busy}
+            onClick={() => void runBulkStatus("In Progress", `Marked ${selectedCount} in progress.`)}
+          >
+            In Progress
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--outline"
+            disabled={busy}
+            onClick={() => void runBulkStatus("Resolved", `Resolved ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"}.`)}
+          >
+            Resolve
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--outline"
+            disabled={busy}
+            onClick={() => void runBulkStatus("Archived", `Archived ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"}.`)}
+          >
+            Archive
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => setSelected([])}>
+            Clear
+          </button>
+        </div>
+      ) : null}
 
       <div className="crossover-table-wrap shift-log-table-wrap hidden md:block">
         {rows.length ? (
           <table className="crossover-table shift-log-table">
             <thead>
               <tr>
+                <th className="shift-log-table__select-col">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={allPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageSelected;
+                    }}
+                    aria-label="Select all rows on this page"
+                    onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+                  />
+                </th>
                 <th>Subject / Log Type</th>
                 <th>Dog / Owner</th>
                 <th>Submitted By</th>
@@ -392,11 +518,41 @@ export function ActiveShiftLogCard({
               </tr>
             </thead>
             <tbody>
-              {rows.map((item) => {
+              {rows.map((item, rowIndex) => {
                 const type = shiftLogType(item);
                 const highlight = item.urgent || type === "Reminder";
+                const isSelected = selected.includes(item.id);
                 return (
-                <tr key={item.id} className={highlight ? "shift-log-row--highlight" : undefined}>
+                <tr
+                  key={item.id}
+                  className={[highlight ? "shift-log-row--highlight" : "", isSelected ? "shift-log-row--selected" : ""]
+                    .filter(Boolean)
+                    .join(" ") || undefined}
+                  onClick={(e) => {
+                    if (e.shiftKey) {
+                      e.preventDefault();
+                      toggleRowSelection(item.id, rowIndex, true, true);
+                    }
+                  }}
+                >
+                  <td className="shift-log-table__select-col" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={isSelected}
+                      aria-label={`Select ${item.subject}`}
+                      onChange={(e) => {
+                        if ((e.nativeEvent as MouseEvent).shiftKey) {
+                          toggleRowSelection(item.id, rowIndex, true, true);
+                          return;
+                        }
+                        toggleRowSelection(item.id, rowIndex, e.target.checked, false);
+                      }}
+                      onClick={(e) => {
+                        if (e.shiftKey) e.preventDefault();
+                      }}
+                    />
+                  </td>
                   <td className="crossover-table__subject">
                     <p className="crossover-table__subject-title">{item.subject}</p>
                     <p className="crossover-table__subject-preview">{shiftLogDetails(item)}</p>
@@ -436,16 +592,35 @@ export function ActiveShiftLogCard({
       </div>
 
       <div className="crossover-mobile-list md:hidden">
-        {rows.length ? rows.map((item) => {
+        {rows.length ? rows.map((item, rowIndex) => {
           const type = shiftLogType(item);
           const highlight = item.urgent || type === "Reminder";
+          const isSelected = selected.includes(item.id);
           return (
-          <article key={item.id} className={`crossover-mobile-card${highlight ? " shift-log-row--highlight" : ""}`}>
+          <article
+            key={item.id}
+            className={`crossover-mobile-card${highlight ? " shift-log-row--highlight" : ""}${isSelected ? " shift-log-row--selected" : ""}`}
+          >
             <div className="crossover-mobile-card__head">
-              <div>
-                <h4 className="crossover-mobile-card__title">{item.subject}</h4>
-                <ShiftLogTypeBadge logType={type} />
-              </div>
+              <label className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={isSelected}
+                  aria-label={`Select ${item.subject}`}
+                  onChange={(e) => {
+                    if ((e.nativeEvent as MouseEvent).shiftKey) {
+                      toggleRowSelection(item.id, rowIndex, true, true);
+                      return;
+                    }
+                    toggleRowSelection(item.id, rowIndex, e.target.checked, false);
+                  }}
+                />
+                <div>
+                  <h4 className="crossover-mobile-card__title">{item.subject}</h4>
+                  <ShiftLogTypeBadge logType={type} />
+                </div>
+              </label>
               <ShiftLogPriorityBadge priority={item.priority} urgent={item.urgent} />
             </div>
             <p className="crossover-mobile-card__meta">{shiftLogSubmittedBy(item)} • {formatDateTime(item.created_at)} • Assigned {shiftLogAssignedTo(item)}</p>
@@ -464,13 +639,60 @@ export function ActiveShiftLogCard({
       </div>
 
       <footer className="crossover-pagination">
-        <p className="crossover-pagination__meta">Showing {rows.length} of {total} entries • Page {page} of {maxPage}</p>
-        <div className="crossover-pagination__controls">
-          <button type="button" className="crossover-btn crossover-btn--ghost" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
-          <span className="crossover-pagination__page" aria-current="page">{page}</span>
-          <button type="button" className="crossover-btn crossover-btn--ghost" disabled={page >= maxPage} onClick={() => onPage(page + 1)}>Next</button>
-        </div>
+        <p className="crossover-pagination__meta">
+          Showing {rows.length} of {total} entries
+          {showAll ? " • All entries" : ` • Page ${page} of ${maxPage}`}
+        </p>
+        {!showAll ? (
+          <div className="crossover-pagination__controls">
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
+            <span className="crossover-pagination__page" aria-current="page">{page}</span>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={page >= maxPage} onClick={() => onPage(page + 1)}>Next</button>
+          </div>
+        ) : null}
       </footer>
+
+      <Modal
+        open={moveOpen}
+        title={`Move ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"}`}
+        description="Choose which Front Desk log should receive the selected rows."
+        onClose={() => {
+          setMoveOpen(false);
+          setMoveTarget("");
+        }}
+        footer={
+          <div className="flex flex-wrap justify-end gap-2">
+            <button
+              type="button"
+              className="admin-btn-secondary"
+              onClick={() => {
+                setMoveOpen(false);
+                setMoveTarget("");
+              }}
+            >
+              Cancel
+            </button>
+            <button type="button" className="admin-btn-primary" disabled={busy || !moveTarget} onClick={() => void confirmMove()}>
+              Move
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          {moveOptions.map((bucket) => (
+            <label key={bucket} className="flex cursor-pointer items-center gap-3 rounded-xl border border-admin-border bg-white/[0.03] px-3 py-3">
+              <input
+                type="radio"
+                name={`shift-log-move-target-${headingId}`}
+                value={bucket}
+                checked={moveTarget === bucket}
+                onChange={() => setMoveTarget(bucket)}
+              />
+              <span className="font-bold text-white">{FRONT_DESK_LOG_BUCKET_LABELS[bucket]}</span>
+            </label>
+          ))}
+        </div>
+      </Modal>
     </section>
   );
 }

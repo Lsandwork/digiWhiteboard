@@ -23,6 +23,8 @@ import {
   listStaffOps,
   markAllStaffNotificationsRead,
   markStaffNotificationRead,
+  moveCrossoverMessages,
+  bulkUpdateCrossoverMessages,
   replyToCrossoverMessage,
   updateActiveIssue,
   updateCrossoverMessage,
@@ -42,7 +44,14 @@ function staffOpsForbiddenResponse() {
   return NextResponse.json({ error: "You do not have permission to manage Staff Admin records." }, { status: 403 });
 }
 
-const CROSSOVER_ACTIONS = new Set(["create_crossover", "update_crossover", "reply_crossover", "delete_crossover"]);
+const CROSSOVER_ACTIONS = new Set([
+  "create_crossover",
+  "update_crossover",
+  "reply_crossover",
+  "delete_crossover",
+  "move_crossover",
+  "bulk_update_crossover"
+]);
 const NOTIFICATION_ACTIONS = new Set(["mark_notification_read", "mark_all_notifications_read"]);
 const STAFF_OPS_VIEW_PERMISSIONS = ["view_front_desk_log", "view_owner_follow_up", "view_active_issues"] as const;
 
@@ -110,7 +119,14 @@ export async function POST(request: Request) {
     if (action === "create_crossover" && !canCreateShiftLogEntry(session)) {
       return crossoverForbiddenResponse();
     }
-    if ((action === "update_crossover" || action === "reply_crossover" || action === "delete_crossover") && !canUseFrontDeskLog(session)) {
+    if (
+      (action === "update_crossover" ||
+        action === "reply_crossover" ||
+        action === "delete_crossover" ||
+        action === "move_crossover" ||
+        action === "bulk_update_crossover") &&
+      !canUseFrontDeskLog(session)
+    ) {
       return crossoverForbiddenResponse();
     }
     if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
@@ -137,6 +153,15 @@ export async function POST(request: Request) {
       const id = String(body.id ?? "");
       result = await updateCrossoverMessage(supabase, id, body, actor);
       auditAction = "staff.crossover.update";
+    } else if (action === "move_crossover") {
+      const ids = Array.isArray(body.ids) ? body.ids.map((id: unknown) => String(id ?? "")) : [];
+      const targetLog = String(body.target_log ?? "") as "crossover" | "open" | "archived";
+      result = await moveCrossoverMessages(supabase, ids, targetLog, actor);
+      auditAction = "staff.crossover.move";
+    } else if (action === "bulk_update_crossover") {
+      const ids = Array.isArray(body.ids) ? body.ids.map((id: unknown) => String(id ?? "")) : [];
+      result = await bulkUpdateCrossoverMessages(supabase, ids, body, actor);
+      auditAction = "staff.crossover.bulk_update";
     } else if (action === "delete_crossover") {
       const id = String(body.id ?? "");
       if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
