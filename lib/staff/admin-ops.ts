@@ -785,14 +785,16 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
       source_id: record.id,
       created_by: actor
     });
-    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
-    await triggerShellyAlert("urgent_front_desk", `front-desk:${record.id}`);
   }
 
   await saveState(supabase, {
     ...state,
     crossover_messages: state.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item))
   });
+  if (alertNow) {
+    const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
+    triggerShellyAlertFireAndForget("urgent_front_desk", `front-desk:${record.id}`);
+  }
   return record;
 }
 
@@ -881,9 +883,13 @@ export async function replyToCrossoverMessage(
   return reply;
 }
 
-export async function updateCrossoverMessage(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
-  const now = nowIso();
-  const state = await loadState(supabase);
+function applyCrossoverMessagePatch(
+  state: StaffOpsState,
+  id: string,
+  patch: Record<string, unknown>,
+  actor: string | null,
+  now = nowIso()
+) {
   const previous = state.crossover_messages.find((item) => item.id === id);
   if (!previous) throw new Error("Shift log entry not found.");
   let updated: CrossoverMessage | null = null;
@@ -1010,8 +1016,14 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
     });
   }
 
+  return { state: next, updated: updatedRecord };
+}
+
+export async function updateCrossoverMessage(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
+  const state = await loadState(supabase);
+  const { state: next, updated } = applyCrossoverMessagePatch(state, id, patch, actor);
   await saveState(supabase, next);
-  return updatedRecord;
+  return updated;
 }
 
 export async function moveCrossoverMessages(
@@ -1094,12 +1106,18 @@ export async function bulkUpdateCrossoverMessages(
   const uniqueIds = [...new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!uniqueIds.length) throw new Error("Select at least one log entry.");
 
-  let updatedCount = 0;
+  let state = await loadState(supabase);
+  const updatedIds: string[] = [];
+  const now = nowIso();
   for (const id of uniqueIds) {
-    await updateCrossoverMessage(supabase, id, patch, actor);
-    updatedCount += 1;
+    if (!state.crossover_messages.some((item) => item.id === id)) continue;
+    const result = applyCrossoverMessagePatch(state, id, patch, actor, now);
+    state = result.state;
+    updatedIds.push(id);
   }
-  return { updated: updatedCount, ids: uniqueIds };
+  if (!updatedIds.length) throw new Error("No matching log entries found.");
+  await saveState(supabase, state);
+  return { updated: updatedIds.length, ids: updatedIds };
 }
 
 export async function deleteCrossoverMessage(
@@ -1289,11 +1307,11 @@ export async function createActiveIssue(supabase: SupabaseClient, input: Record<
       actor
     }
   );
-  if (record.priority === "Urgent" || record.priority === "High" || record.priority === "Critical") {
-    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
-    await triggerShellyAlert("urgent_front_desk", `active-issue:${record.id}`);
-  }
   await saveState(supabase, next);
+  if (record.priority === "Urgent" || record.priority === "High" || record.priority === "Critical") {
+    const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
+    triggerShellyAlertFireAndForget("urgent_front_desk", `active-issue:${record.id}`);
+  }
   return record;
 }
 

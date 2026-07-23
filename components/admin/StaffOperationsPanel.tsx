@@ -71,6 +71,8 @@ import {
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
 
+type StaffOpsMutate = (label: string, payload: Record<string, unknown>, success: string) => Promise<boolean>;
+
 type StaffOpsPayload = {
   crossover_messages: CrossoverMessage[];
   crossover_message_replies: CrossoverReply[];
@@ -299,8 +301,8 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
   const [detail, setDetail] = useState<{ type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null>(null);
   const staffOptions = useMemo(() => activeStaffOptions(data?.staff_directory), [data?.staff_directory]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (options?: { quiet?: boolean }) => {
+    if (!options?.quiet) setLoading(true);
     try {
       const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
       const body = await response.json();
@@ -309,7 +311,7 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to load Staff Admin records.", "error");
     } finally {
-      setLoading(false);
+      if (!options?.quiet) setLoading(false);
     }
   }, [showToast]);
 
@@ -336,7 +338,73 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
     };
   }, []);
 
-  async function mutate(label: string, payload: Record<string, unknown>, success: string) {
+  function applyMutationResult(action: string, result: unknown) {
+    if (!result || typeof result !== "object") return;
+    setData((prev) => {
+      if (!prev) return prev;
+      if (action === "create_crossover") {
+        const record = result as CrossoverMessage;
+        return {
+          ...prev,
+          crossover_messages: [record, ...prev.crossover_messages.filter((item) => item.id !== record.id)]
+        };
+      }
+      if (action === "update_crossover") {
+        const record = result as CrossoverMessage;
+        return {
+          ...prev,
+          crossover_messages: prev.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item))
+        };
+      }
+      if (action === "reply_crossover") {
+        const reply = result as CrossoverReply;
+        return {
+          ...prev,
+          crossover_message_replies: [reply, ...prev.crossover_message_replies.filter((item) => item.id !== reply.id)]
+        };
+      }
+      if (action === "delete_crossover") {
+        const id = String((result as { id?: string }).id ?? "");
+        if (!id) return prev;
+        return {
+          ...prev,
+          crossover_messages: prev.crossover_messages.filter((item) => item.id !== id),
+          crossover_message_replies: prev.crossover_message_replies.filter((item) => item.crossover_message_id !== id)
+        };
+      }
+      if (action === "create_follow_up") {
+        const record = result as OwnerFollowUp;
+        return {
+          ...prev,
+          owner_follow_ups: [record, ...prev.owner_follow_ups.filter((item) => item.id !== record.id)]
+        };
+      }
+      if (action === "update_follow_up") {
+        const record = result as OwnerFollowUp;
+        return {
+          ...prev,
+          owner_follow_ups: prev.owner_follow_ups.map((item) => (item.id === record.id ? { ...item, ...record } : item))
+        };
+      }
+      if (action === "create_issue") {
+        const record = result as ActiveIssue;
+        return {
+          ...prev,
+          active_issues: [record, ...prev.active_issues.filter((item) => item.id !== record.id)]
+        };
+      }
+      if (action === "update_issue") {
+        const record = result as ActiveIssue;
+        return {
+          ...prev,
+          active_issues: prev.active_issues.map((item) => (item.id === record.id ? { ...item, ...record } : item))
+        };
+      }
+      return prev;
+    });
+  }
+
+  async function mutate(label: string, payload: Record<string, unknown>, success: string): Promise<boolean> {
     setBusy(true);
     try {
       const response = await fetch("/api/admin/staff-operations", {
@@ -347,9 +415,12 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? label);
       showToast(success, "success");
-      await load();
+      applyMutationResult(String(payload.action ?? ""), body.result);
+      void load({ quiet: true });
+      return true;
     } catch (error) {
       showToast(error instanceof Error ? error.message : label, "error");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -505,7 +576,7 @@ function CrossoverPage(props: {
   loading: boolean;
   busy: boolean;
   staffOptions: string[];
-  onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>;
+  onMutate: StaffOpsMutate;
   onRefresh: () => Promise<void>;
   onDetail: (item: CrossoverMessage) => void;
   onEdit: (item: CrossoverMessage) => void;
@@ -627,7 +698,7 @@ function CrossoverPage(props: {
         return;
       }
     }
-    await props.onMutate(
+    const ok = await props.onMutate(
       "Unable to save shift log entry.",
       {
         action: "create_crossover",
@@ -654,7 +725,7 @@ function CrossoverPage(props: {
       },
       "Shift log entry saved."
     );
-    setForm(emptyShiftLogForm);
+    if (ok) setForm(emptyShiftLogForm);
   }
 
   return (
@@ -797,7 +868,7 @@ function CrossoverPage(props: {
 }
 
 function FollowUpPage(props: {
-  data: StaffOpsPayload | null; loading: boolean; busy: boolean; filters: Filters; setFilters: (filters: Filters) => void; page: number; setPage: (page: number) => void; recentActivity: StaffActivityLog[]; nowMs: number; staffOptions: string[]; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onRefresh: () => Promise<void>; onDetail: (item: OwnerFollowUp) => void; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; onCloseDetail: () => void;
+  data: StaffOpsPayload | null; loading: boolean; busy: boolean; filters: Filters; setFilters: (filters: Filters) => void; page: number; setPage: (page: number) => void; recentActivity: StaffActivityLog[]; nowMs: number; staffOptions: string[]; onMutate: StaffOpsMutate; onRefresh: () => Promise<void>; onDetail: (item: OwnerFollowUp) => void; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; onCloseDetail: () => void;
 }) {
   const [form, setForm] = useState<FollowUpForm>(emptyFollowUpForm);
 
@@ -823,8 +894,8 @@ function FollowUpPage(props: {
   const paged = paginate(rows, props.page);
 
   async function submit() {
-    await props.onMutate("Unable to create follow up.", { ...form, action: "create_follow_up" }, "Follow up created.");
-    setForm(emptyFollowUpForm);
+    const ok = await props.onMutate("Unable to create follow up.", { ...form, action: "create_follow_up" }, "Follow up created.");
+    if (ok) setForm(emptyFollowUpForm);
   }
 
   return (
@@ -869,7 +940,7 @@ function FollowUpPage(props: {
   );
 }
 
-function DesktopFollowUpTable({ rows, busy, onMutate, onDetail }: { rows: OwnerFollowUp[]; busy: boolean; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: OwnerFollowUp) => void }) {
+function DesktopFollowUpTable({ rows, busy, onMutate, onDetail }: { rows: OwnerFollowUp[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: OwnerFollowUp) => void }) {
   return (
     <div className="crossover-table-wrap hidden md:block">
       <table className="crossover-table">
@@ -906,7 +977,7 @@ function DesktopFollowUpTable({ rows, busy, onMutate, onDetail }: { rows: OwnerF
   );
 }
 
-function FollowUpCard({ item, busy, onMutate, onDetail }: { item: OwnerFollowUp; busy: boolean; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: OwnerFollowUp) => void }) {
+function FollowUpCard({ item, busy, onMutate, onDetail }: { item: OwnerFollowUp; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: OwnerFollowUp) => void }) {
   return (
     <article className="crossover-card crossover-card--sidebar">
       <p className="crossover-table__subject-title">{item.subject}</p>
@@ -930,7 +1001,7 @@ function FollowUpCard({ item, busy, onMutate, onDetail }: { item: OwnerFollowUp;
 }
 
 function IssuesPage(props: {
-  data: StaffOpsPayload | null; loading: boolean; busy: boolean; filters: Filters; setFilters: (filters: Filters) => void; page: number; setPage: (page: number) => void; recentActivity: StaffActivityLog[]; nowMs: number; staffOptions: string[]; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onRefresh: () => Promise<void>; onDetail: (item: ActiveIssue) => void; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; onCloseDetail: () => void;
+  data: StaffOpsPayload | null; loading: boolean; busy: boolean; filters: Filters; setFilters: (filters: Filters) => void; page: number; setPage: (page: number) => void; recentActivity: StaffActivityLog[]; nowMs: number; staffOptions: string[]; onMutate: StaffOpsMutate; onRefresh: () => Promise<void>; onDetail: (item: ActiveIssue) => void; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; onCloseDetail: () => void;
 }) {
   const [form, setForm] = useState<IssueForm>(emptyIssueForm);
   const rows = useMemo(() => (props.data?.active_issues ?? []).filter((item) => {
@@ -943,8 +1014,8 @@ function IssuesPage(props: {
   const paged = paginate(rows, props.page);
   const autoReported = rows.filter((item) => item.source_table === "crossover_messages" || item.source_table === "owner_follow_ups");
   async function submit() {
-    await props.onMutate("Unable to create issue.", { ...form, action: "create_issue" }, "Active issue created.");
-    setForm(emptyIssueForm);
+    const ok = await props.onMutate("Unable to create issue.", { ...form, action: "create_issue" }, "Active issue created.");
+    if (ok) setForm(emptyIssueForm);
   }
   return (
     <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
@@ -981,7 +1052,7 @@ function IssuesPage(props: {
   );
 }
 
-function DesktopIssuesTable({ rows, busy, onMutate, onDetail }: { rows: ActiveIssue[]; busy: boolean; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: ActiveIssue) => void }) {
+function DesktopIssuesTable({ rows, busy, onMutate, onDetail }: { rows: ActiveIssue[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void }) {
   return (
     <div className="crossover-table-wrap hidden md:block">
       <table className="crossover-table">
@@ -1019,7 +1090,7 @@ function DesktopIssuesTable({ rows, busy, onMutate, onDetail }: { rows: ActiveIs
   );
 }
 
-function IssueCard({ item, busy, onMutate, onDetail }: { item: ActiveIssue; busy: boolean; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onDetail: (item: ActiveIssue) => void }) {
+function IssueCard({ item, busy, onMutate, onDetail }: { item: ActiveIssue; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void }) {
   return (
     <article className="crossover-card crossover-card--sidebar">
       <p className="crossover-table__subject-title">{item.title}</p>
@@ -1143,7 +1214,7 @@ function UpcomingSection({ items }: { items: OwnerFollowUp[] }) {
   return <section className="admin-card p-5"><h3 className="text-xl font-black text-white">Upcoming Follow Ups / Escalations</h3><p className="mb-4 text-sm text-admin-muted">Items approaching due dates or requiring escalation.</p><div className="grid gap-3 md:grid-cols-2">{upcoming.map((item) => <article key={item.id} className="rounded-2xl border border-admin-border bg-white/[0.03] p-4"><Badge type="priority" value={item.priority} /><h4 className="mt-3 font-black text-white">{item.subject}</h4><p className="mt-1 text-sm text-admin-muted">Owner: {item.owner_name}</p><p className="mt-3 text-xs text-admin-muted">Assigned to {item.assigned_to} • Due {formatDateTime(item.due_date)}</p></article>)}{!upcoming.length ? <p className="text-sm text-admin-muted">No upcoming follow-ups.</p> : null}</div></section>;
 }
 
-function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { data: StaffOpsPayload | null; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; busy: boolean; staffOptions: string[]; onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>; onClose: () => void }) {
+function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { data: StaffOpsPayload | null; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; busy: boolean; staffOptions: string[]; onMutate: StaffOpsMutate; onClose: () => void }) {
   const [reply, setReply] = useState("");
   const [resolution, setResolution] = useState("");
   useEffect(() => {
@@ -1167,8 +1238,58 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
     detail.type === "crossover" ? resolveStatusForShiftLog(item as CrossoverMessage) : ("Resolved" as const);
   const resolveLabel =
     detail.type === "crossover" && isAssessmentDogLog(item as CrossoverMessage) ? "Check Out" : "Resolve";
+  const updateAction =
+    detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue";
+
+  async function saveAndClose(label: string, payload: Record<string, unknown>, success: string) {
+    const ok = await onMutate(label, payload, success);
+    if (ok) onClose();
+  }
+
   return (
-    <Modal open={Boolean(detail)} title={title} description="View details and update this record without leaving the page." onClose={onClose} footer={<div className="flex flex-wrap justify-end gap-2"><button className="admin-btn-secondary" type="button" onClick={onClose}>Close</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark in progress.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "In Progress" }, "Marked in progress.")}>Mark In Progress</button><button className="admin-btn-secondary" type="button" disabled={busy} onClick={() => void onMutate("Unable to mark pending review.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: "Pending Review" }, "Marked pending review.")}>Pending Review</button><button className="admin-btn-primary" type="button" disabled={busy} onClick={() => void onMutate(resolveStatus === "Check Out" ? "Unable to check out." : "Unable to resolve.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, status: resolveStatus, resolution_notes: resolution }, resolveStatus === "Check Out" ? "Assessment marked Check Out." : "Record resolved.")}>{resolveLabel}</button></div>}>
+    <Modal
+      open={Boolean(detail)}
+      title={title}
+      description="View details and update this record without leaving the page."
+      onClose={onClose}
+      footer={
+        <div className="flex flex-wrap justify-end gap-2">
+          <button className="admin-btn-secondary" type="button" onClick={onClose}>
+            Close
+          </button>
+          <button
+            className="admin-btn-secondary"
+            type="button"
+            disabled={busy}
+            onClick={() => void saveAndClose("Unable to mark in progress.", { action: updateAction, id: item.id, status: "In Progress" }, "Marked in progress.")}
+          >
+            Mark In Progress
+          </button>
+          <button
+            className="admin-btn-secondary"
+            type="button"
+            disabled={busy}
+            onClick={() => void saveAndClose("Unable to mark pending review.", { action: updateAction, id: item.id, status: "Pending Review" }, "Marked pending review.")}
+          >
+            Pending Review
+          </button>
+          <button
+            className="admin-btn-primary"
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void saveAndClose(
+                resolveStatus === "Check Out" ? "Unable to check out." : "Unable to resolve.",
+                { action: updateAction, id: item.id, status: resolveStatus, resolution_notes: resolution },
+                resolveStatus === "Check Out" ? "Assessment marked Check Out." : "Record resolved."
+              )
+            }
+          >
+            {resolveLabel}
+          </button>
+        </div>
+      }
+    >
       <div className="grid gap-4">
         {detail.type === "crossover" && "subject" in item ? (
           <div className="grid gap-2 rounded-2xl border border-admin-border bg-white/[0.03] p-4 text-sm text-admin-muted md:grid-cols-2">
@@ -1184,9 +1305,25 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             {(item as CrossoverMessage).linked_active_issue_id ? <p><span className="font-bold text-white">Linked Active Issue:</span> Yes</p> : null}
           </div>
         ) : null}
-        <div className="rounded-2xl border border-admin-border bg-white/[0.03] p-4"><div className="mb-3 flex flex-wrap gap-2"><Badge type="priority" value={item.priority} /><Badge type="status" value={item.status} /></div><p className="whitespace-pre-wrap text-sm text-admin-muted">{description || "No notes provided."}</p></div>
-        {"assigned_to" in item ? <SelectField label="Assign / Reassign" value={item.assigned_to ?? ""} options={["", ...staffOptions]} onChange={(value) => void onMutate("Unable to assign.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, assigned_to: value }, "Assignment updated.")} /> : null}
-        <PrioritySelect value={item.priority} onChange={(priority) => void onMutate("Unable to change priority.", { action: detail.type === "crossover" ? "update_crossover" : detail.type === "follow_up" ? "update_follow_up" : "update_issue", id: item.id, priority }, "Priority updated.")} />
+        <div className="rounded-2xl border border-admin-border bg-white/[0.03] p-4">
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Badge type="priority" value={item.priority} />
+            <Badge type="status" value={item.status} />
+          </div>
+          <p className="whitespace-pre-wrap text-sm text-admin-muted">{description || "No notes provided."}</p>
+        </div>
+        {"assigned_to" in item ? (
+          <SelectField
+            label="Assign / Reassign"
+            value={item.assigned_to ?? ""}
+            options={["", ...staffOptions]}
+            onChange={(value) => void saveAndClose("Unable to assign.", { action: updateAction, id: item.id, assigned_to: value }, "Assignment updated.")}
+          />
+        ) : null}
+        <PrioritySelect
+          value={item.priority}
+          onChange={(priority) => void saveAndClose("Unable to change priority.", { action: updateAction, id: item.id, priority }, "Priority updated.")}
+        />
         {detail.type === "crossover" ? (
           <div className="grid gap-3">
             <h4 className="font-bold text-white">Updates / Internal Notes</h4>
@@ -1197,11 +1334,39 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
                 <p className="mt-1 text-xs">{entry.created_by ?? "Staff"} • {formatDateTime(entry.created_at)}</p>
               </div>
             ))}
-            <textarea className="admin-input min-h-[80px]" placeholder="Add an update or internal note..." value={reply} onChange={(event) => setReply(event.target.value)} />
-            <button className="admin-btn-primary justify-self-end" type="button" disabled={busy || !reply.trim()} onClick={async () => { await onMutate("Unable to add update.", { action: "reply_crossover", id: item.id, message: reply, update_type: "Internal Note" }, "Update added."); setReply(""); }}>Add Update</button>
+            <textarea
+              className="admin-input min-h-[80px]"
+              placeholder="Add an update or internal note..."
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+            />
+            <button
+              className="admin-btn-primary justify-self-end"
+              type="button"
+              disabled={busy || !reply.trim()}
+              onClick={() =>
+                void (async () => {
+                  const ok = await onMutate(
+                    "Unable to add update.",
+                    { action: "reply_crossover", id: item.id, message: reply, update_type: "Internal Note" },
+                    "Update added."
+                  );
+                  if (ok) {
+                    setReply("");
+                    onClose();
+                  }
+                })()
+              }
+            >
+              Add Update
+            </button>
           </div>
         ) : null}
-        {detail.type === "issues" ? <Field label="Resolution notes"><textarea className="admin-input min-h-[80px]" value={resolution} onChange={(event) => setResolution(event.target.value)} /></Field> : null}
+        {detail.type === "issues" ? (
+          <Field label="Resolution notes">
+            <textarea className="admin-input min-h-[80px]" value={resolution} onChange={(event) => setResolution(event.target.value)} />
+          </Field>
+        ) : null}
       </div>
     </Modal>
   );

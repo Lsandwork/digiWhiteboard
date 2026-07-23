@@ -238,12 +238,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unsupported Staff Admin action." }, { status: 400 });
     }
 
-    await writeAdminAuditLog({
+    void writeAdminAuditLog({
       actorAdminId: session?.adminUserId,
       actorEmail: session?.email,
       action: auditAction,
       targetType: "staff_operations",
       details: { action }
+    }).catch((error) => {
+      console.error("[staff-operations] audit log failed:", error instanceof Error ? error.message : error);
     });
 
     return NextResponse.json({ ok: true, result });

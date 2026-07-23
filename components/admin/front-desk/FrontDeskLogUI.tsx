@@ -309,7 +309,7 @@ export function ActiveShiftLogCard({
   assignOptions: string[];
   onPage: (page: number) => void;
   onRefresh: () => void;
-  onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<void>;
+  onMutate: (label: string, payload: Record<string, unknown>, success: string) => Promise<boolean>;
   onDetail: (item: CrossoverMessage) => void;
   onEdit: (item: CrossoverMessage) => void;
   formatDateTime: (value: string | null) => string;
