@@ -6809,8 +6809,44 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .shift-log-table__select-col {
-  width: 2.25rem;
+  width: 1.75rem;
+  max-width: 1.75rem;
+  padding-left: 0.55rem !important;
+  padding-right: 0.35rem !important;
   vertical-align: middle;
+}
+
+.shift-log-readable .shift-log-table th.shift-log-table__select-col,
+.shift-log-readable .shift-log-table td.shift-log-table__select-col {
+  padding-left: 0.55rem !important;
+  padding-right: 0.35rem !important;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.shift-log-readable .shift-log-table th,
+.shift-log-readable .crossover-table th {
+  padding: 0.75rem 0.7rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+
+.shift-log-readable .shift-log-table td,
+.shift-log-readable .crossover-table td {
+  padding: 0.85rem 0.7rem;
+  line-height: 1.4;
+}
+
+.shift-log-readable .crossover-table__subject-title {
+  font-size: 1.02rem;
+  line-height: 1.35;
+}
+
+.shift-log-readable .crossover-table__subject-preview {
+  margin-top: 0.3rem;
+  -webkit-line-clamp: 2;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .shift-log-bulk-bar {
@@ -6876,32 +6912,32 @@ html[data-theme="light"] .crossover-mobile-card.shift-log-row--selected {
 
 .shift-log-readable .shift-log-table,
 .shift-log-readable .crossover-table {
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .shift-log-readable .shift-log-table th,
 .shift-log-readable .crossover-table th {
-  padding: 1.15rem 0.95rem;
-  font-size: 0.82rem;
+  padding: 0.75rem 0.7rem;
+  font-size: 0.78rem;
   letter-spacing: 0.05em;
 }
 
 .shift-log-readable .shift-log-table td,
 .shift-log-readable .crossover-table td {
-  padding: 1.55rem 0.95rem;
-  line-height: 1.55;
+  padding: 0.85rem 0.7rem;
+  line-height: 1.4;
 }
 
 .shift-log-readable .crossover-table__subject-title {
-  font-size: 1.12rem;
-  line-height: 1.45;
+  font-size: 1.02rem;
+  line-height: 1.35;
 }
 
 .shift-log-readable .crossover-table__subject-preview {
-  margin-top: 0.5rem;
-  -webkit-line-clamp: 3;
-  font-size: 0.98rem;
-  line-height: 1.55;
+  margin-top: 0.3rem;
+  -webkit-line-clamp: 2;
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 
 .shift-log-readable .crossover-table__muted {

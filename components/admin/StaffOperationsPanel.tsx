@@ -581,7 +581,7 @@ function CrossoverPage(props: {
   }, [filters, props.data?.crossover_messages, queryFields]);
 
   const dailyRows = useMemo(() => {
-    // Crossover Log = current-day activity for handoff (includes today's Check Out assessments).
+    // Crossover Log = today's open items only (no past dates, no closed statuses).
     return filteredRows.filter((item) => belongsInCrossoverLog(item));
   }, [filteredRows]);
 
@@ -591,11 +591,8 @@ function CrossoverPage(props: {
   );
 
   const archivedRows = useMemo(() => {
-    // Closed history from prior days (Resolved / Completed / Check Out / Archived).
-    // Today's Check Out / archived assessment items stay on Crossover Log until tomorrow.
-    const closed = (props.data?.crossover_messages ?? []).filter(
-      (item) => isClosedShiftLogStatus(item.status) && !belongsInCrossoverLog(item)
-    );
+    // Archived / Resolved / Check Out / Completed — never on today's Crossover Log.
+    const closed = (props.data?.crossover_messages ?? []).filter((item) => isClosedShiftLogStatus(item.status));
     return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
@@ -663,7 +660,7 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Use Crossover Log for today&apos;s handoff activity. Assessment dogs marked Resolved become Check Out and stay here for the day, then move to Archived Log tomorrow.
+          Crossover Log shows today&apos;s open handoff items only. Open Log holds unresolved follow-ups. Archived Log holds Resolved, Check Out, and Archived entries.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
@@ -694,10 +691,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title={`Crossover Log — ${todayLabel}`}
-            subtitle="Current-day activity for shift crossover, including assessment Check Outs for today."
+            subtitle="Today's open handoff items only — no past dates, and no archived/resolved/check-out rows."
             headingId="shift-log-daily-heading"
             emptyTitle="No crossover entries today"
-            emptyText="Log entries from today will appear here for crossover handoff."
+            emptyText="Open items logged today will appear here for crossover handoff."
             showFilterBar={false}
             showRefresh={false}
             logBucket="crossover"
