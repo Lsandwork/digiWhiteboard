@@ -652,7 +652,7 @@ function CrossoverPage(props: {
   }, [filters, props.data?.crossover_messages, queryFields]);
 
   const dailyRows = useMemo(() => {
-    // Crossover Log = today's open + same-day Resolved/Check Out for AM↔PM handoff.
+    // Crossover Log = today's open + same-day Check Out; Resolved goes to Archived Log.
     return filteredRows.filter((item) => belongsInCrossoverLog(item));
   }, [filteredRows]);
 
@@ -733,7 +733,7 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Crossover Log shows only today&apos;s rows (open plus Resolved/Check Out for AM↔PM handoff). Past-dated Resolved/Check Out/Completed go to Archived Log. Open Log holds unresolved follow-ups.
+          Crossover Log shows today&apos;s open rows (plus same-day Check Out). Marking Resolved moves the entry to Archived Log. Open Log holds unresolved follow-ups.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
@@ -764,10 +764,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title={`Crossover Log — ${todayLabel}`}
-            subtitle="Only today's rows — open plus Resolved/Check Out for AM↔PM handoff. Past-dated closed rows are archived."
+            subtitle="Only today's open rows (plus same-day Check Out). Resolved goes to Archived Log."
             headingId="shift-log-daily-heading"
             emptyTitle="No crossover entries today"
-            emptyText="Today's open and Resolved/Check Out entries appear here for crossover handoff."
+            emptyText="Today's open entries appear here for crossover handoff."
             showFilterBar={false}
             showRefresh={false}
             logBucket="crossover"

@@ -79,7 +79,7 @@ const resolvedToday = base({
   created_at: new Date().toISOString(),
   resolved_at: new Date().toISOString()
 });
-assert.equal(belongsInCrossoverLog(resolvedToday), true, "today's Resolved stays on crossover");
+assert.equal(belongsInCrossoverLog(resolvedToday), false, "Resolved always moves to Archived Log");
 
 const resolvedPast = base({
   status: "Resolved",

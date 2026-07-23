@@ -15,16 +15,20 @@ import type { CrossoverMessage, StaffOpsState } from "@/lib/staff/admin-ops";
 import { listStaffOps } from "@/lib/staff/admin-ops";
 import { loadEnvFiles } from "./load-env-local";
 
-const IMPORT_MARKER = "csv-import:front-desk-open-log:v1";
+const IMPORT_MARKER = "csv-import:front-desk-open-log:v2";
 const ACTOR = "Front Desk";
 const SETTINGS_STORE_KEY = "staff_admin_ops";
-const DEFAULT_FILE = resolve(process.cwd(), "tmp-front-desk-open-log-jul18-22.csv");
+const DEFAULT_FILE = resolve(process.cwd(), "tmp-front-desk-open-log-batch-jul23.csv");
+
+type ShiftToken = "AM" | "PM" | "OV" | "Unknown";
 
 type ParsedNote = {
   dateLabel: string;
-  shift: "AM" | "PM" | "Unknown";
+  shift: ShiftToken;
   author: string;
   note: string;
+  logType: string | null;
+  priority: "Low" | "Normal" | "Medium" | "High" | "Urgent" | "Critical" | null;
   reminderFlag: boolean;
   createdAt: string;
   importKey: string;
@@ -91,11 +95,24 @@ function cleanCell(value: unknown) {
   return normalizeWhitespace(String(value));
 }
 
-function parseShift(value: string): "AM" | "PM" | "Unknown" {
+function parseShift(value: string): ShiftToken {
   const token = value.trim().toUpperCase();
   if (token === "AM") return "AM";
   if (token === "PM") return "PM";
+  if (token === "OV" || token === "OVERNIGHT") return "OV";
   return "Unknown";
+}
+
+function parsePriority(value: string): ParsedNote["priority"] {
+  const token = value.trim().toLowerCase();
+  if (!token || token === "no" || token === "false") return null;
+  if (token === "low") return "Low";
+  if (token === "normal") return "Normal";
+  if (token === "medium") return "Medium";
+  if (token === "high") return "High";
+  if (token === "urgent") return "Urgent";
+  if (token === "critical") return "Critical";
+  return null;
 }
 
 function parseDateParts(value: string) {
@@ -109,10 +126,10 @@ function parseDateParts(value: string) {
   return { year, month, day };
 }
 
-function toHistoricalIso(dateLabel: string, shift: "AM" | "PM" | "Unknown", indexInDay: number) {
+function toHistoricalIso(dateLabel: string, shift: ShiftToken, indexInDay: number) {
   const parts = parseDateParts(dateLabel);
   if (!parts) return new Date().toISOString();
-  const hour = shift === "PM" ? 17 : shift === "AM" ? 9 : 12;
+  const hour = shift === "PM" ? 17 : shift === "AM" ? 9 : shift === "OV" ? 21 : 12;
   const minute = Math.min(59, indexInDay);
   const utcGuess = Date.UTC(parts.year, parts.month - 1, parts.day, hour + 8, minute, 0);
   return new Date(utcGuess).toISOString();
@@ -122,6 +139,7 @@ function shouldSkipNote(note: string) {
   const token = note.trim().toLowerCase();
   if (!token) return true;
   if (token === "nothing:)" || token === "nothing :)") return true;
+  if (token === "nothing to report" || token === "ntr" || token === "none") return true;
   if (token === "true" || token === "false") return true;
   return false;
 }
@@ -131,18 +149,22 @@ function truthyFlag(value: string) {
   return token === "true" || token === "yes" || token === "y" || token === "1";
 }
 
-function mapLogType(note: string, reminderFlag: boolean): string {
+function mapLogType(note: string, reminderFlag: boolean, explicitType?: string | null): string {
   if (reminderFlag) return "Reminder";
+  const explicit = cleanCell(explicitType);
+  if (explicit) return explicit;
   const hay = note.toLowerCase();
   if (/assessment/.test(hay)) return "New Dog Assessment";
-  if (/board|overnight|suite/.test(hay)) return "Boarding / Overnight Note";
-  if (/injury|health|medical|meds|cherry/.test(hay)) return "Medical / Health Note";
-  if (/no leash|belong|lost|cubbie|bag|bed|bedding|laundry/.test(hay)) return "Lost Belongings";
+  if (/board|overnight|suite|cab\b|food/.test(hay)) return "Boarding / Overnight Note";
+  if (/injury|health|medical|meds|stye|eye/.test(hay)) return "Medical / Health Note";
+  if (/attack|fight|conflict/.test(hay)) return "Dog Conflict / Fight";
+  if (/behavior|bedding|den/.test(hay)) return "Dog Behavior Concern";
+  if (/no leash|belong|lost|cubbie|bag|bed|laundry/.test(hay)) return "Lost Belongings";
   if (/taxi|transport/.test(hay)) return "Transportation Note";
   if (/payment|billing|balance|pricing|charge|receipt|reciept|card on file/.test(hay)) {
     return "Payment / Billing Note";
   }
-  if (/water bowl|facility|yard|room/.test(hay)) return "Facility Issue";
+  if (/water bowl|facility|yard|room|pipe|condensation|condensaton/.test(hay)) return "Facility / Yard Issue";
   if (/gingr|sports account|log out/.test(hay)) return "Staff Issue";
   if (/call:|owner|follow/.test(hay)) return "Owner Request";
   if (/daycare|sports/.test(hay)) return "Daycare Note";
@@ -160,7 +182,7 @@ function parseNotes(filePath: string): ParsedNote[] {
   const rows = parseCsv(raw);
   const notes: ParsedNote[] = [];
   let currentDate = "";
-  let currentShift: "AM" | "PM" | "Unknown" = "Unknown";
+  let currentShift: ShiftToken = "Unknown";
   let currentAuthor = "";
   let indexInDay = 0;
   let lastDayKey = "";
@@ -174,7 +196,15 @@ function parseNotes(filePath: string): ParsedNote[] {
     const shiftCell = cleanCell(row[1]);
     const authorCell = cleanCell(row[2]);
     const note = cleanCell(row[3]);
-    const reminder = cleanCell(row[4]);
+    const typeCell = cleanCell(row[4]);
+    const priorityCell = cleanCell(row[5]);
+    // Support both old (Reminder in col 4) and new (Type/Priority/Reminder) layouts.
+    const reminderCell = cleanCell(row[6] || (!typeCell && !priorityCell ? row[4] : ""));
+    const looksLikeType =
+      /dog|facility|behavior|injury|health|conflict|fight|boarding|owner|staff|medical|yard/i.test(typeCell);
+    const logType = looksLikeType ? typeCell : null;
+    const priority = parsePriority(priorityCell || (!looksLikeType ? typeCell : ""));
+    const reminder = looksLikeType ? reminderCell : cleanCell(row[4]);
 
     if (dateCell && parseDateParts(dateCell)) {
       currentDate = dateCell;
@@ -198,6 +228,8 @@ function parseNotes(filePath: string): ParsedNote[] {
       shift: currentShift,
       author: currentAuthor || "Front Desk Coordinator",
       note,
+      logType,
+      priority,
       reminderFlag: truthyFlag(reminder)
     };
 
@@ -220,9 +252,10 @@ function toCrossoverMessage(note: ParsedNote): CrossoverMessage {
     "",
     `Shift: ${note.shift}`,
     `Logged by (original): ${note.author}`,
+    note.logType ? `Type: ${note.logType}` : null,
     note.reminderFlag ? "Spreadsheet Reminder: TRUE (highlighted)" : null,
     "",
-    "Imported into Open Log for follow-up. Archive/resolve when done. Unassigned."
+    "Imported into Open Log for follow-up. Mark Resolved to move to Archived Log. Unassigned."
   ]
     .filter((line) => line !== null)
     .join("\n")
@@ -233,10 +266,10 @@ function toCrossoverMessage(note: ParsedNote): CrossoverMessage {
     subject,
     message: details,
     details,
-    log_type: mapLogType(note.note, note.reminderFlag),
+    log_type: mapLogType(note.note, note.reminderFlag, note.logType),
     from_department: "Front Desk",
     to_department: "Front Desk Team",
-    priority: note.reminderFlag ? "High" : "Normal",
+    priority: note.reminderFlag ? "High" : note.priority ?? "Normal",
     status: "Open",
     related_dog_name: null,
     related_owner_name: null,
