@@ -392,12 +392,15 @@ export function ActiveShiftLogCard({
               </tr>
             </thead>
             <tbody>
-              {rows.map((item) => (
-                <tr key={item.id}>
+              {rows.map((item) => {
+                const type = shiftLogType(item);
+                const highlight = item.urgent || type === "Reminder";
+                return (
+                <tr key={item.id} className={highlight ? "shift-log-row--highlight" : undefined}>
                   <td className="crossover-table__subject">
                     <p className="crossover-table__subject-title">{item.subject}</p>
                     <p className="crossover-table__subject-preview">{shiftLogDetails(item)}</p>
-                    <ShiftLogTypeBadge logType={shiftLogType(item)} />
+                    <ShiftLogTypeBadge logType={type} />
                   </td>
                   <td>
                     {item.related_dog_name ? <p>{item.related_dog_name}</p> : null}
@@ -419,7 +422,8 @@ export function ActiveShiftLogCard({
                   <td><ShiftLogStatusBadge status={item.status} /></td>
                   <td>{renderRowMenu(item)}</td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         ) : (
@@ -432,12 +436,15 @@ export function ActiveShiftLogCard({
       </div>
 
       <div className="crossover-mobile-list md:hidden">
-        {rows.length ? rows.map((item) => (
-          <article key={item.id} className="crossover-mobile-card">
+        {rows.length ? rows.map((item) => {
+          const type = shiftLogType(item);
+          const highlight = item.urgent || type === "Reminder";
+          return (
+          <article key={item.id} className={`crossover-mobile-card${highlight ? " shift-log-row--highlight" : ""}`}>
             <div className="crossover-mobile-card__head">
               <div>
                 <h4 className="crossover-mobile-card__title">{item.subject}</h4>
-                <ShiftLogTypeBadge logType={shiftLogType(item)} />
+                <ShiftLogTypeBadge logType={type} />
               </div>
               <ShiftLogPriorityBadge priority={item.priority} urgent={item.urgent} />
             </div>
@@ -448,7 +455,8 @@ export function ActiveShiftLogCard({
               {renderRowMenu(item)}
             </div>
           </article>
-        )) : (
+        );
+        }) : (
           <div className="crossover-empty crossover-empty--compact">
             <p className="crossover-empty__title">{emptyTitle}</p>
           </div>
