@@ -7,7 +7,8 @@ import type { GroomingPushNotice } from "@/lib/staff/grooming-push-notices";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 import type { TrainerPushNotice } from "@/lib/staff/trainer-push-notices";
 
-const BOARD_OVERLAY_POLL_MS = 12_000;
+/** Poll frequently enough that a push lands on TVs within a few seconds after cache invalidation. */
+const BOARD_OVERLAY_POLL_MS = 4_000;
 const BOARD_OVERLAY_TIMEOUT_MS = 5_000;
 
 export type StaffBoardOverlaysClient = {

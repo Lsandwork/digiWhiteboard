@@ -321,10 +321,18 @@ export function BoardClient({
 
   useEffect(() => {
     document.documentElement.classList.toggle("staff-tv-display", tvMode);
+    // TV / Chromecast receivers need the lighter animation profile even when castMode
+    // query flags are missing — heavy push flash layers stutter on digital whiteboards.
+    if (tvMode && !castMode) {
+      document.documentElement.classList.add("cast-performance-mode");
+    }
     return () => {
       document.documentElement.classList.remove("staff-tv-display");
+      if (tvMode && !castMode) {
+        document.documentElement.classList.remove("cast-performance-mode");
+      }
     };
-  }, [tvMode]);
+  }, [castMode, tvMode]);
 
   useEffect(() => {
     void unlockStaffPushNoticeAudio();
@@ -590,6 +598,8 @@ export function BoardClient({
     enabled: !castKeeperMode,
     onContentUpdate: () => {
       void loadBoard("polling", { silent: true });
+      // Push notices / cast overlays are not part of live-board — refresh them too.
+      void reloadOverlays();
     }
   });
 
@@ -840,7 +850,7 @@ export function BoardClient({
             onDismiss={() => void reloadEmergencyCast()}
           />
         ) : isEmergencyStaffPush ? (
-          <StaffPushNoticeFullscreen notice={activePushNotice!} />
+          <StaffPushNoticeFullscreen notice={activePushNotice!} lowMotion={tvMode || castMode} />
         ) : effectiveGroomingNotice ? (
           <GroomingPushNoticeOverlay
             notice={effectiveGroomingNotice}
@@ -868,7 +878,7 @@ export function BoardClient({
             onDismiss={() => void reloadCastVideo()}
           />
         ) : showActivePushFullscreen ? (
-          <StaffPushNoticeFullscreen notice={activePushNotice!} />
+          <StaffPushNoticeFullscreen notice={activePushNotice!} lowMotion={tvMode || castMode} />
         ) : (
           <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
             {staffBoardLayout.variant === "loading" ? (
@@ -911,7 +921,9 @@ export function BoardClient({
                 ) : null}
               </div>
             )}
-            {activePushNotice ? <StaffPushNoticePanel notice={activePushNotice} /> : null}
+            {activePushNotice ? (
+              <StaffPushNoticePanel notice={activePushNotice} lowMotion={tvMode || castMode} />
+            ) : null}
           </div>
         )}
 

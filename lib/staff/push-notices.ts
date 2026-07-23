@@ -345,8 +345,36 @@ function newNoticeId() {
   return `notice-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/** Cap JSON blob growth — unbounded history makes every push read/write slower. */
+export const MAX_STORED_STAFF_PUSH_NOTICES = 100;
+
 function sortNotices(notices: StaffPushNotice[]) {
   return [...notices].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+}
+
+export function pruneStaffPushNotices(notices: StaffPushNotice[], limit = MAX_STORED_STAFF_PUSH_NOTICES) {
+  const sorted = sortNotices(notices);
+  if (sorted.length <= limit) return sorted;
+
+  const mustKeep: StaffPushNotice[] = [];
+  const optional: StaffPushNotice[] = [];
+  for (const notice of sorted) {
+    const scheduled = Boolean(notice.schedule_enabled) && (notice.recurrence ?? "none") !== "none";
+    if (notice.is_active || scheduled) mustKeep.push(notice);
+    else optional.push(notice);
+  }
+
+  const remaining = Math.max(0, limit - mustKeep.length);
+  return sortNotices([...mustKeep, ...optional.slice(0, remaining)]);
+}
+
+async function notifyBoardOverlaysChanged() {
+  try {
+    const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardOverlayCaches();
+  } catch {
+    // Cache invalidation is best-effort on the hot push path.
+  }
 }
 
 function emptyNoticeState(): StaffPushNoticeState {
@@ -462,9 +490,19 @@ async function loadNoticeState(supabase: SupabaseClient) {
 }
 
 async function saveNoticeState(supabase: SupabaseClient, state: StaffPushNoticeState) {
-  if (await saveNoticeStateToAdminSettings(supabase, state)) return;
-  if (await saveNoticeStateToStaffSettings(supabase, state)) return;
-  if (await saveNoticeStateToActivityLog(supabase, state)) return;
+  const pruned = { notices: pruneStaffPushNotices(state.notices) };
+  if (await saveNoticeStateToAdminSettings(supabase, pruned)) {
+    await notifyBoardOverlaysChanged();
+    return;
+  }
+  if (await saveNoticeStateToStaffSettings(supabase, pruned)) {
+    await notifyBoardOverlaysChanged();
+    return;
+  }
+  if (await saveNoticeStateToActivityLog(supabase, pruned)) {
+    await notifyBoardOverlaysChanged();
+    return;
+  }
   throw new Error("Push Notice storage is not available.");
 }
 
@@ -669,8 +707,9 @@ export async function pushStaffNoticeById(
   await saveNoticeState(supabase, {
     notices: sortNotices(state.notices.map((notice) => (notice.id === id ? updated : notice)))
   });
-  const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
-  await triggerShellyAlertForPushNotice(updated);
+  // Shelly cloud can take several seconds from US regions — never block the whiteboard push.
+  const { triggerShellyAlertForPushNoticeFireAndForget } = await import("@/lib/shelly-push-alerts");
+  triggerShellyAlertForPushNoticeFireAndForget(updated);
   return updated;
 }
 
@@ -698,15 +737,16 @@ export async function createAndPushStaffNotice(
     updated_at: now
   };
   await saveNoticeState(supabase, { notices: sortNotices([notice, ...state.notices]) });
-  const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
-  await triggerShellyAlertForPushNotice(notice);
+  // Shelly cloud can take several seconds from US regions — never block the whiteboard push.
+  const { triggerShellyAlertForPushNoticeFireAndForget } = await import("@/lib/shelly-push-alerts");
+  triggerShellyAlertForPushNoticeFireAndForget(notice);
   return notice;
 }
 
 export async function clearActiveStaffPushNotice(supabase: SupabaseClient, actor: string | null) {
   await saveNoticeState(supabase, clearActiveNoticesInState(await loadNoticeState(supabase), actor));
-  const { clearShellyAlert } = await import("@/lib/shelly-alert");
-  await clearShellyAlert("push_notice_clear");
+  const { clearShellyAlertForPushNoticeFireAndForget } = await import("@/lib/shelly-push-alerts");
+  clearShellyAlertForPushNoticeFireAndForget("push_notice_clear");
 }
 
 export async function deleteStaffPushNotice(supabase: SupabaseClient, id: string) {

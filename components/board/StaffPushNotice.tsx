@@ -24,18 +24,30 @@ export function StaffPushNoticeTvOverlay({ active, notice }: { active: boolean; 
   );
 }
 
-export function StaffPushNoticePanel({ notice }: { notice: StaffPushNotice }) {
+export function StaffPushNoticePanel({
+  notice,
+  lowMotion = false
+}: {
+  notice: StaffPushNotice;
+  lowMotion?: boolean;
+}) {
   const isDailyReminder = isDailyReminderPushNotice(notice);
   return (
     <aside
       className={`staff-push-notice-panel ${isDailyReminder ? "staff-push-notice-panel--daily-reminder staff-push-notice-panel--alert" : "staff-push-notice-panel--alert"}`}
       aria-label={isDailyReminder ? "Active daily reminder" : "Active yard handler alert"}
     >
-      <StaffAlertCard notice={notice} />
+      <StaffAlertCard notice={notice} lowMotion={lowMotion} />
     </aside>
   );
 }
 
-export function StaffPushNoticeFullscreen({ notice }: { notice: StaffPushNotice }) {
-  return <StaffAlertCard notice={notice} fullscreen />;
+export function StaffPushNoticeFullscreen({
+  notice,
+  lowMotion = false
+}: {
+  notice: StaffPushNotice;
+  lowMotion?: boolean;
+}) {
+  return <StaffAlertCard notice={notice} fullscreen lowMotion={lowMotion} />;
 }

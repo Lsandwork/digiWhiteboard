@@ -9828,6 +9828,8 @@ html.cast-performance-mode .cast-lite-panel {
   -webkit-backdrop-filter: none;
 }
 
+html.cast-performance-mode .staff-push-notice,
+html.cast-performance-mode .staff-push-notice::before,
 html.cast-performance-mode .staff-push-notice__flash,
 html.cast-performance-mode .staff-push-notice__flash-layer,
 html.cast-performance-mode .staff-push-notice__stripes,
@@ -9835,12 +9837,33 @@ html.cast-performance-mode .staff-push-notice__strobe-ring,
 html.cast-performance-mode .staff-push-notice__beacon,
 html.cast-performance-mode .staff-push-notice__scanlines,
 html.cast-performance-mode .staff-push-notice__edge-flash,
+html.cast-performance-mode .staff-push-notice__icon,
+html.cast-performance-mode .staff-push-notice__title,
+html.cast-performance-mode .staff-push-notice__eyebrow,
+html.cast-performance-mode .staff-push-notice__paw,
+html.cast-performance-mode .staff-push-notice-panel--alert,
+html.cast-performance-mode .staff-push-notice-fullscreen--alert,
+html.cast-performance-mode .staff-push-notice-tv-flash,
+html.cast-performance-mode .staff-push-notice-tv-vignette,
+html.cast-performance-mode .staff-push-notice-tv-bar,
+html.cast-performance-mode .staff-push-notice-tv-bar span,
 html.cast-performance-mode .push-board-veil,
 html.cast-performance-mode .push-board-veil-vignette,
+html.cast-performance-mode .push-board-veil-bar,
+html.cast-performance-mode .push-board-veil-bar span,
 html.cast-performance-mode .grooming-push__pulse,
 html.cast-performance-mode .grooming-push__glow,
 html.cast-performance-mode .grooming-push__flash-sweep,
 html.cast-performance-mode .grooming-push--alerting * {
+  animation: none !important;
+}
+
+.staff-push-notice--low-motion,
+.staff-push-notice--low-motion::before,
+.staff-push-notice--low-motion .staff-push-notice__flash,
+.staff-push-notice--low-motion .staff-push-notice__icon,
+.staff-push-notice--low-motion .staff-push-notice__title,
+.staff-push-notice--low-motion .staff-push-notice__eyebrow {
   animation: none !important;
 }
 
@@ -10440,18 +10463,18 @@ html.fitdog-cast-mode .social-video-static-controls {
   }
 }
 
-html.fitdog-cast-mode .checkout-alert-active,
-html.fitdog-cast-mode .checkout-ready-badge,
-html.fitdog-cast-mode .checkout-status-badge-alert,
-html.fitdog-cast-mode .checkout-avatar-alert-ring,
-html.fitdog-cast-mode .staff-push-notice__beacon,
-html.fitdog-cast-mode .grooming-push--alerting,
-html.fitdog-cast-mode .trainer-push--alerting {
+html.fitdog-cast-mode:not(.cast-performance-mode) .checkout-alert-active,
+html.fitdog-cast-mode:not(.cast-performance-mode) .checkout-ready-badge,
+html.fitdog-cast-mode:not(.cast-performance-mode) .checkout-status-badge-alert,
+html.fitdog-cast-mode:not(.cast-performance-mode) .checkout-avatar-alert-ring,
+html.fitdog-cast-mode:not(.cast-performance-mode) .staff-push-notice__beacon,
+html.fitdog-cast-mode:not(.cast-performance-mode) .grooming-push--alerting,
+html.fitdog-cast-mode:not(.cast-performance-mode) .trainer-push--alerting {
   animation: fitdog-cast-alert-pulse 1.8s ease-in-out infinite !important;
 }
 
-html.fitdog-cast-mode .push-board-veil,
-html.fitdog-cast-mode .staff-push-notice__flash-layer {
+html.fitdog-cast-mode:not(.cast-performance-mode) .push-board-veil,
+html.fitdog-cast-mode:not(.cast-performance-mode) .staff-push-notice__flash-layer {
   animation: fitdog-cast-alert-fade 2.4s ease-in-out infinite !important;
 }
 

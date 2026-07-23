@@ -127,6 +127,12 @@ async function saveState(supabase: SupabaseClient, state: TrainerNoticeState) {
     [SETTINGS_STORE_KEY]: state
   };
   await supabase.from("admin_settings").upsert({ id: "default", settings, updated_at: new Date().toISOString() });
+  try {
+    const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardOverlayCaches();
+  } catch {
+    // best-effort
+  }
 }
 
 export function normalizeTrainerPushNoticeInput(input: TrainerPushNoticeInput) {
