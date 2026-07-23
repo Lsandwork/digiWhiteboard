@@ -53,25 +53,35 @@ const checkedOutToday = base({
   log_type: "New Dog Assessment",
   subject: "New dog assessment - Ollie",
   status: "Check Out",
-  created_at: new Date().toISOString(),
+  created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
   resolved_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
 });
-assert.equal(belongsInCrossoverLog(checkedOutToday), false, "Check Out never stays on today's crossover");
+assert.equal(belongsInCrossoverLog(checkedOutToday), true, "same-day Check Out stays on crossover");
 assert.equal(isClosedShiftLogStatus(checkedOutToday.status), true);
 
-const archivedToday = base({
-  status: "Archived",
-  created_at: new Date().toISOString(),
-  archived_at: new Date().toISOString()
+const checkedOutYesterday = base({
+  log_type: "New Dog Assessment",
+  subject: "New dog assessment - Past",
+  status: "Check Out",
+  created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+  resolved_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  updated_at: new Date(Date.now() - 2 * 86400000).toISOString()
 });
-assert.equal(belongsInCrossoverLog(archivedToday), false, "Archived never stays on today's crossover");
+assert.equal(belongsInCrossoverLog(checkedOutYesterday), false);
 
 const resolvedToday = base({
   status: "Resolved",
   created_at: new Date().toISOString(),
   resolved_at: new Date().toISOString()
 });
-assert.equal(belongsInCrossoverLog(resolvedToday), false, "Resolved never stays on today's crossover");
+assert.equal(belongsInCrossoverLog(resolvedToday), true, "same-day Resolved stays on crossover");
+
+const archivedToday = base({
+  status: "Archived",
+  created_at: new Date().toISOString(),
+  archived_at: new Date().toISOString()
+});
+assert.equal(belongsInCrossoverLog(archivedToday), false, "explicit Archive leaves crossover immediately");
 
 console.log("front desk check-out tests passed");

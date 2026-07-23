@@ -581,7 +581,7 @@ function CrossoverPage(props: {
   }, [filters, props.data?.crossover_messages, queryFields]);
 
   const dailyRows = useMemo(() => {
-    // Crossover Log = today's open items only (no past dates, no closed statuses).
+    // Crossover Log = today's open + same-day Resolved/Check Out for AM↔PM handoff.
     return filteredRows.filter((item) => belongsInCrossoverLog(item));
   }, [filteredRows]);
 
@@ -591,8 +591,10 @@ function CrossoverPage(props: {
   );
 
   const archivedRows = useMemo(() => {
-    // Archived / Resolved / Check Out / Completed — never on today's Crossover Log.
-    const closed = (props.data?.crossover_messages ?? []).filter((item) => isClosedShiftLogStatus(item.status));
+    // Closed history that is no longer on today's Crossover Log.
+    const closed = (props.data?.crossover_messages ?? []).filter(
+      (item) => isClosedShiftLogStatus(item.status) && !belongsInCrossoverLog(item)
+    );
     return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
@@ -660,7 +662,7 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Crossover Log shows today&apos;s open handoff items only. Open Log holds unresolved follow-ups. Archived Log holds Resolved, Check Out, and Archived entries.
+          Crossover Log shows today&apos;s open items plus same-day Resolved/Check Out for AM↔PM handoff. Those closed rows move to Archived Log the next day. Open Log holds unresolved follow-ups.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
@@ -691,10 +693,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title={`Crossover Log — ${todayLabel}`}
-            subtitle="Today's open handoff items only — no past dates, and no archived/resolved/check-out rows."
+            subtitle="Today's open items plus same-day Resolved/Check Out for AM↔PM handoff. No past-dated rows."
             headingId="shift-log-daily-heading"
             emptyTitle="No crossover entries today"
-            emptyText="Open items logged today will appear here for crossover handoff."
+            emptyText="Open items and same-day Resolved/Check Out entries appear here for crossover handoff."
             showFilterBar={false}
             showRefresh={false}
             logBucket="crossover"
@@ -777,10 +779,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title="Archived Log"
-            subtitle="Prior-day resolved, completed, Check Out, and archived entries — including past imported shift notes."
+            subtitle="Prior-day Resolved, Check Out, Completed, and Archived entries."
             headingId="shift-log-archived-heading"
             emptyTitle="No archived or resolved log entries"
-            emptyText="Closed items from previous days will appear here for reference."
+            emptyText="Closed items from previous days appear here for reference."
             showFilterBar={false}
             showRefresh={false}
             logBucket="archived"
