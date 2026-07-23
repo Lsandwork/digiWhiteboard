@@ -3,13 +3,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { SortableTh, useClientSort, type SortAccessors } from "@/components/admin/ui/sortable-table";
 import { AddShiftLogEntryCard, type ShiftLogFormShape } from "@/components/admin/front-desk/FrontDeskLogUI";
 import { GingrPhotoUploadQueue } from "@/components/admin/photo-upload-queue/GingrPhotoUploadQueue";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
 import type { HandlerDailyChecklistItem } from "@/lib/staff/handler-checklist-daily";
 import type { ManagementReport } from "@/lib/staff/management-reports";
-import { shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
+import { shiftLogSubmittedBy, shiftLogType } from "@/lib/staff/front-desk-log";
 import { serializeTemplateFieldValues } from "@/lib/frontDeskLog/logTemplates";
+
+const HANDLER_ENTRY_SORT_ACCESSORS: SortAccessors<CrossoverMessage> = {
+  subject: (item) => item.subject,
+  type: (item) => shiftLogType(item),
+  dog: (item) => item.related_dog_name ?? "",
+  status: (item) => item.status,
+  created_at: (item) => item.created_at
+};
 
 const CHECKLIST_ITEMS = [
   "Clock in and confirm yard assignment.",
@@ -256,6 +265,49 @@ export function BulkPhotoUploadPanel() {
   return <GingrPhotoUploadQueue />;
 }
 
+function HandlerEntriesTable({ entries }: { entries: CrossoverMessage[] }) {
+  const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(entries, HANDLER_ENTRY_SORT_ACCESSORS, "created_at", "desc");
+  return (
+    <section className="crossover-card p-5">
+      <div className="crossover-card__header crossover-card__header--compact">
+        <h3 className="crossover-card__title">Your Entries</h3>
+        <span className="crossover-link-btn">{sortedRows.length} total</span>
+      </div>
+      {sortedRows.length ? (
+        <div className="overflow-x-auto">
+          <table className="crossover-table w-full min-w-[720px]">
+            <thead>
+              <tr>
+                <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Type" column="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Logged" column="created_at" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map((entry) => (
+                <tr key={entry.id}>
+                  <td>
+                    <p className="crossover-table__subject-title">{entry.subject}</p>
+                    <p className="crossover-table__subject-preview">{entry.details ?? entry.message}</p>
+                  </td>
+                  <td>{entry.log_type ?? "Daycare Note"}</td>
+                  <td>{entry.related_dog_name ?? "—"}</td>
+                  <td><span className="crossover-badge">{entry.status}</span></td>
+                  <td>{formatDateTime(entry.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-admin-muted">No entries yet. Use the form above to add your first handler shift entry.</p>
+      )}
+    </section>
+  );
+}
+
 export function HandlerShiftEntryPanel() {
   const { showToast } = useToast();
   const [form, setForm] = useState(emptyShiftForm);
@@ -353,29 +405,7 @@ export function HandlerShiftEntryPanel() {
         onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
       />
 
-      <section className="crossover-card p-5">
-        <div className="crossover-card__header crossover-card__header--compact">
-          <h3 className="crossover-card__title">Your Entries</h3>
-          <span className="crossover-link-btn">{entries.length} total</span>
-        </div>
-        <div className="grid gap-3">
-          {entries.length ? entries.map((entry) => (
-            <article key={entry.id} className="rounded-xl border border-admin-border px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-bold text-white">{entry.subject}</p>
-                <span className="crossover-badge">{entry.status}</span>
-              </div>
-              <p className="mt-2 text-sm text-admin-muted">{entry.details ?? entry.message}</p>
-              <p className="mt-2 text-xs text-admin-muted">
-                {entry.log_type ?? "Daycare Note"} • {formatDateTime(entry.created_at)}
-                {entry.related_dog_name ? ` • ${entry.related_dog_name}` : ""}
-              </p>
-            </article>
-          )) : (
-            <p className="text-sm text-admin-muted">No entries yet. Use the form above to add your first handler shift entry.</p>
-          )}
-        </div>
-      </section>
+      <HandlerEntriesTable entries={entries} />
     </div>
   );
 }

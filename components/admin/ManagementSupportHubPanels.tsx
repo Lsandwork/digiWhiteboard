@@ -5,6 +5,7 @@ import { Eye, MessageSquare, RefreshCw, UserRound } from "lucide-react";
 import { SupportCommandCenter } from "@/components/admin/support-command-center/SupportCommandCenter";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { SortableTh, useClientSort, type SortAccessors } from "@/components/admin/ui/sortable-table";
 import type { AdminTab } from "@/lib/admin/types";
 import type { ManagementReport, ManagementReportType } from "@/lib/staff/management-reports";
 import type { SupportHubStats, SupportInboxRow, TrainerEntryAdminRow } from "@/lib/staff/management-support-admin";
@@ -196,6 +197,31 @@ function sourceLabel(reportType: ManagementReportType) {
   return "Staff";
 }
 
+
+const SUPPORT_SORT_ACCESSORS: SortAccessors<SupportInboxRow> = {
+  date: (row) => row.date_submitted,
+  source: (row) => sourceLabel(row.report_type),
+  submitted_by: (row) => row.submitted_by,
+  subject: (row) => row.subject,
+  details: (row) => row.details_preview,
+  priority: (row) => row.priority,
+  status: (row) => row.status,
+  assigned: (row) => row.assigned_to ?? "",
+  updated: (row) => row.last_updated
+};
+
+const TRAINER_ENTRY_SORT_ACCESSORS: SortAccessors<TrainerEntryAdminRow> = {
+  date: (row) => row.date_submitted,
+  trainer: (row) => row.trainer_name,
+  entry_type: (row) => row.entry_type,
+  dog: (row) => row.dog_name ?? "",
+  owner: (row) => row.owner_name ?? "",
+  subject: (row) => row.subject,
+  priority: (row) => row.priority,
+  follow_up: (row) => (row.follow_up_needed ? 1 : 0),
+  status: (row) => row.status
+};
+
 function SupportTable({
   rows,
   nameColumn,
@@ -207,25 +233,26 @@ function SupportTable({
   onView: (row: SupportInboxRow) => void;
   showSource?: boolean;
 }) {
+  const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, SUPPORT_SORT_ACCESSORS, "date", "desc");
   return (
     <div className="overflow-x-auto">
       <table className="crossover-table w-full min-w-[1100px]">
         <thead>
           <tr>
-            <th>Date</th>
-            {showSource ? <th>Source</th> : null}
-            <th>{nameColumn}</th>
-            <th>Subject</th>
-            <th>Details</th>
-            <th>Priority</th>
-            <th>Status</th>
-            <th>Assigned</th>
-            <th>Updated</th>
+            <SortableTh label="Date" column="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            {showSource ? <SortableTh label="Source" column="source" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /> : null}
+            <SortableTh label={nameColumn} column="submitted_by" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="Details" column="details" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="Assigned" column="assigned" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+            <SortableTh label="Updated" column="updated" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {sortedRows.map((row) => (
             <tr key={row.id}>
               <td>{formatDateTime(row.date_submitted)}</td>
               {showSource ? <td>{sourceLabel(row.report_type)}</td> : null}
@@ -535,6 +562,7 @@ export function AdminTrainerEntriesPanel() {
         .includes(q)
     );
   }, [entries, query]);
+  const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(filtered, TRAINER_ENTRY_SORT_ACCESSORS, "date", "desc");
 
   return (
     <div className="space-y-5">
@@ -554,19 +582,19 @@ export function AdminTrainerEntriesPanel() {
           <table className="crossover-table w-full min-w-[1000px]">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Trainer</th>
-                <th>Entry Type</th>
-                <th>Dog</th>
-                <th>Owner</th>
-                <th>Subject</th>
-                <th>Priority</th>
-                <th>Follow-Up</th>
-                <th>Status</th>
+                <SortableTh label="Date" column="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Trainer" column="trainer" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Entry Type" column="entry_type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Owner" column="owner" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Follow-Up" column="follow_up" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((entry) => (
+              {sortedRows.map((entry) => (
                 <tr key={entry.id} className={entry.urgent ? "bg-red-500/10" : undefined}>
                   <td>{formatDateTime(entry.date_submitted)}</td>
                   <td>{entry.trainer_name}</td>
@@ -581,7 +609,7 @@ export function AdminTrainerEntriesPanel() {
               ))}
             </tbody>
           </table>
-          {!loading && !filtered.length ? <p className="mt-4 text-sm text-admin-muted">No trainer entries found.</p> : null}
+          {!loading && !sortedRows.length ? <p className="mt-4 text-sm text-admin-muted">No trainer entries found.</p> : null}
         </div>
       </section>
     </div>

@@ -162,11 +162,12 @@ export function AdminUsersPage() {
           emptyTitle="No admin users yet"
           emptyDescription="Add your first admin user to share dashboard access safely."
           columns={[
-            { key: "name", header: "Name", render: (row) => <span className="font-semibold text-white">{row.full_name}</span> },
-            { key: "email", header: "Email / Username", render: (row) => row.email },
+            { key: "name", header: "Name", getSortValue: (row) => row.full_name, render: (row) => <span className="font-semibold text-white">{row.full_name}</span> },
+            { key: "email", header: "Email / Username", getSortValue: (row) => row.email, render: (row) => row.email },
             {
               key: "role",
               header: "Roles",
+              getSortValue: (row) => row.access?.displayLabel ?? ROLE_LABELS[legacyRoleToRoleKey(row.role)],
               render: (row) => (
                 <span className="admin-badge">
                   {row.access?.displayLabel ?? ROLE_LABELS[legacyRoleToRoleKey(row.role)]}
@@ -177,6 +178,7 @@ export function AdminUsersPage() {
               key: "departments",
               header: "Departments",
               hideOnMobile: true,
+              getSortValue: (row) => (row.access?.departments ?? []).map((d) => DEPARTMENT_LABELS[d]).join(", "),
               render: (row) => {
                 const departments = row.access?.departments ?? [];
                 if (!departments.length) return "—";
@@ -186,6 +188,7 @@ export function AdminUsersPage() {
             {
               key: "status",
               header: "Status",
+              getSortValue: (row) => row.status,
               render: (row) => (
                 <span className={`admin-badge ${row.status === "active" ? "admin-badge--green" : "admin-badge--amber"}`}>
                   {row.status === "active" ? "Active" : "Disabled"}
@@ -196,13 +199,16 @@ export function AdminUsersPage() {
               key: "password",
               header: "Password",
               hideOnMobile: true,
+              getSortValue: (row) => (row.force_password_change ? 1 : 0),
               render: (row) => (
                 row.force_password_change ? <span className="admin-badge admin-badge--amber">Must change</span> : "Set"
               )
             },
-            { key: "last_login", header: "Last Login", hideOnMobile: true, render: (row) => row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "Never" },
-            { key: "created", header: "Created", hideOnMobile: true, render: (row) => new Date(row.created_at).toLocaleDateString() }
+            { key: "last_login", header: "Last Login", hideOnMobile: true, getSortValue: (row) => row.last_login_at ?? "", render: (row) => row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "Never" },
+            { key: "created", header: "Created", hideOnMobile: true, getSortValue: (row) => row.created_at, render: (row) => new Date(row.created_at).toLocaleDateString() }
           ]}
+          defaultSortKey="name"
+          defaultSortDir="asc"
           actions={(row) =>
             canManage ? (
               <div ref={menuUserId === row.id ? actionMenuRef : undefined} className="relative flex justify-end gap-1">

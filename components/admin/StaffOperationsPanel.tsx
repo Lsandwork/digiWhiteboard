@@ -48,6 +48,7 @@ import {
 } from "@/components/admin/front-desk/FrontDeskLogUI";
 import { KpiSummaryCards, shiftLogKpiCards } from "@/components/admin/ui/KpiSummaryCards";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
+import { SortableTh, useClientSort, type SortAccessors } from "@/components/admin/ui/sortable-table";
 import { canPushCrossoverToWhiteboard } from "@/lib/admin/users";
 import {
   buildFormFromTemplate,
@@ -69,6 +70,28 @@ import {
   shiftLogSubmittedBy,
   shiftLogType
 } from "@/lib/staff/front-desk-log";
+
+
+const FOLLOW_UP_SORT_ACCESSORS: SortAccessors<OwnerFollowUp> = {
+  subject: (item) => `${item.subject} ${item.owner_name}`,
+  dog: (item) => item.dog_name ?? "",
+  logged_by: (item) => item.logged_by ?? "",
+  assigned_to: (item) => item.assigned_to,
+  priority: (item) => STAFF_PRIORITIES.indexOf(item.priority),
+  due_date: (item) => item.due_date,
+  status: (item) => item.status
+};
+
+const ISSUE_SORT_ACCESSORS: SortAccessors<ActiveIssue> = {
+  title: (item) => item.title,
+  category: (item) => item.category,
+  source: (item) => item.source,
+  reported_by: (item) => item.reported_by ?? "",
+  assigned_to: (item) => item.assigned_to ?? "",
+  priority: (item) => STAFF_PRIORITIES.indexOf(item.priority),
+  reported_at: (item) => item.reported_at,
+  status: (item) => item.status
+};
 
 type StaffOpsTab = "crossover" | "follow_up" | "issues";
 
@@ -668,15 +691,6 @@ function CrossoverPage(props: {
     return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
-  const pagedDaily = showAllDaily
-    ? { page: 1, maxPage: 1, rows: dailyRows }
-    : paginate(dailyRows, dailyPage);
-  const pagedOpen = showAllOpen
-    ? { page: 1, maxPage: 1, rows: openRows }
-    : paginate(openRows, openPage);
-  const pagedArchived = showAllArchived
-    ? { page: 1, maxPage: 1, rows: archivedRows }
-    : paginate(archivedRows, archivedPage);
   const allMessages = props.data?.crossover_messages ?? [];
   const openMessages = allMessages.filter((item) => isOpenShiftLogStatus(item.status));
   const kpiCards = shiftLogKpiCards({
@@ -743,10 +757,10 @@ function CrossoverPage(props: {
         <ShiftLogFilterBar filters={filters} setFilters={setFilters} assignOptions={assignOptions} onClear={() => setFilters(emptyShiftLogFilters)} />
         <div className="crossover-dashboard__log-stack">
           <ActiveShiftLogCard
-            rows={pagedDaily.rows}
+            rows={dailyRows}
             total={dailyRows.length}
-            page={pagedDaily.page}
-            maxPage={pagedDaily.maxPage}
+            page={dailyPage}
+            maxPage={Math.max(1, Math.ceil(dailyRows.length / PAGE_SIZE))}
             pageSize={PAGE_SIZE}
             busy={props.busy}
             loading={props.loading}
@@ -774,10 +788,10 @@ function CrossoverPage(props: {
             onToggleShowAll={() => setShowAllDaily((value) => !value)}
           />
           <ActiveShiftLogCard
-            rows={pagedOpen.rows}
+            rows={openRows}
             total={openRows.length}
-            page={pagedOpen.page}
-            maxPage={pagedOpen.maxPage}
+            page={openPage}
+            maxPage={Math.max(1, Math.ceil(openRows.length / PAGE_SIZE))}
             pageSize={PAGE_SIZE}
             busy={props.busy}
             loading={props.loading}
@@ -829,10 +843,10 @@ function CrossoverPage(props: {
         </div>
         <div className="crossover-dashboard__workspace-archived">
           <ActiveShiftLogCard
-            rows={pagedArchived.rows}
+            rows={archivedRows}
             total={archivedRows.length}
-            page={pagedArchived.page}
-            maxPage={pagedArchived.maxPage}
+            page={archivedPage}
+            maxPage={Math.max(1, Math.ceil(archivedRows.length / PAGE_SIZE))}
             pageSize={PAGE_SIZE}
             busy={props.busy}
             loading={props.loading}
@@ -890,7 +904,12 @@ function FollowUpPage(props: {
     if (props.filters.dueTodayOnly && !isToday(item.due_date)) return false;
     return includesQuery([item.subject, item.owner_name, item.dog_name, item.assigned_to, item.follow_up_notes], props.filters.query);
   }), [props.data?.owner_follow_ups, props.filters, props.nowMs]);
-  const paged = paginate(rows, props.page);
+  const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, FOLLOW_UP_SORT_ACCESSORS, "due_date", "asc");
+  const paged = paginate(sortedRows, props.page);
+  function handleToggleSort(column: string) {
+    toggleSort(column);
+    if (props.page !== 1) props.setPage(1);
+  }
 
   async function submit() {
     const ok = await props.onMutate("Unable to create follow up.", { ...form, action: "create_follow_up" }, "Follow up created.");
@@ -923,9 +942,9 @@ function FollowUpPage(props: {
                 <button type="button" role="switch" aria-checked={props.filters.dueTodayOnly} className={`crossover-urgent-pill ${props.filters.dueTodayOnly ? "crossover-urgent-pill--on" : ""}`} onClick={() => props.setFilters({ ...props.filters, dueTodayOnly: !props.filters.dueTodayOnly })}>Due today</button>
               </div>
             </div>
-            <DesktopFollowUpTable rows={paged.rows} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />
+            <DesktopFollowUpTable rows={paged.rows} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} sortKey={sortKey} sortDir={sortDir} onToggleSort={handleToggleSort} />
             <MobileCards rows={paged.rows} render={(item) => <FollowUpCard item={item} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />} />
-            <Pager page={paged.page} maxPage={paged.maxPage} total={rows.length} onPage={props.setPage} />
+            <Pager page={paged.page} maxPage={paged.maxPage} total={sortedRows.length} onPage={props.setPage} />
           </section>
           <UpcomingSection items={rows} />
         </div>
@@ -939,11 +958,20 @@ function FollowUpPage(props: {
   );
 }
 
-function DesktopFollowUpTable({ rows, busy, onMutate, onDetail }: { rows: OwnerFollowUp[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: OwnerFollowUp) => void }) {
+function DesktopFollowUpTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, onToggleSort }: { rows: OwnerFollowUp[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: OwnerFollowUp) => void; sortKey: string; sortDir: "asc" | "desc"; onToggleSort: (column: string) => void }) {
   return (
     <div className="crossover-table-wrap hidden md:block">
       <table className="crossover-table">
-        <thead><tr><th>Subject / Owner</th><th>Dog</th><th>Logged By</th><th>Assigned To</th><th>Priority</th><th>Due Date</th><th>Status</th><th className="crossover-table__actions-col">Actions</th></tr></thead>
+        <thead><tr>
+          <SortableTh label="Subject / Owner" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Logged By" column="logged_by" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Assigned To" column="assigned_to" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Due Date" column="due_date" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <th className="crossover-table__actions-col">Actions</th>
+        </tr></thead>
         <tbody>
           {rows.map((item) => (
             <tr key={item.id}>
@@ -1010,7 +1038,12 @@ function IssuesPage(props: {
     if (props.filters.urgentOnly && item.priority !== "High" && item.priority !== "Critical") return false;
     return includesQuery([item.title, item.notes, item.related_owner_name, item.related_dog_name, item.reported_by, item.assigned_to], props.filters.query);
   }), [props.data?.active_issues, props.filters]);
-  const paged = paginate(rows, props.page);
+  const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, ISSUE_SORT_ACCESSORS, "reported_at", "desc");
+  const paged = paginate(sortedRows, props.page);
+  function handleToggleSort(column: string) {
+    toggleSort(column);
+    if (props.page !== 1) props.setPage(1);
+  }
   const autoReported = rows.filter((item) => item.source_table === "crossover_messages" || item.source_table === "owner_follow_ups");
   async function submit() {
     const ok = await props.onMutate("Unable to create issue.", { ...form, action: "create_issue" }, "Active issue created.");
@@ -1038,9 +1071,9 @@ function IssuesPage(props: {
             <div className="border-b border-[rgba(255,166,0,0.12)] px-5 pb-5">
               <FilterBar filters={props.filters} setFilters={props.setFilters} type="issues" staffOptions={props.staffOptions} />
             </div>
-            <DesktopIssuesTable rows={paged.rows} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />
+            <DesktopIssuesTable rows={paged.rows} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} sortKey={sortKey} sortDir={sortDir} onToggleSort={handleToggleSort} />
             <MobileCards rows={paged.rows} render={(item) => <IssueCard item={item} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />} />
-            <Pager page={paged.page} maxPage={paged.maxPage} total={rows.length} onPage={props.setPage} />
+            <Pager page={paged.page} maxPage={paged.maxPage} total={sortedRows.length} onPage={props.setPage} />
           </section>
           <EscalationsSection items={rows} />
         </div>
@@ -1051,11 +1084,21 @@ function IssuesPage(props: {
   );
 }
 
-function DesktopIssuesTable({ rows, busy, onMutate, onDetail }: { rows: ActiveIssue[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void }) {
+function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, onToggleSort }: { rows: ActiveIssue[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void; sortKey: string; sortDir: "asc" | "desc"; onToggleSort: (column: string) => void }) {
   return (
     <div className="crossover-table-wrap hidden md:block">
       <table className="crossover-table">
-        <thead><tr><th>Issue / Subject</th><th>Category</th><th>Source</th><th>Reported By</th><th>Assigned To</th><th>Priority</th><th>Reported</th><th>Status</th><th className="crossover-table__actions-col">Actions</th></tr></thead>
+        <thead><tr>
+          <SortableTh label="Issue / Subject" column="title" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Category" column="category" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Source" column="source" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Reported By" column="reported_by" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Assigned To" column="assigned_to" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Reported" column="reported_at" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
+          <th className="crossover-table__actions-col">Actions</th>
+        </tr></thead>
         <tbody>
           {rows.map((item) => (
             <tr key={item.id}>

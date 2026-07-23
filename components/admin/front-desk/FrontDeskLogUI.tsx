@@ -41,6 +41,18 @@ import {
   type ShiftLogType
 } from "@/lib/staff/front-desk-log";
 import { Modal } from "@/components/admin/ui/Modal";
+import { SortableTh, useClientSort, type SortAccessors } from "@/components/admin/ui/sortable-table";
+
+const SHIFT_LOG_SORT_ACCESSORS: SortAccessors<CrossoverMessage> = {
+  subject: (item) => `${item.subject} ${shiftLogType(item)}`,
+  dog_owner: (item) => `${item.related_dog_name ?? ""} ${item.related_owner_name ?? ""}`,
+  submitted_by: (item) => shiftLogSubmittedBy(item),
+  assigned_to: (item) => shiftLogAssignedTo(item),
+  priority: (item) => STAFF_PRIORITIES.indexOf(item.priority),
+  due_logged: (item) => item.due_at || item.reminder_at || item.created_at,
+  status: (item) => item.status,
+  created_at: (item) => item.created_at
+};
 
 export type ShiftLogFilters = {
   query: string;
@@ -328,15 +340,31 @@ export function ActiveShiftLogCard({
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveTarget, setMoveTarget] = useState<FrontDeskLogBucket | "">("");
   const lastSelectedRowIndexRef = useRef<number | null>(null);
+  const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, SHIFT_LOG_SORT_ACCESSORS, "created_at", "desc");
+  const sortedTotal = sortedRows.length;
+  const sortedMaxPage = Math.max(1, Math.ceil(sortedTotal / Math.max(1, pageSize)));
+  const safePage = Math.min(Math.max(1, page), sortedMaxPage);
+  const displayRows = showAll
+    ? sortedRows
+    : sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize);
 
-  const pageRowIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const pageRowIds = useMemo(() => displayRows.map((row) => row.id), [displayRows]);
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
   const somePageSelected = pageRowIds.some((id) => selected.includes(id)) && !allPageSelected;
   const selectedCount = selected.length;
 
   useEffect(() => {
     lastSelectedRowIndexRef.current = null;
-  }, [page, filters, showAll, logBucket]);
+  }, [page, filters, showAll, logBucket, sortKey, sortDir]);
+
+  useEffect(() => {
+    if (page !== safePage) onPage(safePage);
+  }, [page, safePage, onPage]);
+
+  function handleToggleSort(column: string) {
+    toggleSort(column);
+    if (page !== 1) onPage(1);
+  }
 
   const toggleRowSelection = (rowId: string, rowIndex: number, checked: boolean, shiftKey: boolean) => {
     setSelected((current) => {
@@ -491,7 +519,7 @@ export function ActiveShiftLogCard({
       ) : null}
 
       <div className="crossover-table-wrap shift-log-table-wrap hidden md:block">
-        {rows.length ? (
+        {displayRows.length ? (
           <table className="crossover-table shift-log-table">
             <thead>
               <tr>
@@ -507,18 +535,18 @@ export function ActiveShiftLogCard({
                     onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
                   />
                 </th>
-                <th>Subject / Log Type</th>
-                <th>Dog / Owner</th>
-                <th>Submitted By</th>
-                <th>Assigned To</th>
-                <th>Priority</th>
-                <th>Due / Logged</th>
-                <th>Status</th>
+                <SortableTh label="Subject / Log Type" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
+                <SortableTh label="Dog / Owner" column="dog_owner" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
+                <SortableTh label="Submitted By" column="submitted_by" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
+                <SortableTh label="Assigned To" column="assigned_to" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
+                <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
+                <SortableTh label="Due / Logged" column="due_logged" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
+                <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={handleToggleSort} />
                 <th className="crossover-table__actions-col">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((item, rowIndex) => {
+              {displayRows.map((item, rowIndex) => {
                 const type = shiftLogType(item);
                 const highlight = item.urgent || type === "Reminder";
                 const isSelected = selected.includes(item.id);
@@ -592,7 +620,7 @@ export function ActiveShiftLogCard({
       </div>
 
       <div className="crossover-mobile-list md:hidden">
-        {rows.length ? rows.map((item, rowIndex) => {
+        {displayRows.length ? displayRows.map((item, rowIndex) => {
           const type = shiftLogType(item);
           const highlight = item.urgent || type === "Reminder";
           const isSelected = selected.includes(item.id);
@@ -640,14 +668,14 @@ export function ActiveShiftLogCard({
 
       <footer className="crossover-pagination">
         <p className="crossover-pagination__meta">
-          Showing {rows.length} of {total} entries
-          {showAll ? " • All entries" : ` • Page ${page} of ${maxPage}`}
+          Showing {displayRows.length} of {sortedTotal || total} entries
+          {showAll ? " • All entries" : ` • Page ${safePage} of ${sortedMaxPage || maxPage}`}
         </p>
         {!showAll ? (
           <div className="crossover-pagination__controls">
-            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
-            <span className="crossover-pagination__page" aria-current="page">{page}</span>
-            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={page >= maxPage} onClick={() => onPage(page + 1)}>Next</button>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={safePage <= 1} onClick={() => onPage(safePage - 1)}>Previous</button>
+            <span className="crossover-pagination__page" aria-current="page">{safePage}</span>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={safePage >= sortedMaxPage} onClick={() => onPage(safePage + 1)}>Next</button>
           </div>
         ) : null}
       </footer>

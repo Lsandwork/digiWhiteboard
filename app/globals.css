@@ -6145,6 +6145,36 @@ html.lobby-tv-display .social-video-shell {
   border-bottom: 1px solid rgba(245, 158, 11, 0.15);
 }
 
+.sortable-th-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.sortable-th-btn:hover,
+.sortable-th-btn--active {
+  color: #fff;
+}
+.sortable-th-btn__icon {
+  font-size: 0.65rem;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+.sortable-th-btn--active .sortable-th-btn__icon {
+  opacity: 1;
+  color: #f59e0b;
+}
+
+
 .crossover-table th:nth-child(1) { width: 28%; }
 .crossover-table th:nth-child(2) { width: 11%; }
 .crossover-table th:nth-child(3) { width: 10%; }

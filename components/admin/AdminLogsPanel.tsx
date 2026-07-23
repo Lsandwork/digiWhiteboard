@@ -76,11 +76,13 @@ export function AdminLogsPanel({ webhookUrl, events, failedEvents, board }: Admi
             emptyTitle="No audit logs yet"
             emptyDescription="Admin actions like login, publish, and user changes appear here."
             columns={[
-              { key: "action", header: "Action", render: (row) => <span className="font-semibold text-white">{row.action}</span> },
-              { key: "actor", header: "Admin", render: (row) => row.actor_email ?? "System" },
-              { key: "target", header: "Target", hideOnMobile: true, render: (row) => row.target_type ? `${row.target_type}${row.target_id ? `: ${row.target_id}` : ""}` : "—" },
-              { key: "when", header: "When", render: (row) => new Date(row.created_at).toLocaleString() }
+              { key: "action", header: "Action", getSortValue: (row) => row.action, render: (row) => <span className="font-semibold text-white">{row.action}</span> },
+              { key: "actor", header: "Admin", getSortValue: (row) => row.actor_email ?? "System", render: (row) => row.actor_email ?? "System" },
+              { key: "target", header: "Target", hideOnMobile: true, getSortValue: (row) => row.target_type ?? "", render: (row) => row.target_type ? `${row.target_type}${row.target_id ? `: ${row.target_id}` : ""}` : "—" },
+              { key: "when", header: "When", getSortValue: (row) => row.created_at, render: (row) => new Date(row.created_at).toLocaleString() }
             ]}
+            defaultSortKey="when"
+            defaultSortDir="desc"
           />
         </div>
       </section>
@@ -107,11 +109,13 @@ function EventTable({ title, events }: { title: string; events: WebhookEvent[] }
         emptyTitle="No events"
         emptyDescription="Webhook events will appear here when Gingr sends them."
         columns={[
-          { key: "type", header: "Type", render: (row) => row.webhook_type },
-          { key: "entity", header: "Entity", render: (row) => row.entity_id },
-          { key: "verified", header: "Verified", hideOnMobile: true, render: (row) => row.verified ? "Yes" : "No" },
-          { key: "processed", header: "Processed", render: (row) => row.processed ? "Yes" : row.processing_error ?? "No" }
+          { key: "type", header: "Type", getSortValue: (row) => row.webhook_type, render: (row) => row.webhook_type },
+          { key: "entity", header: "Entity", getSortValue: (row) => row.entity_id, render: (row) => row.entity_id },
+          { key: "verified", header: "Verified", hideOnMobile: true, getSortValue: (row) => (row.verified ? 1 : 0), render: (row) => row.verified ? "Yes" : "No" },
+          { key: "processed", header: "Processed", getSortValue: (row) => (row.processed ? 1 : 0), render: (row) => row.processed ? "Yes" : row.processing_error ?? "No" }
         ]}
+        defaultSortKey="type"
+        defaultSortDir="asc"
       />
     </section>
   );

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { SortableTh } from "@/components/admin/ui/sortable-table";
 import { centsToDisplay, bpsToDisplay } from "@/lib/staff/commission-ledger/money";
 import type { PackageCommissionRecord } from "@/lib/staff/commission-ledger/types";
 
@@ -177,6 +178,8 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const dateFrom = searchParams.get("dateFrom") ?? "";
   const dateTo = searchParams.get("dateTo") ?? "";
   const trainerIds = searchParams.get("trainerIds") ?? "";
+  const sortBy = searchParams.get("sortBy") ?? "sale_date";
+  const sortDir = (searchParams.get("sortDir") === "asc" ? "asc" : "desc") as "asc" | "desc";
 
   const isTrainer = Boolean(data?.currentUser?.isTrainerOnly);
   const ledgerBodyText = isTrainer ? "text-2xl leading-snug" : "text-3xl leading-snug";
@@ -231,6 +234,12 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     },
     [pathname, router, searchParams]
   );
+
+  function toggleLedgerSort(column: string) {
+    const nextDir =
+      sortBy === column ? (sortDir === "asc" ? "desc" : "asc") : column.includes("date") || column.includes("cents") ? "desc" : "asc";
+    setParams({ sortBy: column, sortDir: nextDir, page: "1" });
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -649,15 +658,15 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       />
                     </th>
                   ) : null}
-                  <th className="px-4 py-4">Status</th>
-                  <th className="px-4 py-4">Trainer</th>
-                  <th className="px-4 py-4">Sale Date</th>
-                  <th className="px-4 py-4">Client</th>
-                  <th className="px-4 py-4">Dog</th>
-                  <th className="px-4 py-4">Type / Package</th>
-                  <th className="px-4 py-4">Gross</th>
+                  <SortableTh className="px-4 py-4" label="Status" column="approval_status" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className="px-4 py-4" label="Trainer" column="trainer_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className="px-4 py-4" label="Sale Date" column="sale_date" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className="px-4 py-4" label="Client" column="client_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className="px-4 py-4" label="Dog" column="dog_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className="px-4 py-4" label="Type / Package" column="package_or_class" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className="px-4 py-4" label="Gross" column="gross_amount_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
                   <th className="px-4 py-4">Rate</th>
-                  <th className="px-4 py-4">Final</th>
+                  <SortableTh className="px-4 py-4" label="Final" column="final_commission_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
                   <th className="px-4 py-4">Source</th>
                   <th className="px-4 py-4">Comments</th>
                 </tr>
