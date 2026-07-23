@@ -28,6 +28,9 @@ const SORTABLE: Record<string, string> = {
   package_or_class: "package_or_class",
   gross_amount_cents: "gross_amount_cents",
   final_commission_cents: "final_commission_cents",
+  // Source column shows Gingr/APP transaction links
+  source: "gingr_transaction_url",
+  gingr_transaction_url: "gingr_transaction_url",
   approval_status: "approval_status",
   payment_status: "payment_status",
   review_status: "review_status",

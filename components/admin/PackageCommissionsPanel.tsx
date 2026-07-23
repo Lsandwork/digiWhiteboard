@@ -679,7 +679,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                   <SortableTh className="px-4 py-4" label="Gross" column="gross_amount_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
                   <th className="px-4 py-4">Rate</th>
                   <SortableTh className="px-4 py-4" label="Final" column="final_commission_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <th className="px-4 py-4">Source</th>
+                  <SortableTh className="px-4 py-4" label="Source" column="source" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
                   <th className="px-4 py-4">Comments</th>
                 </tr>
               </thead>
