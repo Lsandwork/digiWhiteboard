@@ -24,6 +24,7 @@ type AdminShellProps = {
   board: AdminBoardType;
   tab: AdminTab;
   username: string;
+  displayName?: string | null;
   role?: string | null;
   isDemo?: boolean;
   demoRole?: string | null;
@@ -53,6 +54,7 @@ export function AdminShell({
   board,
   tab,
   username,
+  displayName = null,
   role,
   isDemo,
   demoRole,
@@ -132,6 +134,7 @@ export function AdminShell({
           activeTab={tab}
           board={board}
           username={username}
+          displayName={displayName}
           role={effectiveRole}
           displayLabel={displayLabel}
           visibleTabs={visibleTabs}

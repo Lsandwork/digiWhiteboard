@@ -3,6 +3,7 @@ import type { AdminBoardType } from "@/lib/admin/types";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
+import { getAdminUserById } from "@/lib/admin/users";
 import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
@@ -62,6 +63,10 @@ export async function GET(request: Request) {
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
+  const profileUser = session?.adminUserId
+    ? await getAdminUserById(supabase, session.adminUserId).catch(() => null)
+    : null;
+  const fullName = profileUser?.full_name?.trim() || null;
 
   if (isDemoSession(session)) {
     const sandbox = await getDemoSandbox(supabase);
@@ -69,6 +74,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       board,
       username: session?.email ?? DEMO_EMAIL,
+      fullName,
       session: session ? { ...session, access } : null,
       admin_settings: adminSettings,
       lobby_settings: lobbySettings,
@@ -91,6 +97,7 @@ export async function GET(request: Request) {
   return NextResponse.json({
     board,
     username: session?.email ?? "admin",
+    fullName,
     session: session ? { ...session, access } : null,
     admin_settings: adminSettings,
     lobby_settings: lobbySettings,

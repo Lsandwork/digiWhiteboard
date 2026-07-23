@@ -220,6 +220,7 @@ type SidebarProps = {
   activePath?: string | null;
   board: AdminBoardType;
   username: string;
+  displayName?: string | null;
   role?: string | null;
   displayLabel?: string | null;
   mobileOpen: boolean;
@@ -237,6 +238,7 @@ export function Sidebar({
   activePath = null,
   board,
   username,
+  displayName = null,
   role,
   displayLabel,
   mobileOpen,
@@ -341,9 +343,9 @@ export function Sidebar({
           ) : null}
 
           <div className="admin-user-card">
-            <div className="admin-user-card__avatar" aria-hidden>{userInitials(username)}</div>
+            <div className="admin-user-card__avatar" aria-hidden>{userInitials(displayName?.trim() || username)}</div>
             <div className="min-w-0 flex-1">
-              <p className="admin-user-card__name truncate">{username.split("@")[0] ?? username}</p>
+              <p className="admin-user-card__name truncate">{displayName?.trim() || username.split("@")[0] || username}</p>
               <p className="admin-user-card__meta truncate">{roleLabel}</p>
               <p className="admin-user-card__meta truncate">{username}</p>
             </div>
