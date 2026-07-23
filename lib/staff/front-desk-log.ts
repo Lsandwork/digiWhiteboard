@@ -156,22 +156,33 @@ export function resolveStatusForShiftLog(item: Parameters<typeof isAssessmentDog
 }
 
 /**
- * Crossover Log (current day only, by created_at Pacific date):
- * - Today's open items
- * - Today's Check Out (assessment handoff; Archive next calendar day)
- * - Resolved / Completed always leave for Archived Log
- * - Explicit Archived leaves immediately
+ * Crossover Log — every entry logged today (Pacific), for same-day AM/PM handoff.
+ * Resolved / Check Out / In Progress / edits all stay here.
+ * Only an explicit Archive click removes a same-day row.
  * Past-dated rows never appear here.
  */
 export function belongsInCrossoverLog(item: CrossoverMessage) {
-  if (item.status === "Archived" || item.status === "Resolved" || item.status === "Completed") {
-    return false;
-  }
-  if (!isPacificToday(item.created_at)) return false;
+  if (item.status === "Archived") return false;
+  return isPacificToday(item.created_at);
+}
 
-  if (isOpenShiftLogStatus(item.status)) return true;
+/** Open Log — unresolved / in-flight statuses (any date). */
+export function belongsInOpenLog(item: CrossoverMessage) {
+  return isOpenShiftLogStatus(item.status);
+}
 
-  return item.status === "Check Out";
+/**
+ * Archived Log:
+ * - Explicit Archived (any date)
+ * - Past-dated Resolved / Check Out / Completed (not still on today's Crossover)
+ */
+export function belongsInArchivedLog(item: CrossoverMessage) {
+  if (belongsInCrossoverLog(item)) return false;
+  if (item.status === "Archived") return true;
+  return (
+    !isPacificToday(item.created_at) &&
+    (item.status === "Resolved" || item.status === "Check Out" || item.status === "Completed")
+  );
 }
 
 export type FrontDeskLogBucket = "crossover" | "open" | "archived";

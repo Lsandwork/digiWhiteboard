@@ -57,10 +57,11 @@ import {
   type TemplateFieldValues
 } from "@/lib/frontDeskLog/logTemplates";
 import {
+  belongsInArchivedLog,
   belongsInCrossoverLog,
+  belongsInOpenLog,
   formatShiftLogDayLabel,
   isAssessmentDogLog,
-  isClosedShiftLogStatus,
   isDueToday,
   isOpenShiftLogStatus,
   resolveStatusForShiftLog,
@@ -652,20 +653,18 @@ function CrossoverPage(props: {
   }, [filters, props.data?.crossover_messages, queryFields]);
 
   const dailyRows = useMemo(() => {
-    // Crossover Log = today's open + same-day Check Out; Resolved goes to Archived Log.
+    // Crossover Log = all of today's entries until someone clicks Archive.
     return filteredRows.filter((item) => belongsInCrossoverLog(item));
   }, [filteredRows]);
 
   const openRows = useMemo(
-    () => filteredRows.filter((item) => isOpenShiftLogStatus(item.status)),
+    () => filteredRows.filter((item) => belongsInOpenLog(item)),
     [filteredRows]
   );
 
   const archivedRows = useMemo(() => {
-    // Closed history that is no longer on today's Crossover Log.
-    const closed = (props.data?.crossover_messages ?? []).filter(
-      (item) => isClosedShiftLogStatus(item.status) && !belongsInCrossoverLog(item)
-    );
+    // Past Resolved/Check Out + explicit Archived (never same-day rows still on Crossover).
+    const closed = (props.data?.crossover_messages ?? []).filter((item) => belongsInArchivedLog(item));
     return filterShiftLogRows(closed, { ...filters, status: "", openOnly: false }, queryFields);
   }, [filters, props.data?.crossover_messages, queryFields]);
 
@@ -733,7 +732,7 @@ function CrossoverPage(props: {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Front Desk Tracking Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Crossover Log shows today&apos;s open rows (plus same-day Check Out). Marking Resolved moves the entry to Archived Log. Open Log holds unresolved follow-ups.
+          Crossover Log keeps every entry logged today until someone clicks Archive — even Resolved, Check Out, or In Progress. Open Log holds unresolved follow-ups. Past Resolved/Check Out goes to Archived Log.
         </p>
         {props.loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
@@ -764,10 +763,10 @@ function CrossoverPage(props: {
             onEdit={props.onEdit}
             formatDateTime={formatDateTime}
             title={`Crossover Log — ${todayLabel}`}
-            subtitle="Only today's open rows (plus same-day Check Out). Resolved goes to Archived Log."
+            subtitle="All of today's entries stay here for AM/PM handoff. Only Archive removes them."
             headingId="shift-log-daily-heading"
             emptyTitle="No crossover entries today"
-            emptyText="Today's open entries appear here for crossover handoff."
+            emptyText="Everything logged today appears here until Archived."
             showFilterBar={false}
             showRefresh={false}
             logBucket="crossover"
