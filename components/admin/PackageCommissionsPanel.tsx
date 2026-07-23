@@ -95,6 +95,17 @@ type ReportTypeKey =
   | "refund_report"
   | "date_range";
 
+function sourceLinkLabel(url: string): string {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host.includes("gingr")) return "Gingr";
+    if (host.includes("fitdog.com") || host.includes("app.fitdog")) return "APP";
+  } catch {
+    /* fall through */
+  }
+  return "Source";
+}
+
 function statusPill(
   label: string,
   tone: "amber" | "green" | "sky" | "rose" | "slate" | "orange",
@@ -739,7 +750,21 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       <td className="px-4 py-4">{centsToDisplay(row.gross_amount_cents)}</td>
                       <td className="px-4 py-4">{bpsToDisplay(row.commission_rate_bps) || "—"}</td>
                       <td className="px-4 py-4 font-bold text-fitdog-orange">{centsToDisplay(row.final_commission_cents)}</td>
-                      <td className="px-4 py-4">{row.source}</td>
+                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        {row.gingr_transaction_url ? (
+                          <a
+                            href={row.gingr_transaction_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-sky-300 underline decoration-sky-400/60 underline-offset-2 hover:text-sky-200"
+                            title={row.gingr_transaction_url}
+                          >
+                            {sourceLinkLabel(row.gingr_transaction_url)}
+                          </a>
+                        ) : (
+                          <span className="text-admin-muted">{row.source || "—"}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-4">
                         {row.has_open_comments ? (
                           <span className="inline-flex items-center gap-2 text-amber-200">
@@ -871,6 +896,21 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
               <Info label="Final" value={centsToDisplay(drawer.record.final_commission_cents)} />
               <Info label="Approval" value={drawer.record.approval_status} />
               <Info label="Payment" value={drawer.record.payment_status} />
+              <div className="col-span-2 rounded-lg border border-[var(--border)] bg-black/20 px-3 py-2">
+                <div className="text-xs uppercase tracking-wide text-admin-muted">Source</div>
+                {drawer.record.gingr_transaction_url ? (
+                  <a
+                    href={drawer.record.gingr_transaction_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-block font-semibold text-sky-300 underline decoration-sky-400/60 underline-offset-2 hover:text-sky-200"
+                  >
+                    {sourceLinkLabel(drawer.record.gingr_transaction_url)} — open link
+                  </a>
+                ) : (
+                  <div className="mt-1 font-semibold admin-text-emphasis">{drawer.record.source || "—"}</div>
+                )}
+              </div>
             </div>
 
             {data?.canComment ? (

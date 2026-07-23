@@ -12,13 +12,18 @@ assert.equal(detectServiceLocation("At-Home Training Package"), "at_home");
 assert.equal(detectServiceLocation("At Home Private Session"), "at_home");
 assert.equal(detectServiceLocation("In-Home Behavior Package"), "at_home");
 assert.equal(detectServiceLocation("Refund: At-Home Package"), "at_home");
+assert.equal(detectServiceLocation("1 HOME Private Session"), "at_home");
+assert.equal(detectServiceLocation("@ Home - Core Pack"), "at_home");
+assert.equal(detectServiceLocation("3 Pack @ Home"), "at_home");
+assert.equal(detectServiceLocation("PUPPY JUMPSTART"), "at_home");
+assert.equal(detectServiceLocation("3 Pack @ Facility"), "facility");
 assert.equal(detectServiceLocation("At Facility Obedience Package"), "facility");
 assert.equal(detectServiceLocation("Group Class — Facility"), "facility");
 assert.equal(detectServiceLocation("Private Session"), "facility");
 assert.equal(detectServiceLocation(""), "facility");
 
 assert.equal(trainerRateBpsForPackage("At-Home Session"), AT_HOME_TRAINER_RATE_BPS);
-assert.equal(trainerRateBpsForPackage("Facility Package"), FACILITY_TRAINER_RATE_BPS);
+assert.equal(trainerRateBpsForPackage("3 Pack @ Facility"), FACILITY_TRAINER_RATE_BPS);
 assert.equal(trainerRatePercentForPackage("At Home Package"), 70);
 assert.equal(trainerRatePercentForPackage("Daycare Package"), 50);
 

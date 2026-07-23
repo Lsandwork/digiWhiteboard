@@ -9,11 +9,17 @@ export type ServiceLocation = "at_home" | "facility";
 
 /**
  * Infer at-home vs facility from package/class name.
- * At-home only when the name clearly says so; everything else is facility.
+ * Explicit facility wins; otherwise home markers / known at-home packages → at_home.
  */
 export function detectServiceLocation(packageOrClass: string | null | undefined): ServiceLocation {
-  const text = String(packageOrClass ?? "").toLowerCase();
-  if (/\bat[\s-]?home\b|\bin[\s-]?home\b/.test(text)) return "at_home";
+  const text = String(packageOrClass ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+  if (/\b@?\s*facility\b|\bat[\s-]?facility\b/.test(text)) return "facility";
+  if (
+    /\bat[\s-]?home\b|\bin[\s-]?home\b|\b@\s*home\b|\bhome\b/.test(text) ||
+    /puppy\s*jump\s*start|puppy\s*jumpstart/.test(text)
+  ) {
+    return "at_home";
+  }
   return "facility";
 }
 
