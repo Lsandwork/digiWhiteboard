@@ -200,6 +200,7 @@ export type AdminSettingsPayload = {
 
 export type DashboardPayload = AdminDashboardData & {
   username: string;
+  fullName?: string | null;
   session?: AdminSession | null;
   admin_settings?: AdminGlobalSettings;
 };

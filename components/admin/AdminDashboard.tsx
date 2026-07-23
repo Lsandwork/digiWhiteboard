@@ -397,6 +397,7 @@ export function AdminDashboard() {
         board={board}
         tab={tab}
         username={data.username ?? "admin"}
+        displayName={typeof data.fullName === "string" ? data.fullName : null}
         role={baseRole}
         isDemo={isDemo}
         demoRole={demoRole}

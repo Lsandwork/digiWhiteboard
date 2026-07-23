@@ -10,7 +10,7 @@ import { loadEnvFiles } from "./load-env-local";
 loadEnvFiles();
 
 import { syncUserAccessFromLegacyRole } from "@/lib/admin/user-access";
-import { findAdminUserByEmail, listAdminUsers, updateAdminUser } from "@/lib/admin/users";
+import { findAdminUserByEmail, listAdminUsers, updateAdminUser, type AdminUserPublic } from "@/lib/admin/users";
 import {
   createStaffDirectoryMember,
   listStaffOps,
@@ -63,7 +63,7 @@ async function main() {
     )
   );
 
-  let lonnie = await findAdminUserByEmail(supabase, TARGET_EMAIL);
+  let lonnie: AdminUserPublic | null = await findAdminUserByEmail(supabase, TARGET_EMAIL);
   const adminAlias = matches.find((user) => {
     const email = normEmail(user.email);
     return email === "admin" || email === "admin@fitdog.com" || email.startsWith("admin@");
