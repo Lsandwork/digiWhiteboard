@@ -6809,44 +6809,68 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .shift-log-table__select-col {
-  width: 1.75rem;
-  max-width: 1.75rem;
-  padding-left: 0.55rem !important;
-  padding-right: 0.35rem !important;
+  width: 2.25rem !important;
+  max-width: 2.25rem !important;
+  min-width: 2.25rem !important;
+  padding-left: 0.45rem !important;
+  padding-right: 0.25rem !important;
   vertical-align: middle;
+  text-align: center;
 }
 
 .shift-log-readable .shift-log-table th.shift-log-table__select-col,
 .shift-log-readable .shift-log-table td.shift-log-table__select-col {
-  padding-left: 0.55rem !important;
-  padding-right: 0.35rem !important;
-  padding-top: 0.75rem;
-  padding-bottom: 0.75rem;
+  width: 2.25rem !important;
+  max-width: 2.25rem !important;
+  min-width: 2.25rem !important;
+  padding-left: 0.45rem !important;
+  padding-right: 0.25rem !important;
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
 }
 
-.shift-log-readable .shift-log-table th,
-.shift-log-readable .crossover-table th {
-  padding: 0.75rem 0.7rem;
-  font-size: 0.78rem;
-  letter-spacing: 0.05em;
+/* Shift log has a leading checkbox column — override base 8-col widths. */
+.shift-log-table.crossover-table th:nth-child(1),
+.shift-log-table th:nth-child(1) {
+  width: 2.25rem !important;
+}
+.shift-log-table.crossover-table th:nth-child(2),
+.shift-log-table th:nth-child(2) {
+  width: 28% !important;
+}
+.shift-log-table.crossover-table th:nth-child(3),
+.shift-log-table th:nth-child(3) {
+  width: 9% !important;
+}
+.shift-log-table.crossover-table th:nth-child(4),
+.shift-log-table th:nth-child(4) {
+  width: 9% !important;
+}
+.shift-log-table.crossover-table th:nth-child(5),
+.shift-log-table th:nth-child(5) {
+  width: 10% !important;
+}
+.shift-log-table.crossover-table th:nth-child(6),
+.shift-log-table th:nth-child(6) {
+  width: 8% !important;
+}
+.shift-log-table.crossover-table th:nth-child(7),
+.shift-log-table th:nth-child(7) {
+  width: 12% !important;
+}
+.shift-log-table.crossover-table th:nth-child(8),
+.shift-log-table th:nth-child(8) {
+  width: 9% !important;
+}
+.shift-log-table.crossover-table th:nth-child(9),
+.shift-log-table th:nth-child(9) {
+  width: 7.5rem !important;
 }
 
-.shift-log-readable .shift-log-table td,
-.shift-log-readable .crossover-table td {
-  padding: 0.85rem 0.7rem;
-  line-height: 1.4;
-}
-
-.shift-log-readable .crossover-table__subject-title {
-  font-size: 1.02rem;
-  line-height: 1.35;
-}
-
-.shift-log-readable .crossover-table__subject-preview {
-  margin-top: 0.3rem;
-  -webkit-line-clamp: 2;
-  font-size: 0.9rem;
-  line-height: 1.4;
+.shift-log-table .crossover-table__actions-col,
+.shift-log-table td:last-child {
+  width: 7.5rem !important;
+  white-space: nowrap;
 }
 
 .shift-log-bulk-bar {
