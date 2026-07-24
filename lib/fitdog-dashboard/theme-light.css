@@ -398,12 +398,12 @@ html[data-theme="light"] .admin-badge {
 
 html[data-theme="light"] .admin-badge--green {
   background: var(--success-soft);
-  color: var(--success-foreground);
+  color: #14532d;
 }
 
 html[data-theme="light"] .admin-badge--info {
   background: var(--info-soft);
-  color: var(--info-foreground);
+  color: #1e3a8a;
   font-weight: 800;
   letter-spacing: 0.04em;
 }
@@ -521,7 +521,7 @@ html[data-theme="light"] .crossover-badge--status-active,
 html[data-theme="light"] .notif-hub-status--resolved,
 html[data-theme="light"] .admin-badge--green {
   background: #dcfce7;
-  color: #166534;
+  color: #14532d;
   border-color: rgba(22, 163, 74, 0.35);
 }
 

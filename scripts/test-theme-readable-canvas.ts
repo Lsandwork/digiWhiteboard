@@ -23,5 +23,10 @@ assert.match(readable, /text-slate-300/, "must remap pale slate text");
 assert.match(readable, /text-rose-/, "must remap pale rose/urgent text");
 assert.match(readable, /admin-preview-frame/, "must preserve white text in board previews");
 assert.match(readable, /\.admin-sidebar/, "clear sidebar must keep light text");
+assert.match(readable, /admin-badge--info/, "dashboard/info badges must remapped for light canvases");
+assert.match(readable, /admin-badge--green/, "status/green badges must remapped for light canvases");
+assert.match(readable, /admin-icon-btn/, "action icon buttons must remapped for light canvases");
+assert.match(readable, /#1e3a8a/, "info text must use dark navy on light canvases");
+assert.match(readable, /#14532d/, "success text must use dark green on light canvases");
 
 console.log("theme readable canvas tests passed");

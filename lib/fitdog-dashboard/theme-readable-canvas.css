@@ -273,3 +273,139 @@ html[data-theme="clear"] .admin-sidebar :is(.text-white, [class*="text-white/"],
 html[data-theme="clear"] .admin-sidebar :is(.text-admin-muted, .admin-muted) {
   color: #94a3b8;
 }
+
+/*
+ * Badges, status chips, and action icons on light canvases.
+ * Use near-navy / forest greens so Dashboard / Status / Actions stay readable.
+ */
+html[data-theme="light"] .admin-theme .admin-badge,
+html[data-theme="clear"] .admin-theme .admin-badge {
+  background: #e2e8f0;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+html[data-theme="light"] .admin-theme .admin-badge--info,
+html[data-theme="clear"] .admin-theme .admin-badge--info {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #93c5fd;
+  font-weight: 800;
+}
+
+html[data-theme="light"] .admin-theme .admin-badge--green,
+html[data-theme="clear"] .admin-theme .admin-badge--green,
+html[data-theme="light"] .admin-theme .crossover-badge--status-active,
+html[data-theme="clear"] .admin-theme .crossover-badge--status-active,
+html[data-theme="light"] .admin-theme .notif-hub-status--resolved,
+html[data-theme="clear"] .admin-theme .notif-hub-status--resolved {
+  background: #dcfce7;
+  color: #14532d;
+  border-color: #86efac;
+}
+
+html[data-theme="light"] .admin-theme .admin-badge--amber,
+html[data-theme="clear"] .admin-theme .admin-badge--amber,
+html[data-theme="light"] .admin-theme .crossover-badge--status-pending,
+html[data-theme="clear"] .admin-theme .crossover-badge--status-pending {
+  background: #fef3c7;
+  color: #78350f;
+  border-color: #fcd34d;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-icon-btn, .fitdog-action-icon-btn),
+html[data-theme="clear"] .admin-theme :is(.admin-icon-btn, .fitdog-action-icon-btn) {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-icon-btn, .fitdog-action-icon-btn):hover:not(:disabled),
+html[data-theme="clear"] .admin-theme :is(.admin-icon-btn, .fitdog-action-icon-btn):hover:not(:disabled) {
+  border-color: #ea580c;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+html[data-theme="light"] .admin-theme .admin-icon-btn--accent,
+html[data-theme="clear"] .admin-theme .admin-icon-btn--accent {
+  border-color: #1d4ed8;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+html[data-theme="light"] .admin-theme .admin-icon-btn--accent:hover:not(:disabled),
+html[data-theme="clear"] .admin-theme .admin-icon-btn--accent:hover:not(:disabled) {
+  border-color: #1e3a8a;
+  background: #bfdbfe;
+  color: #172554;
+}
+
+/* Stronger status utility remaps for mid-tone pastels still used sitewide */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-emerald-400"],
+    [class*="text-emerald-500"],
+    [class*="text-green-400"],
+    [class*="text-green-500"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-emerald-400"],
+    [class*="text-emerald-500"],
+    [class*="text-green-400"],
+    [class*="text-green-500"]
+  ) {
+  color: #14532d !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-sky-400"],
+    [class*="text-sky-500"],
+    [class*="text-blue-400"],
+    [class*="text-blue-500"],
+    [class*="text-cyan-400"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-sky-400"],
+    [class*="text-sky-500"],
+    [class*="text-blue-400"],
+    [class*="text-blue-500"],
+    [class*="text-cyan-400"]
+  ) {
+  color: #1e3a8a !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-amber-400"],
+    [class*="text-yellow-400"],
+    [class*="text-orange-400"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-amber-400"],
+    [class*="text-yellow-400"],
+    [class*="text-orange-400"]
+  ) {
+  color: #78350f !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-rose-400"],
+    [class*="text-red-400"],
+    [class*="text-red-500"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-rose-400"],
+    [class*="text-red-400"],
+    [class*="text-red-500"]
+  ) {
+  color: #7f1d1d !important;
+}
+
+/* Token foregrounds used by badges/status chips */
+html[data-theme="light"],
+html[data-theme="clear"] {
+  --success-foreground: #14532d;
+  --info-foreground: #1e3a8a;
+  --warning-foreground: #78350f;
+  --danger-foreground: #7f1d1d;
+}
