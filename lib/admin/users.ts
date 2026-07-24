@@ -263,12 +263,12 @@ export function isFullAdminRole(role?: string | null) {
 
 /** Assistant Manager — management tier (not full admin). */
 export function isManagementRole(role?: string | null) {
-  return role === "assistant_manager";
+  return role === "assistant_manager" || role === "management";
 }
 
 /** Owner Admin, Manager Admin, or Assistant Manager. */
 export function isAdminOrManagementRole(role?: string | null) {
-  return isFullAdminRole(role) || isManagementRole(role);
+  return isFullAdminRole(role) || isManagementRole(role) || role === "admin" || role === "super_admin";
 }
 
 /** HR Records and HR Consult — admin and management only. */

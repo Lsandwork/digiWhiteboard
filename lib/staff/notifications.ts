@@ -1,6 +1,7 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import {
   canAccessCrossoverCommunication,
+  isAdminOrManagementRole,
   isCrossoverStaffRole,
   isFullAdminRole,
   isGroomerRole,
@@ -26,7 +27,9 @@ export type StaffNotificationSourceTab =
   | "push_notices"
   | "notifications"
   | "walks_board"
-  | "package_commissions";
+  | "package_commissions"
+  | "vet_visits"
+  | "track_incidents";
 
 export type NotificationThreadStatus =
   | "open"
@@ -167,7 +170,8 @@ export function notificationVisibleToUser(
     case "coordinator_pool":
       return isStaffOpsLimitedRole(session.role);
     case "admin_pool":
-      return isFullAdminRole(session.role);
+      // Admin + management (assistant managers) receive escalations / vet-visit alerts.
+      return isAdminOrManagementRole(session.role);
     case "department_pool":
       return matchesDepartmentTarget(notification.target, directory, session);
     default:
@@ -191,7 +195,7 @@ export function filterPersonalNotificationsForUser(
 ) {
   return filterNotificationsForUser(state, session).filter((notification) => {
     if (notification.target.kind === "staff_email" || notification.target.kind === "staff_name") return true;
-    if (notification.target.kind === "admin_pool" && isFullAdminRole(session.role)) return true;
+    if (notification.target.kind === "admin_pool" && isAdminOrManagementRole(session.role)) return true;
     return false;
   });
 }

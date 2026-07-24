@@ -108,6 +108,7 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   admin_trainer_entries: FITDOG_UI.frontDeskLog,
   package_commissions: FITDOG_UI.managementSupport,
   track_incidents: FITDOG_UI_PACK.activeIssues,
+  vet_visits: FITDOG_UI_PACK.ownerFollowUp,
   hr_hub: FITDOG_UI.managementSupport,
   hr_consult: FITDOG_UI.managementSupport,
   bulk_photo_upload: FITDOG_UI_PACK.bulkPhotoUpload,
