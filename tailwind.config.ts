@@ -10,11 +10,19 @@ const config: Config = {
           900: "#05101b",
           800: "#0a1724"
         },
+        admin: {
+          muted: "var(--admin-muted)",
+          border: "var(--admin-border)",
+          card: "var(--admin-card)",
+          bg: "var(--admin-bg)"
+        },
         fitdog: {
           orange: "#ff9f1c",
           blue: "#4da3ff",
           green: "#68f77f",
-          violet: "#b77cff"
+          violet: "#b77cff",
+          text: "var(--fitdog-text)",
+          "text-secondary": "var(--fitdog-text-secondary)"
         },
         lobby: {
           orange: "#F46A27",

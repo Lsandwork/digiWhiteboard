@@ -10,6 +10,7 @@
     0 4px 14px rgba(255, 111, 38, 0.12);
 }
 
+html[data-theme="clear"] .crossover-btn--active,
 html[data-theme="light"] .crossover-btn--active {
   background: var(--brand-soft);
   color: var(--brand);
@@ -48,7 +49,8 @@ html[data-theme="light"] .admin-theme .admin-btn-primary {
   box-shadow: 0 0 0 1px rgba(255, 111, 38, 0.15);
 }
 
-html[data-theme="light"] .admin-filter-chip--active {
+html[data-theme="light"] .admin-filter-chip--active,
+html[data-theme="clear"] .admin-filter-chip--active {
   background: var(--brand-soft);
   color: var(--brand);
 }
@@ -71,7 +73,8 @@ html:not([data-theme]) .admin-tab--active {
   color: var(--text-primary, #ffffff);
 }
 
-html[data-theme="light"] .admin-help-category--active {
+html[data-theme="light"] .admin-help-category--active,
+html[data-theme="clear"] .admin-help-category--active {
   color: var(--brand);
 }
 
@@ -91,7 +94,9 @@ html[data-theme="light"] .admin-help-category--active {
 }
 
 html[data-theme="light"] .walks-board-filter--active,
-html[data-theme="light"] .walks-board-type-option--active {
+html[data-theme="light"] .walks-board-type-option--active,
+html[data-theme="clear"] .walks-board-filter--active,
+html[data-theme="clear"] .walks-board-type-option--active {
   color: var(--brand);
   background: var(--brand-soft);
 }
@@ -103,7 +108,8 @@ html[data-theme="light"] .walks-board-type-option--active {
   color: var(--text-primary, #f8fafc);
 }
 
-html[data-theme="light"] .grooming-dog-picker__option--active {
+html[data-theme="light"] .grooming-dog-picker__option--active,
+html[data-theme="clear"] .grooming-dog-picker__option--active {
   color: var(--text-primary);
 }
 
@@ -113,7 +119,8 @@ html[data-theme="light"] .grooming-dog-picker__option--active {
   color: var(--text-primary, #ffd7a1);
 }
 
-html[data-theme="light"] .fitdog-ai-window__tabs button.is-active {
+html[data-theme="light"] .fitdog-ai-window__tabs button.is-active,
+html[data-theme="clear"] .fitdog-ai-window__tabs button.is-active {
   color: var(--brand);
   background: var(--brand-soft);
 }

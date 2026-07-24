@@ -1,0 +1,275 @@
+/*
+ * Shared readability layer for light canvases (Light + Clear themes).
+ * Dark sidebar in Clear is excluded; intentional dark previews keep white text.
+ */
+
+/* Semantic muted text utility used across admin panels */
+.text-admin-muted,
+.admin-muted {
+  color: var(--admin-muted, var(--text-muted, #94a3b8));
+}
+
+/* Titles inherit theme text tokens instead of hardcoded white */
+html[data-theme="light"] .admin-page-title,
+html[data-theme="light"] .admin-section-title,
+html[data-theme="clear"] .admin-page-title,
+html[data-theme="clear"] .admin-section-title {
+  color: var(--fitdog-text, var(--text-primary, #12213a));
+}
+
+/* Content canvas default text */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) {
+  color: var(--fitdog-text, #12213a);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    .text-admin-muted,
+    .admin-muted,
+    .admin-page-subtitle,
+    .admin-section-helper,
+    .admin-field-helper
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    .text-admin-muted,
+    .admin-muted,
+    .admin-page-subtitle,
+    .admin-section-helper,
+    .admin-field-helper
+  ) {
+  color: var(--fitdog-text-secondary, #64748b);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    .text-white,
+    .admin-text-emphasis
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    .text-white,
+    .admin-text-emphasis
+  ) {
+  color: var(--fitdog-text, #12213a) !important;
+}
+
+/* Tailwind opacity white variants: text-white/90, text-white/80, etc. */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) [class*="text-white/"],
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) [class*="text-white/"] {
+  color: var(--fitdog-text, #12213a) !important;
+}
+
+/* Pale slate/gray/zinc used as body/muted text in dark UI */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-slate-100"],
+    [class*="text-slate-200"],
+    [class*="text-slate-300"],
+    [class*="text-gray-100"],
+    [class*="text-gray-200"],
+    [class*="text-gray-300"],
+    [class*="text-zinc-100"],
+    [class*="text-zinc-200"],
+    [class*="text-zinc-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-slate-100"],
+    [class*="text-slate-200"],
+    [class*="text-slate-300"],
+    [class*="text-gray-100"],
+    [class*="text-gray-200"],
+    [class*="text-gray-300"],
+    [class*="text-zinc-100"],
+    [class*="text-zinc-200"],
+    [class*="text-zinc-300"]
+  ) {
+  color: #334155 !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-slate-400"],
+    [class*="text-gray-400"],
+    [class*="text-zinc-400"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-slate-400"],
+    [class*="text-gray-400"],
+    [class*="text-zinc-400"]
+  ) {
+  color: #64748b !important;
+}
+
+/* Soft status pastels → darker readable tones on white */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-emerald-50"],
+    [class*="text-emerald-100"],
+    [class*="text-emerald-200"],
+    [class*="text-emerald-300"],
+    [class*="text-green-50"],
+    [class*="text-green-100"],
+    [class*="text-green-200"],
+    [class*="text-green-300"],
+    [class*="text-lime-100"],
+    [class*="text-lime-200"],
+    [class*="text-lime-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-emerald-50"],
+    [class*="text-emerald-100"],
+    [class*="text-emerald-200"],
+    [class*="text-emerald-300"],
+    [class*="text-green-50"],
+    [class*="text-green-100"],
+    [class*="text-green-200"],
+    [class*="text-green-300"],
+    [class*="text-lime-100"],
+    [class*="text-lime-200"],
+    [class*="text-lime-300"]
+  ) {
+  color: #166534 !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-rose-50"],
+    [class*="text-rose-100"],
+    [class*="text-rose-200"],
+    [class*="text-rose-300"],
+    [class*="text-red-50"],
+    [class*="text-red-100"],
+    [class*="text-red-200"],
+    [class*="text-red-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-rose-50"],
+    [class*="text-rose-100"],
+    [class*="text-rose-200"],
+    [class*="text-rose-300"],
+    [class*="text-red-50"],
+    [class*="text-red-100"],
+    [class*="text-red-200"],
+    [class*="text-red-300"]
+  ) {
+  color: #991b1b !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-amber-50"],
+    [class*="text-amber-100"],
+    [class*="text-amber-200"],
+    [class*="text-amber-300"],
+    [class*="text-yellow-50"],
+    [class*="text-yellow-100"],
+    [class*="text-yellow-200"],
+    [class*="text-yellow-300"],
+    [class*="text-orange-100"],
+    [class*="text-orange-200"],
+    [class*="text-orange-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-amber-50"],
+    [class*="text-amber-100"],
+    [class*="text-amber-200"],
+    [class*="text-amber-300"],
+    [class*="text-yellow-50"],
+    [class*="text-yellow-100"],
+    [class*="text-yellow-200"],
+    [class*="text-yellow-300"],
+    [class*="text-orange-100"],
+    [class*="text-orange-200"],
+    [class*="text-orange-300"]
+  ) {
+  color: #92400e !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-sky-50"],
+    [class*="text-sky-100"],
+    [class*="text-sky-200"],
+    [class*="text-sky-300"],
+    [class*="text-blue-50"],
+    [class*="text-blue-100"],
+    [class*="text-blue-200"],
+    [class*="text-blue-300"],
+    [class*="text-cyan-100"],
+    [class*="text-cyan-200"],
+    [class*="text-cyan-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-sky-50"],
+    [class*="text-sky-100"],
+    [class*="text-sky-200"],
+    [class*="text-sky-300"],
+    [class*="text-blue-50"],
+    [class*="text-blue-100"],
+    [class*="text-blue-200"],
+    [class*="text-blue-300"],
+    [class*="text-cyan-100"],
+    [class*="text-cyan-200"],
+    [class*="text-cyan-300"]
+  ) {
+  color: #1d4ed8 !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-violet-100"],
+    [class*="text-violet-200"],
+    [class*="text-violet-300"],
+    [class*="text-purple-100"],
+    [class*="text-purple-200"],
+    [class*="text-purple-300"],
+    [class*="text-fuchsia-100"],
+    [class*="text-fuchsia-200"],
+    [class*="text-fuchsia-300"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content, .admin-drawer-panel, .admin-modal) :is(
+    [class*="text-violet-100"],
+    [class*="text-violet-200"],
+    [class*="text-violet-300"],
+    [class*="text-purple-100"],
+    [class*="text-purple-200"],
+    [class*="text-purple-300"],
+    [class*="text-fuchsia-100"],
+    [class*="text-fuchsia-200"],
+    [class*="text-fuchsia-300"]
+  ) {
+  color: #6d28d9 !important;
+}
+
+/* Cards, tables, inputs on light canvases */
+html[data-theme="light"] .admin-theme :is(.admin-card, .crossover-card, .fitdog-kpi-card),
+html[data-theme="clear"] .admin-theme :is(.admin-card, .crossover-card, .fitdog-kpi-card) {
+  color: var(--fitdog-text, #12213a);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-table, .crossover-table) th,
+html[data-theme="clear"] .admin-theme :is(.admin-table, .crossover-table) th {
+  color: var(--fitdog-text-secondary, #64748b);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-table, .crossover-table) td,
+html[data-theme="clear"] .admin-theme :is(.admin-table, .crossover-table) td {
+  color: var(--fitdog-text, #12213a);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-input, .admin-select, .crossover-input, .crossover-select),
+html[data-theme="clear"] .admin-theme :is(.admin-input, .admin-select, .crossover-input, .crossover-select) {
+  color: var(--fitdog-text, #12213a);
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-input, .crossover-input)::placeholder,
+html[data-theme="clear"] .admin-theme :is(.admin-input, .crossover-input)::placeholder {
+  color: var(--input-placeholder, #94a3b8);
+}
+
+/* Keep white text on intentional dark preview / board shells */
+html[data-theme="light"] .admin-theme :is(.admin-preview-frame, .board-shell, .cast-lite-shell) :is(.text-white, [class*="text-white/"]),
+html[data-theme="clear"] .admin-theme :is(.admin-preview-frame, .board-shell, .cast-lite-shell) :is(.text-white, [class*="text-white/"]) {
+  color: #ffffff !important;
+}
+
+/* Clear theme: keep dark sidebar text light */
+html[data-theme="clear"] .admin-sidebar,
+html[data-theme="clear"] .admin-sidebar :is(.text-white, [class*="text-white/"], .admin-text-emphasis) {
+  color: #f8fafc;
+}
+
+html[data-theme="clear"] .admin-sidebar :is(.text-admin-muted, .admin-muted) {
+  color: #94a3b8;
+}
