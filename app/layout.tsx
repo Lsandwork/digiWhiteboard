@@ -6,6 +6,7 @@ import "./globals.css";
 import "../lib/theme/tokens.css";
 import "../lib/fitdog-dashboard/theme.css";
 import "../lib/fitdog-dashboard/theme-light.css";
+import "../lib/fitdog-dashboard/theme-clear.css";
 import "../lib/theme/button-states.css";
 
 export const metadata: Metadata = {

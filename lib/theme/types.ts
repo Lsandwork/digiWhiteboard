@@ -1,4 +1,4 @@
-export type ThemeMode = "light" | "dark";
+export type ThemeMode = "light" | "dark" | "clear";
 
 export interface ThemeContextValue {
   theme: ThemeMode;

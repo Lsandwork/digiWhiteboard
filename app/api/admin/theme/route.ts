@@ -41,7 +41,7 @@ export async function PATCH(request: Request) {
 
   const body = (await request.json()) as { theme?: unknown };
   if (!isThemeMode(body.theme)) {
-    return NextResponse.json({ error: "theme must be light or dark." }, { status: 400 });
+    return NextResponse.json({ error: "theme must be dark, light, or clear." }, { status: 400 });
   }
 
   const supabase = getServiceSupabase();

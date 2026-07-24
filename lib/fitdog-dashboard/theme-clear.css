@@ -1,0 +1,242 @@
+/* Clear theme — white page canvas, original dark sidebar, orange accents, light-blue buttons */
+
+html[data-theme="clear"] .admin-theme {
+  --fitdog-bg: #ffffff;
+  --fitdog-sidebar: #0a1017;
+  --fitdog-surface: #ffffff;
+  --fitdog-surface-elevated: #ffffff;
+  --fitdog-border: #e2e8f0;
+  --fitdog-text: #12213a;
+  --fitdog-text-secondary: #64748b;
+  --fitdog-orange: #ff6f26;
+  --fitdog-amber: #ffa612;
+  --fitdog-success: #16a34a;
+  --fitdog-warning: #d97706;
+  --fitdog-danger: #dc2626;
+  --fitdog-info: #45a6ff;
+  --fitdog-teal: #0d9488;
+  --fitdog-btn: #45a6ff;
+  --fitdog-btn-hover: #6bb8ff;
+
+  --admin-bg: #ffffff;
+  --admin-card: #ffffff;
+  --admin-card-alt: #ffffff;
+  --admin-border: #e2e8f0;
+  --admin-muted: #64748b;
+  --crossover-bg: #ffffff;
+  --crossover-card: #ffffff;
+  --crossover-card-alt: #ffffff;
+  --crossover-border: #e2e8f0;
+  --crossover-amber: #ffa612;
+  --crossover-gold: #ff6f26;
+  --crossover-text: #12213a;
+  --crossover-muted: #64748b;
+  --crossover-green: #16a34a;
+  --crossover-red: #dc2626;
+
+  background:
+    radial-gradient(circle at 12% 0%, rgba(255, 111, 38, 0.05), transparent 32%),
+    radial-gradient(circle at 88% 8%, rgba(69, 166, 255, 0.05), transparent 28%),
+    #ffffff;
+  color: var(--fitdog-text);
+}
+
+/* Keep original dark panel / sidebar styling */
+html[data-theme="clear"] .admin-sidebar {
+  border-right: 1px solid #263445;
+  background: #0a1017;
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.2);
+  color: #f8fafc;
+}
+
+html[data-theme="clear"] .admin-sidebar-brand__title,
+html[data-theme="clear"] .admin-sidebar .admin-text-emphasis {
+  color: #f8fafc;
+}
+
+html[data-theme="clear"] .admin-sidebar-brand__subtitle,
+html[data-theme="clear"] .admin-nav-section {
+  color: #94a3b8;
+}
+
+html[data-theme="clear"] .admin-nav-item {
+  color: #b7c1ce;
+}
+
+html[data-theme="clear"] .admin-nav-item:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="clear"] .admin-nav-item--active,
+html[data-theme="clear"] .admin-nav-item--active-parent {
+  color: #f8fafc;
+  background: linear-gradient(90deg, rgba(255, 111, 38, 0.14), rgba(21, 34, 50, 0.9));
+  border-color: rgba(255, 111, 38, 0.35);
+  box-shadow:
+    inset 3px 0 0 #ff6f26,
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="clear"] .admin-nav-group__children .admin-nav-item--active {
+  color: #ff8a4c;
+}
+
+html[data-theme="clear"] .admin-user-card,
+html[data-theme="clear"] .admin-sidebar-help-card {
+  border-color: #263445;
+  background: #111b26;
+  color: #f8fafc;
+  box-shadow: none;
+}
+
+html[data-theme="clear"] .admin-user-card__avatar {
+  background: linear-gradient(135deg, rgba(255, 111, 38, 0.28), rgba(255, 166, 18, 0.16));
+  color: #f8fafc;
+}
+
+html[data-theme="clear"] .admin-sidebar .theme-select {
+  border-color: #263445;
+  background: #111b26;
+  color: #b7c1ce;
+}
+
+html[data-theme="clear"] .admin-sidebar .theme-select__control {
+  color: #f8fafc;
+}
+
+/* Content area: white surfaces, dark text */
+html[data-theme="clear"] .admin-main,
+html[data-theme="clear"] .admin-content {
+  background: transparent;
+  color: var(--fitdog-text);
+}
+
+html[data-theme="clear"] .admin-page-title,
+html[data-theme="clear"] .admin-section-title,
+html[data-theme="clear"] .admin-theme .text-white,
+html[data-theme="clear"] .admin-text-emphasis {
+  color: var(--fitdog-text);
+}
+
+html[data-theme="clear"] .admin-page-subtitle,
+html[data-theme="clear"] .admin-muted,
+html[data-theme="clear"] .text-admin-muted {
+  color: var(--fitdog-text-secondary);
+}
+
+html[data-theme="clear"] .admin-card,
+html[data-theme="clear"] .crossover-card,
+html[data-theme="clear"] .fitdog-kpi-card {
+  border-color: var(--fitdog-border);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
+  color: var(--fitdog-text);
+}
+
+html[data-theme="clear"] .admin-input,
+html[data-theme="clear"] .admin-select,
+html[data-theme="clear"] .crossover-input,
+html[data-theme="clear"] .crossover-select {
+  border-color: var(--fitdog-border);
+  background: #ffffff;
+  color: var(--fitdog-text);
+}
+
+/* Light blue action buttons (not dark navy, not green) */
+html[data-theme="clear"] .admin-btn-primary,
+html[data-theme="clear"] .crossover-btn--primary {
+  border-color: rgba(69, 166, 255, 0.55);
+  background: linear-gradient(180deg, #6bb8ff, #45a6ff 58%, #2f93ef);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(69, 166, 255, 0.28);
+}
+
+html[data-theme="clear"] .admin-btn-primary:hover:not(:disabled),
+html[data-theme="clear"] .crossover-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: 0 10px 22px rgba(69, 166, 255, 0.34);
+}
+
+html[data-theme="clear"] .admin-btn-secondary,
+html[data-theme="clear"] .crossover-btn--ghost,
+html[data-theme="clear"] .crossover-btn--outline {
+  border-color: var(--fitdog-border);
+  background: #ffffff;
+  color: var(--fitdog-text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html[data-theme="clear"] .admin-btn-secondary:hover:not(:disabled),
+html[data-theme="clear"] .crossover-btn--ghost:hover:not(:disabled),
+html[data-theme="clear"] .crossover-btn--outline:hover:not(:disabled) {
+  border-color: rgba(69, 166, 255, 0.45);
+  background: rgba(69, 166, 255, 0.08);
+}
+
+html[data-theme="clear"] .admin-tab--active {
+  border-bottom-color: var(--fitdog-orange);
+  color: var(--fitdog-text);
+}
+
+html[data-theme="clear"] .admin-header-brand__label,
+html[data-theme="clear"] .text-fitdog-orange {
+  color: var(--fitdog-orange);
+}
+
+/* Readable pastel text remaps on white content */
+html[data-theme="clear"] .admin-theme [class*="text-emerald-50"],
+html[data-theme="clear"] .admin-theme [class*="text-emerald-100"],
+html[data-theme="clear"] .admin-theme [class*="text-emerald-200"],
+html[data-theme="clear"] .admin-theme [class*="text-green-100"],
+html[data-theme="clear"] .admin-theme [class*="text-green-200"] {
+  color: #166534 !important;
+}
+
+html[data-theme="clear"] .admin-theme [class*="text-sky-50"],
+html[data-theme="clear"] .admin-theme [class*="text-sky-100"],
+html[data-theme="clear"] .admin-theme [class*="text-sky-200"],
+html[data-theme="clear"] .admin-theme [class*="text-sky-300"] {
+  color: #0369a1 !important;
+}
+
+html[data-theme="clear"] .admin-theme [class*="text-amber-50"],
+html[data-theme="clear"] .admin-theme [class*="text-amber-100"],
+html[data-theme="clear"] .admin-theme [class*="text-amber-200"],
+html[data-theme="clear"] .admin-theme [class*="text-orange-100"],
+html[data-theme="clear"] .admin-theme [class*="text-orange-200"] {
+  color: #c2410c !important;
+}
+
+html[data-theme="clear"] .admin-theme [class*="text-rose-50"],
+html[data-theme="clear"] .admin-theme [class*="text-rose-100"],
+html[data-theme="clear"] .admin-theme [class*="text-rose-200"],
+html[data-theme="clear"] .admin-theme [class*="text-red-100"],
+html[data-theme="clear"] .admin-theme [class*="text-red-200"] {
+  color: #991b1b !important;
+}
+
+html[data-theme="clear"] .admin-theme [class*="bg-black/20"],
+html[data-theme="clear"] .admin-theme [class*="bg-black\\/20"] {
+  background-color: #f8fafc !important;
+}
+
+html[data-theme="clear"] .admin-table th,
+html[data-theme="clear"] .crossover-table th {
+  color: var(--fitdog-text-secondary);
+  border-bottom-color: var(--fitdog-border);
+  background: #f8fafc;
+}
+
+html[data-theme="clear"] .admin-table td,
+html[data-theme="clear"] .crossover-table td {
+  border-bottom-color: #e2e8f0;
+  color: var(--fitdog-text);
+}
+
+html[data-theme="clear"] .admin-drawer-panel,
+html[data-theme="clear"] .admin-modal,
+html[data-theme="clear"] [class*="Modal"] {
+  background: #ffffff;
+  color: var(--fitdog-text);
+}
