@@ -59,6 +59,12 @@ html[data-theme="clear"] .admin-nav-section {
   color: #94a3b8;
 }
 
+html[data-theme="clear"] .admin-nav-section:hover,
+html[data-theme="clear"] .admin-nav-section--active {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+}
+
 html[data-theme="clear"] .admin-nav-item {
   color: #b7c1ce;
 }

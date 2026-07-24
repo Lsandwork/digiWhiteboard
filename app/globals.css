@@ -3444,10 +3444,22 @@ html.lobby-tv-display .social-video-shell {
 .admin-sidebar--collapsed .admin-nav-item > span,
 .admin-sidebar--collapsed .admin-nav-group__chevron,
 .admin-sidebar--collapsed .admin-nav-section,
+.admin-sidebar--collapsed .admin-nav-section__chevron,
 .admin-sidebar--collapsed .admin-sidebar-help-card,
 .admin-sidebar--collapsed .admin-nav-group__children,
 .admin-sidebar--collapsed .admin-user-card .min-w-0 {
   display: none;
+}
+
+.admin-sidebar--collapsed .admin-nav-section-block {
+  margin-top: 0;
+  width: 100%;
+}
+
+.admin-sidebar--collapsed .admin-nav-section__children {
+  margin-top: 0;
+  gap: 0.35rem;
+  align-items: center;
 }
 
 .admin-sidebar--collapsed nav {
@@ -5051,17 +5063,57 @@ html.lobby-tv-display .social-video-shell {
   margin-bottom: 0.15rem;
 }
 
+.admin-nav-section-block {
+  margin-top: 0.55rem;
+}
+
+.admin-nav-section-block:first-child {
+  margin-top: 0.15rem;
+}
+
 .admin-nav-section {
-  margin: 1rem 0 0.35rem;
-  padding: 0 0.55rem;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.55rem;
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: rgba(148, 163, 184, 0.72);
+  transition: color 0.15s ease, background 0.15s ease;
 }
 
-.admin-nav-section:first-child {
+.admin-nav-section:hover {
+  color: rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.admin-nav-section--active {
+  color: rgba(248, 250, 252, 0.95);
+}
+
+.admin-nav-section__label {
+  flex: 1;
+  text-align: left;
+}
+
+.admin-nav-section__chevron {
+  opacity: 0.65;
+  transition: transform 0.15s ease;
+}
+
+.admin-nav-section__chevron--open {
+  transform: rotate(180deg);
+}
+
+.admin-nav-section__children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
   margin-top: 0.15rem;
 }
 

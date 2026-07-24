@@ -301,6 +301,12 @@ html[data-theme="light"] .admin-nav-section {
   color: var(--sidebar-section-label);
 }
 
+html[data-theme="light"] .admin-nav-section:hover,
+html[data-theme="light"] .admin-nav-section--active {
+  color: var(--fitdog-text);
+  background: rgba(15, 23, 42, 0.04);
+}
+
 html[data-theme="light"] .admin-tab--active {
   border-bottom-color: var(--fitdog-orange);
   color: var(--fitdog-text);

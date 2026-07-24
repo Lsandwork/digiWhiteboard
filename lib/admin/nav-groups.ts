@@ -597,6 +597,59 @@ export function findNavSectionForTab(entries: NavEntry[], tab: AdminTab): string
   return null;
 }
 
+export function findNavSectionIdForTab(entries: NavEntry[], tab: AdminTab): string | null {
+  let currentSectionId: string | null = null;
+
+  for (const entry of entries) {
+    if (entry.type === "section") {
+      currentSectionId = entry.id;
+      continue;
+    }
+    if (entry.type === "item" && entry.tab === tab) return currentSectionId;
+    if (entry.type === "group" && entry.children.some((child) => child.tab === tab)) return currentSectionId;
+  }
+
+  return null;
+}
+
+export function findNavSectionIdForPath(entries: NavEntry[], path: string | null | undefined): string | null {
+  if (!path) return null;
+  let currentSectionId: string | null = null;
+
+  for (const entry of entries) {
+    if (entry.type === "section") {
+      currentSectionId = entry.id;
+      continue;
+    }
+    if (entry.type === "route" && entry.href === path) return currentSectionId;
+  }
+
+  return null;
+}
+
+export type NavSectionBucket = {
+  section: Extract<NavEntry, { type: "section" }> | null;
+  children: Array<Exclude<NavEntry, { type: "section" }>>;
+};
+
+/** Group flat nav entries into collapsible section buckets. */
+export function bucketNavEntries(entries: NavEntry[]): NavSectionBucket[] {
+  const buckets: NavSectionBucket[] = [];
+  let current: NavSectionBucket = { section: null, children: [] };
+
+  for (const entry of entries) {
+    if (entry.type === "section") {
+      if (current.section || current.children.length) buckets.push(current);
+      current = { section: entry, children: [] };
+      continue;
+    }
+    current.children.push(entry);
+  }
+
+  if (current.section || current.children.length) buckets.push(current);
+  return buckets;
+}
+
 export function isTabInNav(entries: NavEntry[], tab: AdminTab) {
   for (const entry of entries) {
     if (entry.type === "item" && entry.tab === tab) return true;

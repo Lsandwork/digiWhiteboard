@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
-import { buildAdminNav, buildGroomerNav, buildTeamLeadNav, buildTrainerNav, findNavGroupForTab, findNavSectionForTab } from "../lib/admin/nav-groups";
+import {
+  bucketNavEntries,
+  buildAdminNav,
+  buildGroomerNav,
+  buildTeamLeadNav,
+  buildTrainerNav,
+  findNavGroupForTab,
+  findNavSectionForTab,
+  findNavSectionIdForTab
+} from "../lib/admin/nav-groups";
 import type { AdminTab } from "../lib/admin/types";
 
 const trainerTabs: AdminTab[] = [
@@ -149,5 +158,12 @@ assert.deepEqual(
   supportRequests.children.map((child) => child.tab),
   ["ms_trainer_requests", "ms_groomer_requests"]
 );
+
+const managementBuckets = bucketNavEntries(adminWithSubmitNav);
+assert.ok(
+  managementBuckets.some((bucket) => bucket.section?.label === "Management" && bucket.children.length > 0),
+  "Management section should bucket its tab links for collapsible nav"
+);
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "ms_hub"), "staff_management");
 
 console.log("commissions nav tests passed");

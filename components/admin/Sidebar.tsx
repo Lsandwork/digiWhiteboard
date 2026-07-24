@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronsLeft, ChevronsRight, HelpCircle, Menu, X } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
@@ -12,7 +12,15 @@ import { FITDOG_BRAND, FITDOG_TAB_ICONS } from "@/lib/fitdog-dashboard/assets";
 import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
-import { buildStaffPanelNav, findNavGroupForTab, findNavSectionForTab, getTabDescription, getTabLabel, type NavEntry } from "@/lib/admin/nav-groups";
+import {
+  bucketNavEntries,
+  buildStaffPanelNav,
+  findNavGroupForTab,
+  findNavSectionIdForPath,
+  findNavSectionIdForTab,
+  getTabLabel,
+  type NavEntry
+} from "@/lib/admin/nav-groups";
 
 const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
@@ -35,6 +43,19 @@ function userInitials(username: string) {
   const parts = base.split(/[.\s_-]+/).filter(Boolean);
   if (parts.length >= 2) return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
   return base.slice(0, 2).toUpperCase();
+}
+
+function sectionContainsActive(
+  children: Array<Exclude<NavEntry, { type: "section" }>>,
+  activeTab: AdminTab,
+  activePath?: string | null
+) {
+  return children.some((child) => {
+    if (child.type === "item") return child.tab === activeTab;
+    if (child.type === "group") return child.children.some((item) => item.tab === activeTab);
+    if (child.type === "route") return child.href === activePath;
+    return false;
+  });
 }
 
 function NavIcon({ tab }: { tab: AdminTab }) {
@@ -120,11 +141,42 @@ function SidebarNavGroup({
   );
 }
 
-function SidebarNavSection({ label }: { label: string }) {
+function SidebarNavSection({
+  id,
+  label,
+  expanded,
+  activeChild,
+  onToggle,
+  children
+}: {
+  id: string;
+  label: string;
+  expanded: boolean;
+  activeChild: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
   return (
-    <p className="admin-nav-section" role="presentation">
-      {label}
-    </p>
+    <div className={`admin-nav-section-block ${expanded ? "admin-nav-section-block--open" : ""}`}>
+      <button
+        type="button"
+        className={`admin-nav-section ${activeChild ? "admin-nav-section--active" : ""}`}
+        aria-expanded={expanded}
+        aria-controls={`admin-nav-section-${id}`}
+        onClick={onToggle}
+      >
+        <span className="admin-nav-section__label">{label}</span>
+        <ChevronDown
+          className={`admin-nav-section__chevron h-3.5 w-3.5 shrink-0 ${expanded ? "admin-nav-section__chevron--open" : ""}`}
+          aria-hidden
+        />
+      </button>
+      {expanded ? (
+        <div id={`admin-nav-section-${id}`} className="admin-nav-section__children">
+          {children}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -155,7 +207,7 @@ function SidebarNavRouteItem({
   );
 }
 
-function NavEntryList({
+function NavEntryChildren({
   entries,
   activeTab,
   activePath,
@@ -164,7 +216,7 @@ function NavEntryList({
   onSelect,
   onNavigate
 }: {
-  entries: NavEntry[];
+  entries: Array<Exclude<NavEntry, { type: "section" }>>;
   activeTab: AdminTab;
   activePath?: string | null;
   expandedGroups: Set<string>;
@@ -175,9 +227,6 @@ function NavEntryList({
   return (
     <>
       {entries.map((entry) => {
-        if (entry.type === "section") {
-          return <SidebarNavSection key={entry.id} label={entry.label} />;
-        }
         if (entry.type === "route") {
           return (
             <SidebarNavRouteItem
@@ -209,6 +258,70 @@ function NavEntryList({
             active={activeTab === entry.tab}
             onSelect={onSelect}
           />
+        );
+      })}
+    </>
+  );
+}
+
+function NavEntryList({
+  entries,
+  activeTab,
+  activePath,
+  expandedGroups,
+  expandedSections,
+  forceExpandSections,
+  onToggleGroup,
+  onToggleSection,
+  onSelect,
+  onNavigate
+}: {
+  entries: NavEntry[];
+  activeTab: AdminTab;
+  activePath?: string | null;
+  expandedGroups: Set<string>;
+  expandedSections: Set<string>;
+  forceExpandSections: boolean;
+  onToggleGroup: (id: string) => void;
+  onToggleSection: (id: string) => void;
+  onSelect: (tab: AdminTab) => void;
+  onNavigate: () => void;
+}) {
+  const buckets = useMemo(() => bucketNavEntries(entries), [entries]);
+
+  return (
+    <>
+      {buckets.map((bucket, index) => {
+        const children = (
+          <NavEntryChildren
+            entries={bucket.children}
+            activeTab={activeTab}
+            activePath={activePath}
+            expandedGroups={expandedGroups}
+            onToggleGroup={onToggleGroup}
+            onSelect={onSelect}
+            onNavigate={onNavigate}
+          />
+        );
+
+        if (!bucket.section) {
+          return <div key={`nav-orphan-${index}`}>{children}</div>;
+        }
+
+        const activeChild = sectionContainsActive(bucket.children, activeTab, activePath);
+        const expanded = forceExpandSections || expandedSections.has(bucket.section.id);
+
+        return (
+          <SidebarNavSection
+            key={bucket.section.id}
+            id={bucket.section.id}
+            label={bucket.section.label}
+            expanded={expanded}
+            activeChild={activeChild}
+            onToggle={() => onToggleSection(bucket.section!.id)}
+          >
+            {children}
+          </SidebarNavSection>
         );
       })}
     </>
@@ -255,7 +368,13 @@ export function Sidebar({
     [visibleTabs, board, role]
   );
   const activeGroupId = useMemo(() => findNavGroupForTab(navEntries, activeTab), [navEntries, activeTab]);
+  const activeSectionId = useMemo(() => {
+    return findNavSectionIdForPath(navEntries, activePath) ?? findNavSectionIdForTab(navEntries, activeTab);
+  }, [navEntries, activePath, activeTab]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(activeGroupId ? [activeGroupId] : []));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    () => new Set(activeSectionId ? [activeSectionId] : [])
+  );
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -270,6 +389,19 @@ export function Sidebar({
     return () => window.clearTimeout(timer);
   }, [activeGroupId]);
 
+  useEffect(() => {
+    if (!activeSectionId) return;
+    const timer = window.setTimeout(() => {
+      setExpandedSections((current) => {
+        if (current.has(activeSectionId)) return current;
+        const next = new Set(current);
+        next.add(activeSectionId);
+        return next;
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeSectionId]);
+
   const roleLabel = displayLabel ?? getAdminSidebarRoleLabel(role, username);
 
   function handleSelect(tab: AdminTab) {
@@ -279,6 +411,15 @@ export function Sidebar({
 
   function toggleGroup(id: string) {
     setExpandedGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSection(id: string) {
+    setExpandedSections((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -322,7 +463,10 @@ export function Sidebar({
             activeTab={activeTab}
             activePath={activePath}
             expandedGroups={expandedGroups}
+            expandedSections={expandedSections}
+            forceExpandSections={collapsed}
             onToggleGroup={toggleGroup}
+            onToggleSection={toggleSection}
             onSelect={handleSelect}
             onNavigate={onMobileClose}
           />
