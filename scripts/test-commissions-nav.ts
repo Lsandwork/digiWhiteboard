@@ -58,7 +58,7 @@ const coordinatorNav = buildAdminNav(coordinatorTabs, "staff");
 assert.equal(findNavSectionForTab(coordinatorNav, "yard_push_notices"), "Push to Whiteboard");
 assert.equal(findNavGroupForTab(coordinatorNav, "yard_push_notices"), "push_to_board");
 
-assert.equal(findNavSectionForTab(teamLeadNav, "management_support"), "Management Support");
+assert.equal(findNavSectionForTab(teamLeadNav, "management_support"), "Management");
 assert.equal(
   findNavSectionForTab(adminNav, "management_support"),
   null,
@@ -87,10 +87,30 @@ const groomerTabs: AdminTab[] = [
   "help"
 ];
 const groomerNav = buildGroomerNav(groomerTabs);
-assert.equal(findNavSectionForTab(groomerNav, "management_support"), "Management Support");
+assert.equal(findNavSectionForTab(groomerNav, "management_support"), "Management");
 assert.equal(findNavSectionForTab(groomerNav, "grooming_push"), "Push to Whiteboard");
 const groomerAdminSection = groomerNav.find((entry) => entry.type === "section" && entry.label === "Management Review");
 assert.equal(groomerAdminSection, undefined, "groomer nav should not include empty Management Review section");
+
+const adminWithSubmitTabs: AdminTab[] = [...adminTabs, "management_support"];
+const adminWithSubmitNav = buildAdminNav(adminWithSubmitTabs, "staff");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "management_support"), "Management");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "ms_hub"), "Management");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "admin_trainer_entries"), "Management");
+assert.ok(
+  adminWithSubmitNav.find((entry) => entry.type === "section" && entry.label === "Management"),
+  "admin staff nav should expose a Management section"
+);
+assert.equal(
+  adminWithSubmitNav.some(
+    (entry) =>
+      entry.type === "group" &&
+      entry.id === "front_desk" &&
+      entry.children.some((child) => child.tab === "management_support")
+  ),
+  false,
+  "Submit Request should not live under Front Desk Operations"
+);
 
 assert.equal(findNavSectionForTab(trainerNav, "package_commissions"), "Commissions");
 assert.equal(findNavGroupForTab(trainerNav, "package_commissions"), "commissions");
@@ -109,8 +129,8 @@ assert.equal(trainerCommissionsGroup.children[0]?.label, "Package & Class Commis
 
 const supportComplaints = adminNav.find((entry) => entry.type === "group" && entry.id === "support_complaints");
 const supportRequests = adminNav.find((entry) => entry.type === "group" && entry.id === "support_requests");
-assert.ok(supportComplaints && supportComplaints.type === "group", "Complaints group should exist under Support Inbox");
-assert.ok(supportRequests && supportRequests.type === "group", "Requests group should exist under Support Inbox");
+assert.ok(supportComplaints && supportComplaints.type === "group", "Complaints group should exist under Management");
+assert.ok(supportRequests && supportRequests.type === "group", "Requests group should exist under Management");
 assert.equal(
   supportComplaints.children.some((child) => child.tab === "package_commissions"),
   false,

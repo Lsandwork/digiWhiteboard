@@ -178,6 +178,7 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
+const SETTINGS_NESTED_TABS: AdminTab[] = ["settings", "track_incidents", "vet_visits"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));
@@ -291,9 +292,8 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         "Front Desk & Floor",
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
-          ...singles(["track_incidents", "vet_visits"], visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload"], visible)
+          ...singles(["handler_shift_entry", "bulk_photo_upload"], visible)
         ])
       )
     );
@@ -301,9 +301,9 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
     entries.push(
       ...sectionEntries(
         "staff_management",
-        "Support Inbox",
+        "Management",
         compactEntries([
-          ...singles(["ms_hub"], visible),
+          ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
           ...singles(["admin_trainer_entries"], visible)
@@ -339,7 +339,16 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_admin",
         "Administration",
-        compactEntries([group("admin_system", "System", ADMIN_SYSTEM_TABS, visible)])
+        compactEntries([
+          group("settings_menu", "Settings", SETTINGS_NESTED_TABS, visible),
+          group(
+            "admin_system",
+            "System",
+            ADMIN_SYSTEM_TABS.filter((tab) => tab !== "settings"),
+            visible
+          )
+        ]),
+        true
       )
     );
   }
@@ -393,7 +402,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
   entries.push(
     ...sectionEntries(
       "trainer_support",
-      "Support",
+      "Management",
       compactEntries([...singles(["management_support"], visible)])
     )
   );
@@ -422,7 +431,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
   return entries;
 }
 
-/** Team Lead panel nav — write-up submit lives under Management Support, not Front Desk & Floor. */
+/** Team Lead panel nav — write-up submit lives under Management, not Front Desk & Floor. */
 export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
   const visible = new Set(visibleTabs);
   const entries: NavEntry[] = [];
@@ -449,7 +458,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
   entries.push(
     ...sectionEntries(
       "team_lead_management_support",
-      "Management Support",
+      "Management",
       compactEntries([...singles(["management_support"], visible)])
     )
   );
@@ -505,7 +514,7 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
   entries.push(
     ...sectionEntries(
       "groomer_support",
-      "Management Support",
+      "Management",
       compactEntries([...singles(["management_support"], visible)])
     )
   );
