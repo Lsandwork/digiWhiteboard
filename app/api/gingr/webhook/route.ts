@@ -6,6 +6,7 @@ import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
+import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveDog } from "@/lib/types";
@@ -14,13 +15,12 @@ export const dynamic = "force-dynamic";
 
 const activeTypes = new Set(["checking_in", "checking_out"]);
 const completionTypes = new Set(["check_in", "check_out", "checked_in", "checked_out"]);
+const incidentTypes = new Set(["incident_created", "incident_edited"]);
 const acceptedPassiveTypes = new Set([
   "animal_created",
   "animal_edited",
   "owner_created",
-  "owner_edited",
-  "incident_created",
-  "incident_edited"
+  "owner_edited"
 ]);
 
 function completionStatus(webhookType: string) {
@@ -104,8 +104,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!activeTypes.has(webhookType) && !completionTypes.has(webhookType) && !acceptedPassiveTypes.has(webhookType)) {
+    if (
+      !activeTypes.has(webhookType) &&
+      !completionTypes.has(webhookType) &&
+      !acceptedPassiveTypes.has(webhookType) &&
+      !incidentTypes.has(webhookType)
+    ) {
       throw new Error(`Unsupported webhook_type: ${webhookType}`);
+    }
+
+    if (incidentTypes.has(webhookType)) {
+      // Upsert into Track Incidents ledger; never call Gingr HTTP from the webhook path.
+      await upsertIncidentFromGingrWebhook(supabase, payload, event.id);
+      await supabase.from("gingr_webhook_events").update({ processed: true }).eq("id", event.id);
+      return NextResponse.json({ ok: true, webhook_type: webhookType });
     }
 
     if (activeTypes.has(webhookType)) {

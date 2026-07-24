@@ -75,6 +75,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   ms_trainer_requests: "Trainer Requests",
   admin_trainer_entries: "Trainer Entries",
   package_commissions: "Package & Class Commissions",
+  track_incidents: "Track Incidents",
   demo_push: "Demo Push",
   analytics: "Analytics",
   templates: "Message Templates",
@@ -115,6 +116,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   cast_videos: "Upload and push full-screen videos to displays.",
   trainer_entry: "Log trainer check-ins and session notes.",
   package_commissions: "Track package and class sales, confirm commissions, and review trainer earnings.",
+  track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
   crossover_communication: "Front desk handoff log between shifts.",
   owner_follow_up: "Track owner follow-ups and callbacks.",
   active_issues: "Monitor open floor issues and escalations.",
@@ -287,6 +289,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         "Front Desk & Floor",
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
+          ...singles(["track_incidents"], visible),
           ...singles(MEDIA_TABS, visible),
           ...singles(["management_support", "handler_shift_entry", "bulk_photo_upload"], visible)
         ])

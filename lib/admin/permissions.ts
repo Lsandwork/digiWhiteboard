@@ -63,6 +63,8 @@ export type PermissionKey =
   | "view_package_commissions"
   | "comment_package_commissions"
   | "manage_package_commissions"
+  | "view_track_incidents"
+  | "manage_track_incidents"
   | "review_management_support"
   | "view_notifications"
   | "respond_to_notifications"
@@ -214,6 +216,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_package_commissions",
   "comment_package_commissions",
   "manage_package_commissions",
+  "view_track_incidents",
+  "manage_track_incidents",
   "review_management_support",
   "view_notifications",
   "respond_to_notifications",
@@ -341,6 +345,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "submit_write_up",
   "view_package_commissions",
   "manage_package_commissions",
+  "view_track_incidents",
+  "manage_track_incidents",
   "view_hr_hub",
   "use_hr_consult",
   "view_analytics",
@@ -700,6 +706,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   logs: "view_admin_logs",
   management_support: "submit_write_up",
   package_commissions: "manage_package_commissions",
+  track_incidents: "view_track_incidents",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
   ms_groomer_requests: "review_management_support",
