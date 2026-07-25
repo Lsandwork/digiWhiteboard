@@ -566,24 +566,20 @@ export function AdminTrainerEntriesPanel() {
 
   return (
     <div className="space-y-5">
-      <header className="admin-page-header">
-        <div>
-          <h2 className="admin-page-title">Trainer Entries</h2>
-          <p className="admin-page-subtitle">View all shift log entries submitted through Trainer&apos;s Entry.</p>
-        </div>
+      <div className="flex justify-end">
         <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" onClick={() => void load()}>
           <RefreshCw className="h-4 w-4" /> Refresh
         </button>
-      </header>
+      </div>
       <section className="crossover-card p-5 space-y-4">
-        <input className="admin-input max-w-xl" placeholder="Search trainer, dog, owner, subject…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input className="admin-input max-w-xl" placeholder="Search user, dog, owner, subject…" value={query} onChange={(e) => setQuery(e.target.value)} />
         {loading ? <p className="text-sm text-admin-muted">Loading trainer entries…</p> : null}
         <div className="overflow-x-auto">
-          <table className="crossover-table w-full min-w-[1000px]">
+          <table className="crossover-table trainer-entries-table w-full min-w-[1000px]">
             <thead>
               <tr>
                 <SortableTh label="Date" column="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="Trainer" column="trainer" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                <SortableTh label="User" column="trainer" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="Entry Type" column="entry_type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
                 <SortableTh label="Owner" column="owner" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />

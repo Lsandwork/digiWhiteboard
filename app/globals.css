@@ -6236,6 +6236,17 @@ html.lobby-tv-display .social-video-shell {
 .crossover-table th:nth-child(7) { width: 10%; }
 .crossover-table th:nth-child(8) { width: 9%; }
 
+/* Trainer Entries: Date is col 1 (not Subject) — keep Date/User tight */
+.trainer-entries-table.crossover-table th:nth-child(1) { width: 12%; }
+.trainer-entries-table.crossover-table th:nth-child(2) { width: 9%; }
+.trainer-entries-table.crossover-table th:nth-child(3) { width: 11%; }
+.trainer-entries-table.crossover-table th:nth-child(4) { width: 8%; }
+.trainer-entries-table.crossover-table th:nth-child(5) { width: 12%; }
+.trainer-entries-table.crossover-table th:nth-child(6) { width: 24%; }
+.trainer-entries-table.crossover-table th:nth-child(7) { width: 8%; }
+.trainer-entries-table.crossover-table th:nth-child(8) { width: 8%; }
+.trainer-entries-table.crossover-table th:nth-child(9) { width: 8%; }
+
 .crossover-table tbody tr {
   min-height: 76px;
 }

@@ -104,6 +104,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   checklist: "Personal handler checklist for daily shift tasks.",
   overview: "Live snapshot of alerts, HR, PIP, tasks, staffing, and board health.",
   content: "Edit the messages guests and staff see on the whiteboard.",
+  admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
   promotions: "Manage lobby promotion cards shown during idle time.",
   schedule: "Edit the weekly class schedule on the lobby display.",
   lobby_slideshow: "Upload photos and videos that are added to the lobby idle slideshow.",
