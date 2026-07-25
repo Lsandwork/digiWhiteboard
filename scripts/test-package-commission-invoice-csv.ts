@@ -10,8 +10,10 @@ import {
   parseCsvLine,
   parsePackageCommissionCsv
 } from "../lib/staff/package-commissions";
+import { parseMoneyToCents } from "../lib/staff/commission-ledger/money";
 
-const SAMPLE_PATH = resolve(
+const FIXTURE_PATH = resolve(__dirname, "fixtures/gingr-trainers-invoice-amanda.csv");
+const DESKTOP_SAMPLE_PATH = resolve(
   "/Users/fitdog/Desktop/financial-trainers-invoice-report-06_29_26-07_14_26.csv"
 );
 
@@ -25,9 +27,13 @@ Total Due,,,,,,,,$95.41
 
 function loadSample() {
   try {
-    return readFileSync(SAMPLE_PATH, "utf8");
+    return readFileSync(DESKTOP_SAMPLE_PATH, "utf8");
   } catch {
-    return SAMPLE_FALLBACK;
+    try {
+      return readFileSync(FIXTURE_PATH, "utf8");
+    } catch {
+      return SAMPLE_FALLBACK;
+    }
   }
 }
 
@@ -78,6 +84,7 @@ const atlas = parsed.find((row) => row.dog_name === "Atlas" && row.sold_at === "
 assert.ok(atlas, "Atlas $0 row missing");
 assert.equal(atlas?.commission_amount, "$0.00");
 assert.equal(atlas?.package_sale_amount, "$0.00");
+assert.equal(parseMoneyToCents(atlas?.commission_amount), 0, "zero-share becomes $0.00 amount-mode input");
 
 assert.equal(
   parsed.some((row) => String(row.dog_name).toLowerCase().includes("total")),

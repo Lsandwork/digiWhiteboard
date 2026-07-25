@@ -394,8 +394,10 @@ export async function POST(request: Request) {
         ok: true,
         ...result,
         rows: result.records,
+        created: result.imported,
         imported: result.imported,
-        failed: result.failed
+        failed: result.failed,
+        errors: result.errors
       });
     }
 

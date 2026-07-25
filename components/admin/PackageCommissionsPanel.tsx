@@ -157,6 +157,11 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const [showImport, setShowImport] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [csvFileName, setCsvFileName] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    failed: number;
+    errors: { line: number; message: string; severity?: string }[];
+  } | null>(null);
   const [commentField, setCommentField] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [manualOpen, setManualOpen] = useState(false);
@@ -1112,13 +1117,39 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         </div>
       </Modal>
 
-      <Modal open={showImport} title="Import Trainers Invoice CSV" onClose={() => setShowImport(false)}>
-        <p className="mb-3 text-sm text-admin-muted">
-          Upload a Gingr trainers invoice export or Fitdog commission CSV. Valid rows become editable ledger records.
-        </p>
-        <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--border)] px-4 py-6">
+      <Modal
+        open={showImport}
+        title="Import Trainers Invoice CSV"
+        onClose={() => {
+          setShowImport(false);
+          setImportResult(null);
+        }}
+      >
+        <div className="mb-3 space-y-2 text-sm text-admin-muted">
+          <p>
+            Upload a Gingr trainers invoice export or paste a Fitdog commission CSV. Multi-trainer sections are supported
+            (trainer name → header → rows → Total Due).
+          </p>
+          <p>
+            Invoice columns mapped: Date → sold date, Owner&apos;s Name, Dog&apos;s Name, Class/Program, Sales ($), Trainer
+            Commission (%), Trainer Share ($) as the payout (including $0.00). Price / Discount are ignored. Total Due rows
+            are skipped.
+          </p>
+        </div>
+        <label
+          className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-xl border border-dashed border-[var(--border)] px-4 py-6"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={async (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files?.[0];
+            if (!file) return;
+            setCsvText(await file.text());
+            setCsvFileName(file.name);
+            setImportResult(null);
+          }}
+        >
           <FileSpreadsheet className="h-5 w-5 text-fitdog-orange" />
-          <span className="text-sm font-semibold admin-text-emphasis">{csvFileName ?? "Choose CSV file"}</span>
+          <span className="text-sm font-semibold admin-text-emphasis">{csvFileName ?? "Choose CSV file or drop here"}</span>
           <input
             type="file"
             accept=".csv,text/csv"
@@ -1128,12 +1159,48 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
               if (!file) return;
               setCsvText(await file.text());
               setCsvFileName(file.name);
+              setImportResult(null);
             }}
           />
         </label>
-        <textarea className="crossover-input min-h-40 font-mono text-xs" value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="Paste CSV…" />
+        <textarea
+          className="crossover-input min-h-40 font-mono text-xs"
+          value={csvText}
+          onChange={(e) => {
+            setCsvText(e.target.value);
+            setImportResult(null);
+          }}
+          placeholder="Or paste CSV…"
+        />
+        {importResult ? (
+          <div className="mt-3 rounded-xl border border-admin-border bg-white/[0.03] p-3 text-sm">
+            <p className="font-semibold text-white">
+              {importResult.imported} row{importResult.imported === 1 ? "" : "s"} imported
+              {importResult.failed ? ` · ${importResult.failed} failed` : ""}
+            </p>
+            {importResult.errors?.length ? (
+              <ul className="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-admin-muted">
+                {importResult.errors.slice(0, 40).map((err, index) => (
+                  <li key={`${err.line}-${index}`}>
+                    Line {err.line}: {err.message}
+                    {err.severity === "warning" ? " (warning)" : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-admin-muted">No skipped or failed rows.</p>
+            )}
+          </div>
+        ) : null}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setShowImport(false)}>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--ghost"
+            onClick={() => {
+              setShowImport(false);
+              setImportResult(null);
+            }}
+          >
             Cancel
           </button>
           <button
@@ -1144,11 +1211,17 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
               setBusy(true);
               try {
                 const body = await postAction({ action: "import_csv", csv: csvText, filename: csvFileName ?? "paste.csv" });
-                showToast(`Imported ${body.imported ?? 0} row(s).`, "success");
-                setShowImport(false);
-                setCsvText("");
-                setCsvFileName(null);
-                await load();
+                const imported = Number(body.imported ?? body.created ?? 0);
+                const failed = Number(body.failed ?? 0);
+                const errors = Array.isArray(body.errors) ? body.errors : [];
+                setImportResult({ imported, failed, errors });
+                showToast(
+                  failed
+                    ? `Imported ${imported} row(s); ${failed} failed or skipped.`
+                    : `Imported ${imported} row(s).`,
+                  failed ? "info" : "success"
+                );
+                if (imported > 0) await load();
               } catch (error) {
                 showToast(error instanceof Error ? error.message : "Import failed.", "error");
               } finally {

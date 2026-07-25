@@ -66,7 +66,13 @@ export async function importCommissionCsvToLedger(
     const pkg = String(row.package_type ?? "").trim();
     const grossCents = parseMoneyToCents(row.package_sale_amount);
     const rateBps = trainerRateBpsForPackage(pkg);
-    const finalCents = calculatePercentCommissionCents(grossCents, rateBps);
+    const mode = String(row.commission_mode ?? "").toLowerCase();
+    const shareRaw = String(row.commission_amount ?? "").trim();
+    // Invoice CSV imports use Trainer Share ($) as the payout source of truth (incl. $0.00).
+    const useInvoiceShare = mode === "amount" && shareRaw !== "";
+    const finalCents = useInvoiceShare
+      ? parseMoneyToCents(shareRaw)
+      : calculatePercentCommissionCents(grossCents, rateBps);
     const issues: string[] = [];
     if (!dog) issues.push("Missing dog name");
     if (!client) issues.push("Missing client / owner name");
@@ -108,6 +114,7 @@ export async function importCommissionCsvToLedger(
       ...row,
       _saleDate: saleDate,
       _finalCents: finalCents,
+      _useInvoiceShare: useInvoiceShare,
       _line: i + 1
     });
   }
@@ -182,6 +189,7 @@ export async function importCommissionCsvToLedger(
         row.trainer_user_id
           ? null
           : matchTrainerByName(String(row.trainer_name ?? ""), input.trainers);
+      const useInvoiceShare = Boolean(row._useInvoiceShare);
       const created = await createCommissionRecord(supabase, viewer, actor, {
         trainer_user_id: (row.trainer_user_id as string) || matched?.id || null,
         trainer_name: matched?.full_name || String(row.trainer_name ?? "Unassigned"),
@@ -198,8 +206,18 @@ export async function importCommissionCsvToLedger(
         source: "csv_import",
         import_batch_id: batch.id,
         internal_notes: row.notes ? String(row.notes) : null,
+        // Gingr invoice: honor Trainer Share ($) including $0.00 rows.
+        ...(useInvoiceShare
+          ? {
+              is_manual_override: true,
+              final_commission: row.commission_amount,
+              calculated_commission: row.commission_amount,
+              commission_rate: row.commission_percent,
+              override_reason: "Imported Trainer Share from Gingr invoice CSV"
+            }
+          : {}),
         rule_snapshot: {
-          import_mode: "location_split",
+          import_mode: useInvoiceShare ? "invoice_trainer_share" : "location_split",
           location: detectServiceLocation(String(row.package_type ?? "")),
           trainer_rate_percent: trainerRatePercentForPackage(String(row.package_type ?? "")),
           csv_commission_percent: row.commission_percent ?? null,

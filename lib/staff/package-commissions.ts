@@ -206,11 +206,15 @@ function normalizeInput(input: PackageCommissionInput) {
     package_sale_amount = formatCommissionCurrency(sale);
     commission_percent = String(pct);
   } else {
-    if (!commission_amount) throw new Error("Commission amount is required.");
+    // Amount mode (Gingr invoice Trainer Share) — allow $0.00 shares.
+    if (commission_amount == null || String(commission_amount).trim() === "") {
+      throw new Error("Commission amount is required.");
+    }
+    commission_amount = formatCommissionCurrency(parseCommissionAmount(commission_amount));
     // Keep optional sale total / percent if provided for context, otherwise clear percent-only noise.
     if (package_sale_amount_raw) {
       const sale = parseCommissionAmount(package_sale_amount_raw);
-      package_sale_amount = sale > 0 ? formatCommissionCurrency(sale) : package_sale_amount_raw;
+      package_sale_amount = formatCommissionCurrency(sale);
     }
     if (!commission_percent_raw) commission_percent = null;
   }
