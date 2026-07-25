@@ -33,6 +33,15 @@ async function requireAccess(request: Request) {
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
   if (!canViewFitdogAlerts(access, session?.role)) {
+    console.warn(
+      JSON.stringify({
+        type: "fitdog_alerts_unauthorized",
+        at: new Date().toISOString(),
+        email: session?.email ?? null,
+        role: session?.role ?? null,
+        path: new URL(request.url).pathname
+      })
+    );
     return { error: NextResponse.json({ error: "Fitdog Alerts access required." }, { status: 403 }) };
   }
   return {
