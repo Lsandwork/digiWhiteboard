@@ -22,6 +22,14 @@ const acceptedPassiveTypes = new Set([
   "owner_created",
   "owner_edited"
 ]);
+/** Known Gingr noise we acknowledge but do not action — never 500 (retries hurt Gingr). */
+const ignoredWebhookTypes = new Set([
+  "email_sent",
+  "reservation_form_edited",
+  "reservation_form_created",
+  "sms_sent",
+  "notification_sent"
+]);
 
 function completionStatus(webhookType: string) {
   if (webhookType === "check_in" || webhookType === "checked_in") return "checked_in";
@@ -105,12 +113,18 @@ export async function POST(request: Request) {
 
   try {
     if (
-      !activeTypes.has(webhookType) &&
-      !completionTypes.has(webhookType) &&
-      !acceptedPassiveTypes.has(webhookType) &&
-      !incidentTypes.has(webhookType)
+      ignoredWebhookTypes.has(webhookType) ||
+      (!activeTypes.has(webhookType) &&
+        !completionTypes.has(webhookType) &&
+        !acceptedPassiveTypes.has(webhookType) &&
+        !incidentTypes.has(webhookType))
     ) {
-      throw new Error(`Unsupported webhook_type: ${webhookType}`);
+      // Acknowledge unknown/noise types so Gingr does not retry and audit stays clean.
+      await supabase
+        .from("gingr_webhook_events")
+        .update({ processed: true, processing_error: null })
+        .eq("id", event.id);
+      return NextResponse.json({ ok: true, webhook_type: webhookType, ignored: true });
     }
 
     if (incidentTypes.has(webhookType)) {
