@@ -16,7 +16,7 @@ import {
   type NotificationSession
 } from "@/lib/staff/notification-hub";
 import { canReviewManagementSupport } from "@/lib/admin/users";
-import { notificationVisibleToUser, type StaffNotification } from "@/lib/staff/notifications";
+import { sessionCanAccessNotification, type StaffNotification } from "@/lib/staff/notifications";
 
 export type NotificationDetailPayload = {
   notification: EnrichedNotification;
@@ -41,7 +41,8 @@ export async function loadNotificationDetail(
   const raw = (state.notifications ?? []).find((item) => item.id === notificationId);
   if (!raw) return null;
 
-  if (!notificationVisibleToUser(raw, state.staff_directory, session)) {
+  // Match bell/list scoping so users cannot open other people's alerts by ID.
+  if (!sessionCanAccessNotification(state, notificationId, session)) {
     return null;
   }
 

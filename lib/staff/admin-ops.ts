@@ -16,6 +16,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
   appendStaffEmailNotification,
+  sessionCanAccessNotification,
   type StaffNotification,
   type StaffOpsNotificationEvent
 } from "@/lib/staff/notifications";
@@ -176,7 +177,7 @@ export type StaffOpsState = {
 export type StaffOpsEntity = "crossover" | "follow_up" | "issue";
 
 export type StaffOpsPayload = StaffOpsState & {
-  currentUser: { email: string | null; adminUserId: string | null; role: string };
+  currentUser: { email: string | null; adminUserId: string | null; role: string | null };
 };
 
 const SETTINGS_STORE_KEY = "staff_admin_ops";
@@ -1529,9 +1530,13 @@ export async function deleteStaffDirectoryMember(supabase: SupabaseClient, id: s
 export async function markStaffNotificationRead(
   supabase: SupabaseClient,
   notificationId: string,
-  readerKey: string
+  readerKey: string,
+  session?: { email?: string | null; adminUserId?: string | null; role?: string | null }
 ) {
   const state = await loadState(supabase);
+  if (session && !sessionCanAccessNotification(state, notificationId, session)) {
+    throw new Error("Notification not found.");
+  }
   const next = markNotificationRead(state, notificationId, readerKey);
   await saveState(supabase, next);
   return next.notifications.find((notification) => notification.id === notificationId) ?? null;

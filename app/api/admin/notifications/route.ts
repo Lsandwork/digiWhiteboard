@@ -79,7 +79,11 @@ export async function POST(request: Request) {
       const notificationId = String(body.notification_id ?? "");
       if (!notificationId) return NextResponse.json({ error: "notification_id is required." }, { status: 400 });
       const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
-      await markStaffNotificationRead(supabase, notificationId, readerKey);
+      await markStaffNotificationRead(supabase, notificationId, readerKey, {
+        email: session?.email ?? null,
+        adminUserId: session?.adminUserId ?? null,
+        role: session?.role ?? null
+      });
       return NextResponse.json({ ok: true });
     }
 

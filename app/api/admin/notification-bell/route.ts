@@ -104,30 +104,33 @@ export async function GET(request: Request) {
     );
     canSnooze = permissions.canSnooze;
 
-    const entries = await listActiveWalkBoardEntries(supabase);
-    const nowMs = Date.now();
-    const summary = summarizeWalkBoardEntries(entries, nowMs);
-    walkDueCount = summary.dueNowCount;
-    walkOverdueCount = summary.overdueCount;
+    // Only users who receive Walks Board reminders should see due/overdue dogs in the bell.
+    if (permissions.canReceiveReminders) {
+      const entries = await listActiveWalkBoardEntries(supabase);
+      const nowMs = Date.now();
+      const summary = summarizeWalkBoardEntries(entries, nowMs);
+      walkDueCount = summary.dueNowCount;
+      walkOverdueCount = summary.overdueCount;
 
-    const nextAlerts: BellWalkAlert[] = [];
-    for (const entry of sortWalkBoardEntries(entries, nowMs)) {
-      const urgency = getWalkBoardUrgency(entry, nowMs);
-      if (urgency !== "walk_due" && urgency !== "overdue") continue;
-      nextAlerts.push({
-        id: entry.id,
-        dogName: entry.dog_name,
-        walkType: entry.walk_type,
-        walkTypeLabel: walkBoardTypeLabel(entry.walk_type),
-        urgency,
-        countdown: formatWalkBoardCountdown(entry, nowMs),
-        nextDueAt: entry.next_due_at,
-        snoozeUsed: entry.snooze_used,
-        version: entry.version
-      });
-      if (nextAlerts.length >= 12) break;
+      const nextAlerts: BellWalkAlert[] = [];
+      for (const entry of sortWalkBoardEntries(entries, nowMs)) {
+        const urgency = getWalkBoardUrgency(entry, nowMs);
+        if (urgency !== "walk_due" && urgency !== "overdue") continue;
+        nextAlerts.push({
+          id: entry.id,
+          dogName: entry.dog_name,
+          walkType: entry.walk_type,
+          walkTypeLabel: walkBoardTypeLabel(entry.walk_type),
+          urgency,
+          countdown: formatWalkBoardCountdown(entry, nowMs),
+          nextDueAt: entry.next_due_at,
+          snoozeUsed: entry.snooze_used,
+          version: entry.version
+        });
+        if (nextAlerts.length >= 12) break;
+      }
+      walkAlerts = nextAlerts;
     }
-    walkAlerts = nextAlerts;
   } catch {
     // Walk board may be unavailable for this session.
   }

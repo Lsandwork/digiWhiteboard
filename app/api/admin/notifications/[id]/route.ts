@@ -50,7 +50,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
-    await markStaffNotificationRead(getServiceSupabase(), id, readerKey);
+    await markStaffNotificationRead(getServiceSupabase(), id, readerKey, user);
     const detail = await loadNotificationDetail(getServiceSupabase(), id, user);
     return NextResponse.json({ ok: true, detail });
   } catch {

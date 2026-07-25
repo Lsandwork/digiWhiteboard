@@ -31,7 +31,7 @@ import {
   updateStaffDirectoryMember,
   updateOwnerFollowUp
 } from "@/lib/staff/admin-ops";
-import { notificationReaderKey } from "@/lib/staff/notifications";
+import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -90,12 +90,19 @@ export async function GET(request: Request) {
 
   try {
     const state = await listStaffOps(getServiceSupabase());
+    const readerSession = {
+      email: session?.email ?? null,
+      adminUserId: session?.adminUserId ?? null,
+      role: session?.role ?? null
+    };
     return NextResponse.json({
       ...state,
+      // Never expose other users' notifications in the payload.
+      notifications: notificationsForSession(state, readerSession),
       currentUser: {
-        email: session?.email ?? null,
-        adminUserId: session?.adminUserId ?? null,
-        role: session?.role ?? "owner_admin"
+        email: readerSession.email,
+        adminUserId: readerSession.adminUserId,
+        role: readerSession.role
       }
     });
   } catch (error) {
@@ -224,7 +231,12 @@ export async function POST(request: Request) {
       const notificationId = String(body.notification_id ?? "");
       if (!notificationId) return NextResponse.json({ error: "notification_id is required." }, { status: 400 });
       const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
-      result = await markStaffNotificationRead(supabase, notificationId, readerKey);
+      const readerSession = {
+        email: session?.email ?? null,
+        adminUserId: session?.adminUserId ?? null,
+        role: session?.role ?? null
+      };
+      result = await markStaffNotificationRead(supabase, notificationId, readerKey, readerSession);
       auditAction = "staff.notification.read";
     } else if (action === "mark_all_notifications_read") {
       const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
@@ -233,6 +245,15 @@ export async function POST(request: Request) {
         adminUserId: session?.adminUserId ?? null,
         role: session?.role ?? null
       });
+      // Return only this user's visible notifications after mark-all.
+      result = {
+        ...result,
+        notifications: notificationsForSession(result, {
+          email: session?.email ?? null,
+          adminUserId: session?.adminUserId ?? null,
+          role: session?.role ?? null
+        })
+      };
       auditAction = "staff.notification.read_all";
     } else {
       return NextResponse.json({ error: "Unsupported Staff Admin action." }, { status: 400 });

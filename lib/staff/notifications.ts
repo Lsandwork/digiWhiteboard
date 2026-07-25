@@ -1,13 +1,8 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import {
   canAccessCrossoverCommunication,
-  isAdminOrManagementRole,
   isCrossoverStaffRole,
-  isFullAdminRole,
-  isGroomerRole,
-  isTrainerRole,
-  isStaffOpsLimitedRole,
-  isTeamLeaderRole
+  isStaffOpsLimitedRole
 } from "@/lib/admin/users";
 import type { StaffDirectoryMember, StaffOpsPriority, StaffOpsState } from "@/lib/staff/admin-ops";
 
@@ -145,6 +140,18 @@ function homeDepartmentForRole(role?: string | null) {
   return null;
 }
 
+function isPrivilegedNotificationInboxRole(role?: string | null) {
+  // Explicit roles only — never treat a missing/null role as full admin.
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "management" ||
+    role === "admin" ||
+    role === "super_admin"
+  );
+}
+
 function matchesDepartmentTarget(
   target: Extract<StaffNotificationTarget, { kind: "department_pool" }>,
   directory: StaffDirectoryMember[],
@@ -154,7 +161,8 @@ function matchesDepartmentTarget(
   if (member?.department === target.department) return true;
   const homeDepartment = homeDepartmentForRole(session.role);
   if (homeDepartment === target.department) return true;
-  return isFullAdminRole(session.role) || isStaffOpsLimitedRole(session.role);
+  // Admins/management may see department escalations; limited staff only match their own dept.
+  return isPrivilegedNotificationInboxRole(session.role);
 }
 
 export function notificationVisibleToUser(
@@ -168,10 +176,11 @@ export function notificationVisibleToUser(
     case "staff_name":
       return matchesStaffNameTarget(notification.target, directory, session.email, session.adminUserId);
     case "coordinator_pool":
+      // Shared front-desk / team-lead pool — only those roles, never all staff.
       return isStaffOpsLimitedRole(session.role);
     case "admin_pool":
-      // Admin + management (assistant managers) receive escalations / vet-visit alerts.
-      return isAdminOrManagementRole(session.role);
+      // Admin + management receive escalations / vet-visit alerts.
+      return isPrivilegedNotificationInboxRole(session.role);
     case "department_pool":
       return matchesDepartmentTarget(notification.target, directory, session);
     default:
@@ -188,16 +197,27 @@ export function filterNotificationsForUser(
   );
 }
 
-/** Team leads and groomers only see notifications directly assigned to them. */
+/** Limited staff only see notifications directly addressed to them (name/email). */
 export function filterPersonalNotificationsForUser(
   state: StaffOpsState,
   session: { email?: string | null; adminUserId?: string | null; role?: string | null }
 ) {
-  return filterNotificationsForUser(state, session).filter((notification) => {
-    if (notification.target.kind === "staff_email" || notification.target.kind === "staff_name") return true;
-    if (notification.target.kind === "admin_pool" && isAdminOrManagementRole(session.role)) return true;
+  return (state.notifications ?? []).filter((notification) => {
+    if (notification.target.kind === "staff_email") {
+      return notification.target.email.trim().toLowerCase() === session.email?.trim().toLowerCase();
+    }
+    if (notification.target.kind === "staff_name") {
+      return matchesStaffNameTarget(notification.target, state.staff_directory, session.email, session.adminUserId);
+    }
+    // Privileged roles may still use this helper for personal-only views; include admin_pool then.
+    if (notification.target.kind === "admin_pool" && isPrivilegedNotificationInboxRole(session.role)) return true;
     return false;
   });
+}
+
+/** True when the role should only see personally addressed notifications (not shared pools). */
+export function usesPersonalNotificationsOnly(role?: string | null) {
+  return !isPrivilegedNotificationInboxRole(role);
 }
 
 function buildNotification(event: StaffOpsNotificationEvent, target: StaffNotificationTarget, type: StaffNotificationType): StaffNotification {
@@ -274,10 +294,19 @@ export function notificationsForSession(
   state: StaffOpsState,
   session: { email?: string | null; adminUserId?: string | null; role?: string | null }
 ) {
-  if (isTeamLeaderRole(session.role) || isGroomerRole(session.role) || isTrainerRole(session.role)) {
+  // Non-admin/management users only see alerts that pertain to them personally.
+  if (usesPersonalNotificationsOnly(session.role)) {
     return filterPersonalNotificationsForUser(state, session);
   }
   return filterNotificationsForUser(state, session);
+}
+
+export function sessionCanAccessNotification(
+  state: StaffOpsState,
+  notificationId: string,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  return notificationsForSession(state, session).some((notification) => notification.id === notificationId);
 }
 
 export function countUnreadNotifications(
@@ -304,7 +333,7 @@ export function markAllNotificationsRead(
   readerKey: string,
   session: { email?: string | null; adminUserId?: string | null; role?: string | null }
 ) {
-  const visibleIds = new Set(filterNotificationsForUser(state, session).map((notification) => notification.id));
+  const visibleIds = new Set(notificationsForSession(state, session).map((notification) => notification.id));
   return {
     ...state,
     notifications: (state.notifications ?? []).map((notification) =>
