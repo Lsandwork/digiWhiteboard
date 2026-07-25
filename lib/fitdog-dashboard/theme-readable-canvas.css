@@ -264,6 +264,32 @@ html[data-theme="clear"] .admin-theme :is(.admin-preview-frame, .board-shell, .c
   color: #ffffff !important;
 }
 
+/* Dark hero panels inside Light/Clear canvases (e.g. PIP growth-path header) */
+html[data-theme="light"] .admin-theme .admin-on-dark,
+html[data-theme="clear"] .admin-theme .admin-on-dark {
+  color: #f8fafc;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark :is(.text-white, .admin-text-emphasis),
+html[data-theme="clear"] .admin-theme .admin-on-dark :is(.text-white, .admin-text-emphasis) {
+  color: #ffffff !important;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark [class*="text-white/"],
+html[data-theme="clear"] .admin-theme .admin-on-dark [class*="text-white/"] {
+  color: rgb(255 255 255 / 0.85) !important;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark :is(.text-admin-muted, .admin-muted),
+html[data-theme="clear"] .admin-theme .admin-on-dark :is(.text-admin-muted, .admin-muted) {
+  color: rgb(255 255 255 / 0.7) !important;
+}
+
+html[data-theme="light"] .admin-theme .admin-on-dark [class*="text-emerald-"],
+html[data-theme="clear"] .admin-theme .admin-on-dark [class*="text-emerald-"] {
+  color: #6ee7b7 !important;
+}
+
 /* Clear theme: keep dark sidebar text light */
 html[data-theme="clear"] .admin-sidebar,
 html[data-theme="clear"] .admin-sidebar :is(.text-white, [class*="text-white/"], .admin-text-emphasis) {

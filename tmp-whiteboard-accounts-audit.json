@@ -1,0 +1,594 @@
+{
+  "generated_at": "2026-07-19T06:27:11.348Z",
+  "base_url": "https://staff.ruffops.com",
+  "counts": {
+    "pass": 21,
+    "warn": 15,
+    "fail": 0,
+    "info": 61
+  },
+  "findings": [
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Staff board HTML",
+      "detail": "https://staff.ruffops.com/ → 200 in 293ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Lobby board HTML",
+      "detail": "https://staff.ruffops.com/lobby/checkouts → 200 in 168ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "CAST-TV HTML",
+      "detail": "https://staff.ruffops.com/cast-tv → 200 in 148ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Remote receiver HTML",
+      "detail": "https://staff.ruffops.com/cast/receiver → 200 in 189ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Staff cast redirect",
+      "detail": "https://staff.ruffops.com/staff-cast → 200 in 365ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Lobby cast redirect",
+      "detail": "https://staff.ruffops.com/lobby-cast → 200 in 298ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Live board API",
+      "detail": "https://staff.ruffops.com/api/live-board → 200 in 280ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Lobby checkouts API",
+      "detail": "https://staff.ruffops.com/api/lobby/checkouts?fast=1 → 200 in 211ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Lobby status API",
+      "detail": "https://staff.ruffops.com/api/lobby/status → 200 in 170ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Whiteboard state staff",
+      "detail": "https://staff.ruffops.com/api/whiteboard/state?board=staff → 200 in 567ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Whiteboard state lobby",
+      "detail": "https://staff.ruffops.com/api/whiteboard/state?board=lobby → 200 in 287ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "Display sync API",
+      "detail": "https://staff.ruffops.com/api/display/sync → 200 in 127ms"
+    },
+    {
+      "area": "boards",
+      "severity": "pass",
+      "title": "CAST-TV settings",
+      "detail": "https://staff.ruffops.com/api/cast-tv/settings → 200 in 165ms"
+    },
+    {
+      "area": "domains",
+      "severity": "pass",
+      "title": "Lobby custom domain",
+      "detail": "https://lobby.ruffops.com/ → 200"
+    },
+    {
+      "area": "domains",
+      "severity": "pass",
+      "title": "CAST-TV custom domain",
+      "detail": "https://casttv.ruffops.com/ → 200"
+    },
+    {
+      "area": "devices",
+      "severity": "warn",
+      "title": "Cast Keeper devices",
+      "detail": "0 online (≤90s) / 79 total · 79 stale"
+    },
+    {
+      "area": "devices",
+      "severity": "warn",
+      "title": "lobby_whiteboard: health-c",
+      "detail": "last seen 27m ago · route=/display/lobby-whiteboard · ver=ae20fb58851c3a85976d75fe85ac0c19c70d879d · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 20c30ffd",
+      "detail": "last seen 6d ago · route=/lobby/checkouts · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: a8b9d1d8",
+      "detail": "last seen 6d ago · route=/staff-cast · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: c10d76d4",
+      "detail": "last seen 6d ago · route=/lobby/checkouts · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: f5a62274",
+      "detail": "last seen 6d ago · route=/lobby/checkouts · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: d17442d4",
+      "detail": "last seen 7d ago · route=/lobby/checkouts · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 18e84cb7",
+      "detail": "last seen 8d ago · route=/lobby/checkouts · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: cc9b5634",
+      "detail": "last seen 8d ago · route=/lobby/checkouts · ver=88eae450b9f04578d14047ca2b7db2261541519f · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 05923668",
+      "detail": "last seen 8d ago · route=/lobby/checkouts · ver=71de6b30386f883b167b3fda92b3e1571fad5741 · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 82310ef5",
+      "detail": "last seen 8d ago · route=/lobby/checkouts · ver=75480f5375f7c31488a96730f87453423a698a0b · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: diag-che",
+      "detail": "last seen 9d ago · route=/cast/receiver · ver=37108459fcb412e54534e5ee43e7bfc29cd878af · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 9caf24c9",
+      "detail": "last seen 9d ago · route=/staff-cast · ver=37108459fcb412e54534e5ee43e7bfc29cd878af · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 6c47cbcc",
+      "detail": "last seen 9d ago · route=/lobby-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 24af2981",
+      "detail": "last seen 9d ago · route=/staff-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 990dce95",
+      "detail": "last seen 9d ago · route=/staff-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 21676943",
+      "detail": "last seen 9d ago · route=/staff-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: e893a6d7",
+      "detail": "last seen 9d ago · route=/staff-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 278330e3",
+      "detail": "last seen 9d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: c6ccb260",
+      "detail": "last seen 9d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: cbd6bba2",
+      "detail": "last seen 9d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 2422d435",
+      "detail": "last seen 9d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: d2120140",
+      "detail": "last seen 9d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: cdf93c7c",
+      "detail": "last seen 9d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 6287dcf9",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 34072915",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: d4bf94c0",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 88ff7a15",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: a27f6d4e",
+      "detail": "last seen 10d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: dd450250",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: f0ef4252",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: e4730ce3",
+      "detail": "last seen 10d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: c93b6ee1",
+      "detail": "last seen 10d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 6ee29dc1",
+      "detail": "last seen 10d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: f6886caf",
+      "detail": "last seen 10d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 6b6fc874",
+      "detail": "last seen 10d ago · route=/lobby/checkouts · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 08671b8b",
+      "detail": "last seen 10d ago · route=/lobby-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "staff_whiteboard: 14727bb4",
+      "detail": "last seen 10d ago · route=/ · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: c496a1e5",
+      "detail": "last seen 10d ago · route=/lobby-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: 5ca9cfb3",
+      "detail": "last seen 10d ago · route=/lobby-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "devices",
+      "severity": "info",
+      "title": "lobby_whiteboard: a9917563",
+      "detail": "last seen 10d ago · route=/lobby-cast · ver=3bf5edc4aa78a4a2e264b6f013979dadc2f01f5e · status=online"
+    },
+    {
+      "area": "cast_tv",
+      "severity": "warn",
+      "title": "CAST-TV screen default",
+      "detail": "last seen 1d ago"
+    },
+    {
+      "area": "remote_cast",
+      "severity": "info",
+      "title": "remote_cast_receivers",
+      "detail": "column remote_cast_receivers.name does not exist"
+    },
+    {
+      "area": "data",
+      "severity": "pass",
+      "title": "Staff board dog data",
+      "detail": "5 recent rows sampled · newest update 27m ago"
+    },
+    {
+      "area": "data",
+      "severity": "pass",
+      "title": "Gingr webhooks (24h / failed)",
+      "detail": "1188 events in last 24h · 0 failed (all-time filter)"
+    },
+    {
+      "area": "accounts",
+      "severity": "info",
+      "title": "Account inventory",
+      "detail": "27 total · 27 active · 0 inactive"
+    },
+    {
+      "area": "accounts",
+      "severity": "pass",
+      "title": "Active Super Admins",
+      "detail": "brian@fitdog.com, demo-super@demo.com, demo@demo.com, lonnie@fitdog.com"
+    },
+    {
+      "area": "accounts",
+      "severity": "warn",
+      "title": "Demo accounts (@demo.com)",
+      "detail": "9 total · 9 active (password123 risk if enabled in prod)"
+    },
+    {
+      "area": "accounts",
+      "severity": "warn",
+      "title": "Active never logged in",
+      "detail": "12 active accounts with no last_login_at"
+    },
+    {
+      "area": "accounts",
+      "severity": "pass",
+      "title": "Dormant active accounts (>60d)",
+      "detail": "None"
+    },
+    {
+      "area": "accounts",
+      "severity": "info",
+      "title": "Force password change",
+      "detail": "5 active users must change password on next login"
+    },
+    {
+      "area": "accounts",
+      "severity": "info",
+      "title": "Active accounts by role",
+      "detail": "team_leader:6 · front_desk_coordinator:5 · trainer:4 · owner_admin:4 · groomer:3 · manager_admin:2 · daycare:1 · assistant_manager:1 · marketing:1"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "angelica.n.wms@gmail.com",
+      "detail": "role=team_leader · status=active · last_login=4d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "benard@fitdog.com",
+      "detail": "role=manager_admin · status=active · last_login=4d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "brian.guzman2018@gmail.com",
+      "detail": "role=trainer · status=active · last_login=never · force_pw=true"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "brian@fitdog.com",
+      "detail": "role=owner_admin · status=active · last_login=5d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "contact@fitdog.com",
+      "detail": "role=front_desk_coordinator · status=active · last_login=11d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-admin@demo.com",
+      "detail": "role=manager_admin · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-frontdesk@demo.com",
+      "detail": "role=front_desk_coordinator · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-groomer@demo.com",
+      "detail": "role=groomer · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-handler@demo.com",
+      "detail": "role=daycare · status=active · last_login=12d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-management@demo.com",
+      "detail": "role=assistant_manager · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-super@demo.com",
+      "detail": "role=owner_admin · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-teamlead@demo.com",
+      "detail": "role=team_leader · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo-trainer@demo.com",
+      "detail": "role=trainer · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "warn",
+      "title": "demo@demo.com",
+      "detail": "role=owner_admin · status=active · last_login=never · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "djhyde21401@gmail.com",
+      "detail": "role=team_leader · status=active · last_login=5d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "ivonneebice@gmail.com",
+      "detail": "role=trainer · status=active · last_login=5d ago · force_pw=true"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "janet@test.com",
+      "detail": "role=front_desk_coordinator · status=active · last_login=11d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "jasslynlopezgonzalez@gmail.com",
+      "detail": "role=team_leader · status=active · last_login=3d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "julieeemoss@gmail.com",
+      "detail": "role=front_desk_coordinator · status=active · last_login=11d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "lonnie@fitdog.com",
+      "detail": "role=owner_admin · status=active · last_login=never · force_pw=true"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "loveandcarepawbabys@gmail.com",
+      "detail": "role=trainer · status=active · last_login=never · force_pw=true"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "michael_mejia95@gmail.com",
+      "detail": "role=groomer · status=active · last_login=9d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "michael_mejia95@live.com",
+      "detail": "role=groomer · status=active · last_login=5d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "pamelamj017@gmail.com",
+      "detail": "role=front_desk_coordinator · status=active · last_login=10h ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "rebeca.626.souza@gmail.com",
+      "detail": "role=team_leader · status=active · last_login=1d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "rebeca@fitdog.com",
+      "detail": "role=marketing · status=active · last_login=1d ago · force_pw=false"
+    },
+    {
+      "area": "account_detail",
+      "severity": "info",
+      "title": "xalen93@gmail.com",
+      "detail": "role=team_leader · status=active · last_login=never · force_pw=true"
+    },
+    {
+      "area": "directory",
+      "severity": "pass",
+      "title": "Staff directory ↔ login links",
+      "detail": "0 directory rows · 0 linked · 0 orphan admin_user_id"
+    },
+    {
+      "area": "settings",
+      "severity": "pass",
+      "title": "public_display_disabled",
+      "detail": "Public displays enabled."
+    },
+    {
+      "area": "settings",
+      "severity": "warn",
+      "title": "allow_env_admin_login",
+      "detail": "Env emergency admin login is enabled."
+    }
+  ]
+}
