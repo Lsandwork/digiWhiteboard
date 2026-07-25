@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, RefreshCw, Shield } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
+import { RichText } from "@/components/admin/ui/RichText";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh } from "@/components/admin/ui/sortable-table";
 import type { TrackIncident, TrackIncidentSummary, TrackIncidentSyncRun } from "@/lib/staff/track-incidents/types";
@@ -455,33 +456,46 @@ export function TrackIncidentsPanel() {
 
       {drawer ? (
         <div className="admin-drawer-backdrop" onClick={() => setDrawer(null)}>
-          <aside className="admin-drawer-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4">
-              <h3 className="text-lg font-black admin-text-emphasis">{drawer.incident_number}</h3>
-              <p className="text-sm text-admin-muted">
-                {drawer.dog_name} · {drawer.incident_type}
-              </p>
-            </div>
-            <div className="mb-4 grid gap-2 text-sm">
-              <p>
-                <span className="text-admin-muted">Owner:</span> {drawer.owner_name || "—"}
-              </p>
-              <p>
-                <span className="text-admin-muted">When:</span> {formatWhen(drawer.occurred_at)}
-              </p>
-              <p>
-                <span className="text-admin-muted">Reported by:</span> {drawer.reported_by}
-              </p>
-              <p>
-                <span className="text-admin-muted">Location:</span> {drawer.location_name || "—"}
-              </p>
-              <p>
-                <span className="text-admin-muted">Notes:</span> {drawer.notes || "—"}
-              </p>
-            </div>
+          <aside className="admin-drawer-panel admin-detail-drawer" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-detail-drawer__header">
+              <div>
+                <p className="admin-detail-drawer__kicker">Incident</p>
+                <h3 className="admin-detail-drawer__title">{drawer.incident_number}</h3>
+                <p className="admin-detail-drawer__subtitle">
+                  {drawer.dog_name} · {drawer.incident_type}
+                </p>
+              </div>
+            </header>
+
+            <section className="admin-detail-drawer__meta" aria-label="Incident details">
+              <div className="admin-detail-drawer__meta-item">
+                <span>Owner</span>
+                <strong>{drawer.owner_name || "—"}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>When</span>
+                <strong>{formatWhen(drawer.occurred_at)}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>Reported by</span>
+                <strong>{drawer.reported_by}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>Location</span>
+                <strong>{drawer.location_name || "—"}</strong>
+              </div>
+            </section>
+
+            <section className="admin-detail-drawer__section">
+              <h4 className="admin-detail-drawer__section-title">Notes</h4>
+              <div className="admin-detail-drawer__notes-body">
+                <RichText value={drawer.notes} empty="No notes provided." />
+              </div>
+            </section>
+
             {data?.canManage ? (
-              <div className="grid gap-2">
-                <label className="grid gap-1 text-sm">
+              <section className="admin-detail-drawer__form" aria-label="Update incident">
+                <label>
                   <span className="admin-label">Status</span>
                   <select
                     className="admin-input"
@@ -494,7 +508,7 @@ export function TrackIncidentsPanel() {
                     <option value="resolved">Resolved</option>
                   </select>
                 </label>
-                <label className="grid gap-1 text-sm">
+                <label>
                   <span className="admin-label">Priority</span>
                   <select
                     className="admin-input"
@@ -506,7 +520,7 @@ export function TrackIncidentsPanel() {
                     <option value="low">Low</option>
                   </select>
                 </label>
-                <label className="grid gap-1 text-sm">
+                <label>
                   <span className="admin-label">Assigned to</span>
                   <input
                     className="admin-input"
@@ -518,11 +532,14 @@ export function TrackIncidentsPanel() {
                     }}
                   />
                 </label>
-              </div>
+              </section>
             ) : null}
-            <button type="button" className="crossover-btn crossover-btn--ghost mt-4" onClick={() => setDrawer(null)}>
-              Close
-            </button>
+
+            <div className="admin-detail-drawer__footer">
+              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setDrawer(null)}>
+                Close
+              </button>
+            </div>
           </aside>
         </div>
       ) : null}

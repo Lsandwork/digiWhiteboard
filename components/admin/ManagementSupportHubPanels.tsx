@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, MessageSquare, RefreshCw, UserRound } from "lucide-react";
 import { SupportCommandCenter } from "@/components/admin/support-command-center/SupportCommandCenter";
 import { Modal } from "@/components/admin/ui/Modal";
+import { RichText } from "@/components/admin/ui/RichText";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh, useClientSort, type SortAccessors } from "@/components/admin/ui/sortable-table";
+import { htmlToPlainText } from "@/lib/html/rich-text";
 import type { AdminTab } from "@/lib/admin/types";
 import type { ManagementReport, ManagementReportType } from "@/lib/staff/management-reports";
 import type { SupportHubStats, SupportInboxRow, TrainerEntryAdminRow } from "@/lib/staff/management-support-admin";
@@ -90,21 +92,26 @@ function SupportDetailModal({
         </div>
         <div className="rounded-xl border border-admin-border p-4">
           <p className="font-bold text-white">Details</p>
-          <p className="mt-2 whitespace-pre-wrap text-admin-muted">{details}</p>
+          <div className="mt-2 text-admin-muted">
+            <RichText value={details} empty="No details provided." />
+          </div>
         </div>
         {item.management_response ? (
           <div className="rounded-xl border border-fitdog-orange/30 bg-fitdog-orange/10 p-4">
             <p className="font-bold text-white">Management Response</p>
-            <p className="mt-2 text-admin-muted">{item.management_response}</p>
+            <div className="mt-2 text-admin-muted">
+              <RichText value={item.management_response} />
+            </div>
           </div>
         ) : null}
         {visibleComments.length ? (
           <div className="space-y-2">
             <p className="font-bold text-white">Visible Responses</p>
             {visibleComments.map((comment) => (
-              <p key={comment.id} className="rounded-lg border border-admin-border p-3 text-admin-muted">
-                <span className="font-bold text-white">{comment.user_name}:</span> {comment.body}
-              </p>
+              <div key={comment.id} className="rounded-lg border border-admin-border p-3 text-admin-muted">
+                <span className="font-bold text-white">{comment.user_name}:</span>{" "}
+                <RichText value={comment.body} empty="" />
+              </div>
             ))}
           </div>
         ) : null}
@@ -112,9 +119,10 @@ function SupportDetailModal({
           <div className="space-y-2">
             <p className="font-bold text-white">Internal Notes</p>
             {internalComments.map((comment) => (
-              <p key={comment.id} className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-3 text-admin-muted">
-                <span className="font-bold text-white">{comment.user_name}:</span> {comment.body}
-              </p>
+              <div key={comment.id} className="rounded-lg border border-purple-500/30 bg-purple-500/10 p-3 text-admin-muted">
+                <span className="font-bold text-white">{comment.user_name}:</span>{" "}
+                <RichText value={comment.body} empty="" />
+              </div>
             ))}
           </div>
         ) : null}
@@ -258,7 +266,7 @@ function SupportTable({
               {showSource ? <td>{sourceLabel(row.report_type)}</td> : null}
               <td>{row.submitted_by}</td>
               <td>{row.subject}</td>
-              <td className="max-w-xs truncate">{row.details_preview}</td>
+              <td className="max-w-xs truncate">{htmlToPlainText(row.details_preview ?? "")}</td>
               <td><span className={priorityBadgeClass(row.priority)}>{row.priority}</span></td>
               <td><span className={statusBadgeClass(row.status)}>{row.status}</span></td>
               <td>{row.assigned_to ?? "—"}</td>
