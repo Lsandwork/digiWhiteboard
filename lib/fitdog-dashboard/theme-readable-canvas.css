@@ -409,3 +409,71 @@ html[data-theme="clear"] {
   --warning-foreground: #78350f;
   --danger-foreground: #7f1d1d;
 }
+
+/*
+ * Front Desk Log / crossover mobile cards & chips.
+ * Dark-theme badge colors (pale yellow/white) are unreadable on light cards.
+ */
+html[data-theme="light"] .admin-theme .crossover-dashboard,
+html[data-theme="clear"] .admin-theme .crossover-dashboard {
+  --crossover-text: #12213a;
+  --crossover-muted: #334155;
+  color: #12213a;
+}
+
+html[data-theme="light"] .admin-theme .crossover-mobile-card,
+html[data-theme="clear"] .admin-theme .crossover-mobile-card {
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+html[data-theme="light"] .admin-theme .crossover-mobile-card__title,
+html[data-theme="clear"] .admin-theme .crossover-mobile-card__title {
+  color: #12213a;
+}
+
+html[data-theme="light"] .admin-theme :is(.crossover-mobile-card__route, .crossover-mobile-card__meta, .crossover-mobile-card__preview),
+html[data-theme="clear"] .admin-theme :is(.crossover-mobile-card__route, .crossover-mobile-card__meta, .crossover-mobile-card__preview) {
+  color: #334155;
+}
+
+html[data-theme="light"] .admin-theme .crossover-badge--priority-high,
+html[data-theme="clear"] .admin-theme .crossover-badge--priority-high {
+  border-color: rgba(217, 119, 6, 0.45);
+  background: #fef3c7;
+  color: #78350f;
+}
+
+html[data-theme="light"] .admin-theme .crossover-badge--priority-normal,
+html[data-theme="clear"] .admin-theme .crossover-badge--priority-normal {
+  border-color: rgba(148, 163, 184, 0.7);
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+html[data-theme="light"] .admin-theme .crossover-badge--priority-muted,
+html[data-theme="clear"] .admin-theme .crossover-badge--priority-muted {
+  border-color: rgba(148, 163, 184, 0.55);
+  background: #f1f5f9;
+  color: #334155;
+}
+
+html[data-theme="light"] .admin-theme .shift-log-badge--type-general,
+html[data-theme="clear"] .admin-theme .shift-log-badge--type-general {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+html[data-theme="light"] .admin-theme .crossover-icon-btn,
+html[data-theme="clear"] .admin-theme .crossover-icon-btn {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+html[data-theme="light"] .admin-theme .crossover-icon-btn__lucide,
+html[data-theme="clear"] .admin-theme .crossover-icon-btn__lucide {
+  color: #0f172a;
+  filter: none;
+}
