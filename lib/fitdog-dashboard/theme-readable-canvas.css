@@ -477,3 +477,250 @@ html[data-theme="clear"] .admin-theme .crossover-icon-btn__lucide {
   color: #0f172a;
   filter: none;
 }
+
+/*
+ * FINAL LINE OF DEFENSE — Clear + Light content canvases.
+ * Every title, body, helper, filter pill, and table cell must stay dark.
+ * Sidebar stays light-text via the restore block below.
+ */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) {
+  --crossover-text: #12213a;
+  --crossover-muted: #334155;
+  --admin-muted: #475569;
+  --fitdog-text: #12213a;
+  --fitdog-text-secondary: #475569;
+  --text-primary: #12213a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  color: #12213a;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-dashboard__page-title,
+    .crossover-card__title,
+    .crossover-table__subject-title,
+    .crossover-table__emphasis,
+    .crossover-stat-card__value,
+    .crossover-mobile-card__title,
+    .admin-page-title,
+    .admin-section-title,
+    .admin-text-emphasis,
+    .text-white,
+    [class*="text-white/"]
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-dashboard__page-title,
+    .crossover-card__title,
+    .crossover-table__subject-title,
+    .crossover-table__emphasis,
+    .crossover-stat-card__value,
+    .crossover-mobile-card__title,
+    .admin-page-title,
+    .admin-section-title,
+    .admin-text-emphasis,
+    .text-white,
+    [class*="text-white/"]
+  ) {
+  color: #12213a !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-dashboard__page-subtitle,
+    .crossover-card__subtitle,
+    .crossover-table__subject-preview,
+    .crossover-table__muted,
+    .crossover-table__datetime-logged,
+    .crossover-table td,
+    .crossover-field__label,
+    .crossover-helper,
+    .crossover-label,
+    .crossover-empty,
+    .crossover-pagination__meta,
+    .crossover-urgent-pill,
+    .crossover-mobile-card__meta,
+    .crossover-mobile-card__preview,
+    .crossover-mobile-card__route,
+    .shift-log-form-section-title,
+    .shift-log-preview-card__body,
+    .shift-log-template-loaded-hint,
+    .text-admin-muted,
+    .admin-muted,
+    .admin-page-subtitle,
+    .admin-section-helper,
+    .admin-field-helper,
+    .admin-label
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-dashboard__page-subtitle,
+    .crossover-card__subtitle,
+    .crossover-table__subject-preview,
+    .crossover-table__muted,
+    .crossover-table__datetime-logged,
+    .crossover-table td,
+    .crossover-field__label,
+    .crossover-helper,
+    .crossover-label,
+    .crossover-empty,
+    .crossover-pagination__meta,
+    .crossover-urgent-pill,
+    .crossover-mobile-card__meta,
+    .crossover-mobile-card__preview,
+    .crossover-mobile-card__route,
+    .shift-log-form-section-title,
+    .shift-log-preview-card__body,
+    .shift-log-template-loaded-hint,
+    .text-admin-muted,
+    .admin-muted,
+    .admin-page-subtitle,
+    .admin-section-helper,
+    .admin-field-helper,
+    .admin-label
+  ) {
+  color: #334155 !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-table th,
+    .sortable-th-btn,
+    .admin-table th
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-table th,
+    .sortable-th-btn,
+    .admin-table th
+  ) {
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .sortable-th-btn:hover,
+    .sortable-th-btn--active
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .sortable-th-btn:hover,
+    .sortable-th-btn--active
+  ) {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-urgent-pill--on,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-urgent-pill--on {
+  color: #991b1b !important;
+  background: #fee2e2 !important;
+  border-color: rgba(185, 28, 28, 0.45) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-badge--priority-high,
+    .crossover-badge--priority-normal,
+    .crossover-badge--priority-muted,
+    .crossover-badge--status-active,
+    .crossover-badge--status-pending,
+    .crossover-badge--status-resolved,
+    .crossover-badge--status-muted,
+    .crossover-badge--urgent,
+    .shift-log-badge
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .crossover-badge--priority-high,
+    .crossover-badge--priority-normal,
+    .crossover-badge--priority-muted,
+    .crossover-badge--status-active,
+    .crossover-badge--status-pending,
+    .crossover-badge--status-resolved,
+    .crossover-badge--status-muted,
+    .crossover-badge--urgent,
+    .shift-log-badge
+  ) {
+  /* ensure badge label itself is never white-on-white */
+  font-weight: 800;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--priority-high,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--priority-high {
+  color: #78350f !important;
+  background: #fef3c7 !important;
+  border-color: rgba(217, 119, 6, 0.45) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--priority-normal,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--priority-normal {
+  color: #0f172a !important;
+  background: #e2e8f0 !important;
+  border-color: rgba(148, 163, 184, 0.7) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--priority-muted,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--priority-muted {
+  color: #334155 !important;
+  background: #f1f5f9 !important;
+  border-color: rgba(148, 163, 184, 0.55) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--status-active,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--status-active {
+  color: #14532d !important;
+  background: #dcfce7 !important;
+  border-color: rgba(22, 163, 74, 0.35) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--status-pending,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--status-pending {
+  color: #92400e !important;
+  background: #fef3c7 !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--urgent,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .crossover-badge--urgent {
+  color: #991b1b !important;
+  background: #fee2e2 !important;
+  border-color: rgba(185, 28, 28, 0.45) !important;
+}
+
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .shift-log-badge--type-general,
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) .shift-log-badge--type-general {
+  color: #0f172a !important;
+  background: #e2e8f0 !important;
+}
+
+/* Keep primary CTA labels white on orange buttons */
+html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .admin-btn-primary,
+    .crossover-btn--primary,
+    .admin-btn-primary *,
+    .crossover-btn--primary *
+  ),
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .admin-btn-primary,
+    .crossover-btn--primary,
+    .admin-btn-primary *,
+    .crossover-btn--primary *
+  ) {
+  color: #ffffff !important;
+}
+
+/* Clear sidebar must remain light-on-dark after content remaps */
+html[data-theme="clear"] .admin-sidebar,
+html[data-theme="clear"] .admin-sidebar :is(
+    .text-white,
+    [class*="text-white/"],
+    .admin-text-emphasis,
+    .admin-nav-item,
+    .admin-nav-section,
+    .admin-sidebar-brand__title,
+    .admin-user-card,
+    .admin-sidebar-help-card
+  ) {
+  color: #f8fafc !important;
+}
+
+html[data-theme="clear"] .admin-sidebar :is(.text-admin-muted, .admin-muted, .admin-sidebar-brand__subtitle) {
+  color: #94a3b8 !important;
+}
+
+html[data-theme="clear"] .admin-sidebar .admin-nav-item--active,
+html[data-theme="clear"] .admin-sidebar .admin-nav-item--active-parent {
+  color: #fff7ed !important;
+}
