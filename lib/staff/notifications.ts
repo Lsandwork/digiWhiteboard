@@ -24,7 +24,8 @@ export type StaffNotificationSourceTab =
   | "walks_board"
   | "package_commissions"
   | "vet_visits"
-  | "track_incidents";
+  | "track_incidents"
+  | "fitdog_alerts";
 
 export type NotificationThreadStatus =
   | "open"

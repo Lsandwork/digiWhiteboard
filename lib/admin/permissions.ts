@@ -65,6 +65,8 @@ export type PermissionKey =
   | "manage_package_commissions"
   | "view_track_incidents"
   | "manage_track_incidents"
+  | "view_fitdog_alerts"
+  | "manage_fitdog_alerts"
   | "view_vet_visits"
   | "manage_vet_visits"
   | "review_management_support"
@@ -220,6 +222,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_package_commissions",
   "view_track_incidents",
   "manage_track_incidents",
+  "view_fitdog_alerts",
+  "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
   "review_management_support",
@@ -317,6 +321,8 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
+  "view_fitdog_alerts",
+  "manage_fitdog_alerts",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -351,6 +357,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "manage_package_commissions",
   "view_track_incidents",
   "manage_track_incidents",
+  "view_fitdog_alerts",
+  "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
   "view_hr_hub",
@@ -466,6 +474,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "grooming_push",
   "owner_follow_up",
   "active_issues",
+  "fitdog_alerts",
   "staff_directory",
   "bulk_photo_upload",
   "yard_links",
@@ -713,6 +722,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   management_support: "submit_write_up",
   package_commissions: "manage_package_commissions",
   track_incidents: "view_track_incidents",
+  fitdog_alerts: "view_fitdog_alerts",
   vet_visits: "view_vet_visits",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
@@ -1039,6 +1049,18 @@ export function canAccessAdminTab(
 
   // Walks Board is available to every authenticated staff user on the staff board.
   if (tab === "walks_board") return board === "staff";
+
+  // Fitdog payment alerts are restricted to super_admin, admin, management, front_desk_coordinator.
+  if (tab === "fitdog_alerts") {
+    if (board !== "staff") return false;
+    const roleKey = legacyRoleToRoleKey(legacyRole ?? access?.primaryRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator"
+    );
+  }
 
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
 

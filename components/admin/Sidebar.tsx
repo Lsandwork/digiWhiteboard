@@ -69,12 +69,14 @@ function SidebarNavItem({
   label,
   active,
   nested,
+  badgeCount,
   onSelect
 }: {
   tab: AdminTab;
   label: string;
   active: boolean;
   nested?: boolean;
+  badgeCount?: number;
   onSelect: (tab: AdminTab) => void;
   collapsed?: boolean;
 }) {
@@ -86,7 +88,12 @@ function SidebarNavItem({
       title={label}
     >
       {!nested ? <NavIcon tab={tab} /> : null}
-      <span>{label}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {badgeCount && badgeCount > 0 ? (
+        <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+          {badgeCount > 99 ? "99+" : badgeCount}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -95,17 +102,20 @@ function SidebarNavGroup({
   entry,
   activeTab,
   expanded,
+  badgeCounts,
   onToggle,
   onSelect
 }: {
   entry: Extract<NavEntry, { type: "group" }>;
   activeTab: AdminTab;
   expanded: boolean;
+  badgeCounts?: Partial<Record<AdminTab, number>>;
   onToggle: () => void;
   onSelect: (tab: AdminTab) => void;
 }) {
   const childActive = entry.children.some((child) => child.tab === activeTab);
   const groupIcon = FITDOG_TAB_ICONS[entry.children[0]?.tab];
+  const groupBadge = entry.children.reduce((sum, child) => sum + (badgeCounts?.[child.tab] || 0), 0);
 
   return (
     <div className={`admin-nav-group ${expanded || childActive ? "admin-nav-group--open" : ""}`}>
@@ -121,6 +131,11 @@ function SidebarNavGroup({
           <span className="admin-nav-item__icon inline-block h-5 w-5 shrink-0 rounded bg-white/10" aria-hidden />
         )}
         <span className="flex-1 text-left">{entry.label}</span>
+        {groupBadge > 0 ? (
+          <span className="mr-1 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+            {groupBadge > 99 ? "99+" : groupBadge}
+          </span>
+        ) : null}
         <ChevronDown className={`admin-nav-group__chevron h-4 w-4 shrink-0 ${expanded ? "admin-nav-group__chevron--open" : ""}`} aria-hidden />
       </button>
       {expanded ? (
@@ -132,6 +147,7 @@ function SidebarNavGroup({
               label={child.label}
               active={activeTab === child.tab}
               nested
+              badgeCount={badgeCounts?.[child.tab]}
               onSelect={onSelect}
             />
           ))}
@@ -212,6 +228,7 @@ function NavEntryChildren({
   activeTab,
   activePath,
   expandedGroups,
+  badgeCounts,
   onToggleGroup,
   onSelect,
   onNavigate
@@ -220,6 +237,7 @@ function NavEntryChildren({
   activeTab: AdminTab;
   activePath?: string | null;
   expandedGroups: Set<string>;
+  badgeCounts?: Partial<Record<AdminTab, number>>;
   onToggleGroup: (id: string) => void;
   onSelect: (tab: AdminTab) => void;
   onNavigate: () => void;
@@ -245,6 +263,7 @@ function NavEntryChildren({
               entry={entry}
               activeTab={activeTab}
               expanded={expandedGroups.has(entry.id)}
+              badgeCounts={badgeCounts}
               onToggle={() => onToggleGroup(entry.id)}
               onSelect={onSelect}
             />
@@ -256,6 +275,7 @@ function NavEntryChildren({
             tab={entry.tab}
             label={entry.label}
             active={activeTab === entry.tab}
+            badgeCount={badgeCounts?.[entry.tab]}
             onSelect={onSelect}
           />
         );
@@ -271,6 +291,7 @@ function NavEntryList({
   expandedGroups,
   expandedSections,
   forceExpandSections,
+  badgeCounts,
   onToggleGroup,
   onToggleSection,
   onSelect,
@@ -282,6 +303,7 @@ function NavEntryList({
   expandedGroups: Set<string>;
   expandedSections: Set<string>;
   forceExpandSections: boolean;
+  badgeCounts?: Partial<Record<AdminTab, number>>;
   onToggleGroup: (id: string) => void;
   onToggleSection: (id: string) => void;
   onSelect: (tab: AdminTab) => void;
@@ -298,6 +320,7 @@ function NavEntryList({
             activeTab={activeTab}
             activePath={activePath}
             expandedGroups={expandedGroups}
+            badgeCounts={badgeCounts}
             onToggleGroup={onToggleGroup}
             onSelect={onSelect}
             onNavigate={onNavigate}
@@ -375,6 +398,28 @@ export function Sidebar({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     () => new Set(activeSectionId ? [activeSectionId] : [])
   );
+  const [badgeCounts, setBadgeCounts] = useState<Partial<Record<AdminTab, number>>>({});
+
+  useEffect(() => {
+    if (!visibleTabs.includes("fitdog_alerts")) return;
+    let cancelled = false;
+    async function loadBadges() {
+      try {
+        const res = await fetch("/api/admin/fitdog-alerts?view=badge", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { count?: number };
+        if (!cancelled) setBadgeCounts({ fitdog_alerts: Number(json.count || 0) });
+      } catch {
+        // Badge fetch is best-effort.
+      }
+    }
+    void loadBadges();
+    const timer = window.setInterval(() => void loadBadges(), 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [visibleTabs]);
 
   useEffect(() => {
     if (!activeGroupId) return;
@@ -465,6 +510,7 @@ export function Sidebar({
             expandedGroups={expandedGroups}
             expandedSections={expandedSections}
             forceExpandSections={collapsed}
+            badgeCounts={badgeCounts}
             onToggleGroup={toggleGroup}
             onToggleSection={toggleSection}
             onSelect={handleSelect}
