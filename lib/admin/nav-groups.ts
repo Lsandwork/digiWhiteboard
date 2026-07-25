@@ -178,7 +178,7 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-const SETTINGS_NESTED_TABS: AdminTab[] = ["settings", "track_incidents", "vet_visits"];
+const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));
@@ -306,7 +306,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
-          ...singles(["admin_trainer_entries"], visible)
+          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)
         ]),
         true
       )
@@ -339,16 +339,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_admin",
         "Administration",
-        compactEntries([
-          group("settings_menu", "Settings", SETTINGS_NESTED_TABS, visible),
-          group(
-            "admin_system",
-            "System",
-            ADMIN_SYSTEM_TABS.filter((tab) => tab !== "settings"),
-            visible
-          )
-        ]),
-        true
+        compactEntries([group("admin_system", "System", ADMIN_SYSTEM_TABS, visible)])
       )
     );
   }

@@ -32,6 +32,8 @@ const adminTabs: AdminTab[] = [
   "ms_groomer_requests",
   "ms_trainer_requests",
   "admin_trainer_entries",
+  "track_incidents",
+  "vet_visits",
   "help"
 ];
 
@@ -165,5 +167,9 @@ assert.ok(
   "Management section should bucket its tab links for collapsible nav"
 );
 assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "ms_hub"), "staff_management");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "track_incidents"), "Management");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "vet_visits"), "Management");
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "track_incidents"), "staff_management");
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "vet_visits"), "staff_management");
 
 console.log("commissions nav tests passed");
