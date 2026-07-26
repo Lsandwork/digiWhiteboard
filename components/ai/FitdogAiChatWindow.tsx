@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, MessageCircleHeart, Send, Video, X } from "lucide-react";
+import { Loader2, MessageCircleHeart, Mic, MicOff, Send, Video, X } from "lucide-react";
 import { FitdogGeminiAvatar } from "@/components/ai/FitdogGeminiAvatar";
 import {
   FitdogAiMessage,
@@ -23,6 +23,37 @@ const QUICK_PROMPTS = [
   { label: "Grooming push", message: "I need a dog put in catch for grooming." }
 ];
 
+type BrowserSpeechRecognition = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+function getSpeechRecognitionConstructor(): SpeechRecognitionConstructor | null {
+  if (typeof window === "undefined") return null;
+  const speechWindow = window as Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  };
+  return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+}
+
 function newMessageId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `fitdog-ai-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -42,8 +73,16 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
   const [sending, setSending] = useState(false);
   const [pushingNoticeId, setPushingNoticeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [listening, setListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+  const baseDraftRef = useRef("");
+
+  useEffect(() => {
+    setSpeechSupported(Boolean(getSpeechRecognitionConstructor()));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -57,6 +96,99 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
     if (!open) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, sending, open, mode]);
+
+  useEffect(() => {
+    if (open) return;
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+    setListening(false);
+  }, [open]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  const stopListening = useCallback(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition) {
+      setListening(false);
+      return;
+    }
+    try {
+      recognition.stop();
+    } catch {
+      recognition.abort();
+    }
+    recognitionRef.current = null;
+    setListening(false);
+  }, []);
+
+  const startListening = useCallback(() => {
+    const SpeechRecognitionCtor = getSpeechRecognitionConstructor();
+    if (!SpeechRecognitionCtor) {
+      setError("Voice input is not supported in this browser. Try Chrome or Safari.");
+      return;
+    }
+
+    stopListening();
+    baseDraftRef.current = draft.trim();
+    const recognition = new SpeechRecognitionCtor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      let interim = "";
+      let finalChunk = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const transcript = result?.[0]?.transcript?.trim() ?? "";
+        if (!transcript) continue;
+        if (result.isFinal) finalChunk = `${finalChunk} ${transcript}`.trim();
+        else interim = `${interim} ${transcript}`.trim();
+      }
+      if (finalChunk) {
+        baseDraftRef.current = [baseDraftRef.current, finalChunk].filter(Boolean).join(" ").trim();
+      }
+      const nextDraft = [baseDraftRef.current, interim].filter(Boolean).join(" ").trim();
+      setDraft(nextDraft);
+    };
+
+    recognition.onerror = (event) => {
+      if (event.error === "aborted" || event.error === "no-speech") return;
+      setError(
+        event.error === "not-allowed"
+          ? "Microphone permission is blocked. Allow mic access to speak to Fitdog AI."
+          : "Voice input stopped. Tap the mic and try again."
+      );
+      setListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setListening(true);
+      setError(null);
+    } catch {
+      setError("Unable to start voice input. Check microphone permissions and try again.");
+      setListening(false);
+      recognitionRef.current = null;
+    }
+  }, [draft, stopListening]);
+
+  const toggleListening = useCallback(() => {
+    if (listening) stopListening();
+    else startListening();
+  }, [listening, startListening, stopListening]);
 
   const pushNoticeFromChat = useCallback(async (noticeDraft: FitdogAiPushNoticeDraft, messageId: string) => {
     setPushingNoticeId(messageId);
@@ -107,6 +239,8 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
       const trimmed = text.trim();
       if (!trimmed || sending) return;
 
+      stopListening();
+
       const userMessage: FitdogAiChatMessage = {
         id: newMessageId(),
         role: "user",
@@ -114,13 +248,14 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         createdAt: new Date().toISOString()
       };
 
-      const history = [...messages, userMessage].slice(-8).map((item) => ({
+      const history = [...messages, userMessage].slice(-4).map((item) => ({
         role: item.role,
         content: item.content
       }));
 
       setMessages((current) => [...current, userMessage]);
       setDraft("");
+      baseDraftRef.current = "";
       setSending(true);
       setError(null);
 
@@ -161,7 +296,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         inputRef.current?.focus();
       }
     },
-    [currentPage, messages, sending]
+    [currentPage, messages, sending, stopListening]
   );
 
   function handleVideoComplete(analysis: FitdogAiVideoAnalysis) {
@@ -272,6 +407,11 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
           </div>
 
           {error ? <p className="fitdog-ai-error fitdog-ai-error--inline">{error}</p> : null}
+          {listening ? (
+            <p className="fitdog-ai-listening" aria-live="polite">
+              Listening… speak now. Tap the mic again when you are done.
+            </p>
+          ) : null}
 
           <form
             className="fitdog-ai-composer"
@@ -284,10 +424,30 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
               ref={inputRef}
               rows={2}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask for help — or say what notice to push to the team..."
+              onChange={(event) => {
+                setDraft(event.target.value);
+                if (!listening) baseDraftRef.current = event.target.value.trim();
+              }}
+              placeholder={
+                listening
+                  ? "Listening… your words appear here"
+                  : "Type or tap the mic to speak — ask for help or what to push to the team..."
+              }
               disabled={sending || configured === false}
             />
+            {speechSupported ? (
+              <button
+                type="button"
+                className={`fitdog-ai-mic ${listening ? "is-listening" : ""}`}
+                aria-label={listening ? "Stop voice input" : "Start voice input"}
+                aria-pressed={listening}
+                title={listening ? "Stop recording" : "Speak to Fitdog AI"}
+                disabled={sending || configured === false}
+                onClick={toggleListening}
+              >
+                {listening ? <MicOff className="h-4 w-4" aria-hidden /> : <Mic className="h-4 w-4" aria-hidden />}
+              </button>
+            ) : null}
             <button type="submit" className="fitdog-ai-send" disabled={sending || !draft.trim() || configured === false}>
               {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
             </button>

@@ -33,6 +33,8 @@ export async function generateFitdogText(params: {
   userMessage: string;
   jsonMode?: boolean;
   modelOverride?: string | null;
+  /** Lower temperature + capped tokens for snappy, accurate chat replies. */
+  fastChat?: boolean;
 }): Promise<{ text: string; model: string }> {
   const apiKey = getApiKey();
   const primaryModel = resolveGeminiModel(params.modelOverride);
@@ -46,7 +48,16 @@ export async function generateFitdogText(params: {
       const model = genAI.getGenerativeModel({
         model: modelName,
         systemInstruction: params.systemInstruction,
-        generationConfig: params.jsonMode ? { responseMimeType: "application/json" } : undefined
+        generationConfig: {
+          ...(params.jsonMode ? { responseMimeType: "application/json" as const } : {}),
+          ...(params.fastChat
+            ? {
+                temperature: 0.35,
+                topP: 0.9,
+                maxOutputTokens: 768
+              }
+            : {})
+        }
       });
       const result = await model.generateContent(params.userMessage);
       const text = result.response.text()?.trim();

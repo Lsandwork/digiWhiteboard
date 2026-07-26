@@ -127,11 +127,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const context = await buildFitdogUserContext({ session, currentPage });
+    // Lightweight + cached context keeps chat turns fast without extra DB round-trips.
+    const context = await buildFitdogUserContext({ session, currentPage, lightweight: true });
     const toneHint = detectToneHint(message);
+    const shortHistory = history.slice(-4);
 
     if (!isGeminiConfigured()) {
-      const local = buildLocalChatFallback({ message, history, context });
+      const local = buildLocalChatFallback({ message, history: shortHistory, context });
       if (!local) {
         return NextResponse.json(
           { error: "Fitdog AI is not configured yet. Ask an admin to add GEMINI_API_KEY in Vercel." },
@@ -139,11 +141,17 @@ export async function POST(request: Request) {
         );
       }
       const parsed = normalizeChatJson(local, local.reply);
-      return respondFromParsed({ session, context, message, history, parsed, toneHint });
+      return respondFromParsed({ session, context, message, history: shortHistory, parsed, toneHint });
     }
 
     const systemInstruction = buildFitdogAiSystemPrompt(context);
-    const userPrompt = buildFitdogAiUserPrompt({ message, context, toneHint, recentContext, history });
+    const userPrompt = buildFitdogAiUserPrompt({
+      message,
+      context,
+      toneHint,
+      recentContext,
+      history: shortHistory
+    });
 
     let parsed: ReturnType<typeof normalizeChatJson>;
 
@@ -151,7 +159,8 @@ export async function POST(request: Request) {
       const { text } = await generateFitdogText({
         systemInstruction,
         userMessage: userPrompt,
-        jsonMode: true
+        jsonMode: true,
+        fastChat: true
       });
 
       const fallback: GeminiChatJson = {
@@ -167,24 +176,24 @@ export async function POST(request: Request) {
       parsed = normalizeChatJson(parseGeminiJson<Partial<GeminiChatJson>>(text, fallback), fallback.reply);
     } catch (geminiError) {
       console.error("[fitdog-ai/chat] Gemini failed, using local fallback:", geminiError);
-      const local = buildLocalChatFallback({ message, history, context });
+      const local = buildLocalChatFallback({ message, history: shortHistory, context });
       if (!local) throw geminiError;
       parsed = normalizeChatJson(local, local.reply);
     }
 
-    return respondFromParsed({ session, context, message, history, parsed, toneHint });
+    return respondFromParsed({ session, context, message, history: shortHistory, parsed, toneHint });
   } catch (error) {
     console.error("[fitdog-ai/chat] Request failed:", error);
     try {
-      const context = await buildFitdogUserContext({ session, currentPage });
-      const local = buildLocalChatFallback({ message, history, context });
+      const context = await buildFitdogUserContext({ session, currentPage, lightweight: true });
+      const local = buildLocalChatFallback({ message, history: history.slice(-4), context });
       if (local) {
         const parsed = normalizeChatJson(local, local.reply);
         return respondFromParsed({
           session,
           context,
           message,
-          history,
+          history: history.slice(-4),
           parsed,
           toneHint: detectToneHint(message)
         });
@@ -193,7 +202,7 @@ export async function POST(request: Request) {
       console.error("[fitdog-ai/chat] Local fallback failed:", fallbackError);
     }
 
-    const context = await buildFitdogUserContext({ session, currentPage }).catch(() => null);
+    const context = await buildFitdogUserContext({ session, currentPage, lightweight: true }).catch(() => null);
     return NextResponse.json(
       {
         error: fitdogAiUserFacingError(error),
