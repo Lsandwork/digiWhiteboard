@@ -45,6 +45,7 @@ const teamLeadTabs: AdminTab[] = [
   "yard_push_notices",
   "grooming_push",
   "crossover_communication",
+  "bulk_photo_upload",
   "management_support",
   "notifications",
   "yard_links",
@@ -53,6 +54,11 @@ const teamLeadTabs: AdminTab[] = [
   "help"
 ];
 const teamLeadNav = buildTeamLeadNav(teamLeadTabs);
+assert.equal(
+  findNavSectionForTab(teamLeadNav, "bulk_photo_upload"),
+  "Front Desk & Floor",
+  "team leads must see Bulk Photo Upload in nav"
+);
 
 const coordinatorTabs: AdminTab[] = [
   "push_notices",

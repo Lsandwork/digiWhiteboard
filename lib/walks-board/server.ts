@@ -115,13 +115,24 @@ export async function findActiveWalkBoardDuplicate(
   return (data as WalkBoardEntryRow | null) ?? null;
 }
 
+function isMissingWalkBoardRelation(error: { code?: string; message?: string } | null | undefined) {
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    Boolean(error?.message?.includes("walk_board"))
+  );
+}
+
 export async function listActiveWalkBoardEntries(supabase: SupabaseClient): Promise<WalkBoardEntryView[]> {
   const { data, error } = await supabase
     .from("walk_board_entries")
     .select("*")
     .eq("status", "active")
     .order("next_due_at", { ascending: true });
-  if (error) throw error;
+  if (error) {
+    if (isMissingWalkBoardRelation(error)) return [];
+    throw error;
+  }
 
   const rows = (data ?? []) as WalkBoardEntryRow[];
   const users = await loadUserRefs(
@@ -140,7 +151,10 @@ export async function listWalkBoardActivity(
     .select("*")
     .eq("walk_entry_id", walkEntryId)
     .order("occurred_at", { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (isMissingWalkBoardRelation(error)) return [];
+    throw error;
+  }
 
   const rows = (data ?? []) as WalkBoardActivityRow[];
   const users = await loadUserRefs(

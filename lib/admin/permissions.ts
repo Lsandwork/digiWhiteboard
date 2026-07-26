@@ -532,6 +532,7 @@ export const DOG_HANDLER_TABS = [
   "management_support",
   "bulk_photo_upload",
   "write_ups",
+  "settings",
   "help"
 ] as const;
 
@@ -597,8 +598,15 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
       return "marketing";
     case "viewer":
       return "viewer";
+    case "overnight":
+      return "overnight";
+    case "maintenance":
+      return "maintenance";
+    case "staff":
+      return "staff";
     default:
-      return "admin";
+      // Unknown / unmapped roles must not elevate to admin.
+      return "viewer";
   }
 }
 
@@ -627,6 +635,14 @@ export function roleKeyToLegacyRole(role: RoleKey): string {
       return "trainer";
     case "marketing":
       return "marketing";
+    case "overnight":
+      return "overnight";
+    case "maintenance":
+      return "maintenance";
+    case "staff":
+      return "staff";
+    case "viewer":
+      return "viewer";
     default:
       return "viewer";
   }
@@ -1045,21 +1061,30 @@ export function canAccessAdminTab(
     return (MARKETING_BOARD_TABS as readonly string[]).includes(tab);
   }
 
-  // Walks Board is available to every authenticated staff user on the staff board.
-  if (tab === "walks_board") return board === "staff";
+  // Walks Board is available to floor staff on the staff board (not marketing accounts).
+  if (tab === "walks_board") {
+    if (board !== "staff") return false;
+    if (isMarketingLegacyRole(legacyRole)) return false;
+    return true;
+  }
 
   // Dedicated entry-log tabs are admin/management only — all staff use Front Desk Log instead.
   if (tab === "trainer_entry" || tab === "handler_shift_entry") {
     if (board !== "staff") return false;
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
-    const roleKey = legacyRoleToRoleKey(legacyRole ?? access?.primaryRole);
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
     return roleKey === "admin" || roleKey === "management" || roleKey === "super_admin";
   }
 
-  // Fitdog payment alerts are restricted to super_admin, admin, management, front_desk_coordinator.
+  // Fitdog payment alerts: allowlisted roles or explicit permission.
   if (tab === "fitdog_alerts") {
     if (board !== "staff") return false;
-    const roleKey = legacyRoleToRoleKey(legacyRole ?? access?.primaryRole);
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "view_fitdog_alerts")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
     return (
       roleKey === "super_admin" ||
       roleKey === "admin" ||

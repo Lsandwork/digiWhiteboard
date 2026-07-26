@@ -440,7 +440,10 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication"], visible),
+        ...singles(["bulk_photo_upload"], visible)
+      ])
     )
   );
 

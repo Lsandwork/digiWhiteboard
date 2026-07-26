@@ -4,7 +4,8 @@ import {
   canAccessAdminTab,
   firstAccessibleAdminTab,
   isLobbyDigiBoardOnlyLegacyRole,
-  isStaffDigiBoardOnlyLegacyRole
+  isStaffDigiBoardOnlyLegacyRole,
+  legacyRoleToRoleKey
 } from "../lib/admin/permissions";
 import { ADMIN_TABS } from "../lib/admin/types";
 import type { AdminUserRole } from "../lib/admin/users";
@@ -97,5 +98,18 @@ assert.equal(
   true,
   "admin can still open entry tools"
 );
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "marketing"), "walks_board", "marketing", "staff"),
+  false,
+  "marketing accounts should not open Walks Board on staff"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "settings", "daycare", "staff"),
+  true,
+  "handlers can open Settings/profile"
+);
+assert.equal(legacyRoleToRoleKey("overnight"), "overnight");
+assert.equal(legacyRoleToRoleKey("maintenance"), "maintenance");
+assert.equal(legacyRoleToRoleKey("unknown_role_xyz"), "viewer");
 
 console.log("role access tests passed");
