@@ -31,6 +31,7 @@ import {
   escapeCsvCell,
   validateExport
 } from "../lib/route-generator/samsara-csv";
+import { buildCustomerStopNotes, formatPhoneForDriver } from "../lib/route-generator/stop-notes";
 
 // Permissions
 assert.equal(
@@ -576,6 +577,138 @@ assert.ok(dropParsed.rows.length >= 5);
 
 assert.equal(serviceForAssignedVan("van_1"), "Adventure Hike");
 assert.equal(serviceForAssignedVan("van_3"), "Beach Excursion");
+
+assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
+{
+  const indyNotes = buildCustomerStopNotes({
+    direction: "pickup",
+    items: [
+      {
+        direction: "pickup",
+        reservationId: "1",
+        customerId: "c",
+        ownerFirstName: "Mark",
+        ownerLastName: "DiRuzza",
+        ownerFullName: "Mark DiRuzza",
+        dogId: "d1",
+        dogName: "Indy",
+        serviceRaw: "Recall at the Beach",
+        serviceCanonical: null,
+        addressRaw: "1505 9th Street Apt 207, Santa Monica, CA 90401",
+        addressStreet: "1505 9th Street",
+        addressUnit: "207",
+        addressCity: "Santa Monica",
+        addressState: "CA",
+        addressZip: "90401",
+        ownerPhoneMasked: "•••-•••-7041",
+        timeWindowStart: null,
+        timeWindowEnd: null,
+        dogSize: "Medium",
+        specialNotes:
+          "Entrance is #1986, 2nd floor door code 9102 (push n pull door), key is in potted tree",
+        driverNotes:
+          "Entrance is #1986, 2nd floor door code 9102 (push n pull door), key is in potted tree",
+        reservationNotes: null,
+        householdKey: "h-indy",
+        validationStatus: "ok",
+        validationReasons: [],
+        raw: { phone: "4132187041", location_notes: "Entrance is #1986" }
+      }
+    ]
+  });
+  assert.ok(indyNotes.includes("Indy"));
+  assert.ok(indyNotes.includes("Phone: (413) 218-7041"));
+  assert.ok(indyNotes.includes("Pickup instructions:"));
+  assert.ok(indyNotes.includes("door code 9102"));
+  const noteRow = {
+    routeName: "test",
+    routeNotes: "",
+    vehicleName: "Van 1",
+    driverName: "",
+    stopName: "Indy DiRuzza",
+    stopNotes: indyNotes,
+    stopAddress: "1505 9th Street",
+    scheduledArrival: "",
+    scheduledDeparture: "",
+    routeDate: "2026-07-27",
+    stopOrder: 1,
+    latitude: "34.01",
+    longitude: "-118.49"
+  };
+  const noteCsv = buildCsv({
+    template: { headers: templateHeaders, delimiter: ",", encoding: "utf-8", mappings },
+    rows: [noteRow]
+  });
+  assert.ok(noteCsv.csv.includes("Phone: (413) 218-7041"));
+  assert.ok(noteCsv.csv.includes("door code 9102"));
+}
+
+{
+  // Optimized customer stops must carry Fitdog instructions + phone into notes.
+  const withNotes = optimizeRoutes({
+    direction: "pickup",
+    households: groupHouseholds([
+      {
+        direction: "pickup",
+        reservationId: "99",
+        customerId: "c",
+        ownerFirstName: "Mark",
+        ownerLastName: "DiRuzza",
+        ownerFullName: "Mark DiRuzza",
+        dogId: "d1",
+        dogName: "Indy",
+        serviceRaw: "Adventure Hikes",
+        serviceCanonical: "Adventure Hike",
+        addressRaw: "1505 9th Street Apt 207, Santa Monica, CA 90401",
+        addressStreet: "1505 9th Street",
+        addressUnit: "207",
+        addressCity: "Santa Monica",
+        addressState: "CA",
+        addressZip: "90401",
+        ownerPhoneMasked: "•••-•••-7041",
+        timeWindowStart: null,
+        timeWindowEnd: null,
+        dogSize: "Medium",
+        specialNotes: "Key is in potted tree",
+        driverNotes: "Key is in potted tree",
+        reservationNotes: null,
+        householdKey: "1505 9th",
+        validationStatus: "ok",
+        validationReasons: [],
+        raw: { phone: "(413) 218-7041" }
+      }
+    ]),
+    vehicles: [
+      {
+        vanKey: "van_1",
+        active: true,
+        vehiclePool: "outing",
+        maxDogs: 8,
+        maxLoadUnits: 20,
+        maxLargeDogs: 4,
+        maxStops: 20,
+        eligibleServices: ["Adventure Hike"],
+        capacityConfigured: true
+      }
+    ],
+    depot: {
+      name: "Fitdog",
+      address: "Depot",
+      latitude: 34.01,
+      longitude: -118.49,
+      timezone: "America/Los_Angeles",
+      verified: true
+    },
+    sizeLoads: { Small: 1, Medium: 1.5, Large: 2, "Extra Large": 2.5, Unknown: 2, configured: true },
+    seed: "indy-notes",
+    coordsByHousehold: { "1505 9th": { lat: 34.02, lng: -118.49 } }
+  });
+  const customer = withNotes.routes[0]?.stops.find((s) => s.stopKind === "customer");
+  assert.ok(customer?.notes.includes("Phone: (413) 218-7041"));
+  assert.ok(customer?.notes.includes("Key is in potted tree"));
+  assert.equal(customer?.ownerPhoneDisplay, "(413) 218-7041");
+}
+
 {
   const taxiItems = manualTaxiToReportItems({
     dogName: "Mochi",
