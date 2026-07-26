@@ -52,7 +52,12 @@ export async function PATCH(request: Request) {
       "consent_wording_version",
       "review_request_delay_minutes",
       "webchat_config",
-      "sending_channels"
+      "sending_channels",
+      "ai_enabled",
+      "webchat_enabled",
+      "voice_enabled",
+      "campaigns_enabled",
+      "automations_enabled"
     ]) {
       if (key in body) patch[key] = body[key];
     }

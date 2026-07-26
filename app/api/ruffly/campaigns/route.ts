@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRufflyPermission } from "@/lib/ruffly/api-auth";
+import { isRufflyCampaignsEnabled } from "@/lib/ruffly/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,20 @@ export async function GET(request: Request) {
     const supabase = getServiceSupabase();
     const { data, error } = await supabase.from("ruffly_campaigns").select("*").order("created_at", { ascending: false }).limit(100);
     if (error) throw error;
-    return NextResponse.json({ campaigns: data ?? [] });
+    return NextResponse.json({
+      campaigns: data ?? [],
+      enabled: isRufflyCampaignsEnabled(),
+      note: isRufflyCampaignsEnabled() ? null : "Campaigns flag is off. Enable RUFFLY_CAMPAIGNS_ENABLED after channel tests."
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load campaigns.";
     // Tables may not exist until migration is applied
     if (message.includes("does not exist") || message.includes("schema cache")) {
-      return NextResponse.json({ campaigns: [], warning: "Ruffly tables not migrated yet. Run supabase migration 044_ruffly_core.sql." });
+      return NextResponse.json({
+        campaigns: [],
+        enabled: isRufflyCampaignsEnabled(),
+        warning: "Ruffly tables not migrated yet. Run supabase migration 044_ruffly_core.sql."
+      });
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }

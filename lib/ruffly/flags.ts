@@ -4,7 +4,9 @@ export type RufflyFeatureFlag =
   | "RUFFLY_AI_ENABLED"
   | "RUFFLY_VOICE_ENABLED"
   | "RUFFLY_CAMPAIGNS_ENABLED"
-  | "RUFFLY_AUTOMATIONS_ENABLED";
+  | "RUFFLY_AUTOMATIONS_ENABLED"
+  | "RUFFLY_SENDING_SMS_ENABLED"
+  | "RUFFLY_SENDING_EMAIL_ENABLED";
 
 function envFlag(name: RufflyFeatureFlag, fallback = false): boolean {
   const raw = process.env[name]?.trim().toLowerCase();
@@ -36,6 +38,19 @@ export function isRufflyAutomationsEnabled() {
   return isRufflyEnabled() && envFlag("RUFFLY_AUTOMATIONS_ENABLED", false);
 }
 
+export function isRufflySmsSendingEnabled() {
+  return isRufflyEnabled() && envFlag("RUFFLY_SENDING_SMS_ENABLED", false);
+}
+
+export function isRufflyEmailSendingEnabled() {
+  return isRufflyEnabled() && envFlag("RUFFLY_SENDING_EMAIL_ENABLED", false);
+}
+
+/** Direct Gingr reservation writes are not advertised until a tested write path exists. */
+export function isRufflyGingrBookingEnabled() {
+  return false;
+}
+
 export function rufflyFlagSnapshot() {
   return {
     enabled: isRufflyEnabled(),
@@ -43,6 +58,9 @@ export function rufflyFlagSnapshot() {
     ai: isRufflyAiEnabled(),
     voice: isRufflyVoiceEnabled(),
     campaigns: isRufflyCampaignsEnabled(),
-    automations: isRufflyAutomationsEnabled()
+    automations: isRufflyAutomationsEnabled(),
+    sendingSms: isRufflySmsSendingEnabled(),
+    sendingEmail: isRufflyEmailSendingEnabled(),
+    gingrBooking: isRufflyGingrBookingEnabled()
   };
 }

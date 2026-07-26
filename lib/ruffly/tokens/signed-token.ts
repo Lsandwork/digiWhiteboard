@@ -1,12 +1,8 @@
 import { createHmac, timingSafeEqual, randomBytes, createHash } from "crypto";
 
 function secret() {
-  return (
-    process.env.RUFFLY_TOKEN_SECRET?.trim() ||
-    process.env.ADMIN_SESSION_SECRET?.trim() ||
-    process.env.GINGR_WEBHOOK_SIGNATURE_KEY?.trim() ||
-    ""
-  );
+  // Dedicated secret only — do not fall back to Gingr webhook or admin session keys.
+  return process.env.RUFFLY_TOKEN_SECRET?.trim() || "";
 }
 
 export type RufflyTokenPayload = {

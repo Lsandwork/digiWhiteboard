@@ -11,7 +11,7 @@ import {
 } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
-import { RUFFLY_REWRITE_TARGET, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
+import { RUFFLY_REWRITE_TARGET, rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
 
 export async function middleware(request: NextRequest) {
   try {
@@ -51,13 +51,13 @@ async function runMiddleware(request: NextRequest) {
     url.pathname = RUFFLY_REWRITE_TARGET;
     return NextResponse.rewrite(url);
   }
-  if (
-    pathname === "/widget.js" &&
-    request.headers.get("host")?.toLowerCase().includes("ruffly.ruffops.com")
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/ruffly/widget.js";
-    return NextResponse.rewrite(url);
+  {
+    const rufflyPath = rewriteRufflyPublicPath(request.headers.get("host"), pathname);
+    if (rufflyPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = rufflyPath;
+      return NextResponse.rewrite(url);
+    }
   }
 
   const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;

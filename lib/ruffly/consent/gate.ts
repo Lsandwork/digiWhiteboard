@@ -17,20 +17,10 @@ export async function canSendToContact(input: {
   const phone = contact.phone_normalized;
   const email = contact.email_normalized;
 
-  let suppressionQuery = supabase.from("ruffly_suppressions").select("id, reason").limit(1);
-  if (input.channel === "sms" && phone) {
-    suppressionQuery = suppressionQuery.or(
-      `and(phone_normalized.eq.${phone},channel.in.(sms,all)),and(phone_normalized.eq.${phone},purpose.in.(${input.purpose},all))`
-    );
-  } else if (input.channel === "email" && email) {
-    suppressionQuery = suppressionQuery.or(
-      `and(email_normalized.eq.${email},channel.in.(email,all))`
-    );
-  }
   const { data: suppressions } = await supabase
     .from("ruffly_suppressions")
     .select("id, reason, channel, purpose, phone_normalized, email_normalized")
-    .limit(50);
+    .limit(100);
 
   const blocked = (suppressions || []).some((row) => {
     const channelMatch = row.channel === input.channel || row.channel === "all";
@@ -63,6 +53,7 @@ export async function canSendToContact(input: {
   return { allowed: true };
 }
 
+/** STOP / natural-language opt-out suppresses all SMS purposes. */
 export async function applySmsOptOut(input: {
   contactId?: string | null;
   phone?: string | null;
@@ -71,25 +62,30 @@ export async function applySmsOptOut(input: {
 }) {
   const supabase = getServiceSupabase();
   const phoneNormalized = normalizePhone(input.phone);
+  const now = new Date().toISOString();
+
   if (input.contactId) {
-    await supabase.from("ruffly_consents").upsert(
-      {
-        contact_id: input.contactId,
-        channel: "sms",
-        purpose: "marketing",
-        status: "opted_out",
-        source: input.source,
-        opted_out_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "contact_id,channel,purpose" }
-    );
+    for (const purpose of ["marketing", "transactional"] as const) {
+      await supabase.from("ruffly_consents").upsert(
+        {
+          contact_id: input.contactId,
+          channel: "sms",
+          purpose,
+          status: "opted_out",
+          source: input.source,
+          opted_out_at: now,
+          updated_at: now
+        },
+        { onConflict: "contact_id,channel,purpose" }
+      );
+    }
   }
+
   await supabase.from("ruffly_suppressions").insert({
     contact_id: input.contactId ?? null,
     phone_normalized: phoneNormalized,
     channel: "sms",
-    purpose: "marketing",
+    purpose: "all",
     reason: "customer_opt_out",
     source: input.source
   });

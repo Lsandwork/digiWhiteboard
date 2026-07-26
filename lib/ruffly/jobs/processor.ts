@@ -1,6 +1,9 @@
 import { processStoredGingrWebhook } from "@/lib/integrations/gingr/webhooks/process";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
+import { writeRufflyAuditLog } from "@/lib/ruffly/audit";
 import { canSendToContact } from "@/lib/ruffly/consent/gate";
+import { isRufflySmsSendingEnabled } from "@/lib/ruffly/flags";
+import { rufflyReviewPath } from "@/lib/ruffly/public-url";
 import { claimDueRufflyJobs } from "@/lib/ruffly/queue/jobs";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { hashToken, newOpaqueToken, signRufflyToken } from "@/lib/ruffly/tokens/signed-token";
@@ -92,11 +95,10 @@ export async function processRufflyJobs(limit = 20) {
           ttlSeconds: 14 * 24 * 60 * 60,
           meta: { t: opaque.slice(0, 12) }
         });
-        const publicBase = process.env.RUFFLY_PUBLIC_URL?.trim() || "https://ruffly.ruffops.com";
-        const link = `${publicBase}/review/${encodeURIComponent(signed)}`;
+        const link = rufflyReviewPath(signed);
         if (contact.phone_normalized || contact.phone) {
           const sms = getSmsProvider();
-          if (sms.isConfigured() && process.env.RUFFLY_SENDING_SMS_ENABLED === "true") {
+          if (sms.isConfigured() && isRufflySmsSendingEnabled()) {
             await sms.send({
               to: contact.phone || contact.phone_normalized!,
               purpose: "transactional",
@@ -122,7 +124,7 @@ export async function processRufflyJobs(limit = 20) {
           results.push({ id: job.id, ok: true, skipped: gate.reason });
           continue;
         }
-        if (process.env.RUFFLY_SENDING_SMS_ENABLED !== "true") {
+        if (!isRufflySmsSendingEnabled()) {
           await completeJob(job.id);
           results.push({ id: job.id, ok: true, skipped: "sending_disabled" });
           continue;
@@ -134,6 +136,29 @@ export async function processRufflyJobs(limit = 20) {
           purpose: (job.payload?.purpose as "transactional" | "marketing") || "transactional"
         });
         if (!sent.ok) throw new Error(sent.error || "SMS send failed");
+        await completeJob(job.id);
+        results.push({ id: job.id, ok: true });
+        continue;
+      }
+
+      if (job.job_type === "low_feedback_alert") {
+        const supabase = getServiceSupabase();
+        const feedbackId = String(job.payload?.feedbackId || "");
+        if (feedbackId) {
+          await supabase
+            .from("ruffly_feedback")
+            .update({ status: "needs_follow_up", urgency: "critical", updated_at: new Date().toISOString() })
+            .eq("id", feedbackId);
+        }
+        await writeRufflyAuditLog({
+          action: "ruffly.feedback.low_alert",
+          entityType: "ruffly_feedback",
+          entityId: feedbackId || undefined,
+          details: {
+            contactId: job.payload?.contactId ?? null,
+            rating: job.payload?.rating ?? null
+          }
+        });
         await completeJob(job.id);
         results.push({ id: job.id, ok: true });
         continue;

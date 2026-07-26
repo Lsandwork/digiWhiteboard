@@ -8,13 +8,33 @@ export const dynamic = "force-dynamic";
 
 const ALLOWED_ORIGINS = (process.env.RUFFLY_WEBCHAT_ALLOWED_ORIGINS || "https://fitdog.com,https://www.fitdog.com,https://ruffly.ruffops.com")
   .split(",")
-  .map((value) => value.trim())
+  .map((value) => value.trim().replace(/\/$/, "").toLowerCase())
   .filter(Boolean);
 
+const SITE_KEY = process.env.RUFFLY_WEBCHAT_SITE_KEY?.trim() || "";
+
+const recentHits = new Map<string, { count: number; resetAt: number }>();
+
+function normalizeOrigin(value: string) {
+  return value.trim().replace(/\/$/, "").toLowerCase();
+}
+
+function rateLimit(key: string, limit = 30, windowMs = 60_000) {
+  const now = Date.now();
+  const current = recentHits.get(key);
+  if (!current || current.resetAt <= now) {
+    recentHits.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  current.count += 1;
+  return current.count <= limit;
+}
+
 export async function POST(request: Request) {
-  if (!isRufflyWebchatEnabled() && process.env.NODE_ENV === "production") {
-    // Allow local/dev testing even when flag off if explicitly permitted
-    if (process.env.RUFFLY_WEBCHAT_DEV_BYPASS !== "true") {
+  if (!isRufflyWebchatEnabled()) {
+    if (process.env.RUFFLY_WEBCHAT_DEV_BYPASS === "true" && process.env.NODE_ENV !== "production") {
+      // allow local bypass
+    } else {
       return NextResponse.json({ error: "Web chat is not enabled." }, { status: 403 });
     }
   }
@@ -28,9 +48,18 @@ export async function POST(request: Request) {
     dogName?: string;
   };
 
-  const origin = String(body.origin || request.headers.get("origin") || "");
-  if (origin && ALLOWED_ORIGINS.length && !ALLOWED_ORIGINS.some((allowed) => origin.startsWith(allowed))) {
+  if (SITE_KEY && String(body.siteKey || "") !== SITE_KEY) {
+    return NextResponse.json({ error: "Invalid site key." }, { status: 403 });
+  }
+
+  const origin = normalizeOrigin(String(body.origin || request.headers.get("origin") || ""));
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
     return NextResponse.json({ error: "Origin not allowlisted." }, { status: 403 });
+  }
+
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!rateLimit(`${origin}:${ip}`)) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429 });
   }
 
   const message = String(body.message || "").trim();

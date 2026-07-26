@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRufflyPermission } from "@/lib/ruffly/api-auth";
 import { AI_DISCLOSURE, AI_FORBIDDEN_BEHAVIORS } from "@/lib/ruffly/ai/guardrails";
+import { isRufflyAiEnabled, isRufflyGingrBookingEnabled, isRufflyVoiceEnabled } from "@/lib/ruffly/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,9 +20,12 @@ export async function GET(request: Request) {
     return NextResponse.json({
       disclosure: AI_DISCLOSURE,
       forbidden: AI_FORBIDDEN_BEHAVIORS,
+      aiEnabled: isRufflyAiEnabled(),
+      voiceEnabled: isRufflyVoiceEnabled(),
       voiceConfigured: Boolean(process.env.RUFFLY_VOICE_PROVIDER?.trim()),
+      gingrBookingEnabled: isRufflyGingrBookingEnabled(),
       calls: calls ?? [],
-      note: "Direct Gingr booking is not claimed unless a tested write path exists."
+      note: "Direct Gingr booking is not advertised until Ruffly can successfully create bookings inside Gingr."
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load AI receptionist.";

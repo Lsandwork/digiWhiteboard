@@ -44,8 +44,14 @@ export const RUFFLY_NAV_ROUTE: NavRouteLeaf = {
   label: "Ruffly"
 };
 
-export function appendAuthenticatedGlobalRoutes(entries: NavEntry[]): NavEntry[] {
-  const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE, RUFFLY_NAV_ROUTE];
+export function appendAuthenticatedGlobalRoutes(
+  entries: NavEntry[],
+  options?: { includeRuffly?: boolean }
+): NavEntry[] {
+  const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE];
+  if (options?.includeRuffly !== false) {
+    globalSection.push(RUFFLY_NAV_ROUTE);
+  }
   const helpIndex = entries.findIndex((entry) => entry.type === "section" && entry.id === "help");
   if (helpIndex >= 0) {
     return [...entries.slice(0, helpIndex), ...globalSection, ...entries.slice(helpIndex)];
@@ -542,6 +548,20 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
   return entries;
 }
 
+function roleCanSeeRufflyNav(role?: string | null) {
+  if (!role) return false;
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "front_desk_coordinator" ||
+    role === "team_leader" ||
+    role === "marketing" ||
+    role === "trainer" ||
+    role === "groomer"
+  );
+}
+
 /** Pick the staff-panel sidebar layout for the signed-in role. */
 export function buildStaffPanelNav(
   visibleTabs: AdminTab[],
@@ -553,7 +573,7 @@ export function buildStaffPanelNav(
   else if (role === "team_leader") entries = buildTeamLeadNav(visibleTabs);
   else if (role === "groomer") entries = buildGroomerNav(visibleTabs);
   else entries = buildAdminNav(visibleTabs, board);
-  return appendAuthenticatedGlobalRoutes(entries);
+  return appendAuthenticatedGlobalRoutes(entries, { includeRuffly: roleCanSeeRufflyNav(role) });
 }
 
 export function getTabLabel(tab: AdminTab) {

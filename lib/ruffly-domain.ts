@@ -20,3 +20,27 @@ export function shouldRewriteRufflyRoot(host: string | null | undefined, pathnam
   if (pathname !== "/") return false;
   return isRufflyHostname(host);
 }
+
+/**
+ * Map short public paths on ruffly.ruffops.com to App Router pages.
+ * /review/:token → /ruffly/review/:token
+ * /feedback/:token → /ruffly/feedback/:token
+ * /widget.js → /ruffly/widget.js
+ */
+export function rewriteRufflyPublicPath(host: string | null | undefined, pathname: string): string | null {
+  if (!isRufflyHostname(host)) return null;
+  if (pathname === "/widget.js") return "/ruffly/widget.js";
+  if (pathname === "/review" || pathname.startsWith("/review/")) {
+    return `/ruffly${pathname}`;
+  }
+  if (pathname === "/feedback" || pathname.startsWith("/feedback/")) {
+    return `/ruffly${pathname}`;
+  }
+  if (pathname === "/consent" || pathname.startsWith("/consent/")) {
+    return `/ruffly${pathname}`;
+  }
+  if (pathname === "/campaign" || pathname.startsWith("/campaign/")) {
+    return `/ruffly${pathname}`;
+  }
+  return null;
+}

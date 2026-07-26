@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { canSendToContact } from "@/lib/ruffly/consent/gate";
+import { isRufflySmsSendingEnabled } from "@/lib/ruffly/flags";
 import { requireRufflyPermission } from "@/lib/ruffly/api-auth";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -60,6 +61,8 @@ export async function POST(request: Request, context: Ctx) {
     }
 
     if (action === "assign") {
+      const assignAuth = await requireRufflyPermission(request, "ruffly.inbox.assign");
+      if (!assignAuth.ok) return assignAuth.response;
       const { data, error } = await supabase
         .from("ruffly_conversations")
         .update({ assigned_employee_id: body.assigned_employee_id ?? null, updated_at: new Date().toISOString() })
@@ -112,7 +115,7 @@ export async function POST(request: Request, context: Ctx) {
         .select("phone, phone_normalized")
         .eq("id", conversation.contact_id)
         .maybeSingle();
-      if (process.env.RUFFLY_SENDING_SMS_ENABLED === "true" && contact?.phone) {
+      if (isRufflySmsSendingEnabled() && contact?.phone) {
         const sms = getSmsProvider();
         const sent = await sms.send({ to: contact.phone, body: text, purpose: "transactional" });
         if (!sent.ok) return NextResponse.json({ error: sent.error || "SMS failed." }, { status: 502 });

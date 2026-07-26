@@ -9,12 +9,15 @@ import {
   gingrWebhookIdempotencyKey,
   verifyGingrWebhookSignature
 } from "../lib/integrations/gingr/webhooks/verify";
-import { shouldRewriteRufflyRoot } from "../lib/ruffly-domain";
+import { rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "../lib/ruffly-domain";
+import { isRufflyGingrBookingEnabled } from "../lib/ruffly/flags";
 import { hashToken, signRufflyToken, verifyRufflyToken } from "../lib/ruffly/tokens/signed-token";
 
 assert.equal(shouldRewriteRufflyRoot("ruffly.ruffops.com", "/"), true);
 assert.equal(shouldRewriteRufflyRoot("ruffly.ruffops.com", "/widget.js"), false);
 assert.equal(shouldRewriteRufflyRoot("staff.ruffops.com", "/"), false);
+assert.equal(rewriteRufflyPublicPath("ruffly.ruffops.com", "/review/tok"), "/ruffly/review/tok");
+assert.equal(isRufflyGingrBookingEnabled(), false);
 
 assert.equal(isSmsOptOutRequest("STOP"), true);
 assert.equal(isSmsOptOutRequest("please stop texting me"), true);

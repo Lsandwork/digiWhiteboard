@@ -1,35 +1,56 @@
 import { NextResponse } from "next/server";
-import { isSmsOptOutRequest, OPT_OUT_CONFIRMATION } from "@/lib/ruffly/consent/opt-out";
+import { verifyTwilioSignature } from "@/lib/integrations/sms/twilio-signature";
+import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { applySmsOptOut } from "@/lib/ruffly/consent/gate";
 import { normalizePhone } from "@/lib/ruffly/consent/normalize";
+import { isSmsOptOutRequest, OPT_OUT_CONFIRMATION } from "@/lib/ruffly/consent/opt-out";
+import { isRufflySmsSendingEnabled } from "@/lib/ruffly/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { getSmsProvider } from "@/lib/integrations/sms/provider";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Inbound SMS webhook (Twilio-compatible form body).
- * Configure Twilio webhook to POST here.
- */
-export async function POST(request: Request) {
+async function parseBody(request: Request) {
   const contentType = request.headers.get("content-type") || "";
-  let from = "";
-  let body = "";
-
-  try {
-    if (contentType.includes("application/json")) {
-      const json = (await request.json()) as { From?: string; Body?: string; from?: string; body?: string };
-      from = String(json.From || json.from || "");
-      body = String(json.Body || json.body || "");
-    } else {
-      const form = await request.formData();
-      from = String(form.get("From") || form.get("from") || "");
-      body = String(form.get("Body") || form.get("body") || "");
+  const params: Record<string, string> = {};
+  if (contentType.includes("application/json")) {
+    const json = (await request.json()) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(json)) {
+      params[key] = value == null ? "" : String(value);
     }
-  } catch {
-    return NextResponse.json({ error: "Invalid body." }, { status: 400 });
+  } else {
+    const form = await request.formData();
+    for (const [key, value] of form.entries()) {
+      params[key] = String(value);
+    }
+  }
+  return params;
+}
+
+export async function POST(request: Request) {
+  const params = await parseBody(request).catch(() => null);
+  if (!params) return NextResponse.json({ error: "Invalid body." }, { status: 400 });
+
+  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim() || "";
+  const signature = request.headers.get("x-twilio-signature");
+  const skipVerify = process.env.RUFFLY_SMS_WEBHOOK_SKIP_VERIFY === "true" && process.env.NODE_ENV !== "production";
+  if (!skipVerify) {
+    if (!authToken) {
+      return NextResponse.json({ error: "SMS webhook not configured." }, { status: 503 });
+    }
+    const url = process.env.RUFFLY_SMS_WEBHOOK_URL?.trim() || request.url;
+    const valid = verifyTwilioSignature({
+      authToken,
+      signature,
+      url,
+      params
+    });
+    if (!valid) {
+      return NextResponse.json({ error: "Invalid Twilio signature." }, { status: 401 });
+    }
   }
 
+  const from = params.From || params.from || "";
+  const body = params.Body || params.body || "";
   const phoneNormalized = normalizePhone(from);
   const supabase = getServiceSupabase();
 
@@ -50,13 +71,12 @@ export async function POST(request: Request) {
       source: "inbound_sms",
       rawBody: body
     });
-    if (process.env.RUFFLY_SENDING_SMS_ENABLED === "true" && from) {
+    if (isRufflySmsSendingEnabled() && from) {
       await getSmsProvider().send({ to: from, body: OPT_OUT_CONFIRMATION, purpose: "transactional" });
     }
     return NextResponse.json({ ok: true, optOut: true });
   }
 
-  // Ensure conversation + inbound message
   let conversationId: string | null = null;
   if (contactId) {
     const { data: existing } = await supabase
