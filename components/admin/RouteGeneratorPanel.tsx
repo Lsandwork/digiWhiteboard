@@ -285,9 +285,18 @@ export function RouteGeneratorPanel() {
       return;
     }
     try {
-      await postAction("assign_skipped_occurrence", { reportRunId, occurrenceId, vanKey });
+      const body = await postAction("assign_skipped_occurrence", { reportRunId, occurrenceId, vanKey });
       await refreshReportMeta(reportRunId);
-      showToast(`Assigned class to ${vanKey.replace("van_", "Van ")}. Generate Routes to include it.`, "success");
+      if (body.planApply?.planId) {
+        await hydratePlan(String(body.planApply.planId), { quiet: true });
+        setTab(vanKey ? "pickup" : "overview");
+      }
+      showToast(
+        body.planApply?.updated
+          ? `${vanKey.replace("van_", "Van ")} updated — ${body.planApply.message}`
+          : `Assigned to ${vanKey.replace("van_", "Van ")}. ${body.planApply?.message || "Generate Routes to include it."}`,
+        body.planApply?.updated ? "success" : "info"
+      );
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Assign failed.", "error");
     }
@@ -302,35 +311,59 @@ export function RouteGeneratorPanel() {
     phone: string;
     notes: string;
     vanKey: string;
+    wave: "pickup" | "dropoff" | "both";
   }) {
     if (!reportRunId) {
       showToast("Pull a report first.", "error");
       return;
     }
     try {
-      await postAction("add_taxi", { reportRunId, source: "manual", ...payload });
+      const body = await postAction("add_taxi", { reportRunId, source: "manual", ...payload });
       await refreshReportMeta(reportRunId);
-      showToast("Taxi Service added to the report.", "success");
+      if (body.planApply?.planId) {
+        await hydratePlan(String(body.planApply.planId), { quiet: true });
+        setTab(payload.wave === "dropoff" ? "dropoff" : "pickup");
+      }
+      showToast(
+        body.planApply?.updated
+          ? body.planApply.message
+          : `Taxi saved to report. ${body.planApply?.message || "Generate Routes to include it."}`,
+        body.planApply?.updated ? "success" : "info"
+      );
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to add taxi.", "error");
     }
   }
 
-  async function addGingrTaxi(row: GingrTaxiServiceRow, vanKey: string) {
+  async function addGingrTaxi(
+    row: GingrTaxiServiceRow,
+    vanKey: string,
+    wave: "pickup" | "dropoff" | "both" = "both"
+  ) {
     if (!reportRunId) {
       showToast("Pull a report first.", "error");
       return;
     }
     try {
-      await postAction("add_taxi", {
+      const body = await postAction("add_taxi", {
         reportRunId,
         source: "gingr",
         vanKey,
+        wave,
         gingrReservationId: row.reservationId,
         gingrRow: row
       });
       await refreshReportMeta(reportRunId);
-      showToast("Gingr Taxi added to the report.", "success");
+      if (body.planApply?.planId) {
+        await hydratePlan(String(body.planApply.planId), { quiet: true });
+        setTab(wave === "dropoff" ? "dropoff" : "pickup");
+      }
+      showToast(
+        body.planApply?.updated
+          ? body.planApply.message
+          : `Gingr Taxi saved to report. ${body.planApply?.message || "Generate Routes to include it."}`,
+        body.planApply?.updated ? "success" : "info"
+      );
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to add Gingr taxi.", "error");
     }

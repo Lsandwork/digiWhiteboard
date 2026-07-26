@@ -177,10 +177,14 @@ export async function POST(request: Request) {
     if (action === "add_taxi") {
       const reportRunId = String(body.reportRunId ?? "").trim();
       if (!reportRunId) return NextResponse.json({ error: "reportRunId is required." }, { status: 400 });
+      const waveRaw = String(body.wave ?? "both").trim().toLowerCase();
+      const wave =
+        waveRaw === "pickup" || waveRaw === "dropoff" || waveRaw === "both" ? waveRaw : "both";
       const result = await addTaxiToReportRun({
         reportRunId,
         source: body.source === "gingr" ? "gingr" : "manual",
         vanKey: body.vanKey ? String(body.vanKey) : null,
+        wave,
         gingrReservationId: body.gingrReservationId ? String(body.gingrReservationId) : null,
         gingrRow: (body.gingrRow as never) || null,
         dogName: body.dogName ? String(body.dogName) : null,

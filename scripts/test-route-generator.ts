@@ -16,6 +16,7 @@ import { lockDropoffGroupsToPickupVans, optimizeRoutes } from "../lib/route-gene
 import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
 import { serviceForAssignedVan } from "../lib/route-generator/fitdog-api";
 import { manualTaxiToReportItems } from "../lib/route-generator/gingr-taxi";
+import { filterItemsByWave } from "../lib/route-generator/apply-to-plan";
 import {
   autoMapHeaders,
   looksLikeLoginPage,
@@ -937,6 +938,26 @@ assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
   assert.equal(taxiItems[0]?.raw.locked_van, "van_5");
   assert.equal(taxiItems[0]?.direction, "pickup");
   assert.equal(taxiItems[1]?.direction, "dropoff");
+
+  const pickupOnly = manualTaxiToReportItems({
+    dogName: "Indy",
+    address: "1505 9th",
+    vanKey: "van_5",
+    wave: "pickup"
+  });
+  assert.equal(pickupOnly.length, 1);
+  assert.equal(pickupOnly[0]?.direction, "pickup");
+  const dropOnly = manualTaxiToReportItems({
+    dogName: "Indy",
+    address: "1505 9th",
+    vanKey: "van_5",
+    wave: "dropoff"
+  });
+  assert.equal(dropOnly.length, 1);
+  assert.equal(dropOnly[0]?.direction, "dropoff");
+  assert.equal(filterItemsByWave(taxiItems, "pickup").length, 1);
+  assert.equal(filterItemsByWave(taxiItems, "dropoff").length, 1);
+  assert.equal(filterItemsByWave(taxiItems, "both").length, 2);
 }
 
 console.log("route-generator tests: ok");
