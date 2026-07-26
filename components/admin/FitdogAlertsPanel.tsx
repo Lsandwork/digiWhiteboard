@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronRight, ExternalLink, RefreshCw, X } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh } from "@/components/admin/ui/sortable-table";
 import type {
@@ -24,7 +24,56 @@ import { formatUsd } from "@/lib/fitdog-ops/money";
 
 type PanelView = "alerts" | "resolved" | "sync" | "settings";
 
+type SummaryFocus =
+  | "new"
+  | "card_declined"
+  | "other"
+  | "failed"
+  | "missed"
+  | "resolved_today";
+
 type AlertRow = OperationsAlert & { amount_due_label?: string };
+
+const FAILED_PAYMENT_TYPES = new Set<string>([
+  "PAYMENT_FAILED",
+  "PAYMENT_PROCESSING_ERROR",
+  "PAYMENT_RETRY_FAILED"
+]);
+
+const SUMMARY_FOCUS_LABELS: Record<SummaryFocus, string> = {
+  new: "New Alerts",
+  card_declined: "Card Declined",
+  other: "Other Alerts",
+  failed: "Failed Payments",
+  missed: "Missed Payments",
+  resolved_today: "Resolved Today"
+};
+
+function startOfLocalDay(date = new Date()) {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+}
+
+function rowMatchesSummaryFocus(row: AlertRow, focus: SummaryFocus) {
+  if (focus === "new") return row.status === "new";
+  if (focus === "card_declined") return isDeclinedPaymentAlert(row);
+  if (focus === "failed") return FAILED_PAYMENT_TYPES.has(String(row.alert_type));
+  if (focus === "missed") return row.alert_type === "PAYMENT_MISSED";
+  if (focus === "other") {
+    // Residual open category: not declined / failed / missed
+    return (
+      !isDeclinedPaymentAlert(row) &&
+      !FAILED_PAYMENT_TYPES.has(String(row.alert_type)) &&
+      row.alert_type !== "PAYMENT_MISSED"
+    );
+  }
+  if (focus === "resolved_today") {
+    if (!row.resolved_at) return false;
+    return new Date(row.resolved_at).getTime() >= startOfLocalDay().getTime();
+  }
+  return true;
+}
 
 function alertWasUpdated(row: Pick<OperationsAlert, "created_at" | "updated_at">) {
   if (!row.created_at || !row.updated_at) return false;
@@ -276,6 +325,8 @@ function AlertSection({
 export function FitdogAlertsPanel() {
   const { showToast } = useToast();
   const [panelView, setPanelView] = useState<PanelView>("alerts");
+  const [summaryFocus, setSummaryFocus] = useState<SummaryFocus | null>(null);
+  const resultsRef = useRef<HTMLDivElement | null>(null);
   const [data, setData] = useState<ListPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -470,13 +521,93 @@ export function FitdogAlertsPanel() {
     []
   );
 
+  const clearSummaryFocus = useCallback(() => {
+    setSummaryFocus(null);
+    setAlertType("all");
+    setStatus("all");
+  }, []);
+
+  const applySummaryFocus = useCallback(
+    (focus: SummaryFocus | "sync") => {
+      if (focus === "sync") {
+        setSummaryFocus(null);
+        setPanelView("sync");
+        return;
+      }
+
+      const nextFocus = summaryFocus === focus ? null : focus;
+      setSummaryFocus(nextFocus);
+
+      if (!nextFocus) {
+        setAlertType("all");
+        setStatus("all");
+        if (panelView === "resolved") {
+          setSortBy("resolved_at");
+          setSortDir("desc");
+        } else {
+          setSortBy("detected_at");
+          setSortDir("desc");
+        }
+        return;
+      }
+
+      setQ("");
+      setAssignedUserId("all");
+      setOwner("");
+      setDog("");
+      setService("");
+      setMinAmount("");
+      setUnassignedOnly(false);
+      setDateFrom("");
+      setDateTo("");
+
+      if (nextFocus === "resolved_today") {
+        setPanelView("resolved");
+        setAlertType("all");
+        setStatus("all");
+        setSortBy("resolved_at");
+        setSortDir("desc");
+      } else {
+        setPanelView("alerts");
+        setSortBy("detected_at");
+        setSortDir("desc");
+        if (nextFocus === "new") {
+          setAlertType("all");
+          setStatus("new");
+        } else if (nextFocus === "card_declined") {
+          setAlertType("CARD_DECLINED");
+          setStatus("all");
+        } else if (nextFocus === "missed") {
+          setAlertType("PAYMENT_MISSED");
+          setStatus("all");
+        } else {
+          // failed / other: load open alerts, then filter client-side by category
+          setAlertType("all");
+          setStatus("all");
+        }
+      }
+
+      window.setTimeout(() => {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 50);
+    },
+    [panelView, summaryFocus]
+  );
+
+  const allRows = useMemo(() => (data?.rows || []) as AlertRow[], [data?.rows]);
+
+  const focusedRows = useMemo(() => {
+    if (!summaryFocus) return allRows;
+    return allRows.filter((row) => rowMatchesSummaryFocus(row, summaryFocus));
+  }, [allRows, summaryFocus]);
+
   const declinedRows = useMemo(
-    () => ((data?.rows || []) as AlertRow[]).filter((row) => isDeclinedPaymentAlert(row)),
-    [data?.rows]
+    () => (summaryFocus ? focusedRows : allRows).filter((row) => isDeclinedPaymentAlert(row)),
+    [allRows, focusedRows, summaryFocus]
   );
   const otherRows = useMemo(
-    () => ((data?.rows || []) as AlertRow[]).filter((row) => !isDeclinedPaymentAlert(row)),
-    [data?.rows]
+    () => (summaryFocus ? focusedRows : allRows).filter((row) => !isDeclinedPaymentAlert(row)),
+    [allRows, focusedRows, summaryFocus]
   );
 
   return (
@@ -513,12 +644,16 @@ export function FitdogAlertsPanel() {
                 : "border-admin-border text-admin-muted hover:text-white"
             }`}
             onClick={() => {
+              setSummaryFocus(null);
               setPanelView(tab.id);
               if (tab.id === "resolved") {
                 setStatus("all");
+                setAlertType("all");
                 setSortBy("resolved_at");
                 setSortDir("desc");
               } else if (tab.id === "alerts") {
+                setStatus("all");
+                setAlertType("all");
                 setSortBy("detected_at");
                 setSortDir("desc");
               }
@@ -532,46 +667,96 @@ export function FitdogAlertsPanel() {
       {panelView !== "sync" && panelView !== "settings" ? (
         <>
           <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-7">
-            {[
-              { label: "New Alerts", value: summary?.new_alerts ?? 0 },
-              { label: "Card Declined", value: summary?.card_declined ?? declinedRows.length },
-              { label: "Other Alerts", value: summary?.other_notifications ?? otherRows.length },
-              { label: "Failed Payments", value: summary?.failed_payments ?? 0 },
-              { label: "Missed Payments", value: summary?.missed_payments ?? 0 },
-              { label: "Resolved Today", value: summary?.resolved_today ?? 0 },
-              {
-                label: "Last Fitdog Sync",
-                value: formatWhen(summary?.last_successful_sync_at),
-                wide: true,
-                sync: true
-              }
-            ].map((card) => (
-              <article
-                key={card.label}
-                className={`admin-card p-3 sm:p-4 ${"wide" in card && card.wide ? "col-span-2 lg:col-span-3 xl:col-span-1" : ""}`}
-              >
-                <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-admin-muted sm:text-xs">
-                  {card.label}
-                </p>
-                <p
-                  className={`mt-1.5 font-black text-white ${
-                    "sync" in card && card.sync
-                      ? "flex items-center gap-2 text-sm leading-snug sm:text-base"
-                      : "text-xl sm:text-2xl"
+            {(
+              [
+                { id: "new" as const, label: "New Alerts", value: summary?.new_alerts ?? 0 },
+                {
+                  id: "card_declined" as const,
+                  label: "Card Declined",
+                  value: summary?.card_declined ?? 0
+                },
+                {
+                  id: "other" as const,
+                  label: "Other Alerts",
+                  value: summary?.other_notifications ?? otherRows.length
+                },
+                { id: "failed" as const, label: "Failed Payments", value: summary?.failed_payments ?? 0 },
+                { id: "missed" as const, label: "Missed Payments", value: summary?.missed_payments ?? 0 },
+                { id: "resolved_today" as const, label: "Resolved Today", value: summary?.resolved_today ?? 0 },
+                {
+                  id: "sync" as const,
+                  label: "Last Fitdog Sync",
+                  value: formatWhen(summary?.last_successful_sync_at),
+                  wide: true,
+                  sync: true
+                }
+              ] as const
+            ).map((card) => {
+              const active = card.id !== "sync" && summaryFocus === card.id;
+              return (
+                <button
+                  key={card.label}
+                  type="button"
+                  onClick={() => applySummaryFocus(card.id)}
+                  aria-pressed={card.id === "sync" ? undefined : active}
+                  title={
+                    card.id === "sync"
+                      ? "Open sync history"
+                      : active
+                        ? `Clear ${card.label} filter`
+                        : `View ${card.label}`
+                  }
+                  className={`admin-card p-3 text-left transition sm:p-4 ${
+                    "wide" in card && card.wide ? "col-span-2 lg:col-span-3 xl:col-span-1" : ""
+                  } ${
+                    active
+                      ? "border-fitdog-orange ring-1 ring-fitdog-orange/40"
+                      : "hover:border-fitdog-orange/50 hover:bg-white/[0.03]"
                   }`}
                 >
-                  <span className="min-w-0 break-words">{card.value}</span>
-                  {"sync" in card && card.sync && summary?.last_successful_sync_at ? (
-                    <span
-                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-fitdog-orange"
-                      title="Last successful sync"
-                      aria-hidden
-                    />
-                  ) : null}
-                </p>
-              </article>
-            ))}
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-admin-muted sm:text-xs">
+                    {card.label}
+                  </p>
+                  <p
+                    className={`mt-1.5 font-black text-white ${
+                      "sync" in card && card.sync
+                        ? "flex items-center gap-2 text-sm leading-snug sm:text-base"
+                        : "text-xl sm:text-2xl"
+                    }`}
+                  >
+                    <span className="min-w-0 break-words">{card.value}</span>
+                    {"sync" in card && card.sync && summary?.last_successful_sync_at ? (
+                      <span
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-fitdog-orange"
+                        title="Last successful sync"
+                        aria-hidden
+                      />
+                    ) : null}
+                  </p>
+                  {card.id !== "sync" ? (
+                    <p className="mt-1 text-[0.65rem] font-semibold text-fitdog-orange sm:text-xs">
+                      {active ? "Showing · tap to clear" : "Tap to view"}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-[0.65rem] font-semibold text-fitdog-orange sm:text-xs">Tap for sync history</p>
+                  )}
+                </button>
+              );
+            })}
           </div>
+
+          {summaryFocus ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-fitdog-orange/35 bg-fitdog-orange/10 px-3 py-2 text-sm">
+              <p className="font-semibold text-white">
+                Showing <span className="text-fitdog-orange">{SUMMARY_FOCUS_LABELS[summaryFocus]}</span>
+                <span className="ml-2 font-medium text-admin-muted">({focusedRows.length})</span>
+              </p>
+              <button type="button" className="admin-btn-secondary min-h-9 gap-1 px-3 text-xs" onClick={clearSummaryFocus}>
+                <X className="h-3.5 w-3.5" />
+                Clear filter
+              </button>
+            </div>
+          ) : null}
 
           <div className="admin-card grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-4">
             <input
@@ -580,7 +765,14 @@ export function FitdogAlertsPanel() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
             />
-            <select className="admin-select min-h-11" value={alertType} onChange={(e) => setAlertType(e.target.value as FitdogAlertType | "all")}>
+            <select
+              className="admin-select min-h-11"
+              value={alertType}
+              onChange={(e) => {
+                setSummaryFocus(null);
+                setAlertType(e.target.value as FitdogAlertType | "all");
+              }}
+            >
               <option value="all">All alert types</option>
               {FITDOG_ALERT_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -591,7 +783,10 @@ export function FitdogAlertsPanel() {
             <select
               className="admin-select min-h-11"
               value={effectiveStatus}
-              onChange={(e) => setStatus(e.target.value as OperationsAlertStatus | "all")}
+              onChange={(e) => {
+                setSummaryFocus(null);
+                setStatus(e.target.value as OperationsAlertStatus | "all");
+              }}
             >
               <option value="all">{panelView === "resolved" ? "All resolved" : "All statuses"}</option>
               {(panelView === "resolved"
@@ -625,13 +820,25 @@ export function FitdogAlertsPanel() {
             </label>
           </div>
 
-          {panelView === "alerts" ? (
-            <div className="space-y-5">
+          <div ref={resultsRef} className="space-y-5">
+            {summaryFocus ? (
               <AlertSection
-                title="Card declined — call to reschedule"
-                subtitle="Class cancellations caused by a declined credit card. Contact the customer to reschedule."
-                accent
-                rows={declinedRows}
+                title={SUMMARY_FOCUS_LABELS[summaryFocus]}
+                subtitle={
+                  summaryFocus === "new"
+                    ? "Open alerts that still need first acknowledgment."
+                    : summaryFocus === "card_declined"
+                      ? "Class cancellations caused by a declined credit card. Contact the customer to reschedule."
+                      : summaryFocus === "failed"
+                        ? "Failed charges, processing errors, and retry failures."
+                        : summaryFocus === "missed"
+                          ? "Payments that were missed past the grace window."
+                          : summaryFocus === "resolved_today"
+                            ? "Alerts marked resolved, paid, waived, or false positive today."
+                            : "Cancellations, vaccinations, document uploads, and other non-declined alerts."
+                }
+                accent={summaryFocus === "card_declined" || summaryFocus === "failed" || summaryFocus === "new"}
+                rows={focusedRows}
                 loading={loading}
                 sortBy={sortBy}
                 sortDir={sortDir}
@@ -640,56 +847,74 @@ export function FitdogAlertsPanel() {
                   setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
                 }}
                 onOpen={(id) => void openDetail(id)}
-                emptyLabel="No open card-declined cancellations."
+                emptyLabel={`No ${SUMMARY_FOCUS_LABELS[summaryFocus].toLowerCase()} right now.`}
               />
-              <AlertSection
-                title="Other Fitdog alerts"
-                subtitle="Cancellations, vaccinations, document uploads, and other payment issues."
-                rows={otherRows}
-                loading={loading}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onToggleSort={(column) => {
-                  setSortBy(column);
-                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
-                }}
-                onOpen={(id) => void openDetail(id)}
-                emptyLabel="No other open Fitdog alerts."
-              />
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <AlertSection
-                title="Past declined payments"
-                subtitle="Card declines and declined-payment cancellations marked RESOLVED."
-                accent
-                rows={declinedRows}
-                loading={loading}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onToggleSort={(column) => {
-                  setSortBy(column);
-                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
-                }}
-                onOpen={(id) => void openDetail(id)}
-                emptyLabel="No past declined payments yet."
-              />
-              <AlertSection
-                title="Other past alerts"
-                subtitle="Failed payments, missed payments, notifications, and other closed Fitdog alerts — status RESOLVED."
-                rows={otherRows}
-                loading={loading}
-                sortBy={sortBy}
-                sortDir={sortDir}
-                onToggleSort={(column) => {
-                  setSortBy(column);
-                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
-                }}
-                onOpen={(id) => void openDetail(id)}
-                emptyLabel="No other past alerts match these filters."
-              />
-            </div>
-          )}
+            ) : panelView === "alerts" ? (
+              <>
+                <AlertSection
+                  title="Card declined — call to reschedule"
+                  subtitle="Class cancellations caused by a declined credit card. Contact the customer to reschedule."
+                  accent
+                  rows={declinedRows}
+                  loading={loading}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onToggleSort={(column) => {
+                    setSortBy(column);
+                    setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                  }}
+                  onOpen={(id) => void openDetail(id)}
+                  emptyLabel="No open card-declined cancellations."
+                />
+                <AlertSection
+                  title="Other Fitdog alerts"
+                  subtitle="Cancellations, vaccinations, document uploads, and other payment issues."
+                  rows={otherRows}
+                  loading={loading}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onToggleSort={(column) => {
+                    setSortBy(column);
+                    setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                  }}
+                  onOpen={(id) => void openDetail(id)}
+                  emptyLabel="No other open Fitdog alerts."
+                />
+              </>
+            ) : (
+              <>
+                <AlertSection
+                  title="Past declined payments"
+                  subtitle="Card declines and declined-payment cancellations marked RESOLVED."
+                  accent
+                  rows={declinedRows}
+                  loading={loading}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onToggleSort={(column) => {
+                    setSortBy(column);
+                    setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                  }}
+                  onOpen={(id) => void openDetail(id)}
+                  emptyLabel="No past declined payments yet."
+                />
+                <AlertSection
+                  title="Other past alerts"
+                  subtitle="Failed payments, missed payments, notifications, and other closed Fitdog alerts — status RESOLVED."
+                  rows={otherRows}
+                  loading={loading}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onToggleSort={(column) => {
+                    setSortBy(column);
+                    setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                  }}
+                  onOpen={(id) => void openDetail(id)}
+                  emptyLabel="No other past alerts match these filters."
+                />
+              </>
+            )}
+          </div>
         </>
       ) : null}
 
