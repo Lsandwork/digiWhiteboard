@@ -6429,12 +6429,15 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 
 .crossover-table td {
   padding: 1.375rem 0.75rem;
-  vertical-align: middle;
+  vertical-align: top;
   color: var(--crossover-muted);
   border-bottom: 1px solid rgba(245, 158, 11, 0.15);
   word-wrap: break-word;
   overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
   line-height: 1.5;
+  overflow: visible;
 }
 
 .crossover-table td.crossover-table__empty-row {
@@ -6471,6 +6474,43 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   font-size: 0.78rem;
   line-height: 1.5;
   color: var(--crossover-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/*
+ * Important / urgent rows must never clip subject or details at any text size.
+ * Full wrap instead of line-clamp so staff can read the full log line.
+ */
+.shift-log-table tbody tr.shift-log-row--highlight td,
+.crossover-table tbody tr.shift-log-row--highlight td,
+.crossover-mobile-card.shift-log-row--highlight {
+  overflow: visible;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.shift-log-table tbody tr.shift-log-row--highlight .crossover-table__subject-title,
+.crossover-table tbody tr.shift-log-row--highlight .crossover-table__subject-title,
+.crossover-mobile-card.shift-log-row--highlight .crossover-mobile-card__title {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.shift-log-table tbody tr.shift-log-row--highlight .crossover-table__subject-preview,
+.crossover-table tbody tr.shift-log-row--highlight .crossover-table__subject-preview,
+.crossover-mobile-card.shift-log-row--highlight .crossover-mobile-card__preview {
+  display: block;
+  -webkit-line-clamp: unset;
+  -webkit-box-orient: unset;
+  overflow: visible;
+  white-space: normal;
+  max-height: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .crossover-table__datetime {
@@ -7233,6 +7273,14 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   line-height: 1.4;
 }
 
+.shift-log-readable .shift-log-table tbody tr.shift-log-row--highlight .crossover-table__subject-preview,
+.shift-log-readable .crossover-table tbody tr.shift-log-row--highlight .crossover-table__subject-preview {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+  max-height: none;
+}
+
 .shift-log-readable .crossover-table__muted {
   font-size: 0.95rem;
 }
@@ -7523,6 +7571,16 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 
 .admin-theme .admin-card > .hidden.overflow-x-auto tbody tr:hover {
   background: rgba(255, 166, 0, 0.04);
+}
+
+/* Critical / high Fitdog alert rows: never clip details */
+.admin-theme .admin-card table.min-w-full tbody tr.fitdog-alert-row--important td,
+.admin-theme .admin-card > .hidden.overflow-x-auto tbody tr.fitdog-alert-row--important td {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  vertical-align: top;
 }
 
 .push-notice-dog-handler-card {
@@ -8609,7 +8667,15 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 }
 
 .admin-main {
-  padding-bottom: 4.5rem;
+  /* Room for floating A-/A+ + AI dock; scale page content without shrinking the dock */
+  padding-bottom: calc(6.25rem + env(safe-area-inset-bottom, 0px));
+  zoom: var(--admin-text-scale, 1);
+}
+
+@supports not (zoom: 1) {
+  .admin-main {
+    font-size: calc(1rem * var(--admin-text-scale, 1));
+  }
 }
 
 /* HR Consult chat */
@@ -8955,11 +9021,83 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   color: #ffd7a1;
 }
 
-.fitdog-ai-bubble {
+/* Floating dock: text size controls + Fitdog AI bubble */
+.admin-floating-dock {
   position: fixed;
-  right: 1rem;
-  bottom: 1rem;
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  pointer-events: none;
+}
+
+.admin-floating-dock > * {
+  pointer-events: auto;
+}
+
+.admin-text-scale {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-text-scale {
+  border-color: rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+}
+
+.admin-text-scale__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-text-scale__btn {
+  color: #12213a;
+}
+
+.admin-text-scale__btn:hover:not(:disabled) {
+  background: rgba(255, 159, 28, 0.18);
+}
+
+.admin-text-scale__btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.admin-text-scale__label {
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.admin-text-scale__label--sm {
+  font-size: 0.85rem;
+}
+
+.admin-text-scale__label--lg {
+  font-size: 1.15rem;
+}
+
+.fitdog-ai-bubble {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
@@ -8985,8 +9123,8 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 
 .fitdog-ai-window {
   position: fixed;
-  right: 1rem;
-  bottom: 5.25rem;
+  right: max(0.75rem, env(safe-area-inset-right, 0px));
+  bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
   z-index: 61;
   display: flex;
   width: min(100vw - 2rem, 26rem);

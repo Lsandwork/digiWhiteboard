@@ -246,7 +246,9 @@ function AlertSection({
               return (
                 <tr
                   key={row.id}
-                  className="cursor-pointer border-b border-admin-border/60 hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none"
+                  className={`cursor-pointer border-b border-admin-border/60 hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none${
+                    row.severity === "critical" || row.severity === "high" ? " fitdog-alert-row--important" : ""
+                  }`}
                   tabIndex={0}
                   role="button"
                   aria-label={`Open alert for ${row.owner_name}`}
@@ -274,7 +276,14 @@ function AlertSection({
                   <td className="px-3 py-3 font-semibold text-white">
                     {row.amount_due_label || formatUsd(row.amount_due, row.currency)}
                   </td>
-                  <td className="max-w-[280px] truncate px-3 py-3 text-admin-muted" title={row.failure_reason || ""}>
+                  <td
+                    className={`px-3 py-3 text-admin-muted ${
+                      row.severity === "critical" || row.severity === "high"
+                        ? "max-w-[320px] whitespace-normal break-words"
+                        : "max-w-[280px] truncate"
+                    }`}
+                    title={row.failure_reason || ""}
+                  >
                     {row.failure_reason || "—"}
                   </td>
                   <td className="px-3 py-3">

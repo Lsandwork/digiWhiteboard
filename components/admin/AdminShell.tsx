@@ -15,6 +15,7 @@ import { buildStaffPanelNav, findNavSectionForTab, getTabDescription, getTabLabe
 import { BoardSwitcher } from "@/components/admin/BoardSwitcher";
 import { DemoRoleSwitcher } from "@/components/demo/DemoRoleSwitcher";
 import { FitdogAiBubble } from "@/components/ai/FitdogAiBubble";
+import { TextScaleControls } from "@/components/admin/TextScaleControls";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { NotificationBell } from "@/components/admin/NotificationBell";
@@ -239,7 +240,10 @@ export function AdminShell({
         />
       ) : null}
 
-      <FitdogAiBubble board={board} tab={tab} />
+      <div className="admin-floating-dock">
+        <TextScaleControls />
+        <FitdogAiBubble board={board} tab={tab} />
+      </div>
     </div>
   );
 }
