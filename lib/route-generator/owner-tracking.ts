@@ -70,12 +70,17 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
 
   const { data: vehicleRows } = await supabase
     .from("route_vehicle_configs")
-    .select("van_key, samsara_vehicle_name, display_name");
+    .select("van_key, samsara_vehicle_name, samsara_serial, display_name");
   const vehicleNameByKey = new Map(
     (vehicleRows ?? []).map((row) => [
       String(row.van_key),
       String(row.samsara_vehicle_name || row.display_name || row.van_key)
     ])
+  );
+  const vehicleSerialByKey = new Map(
+    (vehicleRows ?? [])
+      .filter((row) => row.samsara_serial)
+      .map((row) => [String(row.van_key), String(row.samsara_serial)])
   );
 
   let created = 0;
@@ -120,6 +125,7 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
           direction: route.direction,
           van_key: route.van_key,
           samsara_vehicle_name: vehicleNameByKey.get(String(route.van_key)) || null,
+          samsara_serial: vehicleSerialByKey.get(String(route.van_key)) || null,
           owner_name: stop.owner_name,
           dog_names: dogNames.length ? dogNames : [`${stop.dog_count || 1} dog(s)`],
           owner_phone_e164: phone,
@@ -184,7 +190,7 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
   if (isSamsaraLiveConfigured() && row.stop_latitude != null && row.stop_longitude != null) {
     try {
       const vehicles = await fetchSamsaraVehicleLocations();
-      const match = matchVehicleByName(vehicles, row.samsara_vehicle_name);
+      const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
       if (match) {
         etaMinutes = etaMinutesFromCoords(
           { lat: match.latitude, lng: match.longitude },
@@ -267,7 +273,7 @@ export async function processOwnerEtaAlerts(): Promise<{
   const sms = getSmsProvider();
   for (const row of rows ?? []) {
     if (row.stop_latitude == null || row.stop_longitude == null) continue;
-    const match = matchVehicleByName(vehicles, row.samsara_vehicle_name);
+    const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
     if (!match) continue;
 
     const etaMinutes = etaMinutesFromCoords(

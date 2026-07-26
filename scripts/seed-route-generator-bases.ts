@@ -140,6 +140,7 @@ async function main() {
   );
 
   // Van routing: 1/2 Hahn M–F; 3 Beach M/W/F + Hahn T/Th; 5/6 Club taxi/group/training.
+  // Samsara names use zero-padded labels (Van 01…); never Van 04.
   await client.query(
     `update route_vehicle_configs
      set vehicle_pool = case
@@ -155,6 +156,22 @@ async function main() {
            when van_key = 'van_3' then 'huntington'
            else 'kenneth_hahn'
          end,
+         samsara_vehicle_name = case
+           when van_key = 'van_1' then 'Van 01'
+           when van_key = 'van_2' then 'Van 02'
+           when van_key = 'van_3' then 'Van 03'
+           when van_key = 'van_5' then 'Van 05'
+           when van_key = 'van_6' then 'Van 06'
+           else samsara_vehicle_name
+         end,
+         samsara_serial = case
+           when van_key = 'van_1' then 'GXPD-PPW-GEV'
+           when van_key = 'van_2' then 'GW6E-ADZ-ATK'
+           when van_key = 'van_3' then 'GVE5-PCJ-7KK'
+           when van_key = 'van_5' then 'GGR6-JKW-B6F'
+           when van_key = 'van_6' then 'GKEW-DZK-4NX'
+           else samsara_serial
+         end,
          eligible_services = case
            when van_key in ('van_1', 'van_2') then array['Adventure Hike']
            when van_key = 'van_3' then array['Beach Excursion', 'Adventure Hike']
@@ -168,6 +185,7 @@ async function main() {
          updated_at = now()
      where van_key in ('van_1', 'van_2', 'van_3', 'van_5', 'van_6')`
   );
+  await client.query(`delete from route_vehicle_configs where van_key = 'van_4'`);
 
   const { rows: checklistRows } = await client.query(
     `select value from route_generator_settings where key='feature_checklist'`

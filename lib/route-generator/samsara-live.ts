@@ -6,12 +6,23 @@
 export type SamsaraVehicleLocation = {
   id: string;
   name: string;
+  serial?: string | null;
   latitude: number;
   longitude: number;
   speedMilesPerHour: number | null;
   heading: number | null;
   time: string | null;
 };
+
+/** Normalize "Van 01" / "Van 1" / "van_1" for loose matching. */
+export function normalizeSamsaraVanLabel(value: string | null | undefined): string {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\bvan\s*0*(\d+)\b/g, "van $1");
+}
 
 function samsaraToken(): string | null {
   const token =
@@ -61,9 +72,15 @@ export async function fetchSamsaraVehicleLocations(): Promise<SamsaraVehicleLoca
       const lat = row.gps?.latitude;
       const lng = row.gps?.longitude;
       if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      const externalIds = (row as { externalIds?: Record<string, string>; gateway?: { serial?: string } }).externalIds;
+      const serial =
+        externalIds?.["samsara.serial"] ||
+        (row as { gateway?: { serial?: string } }).gateway?.serial ||
+        null;
       return {
         id: String(row.id ?? ""),
         name: String(row.name || "").trim(),
+        serial,
         latitude: lat,
         longitude: lng,
         speedMilesPerHour: row.gps?.speedMilesPerHour ?? null,
@@ -76,18 +93,25 @@ export async function fetchSamsaraVehicleLocations(): Promise<SamsaraVehicleLoca
 
 export function matchVehicleByName(
   vehicles: SamsaraVehicleLocation[],
-  samsaraVehicleName: string | null | undefined
+  samsaraVehicleName: string | null | undefined,
+  samsaraSerial?: string | null
 ): SamsaraVehicleLocation | null {
-  const target = String(samsaraVehicleName || "")
+  const serial = String(samsaraSerial || "")
     .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ");
+    .toUpperCase();
+  if (serial) {
+    const bySerial = vehicles.find((v) => String(v.serial || "").trim().toUpperCase() === serial);
+    if (bySerial) return bySerial;
+  }
+
+  const target = normalizeSamsaraVanLabel(samsaraVehicleName);
   if (!target) return null;
-  const exact = vehicles.find((v) => v.name.toLowerCase() === target);
+  const exact = vehicles.find((v) => normalizeSamsaraVanLabel(v.name) === target);
   if (exact) return exact;
-  const loose = vehicles.find(
-    (v) => v.name.toLowerCase().includes(target) || target.includes(v.name.toLowerCase())
-  );
+  const loose = vehicles.find((v) => {
+    const name = normalizeSamsaraVanLabel(v.name);
+    return name.includes(target) || target.includes(name);
+  });
   return loose ?? null;
 }
 
