@@ -6,7 +6,6 @@ export type HelpAudience = "admin" | "staff_ops" | "viewer";
 
 export type HelpVisualStep = {
   image?: string;
-  illustration?: "cast-chrome" | "cast-button" | "cast-picker";
   video?: string;
   poster?: string;
   title: string;
@@ -32,7 +31,7 @@ export type HelpArticle = {
   links?: HelpLink[];
   audiences?: HelpAudience[];
   visualSteps?: HelpVisualStep[];
-  walkthrough?: "lobby-cast" | "staff-cast" | "push-notices";
+  walkthrough?: "marketing-cast" | "push-notices";
 };
 
 export type HelpCategory =
@@ -188,89 +187,121 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "lobby-tv-cast",
     title: "How do I put the lobby board on a TV?",
-    summary: "Open Google Chrome first, then click Cast to TV, then pick the correct lobby monitor.",
+    summary: "Turn on the TV and Google TV streamer, open HI Browser, go to lobby.ruffops.com, then fullscreen.",
     category: "TV Setup",
-    keywords: ["tv", "chromecast", "cast", "display", "lobby tv", "screen", "chrome", "monitor"],
+    keywords: ["tv", "hi browser", "google tv", "streamer", "display", "lobby tv", "screen", "fullscreen", "lobby.ruffops.com"],
     audiences: ["admin", "viewer"],
     steps: [
-      "On the computer connected to the lobby TV, open Google Chrome first (Safari and Firefox will not work for casting).",
-      "Go to the Lobby Whiteboard URL (link below).",
-      "On the whiteboard page, click the orange Cast to TV button.",
-      "In Chrome’s device list, select the lobby TV or monitor — read the name carefully so you do not cast to the wrong screen.",
-      "Leave the Chrome tab open. Closing the tab stops the cast."
+      "Turn on the lobby TV.",
+      "Turn on the Google TV streamer (the small box plugged into the TV).",
+      "On the Google TV home screen, open the HI Browser app.",
+      "In HI Browser, search for or type lobby.ruffops.com and open it.",
+      "Tap the fullscreen button in the top-right corner of HI Browser so the Lobby Whiteboard fills the TV.",
+      "Leave HI Browser open on fullscreen for the whole day."
     ],
     tips: [
-      "Computer and Chromecast must be on the same Wi‑Fi.",
-      "Use the step-by-step pictures below if you are unsure."
+      "Staff and lobby boards use HI Browser on the Google TV streamer — not Cast to TV.",
+      "Cast to TV is only for the marketing advertising TV (CAST-TV slides)."
     ],
-    walkthrough: "lobby-cast",
     visualSteps: [
       {
-        illustration: "cast-chrome",
-        title: "Step 1 — Open Chrome",
-        caption: "Start Google Chrome on the front-desk computer before anything else."
-      },
-      {
-        illustration: "cast-button",
-        title: "Step 2 — Cast to TV",
-        caption: "On the lobby whiteboard, click the Cast to TV button."
-      },
-      {
-        illustration: "cast-picker",
-        title: "Step 3 — Select monitor",
-        caption: "Choose the device that matches your lobby TV."
+        image: "/help/lobby-whiteboard.png",
+        title: "Lobby board on the TV",
+        caption: "When HI Browser is on lobby.ruffops.com and fullscreen, guests see the live Lobby Whiteboard."
       }
     ],
-    links: [{ label: "Lobby Whiteboard URL", href: "/lobby/checkouts" }]
+    links: [
+      { label: "Lobby Whiteboard (lobby.ruffops.com)", href: "https://lobby.ruffops.com", external: true },
+      { label: "Open Lobby Whiteboard", href: "/lobby/checkouts" }
+    ]
   },
   {
     id: "staff-tv-cast",
     title: "How do I put the staff board on a TV?",
-    summary: "Same steps as lobby: Chrome first, Cast to TV, then pick the staff-area monitor.",
+    summary: "Turn on the TV and Google TV streamer, open HI Browser, go to staff.ruffops.com, then fullscreen.",
     category: "TV Setup",
-    keywords: ["tv", "chromecast", "cast", "staff tv", "staff board", "chrome", "monitor"],
+    keywords: [
+      "tv",
+      "hi browser",
+      "google tv",
+      "streamer",
+      "staff tv",
+      "staff board",
+      "fullscreen",
+      "staff.ruffops.com"
+    ],
     audiences: ["admin", "staff_ops"],
     steps: [
-      "On the computer near the staff display, open Google Chrome first.",
-      "Open the Staff Digital Whiteboard page (link below).",
-      "Click Cast to TV on the staff board.",
-      "In Chrome’s picker, select the staff TV or monitor — not the lobby TV.",
-      "Keep the tab open for the whole shift."
+      "Turn on the staff TV.",
+      "Turn on the Google TV streamer (the small box plugged into the TV).",
+      "On the Google TV home screen, open the HI Browser app.",
+      "In HI Browser, search for or type staff.ruffops.com and open it.",
+      "Tap the fullscreen button in the top-right corner of HI Browser so the Staff Digital Whiteboard fills the TV.",
+      "Leave HI Browser open on fullscreen for the whole shift."
     ],
-    tips: ["Lobby and staff TVs often have different names in the picker — double-check before selecting."],
-    walkthrough: "staff-cast",
+    tips: [
+      "Do not use Cast to TV for staff displays — use HI Browser on the Google TV streamer.",
+      "If the page looks cropped, exit fullscreen and tap the top-right fullscreen button again."
+    ],
     visualSteps: [
       {
-        illustration: "cast-chrome",
-        title: "Step 1 — Open Chrome",
-        caption: "Use Chrome on the computer hooked up near the staff display."
-      },
-      {
-        illustration: "cast-button",
-        title: "Step 2 — Cast to TV",
-        caption: "Click Cast to TV on the staff whiteboard page."
-      },
-      {
-        illustration: "cast-picker",
-        title: "Step 3 — Select monitor",
-        caption: "Pick the staff-area TV, not the lobby TV."
+        image: "/help/staff-whiteboard.png",
+        title: "Staff board on the TV",
+        caption: "When HI Browser is on staff.ruffops.com and fullscreen, handlers see the live Staff Digital Whiteboard."
       }
     ],
-    links: [{ label: "Staff Whiteboard URL", href: "/" }]
+    links: [
+      { label: "Staff Whiteboard (staff.ruffops.com)", href: "https://staff.ruffops.com", external: true },
+      { label: "Open Staff Whiteboard", href: "/" }
+    ]
+  },
+  {
+    id: "marketing-cast-tv",
+    title: "How do I cast advertising slides for Marketing?",
+    summary: "Marketing still uses Cast to TV for the advertising display that plays CAST-TV slides.",
+    category: "TV Setup",
+    keywords: ["marketing", "cast", "cast-tv", "chromecast", "advertising", "slideshow", "casttv.ruffops.com", "slides"],
+    audiences: ["admin", "viewer"],
+    steps: [
+      "Sign in to Digi-Board and open Marketing → CAST-TV.",
+      "Upload or reorder the photo/video playlist that should play on the advertising TV.",
+      "On the computer connected for the advertising TV, open Google Chrome.",
+      "Go to casttv.ruffops.com (or use Open CAST-TV from the CAST-TV tab).",
+      "Click Cast to TV and select the advertising TV — not a staff or lobby whiteboard TV.",
+      "Leave that Chrome tab open so the slideshow keeps playing."
+    ],
+    tips: [
+      "Staff and lobby whiteboards use HI Browser on Google TV streamers. Only the marketing advertising TV uses Cast to TV.",
+      "Use Hard Refresh Cast TVs in Digi-Board if the advertising display is stuck on an old slide."
+    ],
+    walkthrough: "marketing-cast",
+    visualSteps: [
+      {
+        image: "/help/cast-tv-marketing.png",
+        title: "CAST-TV playlist",
+        caption: "Manage advertising slides in Digi-Board → Marketing → CAST-TV before casting to the ad TV."
+      }
+    ],
+    adminTab: "cast_tv",
+    adminBoard: "marketing",
+    links: [
+      { label: "Open CAST-TV site", href: "https://casttv.ruffops.com", external: true },
+      { label: "CAST-TV in Digi-Board", href: "/admin?board=marketing&tab=cast_tv" }
+    ]
   },
   {
     id: "troubleshoot-cast",
-    title: "Casting is not working",
-    summary: "Fix Chromecast and browser issues when Cast to TV fails.",
+    title: "Staff/lobby TV or marketing cast is not working",
+    summary: "Fix HI Browser fullscreen issues on staff/lobby TVs, or Cast to TV issues on the marketing ad TV.",
     category: "Troubleshooting",
-    keywords: ["cast failed", "chromecast", "no devices", "tv not showing", "chrome"],
+    keywords: ["cast failed", "hi browser", "google tv", "streamer", "no devices", "tv not showing", "fullscreen", "chromecast"],
     audiences: ["admin", "staff_ops", "viewer"],
     steps: [
-      "Confirm you opened Google Chrome — other browsers cannot use Cast to TV.",
-      "Make sure the computer and Chromecast are on the same Wi‑Fi network.",
-      "Refresh the whiteboard page and click Cast to TV again.",
-      "Restart the TV or Chromecast if no devices appear in the list.",
-      "Ask an admin to verify you are on the correct board URL."
+      "Staff or lobby TV: confirm the Google TV streamer is on, then open HI Browser (not Chrome Cast).",
+      "Confirm the URL is staff.ruffops.com for staff TVs or lobby.ruffops.com for lobby TVs.",
+      "Tap the fullscreen button in the top-right of HI Browser again.",
+      "Restart the TV and Google TV streamer if HI Browser will not load.",
+      "Marketing advertising TV only: use Google Chrome → casttv.ruffops.com → Cast to TV, and confirm computer and Chromecast are on the same Wi‑Fi."
     ]
   },
   {
@@ -497,19 +528,20 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "marketing-account",
     title: "What can a Marketing Account do?",
-    summary: "Marketing accounts manage lobby-facing Digi-Board content such as promotions, messages, and CAST-TV media when enabled.",
+    summary: "Marketing accounts manage CAST-TV advertising slides and lobby-facing Digi-Board content when enabled.",
     category: "Users & Login",
-    keywords: ["marketing", "promotions", "lobby", "cast-tv", "slideshow"],
+    keywords: ["marketing", "promotions", "lobby", "cast-tv", "slideshow", "advertising"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned Marketing credentials.",
+      "Open Marketing → CAST-TV to upload and order advertising photos/videos for casttv.ruffops.com.",
+      "Use Cast to TV from Chrome on casttv.ruffops.com for the advertising TV only (staff/lobby TVs use HI Browser instead).",
       "Use Lobby Whiteboard tools for promotions, content, and schedule updates your role can access.",
-      "If CAST-TV or lobby slideshow tools are enabled for your account, upload and order media there.",
       "Marketing accounts do not manage staff operations, Front Desk Log, Gingr integrations, or admin user security.",
-      "Use Help Center for lobby board guides, and email Lonnie@fitdog.com if login access looks wrong."
+      "Use Help Center for CAST-TV and lobby guides, and email Lonnie@fitdog.com if login access looks wrong."
     ],
-    adminTab: "promotions",
-    adminBoard: "lobby",
-    tips: ["Publish or save changes when your board tools show unsaved work so TVs pick up the latest content."]
+    adminTab: "cast_tv",
+    adminBoard: "marketing",
+    tips: ["See “How do I cast advertising slides for Marketing?” in TV Setup for the full Cast to TV steps."]
   },
   {
     id: "change-password",
@@ -678,6 +710,8 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "lobby-display-settings": ADMIN_ONLY,
   "lobby-tv-cast": LOBBY_VIEWERS,
   "staff-tv-cast": STAFF_OPS_AND_ADMIN,
+  "marketing-cast-tv": LOBBY_VIEWERS,
+  "troubleshoot-cast": EVERYONE,
   "staff-reminders": EVERYONE,
   "staff-display": STAFF_OPS_AND_ADMIN,
   "push-notices": STAFF_OPS_AND_ADMIN,
@@ -725,7 +759,9 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "preview-and-refresh",
   "troubleshoot-no-checkouts",
   "lobby-tv-cast",
-  "staff-tv-cast"
+  "staff-tv-cast",
+  "marketing-cast-tv",
+  "troubleshoot-cast"
 ]);
 
 const CROSSOVER_STAFF_ARTICLE_IDS = new Set([
@@ -734,6 +770,7 @@ const CROSSOVER_STAFF_ARTICLE_IDS = new Set([
   "groomer-trainer-crossover",
   "push-notices",
   "staff-tv-cast",
+  "troubleshoot-cast",
   "troubleshoot-no-checkouts"
 ]);
 
@@ -742,6 +779,7 @@ const DOG_HANDLER_ARTICLE_IDS = new Set([
   "front-desk-log",
   "dog-handler-basics",
   "staff-tv-cast",
+  "troubleshoot-cast",
   "troubleshoot-no-checkouts"
 ]);
 
@@ -751,7 +789,8 @@ const MARKETING_ARTICLE_IDS = new Set([
   "lobby-messages",
   "lobby-promotions",
   "lobby-schedule",
-  "lobby-tv-cast",
+  "marketing-cast-tv",
+  "troubleshoot-cast",
   "troubleshoot-no-checkouts"
 ]);
 

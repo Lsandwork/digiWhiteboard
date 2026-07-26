@@ -3757,13 +3757,32 @@ html.lobby-tv-display .social-video-shell {
 
   .admin-help-walkthrough-stage {
     padding: 0.75rem;
-    background: #f8fafc;
+    background: #0b1220;
     animation: adminHelpWalkthroughFade 0.35s ease;
+  }
+
+  .admin-help-walkthrough-photo {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    object-position: top center;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: #000;
+  }
+
+  .admin-help-walkthrough-caption {
+    margin: 0.65rem 0 0;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    line-height: 1.4;
   }
 
   .admin-help-walkthrough-steps {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: 0.35rem;
     padding: 0.65rem;
   }

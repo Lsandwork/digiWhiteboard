@@ -103,7 +103,7 @@ export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-admin-muted" aria-hidden />
           <input
             className="admin-input admin-help-search-input pl-12"
-            placeholder="Search help… e.g. login, crossover log, check out, cast, push notices"
+            placeholder="Search help… e.g. login, TV, HI Browser, push notices, CAST-TV"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             aria-label="Search help articles"
@@ -141,7 +141,7 @@ export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
       {results.length === 0 ? (
         <section className="admin-empty-state">
           <p className="admin-empty-state-title">No guides found</p>
-          <p className="admin-empty-state-text">Try a simpler word like “login”, “cast”, or “push notices”.</p>
+          <p className="admin-empty-state-text">Try a simpler word like “login”, “TV”, or “push notices”.</p>
         </section>
       ) : grouped && !query.trim() && category === "All" ? (
         <div className="space-y-8">
@@ -216,10 +216,7 @@ function HelpArticleCard({
             <div className={`admin-help-visual-steps ${article.walkthrough ? "admin-help-visual-steps--with-demo" : ""}`}>
               {article.visualSteps.map((step) => (
                 <figure key={step.title} className="admin-help-visual-step">
-                  <HelpVisualMedia
-                    step={step}
-                    variant={article.walkthrough === "staff-cast" ? "staff" : "lobby"}
-                  />
+                  <HelpVisualMedia step={step} variant="lobby" />
                   <figcaption>
                     <strong>{step.title}</strong>
                     <span>{step.caption}</span>
