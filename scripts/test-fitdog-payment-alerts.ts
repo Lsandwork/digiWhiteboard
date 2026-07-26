@@ -3,6 +3,12 @@ import { accessFromLegacyRole, canAccessAdminTab } from "../lib/admin/permission
 import { canManageFitdogAlerts, canViewFitdogAlerts } from "../lib/fitdog-ops/access";
 import { classifyPaymentFailure, serviceIsCovered } from "../lib/fitdog-ops/classify";
 import { buildFitdogIdempotencyKey } from "../lib/fitdog-ops/idempotency";
+import {
+  formatFitdogAlertType,
+  formatOperationsAlertStatus,
+  isClosedAlertStatus,
+  isDeclinedPaymentAlert
+} from "../lib/fitdog-ops/display";
 import { formatUsd } from "../lib/fitdog-ops/money";
 import {
   classifyFitdogNotificationText,
@@ -333,6 +339,25 @@ import { sanitizeFitdogPayload } from "../lib/fitdog-ops/sanitize";
   assert.equal(result.createOrUpdate.filter((row) => row.alert_type === "CARD_DECLINED").length, 1);
   assert.equal(result.createOrUpdate.filter((row) => row.alert_type === "FITDOG_NOTIFICATION").length, 2);
   assert.match(String(result.createOrUpdate.find((row) => row.alert_type === "CARD_DECLINED")?.failure_reason), /credit card being declined/i);
+}
+
+// 14. Past alerts display closed statuses as RESOLVED; declined payments stay identifiable.
+{
+  assert.equal(formatOperationsAlertStatus("paid"), "RESOLVED");
+  assert.equal(formatOperationsAlertStatus("waived"), "RESOLVED");
+  assert.equal(formatOperationsAlertStatus("false_positive"), "RESOLVED");
+  assert.equal(formatOperationsAlertStatus("resolved"), "RESOLVED");
+  assert.equal(formatOperationsAlertStatus("new"), "NEW");
+  assert.equal(isClosedAlertStatus("paid"), true);
+  assert.equal(formatFitdogAlertType("CARD_DECLINED"), "Declined Payment");
+  assert.equal(isDeclinedPaymentAlert({ alert_type: "CARD_DECLINED" }), true);
+  assert.equal(
+    isDeclinedPaymentAlert({
+      alert_type: "PAYMENT_RESOLVED",
+      failure_reason: "Card declined — do not honor"
+    }),
+    true
+  );
 }
 
 console.log("fitdog payment alerts tests passed");

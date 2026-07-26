@@ -293,7 +293,7 @@ export async function POST(request: Request) {
         alertId,
         {
           status: "paid",
-          alert_type: "PAYMENT_RESOLVED",
+          // Preserve original alert_type so Past Alerts still show Declined Payments, etc.
           amount_paid: amount,
           resolved_at: new Date().toISOString(),
           resolution_type: action === "record_manual_payment" ? "manual_payment" : "marked_paid",

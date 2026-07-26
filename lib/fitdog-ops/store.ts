@@ -430,7 +430,7 @@ export async function resolveAlertFromPayment(
   const { data, error } = await supabase
     .from("operations_alerts")
     .update({
-      alert_type: "PAYMENT_RESOLVED",
+      // Keep original alert_type (e.g. CARD_DECLINED) so Past Alerts can still group Declined Payments.
       status: "paid",
       amount_paid: normalizeUsdAmount(transaction.amount),
       transaction_id: transaction.fitdog_transaction_id,
@@ -543,7 +543,14 @@ export async function listOperationsAlerts(supabase: Db, filters: OperationsAler
   }
 
   if (filters.alertType && filters.alertType !== "all") query = query.eq("alert_type", filters.alertType);
-  if (filters.status && filters.status !== "all") query = query.eq("status", filters.status);
+  // On the Past Alerts (resolved) view, ignore open-status filters so history still loads.
+  if (filters.status && filters.status !== "all") {
+    if (view === "resolved" && OPEN_ALERT_STATUSES.includes(filters.status as OperationsAlertStatus)) {
+      // keep resolved statuses only
+    } else {
+      query = query.eq("status", filters.status);
+    }
+  }
   if (filters.assignedUserId === "unassigned" || filters.unassignedOnly) query = query.is("assigned_user_id", null);
   else if (filters.assignedUserId && filters.assignedUserId !== "all") query = query.eq("assigned_user_id", filters.assignedUserId);
   if (filters.dateFrom) query = query.gte("detected_at", filters.dateFrom);
@@ -559,10 +566,15 @@ export async function listOperationsAlerts(supabase: Db, filters: OperationsAler
     );
   }
 
-  const sortBy = filters.sortBy || "detected_at";
+  const sortBy =
+    filters.sortBy ||
+    (view === "resolved" ? "resolved_at" : "detected_at");
   const ascending = filters.sortDir === "asc";
   // Prefer critical unresolved first via client re-sort after fetch of page window.
-  query = query.order(sortBy, { ascending }).range((page - 1) * pageSize, page * pageSize - 1);
+  query = query
+    .order(sortBy, { ascending, nullsFirst: false })
+    .order("detected_at", { ascending: false })
+    .range((page - 1) * pageSize, page * pageSize - 1);
 
   const { data, error, count } = await query;
   if (error) {

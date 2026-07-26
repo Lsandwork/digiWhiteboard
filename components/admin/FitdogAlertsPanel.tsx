@@ -13,6 +13,12 @@ import type {
   OperationsAlertStatus,
   OperationsAlertSummary
 } from "@/lib/fitdog-ops/types";
+import {
+  formatFitdogAlertType,
+  formatOperationsAlertStatus,
+  isClosedAlertStatus,
+  isDeclinedPaymentAlert
+} from "@/lib/fitdog-ops/display";
 import { FITDOG_ALERT_TYPES, OPERATIONS_ALERT_STATUSES } from "@/lib/fitdog-ops/types";
 import { formatUsd } from "@/lib/fitdog-ops/money";
 
@@ -65,7 +71,9 @@ function severityTone(severity: string) {
 }
 
 function statusTone(status: string) {
-  if (status === "paid" || status === "resolved" || status === "waived") return "bg-emerald-500/15 text-emerald-100 border-emerald-400/30";
+  if (isClosedAlertStatus(status) || status === "waived" || status === "false_positive") {
+    return "bg-emerald-500/15 text-emerald-100 border-emerald-400/40";
+  }
   if (status === "new") return "bg-rose-500/15 text-rose-100 border-rose-400/30";
   return "bg-sky-500/15 text-sky-100 border-sky-400/30";
 }
@@ -128,7 +136,9 @@ function AlertSection({
                   </span>
                 </td>
                 <td className="px-3 py-3 text-admin-muted">{formatWhen(row.detected_at)}</td>
-                <td className="px-3 py-3 font-medium text-white">{row.alert_type}</td>
+                <td className="px-3 py-3 font-medium text-white" title={row.alert_type}>
+                  {formatFitdogAlertType(row.alert_type)}
+                </td>
                 <td className="px-3 py-3 text-white">{row.owner_name}</td>
                 <td className="px-3 py-3 text-admin-muted">{row.dog_name || "—"}</td>
                 <td className="px-3 py-3 text-admin-muted">{row.service_name || "—"}</td>
@@ -138,7 +148,12 @@ function AlertSection({
                   {row.failure_reason || "—"}
                 </td>
                 <td className="px-3 py-3">
-                  <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusTone(row.status)}`}>{row.status}</span>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide ${statusTone(row.status)}`}
+                    title={row.status}
+                  >
+                    {formatOperationsAlertStatus(row.status)}
+                  </span>
                 </td>
                 <td className="px-3 py-3">
                   {updated ? (
@@ -207,6 +222,7 @@ export function FitdogAlertsPanel() {
   });
 
   const listView = panelView === "resolved" ? "resolved" : "payment";
+  const effectiveStatus = panelView === "resolved" && status !== "all" && !isClosedAlertStatus(status) ? "all" : status;
 
   const load = useCallback(async () => {
     if (panelView === "sync" || panelView === "settings") return;
@@ -216,7 +232,7 @@ export function FitdogAlertsPanel() {
         listView,
         q,
         alertType,
-        status,
+        status: effectiveStatus,
         assignedUserId,
         owner,
         dog,
@@ -225,10 +241,10 @@ export function FitdogAlertsPanel() {
         dateFrom,
         dateTo,
         minAmount,
-        sortBy,
+        sortBy: panelView === "resolved" && sortBy === "detected_at" ? "resolved_at" : sortBy,
         sortDir,
         page: "1",
-        pageSize: "50"
+        pageSize: panelView === "resolved" ? "100" : "50"
       });
       const res = await fetch(`/api/admin/fitdog-alerts?${params}`, { cache: "no-store" });
       const json = (await res.json()) as ListPayload & { error?: string };
@@ -253,7 +269,7 @@ export function FitdogAlertsPanel() {
     listView,
     q,
     alertType,
-    status,
+    effectiveStatus,
     assignedUserId,
     owner,
     dog,
@@ -356,7 +372,7 @@ export function FitdogAlertsPanel() {
   const tabs: Array<{ id: PanelView; label: string }> = useMemo(
     () => [
       { id: "alerts", label: "Fitdog Alerts" },
-      { id: "resolved", label: "Resolved" },
+      { id: "resolved", label: "Past Alerts" },
       { id: "sync", label: "Sync History" },
       { id: "settings", label: "Integration Settings" }
     ],
@@ -364,11 +380,11 @@ export function FitdogAlertsPanel() {
   );
 
   const declinedRows = useMemo(
-    () => ((data?.rows || []) as AlertRow[]).filter((row) => row.alert_type === "CARD_DECLINED"),
+    () => ((data?.rows || []) as AlertRow[]).filter((row) => isDeclinedPaymentAlert(row)),
     [data?.rows]
   );
   const otherRows = useMemo(
-    () => ((data?.rows || []) as AlertRow[]).filter((row) => row.alert_type !== "CARD_DECLINED"),
+    () => ((data?.rows || []) as AlertRow[]).filter((row) => !isDeclinedPaymentAlert(row)),
     [data?.rows]
   );
 
@@ -405,7 +421,17 @@ export function FitdogAlertsPanel() {
                 ? "border-fitdog-orange bg-fitdog-orange/20 text-white"
                 : "border-admin-border text-admin-muted hover:text-white"
             }`}
-            onClick={() => setPanelView(tab.id)}
+            onClick={() => {
+              setPanelView(tab.id);
+              if (tab.id === "resolved") {
+                setStatus("all");
+                setSortBy("resolved_at");
+                setSortDir("desc");
+              } else if (tab.id === "alerts") {
+                setSortBy("detected_at");
+                setSortDir("desc");
+              }
+            }}
           >
             {tab.label}
           </button>
@@ -441,11 +467,15 @@ export function FitdogAlertsPanel() {
                 </option>
               ))}
             </select>
-            <select className="admin-select" value={status} onChange={(e) => setStatus(e.target.value as OperationsAlertStatus | "all")}>
-              <option value="all">All statuses</option>
-              {OPERATIONS_ALERT_STATUSES.map((value) => (
+            <select className="admin-select" value={effectiveStatus} onChange={(e) => setStatus(e.target.value as OperationsAlertStatus | "all")}>
+              <option value="all">{panelView === "resolved" ? "All resolved" : "All statuses"}</option>
+              {(panelView === "resolved"
+                ? OPERATIONS_ALERT_STATUSES.filter((value) => isClosedAlertStatus(value))
+                : OPERATIONS_ALERT_STATUSES
+              ).map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {formatOperationsAlertStatus(value)}
+                  {isClosedAlertStatus(value) && value !== "resolved" ? ` (${value})` : ""}
                 </option>
               ))}
             </select>
@@ -503,20 +533,37 @@ export function FitdogAlertsPanel() {
               />
             </div>
           ) : (
-            <AlertSection
-              title="Resolved alerts"
-              subtitle="Paid, waived, false-positive, and closed Fitdog alerts."
-              rows={(data?.rows || []) as AlertRow[]}
-              loading={loading}
-              sortBy={sortBy}
-              sortDir={sortDir}
-              onToggleSort={(column) => {
-                setSortBy(column);
-                setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
-              }}
-              onOpen={(id) => void openDetail(id)}
-              emptyLabel="No resolved alerts match these filters."
-            />
+            <div className="space-y-5">
+              <AlertSection
+                title="Past declined payments"
+                subtitle="Card declines and declined-payment cancellations marked RESOLVED."
+                accent
+                rows={declinedRows}
+                loading={loading}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onToggleSort={(column) => {
+                  setSortBy(column);
+                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                }}
+                onOpen={(id) => void openDetail(id)}
+                emptyLabel="No past declined payments yet."
+              />
+              <AlertSection
+                title="Other past alerts"
+                subtitle="Failed payments, missed payments, notifications, and other closed Fitdog alerts — status RESOLVED."
+                rows={otherRows}
+                loading={loading}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onToggleSort={(column) => {
+                  setSortBy(column);
+                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                }}
+                onOpen={(id) => void openDetail(id)}
+                emptyLabel="No other past alerts match these filters."
+              />
+            </div>
           )}
         </>
       ) : null}
@@ -669,9 +716,19 @@ export function FitdogAlertsPanel() {
           <aside className="admin-drawer-panel" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-fitdog-orange">{drawer.alert.alert_type}</p>
+                <p className="text-xs uppercase tracking-wide text-fitdog-orange">
+                  {formatFitdogAlertType(drawer.alert.alert_type)}
+                </p>
                 <h3 className="mt-1 text-xl font-black text-white">{drawer.alert.owner_name}</h3>
                 <p className="text-sm text-admin-muted">{drawer.alert.dog_name || "No dog listed"}</p>
+                <p className="mt-2">
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide ${statusTone(drawer.alert.status)}`}
+                    title={drawer.alert.status}
+                  >
+                    {formatOperationsAlertStatus(drawer.alert.status)}
+                  </span>
+                </p>
               </div>
               <button type="button" className="admin-btn-secondary" onClick={() => setDrawer(null)}>
                 Close
