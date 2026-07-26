@@ -12,7 +12,7 @@ import { capacityAllows, resolveLoadUnits, isServiceEligibleForVan } from "../li
 import { assertNeverVan4, FITDOG_VAN_KEYS } from "../lib/route-generator/flags";
 import { formatStopDisplayName, groupHouseholds } from "../lib/route-generator/households";
 import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
-import { optimizeRoutes } from "../lib/route-generator/optimizer";
+import { lockDropoffGroupsToPickupVans, optimizeRoutes } from "../lib/route-generator/optimizer";
 import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
 import { serviceForAssignedVan } from "../lib/route-generator/fitdog-api";
 import { manualTaxiToReportItems } from "../lib/route-generator/gingr-taxi";
@@ -577,6 +577,219 @@ assert.ok(dropParsed.rows.length >= 5);
 
 assert.equal(serviceForAssignedVan("van_1"), "Adventure Hike");
 assert.equal(serviceForAssignedVan("van_3"), "Beach Excursion");
+
+// Drop-off vans must match pickup vans (Van 3 never drops dogs it did not pick up).
+{
+  const dropoffLock = lockDropoffGroupsToPickupVans({
+    pickupRoutes: [
+      {
+        vanKey: "van_3",
+        vehiclePool: "outing",
+        direction: "pickup",
+        waveName: "Morning Pickup",
+        stops: [
+          {
+            sequence: 1,
+            stopKind: "customer",
+            householdKey: "beach-home",
+            ownerName: "Remy",
+            address: "1 Beach",
+            latitude: 34,
+            longitude: -118,
+            dogCount: 1,
+            loadUnits: 1,
+            largeDogs: 0,
+            serviceTypes: ["Beach Excursion"],
+            dogNames: ["Remy"],
+            reservationIds: ["res-beach"],
+            locked: false,
+            notes: "Remy"
+          }
+        ],
+        totalDogs: 1,
+        loadUnitsUsed: 1,
+        largeDogs: 0,
+        serviceTypes: ["Beach Excursion"],
+        warnings: [],
+        estimatedDistanceMiles: 1,
+        estimatedDriveMinutes: 5
+      },
+      {
+        vanKey: "van_1",
+        vehiclePool: "outing",
+        direction: "pickup",
+        waveName: "Morning Pickup",
+        stops: [
+          {
+            sequence: 1,
+            stopKind: "customer",
+            householdKey: "adv-home",
+            ownerName: "Emmie",
+            address: "2 Adv",
+            latitude: 34.1,
+            longitude: -118.1,
+            dogCount: 1,
+            loadUnits: 1,
+            largeDogs: 0,
+            serviceTypes: ["Adventure Hike"],
+            dogNames: ["Emmie"],
+            reservationIds: ["res-adv"],
+            locked: false,
+            notes: "Emmie"
+          }
+        ],
+        totalDogs: 1,
+        loadUnitsUsed: 1,
+        largeDogs: 0,
+        serviceTypes: ["Adventure Hike"],
+        warnings: [],
+        estimatedDistanceMiles: 1,
+        estimatedDriveMinutes: 5
+      }
+    ],
+    dropoffGroups: [
+      {
+        householdKey: "beach-home",
+        direction: "dropoff",
+        address: "1 Beach",
+        ownerName: "Remy",
+        dogCount: 1,
+        items: [
+          {
+            direction: "dropoff",
+            reservationId: "res-beach",
+            customerId: "c1",
+            ownerFirstName: "A",
+            ownerLastName: "B",
+            ownerFullName: "A B",
+            dogId: "d1",
+            dogName: "Remy",
+            serviceRaw: "Beach Excursion",
+            serviceCanonical: "Beach Excursion",
+            addressRaw: "1 Beach",
+            addressStreet: "1 Beach",
+            addressUnit: null,
+            addressCity: "LA",
+            addressState: "CA",
+            addressZip: "90000",
+            ownerPhoneMasked: null,
+            timeWindowStart: null,
+            timeWindowEnd: null,
+            dogSize: "Medium",
+            specialNotes: null,
+            driverNotes: null,
+            reservationNotes: null,
+            householdKey: "beach-home",
+            validationStatus: "ok",
+            validationReasons: [],
+            raw: {}
+          }
+        ]
+      },
+      {
+        householdKey: "adv-home",
+        direction: "dropoff",
+        address: "2 Adv",
+        ownerName: "Emmie",
+        dogCount: 1,
+        items: [
+          {
+            direction: "dropoff",
+            reservationId: "res-adv",
+            customerId: "c2",
+            ownerFirstName: "C",
+            ownerLastName: "D",
+            ownerFullName: "C D",
+            dogId: "d2",
+            dogName: "Emmie",
+            serviceRaw: "Adventure Hikes",
+            serviceCanonical: "Adventure Hike",
+            addressRaw: "2 Adv",
+            addressStreet: "2 Adv",
+            addressUnit: null,
+            addressCity: "LA",
+            addressState: "CA",
+            addressZip: "90000",
+            ownerPhoneMasked: null,
+            timeWindowStart: null,
+            timeWindowEnd: null,
+            dogSize: "Small",
+            specialNotes: null,
+            driverNotes: null,
+            reservationNotes: null,
+            householdKey: "adv-home",
+            validationStatus: "ok",
+            validationReasons: [],
+            raw: {}
+          }
+        ]
+      }
+    ]
+  });
+  assert.equal(dropoffLock.lockedVanByHousehold["beach-home"], "van_3");
+  assert.equal(dropoffLock.lockedVanByHousehold["adv-home"], "van_1");
+  assert.notEqual(dropoffLock.lockedVanByHousehold["adv-home"], "van_3");
+
+  const dropoffOpt = optimizeRoutes({
+    direction: "dropoff",
+    households: dropoffLock.dropoffGroups,
+    vehicles: [
+      {
+        vanKey: "van_1",
+        active: true,
+        vehiclePool: "outing",
+        maxDogs: 10,
+        maxLoadUnits: 20,
+        maxLargeDogs: 5,
+        maxStops: 20,
+        eligibleServices: ["Adventure Hike", "Beach Excursion"],
+        capacityConfigured: true
+      },
+      {
+        vanKey: "van_3",
+        active: true,
+        vehiclePool: "outing",
+        maxDogs: 10,
+        maxLoadUnits: 20,
+        maxLargeDogs: 5,
+        maxStops: 20,
+        eligibleServices: ["Adventure Hike", "Beach Excursion"],
+        capacityConfigured: true
+      }
+    ],
+    depot: {
+      name: "Hub",
+      address: "Hub",
+      latitude: 34.04,
+      longitude: -118.43,
+      timezone: "America/Los_Angeles",
+      verified: true
+    },
+    sizeLoads: { Small: 1, Medium: 1, Large: 2, "Extra Large": 2, Unknown: 1, configured: true },
+    seed: "dropoff-lock-test",
+    lockedVanByHousehold: dropoffLock.lockedVanByHousehold,
+    coordsByHousehold: {
+      "beach-home": { lat: 34.02, lng: -118.5 },
+      "adv-home": { lat: 34.03, lng: -118.4 }
+    }
+  });
+  const van3 = dropoffOpt.routes.find((r) => r.vanKey === "van_3");
+  const van1 = dropoffOpt.routes.find((r) => r.vanKey === "van_1");
+  assert.ok(van3, "Van 3 drop-off route expected");
+  assert.ok(van1, "Van 1 drop-off route expected");
+  assert.deepEqual(
+    van3!.stops.filter((s) => s.stopKind === "customer").flatMap((s) => s.dogNames),
+    ["Remy"]
+  );
+  assert.ok(
+    !van3!.stops.some((s) => s.dogNames.includes("Emmie")),
+    "Van 3 drop-off must not include Adventure dogs picked up by Van 1"
+  );
+  assert.deepEqual(
+    van1!.stops.filter((s) => s.stopKind === "customer").flatMap((s) => s.dogNames),
+    ["Emmie"]
+  );
+}
 
 assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
 {

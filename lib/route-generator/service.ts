@@ -14,7 +14,11 @@ import {
   taxiRowToReportItems,
   type GingrTaxiServiceRow
 } from "@/lib/route-generator/gingr-taxi";
-import { optimizeRoutes, type DepotConfig } from "@/lib/route-generator/optimizer";
+import {
+  lockDropoffGroupsToPickupVans,
+  optimizeRoutes,
+  type DepotConfig
+} from "@/lib/route-generator/optimizer";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import {
   autoMapSamsaraHeaders,
@@ -736,18 +740,35 @@ export async function generatePlanForRun(params: {
     lockedVanByHousehold,
     operatingDate
   });
+
+  // Drop-off must use the same van that picked each dog up (Van 3 never drops dogs it did not collect).
+  const dropoffLock = lockDropoffGroupsToPickupVans({
+    pickupRoutes: pickupOpt.routes,
+    dropoffGroups,
+    existingLocks: lockedVanByHousehold
+  });
+  for (const group of dropoffLock.dropoffGroups) {
+    const baseKey = group.householdKey.split("::")[0]!;
+    if (!coords[group.householdKey] && coords[baseKey]) {
+      coords[group.householdKey] = coords[baseKey]!;
+    }
+  }
+
   const dropoffOpt = optimizeRoutes({
     direction: "dropoff",
-    households: dropoffGroups,
+    households: dropoffLock.dropoffGroups,
     vehicles: effectiveVehicles,
     depot: effectiveDepot,
     locations,
     sizeLoads,
     seed: `dropoff:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
-    lockedVanByHousehold,
+    lockedVanByHousehold: dropoffLock.lockedVanByHousehold,
     operatingDate
   });
+  if (dropoffLock.warnings.length) {
+    dropoffOpt.warnings.push(...dropoffLock.warnings);
+  }
   if (activeUnconfigured.length) {
     pickupOpt.warnings.push(
       "Active van capacities are not fully configured — shadow placeholders were used. Confirm capacities before production."
