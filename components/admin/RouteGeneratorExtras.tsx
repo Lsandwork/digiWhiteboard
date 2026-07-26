@@ -27,8 +27,9 @@ type Props = {
     phone: string;
     notes: string;
     vanKey: string;
+    wave: "pickup" | "dropoff" | "both";
   }) => Promise<void>;
-  onAddGingrTaxi: (row: GingrTaxiServiceRow, vanKey: string) => Promise<void>;
+  onAddGingrTaxi: (row: GingrTaxiServiceRow, vanKey: string, wave: "pickup" | "dropoff" | "both") => Promise<void>;
 };
 
 export function RouteGeneratorExtras({
@@ -45,6 +46,7 @@ export function RouteGeneratorExtras({
   const [gingrError, setGingrError] = useState<string | null>(null);
   const [gingrConfigured, setGingrConfigured] = useState(true);
   const [gingrVan, setGingrVan] = useState("van_5");
+  const [gingrWave, setGingrWave] = useState<"pickup" | "dropoff" | "both">("both");
   const [selectedGingrId, setSelectedGingrId] = useState("");
   const [taxiForm, setTaxiForm] = useState({
     dogName: "",
@@ -54,7 +56,8 @@ export function RouteGeneratorExtras({
     zip: "",
     phone: "",
     notes: "",
-    vanKey: "van_5"
+    vanKey: "van_5",
+    wave: "both" as "pickup" | "dropoff" | "both"
   });
 
   useEffect(() => {
@@ -99,8 +102,8 @@ export function RouteGeneratorExtras({
         <div className="border-b border-admin-border px-4 py-3">
           <h3 className="text-base font-semibold text-white">Skipped non-route class occurrences</h3>
           <p className="text-xs text-admin-muted">
-            Classes that are not Beach / Adventure / Trainer / Group / Taxi. Assign them to a van route to include
-            those dogs on Generate Routes.
+            Classes that are not Beach / Adventure / Trainer / Group / Taxi. Assign to a van — if routes already
+            exist, that van&apos;s pickup and drop-off are updated immediately (e.g. Indy → Van 5).
           </p>
         </div>
         {!skippedOccurrences.length ? (
@@ -204,18 +207,30 @@ export function RouteGeneratorExtras({
         <div className="rounded-xl border border-admin-border/80 bg-black/20 p-3">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h4 className="text-sm font-semibold text-white">Gingr taxi services by date</h4>
-            <select
-              className="admin-input"
-              value={gingrVan}
-              disabled={busy}
-              onChange={(event) => setGingrVan(event.target.value)}
-            >
-              {VAN_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="flex flex-wrap gap-2">
+              <select
+                className="admin-input"
+                value={gingrWave}
+                disabled={busy}
+                onChange={(event) => setGingrWave(event.target.value as "pickup" | "dropoff" | "both")}
+              >
+                <option value="both">Pickup + Drop-off</option>
+                <option value="pickup">Pickup only</option>
+                <option value="dropoff">Drop-off only</option>
+              </select>
+              <select
+                className="admin-input"
+                value={gingrVan}
+                disabled={busy}
+                onChange={(event) => setGingrVan(event.target.value)}
+              >
+                {VAN_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           {!gingrConfigured ? (
             <p className="text-sm text-amber-200">GINGR_API_KEY is not configured — use manual taxi entry below.</p>
@@ -245,7 +260,7 @@ export function RouteGeneratorExtras({
                 disabled={!reportRunId || busy || !selectedGingrId}
                 onClick={() => {
                   const row = gingrTaxi.find((item) => item.reservationId === selectedGingrId);
-                  if (row) void onAddGingrTaxi(row, gingrVan);
+                  if (row) void onAddGingrTaxi(row, gingrVan, gingrWave);
                 }}
               >
                 Add selected Gingr Taxi
@@ -306,7 +321,7 @@ export function RouteGeneratorExtras({
               />
             </label>
             <label className="block text-xs text-admin-muted">
-              Assign to route
+              Assign to van
               <select
                 className="admin-input mt-1"
                 value={taxiForm.vanKey}
@@ -317,6 +332,23 @@ export function RouteGeneratorExtras({
                     {option.label}
                   </option>
                 ))}
+              </select>
+            </label>
+            <label className="block text-xs text-admin-muted">
+              Wave
+              <select
+                className="admin-input mt-1"
+                value={taxiForm.wave}
+                onChange={(event) =>
+                  setTaxiForm((prev) => ({
+                    ...prev,
+                    wave: event.target.value as "pickup" | "dropoff" | "both"
+                  }))
+                }
+              >
+                <option value="both">Pickup + Drop-off</option>
+                <option value="pickup">Pickup only</option>
+                <option value="dropoff">Drop-off only</option>
               </select>
             </label>
             <label className="block text-xs text-admin-muted md:col-span-2">

@@ -40,6 +40,10 @@ import {
 import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
 import { createOwnerTrackingForPlan } from "@/lib/route-generator/owner-tracking";
 import { buildCustomerStopNotesFromReportRows } from "@/lib/route-generator/stop-notes";
+import {
+  applyItemsToExistingPlan,
+  type ManualWave
+} from "@/lib/route-generator/apply-to-plan";
 
 const VAN_COLORS: Record<FitdogVanKey, string> = {
   van_1: "#f15f2a",
@@ -460,6 +464,13 @@ export async function assignSkippedOccurrence(params: {
     .single();
   if (updateError || !updated) throw new Error(updateError?.message || "Unable to update report run.");
 
+  const planApply = await applyItemsToExistingPlan({
+    reportRunId: params.reportRunId,
+    vanKey: params.vanKey,
+    items: promoted.items,
+    wave: "both"
+  });
+
   await writeRouteAuditEvent({
     action: "route_generator.skipped_occurrence_assigned",
     entityType: "route_report_run",
@@ -472,7 +483,10 @@ export async function assignSkippedOccurrence(params: {
       className: promoted.className,
       vanKey: params.vanKey,
       serviceCanonical,
-      dogCount: promoted.items.filter((i) => i.direction === "pickup").length
+      dogCount: promoted.items.filter((i) => i.direction === "pickup").length,
+      planUpdated: planApply.updated,
+      planId: planApply.planId,
+      routesUpdated: planApply.routesUpdated
     }
   });
 
@@ -485,7 +499,8 @@ export async function assignSkippedOccurrence(params: {
       vanKey: params.vanKey,
       serviceCanonical,
       itemCount: promoted.items.length
-    }
+    },
+    planApply
   };
 }
 
@@ -493,6 +508,8 @@ export async function addTaxiToReportRun(params: {
   reportRunId: string;
   source: "manual" | "gingr";
   vanKey?: string | null;
+  /** pickup | dropoff | both — which wave(s) to add onto the assigned van route */
+  wave?: ManualWave | null;
   gingrReservationId?: string | null;
   gingrRow?: GingrTaxiServiceRow | null;
   dogName?: string | null;
@@ -512,6 +529,7 @@ export async function addTaxiToReportRun(params: {
   }
   const supabase = getServiceSupabase();
   const { run, metadata } = await getReportRun(params.reportRunId);
+  const wave: ManualWave = params.wave === "pickup" || params.wave === "dropoff" ? params.wave : "both";
   let items: NormalizedReportItem[] = [];
 
   if (params.source === "gingr") {
@@ -522,6 +540,7 @@ export async function addTaxiToReportRun(params: {
     }
     if (!row) throw new Error("Select a Gingr taxi reservation to add.");
     items = taxiRowToReportItems({ row, vanKey: params.vanKey });
+    if (wave !== "both") items = items.filter((item) => item.direction === wave);
   } else {
     if (!params.dogName?.trim() || !params.address?.trim()) {
       throw new Error("Taxi entries need a dog name and address.");
@@ -535,7 +554,8 @@ export async function addTaxiToReportRun(params: {
       zip: params.zip,
       phone: params.phone,
       notes: params.notes,
-      vanKey: params.vanKey
+      vanKey: params.vanKey,
+      wave
     });
   }
 
@@ -570,6 +590,16 @@ export async function addTaxiToReportRun(params: {
     .single();
   if (updateError || !updated) throw new Error(updateError?.message || "Unable to update report run.");
 
+  let planApply: Awaited<ReturnType<typeof applyItemsToExistingPlan>> | null = null;
+  if (params.vanKey) {
+    planApply = await applyItemsToExistingPlan({
+      reportRunId: params.reportRunId,
+      vanKey: params.vanKey,
+      items,
+      wave
+    });
+  }
+
   await writeRouteAuditEvent({
     action: "route_generator.taxi_added",
     entityType: "route_report_run",
@@ -580,12 +610,16 @@ export async function addTaxiToReportRun(params: {
     newValue: {
       source: params.source,
       vanKey: params.vanKey ?? null,
+      wave,
       dogName: items[0]?.dogName,
-      reservationId: items[0]?.reservationId
+      reservationId: items[0]?.reservationId,
+      planUpdated: planApply?.updated ?? false,
+      planId: planApply?.planId ?? null,
+      routesUpdated: planApply?.routesUpdated ?? []
     }
   });
 
-  return { run: updated, metadata: nextMetadata, items };
+  return { run: updated, metadata: nextMetadata, items, planApply };
 }
 
 export async function generatePlanForRun(params: {

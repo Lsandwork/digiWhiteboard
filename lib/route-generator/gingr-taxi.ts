@@ -173,6 +173,8 @@ export function manualTaxiToReportItems(params: {
   notes?: string | null;
   vanKey?: string | null;
   reservationId?: string | null;
+  /** pickup | dropoff | both (default both) */
+  wave?: "pickup" | "dropoff" | "both" | null;
 }): NormalizedReportItem[] {
   const addressRaw = [params.address, params.city, params.state || "CA", params.zip].filter(Boolean).join(", ");
   const parsed = parseAddress(addressRaw);
@@ -221,8 +223,13 @@ export function manualTaxiToReportItems(params: {
     }
   };
 
-  return [
-    { ...base, direction: "pickup" as const },
-    { ...base, direction: "dropoff" as const }
-  ];
+  const wave = params.wave || "both";
+  const rows: NormalizedReportItem[] = [];
+  if (wave === "pickup" || wave === "both") {
+    rows.push({ ...base, direction: "pickup" as const });
+  }
+  if (wave === "dropoff" || wave === "both") {
+    rows.push({ ...base, direction: "dropoff" as const });
+  }
+  return rows;
 }
