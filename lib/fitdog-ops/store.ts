@@ -336,7 +336,7 @@ export async function upsertProposedAlert(
         payment_method_last_four: proposed.payment_method_last_four,
         package_credit_check: proposed.package_credit_check,
         source_url: proposed.source_url,
-        severity: proposed.severity,
+        severity: proposed.alert_type === "CARD_DECLINED" ? "critical" : proposed.severity,
         updated_at: new Date().toISOString()
       })
       .eq("id", existing.id)
@@ -361,7 +361,7 @@ export async function upsertProposedAlert(
       source_record_id: proposed.source_record_id,
       idempotency_key: proposed.idempotency_key,
       alert_type: proposed.alert_type,
-      severity: proposed.severity,
+      severity: proposed.alert_type === "CARD_DECLINED" ? "critical" : proposed.severity,
       owner_id: proposed.owner_id,
       owner_name: proposed.owner_name,
       dog_id: proposed.dog_id,

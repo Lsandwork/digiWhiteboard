@@ -169,7 +169,8 @@ export async function runFitdogSync(
               resolved_at: proposed.detected_at || result.alert.detected_at,
               resolution_type: "imported_history",
               resolution_notes: "Imported from Fitdog activity history.",
-              severity: "low"
+              // Keep Declined Payments critical even in history so UI urgency stays correct.
+              severity: proposed.alert_type === "CARD_DECLINED" ? "critical" : "low"
             },
             {
               type: "resolved",

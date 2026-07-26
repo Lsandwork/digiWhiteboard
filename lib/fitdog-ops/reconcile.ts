@@ -118,6 +118,9 @@ function notificationToProposed(item: NonNullable<FitdogSyncSnapshot["notificati
   const parsed = parseFitdogNotification(item);
   if (!parsed.text) return null;
   const amountDue = 0;
+  // Declined Payments must always stay critical / urgent for staff alerting.
+  const severity =
+    parsed.alert_type === "CARD_DECLINED" ? "critical" : severityForAlertType(parsed.alert_type);
   return {
     idempotency_key: buildFitdogIdempotencyKey({
       source_event_id: parsed.id,
@@ -129,7 +132,7 @@ function notificationToProposed(item: NonNullable<FitdogSyncSnapshot["notificati
       amount_due: amountDue
     }),
     alert_type: parsed.alert_type,
-    severity: severityForAlertType(parsed.alert_type),
+    severity,
     source_event_id: parsed.id,
     source_record_id: parsed.id,
     owner_id: null,
