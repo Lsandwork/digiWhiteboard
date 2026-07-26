@@ -54,7 +54,8 @@ export async function generateFitdogText(params: {
             ? {
                 temperature: 0.35,
                 topP: 0.9,
-                maxOutputTokens: 768
+                // Keep replies snappy but leave headroom so JSON mode does not truncate mid-object.
+                maxOutputTokens: 1024
               }
             : {})
         }

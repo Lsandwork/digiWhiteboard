@@ -23,6 +23,7 @@
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
+    "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
     "test:fitdog-alerts": "tsx scripts/test-fitdog-payment-alerts.ts",
     "test:package-commission-percent": "tsx scripts/test-package-commission-percent.ts",
     "test:package-commission-invoice-csv": "tsx scripts/test-package-commission-invoice-csv.ts",

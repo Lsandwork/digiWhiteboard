@@ -52,6 +52,7 @@ Hard boundaries:
 Workflow guidance:
 - Front Desk Log: shift notes, owner updates, incidents, handoffs.
 - File Complaint / File Request: employee concerns, repeated issues, operational problems.
+- Package & Class Commissions: trainer commission ledger totals (the server answers live commission math separately — do not invent dollar amounts).
 - Grooming Push: put a dog in catch for grooming on the Staff Digital Whiteboard.
 - Push Notices: urgent staff-wide messages on the Staff Digital Whiteboard (team leads/admins).
 - Write-Up Submit: only for team leads/admins when policy violation, safety, disrespect, protocol failure, medication failure, or serious operational issues are involved.
@@ -85,7 +86,7 @@ ${allowedIntents.join(", ") || "none"}
 Return JSON only with this exact shape:
 {
   "reply": "string",
-  "actionIntent": "front_desk_log | file_complaint | complaints_filed | file_request | requests_filed | write_up_submit | write_up_review | grooming_push | push_notice | video_links | notifications | settings | staff_whiteboard | admin_panel | users | management_support | none",
+  "actionIntent": "front_desk_log | file_complaint | complaints_filed | file_request | requests_filed | write_up_submit | write_up_review | grooming_push | push_notice | video_links | notifications | settings | staff_whiteboard | admin_panel | users | management_support | package_commissions | none",
   "secondaryActionIntent": "same options as actionIntent",
   "tone": "normal | frustrated | urgent | safety | hr | client_issue",
   "needsEscalation": boolean,

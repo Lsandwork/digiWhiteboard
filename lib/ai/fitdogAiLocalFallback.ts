@@ -1,5 +1,5 @@
-import type { UserAccess } from "@/lib/admin/permissions";
 import { canAccessActionIntent } from "@/lib/ai/fitdogActionLinks";
+import { isCommissionQuestion } from "@/lib/ai/fitdogAiCommissionAnswer";
 import type { GeminiChatJson } from "@/lib/ai/fitdogAiGuards";
 import type { FitdogAiChatHistoryItem, FitdogAiPushNoticeDraft } from "@/lib/ai/fitdogAiPushNotice";
 import { inferPushNoticeDraft } from "@/lib/ai/fitdogAiPushNotice";
@@ -15,6 +15,13 @@ const DOCUMENT_INTENT_PATTERN =
   /\b(document|write up|write-up|log this|front desk log|handoff)\b/i;
 
 const WHERE_TO_GO_PATTERN = /\bwhere should (this|it) go\b/i;
+
+export const FITDOG_AI_GLITCH_REPLY =
+  "Something glitched on my end. Jot down the time, dogs involved, and what you saw — then use the right Fitdog form.";
+
+export function isGlitchAiReply(reply: string): boolean {
+  return /something glitched on my end/i.test(reply);
+}
 
 function stripPushBoilerplate(message: string) {
   return message
@@ -128,6 +135,21 @@ export function buildLocalChatFallback(params: {
     };
   }
 
+  if (isCommissionQuestion(trimmed)) {
+    const canViewCommissions = canAccessActionIntent(context.access, "package_commissions");
+    return {
+      reply: canViewCommissions
+        ? "I can pull commission totals from the ledger — ask me again with the trainer name and date range (for example: Amanda, last two weeks). Or open Package & Class Commissions to filter the rows yourself."
+        : "Commission totals live in Package & Class Commissions. You may need view access from a team lead or admin before I can read those numbers.",
+      actionIntent: canViewCommissions ? "package_commissions" : "none",
+      secondaryActionIntent: "none",
+      tone: "normal",
+      needsEscalation: false,
+      escalationReason: "",
+      pushNotice: null
+    };
+  }
+
   if (WHERE_TO_GO_PATTERN.test(trimmed) || DOCUMENT_INTENT_PATTERN.test(trimmed)) {
     return {
       reply:
@@ -154,5 +176,16 @@ export function buildLocalChatFallback(params: {
     };
   }
 
-  return null;
+  return {
+    reply:
+      "Ask me anything shift-related — commissions, push notices, front desk handoffs, grooming catch, or where a note should go — and I'll answer from Fitdog or point you to the right page.",
+    actionIntent: "front_desk_log",
+    secondaryActionIntent: canAccessActionIntent(context.access, "package_commissions")
+      ? "package_commissions"
+      : "management_support",
+    tone: "normal",
+    needsEscalation: false,
+    escalationReason: "",
+    pushNotice: null
+  };
 }
