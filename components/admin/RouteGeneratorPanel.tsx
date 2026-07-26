@@ -11,7 +11,10 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { RouteGeneratorExtras } from "@/components/admin/RouteGeneratorExtras";
 import type { FitdogLocationsConfig } from "@/lib/route-generator/locations";
+import type { SkippedOccurrence } from "@/lib/route-generator/fitdog-api";
+import type { GingrTaxiServiceRow } from "@/lib/route-generator/gingr-taxi";
 
 const RouteGeneratorMap = dynamic(
   () => import("@/components/admin/RouteGeneratorMap").then((mod) => mod.RouteGeneratorMap),
@@ -23,7 +26,16 @@ const RouteGeneratorMap = dynamic(
   }
 );
 
-type TabId = "overview" | "pickup" | "dropoff" | "needs_review" | "raw" | "exports" | "audit" | "settings";
+type TabId =
+  | "overview"
+  | "pickup"
+  | "dropoff"
+  | "needs_review"
+  | "extras"
+  | "raw"
+  | "exports"
+  | "audit"
+  | "settings";
 
 type Bootstrap = {
   featureEnabled: boolean;
@@ -74,6 +86,10 @@ type PlanBundle = {
   routes: Array<Record<string, unknown>>;
   stops: Array<Record<string, unknown>>;
   items: Array<Record<string, unknown>>;
+  metadata?: {
+    warnings?: string[];
+    skippedOccurrences?: SkippedOccurrence[];
+  };
 };
 
 function todayLA() {
@@ -93,7 +109,12 @@ export function RouteGeneratorPanel() {
   const [busy, setBusy] = useState(false);
   const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null);
   const [reportRunId, setReportRunId] = useState<string | null>(null);
-  const [pullMeta, setPullMeta] = useState<{ pickup: number; dropoff: number; warnings: string[] } | null>(null);
+  const [pullMeta, setPullMeta] = useState<{
+    pickup: number;
+    dropoff: number;
+    warnings: string[];
+    skippedOccurrences: SkippedOccurrence[];
+  } | null>(null);
   const [bundle, setBundle] = useState<PlanBundle | null>(null);
   const [visibleVans, setVisibleVans] = useState<Record<string, boolean>>({});
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
@@ -118,7 +139,8 @@ export function RouteGeneratorPanel() {
       setPullMeta({
         pickup: Number(summary.pickupDogs ?? next.items?.filter((i) => i.direction === "pickup").length ?? 0),
         dropoff: Number(summary.dropoffDogs ?? next.items?.filter((i) => i.direction === "dropoff").length ?? 0),
-        warnings: []
+        warnings: next.metadata?.warnings ?? [],
+        skippedOccurrences: next.metadata?.skippedOccurrences ?? []
       });
       return next;
     },
@@ -186,17 +208,100 @@ export function RouteGeneratorPanel() {
     try {
       const body = await postAction("pull_report", { date });
       setReportRunId(body.run.id);
+      const skipped =
+        (body.pull.skippedOccurrences as SkippedOccurrence[] | undefined) ||
+        (body.run?.metadata?.skippedOccurrences as SkippedOccurrence[] | undefined) ||
+        [];
       setPullMeta({
         pickup: body.pull.pickupItems.length,
         dropoff: body.pull.dropoffItems.length,
-        warnings: body.pull.warnings ?? []
+        warnings: body.pull.warnings ?? [],
+        skippedOccurrences: skipped
       });
       setBundle(null);
-      showToast("Report pulled and normalized. Next: Generate Routes.", "success");
+      if (skipped.length) setTab("extras");
+      showToast(
+        skipped.length
+          ? `Report pulled. ${skipped.length} non-route class(es) need assignment.`
+          : "Report pulled and normalized. Next: Generate Routes.",
+        skipped.length ? "info" : "success"
+      );
       // Refresh connection/checklist only — keep the new reportRunId (don't rehydrate an older plan).
       await refresh({ hydrateLatestPlan: false });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Pull failed.", "error");
+    }
+  }
+
+  async function refreshReportMeta(reportRunIdValue: string) {
+    const response = await fetch(
+      `/api/admin/route-generator?view=report_run&reportRunId=${encodeURIComponent(reportRunIdValue)}`,
+      { cache: "no-store" }
+    );
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Unable to refresh report run.");
+    setPullMeta({
+      pickup: Number(body.run?.pickup_count ?? 0),
+      dropoff: Number(body.run?.dropoff_count ?? 0),
+      warnings: body.metadata?.warnings ?? [],
+      skippedOccurrences: body.metadata?.skippedOccurrences ?? []
+    });
+  }
+
+  async function assignSkipped(occurrenceId: number, vanKey: string) {
+    if (!reportRunId) {
+      showToast("Pull a report first.", "error");
+      return;
+    }
+    try {
+      await postAction("assign_skipped_occurrence", { reportRunId, occurrenceId, vanKey });
+      await refreshReportMeta(reportRunId);
+      showToast(`Assigned class to ${vanKey.replace("van_", "Van ")}. Generate Routes to include it.`, "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Assign failed.", "error");
+    }
+  }
+
+  async function addManualTaxi(payload: {
+    dogName: string;
+    ownerName: string;
+    address: string;
+    city: string;
+    zip: string;
+    phone: string;
+    notes: string;
+    vanKey: string;
+  }) {
+    if (!reportRunId) {
+      showToast("Pull a report first.", "error");
+      return;
+    }
+    try {
+      await postAction("add_taxi", { reportRunId, source: "manual", ...payload });
+      await refreshReportMeta(reportRunId);
+      showToast("Taxi Service added to the report.", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to add taxi.", "error");
+    }
+  }
+
+  async function addGingrTaxi(row: GingrTaxiServiceRow, vanKey: string) {
+    if (!reportRunId) {
+      showToast("Pull a report first.", "error");
+      return;
+    }
+    try {
+      await postAction("add_taxi", {
+        reportRunId,
+        source: "gingr",
+        vanKey,
+        gingrReservationId: row.reservationId,
+        gingrRow: row
+      });
+      await refreshReportMeta(reportRunId);
+      showToast("Gingr Taxi added to the report.", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to add Gingr taxi.", "error");
     }
   }
 
@@ -455,8 +560,19 @@ export function RouteGeneratorPanel() {
       {pullMeta ? (
         <section className="rounded-2xl border border-admin-border bg-black/20 px-4 py-3 text-sm text-admin-muted">
           Last pull · Pickup {pullMeta.pickup} · Drop-off {pullMeta.dropoff}
-          {pullMeta.warnings.length ? (
-            <p className="mt-1 text-amber-200">{pullMeta.warnings.join(" · ")}</p>
+          {pullMeta.skippedOccurrences.length ? (
+            <p className="mt-1 text-amber-200">
+              Skipped {pullMeta.skippedOccurrences.length} non-route class occurrence(s) — open{" "}
+              <button type="button" className="underline" onClick={() => setTab("extras")}>
+                Skipped / Taxi
+              </button>{" "}
+              to assign them.
+            </p>
+          ) : null}
+          {pullMeta.warnings.filter((warning) => !/Skipped \d+ non-route class/i.test(warning)).length ? (
+            <p className="mt-1 text-amber-200">
+              {pullMeta.warnings.filter((warning) => !/Skipped \d+ non-route class/i.test(warning)).join(" · ")}
+            </p>
           ) : null}
         </section>
       ) : null}
@@ -468,6 +584,7 @@ export function RouteGeneratorPanel() {
             ["pickup", "Pickup Routes"],
             ["dropoff", "Drop-Off Routes"],
             ["needs_review", "Needs Review"],
+            ["extras", "Skipped / Taxi"],
             ["raw", "Raw Report"],
             ["exports", "Export History"],
             ["settings", "Settings"]
@@ -482,6 +599,9 @@ export function RouteGeneratorPanel() {
             onClick={() => setTab(id)}
           >
             {label}
+            {id === "extras" && pullMeta?.skippedOccurrences.some((row) => !row.assignedVanKey)
+              ? ` (${pullMeta.skippedOccurrences.filter((row) => !row.assignedVanKey).length})`
+              : ""}
           </button>
         ))}
       </div>
@@ -607,6 +727,18 @@ export function RouteGeneratorPanel() {
           Raw import snapshots are stored server-side on each report run for audit. Open Needs Review for normalized
           validation issues. Sanitized previews are available to Super Admins via report source files.
         </section>
+      ) : null}
+
+      {tab === "extras" ? (
+        <RouteGeneratorExtras
+          date={date}
+          reportRunId={reportRunId}
+          skippedOccurrences={pullMeta?.skippedOccurrences ?? []}
+          busy={busy}
+          onAssignSkipped={assignSkipped}
+          onAddManualTaxi={addManualTaxi}
+          onAddGingrTaxi={addGingrTaxi}
+        />
       ) : null}
 
       {tab === "exports" ? (

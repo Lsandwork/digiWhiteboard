@@ -222,9 +222,10 @@ export function optimizeRoutes(params: {
     }
     const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical;
     if (service && !isServiceEligibleForVan(service, bucket.vehicle)) {
-      unassigned.push(stop);
-      warnings.push(`${stop.address}: locked van is not eligible for ${service}.`);
-      continue;
+      // Manual / skipped-class / taxi assignments may intentionally pin a service onto a van.
+      warnings.push(
+        `${stop.address}: locked onto ${lockedVan.replace("van_", "Van ")} even though default eligibility excludes ${service}.`
+      );
     }
     const check = capacityAllows({
       vehicle: bucket.vehicle,

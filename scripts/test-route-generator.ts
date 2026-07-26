@@ -14,6 +14,8 @@ import { formatStopDisplayName, groupHouseholds } from "../lib/route-generator/h
 import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
 import { optimizeRoutes } from "../lib/route-generator/optimizer";
 import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
+import { serviceForAssignedVan } from "../lib/route-generator/fitdog-api";
+import { manualTaxiToReportItems } from "../lib/route-generator/gingr-taxi";
 import {
   autoMapHeaders,
   looksLikeLoginPage,
@@ -478,5 +480,24 @@ assert.ok(!built.csv.toLowerCase().includes("van 4"));
 // Dropoff fixture parses
 const dropParsed = parseCsv(dropoffCsv);
 assert.ok(dropParsed.rows.length >= 5);
+
+assert.equal(serviceForAssignedVan("van_1"), "Adventure Hike");
+assert.equal(serviceForAssignedVan("van_3"), "Beach Excursion");
+{
+  const taxiItems = manualTaxiToReportItems({
+    dogName: "Mochi",
+    ownerName: "Alex Rivera",
+    address: "123 Ocean Ave",
+    city: "Santa Monica",
+    zip: "90401",
+    vanKey: "van_5"
+  });
+  assert.equal(taxiItems.length, 2);
+  assert.equal(taxiItems[0]?.serviceCanonical, "Taxi Service");
+  assert.equal(taxiItems[0]?.serviceRaw, "Taxi");
+  assert.equal(taxiItems[0]?.raw.locked_van, "van_5");
+  assert.equal(taxiItems[0]?.direction, "pickup");
+  assert.equal(taxiItems[1]?.direction, "dropoff");
+}
 
 console.log("route-generator tests: ok");

@@ -356,16 +356,102 @@ export function canUseFitdogEmployeeApi(): boolean {
   return Boolean(fitdogEmployeeEmail() && fitdogEmployeePassword());
 }
 
+export type SkippedOccurrenceDog = {
+  productId: number;
+  dogId: string | null;
+  dogName: string | null;
+  ownerName: string | null;
+  pickupAddress: string | null;
+  dropoffAddress: string | null;
+  status: string | null;
+};
+
+export type SkippedOccurrence = {
+  occurrenceId: number;
+  date: string;
+  classId: number | null;
+  className: string;
+  pickupWindowStart: string | null;
+  pickupWindowEnd: string | null;
+  dropoffWindowStart: string | null;
+  dropoffWindowEnd: string | null;
+  dogCount: number;
+  dogs: SkippedOccurrenceDog[];
+  assignedVanKey?: string | null;
+  assignedService?: CanonicalService | null;
+  assignedAt?: string | null;
+};
+
 export type FitdogApiPullBundle = {
   pickupItems: NormalizedReportItem[];
   dropoffItems: NormalizedReportItem[];
   pickupCsv: string;
   dropoffCsv: string;
   warnings: string[];
+  skippedOccurrences: SkippedOccurrence[];
   occurrenceCount: number;
   productCount: number;
   services: string[];
 };
+
+function summarizeProductDog(product: FitdogProduct): SkippedOccurrenceDog {
+  return {
+    productId: product.id,
+    dogId: product.dog != null ? String(product.dog) : product.dog_detail?.id != null ? String(product.dog_detail.id) : null,
+    dogName: cleanText(product.dog_detail?.name),
+    ownerName: cleanText(product.owner_detail?.full_name || product.customer_detail?.full_name),
+    pickupAddress: addressFromDetail(product.pickup_location_detail).raw,
+    dropoffAddress: addressFromDetail(product.drop_off_location_detail).raw,
+    status: cleanText(product.status_detail) || (product.status != null ? String(product.status) : null)
+  };
+}
+
+/** Map a van choice to the canonical outing service used when promoting a skipped class. */
+export function serviceForAssignedVan(vanKey: string): CanonicalService {
+  if (vanKey === "van_3") return "Beach Excursion";
+  if (vanKey === "van_1" || vanKey === "van_2") return "Adventure Hike";
+  return "Adventure Hike";
+}
+
+/**
+ * Re-fetch a Fitdog class occurrence and build pickup/drop-off report items for a chosen van/service.
+ */
+export async function promoteSkippedOccurrenceToItems(params: {
+  occurrenceId: number;
+  vanKey: string;
+  serviceCanonical?: CanonicalService;
+}): Promise<{ items: NormalizedReportItem[]; occurrence: FitdogOccurrence; className: string }> {
+  const token = await fetchFitdogEmployeeAccessToken();
+  const occurrence = await fitdogGetJson<FitdogOccurrence>(
+    token.access_token,
+    `/api/v1/employees/class-occurrences/${params.occurrenceId}/`
+  );
+  const className = cleanText(occurrence.training_class_detail?.name) || `Class ${params.occurrenceId}`;
+  const serviceCanonical = params.serviceCanonical || serviceForAssignedVan(params.vanKey);
+  const products = await fetchProductsForOccurrence(token.access_token, params.occurrenceId);
+  const items: NormalizedReportItem[] = [];
+  for (const product of products) {
+    if (!isScheduledProduct(product)) continue;
+    for (const direction of ["pickup", "dropoff"] as const) {
+      const item = buildItem({
+        direction,
+        product,
+        occurrence,
+        serviceRaw: className,
+        serviceCanonical
+      });
+      item.raw = {
+        ...item.raw,
+        locked_van: params.vanKey,
+        assigned_from_skipped: "true",
+        original_class_name: className,
+        occurrence_id: String(params.occurrenceId)
+      };
+      items.push(item);
+    }
+  }
+  return { items, occurrence, className };
+}
 
 /**
  * Pull live Fitdog class signups for an operating date via OAuth + class-occurrences/products.
@@ -382,24 +468,37 @@ export async function pullFitdogRouteReportFromApi(date: string): Promise<Fitdog
   const token = await fetchFitdogEmployeeAccessToken();
   const occurrences = await fetchOccurrencesForDate(token.access_token, date);
   const warnings: string[] = [];
+  const skippedOccurrences: SkippedOccurrence[] = [];
   const pickupItems: NormalizedReportItem[] = [];
   const dropoffItems: NormalizedReportItem[] = [];
   const services = new Set<string>();
   let productCount = 0;
-  let skippedUnknown = 0;
   let skippedUnscheduled = 0;
 
   for (const occurrence of occurrences) {
     const serviceRaw = cleanText(occurrence.training_class_detail?.name);
     if (!serviceRaw) continue;
     const serviceCanonical = normalizeServiceName(serviceRaw);
+    const products = await fetchProductsForOccurrence(token.access_token, occurrence.id);
+
     if (!serviceCanonical) {
-      skippedUnknown += 1;
+      const scheduled = products.filter((product) => isScheduledProduct(product));
+      skippedOccurrences.push({
+        occurrenceId: occurrence.id,
+        date: occurrence.date,
+        classId: occurrence.training_class ?? occurrence.training_class_detail?.id ?? null,
+        className: serviceRaw,
+        pickupWindowStart: formatTime(occurrence.pickup_start_time),
+        pickupWindowEnd: formatTime(occurrence.pickup_end_time),
+        dropoffWindowStart: formatTime(occurrence.dropoff_start_time),
+        dropoffWindowEnd: formatTime(occurrence.dropoff_end_time),
+        dogCount: scheduled.length,
+        dogs: scheduled.map(summarizeProductDog)
+      });
       continue;
     }
     services.add(serviceRaw);
 
-    const products = await fetchProductsForOccurrence(token.access_token, occurrence.id);
     for (const product of products) {
       if (!isScheduledProduct(product)) {
         skippedUnscheduled += 1;
@@ -434,8 +533,10 @@ export async function pullFitdogRouteReportFromApi(date: string): Promise<Fitdog
       `Fitdog returned ${occurrences.length} occurrence(s) for ${date}, but no scheduled dogs for route services (Beach Excursion, Adventure Hike, Trainer-Led Hike, Group Class, Taxi).`
     );
   }
-  if (skippedUnknown) {
-    warnings.push(`Skipped ${skippedUnknown} non-route class occurrence(s) (not Beach/Adventure/Trainer/Group/Taxi).`);
+  if (skippedOccurrences.length) {
+    warnings.push(
+      `Skipped ${skippedOccurrences.length} non-route class occurrence(s) (not Beach/Adventure/Trainer/Group/Taxi).`
+    );
   }
   if (skippedUnscheduled) {
     warnings.push(`Skipped ${skippedUnscheduled} cancelled/unscheduled product(s).`);
@@ -447,6 +548,7 @@ export async function pullFitdogRouteReportFromApi(date: string): Promise<Fitdog
     pickupCsv: itemsToCsv(pickupItems, "pickup"),
     dropoffCsv: itemsToCsv(dropoffItems, "dropoff"),
     warnings,
+    skippedOccurrences,
     occurrenceCount: occurrences.length,
     productCount,
     services: [...services].sort()
