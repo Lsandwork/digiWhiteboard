@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { fitdogRouteReportProvider } from "@/lib/route-generator/fitdog-provider";
 import { groupHouseholdsWithFacilities } from "@/lib/route-generator/facility";
@@ -21,10 +19,10 @@ import {
 } from "@/lib/route-generator/optimizer";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import {
-  autoMapSamsaraHeaders,
   buildCsv,
   buildRouteName,
   formatSamsaraCsvDateTime,
+  getCanonicalSamsaraTemplate,
   synthesizeStopSchedule,
   validateExport,
   type ExportStopRow,
@@ -1034,17 +1032,9 @@ export async function exportSamsaraCsv(params: {
     throw new Error("Emergency export requires a written reason.");
   }
 
-  const templateCsv = await readFile(
-    path.join(process.cwd(), "scripts/fixtures/route-generator/samsara-template.csv"),
-    "utf8"
-  );
-  const headers = templateCsv.trim().split(/\r?\n/)[0]!.split(",");
-  const template: SamsaraTemplate = {
-    headers,
-    delimiter: ",",
-    encoding: "utf-8",
-    mappings: autoMapSamsaraHeaders(headers)
-  };
+  // Always use Samsara's exact A–K bulk-upload headers. Never trust a stale
+  // DB/fixture alias set — unsupported names fail cloud.samsara.com upload.
+  const template: SamsaraTemplate = getCanonicalSamsaraTemplate();
 
   const vehicles = await listVehicles();
   const vehicleNameByKey = new Map(

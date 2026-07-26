@@ -1,9 +1,52 @@
+/**
+ * Canonical Samsara dashboard bulk-upload headers (columns A–K).
+ * Any other header names are rejected by cloud.samsara.com CSV upload.
+ * Do not invent aliases — keep this list exact.
+ */
+export const SAMSARA_BULK_UPLOAD_HEADERS = [
+  "Route Name",
+  "Assigned Driver Username",
+  "Assigned Vehicle Name",
+  "Stop Name",
+  "Notes",
+  "Scheduled Arrival Time",
+  "Scheduled Departure Time",
+  "Address Name",
+  "Latitude",
+  "Longitude",
+  "Full Address"
+] as const;
+
+/** Headers that previously caused Samsara "column headers are not supported". */
+export const SAMSARA_UNSUPPORTED_HEADERS = [
+  "Route Notes",
+  "Assigned Vehicle",
+  "Assigned Driver",
+  "Stop Notes",
+  "Stop Address",
+  "Scheduled Arrival",
+  "Scheduled Departure",
+  "Route Date",
+  "Stop Order"
+] as const;
+
 export type SamsaraTemplate = {
   headers: string[];
   delimiter: string;
   encoding: string;
   mappings: Record<string, string | null>; // samsara column -> route field
 };
+
+/** Always-valid template for Fitdog raw lat/lng + full address uploads. */
+export function getCanonicalSamsaraTemplate(): SamsaraTemplate {
+  const headers = [...SAMSARA_BULK_UPLOAD_HEADERS];
+  return {
+    headers,
+    delimiter: ",",
+    encoding: "utf-8",
+    mappings: autoMapSamsaraHeaders(headers)
+  };
+}
 
 export type ExportStopRow = {
   routeName: string;
@@ -197,11 +240,27 @@ export function validateExport(params: {
   const errors: string[] = [];
   const warnings: string[] = [];
   const headerLine = params.csv.split(/\r?\n/)[0] ?? "";
-  const parsedHeaders = headerLine.split(params.template.delimiter).map((h) => h.replace(/^"|"$/g, ""));
-  if (parsedHeaders.join("|") !== params.template.headers.join("|")) {
-    errors.push("Header names/order do not match the active Samsara template.");
+  const parsedHeaders = headerLine.split(params.template.delimiter).map((h) => h.replace(/^"|"$/g, "").trim());
+  const canonical = SAMSARA_BULK_UPLOAD_HEADERS.join("|");
+  if (parsedHeaders.join("|") !== canonical) {
+    errors.push(
+      `Header names/order must exactly match Samsara bulk-upload columns A–K: ${SAMSARA_BULK_UPLOAD_HEADERS.join(", ")}`
+    );
+  }
+  for (const bad of SAMSARA_UNSUPPORTED_HEADERS) {
+    if (parsedHeaders.includes(bad)) {
+      errors.push(`Unsupported Samsara header present: ${bad}`);
+    }
   }
   if (!params.rows.length) errors.push("Export has no stop rows.");
+  for (const row of params.rows) {
+    if (!row.scheduledArrival?.trim() || !row.scheduledDeparture?.trim()) {
+      errors.push(`Missing scheduled arrival/departure on route ${row.routeName}`);
+    }
+    if (!row.stopAddress?.trim() && (!row.latitude || !row.longitude)) {
+      errors.push(`Stop "${row.stopName}" on ${row.routeName} needs Full Address or lat/lng.`);
+    }
+  }
 
   const byRoute = new Map<string, ExportStopRow[]>();
   for (const row of params.rows) {

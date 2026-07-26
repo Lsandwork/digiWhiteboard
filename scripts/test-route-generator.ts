@@ -30,6 +30,9 @@ import {
   buildCsv,
   buildRouteName,
   escapeCsvCell,
+  getCanonicalSamsaraTemplate,
+  SAMSARA_BULK_UPLOAD_HEADERS,
+  SAMSARA_UNSUPPORTED_HEADERS,
   synthesizeStopSchedule,
   validateExport
 } from "../lib/route-generator/samsara-csv";
@@ -513,24 +516,20 @@ const templateHeaders = readFileSync(path.join("scripts/fixtures/route-generator
   .split("\n")[0]!
   .split(",");
 const mappings = autoMapSamsaraHeaders(templateHeaders);
-assert.deepEqual(templateHeaders, [
-  "Route Name",
-  "Assigned Driver Username",
-  "Assigned Vehicle Name",
-  "Stop Name",
-  "Notes",
-  "Scheduled Arrival Time",
-  "Scheduled Departure Time",
-  "Address Name",
-  "Latitude",
-  "Longitude",
-  "Full Address"
-]);
+assert.deepEqual(templateHeaders, [...SAMSARA_BULK_UPLOAD_HEADERS]);
+assert.deepEqual(getCanonicalSamsaraTemplate().headers, [...SAMSARA_BULK_UPLOAD_HEADERS]);
 assert.equal(mappings["Full Address"], "full_address");
 assert.equal(mappings["Notes"], "stop_notes");
 assert.equal(mappings["Address Name"], null);
 assert.equal(mappings["Assigned Vehicle Name"], "assigned_vehicle");
 assert.equal(mappings["Scheduled Arrival Time"], "scheduled_arrival");
+for (const bad of SAMSARA_UNSUPPORTED_HEADERS) {
+  assert.equal(
+    (templateHeaders as string[]).includes(bad),
+    false,
+    `fixture must not include unsupported header ${bad}`
+  );
+}
 const rows = [
   {
     routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 01" }),
