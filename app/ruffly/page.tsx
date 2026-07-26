@@ -4,7 +4,14 @@ import { RufflyPageClient } from "@/components/ruffly/shell/RufflyPageClient";
 import { getAdminSession } from "@/lib/admin/session";
 import { hasPermission } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
-import { isRufflyEnabled } from "@/lib/ruffly/flags";
+import {
+  isRufflyAiEnabled,
+  isRufflyAutomationsEnabled,
+  isRufflyCampaignsEnabled,
+  isRufflyEnabled,
+  isRufflyVoiceEnabled,
+  isRufflyWebchatEnabled
+} from "@/lib/ruffly/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -36,11 +43,11 @@ export default async function RufflyRoutePage() {
           access={access}
           flags={{
             enabled: isRufflyEnabled() || session.role === "owner_admin",
-            webchat: process.env.RUFFLY_WEBCHAT_ENABLED === "true",
-            ai: process.env.RUFFLY_AI_ENABLED === "true",
-            voice: process.env.RUFFLY_VOICE_ENABLED === "true",
-            campaigns: process.env.RUFFLY_CAMPAIGNS_ENABLED === "true",
-            automations: process.env.RUFFLY_AUTOMATIONS_ENABLED === "true"
+            webchat: isRufflyWebchatEnabled(),
+            ai: isRufflyAiEnabled(),
+            voice: isRufflyVoiceEnabled(),
+            campaigns: isRufflyCampaignsEnabled(),
+            automations: isRufflyAutomationsEnabled()
           }}
         />
       </main>
