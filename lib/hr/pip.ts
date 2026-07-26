@@ -217,13 +217,118 @@ function emptyState(): PipState {
   return { plans: [] };
 }
 
+/** Normalize employee labels so "Anderson" and "Anderson (Callum Dog owner)" match. */
+export function normalizePipEmployeeKey(name: string) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function preferEmployeeDisplayName(names: string[]) {
+  const cleaned = names.map((name) => name.trim()).filter(Boolean);
+  if (!cleaned.length) return "Team member";
+  // Prefer the shortest name without parenthetical aliases.
+  const withoutParens = cleaned.filter((name) => !/\(/.test(name));
+  const pool = withoutParens.length ? withoutParens : cleaned;
+  return [...pool].sort((a, b) => a.length - b.length || a.localeCompare(b))[0]!;
+}
+
+function pickPreferredText(...values: Array<string | null | undefined>) {
+  return values.map((value) => (value ? String(value).trim() : "")).find(Boolean) || null;
+}
+
+function isOpenPipStatus(status: PipStatus) {
+  return status === "Active" || status === "On Hold";
+}
+
+function mergeOpenPipGroup(group: PipPlan[]): PipPlan {
+  const ordered = [...group].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const primary = ordered[0]!;
+  if (ordered.length === 1) return primary;
+
+  const names = [...new Set(ordered.map((plan) => plan.employee_name.trim()).filter(Boolean))];
+  const focuses = [...new Set(ordered.map((plan) => plan.focus_area.trim()).filter(Boolean))];
+  const goals = [...new Set(ordered.flatMap((plan) => plan.goals))];
+  const sourceIds = [...new Set(ordered.flatMap((plan) => plan.source_record_ids))];
+  const checkIns = [...ordered.flatMap((plan) => plan.check_ins)].sort((a, b) =>
+    b.created_at.localeCompare(a.created_at)
+  );
+  const status = ordered.find((plan) => plan.status === "Active")?.status ?? ordered[0]!.status;
+  const progress = Math.max(...ordered.map((plan) => plan.progress_percent), 0);
+
+  const noteParts = [
+    ...ordered.map((plan) => plan.manager_notes).filter(Boolean),
+    names.length > 1 ? `Merged duplicate PIP entries for the same employee (${names.join(" · ")}).` : null,
+    focuses.length > 1 ? `Combined focus areas:\n- ${focuses.join("\n- ")}` : null
+  ].filter(Boolean);
+
+  return (
+    normalizePlan({
+      ...primary,
+      employee_name: preferEmployeeDisplayName(names),
+      employee_role: pickPreferredText(...ordered.map((plan) => plan.employee_role)),
+      manager_name: pickPreferredText(...ordered.map((plan) => plan.manager_name)),
+      title: pickPreferredText(...ordered.map((plan) => plan.title)),
+      stage: ordered.find((plan) => plan.stage)?.stage ?? primary.stage,
+      risk_level: ordered.some((plan) => plan.risk_level === "Critical")
+        ? "Critical"
+        : ordered.some((plan) => plan.risk_level === "High")
+          ? "High"
+          : ordered.some((plan) => plan.risk_level === "Medium")
+            ? "Medium"
+            : primary.risk_level,
+      focus_area: focuses.join(" | ").slice(0, 2000),
+      goals,
+      success_metrics: pickPreferredText(...ordered.map((plan) => plan.success_metrics)),
+      support_offered: pickPreferredText(...ordered.map((plan) => plan.support_offered)),
+      employee_facing_summary: pickPreferredText(...ordered.map((plan) => plan.employee_facing_summary)),
+      manager_notes: noteParts.join("\n\n").slice(0, 4000),
+      start_date: [...ordered.map((plan) => plan.start_date)].sort()[0] ?? primary.start_date,
+      next_review_date:
+        [...ordered.map((plan) => plan.next_review_date).filter(Boolean)].sort()[0] ?? primary.next_review_date,
+      target_end_date:
+        [...ordered.map((plan) => plan.target_end_date).filter(Boolean)].sort().at(-1) ?? primary.target_end_date,
+      progress_percent: progress,
+      status,
+      source_record_ids: sourceIds,
+      check_ins: checkIns.slice(0, 40),
+      updated_at: new Date().toISOString()
+    }) ?? primary
+  );
+}
+
+/** Collapse multiple open PIP rows for the same employee into one plan. Closed plans stay separate. */
+export function mergePipPlansByEmployee(plans: PipPlan[]): PipPlan[] {
+  const closed: PipPlan[] = [];
+  const openGroups = new Map<string, PipPlan[]>();
+
+  for (const plan of plans) {
+    if (!isOpenPipStatus(plan.status)) {
+      closed.push(plan);
+      continue;
+    }
+    const key = normalizePipEmployeeKey(plan.employee_name) || plan.id;
+    const list = openGroups.get(key) ?? [];
+    list.push(plan);
+    openGroups.set(key, list);
+  }
+
+  const mergedOpen = [...openGroups.values()].map(mergeOpenPipGroup);
+  return [...mergedOpen, ...closed].sort((a, b) =>
+    String(a.next_review_date || "9999").localeCompare(String(b.next_review_date || "9999"))
+  );
+}
+
 function parseState(value: unknown): PipState {
   if (!value || typeof value !== "object") return emptyState();
   const plans = Array.isArray((value as { plans?: unknown }).plans)
     ? ((value as { plans: unknown[] }).plans).map(normalizePlan).filter((p): p is PipPlan => Boolean(p))
     : [];
   return {
-    plans: plans.sort((a, b) => String(a.next_review_date || "9999").localeCompare(String(b.next_review_date || "9999")))
+    plans: mergePipPlansByEmployee(plans)
   };
 }
 
@@ -238,7 +343,17 @@ async function loadState(supabase: SupabaseClient): Promise<PipState> {
     throw error;
   }
   const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseState(settings[SETTINGS_STORE_KEY]);
+  const rawPlans = Array.isArray((settings[SETTINGS_STORE_KEY] as { plans?: unknown } | undefined)?.plans)
+    ? ((settings[SETTINGS_STORE_KEY] as { plans: unknown[] }).plans)
+        .map(normalizePlan)
+        .filter((plan): plan is PipPlan => Boolean(plan))
+    : [];
+  const merged = mergePipPlansByEmployee(rawPlans);
+  // Persist dedupe so overview / command center stop showing duplicate employees.
+  if (merged.length !== rawPlans.length || merged.some((plan, index) => plan.id !== rawPlans[index]?.id)) {
+    await saveState(supabase, { plans: merged });
+  }
+  return { plans: merged };
 }
 
 async function saveState(supabase: SupabaseClient, state: PipState) {
@@ -296,7 +411,24 @@ export async function createPipPlan(supabase: SupabaseClient, input: PipPlanInpu
     updated_at: now
   });
   if (!plan) throw new Error("Employee name and focus area are required.");
+
+  const key = normalizePipEmployeeKey(plan.employee_name);
+  const existingIndex = state.plans.findIndex(
+    (row) =>
+      (row.status === "Active" || row.status === "On Hold") &&
+      normalizePipEmployeeKey(row.employee_name) === key
+  );
+  if (existingIndex >= 0) {
+    const existing = state.plans[existingIndex]!;
+    const merged = mergePipPlansByEmployee([existing, plan])[0]!;
+    state.plans[existingIndex] = merged;
+    state.plans = mergePipPlansByEmployee(state.plans);
+    await saveState(supabase, state);
+    return merged;
+  }
+
   state.plans.unshift(plan);
+  state.plans = mergePipPlansByEmployee(state.plans);
   await saveState(supabase, state);
   return plan;
 }
@@ -319,10 +451,23 @@ export async function createPipPlansBulk(
       updated_at: now
     });
     if (!plan) continue;
-    state.plans.unshift(plan);
-    created.push(plan);
+    const key = normalizePipEmployeeKey(plan.employee_name);
+    const existingIndex = state.plans.findIndex(
+      (row) =>
+        (row.status === "Active" || row.status === "On Hold") &&
+        normalizePipEmployeeKey(row.employee_name) === key
+    );
+    if (existingIndex >= 0) {
+      const merged = mergePipPlansByEmployee([state.plans[existingIndex]!, plan])[0]!;
+      state.plans[existingIndex] = merged;
+      created.push(merged);
+    } else {
+      state.plans.unshift(plan);
+      created.push(plan);
+    }
   }
   if (!created.length) throw new Error("No valid PIP plans to create. Each needs an employee name and focus area.");
+  state.plans = mergePipPlansByEmployee(state.plans);
   await saveState(supabase, state);
   return created;
 }

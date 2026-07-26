@@ -267,7 +267,7 @@ export function PipPanel() {
 
   return (
     <section className="space-y-5">
-      <header className="overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1a2a24] via-[#152018] to-[#0f1412] p-6">
+      <header className="admin-on-dark overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#1a2a24] via-[#152018] to-[#0f1412] p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300/90">Growth Path · Performance Improvement Plan</p>

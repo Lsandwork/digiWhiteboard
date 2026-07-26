@@ -14,6 +14,7 @@ import {
   defaultTargetEndDate,
   deletePipPlan,
   listPipPlans,
+  normalizePipEmployeeKey,
   pipReviewsDueThisWeek,
   updatePipPlan,
   type PipPlanInput,
@@ -117,7 +118,7 @@ export async function POST(request: Request) {
         if (!report || !isHrRecord(report) || report.hr_hub_hidden) continue;
         const record = toHrRecord(report);
         const employee_name = (record.subject_name || "Team member").trim();
-        const key = employee_name.toLowerCase();
+        const key = normalizePipEmployeeKey(employee_name) || employee_name.toLowerCase();
         const inferredRole = inferEmployeeRoleFromHrSignals({
           report_type: report.report_type,
           department: record.department,
