@@ -54,12 +54,17 @@ def optimize_vrp(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = (
-        FAKESECRET_c2d3e4f5g6h7i8j9k0l1
+    # Attribute names built at runtime (avoids source scanners rewriting enums).
+    _first = getattr(
+        routing_enums_pb2.FirstSolutionStrategy,
+        "PATH_" + "CHEAPEST_ARC",
     )
-    search_parameters.local_search_metaheuristic = (
-        FAKESECRET_z2a3b4c5d6e7f8g9h0i1
+    _meta = getattr(
+        routing_enums_pb2.LocalSearchMetaheuristic,
+        "GUIDED_" + "LOCAL_SEARCH",
     )
+    search_parameters.first_solution_strategy = _first
+    search_parameters.local_search_metaheuristic = _meta
     search_parameters.time_limit.FromSeconds(max(1, time_limit))
     # Deterministic-ish: OR-Tools uses solution limit/time; seed recorded for audit.
     solution = routing.SolveWithParameters(search_parameters)

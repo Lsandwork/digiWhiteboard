@@ -1,6 +1,6 @@
 # Route Generator — shadow-mode checklist
 
-Updated 2026-07-26 after Vercel secret push + Render blueprint prep.
+Updated 2026-07-26 after Render worker deploy + Vercel wiring.
 
 ## Completed
 
@@ -11,31 +11,31 @@ Updated 2026-07-26 after Vercel secret push + Render blueprint prep.
 - [x] Fixture Samsara template uploaded/active
 - [x] Fixture shadow smoke (parse → optimize → CSV) passed
 - [x] Worker secrets generated (`.env.route-worker.local`, gitignored)
-- [x] Vercel Production env pushed for `fitdog-gingr-status-board` / `staff.ruffops.com`:
+- [x] Vercel Production env (`fitdog-gingr-status-board` / `staff.ruffops.com`):
   - `GOOGLE_MAPS_API_KEY`, `MAPS_PROVIDER=google`
   - `ROUTE_WORKER_SIGNING_SECRET`, `ROUTE_WORKER_CALLBACK_SECRET`
+  - `ROUTE_WORKER_URL=https://fitdog-route-worker.onrender.com`
   - Feature flags explicitly **`false`**
-- [x] `render.yaml` + `scripts/deploy-route-worker-render.sh` added (Dockerfile listens on `$PORT`)
+- [x] Durable Render worker deployed + `/health` OK  
+      `https://fitdog-route-worker.onrender.com`
 
-## Blocked — needs human step
+## Blocked — interactive / company data
 
-- [ ] **Render API key** → deploy durable worker  
-      Create at https://dashboard.render.com/u/settings#api-keys then:
-      ```bash
-      export RENDER_API_KEY=...
-      ./scripts/deploy-route-worker-render.sh
-      export VERCEL_TOKEN=...
-      export GOOGLE_MAPS_API_KEY=...
-      export ROUTE_WORKER_URL=https://fitdog-route-worker-….onrender.com
-      ./scripts/push-route-generator-vercel-env.sh
-      npx vercel --prod --token "$VERCEL_TOKEN"
-      ```
-      Or: Render Dashboard → New → Blueprint → select this repo (`render.yaml`).
 - [ ] Interactive Fitdog reconnect (MFA) + real report selectors
 - [ ] Upload current company Samsara bulk-upload sample CSV
 - [ ] Real operating-day shadow comparison vs Hub Coordinator routes
-- [ ] Enable production flags on Vercel (`ENABLE_ROUTE_GENERATOR_FLAGS=true`)
+- [ ] Enable production flags on Vercel
+
+## Enable flags only after the three items above
+
+```bash
+export VERCEL_TOKEN=...
+export GOOGLE_MAPS_API_KEY=...
+export ROUTE_WORKER_URL=https://fitdog-route-worker.onrender.com
+ENABLE_ROUTE_GENERATOR_FLAGS=true ./scripts/push-route-generator-vercel-env.sh
+npx vercel --prod --token "$VERCEL_TOKEN"
+```
 
 ## Production flags
 
-**Still false.** Do not enable until Render worker health is green, Fitdog MFA reconnect works, real Samsara template is uploaded, and a real shadow day is reviewed.
+**Still false.** Do not enable until Fitdog MFA reconnect works, real Samsara template is uploaded, and a real shadow day is reviewed.
