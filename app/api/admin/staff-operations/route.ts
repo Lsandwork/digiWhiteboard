@@ -240,19 +240,16 @@ export async function POST(request: Request) {
       auditAction = "staff.notification.read";
     } else if (action === "mark_all_notifications_read") {
       const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
-      result = await markAllStaffNotificationsRead(supabase, readerKey, {
+      const readerSession = {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
         role: session?.role ?? null
-      });
+      };
+      const nextState = await markAllStaffNotificationsRead(supabase, readerKey, readerSession);
       // Return only this user's visible notifications after mark-all.
       result = {
-        ...result,
-        notifications: notificationsForSession(result, {
-          email: session?.email ?? null,
-          adminUserId: session?.adminUserId ?? null,
-          role: session?.role ?? null
-        })
+        ...nextState,
+        notifications: notificationsForSession(nextState, readerSession)
       };
       auditAction = "staff.notification.read_all";
     } else {
