@@ -30,6 +30,10 @@ import {
   buildCsv,
   buildRouteName,
   escapeCsvCell,
+  getCanonicalSamsaraTemplate,
+  SAMSARA_BULK_UPLOAD_HEADERS,
+  SAMSARA_UNSUPPORTED_HEADERS,
+  synthesizeStopSchedule,
   validateExport
 } from "../lib/route-generator/samsara-csv";
 import { buildCustomerStopNotes, formatPhoneForDriver } from "../lib/route-generator/stop-notes";
@@ -512,47 +516,61 @@ const templateHeaders = readFileSync(path.join("scripts/fixtures/route-generator
   .split("\n")[0]!
   .split(",");
 const mappings = autoMapSamsaraHeaders(templateHeaders);
+assert.deepEqual(templateHeaders, [...SAMSARA_BULK_UPLOAD_HEADERS]);
+assert.deepEqual(getCanonicalSamsaraTemplate().headers, [...SAMSARA_BULK_UPLOAD_HEADERS]);
+assert.equal(mappings["Full Address"], "full_address");
+assert.equal(mappings["Notes"], "stop_notes");
+assert.equal(mappings["Address Name"], null);
+assert.equal(mappings["Assigned Vehicle Name"], "assigned_vehicle");
+assert.equal(mappings["Scheduled Arrival Time"], "scheduled_arrival");
+for (const bad of SAMSARA_UNSUPPORTED_HEADERS) {
+  assert.equal(
+    (templateHeaders as string[]).includes(bad),
+    false,
+    `fixture must not include unsupported header ${bad}`
+  );
+}
 const rows = [
   {
-    routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 1" }),
+    routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 01" }),
     routeNotes: "AM",
-    vehicleName: "Van 1",
+    vehicleName: "Van 01",
     driverName: "",
     stopName: "Depot",
     stopNotes: "start",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "",
-    scheduledDeparture: "",
+    scheduledArrival: "07/26/2026 07:00",
+    scheduledDeparture: "07/26/2026 07:05",
     routeDate: "2026-07-26",
     stopOrder: 0,
     latitude: "34.01",
     longitude: "-118.49"
   },
   {
-    routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 1" }),
+    routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 01" }),
     routeNotes: "AM",
-    vehicleName: "Van 1",
+    vehicleName: "Van 01",
     driverName: "",
     stopName: "Alex Rivera",
     stopNotes: "2 dogs",
     stopAddress: "123 Ocean Ave, Santa Monica, CA 90401",
-    scheduledArrival: "",
-    scheduledDeparture: "",
+    scheduledArrival: "07/26/2026 07:08",
+    scheduledDeparture: "07/26/2026 07:13",
     routeDate: "2026-07-26",
     stopOrder: 1,
     latitude: "34.02",
     longitude: "-118.50"
   },
   {
-    routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 1" }),
+    routeName: buildRouteName({ date: "2026-07-26", direction: "pickup", vanDisplay: "Van 01" }),
     routeNotes: "AM",
-    vehicleName: "Van 1",
+    vehicleName: "Van 01",
     driverName: "",
     stopName: "Depot",
     stopNotes: "end",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "",
-    scheduledDeparture: "",
+    scheduledArrival: "07/26/2026 07:16",
+    scheduledDeparture: "07/26/2026 07:16",
     routeDate: "2026-07-26",
     stopOrder: 2,
     latitude: "34.01",
@@ -569,8 +587,20 @@ const validation = validateExport({
   csv: built.csv
 });
 assert.equal(validation.ok, true, JSON.stringify(validation.report));
-assert.ok(built.csv.includes("2026-07-26 AM Pickup - Van 1"));
+assert.ok(built.csv.includes("2026-07-26 AM Pickup - Van 01"));
+assert.ok(built.csv.includes("Full Address"));
+assert.ok(built.csv.includes("Scheduled Arrival Time"));
+assert.ok(!built.csv.includes("Route Date"));
+assert.ok(!built.csv.includes("Stop Order"));
 assert.ok(!built.csv.toLowerCase().includes("van 4"));
+// Synthesized schedule stays in America/Los_Angeles civil time.
+const sched = synthesizeStopSchedule({
+  operatingDate: "2026-07-27",
+  direction: "pickup",
+  stopIndex: 0,
+  stopCount: 3
+});
+assert.equal(sched.arrival, "07/27/2026 07:00");
 
 // Dropoff fixture parses
 const dropParsed = parseCsv(dropoffCsv);

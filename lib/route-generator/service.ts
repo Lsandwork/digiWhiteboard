@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { fitdogRouteReportProvider } from "@/lib/route-generator/fitdog-provider";
 import { groupHouseholdsWithFacilities } from "@/lib/route-generator/facility";
@@ -21,9 +19,11 @@ import {
 } from "@/lib/route-generator/optimizer";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import {
-  autoMapSamsaraHeaders,
   buildCsv,
   buildRouteName,
+  formatSamsaraCsvDateTime,
+  getCanonicalSamsaraTemplate,
+  synthesizeStopSchedule,
   validateExport,
   type ExportStopRow,
   type SamsaraTemplate
@@ -1032,17 +1032,9 @@ export async function exportSamsaraCsv(params: {
     throw new Error("Emergency export requires a written reason.");
   }
 
-  const templateCsv = await readFile(
-    path.join(process.cwd(), "scripts/fixtures/route-generator/samsara-template.csv"),
-    "utf8"
-  );
-  const headers = templateCsv.trim().split(/\r?\n/)[0]!.split(",");
-  const template: SamsaraTemplate = {
-    headers,
-    delimiter: ",",
-    encoding: "utf-8",
-    mappings: autoMapSamsaraHeaders(headers)
-  };
+  // Always use Samsara's exact A–K bulk-upload headers. Never trust a stale
+  // DB/fixture alias set — unsupported names fail cloud.samsara.com upload.
+  const template: SamsaraTemplate = getCanonicalSamsaraTemplate();
 
   const vehicles = await listVehicles();
   const vehicleNameByKey = new Map(
@@ -1087,7 +1079,7 @@ export async function exportSamsaraCsv(params: {
       direction,
       vanDisplay: String(route.display_name || vanDisplay)
     });
-    for (const stop of routeStops) {
+    routeStops.forEach((stop, stopIndex) => {
       let stopNotes = String(stop.driver_notes || "");
       if (stop.stop_kind === "customer") {
         const linked = stopItemsByStop.get(String(stop.id)) ?? [];
@@ -1117,22 +1109,46 @@ export async function exportSamsaraCsv(params: {
           stopNotes = `${stopNotes}\nPhone: ${stop.owner_phone_display}`.trim();
         }
       }
+      const stopRecord = stop as Record<string, unknown>;
+      const etaArrival = stopRecord.eta_arrival ? new Date(String(stopRecord.eta_arrival)) : null;
+      const etaDeparture = stopRecord.eta_departure
+        ? new Date(String(stopRecord.eta_departure))
+        : null;
+      const synthesized = synthesizeStopSchedule({
+        operatingDate: String(bundle.plan.operating_date),
+        direction,
+        stopIndex,
+        stopCount: routeStops.length
+      });
+      const scheduledArrival =
+        etaArrival && !Number.isNaN(etaArrival.getTime())
+          ? formatSamsaraCsvDateTime(etaArrival)
+          : synthesized.arrival;
+      const scheduledDeparture =
+        etaDeparture && !Number.isNaN(etaDeparture.getTime())
+          ? formatSamsaraCsvDateTime(etaDeparture)
+          : synthesized.departure;
+      // Prefer stop notes; include route wave context when present.
+      const notesWithRoute =
+        stopNotes.trim() ||
+        `${route.wave_name || ""}`.trim();
       rows.push({
         routeName,
         routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
+        // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
-        driverName: route.driver_name || "",
+        driverName: "",
         stopName: stop.owner_name || stop.stop_kind,
-        stopNotes,
+        stopNotes: notesWithRoute,
         stopAddress: stop.address || "",
-        scheduledArrival: "",
-        scheduledDeparture: "",
+        scheduledArrival,
+        scheduledDeparture,
         routeDate: String(bundle.plan.operating_date),
         stopOrder: Number(stop.sequence),
         latitude: stop.latitude == null ? "" : String(stop.latitude),
         longitude: stop.longitude == null ? "" : String(stop.longitude)
       });
-    }
+    });
   }
 
   const built = buildCsv({ template, rows });
