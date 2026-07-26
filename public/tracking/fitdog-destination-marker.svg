@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80" role="img" aria-label="Fitdog destination">
+  <path d="M32 4C18 4 8 16 8 30c0 18 24 46 24 46s24-28 24-46C56 16 46 4 32 4z" fill="#1BAFC8"/>
+  <circle cx="32" cy="28" r="14" fill="#ffffff"/>
+  <text x="32" y="33" text-anchor="middle" font-size="12" font-family="Arial, sans-serif" fill="#102E66" font-weight="700">FD</text>
+</svg>

@@ -77,6 +77,14 @@ export type PermissionKey =
   | "route_generator.export"
   | "route_generator.manage_settings"
   | "route_generator.view_audit"
+  | "live_tracking.view"
+  | "live_tracking.manage"
+  | "live_tracking.send_test"
+  | "live_tracking.resend_notification"
+  | "live_tracking.disable_session"
+  | "live_tracking.override_eta"
+  | "live_tracking.view_audit"
+  | "live_tracking.manage_settings"
   | "review_management_support"
   | "view_notifications"
   | "respond_to_notifications"
@@ -272,6 +280,14 @@ const ALL_PERMISSIONS = Object.freeze([
   "route_generator.export",
   "route_generator.manage_settings",
   "route_generator.view_audit",
+  "live_tracking.view",
+  "live_tracking.manage",
+  "live_tracking.send_test",
+  "live_tracking.resend_notification",
+  "live_tracking.disable_session",
+  "live_tracking.override_eta",
+  "live_tracking.view_audit",
+  "live_tracking.manage_settings",
   "review_management_support",
   "view_notifications",
   "respond_to_notifications",
@@ -341,7 +357,8 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "manage_gemini_settings",
   "manage_database_tools",
   "reopen_photo_upload_batches",
-  "manage_photo_upload_settings"
+  "manage_photo_upload_settings",
+  "live_tracking.manage_settings"
 ]);
 
 /** Staff file complaints/requests; admin and management review (and may also submit write-ups). */
@@ -401,6 +418,9 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_own_groomer_submissions",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "live_tracking.view",
+  "live_tracking.resend_notification",
+  "live_tracking.send_test",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -455,6 +475,13 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "route_generator.approve",
   "route_generator.export",
   "route_generator.view_audit",
+  "live_tracking.view",
+  "live_tracking.manage",
+  "live_tracking.send_test",
+  "live_tracking.resend_notification",
+  "live_tracking.disable_session",
+  "live_tracking.override_eta",
+  "live_tracking.view_audit",
   "view_hr_hub",
   "use_hr_consult",
   "view_analytics",

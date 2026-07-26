@@ -1,0 +1,10 @@
+{
+  "eventId": "evt-route-eta-1",
+  "eventType": "RouteStopEtaUpdated",
+  "data": {
+    "routeId": "route-abc",
+    "stopId": "stop-xyz",
+    "eta": "2026-07-26T16:20:00.000Z",
+    "vehicleId": "samsara-vehicle-van-1"
+  }
+}

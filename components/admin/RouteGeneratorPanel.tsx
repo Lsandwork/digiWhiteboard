@@ -11,8 +11,19 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { LiveTrackingPanel } from "@/components/admin/LiveTrackingPanel";
+import { DriverRouteWorkflowPanel } from "@/components/admin/DriverRouteWorkflowPanel";
 
-type TabId = "overview" | "pickup" | "dropoff" | "needs_review" | "raw" | "exports" | "audit" | "settings";
+type TabId =
+  | "overview"
+  | "pickup"
+  | "dropoff"
+  | "needs_review"
+  | "raw"
+  | "exports"
+  | "audit"
+  | "live_tracking"
+  | "settings";
 
 type Bootstrap = {
   featureEnabled: boolean;
@@ -287,6 +298,7 @@ export function RouteGeneratorPanel() {
             ["needs_review", "Needs Review"],
             ["raw", "Raw Report"],
             ["exports", "Export History"],
+            ["live_tracking", "Live Tracking"],
             ["settings", "Settings"]
           ] as const
         ).map(([id, label]) => (
@@ -446,6 +458,13 @@ export function RouteGeneratorPanel() {
             <p className="text-sm text-admin-muted">No CSV generated in this session yet.</p>
           )}
         </section>
+      ) : null}
+
+      {tab === "live_tracking" ? (
+        <div className="space-y-4">
+          <LiveTrackingPanel planId={bundle?.plan?.id ?? null} />
+          <DriverRouteWorkflowPanel />
+        </div>
       ) : null}
 
       {tab === "settings" ? (

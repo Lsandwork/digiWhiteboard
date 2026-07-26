@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 80" role="img" aria-label="Fitdog van side view">
+  <rect x="10" y="22" width="120" height="40" rx="10" fill="#ff9f1c" stroke="#102E66" stroke-width="3"/>
+  <rect x="98" y="28" width="28" height="20" rx="4" fill="#d9f3ff" stroke="#102E66" stroke-width="2"/>
+  <rect x="24" y="30" width="60" height="22" rx="4" fill="#fff7ed" stroke="#102E66" stroke-width="2"/>
+  <circle cx="40" cy="64" r="9" fill="#1f2937"/>
+  <circle cx="104" cy="64" r="9" fill="#1f2937"/>
+  <circle cx="54" cy="41" r="7" fill="#68f77f" stroke="#102E66" stroke-width="2"/>
+  <text x="70" y="46" font-size="12" font-family="Arial, sans-serif" fill="#102E66" font-weight="700">Fitdog</text>
+</svg>
