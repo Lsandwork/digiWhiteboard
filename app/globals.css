@@ -5322,6 +5322,14 @@ html.lobby-tv-display .social-video-shell {
   border: 1px solid rgba(100, 185, 220, 0.25);
 }
 
+/* Overview meta row: keep preview the same height as Publish / System Info cards */
+.admin-preview-frame--compact {
+  aspect-ratio: auto;
+  max-height: 9.5rem;
+  min-height: 7.5rem;
+  overflow: hidden;
+}
+
 .admin-preview-frame--lobby {
   background: linear-gradient(180deg, #0b1a24, #132433);
 }

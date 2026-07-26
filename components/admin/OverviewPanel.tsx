@@ -24,7 +24,7 @@ import type { AdminTab } from "@/lib/admin/types";
 
 type OverviewPanelProps = {
   onNavigate?: (tab: AdminTab) => void;
-  /** Publish & Version + System Info shown under Whiteboard & Gingr Health, left → right. */
+  /** Publish & Version, System Info, and compact Live Preview under Whiteboard & Gingr Health. */
   boardMetaPanels?: ReactNode;
 };
 
@@ -379,7 +379,7 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
       </section>
 
       {boardMetaPanels ? (
-        <div className="grid gap-4 md:grid-cols-2">{boardMetaPanels}</div>
+        <div className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-3">{boardMetaPanels}</div>
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
