@@ -196,10 +196,13 @@ export function civilTimeToUtcMs(localIso: string, timeZone: string): number {
   return guess;
 }
 
-/** Escape CSV cell; neutralize formula injection. */
+/** Escape CSV cell; neutralize formula injection without breaking numeric lat/lng. */
 export function escapeCsvCell(value: unknown, delimiter = ","): string {
   let text = value == null ? "" : String(value);
-  if (/^[=+\-@]/.test(text)) text = `'${text}`;
+  // Only neutralize spreadsheet formulas. Do NOT prefix real negative numbers
+  // (Samsara longitude values like -118.49 must stay numeric).
+  const isPlainNumber = /^-?\d+(\.\d+)?$/.test(text.trim());
+  if (!isPlainNumber && /^[=+\-@]/.test(text)) text = `'${text}`;
   const needsQuotes =
     text.includes('"') || text.includes("\n") || text.includes("\r") || text.includes(delimiter);
   if (text.includes('"')) text = text.replace(/"/g, '""');

@@ -511,6 +511,9 @@ assert.equal(JSON.stringify(opt.routes.map((r) => r.vanKey)), JSON.stringify(aga
 
 // Samsara CSV
 assert.equal(escapeCsvCell("=1+1"), "'=1+1");
+assert.equal(escapeCsvCell("-118.4323383"), "-118.4323383", "negative longitude must stay numeric for Samsara");
+assert.equal(escapeCsvCell("34.0447222"), "34.0447222");
+assert.equal(escapeCsvCell("-total dogs"), "'-total dogs");
 const templateHeaders = readFileSync(path.join("scripts/fixtures/route-generator/samsara-template.csv"), "utf8")
   .trim()
   .split("\n")[0]!
