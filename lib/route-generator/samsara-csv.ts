@@ -30,7 +30,9 @@ const FIELD_GETTERS: Record<string, (row: ExportStopRow) => string | number> = {
   driver: (r) => r.driverName,
   stop_name: (r) => r.stopName,
   stop_notes: (r) => r.stopNotes,
+  notes: (r) => r.stopNotes,
   stop_address: (r) => r.stopAddress,
+  full_address: (r) => r.stopAddress,
   address: (r) => r.stopAddress,
   scheduled_arrival: (r) => r.scheduledArrival,
   scheduled_departure: (r) => r.scheduledDeparture,
@@ -40,26 +42,115 @@ const FIELD_GETTERS: Record<string, (row: ExportStopRow) => string | number> = {
   longitude: (r) => r.longitude
 };
 
+/**
+ * Map Samsara bulk-upload headers (columns A–K from the dashboard sample) to export fields.
+ * Unsupported / unused columns (e.g. Address Name when using raw lat/lng) map to null.
+ */
 export function autoMapSamsaraHeaders(headers: string[]): Record<string, string | null> {
   const mapping: Record<string, string | null> = {};
   for (const header of headers) {
-    const h = header.toLowerCase();
+    const h = header.toLowerCase().trim();
     if (/route.?name/.test(h)) mapping[header] = "route_name";
     else if (/route.?note/.test(h)) mapping[header] = "route_notes";
+    else if (/full.?address/.test(h)) mapping[header] = "full_address";
+    else if (/address.?name/.test(h)) mapping[header] = null; // address-book mode; leave blank for raw
+    else if (/^notes$/.test(h) || /stop.?note/.test(h)) mapping[header] = "stop_notes";
     else if (/vehicle/.test(h)) mapping[header] = "assigned_vehicle";
     else if (/driver/.test(h)) mapping[header] = "assigned_driver";
-    else if (/stop.?name|name/.test(h) && /stop/.test(h)) mapping[header] = "stop_name";
-    else if (/stop.?note/.test(h)) mapping[header] = "stop_notes";
+    else if (/stop.?name/.test(h)) mapping[header] = "stop_name";
     else if (/address/.test(h)) mapping[header] = "stop_address";
     else if (/arrival/.test(h)) mapping[header] = "scheduled_arrival";
     else if (/departure/.test(h)) mapping[header] = "scheduled_departure";
     else if (/date/.test(h)) mapping[header] = "route_date";
     else if (/order|sequence/.test(h)) mapping[header] = "stop_order";
-    else if (/lat/.test(h)) mapping[header] = "latitude";
-    else if (/lng|lon/.test(h)) mapping[header] = "longitude";
+    else if (/^lat/.test(h)) mapping[header] = "latitude";
+    else if (/^(lng|lon)/.test(h)) mapping[header] = "longitude";
     else mapping[header] = null;
   }
   return mapping;
+}
+
+/** Format a Date for Samsara route CSV upload in org-local wall time. */
+export function formatSamsaraCsvDateTime(date: Date, timeZone = "America/Los_Angeles"): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((p) => p.type === type)?.value ?? "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${get("month")}/${get("day")}/${get("year")} ${hour}:${get("minute")}`;
+}
+
+/**
+ * Build spaced stop arrival/departure times for a route when ETAs were not persisted.
+ * Pickup defaults to 07:00 PT; drop-off defaults to 15:30 PT.
+ */
+export function synthesizeStopSchedule(params: {
+  operatingDate: string; // YYYY-MM-DD
+  direction: "pickup" | "dropoff";
+  stopIndex: number;
+  stopCount: number;
+  minutesPerStop?: number;
+}): { arrival: string; departure: string } {
+  const minutesPerStop = params.minutesPerStop ?? 8;
+  const startHour = params.direction === "pickup" ? 7 : 15;
+  const startMinute = params.direction === "pickup" ? 0 : 30;
+  const localStamp = `${params.operatingDate}T${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}:00`;
+  const startMs = civilTimeToUtcMs(localStamp, "America/Los_Angeles");
+  const arriveMs = startMs + params.stopIndex * minutesPerStop * 60_000;
+  const departMs =
+    arriveMs + (params.stopIndex === params.stopCount - 1 ? 0 : Math.min(5, minutesPerStop) * 60_000);
+  return {
+    arrival: formatSamsaraCsvDateTime(new Date(arriveMs)),
+    departure: formatSamsaraCsvDateTime(new Date(departMs))
+  };
+}
+
+/** Convert a civil local datetime `YYYY-MM-DDTHH:mm:ss` in `timeZone` to UTC epoch ms. */
+export function civilTimeToUtcMs(localIso: string, timeZone: string): number {
+  const m = localIso.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/
+  );
+  if (!m) throw new Error(`Invalid civil time: ${localIso}`);
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  const second = Number(m[6] ?? 0);
+  // Guess UTC, then correct using the timezone offset at that instant.
+  let guess = Date.UTC(year, month - 1, day, hour, minute, second);
+  for (let i = 0; i < 3; i += 1) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }).formatToParts(new Date(guess));
+    const get = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((p) => p.type === type)?.value ?? "0");
+    const asUtc = Date.UTC(
+      get("year"),
+      get("month") - 1,
+      get("day"),
+      get("hour") === 24 ? 0 : get("hour"),
+      get("minute"),
+      get("second")
+    );
+    const desired = Date.UTC(year, month - 1, day, hour, minute, second);
+    guess += desired - asUtc;
+  }
+  return guess;
 }
 
 /** Escape CSV cell; neutralize formula injection. */

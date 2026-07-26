@@ -24,6 +24,8 @@ import {
   autoMapSamsaraHeaders,
   buildCsv,
   buildRouteName,
+  formatSamsaraCsvDateTime,
+  synthesizeStopSchedule,
   validateExport,
   type ExportStopRow,
   type SamsaraTemplate
@@ -1087,7 +1089,7 @@ export async function exportSamsaraCsv(params: {
       direction,
       vanDisplay: String(route.display_name || vanDisplay)
     });
-    for (const stop of routeStops) {
+    routeStops.forEach((stop, stopIndex) => {
       let stopNotes = String(stop.driver_notes || "");
       if (stop.stop_kind === "customer") {
         const linked = stopItemsByStop.get(String(stop.id)) ?? [];
@@ -1117,22 +1119,46 @@ export async function exportSamsaraCsv(params: {
           stopNotes = `${stopNotes}\nPhone: ${stop.owner_phone_display}`.trim();
         }
       }
+      const stopRecord = stop as Record<string, unknown>;
+      const etaArrival = stopRecord.eta_arrival ? new Date(String(stopRecord.eta_arrival)) : null;
+      const etaDeparture = stopRecord.eta_departure
+        ? new Date(String(stopRecord.eta_departure))
+        : null;
+      const synthesized = synthesizeStopSchedule({
+        operatingDate: String(bundle.plan.operating_date),
+        direction,
+        stopIndex,
+        stopCount: routeStops.length
+      });
+      const scheduledArrival =
+        etaArrival && !Number.isNaN(etaArrival.getTime())
+          ? formatSamsaraCsvDateTime(etaArrival)
+          : synthesized.arrival;
+      const scheduledDeparture =
+        etaDeparture && !Number.isNaN(etaDeparture.getTime())
+          ? formatSamsaraCsvDateTime(etaDeparture)
+          : synthesized.departure;
+      // Prefer stop notes; include route wave context when present.
+      const notesWithRoute =
+        stopNotes.trim() ||
+        `${route.wave_name || ""}`.trim();
       rows.push({
         routeName,
         routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
+        // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
-        driverName: route.driver_name || "",
+        driverName: "",
         stopName: stop.owner_name || stop.stop_kind,
-        stopNotes,
+        stopNotes: notesWithRoute,
         stopAddress: stop.address || "",
-        scheduledArrival: "",
-        scheduledDeparture: "",
+        scheduledArrival,
+        scheduledDeparture,
         routeDate: String(bundle.plan.operating_date),
         stopOrder: Number(stop.sequence),
         latitude: stop.latitude == null ? "" : String(stop.latitude),
         longitude: stop.longitude == null ? "" : String(stop.longitude)
       });
-    }
+    });
   }
 
   const built = buildCsv({ template, rows });
