@@ -1,27 +1,48 @@
-# Route Generator — shadow-mode-checklist
+# Route Generator — shadow-mode checklist
 
-See also: [README](./README.md)
+Status as of automated setup run (2026-07-26). Production flags remain **disabled**.
 
-## Summary
-Production Route Generator for staff.ruffops.com: Fitdog report pull → normalize → optimize (Van 1/2/3/5/6 only) → approve → Samsara CSV.
+## Completed by agent
 
-## Key paths
-- UI: `components/admin/RouteGeneratorPanel.tsx`
-- API: `app/api/admin/route-generator/route.ts`
-- Domain: `lib/route-generator/`
-- Migration: `supabase/migrations/045_route_generator.sql`
-- Worker: `services/route-worker/`
-- Fixtures: `scripts/fixtures/route-generator/`
-- Tests: `npm run test:route-generator`
+- [x] Migration `045_route_generator.sql` applied to production Supabase
+- [x] Depot address seeded from official Fitdog contact page + geocoded (`verified=false`)
+- [x] Provisional van capacities seeded for Van 1/2/3/5/6 (`capacity_configured=false`)
+- [x] Service aliases seeded (canonical + common variants)
+- [x] Fixture Samsara template uploaded and marked active/validated
+- [x] Local route-worker `/health` OK
+- [x] Fixture report parse → optimize → CSV validation smoke passed
+- [x] Feature checklist stored in `route_generator_settings.feature_checklist`
 
-## Feature flags
-`ROUTE_GENERATOR_ENABLED`, `FITDOG_REPORT_SYNC_ENABLED`, `ROUTE_OPTIMIZATION_ENABLED`, `SAMSARA_CSV_EXPORT_ENABLED`, `SAMSARA_DIRECT_SYNC_ENABLED`
+## Must be completed by Fitdog Super Admin before enabling flags
 
-## Roles
-Super Admin, Admin, Management only. Server-side RBAC on every endpoint.
+- [ ] Open **Route Generator → Settings** and verify depot address/lat/lng (`verified=true`)
+- [ ] Confirm real van capacities / Samsara vehicle names; set `capacity_configured=true` for each active van
+- [ ] Review service aliases against a live Fitdog report
+- [ ] Add `GOOGLE_MAPS_API_KEY` (and optionally Mapbox) in Vercel
+- [ ] Deploy `services/route-worker` to a durable host; set `ROUTE_WORKER_URL` + signing secrets on Vercel
+- [ ] Connect real Fitdog report (API/CSV/browser worker) and pass connection test
+- [ ] Upload current Samsara bulk-upload sample CSV from the company Samsara dashboard (replace fixture)
+- [ ] Pull a real report for an operating date and compare against Hub Coordinator manual routes
+- [ ] Complete shadow comparison notes (van assignment %, sequence similarity, mileage delta)
+- [ ] Only then set:
 
-## Van 4
-Never generate, display, assign, import, or reference Van 4.
+```bash
+ROUTE_GENERATOR_ENABLED=true
+FITDOG_REPORT_SYNC_ENABLED=true   # after live Fitdog connection works
+ROUTE_OPTIMIZATION_ENABLED=true   # after worker URL is live
+SAMSARA_CSV_EXPORT_ENABLED=true   # after company template uploaded
+# keep SAMSARA_DIRECT_SYNC_ENABLED=false unless intentionally adopting API sync
+```
 
-## Notes for shadow-mode-checklist
-Document operational details for **shadow-mode-checklist** in this file as the feature is rolled out. Live Fitdog credentials and the current Samsara sample template must be validated by Fitdog before claiming production verification.
+## Explicitly not done (and why)
+
+| Item | Blocker |
+|---|---|
+| Vercel env / production flags | No Vercel token in this agent environment |
+| Hosted route-worker deploy | No Railway/Render/Fly credentials |
+| Real Fitdog report sync | `FITDOG_API_BASE_URL` / `FITDOG_API_TOKEN` empty; report selectors not authorized |
+| Company Samsara template | Only fixture template available |
+| Maps provider | `GOOGLE_MAPS_API_KEY` missing |
+| Production enablement | Checklist incomplete by design |
+
+Do **not** claim Fitdog or Samsara production verification until the Super Admin items above are finished with real credentials and a live route day.

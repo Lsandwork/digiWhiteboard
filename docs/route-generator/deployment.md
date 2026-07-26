@@ -1,27 +1,66 @@
 # Route Generator — deployment
 
-See also: [README](./README.md)
+## Applied in production Supabase (2026-07-26)
 
-## Summary
-Production Route Generator for staff.ruffops.com: Fitdog report pull → normalize → optimize (Van 1/2/3/5/6 only) → approve → Samsara CSV.
+- [x] `supabase/migrations/045_route_generator.sql` applied via `npm run db:push -- 045_route_generator.sql`
+- [x] Shadow setup script seeded depot (official public Fitdog address), provisional van capacities, service aliases, fixture Samsara template
+- [x] Local `services/route-worker` health-checked on `127.0.0.1:8091`
+- [x] Fixture shadow smoke: report parse → optimize → CSV validation passed
+- [ ] Production Vercel env flags remain **off** until Super Admin completes checklist below
 
-## Key paths
-- UI: `components/admin/RouteGeneratorPanel.tsx`
-- API: `app/api/admin/route-generator/route.ts`
-- Domain: `lib/route-generator/`
-- Migration: `supabase/migrations/045_route_generator.sql`
-- Worker: `services/route-worker/`
-- Fixtures: `scripts/fixtures/route-generator/`
-- Tests: `npm run test:route-generator`
+## Operator commands
 
-## Feature flags
-`ROUTE_GENERATOR_ENABLED`, `FITDOG_REPORT_SYNC_ENABLED`, `ROUTE_OPTIMIZATION_ENABLED`, `SAMSARA_CSV_EXPORT_ENABLED`, `SAMSARA_DIRECT_SYNC_ENABLED`
+```bash
+# Apply only migration 045 (do not use db:push:all if older migrations fail)
+npm run db:push -- 045_route_generator.sql
 
-## Roles
-Super Admin, Admin, Management only. Server-side RBAC on every endpoint.
+# Seed depot / provisional vans / aliases / Samsara fixture template
+npx tsx scripts/setup-route-generator-shadow.ts
 
-## Van 4
-Never generate, display, assign, import, or reference Van 4.
+# Fixture shadow smoke (no service-role key required)
+npx tsx scripts/run-route-generator-shadow-smoke.ts
 
-## Notes for deployment
-Document operational details for **deployment** in this file as the feature is rolled out. Live Fitdog credentials and the current Samsara sample template must be validated by Fitdog before claiming production verification.
+# Local worker
+set -a; source .env.route-worker.local; set +a
+cd services/route-worker && uvicorn app.main:app --host 0.0.0.0 --port 8091
+```
+
+## Vercel env still required (not settable from this agent)
+
+Paste into Vercel Project → Settings → Environment Variables (Production):
+
+| Variable | Value |
+|---|---|
+| `ROUTE_GENERATOR_ENABLED` | `false` until checklist complete |
+| `FITDOG_REPORT_SYNC_ENABLED` | `false` until real Fitdog report connection works |
+| `ROUTE_OPTIMIZATION_ENABLED` | `false` until worker URL is live |
+| `SAMSARA_CSV_EXPORT_ENABLED` | `false` until company Samsara template uploaded |
+| `SAMSARA_DIRECT_SYNC_ENABLED` | `false` |
+| `GOOGLE_MAPS_API_KEY` | company Maps key |
+| `MAPS_PROVIDER` | `google` |
+| `ROUTE_WORKER_URL` | public worker URL after deploy |
+| `ROUTE_WORKER_SIGNING_SECRET` | from `.env.route-worker.local` |
+| `ROUTE_WORKER_CALLBACK_SECRET` | from `.env.route-worker.local` |
+
+Worker secrets were generated to **`.env.route-worker.local`** (gitignored).
+
+## Deploy route-worker (hosting credentials not available here)
+
+Deploy `services/route-worker` to Railway / Render / Fly.io / Cloud Run:
+
+1. Build with `services/route-worker/Dockerfile`
+2. Set `ROUTE_WORKER_SIGNING_SECRET` (same as Vercel)
+3. Optionally set `ROUTE_WORKER_CALLBACK_SECRET`
+4. Expose HTTPS URL → set `ROUTE_WORKER_URL` on Vercel
+5. Confirm `GET /health` returns `{ "status": "ok" }`
+
+## Fitdog / Samsara
+
+- Fitdog report connection remains **fixture** until Super Admin completes Connect Fitdog with authorized report selectors / API token.
+- Active Samsara template is the **fixture** sample. Replace by uploading the current company Samsara bulk-upload CSV in Route Generator settings before production export.
+- Depot address seeded from public Fitdog contact page (`1712 21st Street, Santa Monica, CA 90404`) with geocode — **`verified: false`** until Super Admin confirms.
+- Van capacities are provisional placeholders with **`capacity_configured: false`** until Super Admin confirms real numbers.
+
+## Do not enable production yet
+
+Keep all production flags false until shadow-mode checklist in [shadow-mode-checklist.md](./shadow-mode-checklist.md) is complete.
