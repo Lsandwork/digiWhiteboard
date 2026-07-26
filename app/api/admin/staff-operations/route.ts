@@ -23,6 +23,7 @@ import {
   deleteStaffDirectoryMember,
   createOwnerFollowUp,
   listStaffOps,
+  clearStaffInboxNotifications,
   markAllStaffNotificationsRead,
   markStaffNotificationRead,
   moveCrossoverMessages,
@@ -54,7 +55,11 @@ const CROSSOVER_ACTIONS = new Set([
   "move_crossover",
   "bulk_update_crossover"
 ]);
-const NOTIFICATION_ACTIONS = new Set(["mark_notification_read", "mark_all_notifications_read"]);
+const NOTIFICATION_ACTIONS = new Set([
+  "mark_notification_read",
+  "mark_all_notifications_read",
+  "clear_inbox_notifications"
+]);
 const STAFF_OPS_VIEW_PERMISSIONS = ["view_front_desk_log", "view_owner_follow_up", "view_active_issues"] as const;
 
 function canViewStaffOps(role: string | null, session: ReturnType<typeof getAdminSessionFromRequest>) {
@@ -265,6 +270,19 @@ export async function POST(request: Request) {
         notifications: notificationsForSession(nextState, readerSession)
       };
       auditAction = "staff.notification.read_all";
+    } else if (action === "clear_inbox_notifications") {
+      const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
+      const readerSession = {
+        email: session?.email ?? null,
+        adminUserId: session?.adminUserId ?? null,
+        role: role ?? null
+      };
+      const nextState = await clearStaffInboxNotifications(supabase, readerKey, readerSession);
+      result = {
+        ...nextState,
+        notifications: notificationsForSession(nextState, readerSession)
+      };
+      auditAction = "staff.notification.clear_inbox";
     } else {
       return NextResponse.json({ error: "Unsupported Staff Admin action." }, { status: 400 });
     }

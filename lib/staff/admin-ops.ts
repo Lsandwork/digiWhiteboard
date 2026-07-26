@@ -12,6 +12,7 @@ import {
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
+  clearInboxNotificationsKeepingAssigned,
   dispatchStaffOpsNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -1549,6 +1550,17 @@ export async function markAllStaffNotificationsRead(
 ) {
   const state = await loadState(supabase);
   const next = markAllNotificationsRead(state, readerKey, session);
+  await saveState(supabase, next);
+  return next;
+}
+
+export async function clearStaffInboxNotifications(
+  supabase: SupabaseClient,
+  readerKey: string,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  const state = await loadState(supabase);
+  const next = clearInboxNotificationsKeepingAssigned(state, readerKey, session);
   await saveState(supabase, next);
   return next;
 }

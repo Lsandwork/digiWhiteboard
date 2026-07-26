@@ -54,6 +54,7 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<BellPayload | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
   const lastWalkSignatureRef = useRef<string>("");
   const audioUnlockedRef = useRef(false);
 
@@ -111,6 +112,26 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
     if (audioUnlockedRef.current) return;
     audioUnlockedRef.current = true;
     await unlockStaffPushNoticeAudio();
+  }
+
+  async function clearInbox() {
+    if (clearing) return;
+    setClearing(true);
+    try {
+      const response = await fetch("/api/admin/notification-bell", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "clear_inbox" })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Unable to clear inbox.");
+      showToast("Inbox cleared. Assigned alerts stay open.", "success");
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to clear inbox.", "error");
+    } finally {
+      setClearing(false);
+    }
   }
 
   async function postWalkAction(action: "snooze" | "mark_walked", alert: BellWalkAlert) {
@@ -264,9 +285,20 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
           <section className="admin-notification-bell__section">
             <div className="admin-notification-bell__section-head">
               <h3>Inbox</h3>
-              {data?.unreadCount ? (
-                <span className="admin-notification-bell__chip">{data.unreadCount} unread</span>
-              ) : null}
+              <div className="admin-notification-bell__section-actions">
+                {data?.unreadCount ? (
+                  <span className="admin-notification-bell__chip">{data.unreadCount} unread</span>
+                ) : null}
+                <button
+                  type="button"
+                  className="admin-notification-bell__clear"
+                  disabled={clearing || !data?.unreadCount}
+                  title="Clear inbox notifications. Alerts assigned to you stay open."
+                  onClick={() => void clearInbox()}
+                >
+                  {clearing ? "Clearing…" : "Clear"}
+                </button>
+              </div>
             </div>
             {recent.length === 0 ? (
               <p className="admin-notification-bell__empty">

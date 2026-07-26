@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import {
+  clearInboxNotificationsKeepingAssigned,
+  countUnreadNotifications,
   filterPersonalNotificationsForUser,
+  notificationReaderKey,
   notificationsForSession,
   sessionCanAccessNotification,
   usesPersonalNotificationsOnly,
@@ -140,5 +143,36 @@ const personalSam = filterPersonalNotificationsForUser(state, {
 });
 assert.equal(personalSam.some((n) => n.id === "coord-pool"), false);
 assert.equal(personalSam.some((n) => n.id === "front-desk-dept"), false);
+
+// Clear inbox keeps assignment alerts for that user unread.
+{
+  const clearState = makeState([
+    notif({
+      id: "pool-noise",
+      target: { kind: "admin_pool" },
+      type: "escalation",
+      title: "Active issue updated"
+    }),
+    notif({
+      id: "assigned-alex",
+      target: { kind: "staff_name", name: "Alex Trainer" },
+      type: "assignment",
+      title: "Assigned to Alex",
+      assigned_to: "Alex Trainer"
+    }),
+    notif({
+      id: "mention-alex",
+      target: { kind: "staff_email", email: "alex@fitdog.com" },
+      type: "mention",
+      title: "Mentioned Alex"
+    })
+  ]);
+  const session = { email: "alex@fitdog.com", adminUserId: "admin-alex", role: "trainer" as const };
+  const readerKey = notificationReaderKey(session.email, session.adminUserId);
+  const cleared = clearInboxNotificationsKeepingAssigned(clearState, readerKey, session);
+  assert.equal(countUnreadNotifications(cleared, session), 1, "only assigned alert stays unread");
+  const remaining = notificationsForSession(cleared, session).filter((n) => !n.read_by.includes(readerKey));
+  assert.deepEqual(remaining.map((n) => n.id), ["assigned-alex"]);
+}
 
 console.log("notification privacy tests passed");
