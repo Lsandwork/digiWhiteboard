@@ -22,6 +22,17 @@ Route-eligible services (canonicalized):
 
 Each scheduled product becomes a pickup row and a drop-off row with real owner, dog, address, windows, and size (mapped from Fitdog weight buckets).
 
+## Van start / end destinations
+| Van | Pickup | Drop-off | Services |
+|-----|--------|----------|----------|
+| 1, 2 | Fitdog Westwood Hub → Kenneth Hahn Trail | Kenneth Hahn Trail → Hub | Adventure Hike |
+| 3 | Hub → Huntington Dog Beach | Huntington Dog Beach → Hub | Beach Excursion |
+| 5, 6 | Overflow (destination follows services) | Overflow | Outing + club services |
+
+Dogs with a Fitdog Club/HQ address (or Fitdog-marked location) do **not** get a home stop. They are added as a **Fitdog Club** mid-route stop and still count on the outing van.
+
+Stop labels use dog names (`Remy Jaeger`, `Bruno + Ollie`).
+
 ## Required env
 - `FITDOG_EMPLOYEE_EMAIL`
 - `FITDOG_EMPLOYEE_PASSWORD`
