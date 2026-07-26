@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -24,6 +24,8 @@ import type { AdminTab } from "@/lib/admin/types";
 
 type OverviewPanelProps = {
   onNavigate?: (tab: AdminTab) => void;
+  /** Publish & Version + System Info shown under Whiteboard & Gingr Health, left → right. */
+  boardMetaPanels?: ReactNode;
 };
 
 type AlertFilter = "all" | "high" | "unassigned" | "overdue";
@@ -108,7 +110,7 @@ function priorityDot(priority: OverviewAlert["priority"]) {
   return "bg-amber-400";
 }
 
-export function OverviewPanel({ onNavigate }: OverviewPanelProps) {
+export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProps) {
   const { showToast } = useToast();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -375,6 +377,10 @@ export function OverviewPanel({ onNavigate }: OverviewPanelProps) {
           </table>
         </div>
       </section>
+
+      {boardMetaPanels ? (
+        <div className="grid gap-4 md:grid-cols-2">{boardMetaPanels}</div>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-5">
