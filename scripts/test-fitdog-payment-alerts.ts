@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { accessFromLegacyRole, canAccessAdminTab } from "../lib/admin/permissions";
 import { canManageFitdogAlerts, canViewFitdogAlerts } from "../lib/fitdog-ops/access";
-import { classifyPaymentFailure, serviceIsCovered } from "../lib/fitdog-ops/classify";
+import { classifyPaymentFailure, serviceIsCovered, severityForAlertType } from "../lib/fitdog-ops/classify";
 import { buildFitdogIdempotencyKey } from "../lib/fitdog-ops/idempotency";
 import {
   formatFitdogAlertType,
@@ -361,7 +361,32 @@ import { sanitizeFitdogPayload } from "../lib/fitdog-ops/sanitize";
   );
 }
 
-// 15. Activity-stream noise filter keeps declined/cancel/vax/docs, drops address/notes clutter.
+// 15. Declined Payments are always critical severity for urgent staff alerting.
+{
+  assert.equal(severityForAlertType("CARD_DECLINED"), "critical");
+  const parsed = parseFitdogNotification({
+    id: "declined-urgent",
+    text: "Lucia Atwood class, Reliable Recall, on 07/24/2026 Jake was cancelled due to their credit card being declined. Try to call the customer to reschedule class."
+  });
+  const result = reconcileFitdogSnapshot(
+    {
+      notifications: [
+        {
+          id: parsed.id,
+          text: parsed.text,
+          detected_at: new Date().toISOString(),
+          source_url: "https://app.fitdog.com/dashboard"
+        }
+      ]
+    },
+    { graceMinutes: 60 }
+  );
+  const declined = result.createOrUpdate.find((row) => row.alert_type === "CARD_DECLINED");
+  assert.ok(declined);
+  assert.equal(declined?.severity, "critical");
+}
+
+// 16. Activity-stream noise filter keeps declined/cancel/vax/docs, drops address/notes clutter.
 {
   assert.equal(
     isUsefulFitdogActivity(

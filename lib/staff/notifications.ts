@@ -71,6 +71,8 @@ export type StaffOpsNotificationEvent = {
   toDepartment?: string | null;
   mentionText?: string | null;
   actor: string | null;
+  /** Fan out personal alerts to active Front Desk Coordinators (they use personal inbox only). */
+  notifyFrontDeskCoordinators?: boolean;
 };
 
 const MAX_NOTIFICATIONS = 400;
@@ -270,6 +272,24 @@ export function dispatchStaffOpsNotifications(state: StaffOpsState, event: Staff
 
   if (shouldAlert && event.toDepartment) {
     created.push(buildNotification(event, { kind: "department_pool", department: event.toDepartment }, "escalation"));
+  }
+
+  if (event.notifyFrontDeskCoordinators) {
+    const seen = new Set<string>();
+    for (const member of state.staff_directory) {
+      if (member.status !== "Active" || member.dashboard_role !== "front_desk_coordinator") continue;
+      const email = member.email?.trim().toLowerCase();
+      if (email) {
+        if (seen.has(`email:${email}`)) continue;
+        seen.add(`email:${email}`);
+        created.push(buildNotification(event, { kind: "staff_email", email }, "escalation"));
+        continue;
+      }
+      const name = member.name?.trim();
+      if (!name || seen.has(`name:${name}`)) continue;
+      seen.add(`name:${name}`);
+      created.push(buildNotification(event, { kind: "staff_name", name }, "escalation"));
+    }
   }
 
   const existing = state.notifications ?? [];

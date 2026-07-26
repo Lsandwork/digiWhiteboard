@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   clearInboxNotificationsKeepingAssigned,
   countUnreadNotifications,
+  dispatchStaffOpsNotifications,
   filterPersonalNotificationsForUser,
   notificationReaderKey,
   notificationsForSession,
@@ -173,6 +174,44 @@ assert.equal(personalSam.some((n) => n.id === "front-desk-dept"), false);
   assert.equal(countUnreadNotifications(cleared, session), 1, "only assigned alert stays unread");
   const remaining = notificationsForSession(cleared, session).filter((n) => !n.read_by.includes(readerKey));
   assert.deepEqual(remaining.map((n) => n.id), ["assigned-alex"]);
+}
+
+// Declined Payment urgent alerts reach admin pool + each Front Desk Coordinator personally.
+{
+  const declinedState = makeState([]);
+  const next = dispatchStaffOpsNotifications(declinedState, {
+    eventType: "created",
+    sourceTable: "operations_alerts",
+    sourceId: "alert-declined-1",
+    sourceTab: "fitdog_alerts",
+    title: "Declined Payment · Pat Owner",
+    body: "Card declined",
+    priority: "Critical",
+    urgent: true,
+    needsManagementReview: true,
+    notifyFrontDeskCoordinators: true,
+    toDepartment: "Front Desk",
+    actor: "Fitdog Sync"
+  });
+  assert.ok(
+    next.notifications.some((n) => n.target.kind === "admin_pool"),
+    "admin/management pool receives declined payment"
+  );
+  assert.ok(
+    next.notifications.some(
+      (n) => n.target.kind === "staff_email" && n.target.email === "sam@fitdog.com"
+    ),
+    "front desk coordinator receives personal declined payment alert"
+  );
+  const samInbox = notificationsForSession(next, {
+    email: "sam@fitdog.com",
+    adminUserId: "admin-sam",
+    role: "front_desk_coordinator"
+  });
+  assert.ok(
+    samInbox.some((n) => n.source_id === "alert-declined-1"),
+    "front desk coordinator can see declined payment in personal inbox"
+  );
 }
 
 console.log("notification privacy tests passed");
