@@ -26,6 +26,10 @@
     {
       "path": "/api/cron/track-incidents-sync",
       "schedule": "5 12,13 * * *"
+    },
+    {
+      "path": "/api/cron/fitdog-sync",
+      "schedule": "*/8 * * * *"
     }
   ]
 }
