@@ -685,20 +685,46 @@ html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .adm
   background: #e2e8f0 !important;
 }
 
-/* Keep primary CTA labels white on orange buttons */
+/* Light theme: white labels on orange primary CTAs */
 html[data-theme="light"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
     .admin-btn-primary,
     .crossover-btn--primary,
-    .admin-btn-primary *,
-    .crossover-btn--primary *
-  ),
+    .admin-btn-primary *:not(img):not(.fitdog-dash-icon),
+    .crossover-btn--primary *:not(img):not(.fitdog-dash-icon)
+  ) {
+  color: #ffffff !important;
+}
+
+/* Clear theme: dark navy labels on light-blue primary CTAs */
 html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
     .admin-btn-primary,
     .crossover-btn--primary,
-    .admin-btn-primary *,
-    .crossover-btn--primary *
+    .admin-btn-primary *:not(img):not(.fitdog-dash-icon),
+    .crossover-btn--primary *:not(img):not(.fitdog-dash-icon)
   ) {
-  color: #ffffff !important;
+  color: #12213a !important;
+}
+
+html[data-theme="clear"] .admin-theme :is(.admin-main, .admin-content-main, .admin-drawer-panel, .admin-modal) :is(
+    .admin-btn-secondary,
+    .crossover-btn--outline,
+    .crossover-btn--ghost,
+    .admin-btn-secondary *:not(img):not(.fitdog-dash-icon),
+    .crossover-btn--outline *:not(img):not(.fitdog-dash-icon),
+    .crossover-btn--ghost *:not(img):not(.fitdog-dash-icon)
+  ) {
+  color: #12213a !important;
+}
+
+/* Header brand + page chrome in clear/light */
+html[data-theme="clear"] .admin-theme .admin-header :is(.text-white, [class*="text-white/"], .admin-header-brand p),
+html[data-theme="light"] .admin-theme .admin-header :is(.text-white, [class*="text-white/"], .admin-header-brand p:not(.admin-header-brand__label)) {
+  color: #12213a !important;
+}
+
+html[data-theme="clear"] .admin-theme .admin-header .admin-header-brand__label,
+html[data-theme="light"] .admin-theme .admin-header .admin-header-brand__label {
+  color: var(--fitdog-orange, #ff6f26) !important;
 }
 
 /* Clear sidebar must remain light-on-dark after content remaps */

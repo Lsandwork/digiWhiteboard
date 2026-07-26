@@ -41,6 +41,20 @@ html[data-theme="light"] .admin-theme .admin-btn-primary {
   color: #ffffff;
 }
 
+/* Clear: keep dark navy labels on light-blue CTAs (loaded last for specificity) */
+html[data-theme="clear"] .admin-theme .crossover-btn--primary,
+html[data-theme="clear"] .admin-theme .admin-btn-primary {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: linear-gradient(180deg, #dbeafe 0%, #bfdbfe 58%, #93c5fd 100%);
+  color: #12213a;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
+}
+
+html[data-theme="clear"] .admin-theme .crossover-btn--primary:hover:not(:disabled),
+html[data-theme="clear"] .admin-theme .admin-btn-primary:hover:not(:disabled) {
+  color: #0f172a;
+}
+
 /* Filter chips */
 .admin-filter-chip--active {
   border-color: rgba(255, 111, 38, 0.45);

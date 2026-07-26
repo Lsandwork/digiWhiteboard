@@ -149,19 +149,23 @@ html[data-theme="clear"] .crossover-select {
   color: var(--fitdog-text);
 }
 
-/* Light blue action buttons (not dark navy, not green) */
+/*
+ * Clear CTAs: light blue fill + dark navy label (white-on-sky failed contrast).
+ * Secondary buttons stay white with dark text; light PNG icons are darkened below.
+ */
 html[data-theme="clear"] .admin-btn-primary,
 html[data-theme="clear"] .crossover-btn--primary {
-  border-color: rgba(69, 166, 255, 0.55);
-  background: linear-gradient(180deg, #6bb8ff, #45a6ff 58%, #2f93ef);
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(69, 166, 255, 0.28);
+  border-color: rgba(37, 99, 235, 0.35);
+  background: linear-gradient(180deg, #dbeafe, #bfdbfe 58%, #93c5fd);
+  color: #12213a;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
 }
 
 html[data-theme="clear"] .admin-btn-primary:hover:not(:disabled),
 html[data-theme="clear"] .crossover-btn--primary:hover:not(:disabled) {
-  filter: brightness(1.05);
-  box-shadow: 0 10px 22px rgba(69, 166, 255, 0.34);
+  filter: brightness(0.98);
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.22);
+  color: #0f172a;
 }
 
 html[data-theme="clear"] .admin-btn-secondary,
@@ -169,8 +173,17 @@ html[data-theme="clear"] .crossover-btn--ghost,
 html[data-theme="clear"] .crossover-btn--outline {
   border-color: var(--fitdog-border);
   background: #ffffff;
-  color: var(--fitdog-text);
+  color: #12213a;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+/* Near-white dashboard PNGs → dark ink on clear light buttons */
+html[data-theme="clear"] .admin-btn-primary .fitdog-dash-icon,
+html[data-theme="clear"] .admin-btn-secondary .fitdog-dash-icon,
+html[data-theme="clear"] .crossover-btn--primary .fitdog-dash-icon,
+html[data-theme="clear"] .crossover-btn--outline .fitdog-dash-icon,
+html[data-theme="clear"] .crossover-btn--ghost .fitdog-dash-icon {
+  filter: brightness(0) saturate(100%) opacity(0.82);
 }
 
 html[data-theme="clear"] .admin-btn-secondary:hover:not(:disabled),
@@ -272,17 +285,11 @@ html[data-theme="clear"] .crossover-stat-card {
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
-html[data-theme="clear"] .crossover-btn--primary {
-  border-color: rgba(249, 115, 22, 0.45);
-  background: linear-gradient(180deg, #fb923c, #f97316 58%, #ea580c);
-  color: #ffffff;
-}
-
 html[data-theme="clear"] .crossover-btn--outline,
 html[data-theme="clear"] .crossover-btn--ghost {
   border-color: #cbd5e1;
   background: #ffffff;
-  color: #334155;
+  color: #12213a;
 }
 
 html[data-theme="clear"] .crossover-btn--outline:hover:not(:disabled),
