@@ -212,7 +212,7 @@ export function FitdogAlertsPanel() {
   const [sortBy, setSortBy] = useState("detected_at");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [settingsForm, setSettingsForm] = useState({
-    integration_mode: "playwright",
+    integration_mode: "api",
     sync_enabled: true,
     missed_payment_grace_minutes: 60,
     backfill_days: 365,
@@ -638,8 +638,8 @@ export function FitdogAlertsPanel() {
               value={settingsForm.integration_mode}
               onChange={(e) => setSettingsForm((prev) => ({ ...prev, integration_mode: e.target.value }))}
             >
-              <option value="playwright">Playwright (authenticated sync)</option>
-              <option value="api">Official API</option>
+              <option value="api">Fitdog activity API (recommended)</option>
+              <option value="playwright">Playwright browser fallback</option>
               <option value="webhook">Webhook + pull reconciliation</option>
             </select>
           </label>

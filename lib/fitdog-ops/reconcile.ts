@@ -41,6 +41,7 @@ export type ProposedAlert = {
   payment_method_last_four: string | null;
   package_credit_check: Record<string, unknown>;
   source_url: string | null;
+  detected_at?: string | null;
   auto_resolve_match?: {
     owner_id?: string | null;
     dog_id?: string | null;
@@ -148,7 +149,8 @@ function notificationToProposed(item: NonNullable<FitdogSyncSnapshot["notificati
     payment_method_brand: null,
     payment_method_last_four: null,
     package_credit_check: { source: "fitdog_notification_feed" },
-    source_url: parsed.source_url
+    source_url: parsed.source_url,
+    detected_at: parsed.detected_at
   };
 }
 

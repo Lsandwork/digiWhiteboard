@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fitdogHistoryResolveHours } from "@/lib/fitdog-ops/config";
 import { getFitdogProvider, normalizeFitdogWebhookPayload } from "@/lib/fitdog-ops/providers";
 import { reconcileFitdogSnapshot } from "@/lib/fitdog-ops/reconcile";
 import { notifyFitdogPaymentAlert } from "@/lib/fitdog-ops/notifications";
@@ -11,8 +12,10 @@ import {
   getFitdogIntegrationSettings,
   insertRawEvent,
   listOpenAlertKeys,
+  listSyncRuns,
   markRawEventProcessed,
   updateFitdogIntegrationSettings,
+  updateOperationsAlert,
   upsertPaymentTransactions,
   upsertProposedAlert,
   upsertServices
@@ -23,7 +26,7 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function withBackoff<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
+async function withBackoff<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
   let attempt = 0;
   let lastError: unknown;
   while (attempt <= retries) {
@@ -32,7 +35,7 @@ async function withBackoff<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
     } catch (error) {
       lastError = error;
       if (attempt === retries) break;
-      await sleep(Math.min(30000, 1000 * 2 ** attempt));
+      await sleep(Math.min(5000, 1000 * 2 ** attempt));
       attempt += 1;
     }
   }
@@ -60,6 +63,27 @@ export async function runFitdogSync(
     return finishSyncRun(supabase, skipped.id, {
       status: "skipped",
       message: "Fitdog sync disabled."
+    });
+  }
+
+  // Prevent overlapping Chromium/API syncs from stacking and freezing the UI.
+  const recent = await listSyncRuns(supabase, 5);
+  const active = recent.find((run) => {
+    if (run.status !== "running") return false;
+    const started = new Date(run.started_at).getTime();
+    return Number.isFinite(started) && Date.now() - started < 4 * 60_000;
+  });
+  if (active && !options.force) {
+    const skipped = await createSyncRun(supabase, {
+      trigger: options.trigger,
+      mode: options.mode || "incremental",
+      status: "skipped",
+      actor_user_id: options.actorUserId ?? null,
+      message: `Sync already running (${active.id}).`
+    });
+    return finishSyncRun(supabase, skipped.id, {
+      status: "skipped",
+      message: `Sync already running (${active.id}).`
     });
   }
 
@@ -125,6 +149,8 @@ export async function runFitdogSync(
 
     let alertsCreated = 0;
     let alertsUpdated = 0;
+    let historyResolved = 0;
+    const historyCutoff = Date.now() - fitdogHistoryResolveHours() * 60 * 60 * 1000;
     for (const proposed of reconciled.createOrUpdate) {
       const result = await upsertProposedAlert(supabase, proposed, {
         userId: options.actorUserId,
@@ -132,7 +158,30 @@ export async function runFitdogSync(
       });
       if (result.created) {
         alertsCreated += 1;
-        await notifyFitdogPaymentAlert(supabase, result.alert, "created");
+        const detectedMs = new Date(proposed.detected_at || result.alert.detected_at).getTime();
+        const isHistory = Number.isFinite(detectedMs) && detectedMs < historyCutoff;
+        if (isHistory) {
+          await updateOperationsAlert(
+            supabase,
+            result.alert.id,
+            {
+              status: "resolved",
+              resolved_at: proposed.detected_at || result.alert.detected_at,
+              resolution_type: "imported_history",
+              resolution_notes: "Imported from Fitdog activity history.",
+              severity: "low"
+            },
+            {
+              type: "resolved",
+              message: "Auto-filed to Past Alerts (historical Fitdog activity).",
+              actor_user_id: options.actorUserId,
+              actor_name: "Fitdog Sync"
+            }
+          );
+          historyResolved += 1;
+        } else {
+          await notifyFitdogPaymentAlert(supabase, result.alert, "created");
+        }
       } else {
         alertsUpdated += 1;
       }
@@ -196,14 +245,15 @@ export async function runFitdogSync(
       records_scanned: reconciled.records_scanned || snapshot.records_scanned || 0,
       alerts_created: alertsCreated,
       alerts_updated: alertsUpdated,
-      alerts_resolved: auto.resolved,
+      alerts_resolved: auto.resolved + historyResolved,
       error_count: snapshot.parse_failures?.length || 0,
       message: `Sync complete (${mode}).`,
       checkpoint: snapshot.checkpoint || {},
       metadata: {
         authExpired: Boolean(snapshot.authExpired),
         reauthenticated: Boolean(snapshot.reauthenticated),
-        provider: provider.mode
+        provider: provider.mode,
+        historyResolved
       }
     });
   } catch (error) {
@@ -212,13 +262,13 @@ export async function runFitdogSync(
       supabase,
       {
         idempotency_key: buildFitdogIdempotencyKey({
-          source_event_id: `sync-error-${run.id}`,
+          source_event_id: "sync-error-active",
           alert_type: "FITDOG_SYNC_ERROR",
           amount_due: 0
         }),
         alert_type: "FITDOG_SYNC_ERROR",
         severity: severityForAlertType("FITDOG_SYNC_ERROR"),
-        source_event_id: run.id,
+        source_event_id: "sync-error-active",
         source_record_id: run.id,
         owner_id: null,
         owner_name: "Fitdog Sync",

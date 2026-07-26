@@ -1,9 +1,10 @@
 import type { FitdogIntegrationMode } from "@/lib/fitdog-ops/types";
 
 export function fitdogEnvMode(): FitdogIntegrationMode {
-  const mode = String(process.env.FITDOG_INTEGRATION_MODE || "playwright").trim().toLowerCase();
+  // Prefer the native Fitdog activity-stream API (fast). Playwright remains a fallback mode.
+  const mode = String(process.env.FITDOG_INTEGRATION_MODE || "api").trim().toLowerCase();
   if (mode === "api" || mode === "webhook" || mode === "playwright") return mode;
-  return "playwright";
+  return "api";
 }
 
 export function fitdogSyncEnabled(): boolean {
@@ -50,6 +51,31 @@ export function fitdogEmployeePassword(): string | null {
   return process.env.FITDOG_EMPLOYEE_PASSWORD || null;
 }
 
+/**
+ * Public Fitdog web OAuth client credentials (embedded in app.fitdog.com).
+ * Override via env if Fitdog rotates them.
+ */
+export function fitdogOauthClientId(): string | null {
+  return (
+    process.env.FITDOG_OAUTH_CLIENT_ID?.trim() ||
+    "wuNuuAsOd8iemfAgjMLfbnh4PkIo3TmIpzt2tdSR"
+  );
+}
+
+export function fitdogOauthClientSecret(): string | null {
+  return (
+    process.env.FITDOG_OAUTH_CLIENT_SECRET?.trim() ||
+    "mSQaKOgyJUj6to65ksD2jsAOPaG3UjISwR9Z6X31ESxUC5QtDew2ZbjwY6XDaRMmSww19MEDNCABe8mdnieU8hWgDYWe5mPv7uVnrsbUbhIxv5tmvfCtBjilY8MHMuaE"
+  );
+}
+
 export function fitdogSessionEncryptionKey(): string | null {
   return process.env.FITDOG_SESSION_ENCRYPTION_KEY?.trim() || process.env.ADMIN_SESSION_SECRET?.trim() || null;
+}
+
+/** Activity items older than this are imported into Past Alerts as resolved. */
+export function fitdogHistoryResolveHours(fallback = 48): number {
+  const n = Number(process.env.FITDOG_HISTORY_RESOLVE_HOURS ?? fallback);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.round(n);
 }
