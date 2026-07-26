@@ -381,7 +381,7 @@ export async function upsertProposedAlert(
       status: "new",
       package_credit_check: proposed.package_credit_check,
       source_url: proposed.source_url,
-      detected_at: new Date().toISOString()
+      detected_at: proposed.detected_at || new Date().toISOString()
     })
     .select("*")
     .single();

@@ -14,6 +14,7 @@ import {
   classifyFitdogNotificationText,
   parseFitdogNotification
 } from "../lib/fitdog-ops/notifications-parse";
+import { isUsefulFitdogActivity } from "../lib/fitdog-ops/providers/native-api";
 import { normalizeFitdogWebhookPayload } from "../lib/fitdog-ops/providers/webhook";
 import {
   alertMatchesSuccessfulPayment,
@@ -358,6 +359,21 @@ import { sanitizeFitdogPayload } from "../lib/fitdog-ops/sanitize";
     }),
     true
   );
+}
+
+// 15. Activity-stream noise filter keeps declined/cancel/vax/docs, drops address/notes clutter.
+{
+  assert.equal(
+    isUsefulFitdogActivity(
+      "Lucia Atwood class, Reliable Recall, on 07/24/2026 Jake was cancelled due to their credit card being declined."
+    ),
+    true
+  );
+  assert.equal(isUsefulFitdogActivity("Scout cancelled their Trail Foundations for 07/24/2026."), true);
+  assert.equal(isUsefulFitdogActivity("Birdie has an expired vaccination."), true);
+  assert.equal(isUsefulFitdogActivity("Erin Little uploaded documents to account"), true);
+  assert.equal(isUsefulFitdogActivity("Location address with name: Home for Mark landecker has been created"), false);
+  assert.equal(isUsefulFitdogActivity("Lonnie Sandoval posted in Daily Notes on 2026-07-16"), false);
 }
 
 console.log("fitdog payment alerts tests passed");
