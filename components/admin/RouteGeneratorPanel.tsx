@@ -1,16 +1,27 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
   Download,
-  MapPin,
   RefreshCw,
   Route,
   ShieldAlert
 } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import type { FitdogLocationsConfig } from "@/lib/route-generator/locations";
+
+const RouteGeneratorMap = dynamic(
+  () => import("@/components/admin/RouteGeneratorMap").then((mod) => mod.RouteGeneratorMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid h-[360px] place-items-center text-sm text-admin-muted">Loading map…</div>
+    )
+  }
+);
 
 type TabId = "overview" | "pickup" | "dropoff" | "needs_review" | "raw" | "exports" | "audit" | "settings";
 
@@ -24,10 +35,12 @@ type Bootstrap = {
     timezone: string;
     verified: boolean;
   };
+  locations?: FitdogLocationsConfig;
   vehicles: Array<{
     vanKey: string;
     active: boolean;
     vehiclePool: string;
+    homeBaseKey?: string;
     maxDogs: number | null;
     capacityConfigured: boolean;
     eligibleServices: string[];
@@ -83,6 +96,7 @@ export function RouteGeneratorPanel() {
   const [pullMeta, setPullMeta] = useState<{ pickup: number; dropoff: number; warnings: string[] } | null>(null);
   const [bundle, setBundle] = useState<PlanBundle | null>(null);
   const [visibleVans, setVisibleVans] = useState<Record<string, boolean>>({});
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<string | null>(null);
 
   const hydratePlan = useCallback(
@@ -280,15 +294,63 @@ export function RouteGeneratorPanel() {
     [bundle]
   );
 
-  const mapStops = useMemo(() => {
+  const mapRoutes = useMemo(() => {
     if (!bundle) return [];
-    return bundle.stops.filter((stop) => {
-      const route = bundle.routes.find((r) => r.id === stop.route_id);
-      if (!route) return false;
-      if (visibleVans[String(route.van_key)] === false) return false;
-      return stop.stop_kind === "customer" || stop.stop_kind === "depot_start";
-    });
+    return bundle.routes
+      .filter((route) => visibleVans[String(route.van_key)] !== false)
+      .map((route) => {
+        const stops = bundle.stops
+          .filter((stop) => stop.route_id === route.id)
+          .map((stop) => {
+            const stopKind = String(stop.stop_kind ?? "customer");
+            let label = String(stop.owner_name || stopKind || "Stop");
+            if (stopKind === "depot_start" || stopKind === "depot_end") {
+              if (!/hub|club/i.test(label)) {
+                label = String(route.vehicle_pool) === "club" ? "CLUB" : "HUB";
+              } else if (/club/i.test(label)) {
+                label = "CLUB";
+              } else {
+                label = "HUB";
+              }
+            }
+            return {
+              id: String(stop.id),
+              routeId: String(route.id),
+              sequence: Number(stop.sequence ?? 0),
+              stopKind,
+              label,
+              address: String(stop.address || ""),
+              latitude: Number(stop.latitude),
+              longitude: Number(stop.longitude),
+              color: String(route.map_color || "#f15f2a")
+            };
+          })
+          .filter((stop) => Number.isFinite(stop.latitude) && Number.isFinite(stop.longitude));
+        return {
+          id: String(route.id),
+          vanKey: String(route.van_key),
+          direction: String(route.direction),
+          waveName: String(route.wave_name || ""),
+          color: String(route.map_color || "#f15f2a"),
+          stops
+        };
+      });
   }, [bundle, visibleVans]);
+
+  useEffect(() => {
+    if (!selectedRouteId) return;
+    if (!mapRoutes.some((route) => route.id === selectedRouteId)) {
+      setSelectedRouteId(null);
+    }
+  }, [mapRoutes, selectedRouteId]);
+
+  function selectRoute(routeId: string) {
+    setSelectedRouteId((current) => (current === routeId ? null : routeId));
+    setTab("overview");
+    window.setTimeout(() => {
+      document.getElementById("route-generator-map")?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 50);
+  }
 
   if (loading && !bootstrap) {
     return <p className="admin-empty-state-text">Loading Route Generator…</p>;
@@ -436,9 +498,14 @@ export function RouteGeneratorPanel() {
             <OverviewCard label="Needs review" value={String(bundle?.plan.summary?.needsReview ?? needsReview.length ?? "—")} tone="warn" />
           </div>
 
-          <section className="admin-card p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-base font-semibold text-white">Interactive map</h3>
+          <section id="route-generator-map" className="admin-card p-4">
+            <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-white">Interactive map</h3>
+                <p className="text-xs text-admin-muted">
+                  Click a route card to focus it. HUB and CLUB bases are always marked.
+                </p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {Object.keys(visibleVans).map((van) => (
                   <label key={van} className="inline-flex items-center gap-1 text-xs text-admin-muted">
@@ -452,33 +519,13 @@ export function RouteGeneratorPanel() {
                 ))}
               </div>
             </div>
-            <div className="relative min-h-[280px] overflow-hidden rounded-xl border border-admin-border bg-[#0b1220]">
-              {!mapStops.length ? (
-                <div className="grid h-[280px] place-items-center text-sm text-admin-muted">
-                  <div className="text-center">
-                    <MapPin className="mx-auto mb-2 h-5 w-5" />
-                    Pull a report and generate routes to plot stops.
-                  </div>
-                </div>
-              ) : (
-                <svg viewBox="0 0 800 320" className="h-[280px] w-full">
-                  <rect width="800" height="320" fill="#0b1220" />
-                  {mapStops.map((stop, index) => {
-                    const route = bundle?.routes.find((r) => r.id === stop.route_id);
-                    const color = String(route?.map_color || "#f15f2a");
-                    const x = 60 + ((Number(stop.longitude) + 118.55) * 4000) % 680;
-                    const y = 40 + ((34.05 - Number(stop.latitude)) * 4000) % 240;
-                    return (
-                      <g key={String(stop.id)}>
-                        <circle cx={x} cy={y} r={stop.stop_kind === "depot_start" ? 8 : 6} fill={color} />
-                        <text x={x + 10} y={y + 4} fill="#e2e8f0" fontSize="10">
-                          {stop.stop_kind === "depot_start" ? "Depot" : `${index + 1}`}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </svg>
-              )}
+            <div className="overflow-hidden rounded-xl border border-admin-border bg-[#0b1220]">
+              <RouteGeneratorMap
+                routes={mapRoutes}
+                selectedRouteId={selectedRouteId}
+                locations={bootstrap.locations}
+                onSelectRoute={setSelectedRouteId}
+              />
             </div>
           </section>
 
@@ -488,6 +535,8 @@ export function RouteGeneratorPanel() {
                 key={String(route.id)}
                 route={route}
                 stops={(bundle?.stops ?? []).filter((s) => s.route_id === route.id)}
+                selected={selectedRouteId === String(route.id)}
+                onSelect={() => selectRoute(String(route.id))}
               />
             ))}
           </div>
@@ -502,6 +551,8 @@ export function RouteGeneratorPanel() {
               route={route}
               stops={(bundle?.stops ?? []).filter((s) => s.route_id === route.id)}
               expanded
+              selected={selectedRouteId === String(route.id)}
+              onSelect={() => selectRoute(String(route.id))}
             />
           ))}
           {!(tab === "pickup" ? pickupRoutes : dropoffRoutes).length ? (
@@ -576,20 +627,30 @@ export function RouteGeneratorPanel() {
         <section className="admin-card space-y-4 p-4">
           <h3 className="text-base font-semibold text-white">Setup checklist</h3>
           <ul className="space-y-2 text-sm text-admin-muted">
-            <li>Depot verified: {bootstrap?.depot?.verified ? "yes" : "no — Super Admin must configure"}</li>
+            <li>
+              HUB: {bootstrap?.locations?.hub?.address || "2140 Westwood Blvd, West Los Angeles, CA 90025"}
+              {bootstrap?.locations?.hub?.verified ? " · verified" : ""}
+            </li>
+            <li>
+              CLUB: {bootstrap?.locations?.club?.address || "1712 21st St, Santa Monica, CA 90404"}
+              {bootstrap?.locations?.club?.verified ? " · verified" : ""}
+            </li>
             <li>
               Active vans with capacity configured:{" "}
               {bootstrap?.vehicles?.filter((v) => v.active && v.capacityConfigured).length ?? 0}/
               {bootstrap?.vehicles?.filter((v) => v.active).length ?? 0}
             </li>
             <li>Shadow mode: {String(bootstrap?.checklist?.shadow_mode ?? true)}</li>
-            <li>Vans available: Van 1, Van 2, Van 3, Van 5, Van 6 (never Van 4)</li>
+            <li>
+              Home bases: club-pool vans start/end at CLUB (2 vans); outing-pool vans start/end at HUB (3 vans). Never
+              Van 4.
+            </li>
             <li>Samsara template: upload under Settings → Integrations → Samsara Route Export before production export</li>
             <li>Fitdog integration: Connect under Settings → Integrations → Fitdog Route Report</li>
           </ul>
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
             <AlertTriangle className="mb-1 h-4 w-4" />
-            Production exports stay blocked until depot verification, van capacities, Samsara template validation, and
+            Production exports stay blocked until HUB/CLUB verification, van capacities, Samsara template validation, and
             shadow-mode review are complete.
           </div>
         </section>
@@ -614,24 +675,53 @@ function OverviewCard({ label, value, tone }: { label: string; value: string; to
 function RouteCard({
   route,
   stops,
-  expanded
+  expanded,
+  selected,
+  onSelect
 }: {
   route: Record<string, unknown>;
   stops: Array<Record<string, unknown>>;
   expanded?: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   const customerStops = stops.filter((s) => s.stop_kind === "customer");
+  const homeStop = stops.find((s) => s.stop_kind === "depot_start");
+  const homeLabel = String(homeStop?.owner_name || (route.vehicle_pool === "club" ? "CLUB" : "HUB"));
   return (
-    <article className="admin-card p-4">
+    <article
+      className={`admin-card p-4 transition ${
+        selected ? "ring-2 ring-fitdog-orange border-fitdog-orange/50" : ""
+      } ${onSelect ? "cursor-pointer hover:border-fitdog-orange/40" : ""}`}
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={
+        onSelect
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onSelect();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
           <h4 className="font-semibold text-white">
             {String(route.van_key).replace("van_", "Van ")} · {String(route.direction)} · {String(route.wave_name)}
           </h4>
           <p className="text-xs text-admin-muted">
-            {String(route.vehicle_pool)} pool · {customerStops.length} stops · {String(route.total_dogs)} dogs ·{" "}
-            {String(route.estimated_distance_miles)} mi · {String(route.estimated_drive_minutes)} min
+            {String(route.vehicle_pool)} pool · home {homeLabel} · {customerStops.length} stops ·{" "}
+            {String(route.total_dogs)} dogs · {String(route.estimated_distance_miles)} mi ·{" "}
+            {String(route.estimated_drive_minutes)} min
           </p>
+          {onSelect ? (
+            <p className="mt-1 text-[11px] font-semibold text-fitdog-orange">
+              {selected ? "Showing on map · click to clear" : "Click to view on map"}
+            </p>
+          ) : null}
         </div>
         <span
           className="mt-1 inline-block h-3 w-3 rounded-full"
@@ -643,18 +733,25 @@ function RouteCard({
           {stops
             .slice()
             .sort((a, b) => Number(a.sequence) - Number(b.sequence))
-            .map((stop) => (
-              <li key={String(stop.id)} className="rounded-lg border border-admin-border/60 px-3 py-2">
-                <div className="flex justify-between gap-2">
-                  <span className="font-medium text-white">
-                    #{Number(stop.sequence)} {String(stop.owner_name || stop.stop_kind)}
-                  </span>
-                  <span className="text-xs text-admin-muted">{String(stop.dog_count)} dogs</span>
-                </div>
-                <p className="text-xs text-admin-muted">{String(stop.address || "—")}</p>
-                {stop.driver_notes ? <p className="mt-1 text-xs text-admin-muted">{String(stop.driver_notes)}</p> : null}
-              </li>
-            ))}
+            .map((stop) => {
+              const kind = String(stop.stop_kind);
+              const name =
+                kind === "depot_start" || kind === "depot_end"
+                  ? String(stop.owner_name || "HUB")
+                  : String(stop.owner_name || kind);
+              return (
+                <li key={String(stop.id)} className="rounded-lg border border-admin-border/60 px-3 py-2">
+                  <div className="flex justify-between gap-2">
+                    <span className="font-medium text-white">
+                      #{Number(stop.sequence)} {name}
+                    </span>
+                    <span className="text-xs text-admin-muted">{String(stop.dog_count)} dogs</span>
+                  </div>
+                  <p className="text-xs text-admin-muted">{String(stop.address || "—")}</p>
+                  {stop.driver_notes ? <p className="mt-1 text-xs text-admin-muted">{String(stop.driver_notes)}</p> : null}
+                </li>
+              );
+            })}
         </ol>
       ) : null}
     </article>

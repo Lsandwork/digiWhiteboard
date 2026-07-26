@@ -242,6 +242,9 @@ assert.ok(opt.routes.every((r) => r.vanKey !== ("van_4" as never)));
 assert.ok(opt.routes.every((r) => r.stops[0]?.stopKind === "depot_start"));
 assert.ok(opt.routes.every((r) => r.stops[r.stops.length - 1]?.stopKind === "depot_end"));
 for (const route of opt.routes) {
+  const start = route.stops[0];
+  const expectedHome = route.vehiclePool === "club" ? "CLUB" : "HUB";
+  assert.equal(start?.ownerName, expectedHome, `${route.vanKey} should start at ${expectedHome}`);
   for (const service of route.serviceTypes) {
     const vehicle = vehicles.find((v) => v.vanKey === route.vanKey)!;
     assert.equal(vehicle.eligibleServices.includes(service), true, `${service} on ${route.vanKey}`);

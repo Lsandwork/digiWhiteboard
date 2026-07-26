@@ -62,6 +62,9 @@ async function main() {
     vanKey: String(row.van_key),
     active: Boolean(row.active),
     vehiclePool: row.vehicle_pool as "club" | "outing",
+    homeBaseKey: (row.starting_depot_key === "club" || row.vehicle_pool === "club" ? "club" : "hub") as
+      | "hub"
+      | "club",
     maxDogs: row.max_dogs == null ? 8 : Number(row.max_dogs),
     maxLoadUnits: row.max_load_units == null ? 12 : Number(row.max_load_units),
     maxLargeDogs: row.max_large_dogs == null ? 4 : Number(row.max_large_dogs),

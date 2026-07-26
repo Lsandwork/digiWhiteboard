@@ -7,6 +7,8 @@ export type VehicleCapacityConfig = {
   vanKey: string;
   active: boolean;
   vehiclePool: "club" | "outing";
+  /** Where the van starts/ends the day — HUB (outing) or CLUB (club pool). */
+  homeBaseKey?: "hub" | "club";
   maxDogs: number | null;
   maxLoadUnits: number | null;
   maxLargeDogs: number | null;

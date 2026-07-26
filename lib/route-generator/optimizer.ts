@@ -13,6 +13,12 @@ import {
   type VehicleCapacityConfig
 } from "@/lib/route-generator/capacity";
 import type { HouseholdStopGroup } from "@/lib/route-generator/households";
+import {
+  DEFAULT_FITDOG_LOCATIONS,
+  homeBaseForVehiclePool,
+  resolveBaseLocation,
+  type FitdogLocationsConfig
+} from "@/lib/route-generator/locations";
 
 export type DepotConfig = {
   name: string;
@@ -128,6 +134,8 @@ export function optimizeRoutes(params: {
   households: HouseholdStopGroup[];
   vehicles: VehicleCapacityConfig[];
   depot: DepotConfig;
+  /** Dual bases: HUB + CLUB. Falls back to `depot` when a base is missing coords. */
+  locations?: FitdogLocationsConfig;
   sizeLoads: SizeLoadConfig;
   seed?: string;
   coordsByHousehold?: Record<string, { lat: number; lng: number }>;
@@ -137,12 +145,26 @@ export function optimizeRoutes(params: {
   const rng = mulberry32(hashSeed(seed));
   const warnings: string[] = [];
   const unassigned: HouseholdStopGroup[] = [];
+  const locations: FitdogLocationsConfig = params.locations ?? {
+    hub: { ...DEFAULT_FITDOG_LOCATIONS.hub },
+    club: {
+      ...DEFAULT_FITDOG_LOCATIONS.club,
+      // Legacy single-depot configs map onto CLUB; keep the CLUB label.
+      address: params.depot.address || DEFAULT_FITDOG_LOCATIONS.club.address,
+      latitude: params.depot.latitude ?? DEFAULT_FITDOG_LOCATIONS.club.latitude,
+      longitude: params.depot.longitude ?? DEFAULT_FITDOG_LOCATIONS.club.longitude,
+      verified: params.depot.verified
+    }
+  };
 
   const vehicles = params.vehicles
     .filter((v) => v.active)
     .map((v) => {
       assertNeverVan4(v.vanKey);
-      return v;
+      return {
+        ...v,
+        homeBaseKey: v.homeBaseKey || homeBaseForVehiclePool(v.vehiclePool)
+      };
     });
 
   if (!vehicles.length) {
@@ -249,10 +271,13 @@ export function optimizeRoutes(params: {
           addLarge: stop.large,
           addStops: 1
         });
+        const home = resolveBaseLocation(locations, bucket.vehicle.homeBaseKey);
         const depotCoord =
-          params.depot.latitude != null && params.depot.longitude != null
-            ? { lat: params.depot.latitude, lng: params.depot.longitude }
-            : null;
+          home.latitude != null && home.longitude != null
+            ? { lat: home.latitude, lng: home.longitude }
+            : params.depot.latitude != null && params.depot.longitude != null
+              ? { lat: params.depot.latitude, lng: params.depot.longitude }
+              : null;
         const last = bucket.stops[bucket.stops.length - 1];
         const from = last?.coord ?? depotCoord;
         const dist = from && stop.coord ? haversineMiles(from, stop.coord) : 25;
@@ -277,15 +302,17 @@ export function optimizeRoutes(params: {
     }
   }
 
-  const depotCoord =
-    params.depot.latitude != null && params.depot.longitude != null
-      ? { lat: params.depot.latitude, lng: params.depot.longitude }
-      : null;
-
   const routes: OptimizedRoute[] = [];
   for (const vanKey of FITDOG_VAN_KEYS) {
     const bucket = buckets.get(vanKey);
     if (!bucket || !bucket.stops.length) continue;
+    const home = resolveBaseLocation(locations, bucket.vehicle.homeBaseKey);
+    const depotCoord =
+      home.latitude != null && home.longitude != null
+        ? { lat: home.latitude, lng: home.longitude }
+        : params.depot.latitude != null && params.depot.longitude != null
+          ? { lat: params.depot.latitude, lng: params.depot.longitude }
+          : null;
     const ordered = nearestNeighborOrder(bucket.stops, depotCoord, rng);
     let distance = 0;
     let prev = depotCoord;
@@ -295,15 +322,20 @@ export function optimizeRoutes(params: {
     }
     if (prev && depotCoord) distance += haversineMiles(prev, depotCoord);
 
+    const baseName = home.name || (bucket.vehicle.homeBaseKey === "club" ? "CLUB" : "HUB");
+    const baseAddress = home.address || params.depot.address || baseName;
+    const baseLat = home.latitude ?? params.depot.latitude;
+    const baseLng = home.longitude ?? params.depot.longitude;
+
     const stops: OptimizedStop[] = [
       {
         sequence: 0,
         stopKind: "depot_start",
         householdKey: null,
-        ownerName: params.depot.name || "Fitdog",
-        address: params.depot.address || "Fitdog Depot",
-        latitude: params.depot.latitude,
-        longitude: params.depot.longitude,
+        ownerName: baseName,
+        address: baseAddress,
+        latitude: baseLat,
+        longitude: baseLng,
         dogCount: 0,
         loadUnits: 0,
         largeDogs: 0,
@@ -311,7 +343,7 @@ export function optimizeRoutes(params: {
         dogNames: [],
         reservationIds: [],
         locked: true,
-        notes: "Start at Fitdog depot"
+        notes: `Start at ${baseName}`
       }
     ];
 
@@ -344,10 +376,10 @@ export function optimizeRoutes(params: {
       sequence: ordered.length + 1,
       stopKind: "depot_end",
       householdKey: null,
-      ownerName: params.depot.name || "Fitdog",
-      address: params.depot.address || "Fitdog Depot",
-      latitude: params.depot.latitude,
-      longitude: params.depot.longitude,
+      ownerName: baseName,
+      address: baseAddress,
+      latitude: baseLat,
+      longitude: baseLng,
       dogCount: 0,
       loadUnits: 0,
       largeDogs: 0,
@@ -355,7 +387,7 @@ export function optimizeRoutes(params: {
       dogNames: [],
       reservationIds: [],
       locked: true,
-      notes: "Return to Fitdog depot"
+      notes: `Return to ${baseName}`
     });
 
     routes.push({
