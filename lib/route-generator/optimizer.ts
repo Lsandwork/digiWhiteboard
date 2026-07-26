@@ -142,6 +142,8 @@ export function optimizeRoutes(params: {
   seed?: string;
   coordsByHousehold?: Record<string, { lat: number; lng: number }>;
   lockedVanByHousehold?: Record<string, FitdogVanKey>;
+  /** YYYY-MM-DD — drives Van 3 Huntington vs Kenneth Hahn schedule. */
+  operatingDate?: string | null;
 }): OptimizationResult {
   const seed = params.seed || `${params.direction}:${params.households.length}:${Date.now()}`;
   const rng = mulberry32(hashSeed(seed));
@@ -320,7 +322,8 @@ export function optimizeRoutes(params: {
     const { startKey, endKey } = resolveRouteEndpoints({
       vanKey,
       direction: params.direction,
-      serviceTypes
+      serviceTypes,
+      operatingDate: params.operatingDate
     });
     const startBase = resolveBaseLocation(locations, startKey);
     const endBase = resolveBaseLocation(locations, endKey);

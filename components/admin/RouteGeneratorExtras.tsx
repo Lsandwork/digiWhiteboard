@@ -5,11 +5,11 @@ import type { SkippedOccurrence } from "@/lib/route-generator/fitdog-api";
 import type { GingrTaxiServiceRow } from "@/lib/route-generator/gingr-taxi";
 
 const VAN_OPTIONS = [
+  { value: "van_5", label: "Van 5 (Club · taxi/group/training)" },
+  { value: "van_6", label: "Van 6 (Club · taxi/group/training)" },
   { value: "van_1", label: "Van 1 (Kenneth Hahn)" },
   { value: "van_2", label: "Van 2 (Kenneth Hahn)" },
-  { value: "van_3", label: "Van 3 (Huntington Beach)" },
-  { value: "van_5", label: "Van 5 (overflow)" },
-  { value: "van_6", label: "Van 6 (overflow)" }
+  { value: "van_3", label: "Van 3 (Beach M/W/F · Hahn T/Th)" }
 ];
 
 type Props = {
@@ -119,7 +119,7 @@ export function RouteGeneratorExtras({
               </thead>
               <tbody>
                 {skippedOccurrences.map((row) => {
-                  const selectedVan = vanByOccurrence[row.occurrenceId] || "van_1";
+                  const selectedVan = vanByOccurrence[row.occurrenceId] || "van_5";
                   const assigned = Boolean(row.assignedVanKey);
                   return (
                     <tr key={row.occurrenceId} className="border-t border-admin-border/70 align-top">
