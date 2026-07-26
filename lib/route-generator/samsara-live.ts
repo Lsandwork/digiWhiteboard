@@ -67,28 +67,28 @@ export async function fetchSamsaraVehicleLocations(): Promise<SamsaraVehicleLoca
     }>;
   };
 
-  return (body.data ?? [])
-    .map((row) => {
-      const lat = row.gps?.latitude;
-      const lng = row.gps?.longitude;
-      if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      const externalIds = (row as { externalIds?: Record<string, string>; gateway?: { serial?: string } }).externalIds;
-      const serial =
-        externalIds?.["samsara.serial"] ||
-        (row as { gateway?: { serial?: string } }).gateway?.serial ||
-        null;
-      return {
-        id: String(row.id ?? ""),
-        name: String(row.name || "").trim(),
-        serial,
-        latitude: lat,
-        longitude: lng,
-        speedMilesPerHour: row.gps?.speedMilesPerHour ?? null,
-        heading: row.gps?.headingDegrees ?? null,
-        time: row.gps?.time ?? null
-      } satisfies SamsaraVehicleLocation;
-    })
-    .filter((row): row is SamsaraVehicleLocation => Boolean(row));
+  const vehicles: SamsaraVehicleLocation[] = [];
+  for (const row of body.data ?? []) {
+    const lat = row.gps?.latitude;
+    const lng = row.gps?.longitude;
+    if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    const externalIds = (row as { externalIds?: Record<string, string>; gateway?: { serial?: string } }).externalIds;
+    const serial =
+      externalIds?.["samsara.serial"] ||
+      (row as { gateway?: { serial?: string } }).gateway?.serial ||
+      null;
+    vehicles.push({
+      id: String(row.id ?? ""),
+      name: String(row.name || "").trim(),
+      serial,
+      latitude: lat,
+      longitude: lng,
+      speedMilesPerHour: row.gps?.speedMilesPerHour ?? null,
+      heading: row.gps?.headingDegrees ?? null,
+      time: row.gps?.time ?? null
+    });
+  }
+  return vehicles;
 }
 
 export function matchVehicleByName(
