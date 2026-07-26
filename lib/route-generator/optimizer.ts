@@ -21,6 +21,7 @@ import {
   resolveRouteEndpoints,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
+import { buildCustomerStopNotes, formatPhoneForDriver } from "@/lib/route-generator/stop-notes";
 
 export type DepotConfig = {
   name: string;
@@ -47,6 +48,8 @@ export type OptimizedStop = {
   reservationIds: string[];
   locked: boolean;
   notes: string;
+  /** Full owner phone for drivers (Samsara notes + tracking SMS). */
+  ownerPhoneDisplay?: string | null;
 };
 
 export type OptimizedRoute = {
@@ -383,6 +386,19 @@ export function optimizeRoutes(params: {
         )
       ];
       const isFacility = isFacilityHouseholdKey(stop.householdKey);
+      const phones = [
+        ...new Set(
+          stop.items
+            .map((item) =>
+              formatPhoneForDriver(
+                (item.raw?.phone as string | undefined) ||
+                  (item.raw?.owner_phone as string | undefined) ||
+                  null
+              )
+            )
+            .filter((value): value is string => Boolean(value))
+        )
+      ];
       stops.push({
         sequence: index + 1,
         stopKind: "customer",
@@ -398,11 +414,13 @@ export function optimizeRoutes(params: {
         dogNames: stop.items.map((i) => i.dogName || "Dog"),
         reservationIds: stop.items.map((i) => i.reservationId || "").filter(Boolean),
         locked: Boolean(params.lockedVanByHousehold?.[stop.householdKey]),
-        notes: isFacility
-          ? `Fitdog facility stop — ${stop.dogCount} dog(s) already on-site: ${stop.items
-              .map((i) => i.dogName)
-              .join(", ")}`
-          : `${stop.dogCount} dog(s): ${stop.items.map((i) => i.dogName).join(", ")}`
+        ownerPhoneDisplay: phones[0] ?? null,
+        notes: buildCustomerStopNotes({
+          items: stop.items,
+          direction: params.direction,
+          isFacility,
+          facilityLabel: isFacility ? stop.address : null
+        })
       });
     });
 

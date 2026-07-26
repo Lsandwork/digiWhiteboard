@@ -33,6 +33,9 @@ import {
   normalizeBaseKey,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
+import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
+import { createOwnerTrackingForPlan } from "@/lib/route-generator/owner-tracking";
+import { buildCustomerStopNotesFromReportRows } from "@/lib/route-generator/stop-notes";
 
 const VAN_COLORS: Record<FitdogVanKey, string> = {
   van_1: "#f15f2a",
@@ -821,21 +824,43 @@ export async function generatePlanForRun(params: {
     if (routeError || !routeRow) throw new Error(routeError?.message || "Unable to save route.");
 
     for (const stop of route.stops) {
-      await supabase.from("route_plan_stops").insert({
-        route_id: routeRow.id,
-        sequence: stop.sequence,
-        stop_kind: stop.stopKind,
-        owner_name: stop.ownerName,
-        address: stop.address,
-        latitude: stop.latitude,
-        longitude: stop.longitude,
-        dog_count: stop.dogCount,
-        load_units: stop.loadUnits,
-        driver_notes: stop.notes,
-        validation_status: "ok",
-        locked: stop.locked,
-        household_key: stop.householdKey
-      });
+      const { data: stopRow, error: stopError } = await supabase
+        .from("route_plan_stops")
+        .insert({
+          route_id: routeRow.id,
+          sequence: stop.sequence,
+          stop_kind: stop.stopKind,
+          owner_name: stop.ownerName,
+          address: stop.address,
+          latitude: stop.latitude,
+          longitude: stop.longitude,
+          dog_count: stop.dogCount,
+          load_units: stop.loadUnits,
+          driver_notes: stop.notes,
+          owner_phone_masked: stop.ownerPhoneDisplay
+            ? `•••-•••-${String(stop.ownerPhoneDisplay).replace(/\D/g, "").slice(-4)}`
+            : null,
+          owner_phone_display: stop.ownerPhoneDisplay ?? null,
+          validation_status: "ok",
+          locked: stop.locked,
+          household_key: stop.householdKey
+        })
+        .select("*")
+        .single();
+      if (stopError || !stopRow) throw new Error(stopError?.message || "Unable to save stop.");
+
+      if (stop.stopKind === "customer" && stop.reservationIds.length) {
+        const itemRows = stop.reservationIds.map((reservationId, index) => ({
+          stop_id: stopRow.id,
+          dog_name: stop.dogNames[index] || null,
+          service_canonical: stop.serviceTypes[0] || null,
+          reservation_id: reservationId,
+          dog_size: null,
+          load_units: 1
+        }));
+        const { error: itemError } = await supabase.from("route_plan_stop_items").insert(itemRows);
+        if (itemError) throw new Error(itemError.message);
+      }
     }
   }
 
@@ -916,6 +941,23 @@ export async function approvePlan(params: {
     actorEmail: params.actorEmail,
     actorRole: params.actorRole
   });
+
+  // Create owner tracking links (+ SMS when Twilio is configured).
+  try {
+    const tracking = await createOwnerTrackingForPlan(params.planId);
+    await writeRouteAuditEvent({
+      action: "route_generator.owner_tracking_created",
+      entityType: "route_plan",
+      entityId: params.planId,
+      actorAdminId: params.actorAdminId,
+      actorEmail: params.actorEmail,
+      actorRole: params.actorRole,
+      newValue: tracking
+    });
+  } catch (trackingError) {
+    console.error("owner tracking create failed", trackingError);
+  }
+
   return plan;
 }
 
@@ -961,23 +1003,72 @@ export async function exportSamsaraCsv(params: {
     );
   }
 
+  // Load stop→reservation links so export can rebuild Fitdog pickup instructions + phones.
+  const stopIds = bundle.stops.map((s) => String(s.id));
+  const { data: stopItems } = stopIds.length
+    ? await supabase.from("route_plan_stop_items").select("*").in("stop_id", stopIds)
+    : { data: [] as Array<Record<string, unknown>> };
+  const stopItemsByStop = new Map<string, Array<Record<string, unknown>>>();
+  for (const item of stopItems ?? []) {
+    const key = String(item.stop_id);
+    const list = stopItemsByStop.get(key) ?? [];
+    list.push(item);
+    stopItemsByStop.set(key, list);
+  }
+  const reportItems = (bundle.items ?? []) as Array<Record<string, unknown>>;
+  const reportByReservation = new Map(
+    reportItems
+      .filter((item) => item.reservation_id != null)
+      .map((item) => [`${item.direction}|${item.reservation_id}`, item])
+  );
+
   const rows: ExportStopRow[] = [];
   for (const route of bundle.routes) {
     const routeStops = bundle.stops.filter((s) => s.route_id === route.id).sort((a, b) => a.sequence - b.sequence);
     const vanDisplay = vehicleNameByKey.get(String(route.van_key)) || String(route.van_key);
+    const direction = route.direction as "pickup" | "dropoff";
     const routeName = buildRouteName({
       date: String(bundle.plan.operating_date),
-      direction: route.direction as "pickup" | "dropoff",
+      direction,
       vanDisplay: String(route.display_name || vanDisplay)
     });
     for (const stop of routeStops) {
+      let stopNotes = String(stop.driver_notes || "");
+      if (stop.stop_kind === "customer") {
+        const linked = stopItemsByStop.get(String(stop.id)) ?? [];
+        const matchedReport = linked
+          .map((item) => reportByReservation.get(`${direction}|${item.reservation_id}`))
+          .filter((row): row is Record<string, unknown> => Boolean(row));
+        // Fallback: same household + direction from the report run.
+        const householdMatches =
+          matchedReport.length > 0
+            ? matchedReport
+            : reportItems.filter(
+                (item) =>
+                  item.direction === direction &&
+                  stop.household_key &&
+                  String(item.address_raw || "")
+                    .toLowerCase()
+                    .includes(String(stop.address || "").slice(0, 12).toLowerCase())
+              );
+        if (householdMatches.length) {
+          stopNotes = buildCustomerStopNotesFromReportRows(householdMatches, direction, {
+            isFacility: isFacilityHouseholdKey(stop.household_key),
+            facilityLabel: stop.address
+          });
+        }
+        // Ensure phone is present even if older notes only had dog counts.
+        if (stop.owner_phone_display && !/Phone:/i.test(stopNotes)) {
+          stopNotes = `${stopNotes}\nPhone: ${stop.owner_phone_display}`.trim();
+        }
+      }
       rows.push({
         routeName,
         routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
         vehicleName: vanDisplay,
         driverName: route.driver_name || "",
         stopName: stop.owner_name || stop.stop_kind,
-        stopNotes: stop.driver_notes || "",
+        stopNotes,
         stopAddress: stop.address || "",
         scheduledArrival: "",
         scheduledDeparture: "",
