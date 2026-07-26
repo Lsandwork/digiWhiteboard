@@ -131,8 +131,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   grooming_push: "Alert handlers when a dog needs grooming.",
   trainer_push: "Alert handlers when a dog needs training.",
   cast_videos: "Upload and push full-screen videos to displays.",
-  trainer_entry: "Admin/management trainer entry tool. Staff should use Front Desk Log.",
-  handler_shift_entry: "Admin/management handler entry tool. Staff should use Front Desk Log.",
+  trainer_entry: "Retired — use Front Desk Log.",
+  handler_shift_entry: "Retired — use Front Desk Log.",
   package_commissions: "Track package and class sales, confirm commissions, and review trainer earnings.",
   track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
   fitdog_alerts: "Failed payments, missed payments, card issues, and Fitdog sync health under Operations.",
@@ -191,15 +191,13 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "walks_board"
 ];
 
-/** Admin/management-only entry tools (staff use Front Desk Log instead). */
-const MANAGEMENT_ENTRY_TABS: AdminTab[] = ["trainer_entry", "handler_shift_entry"];
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
 const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
 const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer_complaints"];
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits", "route_generator"];
+const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));
@@ -295,7 +293,22 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_dashboard",
         "Dashboard",
-        singles(["demo_push", "overview", "whiteboard_preview", "display", "remote_cast", "content", "analytics", "checklist"], visible)
+        // Route Generator sits under Dashboard (not buried in Management) so it stays
+        // visible without expanding a collapsed section / scrolling an icon rail.
+        singles(
+          [
+            "demo_push",
+            "overview",
+            "route_generator",
+            "whiteboard_preview",
+            "display",
+            "remote_cast",
+            "content",
+            "analytics",
+            "checklist"
+          ],
+          visible
+        )
       )
     );
 
@@ -327,7 +340,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
-          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS, ...MANAGEMENT_ENTRY_TABS], visible)
+          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)
         ]),
         true
       )

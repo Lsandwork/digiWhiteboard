@@ -16,6 +16,12 @@ import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import { FITDOG_VAN_KEYS, type FitdogVanKey } from "@/lib/route-generator/flags";
 import type { VehicleCapacityConfig, SizeLoadConfig } from "@/lib/route-generator/capacity";
 import type { CanonicalService } from "@/lib/route-generator/flags";
+import {
+  DEFAULT_FITDOG_LOCATIONS,
+  homeBaseForVehiclePool,
+  normalizeBaseKey,
+  type FitdogLocationsConfig
+} from "@/lib/route-generator/locations";
 
 const VAN_COLORS: Record<FitdogVanKey, string> = {
   van_1: "#f15f2a",
@@ -35,17 +41,48 @@ async function listVehicles(): Promise<VehicleCapacityConfig[]> {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase.from("route_vehicle_configs").select("*").order("van_key");
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => ({
-    vanKey: String(row.van_key),
-    active: Boolean(row.active),
-    vehiclePool: row.vehicle_pool as "club" | "outing",
-    maxDogs: row.max_dogs == null ? null : Number(row.max_dogs),
-    maxLoadUnits: row.max_load_units == null ? null : Number(row.max_load_units),
-    maxLargeDogs: row.max_large_dogs == null ? null : Number(row.max_large_dogs),
-    maxStops: row.max_stops == null ? null : Number(row.max_stops),
-    eligibleServices: (row.eligible_services ?? []) as CanonicalService[],
-    capacityConfigured: Boolean(row.capacity_configured)
-  }));
+  return (data ?? []).map((row) => {
+    const vehiclePool = row.vehicle_pool as "club" | "outing";
+    return {
+      vanKey: String(row.van_key),
+      active: Boolean(row.active),
+      vehiclePool,
+      homeBaseKey: normalizeBaseKey(
+        String(row.starting_depot_key || row.ending_depot_key || homeBaseForVehiclePool(vehiclePool))
+      ),
+      maxDogs: row.max_dogs == null ? null : Number(row.max_dogs),
+      maxLoadUnits: row.max_load_units == null ? null : Number(row.max_load_units),
+      maxLargeDogs: row.max_large_dogs == null ? null : Number(row.max_large_dogs),
+      maxStops: row.max_stops == null ? null : Number(row.max_stops),
+      eligibleServices: (row.eligible_services ?? []) as CanonicalService[],
+      capacityConfigured: Boolean(row.capacity_configured)
+    };
+  });
+}
+
+async function getLocations(depot: DepotConfig): Promise<FitdogLocationsConfig> {
+  const stored = await getSetting<Partial<FitdogLocationsConfig> | null>("locations", null);
+  const hub = {
+    ...DEFAULT_FITDOG_LOCATIONS.hub,
+    ...(stored?.hub ?? {})
+  };
+  const club = {
+    ...DEFAULT_FITDOG_LOCATIONS.club,
+    ...(stored?.club ?? {}),
+    // Keep club aligned with legacy depot when locations.club was never seeded.
+    ...(stored?.club
+      ? {}
+      : {
+          address: depot.address || DEFAULT_FITDOG_LOCATIONS.club.address,
+          latitude: depot.latitude ?? DEFAULT_FITDOG_LOCATIONS.club.latitude,
+          longitude: depot.longitude ?? DEFAULT_FITDOG_LOCATIONS.club.longitude,
+          verified: depot.verified
+        })
+  };
+  return {
+    hub: { ...hub, key: "hub", name: hub.name || "HUB" },
+    club: { ...club, key: "club", name: club.name || "CLUB" }
+  };
 }
 
 function syntheticCoords(householdKey: string, index: number) {
@@ -62,15 +99,16 @@ function syntheticCoords(householdKey: string, index: number) {
 
 export async function getRouteGeneratorBootstrap() {
   const supabase = getServiceSupabase();
-  const [depot, sizeLoads, checklist, vehicles, connection, latestPlan] = await Promise.all([
-    getSetting<DepotConfig>("depot", {
-      name: "",
-      address: "",
-      latitude: null,
-      longitude: null,
-      timezone: "America/Los_Angeles",
-      verified: false
-    }),
+  const depot = await getSetting<DepotConfig>("depot", {
+    name: "",
+    address: "",
+    latitude: null,
+    longitude: null,
+    timezone: "America/Los_Angeles",
+    verified: false
+  });
+  const [locations, sizeLoads, checklist, vehicles, connection, latestPlan] = await Promise.all([
+    getLocations(depot),
     getSetting<SizeLoadConfig>("dog_size_loads", { configured: false }),
     getSetting<Record<string, unknown>>("feature_checklist", { shadow_mode: true, production_enabled: false }),
     listVehicles(),
@@ -80,13 +118,18 @@ export async function getRouteGeneratorBootstrap() {
 
   return {
     depot,
+    locations,
     sizeLoads,
     checklist,
     vehicles,
     connection: connection.data,
     latestPlan: latestPlan.data,
     vanKeys: FITDOG_VAN_KEYS,
-    mapColors: VAN_COLORS
+    mapColors: VAN_COLORS,
+    mapsProvider: process.env.MAPS_PROVIDER?.trim() || "google",
+    mapsConfigured: Boolean(
+      process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim()
+    )
   };
 }
 
@@ -233,6 +276,7 @@ export async function generatePlanForRun(params: {
     timezone: "America/Los_Angeles",
     verified: false
   });
+  const locations = await getLocations(depot);
   if (!depot.verified || !depot.address) {
     // Allow shadow generation with synthetic depot, but mark needs review
   }
@@ -283,10 +327,10 @@ export async function generatePlanForRun(params: {
 
   const effectiveDepot: DepotConfig = {
     ...depot,
-    latitude: depot.latitude ?? 34.011,
-    longitude: depot.longitude ?? -118.495,
-    address: depot.address || "Fitdog Depot (configure in Settings)",
-    name: depot.name || "Fitdog"
+    latitude: locations.club.latitude ?? depot.latitude ?? 34.0249,
+    longitude: locations.club.longitude ?? depot.longitude ?? -118.4756,
+    address: locations.club.address || depot.address || "CLUB",
+    name: locations.club.name || "CLUB"
   };
 
   const pickupOpt = optimizeRoutes({
@@ -294,6 +338,7 @@ export async function generatePlanForRun(params: {
     households: pickupGroups,
     vehicles: effectiveVehicles,
     depot: effectiveDepot,
+    locations,
     sizeLoads,
     seed: `pickup:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords
@@ -303,6 +348,7 @@ export async function generatePlanForRun(params: {
     households: dropoffGroups,
     vehicles: effectiveVehicles,
     depot: effectiveDepot,
+    locations,
     sizeLoads,
     seed: `dropoff:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords

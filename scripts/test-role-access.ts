@@ -93,13 +93,18 @@ assert.equal(
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "handler_shift_entry", "assistant_manager", "staff"),
-  true,
-  "management can still open entry tools"
+  false,
+  "management no longer sees Handler Shift Entry Log"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "manager_admin"), "trainer_entry", "manager_admin", "staff"),
-  true,
-  "admin can still open entry tools"
+  false,
+  "admin no longer sees Trainer's Entry"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "trainer_entry", "owner_admin", "staff"),
+  false,
+  "super admin no longer sees Trainer's Entry"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "marketing"), "walks_board", "marketing", "staff"),

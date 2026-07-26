@@ -26,6 +26,7 @@
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
     "test:route-generator": "tsx scripts/test-route-generator.ts",
     "setup:route-generator-shadow": "tsx scripts/setup-route-generator-shadow.ts",
+    "setup:route-generator-bases": "tsx scripts/seed-route-generator-bases.ts",
     "smoke:route-generator-shadow": "tsx scripts/run-route-generator-shadow-smoke.ts",
     "test:fitdog-alerts": "tsx scripts/test-fitdog-payment-alerts.ts",
     "test:package-commission-percent": "tsx scripts/test-package-commission-percent.ts",
@@ -64,6 +65,7 @@
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "jszip": "^3.10.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.468.0",
     "next": "^16.2.9",
     "pdf-lib": "^1.17.1",
@@ -75,6 +77,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/jszip": "^3.4.0",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20.14.10",
     "@types/pg": "^8.20.0",
     "@types/react": "^18.3.3",

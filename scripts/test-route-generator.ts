@@ -5,6 +5,8 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab
 } from "../lib/admin/permissions";
+import { buildAdminNav } from "../lib/admin/nav-groups";
+import { ADMIN_TABS } from "../lib/admin/types";
 import { parseAddress, householdKey } from "../lib/route-generator/address";
 import { capacityAllows, resolveLoadUnits, isServiceEligibleForVan } from "../lib/route-generator/capacity";
 import { assertNeverVan4, FITDOG_VAN_KEYS } from "../lib/route-generator/flags";
@@ -32,6 +34,11 @@ assert.equal(
   true
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "route_generator", "owner_admin", "lobby"),
+  false,
+  "Route Generator must stay staff-board only even for Super Admin"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "route_generator", "assistant_manager", "staff"),
   true
 );
@@ -44,6 +51,29 @@ assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "route_generator", "trainer", "staff"),
   false
 );
+
+{
+  const access = accessFromLegacyRole(null, null, "owner_admin");
+  const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, "owner_admin", "staff"));
+  const nav = buildAdminNav(visible, "staff");
+  let section: string | null = null;
+  let routeGeneratorSection: string | null = null;
+  for (const entry of nav) {
+    if (entry.type === "section") {
+      section = entry.id;
+      continue;
+    }
+    if (entry.type === "item" && entry.tab === "route_generator") {
+      routeGeneratorSection = section;
+      break;
+    }
+  }
+  assert.equal(
+    routeGeneratorSection,
+    "staff_dashboard",
+    "Route Generator must stay under Dashboard so the nav click is always reachable"
+  );
+}
 
 // Never Van 4
 assert.deepEqual(FITDOG_VAN_KEYS.includes("van_4" as never), false);
@@ -212,6 +242,9 @@ assert.ok(opt.routes.every((r) => r.vanKey !== ("van_4" as never)));
 assert.ok(opt.routes.every((r) => r.stops[0]?.stopKind === "depot_start"));
 assert.ok(opt.routes.every((r) => r.stops[r.stops.length - 1]?.stopKind === "depot_end"));
 for (const route of opt.routes) {
+  const start = route.stops[0];
+  const expectedHome = route.vehiclePool === "club" ? "CLUB" : "HUB";
+  assert.equal(start?.ownerName, expectedHome, `${route.vanKey} should start at ${expectedHome}`);
   for (const service of route.serviceTypes) {
     const vehicle = vehicles.find((v) => v.vanKey === route.vanKey)!;
     assert.equal(vehicle.eligibleServices.includes(service), true, `${service} on ${route.vanKey}`);

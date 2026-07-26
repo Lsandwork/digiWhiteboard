@@ -41,6 +41,7 @@ export const FITDOG_UI_PACK = {
   castVideos: "/assets/fitdog/ui-pack/cast-videos.svg",
   ownerFollowUp: "/assets/fitdog/ui-pack/owner-follow-up.svg",
   activeIssues: "/assets/fitdog/ui-pack/active-issues.svg",
+  browserWorld: "/assets/fitdog/ui-pack/browser-world.svg",
   users: "/assets/fitdog/ui-pack/users.svg",
   bulkPhotoUpload: "/assets/fitdog/ui-pack/bulk-photo-upload.svg",
   writeUps: "/assets/fitdog/ui-pack/write-ups.svg",
@@ -121,6 +122,7 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   demo_push: FITDOG_UI.pushNotices,
   notifications: FITDOG_UI.notifications,
   walks_board: FITDOG_UI.frontDeskLog,
-  route_generator: FITDOG_UI_PACK.activeIssues,
+  // Distinct from Track Incidents / Active Issues (same triangle icon was confusing in the collapsed rail).
+  route_generator: FITDOG_UI_PACK.browserWorld,
   remote_cast: FITDOG_UI_PACK.castVideos
 };
