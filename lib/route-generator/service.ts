@@ -211,7 +211,12 @@ export async function pullReportForDate(params: {
 
   await supabase
     .from("route_report_connections")
-    .update({ last_successful_pull_at: new Date().toISOString(), status: "connected" })
+    .update({
+      last_successful_pull_at: new Date().toISOString(),
+      status: "connected",
+      source_mode: pull.sourceMode,
+      last_error: null
+    })
     .eq("provider", "fitdog");
 
   await writeRouteAuditEvent({

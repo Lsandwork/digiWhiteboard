@@ -376,13 +376,18 @@ export function RouteGeneratorPanel() {
             <h2 className="admin-page-title">Route Generator</h2>
           </div>
           <p className="admin-page-subtitle mt-1 max-w-3xl">
-            Pull Fitdog pickup/drop-off reports, optimize Van 1/2/3/5/6 routes, and export validated Samsara CSVs.
+            Pull live Fitdog signups (Beach Excursion, Adventure Hike, Trainer-Led Hike, Group Class), optimize Van
+            1/2/3/5/6 routes, and export validated Samsara CSVs.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-admin-muted">
           <span>
             Connection:{" "}
             <strong className="text-white">{bootstrap.connection?.status ?? "disconnected"}</strong>
+          </span>
+          <span>
+            Source:{" "}
+            <strong className="text-white">{bootstrap.connection?.source_mode ?? "—"}</strong>
           </span>
           <span>
             Last pull:{" "}
