@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh } from "@/components/admin/ui/sortable-table";
 import type {
@@ -102,88 +102,173 @@ function AlertSection({
   accent?: boolean;
 }) {
   return (
-    <section className={`admin-card overflow-x-auto ${accent ? "border-rose-400/40 ring-1 ring-rose-400/20" : ""}`}>
+    <section className={`admin-card ${accent ? "border-rose-400/40 ring-1 ring-rose-400/20" : ""}`}>
       <div className={`border-b border-admin-border px-4 py-3 ${accent ? "bg-rose-500/10" : ""}`}>
-        <h3 className="text-lg font-black text-white">{title}</h3>
+        <h3 className="text-base font-black text-white sm:text-lg">{title}</h3>
         <p className="text-sm text-admin-muted">{subtitle}</p>
       </div>
-      <table className="min-w-full text-left text-sm">
-        <thead>
-          <tr className="border-b border-admin-border text-admin-muted">
-            <SortableTh label="Priority" column="severity" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
-            <SortableTh label="Detected" column="detected_at" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
-            <th className="px-3 py-3 font-semibold">Alert Type</th>
-            <th className="px-3 py-3 font-semibold">Owner</th>
-            <th className="px-3 py-3 font-semibold">Dog</th>
-            <th className="px-3 py-3 font-semibold">Service</th>
-            <th className="px-3 py-3 font-semibold">Service Date</th>
-            <SortableTh label="Amount Due" column="amount_due" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
-            <th className="px-3 py-3 font-semibold">Details</th>
-            <th className="px-3 py-3 font-semibold">Status</th>
-            <th className="px-3 py-3 font-semibold">Updated</th>
-            <th className="px-3 py-3 font-semibold">Assigned To</th>
-            <th className="px-3 py-3 font-semibold">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const updated = alertWasUpdated(row);
-            return (
-              <tr key={row.id} className="border-b border-admin-border/60 hover:bg-white/[0.02]">
-                <td className="px-3 py-3">
+
+      {/* Mobile: stacked tappable cards (no horizontal scroll) */}
+      <div className="space-y-2 p-3 md:hidden">
+        {rows.map((row) => {
+          const updated = alertWasUpdated(row);
+          return (
+            <button
+              key={row.id}
+              type="button"
+              className="admin-table-card flex w-full flex-col gap-2 p-3 text-left transition hover:bg-white/[0.03] active:bg-white/[0.06]"
+              onClick={() => onOpen(row.id)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold text-white">{row.owner_name}</p>
+                  <p className="mt-0.5 truncate text-sm text-admin-muted">
+                    {row.dog_name || "No dog"} · {formatFitdogAlertType(row.alert_type)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
                   <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${severityTone(row.severity)}`}>
                     {row.severity}
                   </span>
-                </td>
-                <td className="px-3 py-3 text-admin-muted">{formatWhen(row.detected_at)}</td>
-                <td className="px-3 py-3 font-medium text-white" title={row.alert_type}>
-                  {formatFitdogAlertType(row.alert_type)}
-                </td>
-                <td className="px-3 py-3 text-white">{row.owner_name}</td>
-                <td className="px-3 py-3 text-admin-muted">{row.dog_name || "—"}</td>
-                <td className="px-3 py-3 text-admin-muted">{row.service_name || "—"}</td>
-                <td className="px-3 py-3 text-admin-muted">{formatWhen(row.service_date)}</td>
-                <td className="px-3 py-3 font-semibold text-white">{row.amount_due_label || formatUsd(row.amount_due, row.currency)}</td>
-                <td className="px-3 py-3 text-admin-muted max-w-[280px] truncate" title={row.failure_reason || ""}>
-                  {row.failure_reason || "—"}
-                </td>
-                <td className="px-3 py-3">
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide ${statusTone(row.status)}`}
-                    title={row.status}
-                  >
-                    {formatOperationsAlertStatus(row.status)}
+                  <ChevronRight className="h-4 w-4 text-admin-muted" aria-hidden />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className={`rounded-full border px-2 py-0.5 font-semibold tracking-wide ${statusTone(row.status)}`}>
+                  {formatOperationsAlertStatus(row.status)}
+                </span>
+                {updated ? (
+                  <span className="rounded-full border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-100">
+                    Updated
                   </span>
-                </td>
-                <td className="px-3 py-3">
-                  {updated ? (
-                    <span className="rounded-full border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-100" title={formatWhen(row.updated_at)}>
-                      Updated
+                ) : (
+                  <span className="rounded-full border border-admin-border px-2 py-0.5 font-semibold text-admin-muted">
+                    New
+                  </span>
+                )}
+                <span className="font-semibold text-white">
+                  {row.amount_due_label || formatUsd(row.amount_due, row.currency)}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-admin-muted">
+                <span>{formatWhen(row.detected_at)}</span>
+                {row.service_name ? <span>{row.service_name}</span> : null}
+                <span>{row.assigned_user_name || "Unassigned"}</span>
+              </div>
+              {row.failure_reason ? (
+                <p className="line-clamp-2 text-xs text-admin-muted">{row.failure_reason}</p>
+              ) : null}
+            </button>
+          );
+        })}
+        {!loading && !rows.length ? (
+          <p className="px-2 py-6 text-center text-sm text-admin-muted">{emptyLabel}</p>
+        ) : null}
+        {loading && !rows.length ? (
+          <p className="px-2 py-6 text-center text-sm text-admin-muted">Loading…</p>
+        ) : null}
+      </div>
+
+      {/* Desktop: full table; entire row opens details */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="min-w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-admin-border text-admin-muted">
+              <SortableTh label="Priority" column="severity" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
+              <SortableTh label="Detected" column="detected_at" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
+              <th className="px-3 py-3 font-semibold">Alert Type</th>
+              <th className="px-3 py-3 font-semibold">Owner</th>
+              <th className="px-3 py-3 font-semibold">Dog</th>
+              <th className="px-3 py-3 font-semibold">Service</th>
+              <th className="px-3 py-3 font-semibold">Service Date</th>
+              <SortableTh label="Amount Due" column="amount_due" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
+              <th className="px-3 py-3 font-semibold">Details</th>
+              <th className="px-3 py-3 font-semibold">Status</th>
+              <th className="px-3 py-3 font-semibold">Updated</th>
+              <th className="px-3 py-3 font-semibold">Assigned To</th>
+              <th className="px-3 py-3 font-semibold">
+                <span className="sr-only">Open</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const updated = alertWasUpdated(row);
+              return (
+                <tr
+                  key={row.id}
+                  className="cursor-pointer border-b border-admin-border/60 hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Open alert for ${row.owner_name}`}
+                  onClick={() => onOpen(row.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onOpen(row.id);
+                    }
+                  }}
+                >
+                  <td className="px-3 py-3">
+                    <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${severityTone(row.severity)}`}>
+                      {row.severity}
                     </span>
-                  ) : (
-                    <span className="rounded-full border border-admin-border px-2 py-0.5 text-xs font-semibold text-admin-muted">
-                      New
+                  </td>
+                  <td className="px-3 py-3 text-admin-muted">{formatWhen(row.detected_at)}</td>
+                  <td className="px-3 py-3 font-medium text-white" title={row.alert_type}>
+                    {formatFitdogAlertType(row.alert_type)}
+                  </td>
+                  <td className="px-3 py-3 text-white">{row.owner_name}</td>
+                  <td className="px-3 py-3 text-admin-muted">{row.dog_name || "—"}</td>
+                  <td className="px-3 py-3 text-admin-muted">{row.service_name || "—"}</td>
+                  <td className="px-3 py-3 text-admin-muted">{formatWhen(row.service_date)}</td>
+                  <td className="px-3 py-3 font-semibold text-white">
+                    {row.amount_due_label || formatUsd(row.amount_due, row.currency)}
+                  </td>
+                  <td className="max-w-[280px] truncate px-3 py-3 text-admin-muted" title={row.failure_reason || ""}>
+                    {row.failure_reason || "—"}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide ${statusTone(row.status)}`}
+                      title={row.status}
+                    >
+                      {formatOperationsAlertStatus(row.status)}
                     </span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-admin-muted">{row.assigned_user_name || "Unassigned"}</td>
-                <td className="px-3 py-3">
-                  <button type="button" className="text-fitdog-orange hover:underline" onClick={() => onOpen(row.id)}>
-                    Open
-                  </button>
+                  </td>
+                  <td className="px-3 py-3">
+                    {updated ? (
+                      <span
+                        className="rounded-full border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-100"
+                        title={formatWhen(row.updated_at)}
+                      >
+                        Updated
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-admin-border px-2 py-0.5 text-xs font-semibold text-admin-muted">
+                        New
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-admin-muted">{row.assigned_user_name || "Unassigned"}</td>
+                  <td className="px-3 py-3">
+                    <span className="inline-flex items-center gap-1 text-fitdog-orange">
+                      Open <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+            {!loading && !rows.length ? (
+              <tr>
+                <td colSpan={13} className="px-3 py-8 text-center text-admin-muted">
+                  {emptyLabel}
                 </td>
               </tr>
-            );
-          })}
-          {!loading && !rows.length ? (
-            <tr>
-              <td colSpan={13} className="px-3 py-8 text-center text-admin-muted">
-                {emptyLabel}
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -417,12 +502,12 @@ export function FitdogAlertsPanel() {
         </div>
       </header>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
-            className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+            className={`shrink-0 rounded-xl border px-3 py-2.5 text-sm font-semibold ${
               panelView === tab.id
                 ? "border-fitdog-orange bg-fitdog-orange/20 text-white"
                 : "border-admin-border text-admin-muted hover:text-white"
@@ -446,7 +531,7 @@ export function FitdogAlertsPanel() {
 
       {panelView !== "sync" && panelView !== "settings" ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-7">
             {[
               { label: "New Alerts", value: summary?.new_alerts ?? 0 },
               { label: "Card Declined", value: summary?.card_declined ?? declinedRows.length },
@@ -454,18 +539,48 @@ export function FitdogAlertsPanel() {
               { label: "Failed Payments", value: summary?.failed_payments ?? 0 },
               { label: "Missed Payments", value: summary?.missed_payments ?? 0 },
               { label: "Resolved Today", value: summary?.resolved_today ?? 0 },
-              { label: "Last Fitdog Sync", value: formatWhen(summary?.last_successful_sync_at) }
+              {
+                label: "Last Fitdog Sync",
+                value: formatWhen(summary?.last_successful_sync_at),
+                wide: true,
+                sync: true
+              }
             ].map((card) => (
-              <article key={card.label} className="admin-card p-4">
-                <p className="text-xs uppercase tracking-wide text-admin-muted">{card.label}</p>
-                <p className="mt-2 text-2xl font-black text-white">{card.value}</p>
+              <article
+                key={card.label}
+                className={`admin-card p-3 sm:p-4 ${"wide" in card && card.wide ? "col-span-2 lg:col-span-3 xl:col-span-1" : ""}`}
+              >
+                <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-admin-muted sm:text-xs">
+                  {card.label}
+                </p>
+                <p
+                  className={`mt-1.5 font-black text-white ${
+                    "sync" in card && card.sync
+                      ? "flex items-center gap-2 text-sm leading-snug sm:text-base"
+                      : "text-xl sm:text-2xl"
+                  }`}
+                >
+                  <span className="min-w-0 break-words">{card.value}</span>
+                  {"sync" in card && card.sync && summary?.last_successful_sync_at ? (
+                    <span
+                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-fitdog-orange"
+                      title="Last successful sync"
+                      aria-hidden
+                    />
+                  ) : null}
+                </p>
               </article>
             ))}
           </div>
 
-          <div className="admin-card grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
-            <input className="admin-input" placeholder="Search owner, dog, reason…" value={q} onChange={(e) => setQ(e.target.value)} />
-            <select className="admin-select" value={alertType} onChange={(e) => setAlertType(e.target.value as FitdogAlertType | "all")}>
+          <div className="admin-card grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-4">
+            <input
+              className="admin-input min-h-11 sm:col-span-2 xl:col-span-1"
+              placeholder="Search owner, dog, reason…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select className="admin-select min-h-11" value={alertType} onChange={(e) => setAlertType(e.target.value as FitdogAlertType | "all")}>
               <option value="all">All alert types</option>
               {FITDOG_ALERT_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -473,7 +588,11 @@ export function FitdogAlertsPanel() {
                 </option>
               ))}
             </select>
-            <select className="admin-select" value={effectiveStatus} onChange={(e) => setStatus(e.target.value as OperationsAlertStatus | "all")}>
+            <select
+              className="admin-select min-h-11"
+              value={effectiveStatus}
+              onChange={(e) => setStatus(e.target.value as OperationsAlertStatus | "all")}
+            >
               <option value="all">{panelView === "resolved" ? "All resolved" : "All statuses"}</option>
               {(panelView === "resolved"
                 ? OPERATIONS_ALERT_STATUSES.filter((value) => isClosedAlertStatus(value))
@@ -485,7 +604,7 @@ export function FitdogAlertsPanel() {
                 </option>
               ))}
             </select>
-            <select className="admin-select" value={assignedUserId} onChange={(e) => setAssignedUserId(e.target.value)}>
+            <select className="admin-select min-h-11" value={assignedUserId} onChange={(e) => setAssignedUserId(e.target.value)}>
               <option value="all">All assignees</option>
               <option value="unassigned">Unassigned</option>
               {(data?.assignableUsers || []).map((user) => (
@@ -494,13 +613,13 @@ export function FitdogAlertsPanel() {
                 </option>
               ))}
             </select>
-            <input className="admin-input" placeholder="Owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
-            <input className="admin-input" placeholder="Dog" value={dog} onChange={(e) => setDog(e.target.value)} />
-            <input className="admin-input" placeholder="Service" value={service} onChange={(e) => setService(e.target.value)} />
-            <input className="admin-input" placeholder="Min amount" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
-            <input className="admin-input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            <input className="admin-input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            <label className="flex items-center gap-2 text-sm text-admin-muted">
+            <input className="admin-input min-h-11" placeholder="Owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
+            <input className="admin-input min-h-11" placeholder="Dog" value={dog} onChange={(e) => setDog(e.target.value)} />
+            <input className="admin-input min-h-11" placeholder="Service" value={service} onChange={(e) => setService(e.target.value)} />
+            <input className="admin-input min-h-11" placeholder="Min amount" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
+            <input className="admin-input min-h-11" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <input className="admin-input min-h-11" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+            <label className="flex min-h-11 items-center gap-2 text-sm text-admin-muted">
               <input type="checkbox" checked={unassignedOnly} onChange={(e) => setUnassignedOnly(e.target.checked)} />
               Unassigned only
             </label>
@@ -756,7 +875,7 @@ export function FitdogAlertsPanel() {
               ) : null}
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
               {[
                 ["acknowledge", "Acknowledge"],
                 ["assign_to_me", "Assign to me"],
@@ -773,7 +892,7 @@ export function FitdogAlertsPanel() {
                 <button
                   key={action}
                   type="button"
-                  className="admin-btn-secondary"
+                  className="admin-btn-secondary min-h-11 justify-center text-sm"
                   onClick={() => void runAction(action === "sync" ? "sync" : action, action === "sync" ? { mode: "reconciliation" } : {})}
                 >
                   {label}
