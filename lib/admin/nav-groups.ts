@@ -111,7 +111,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   handler_shift_entry: "Handler Shift Entry Log",
   hr_pip: "Track PIP",
   remote_cast: "Remote Whiteboard Cast",
-  walks_board: "Walks Board"
+  walks_board: "Walks Board",
+  route_generator: "Route Generator"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -146,6 +147,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
   walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
+  route_generator: "Pull Fitdog pickup/drop-off reports, optimize van routes, and export Samsara CSVs.",
   staff_directory: "Edit staff names, roles, and contact info.",
   staff_create_user: "Create a new staff admin login.",
   users: "Manage admin users, roles, and permissions.",
@@ -197,7 +199,7 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits"];
+const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits", "route_generator"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));

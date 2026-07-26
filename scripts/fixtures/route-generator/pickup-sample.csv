@@ -1,0 +1,8 @@
+Reservation ID,Customer ID,Owner Name,Dog Name,Service,Pickup Requested,Pickup Address,City,State,ZIP,Phone,Pickup Window Start,Pickup Window End,Dog Size,Driver Notes
+R-1001,C-10,Alex Rivera,Mango,Adventure Hike,yes,"123 Ocean Ave Apt 2",Santa Monica,CA,90401,3105551001,07:30,08:00,Medium,Gate code 12
+R-1002,C-10,Alex Rivera,Kiwi,Adventure Hike,yes,"123 Ocean Ave Apt 2",Santa Monica,CA,90401,3105551001,07:30,08:00,Small,
+R-1003,C-22,Jordan Lee,Bean,Beach Excursion,yes,456 Montana Ave,Santa Monica,CA,90403,3105552002,07:45,08:15,Large,Ring doorbell
+R-1004,C-33,Sam Patel,Nori,Trainer-Led Hike,yes,789 Wilshire Blvd,Santa Monica,CA,90401,3105553003,08:00,08:30,Medium,
+R-1005,C-44,Riley Chen,Toast,Group Class,yes,12 4th St,Santa Monica,CA,90401,3105554004,08:10,08:40,Small,
+R-1006,C-55,Casey Ng,Pumpkin,Taxi Service,yes,88 Colorado Ave,Santa Monica,CA,90401,3105555005,09:00,09:30,Unknown,Size unknown
+R-1007,C-66,Missing Address,Ghost,Adventure Hike,yes,,,,,3105556006,07:30,08:00,Medium,

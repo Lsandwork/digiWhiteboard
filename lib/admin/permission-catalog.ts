@@ -190,7 +190,15 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("manage_staff_directory", "Manage Staff Directory", "Edit staff directory entries."),
       p("view_package_commissions", "View Package & Class Commissions", "View trainer package and class commissions."),
       p("comment_package_commissions", "Comment on Commissions", "Add comments or disputes to commission rows."),
-      p("manage_package_commissions", "Manage Package & Class Commissions", "Add, confirm, and administer trainer commissions.")
+      p("manage_package_commissions", "Manage Package & Class Commissions", "Add, confirm, and administer trainer commissions."),
+      p("route_generator.view", "Route Generator: View", "View Route Generator plans and maps."),
+      p("route_generator.pull_report", "Route Generator: Pull Report", "Pull Fitdog pickup/drop-off reports."),
+      p("route_generator.generate", "Route Generator: Generate", "Generate and re-optimize routes."),
+      p("route_generator.edit", "Route Generator: Edit", "Manually edit routes and overrides."),
+      p("route_generator.approve", "Route Generator: Approve", "Approve route plans for export."),
+      p("route_generator.export", "Route Generator: Export", "Export validated Samsara CSV files."),
+      p("route_generator.manage_settings", "Route Generator: Manage Settings", "Manage vans, depot, integrations, and templates."),
+      p("route_generator.view_audit", "Route Generator: View Audit", "View Route Generator audit events.")
     ]
   },
   {
