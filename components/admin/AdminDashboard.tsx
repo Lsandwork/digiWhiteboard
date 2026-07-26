@@ -384,18 +384,22 @@ export function AdminDashboard() {
     />
   );
   const systemInfoPanel = <SystemInfoPanel board={board} dataSource={data.data_source} />;
+  const livePreviewPanel = (
+    <LivePreviewPanel
+      board={board}
+      lobbySettings={lobbySettings}
+      staffSettings={staffSettings}
+      promotions={data.promotions}
+      staffDogs={data.staff_dogs}
+      activeCheckouts={data.active_checkouts}
+      onFullscreen={() => setPreviewOpen(true)}
+      compact={isStaffOverview}
+    />
+  );
   const preview = (
     <div className="space-y-4">
-      <LivePreviewPanel
-        board={board}
-        lobbySettings={lobbySettings}
-        staffSettings={staffSettings}
-        promotions={data.promotions}
-        staffDogs={data.staff_dogs}
-        activeCheckouts={data.active_checkouts}
-        onFullscreen={() => setPreviewOpen(true)}
-      />
-      {/* On staff Overview these sit under Whiteboard & Gingr Health (left → right). */}
+      {livePreviewPanel}
+      {/* On staff Overview these sit under Whiteboard & Gingr Health with Live Preview in-row. */}
       {!isStaffOverview ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
           {publishPanel}
@@ -436,7 +440,7 @@ export function AdminDashboard() {
         canUseBoardSwitcher={canUseBoardSwitcher}
         accessibleBoards={accessibleBoards}
         preview={preview}
-        showPreview={showPreview && !isDemo && canSeeAdminUtilities && board !== "marketing"}
+        showPreview={showPreview && !isStaffOverview && !isDemo && canSeeAdminUtilities && board !== "marketing"}
       >
         {error ? <p className="admin-error">{error}</p> : null}
 
@@ -468,6 +472,7 @@ export function AdminDashboard() {
                 <>
                   {publishPanel}
                   {systemInfoPanel}
+                  {livePreviewPanel}
                 </>
               }
             />

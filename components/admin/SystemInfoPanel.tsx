@@ -9,9 +9,9 @@ type SystemInfoPanelProps = {
 
 export function SystemInfoPanel({ board, dataSource }: SystemInfoPanelProps) {
   return (
-    <section className="admin-card p-4">
+    <section className="admin-card flex h-full flex-col p-4">
       <h2 className="mb-3 font-black text-white">System Info</h2>
-      <dl className="space-y-2 text-sm">
+      <dl className="mt-auto space-y-2 text-sm">
         <Row label="Board ID" value={board === "lobby" ? "board_lobby_01" : "board_staff_01"} />
         <Row label="Selected board" value={board === "lobby" ? "Lobby Whiteboard" : "Staff Digital Whiteboard"} />
         <Row label="Content Source" value={dataSource} />

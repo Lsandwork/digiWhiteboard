@@ -16,21 +16,36 @@ type LivePreviewPanelProps = {
   staffDogs: LiveDog[];
   activeCheckouts: number;
   onFullscreen?: () => void;
+  /** Match sibling card height on Overview (Publish / System Info). */
+  compact?: boolean;
 };
 
-export function LivePreviewPanel({ board, lobbySettings, staffSettings, promotions, staffDogs, activeCheckouts, onFullscreen }: LivePreviewPanelProps) {
+export function LivePreviewPanel({
+  board,
+  lobbySettings,
+  staffSettings,
+  promotions,
+  staffDogs,
+  activeCheckouts,
+  onFullscreen,
+  compact = false
+}: LivePreviewPanelProps) {
   const featuredPromotion = promotions.find((p) => p.active) ?? promotions[0];
   const checkoutDogs = staffDogs.filter((d) => d.display_status === "checking_out").slice(0, 3);
 
   return (
-    <section className="admin-card overflow-hidden">
+    <section className={`admin-card overflow-hidden ${compact ? "flex h-full min-h-0 flex-col" : ""}`}>
       <div className="flex items-center justify-between border-b border-admin-border px-4 py-3">
         <h2 className="font-black text-white">Live Preview</h2>
         <span className="admin-badge admin-badge--green">LIVE</span>
       </div>
 
-      <div className="p-4">
-        <div className={`admin-preview-frame ${board === "lobby" ? "admin-preview-frame--lobby" : "admin-preview-frame--staff"}`}>
+      <div className={`p-4 ${compact ? "flex min-h-0 flex-1 flex-col" : ""}`}>
+        <div
+          className={`admin-preview-frame ${board === "lobby" ? "admin-preview-frame--lobby" : "admin-preview-frame--staff"} ${
+            compact ? "admin-preview-frame--compact" : ""
+          }`}
+        >
           {board === "lobby" ? (
             <>
               <div className="flex items-center gap-2">
@@ -65,7 +80,7 @@ export function LivePreviewPanel({ board, lobbySettings, staffSettings, promotio
           )}
         </div>
 
-        <div className="mt-3 flex items-center justify-between text-xs text-admin-muted">
+        <div className={`mt-3 flex items-center justify-between text-xs text-admin-muted ${compact ? "mt-auto pt-3" : ""}`}>
           <span>{board === "lobby" ? "Lobby TV 1" : "Staff Display 1"}</span>
           <span>1920 × 1080</span>
           {onFullscreen ? (

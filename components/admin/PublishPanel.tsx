@@ -25,7 +25,7 @@ export function PublishPanel({
   hasUnpublishedChanges
 }: PublishPanelProps) {
   return (
-    <section className="admin-card p-4">
+    <section className="admin-card flex h-full flex-col p-4">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 className="font-black text-white">Publish & Version</h2>
         <span className={`admin-badge ${hasUnpublishedChanges ? "admin-badge--amber" : "admin-badge--green"}`}>
@@ -38,10 +38,14 @@ export function PublishPanel({
         <div className="flex justify-between gap-4"><dt className="text-admin-muted">Published by</dt><dd className="text-white">{publishedBy ?? "—"}</dd></div>
         <div className="flex justify-between gap-4"><dt className="text-admin-muted">Board</dt><dd className="text-white">{board === "lobby" ? "Lobby Whiteboard" : "Staff Digital Whiteboard"}</dd></div>
       </dl>
-      <button type="button" className="admin-btn-primary mt-4 inline-flex w-full items-center justify-center gap-2" onClick={onPublish} disabled={busy}>
-        <Upload className="h-4 w-4" /> {busy ? "Publishing…" : "Publish Changes"}
-      </button>
-      <button type="button" className="admin-btn-secondary mt-2 w-full" onClick={onViewHistory}>View Change History</button>
+      <div className="mt-auto pt-4">
+        <button type="button" className="admin-btn-primary inline-flex w-full items-center justify-center gap-2" onClick={onPublish} disabled={busy}>
+          <Upload className="h-4 w-4" /> {busy ? "Publishing…" : "Publish Changes"}
+        </button>
+        <button type="button" className="admin-btn-secondary mt-2 w-full" onClick={onViewHistory}>
+          View Change History
+        </button>
+      </div>
     </section>
   );
 }
