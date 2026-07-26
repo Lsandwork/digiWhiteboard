@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
-import { canAccessManagementReports, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import {
+  canAccessManagementReports,
+  getEffectiveAdminRole,
+  isAdminRequest,
+  unauthorizedAdminResponse
+} from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { canUseStandardOrEmergencyPush } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, canUseStandardOrEmergencyPush } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { appendStaffOpsActivityEntries, dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
@@ -42,18 +47,20 @@ function actorFromRequest(request: Request) {
 async function actorContext(request: Request) {
   const { session, actor } = actorFromRequest(request);
   const supabase = getServiceSupabase();
+  const effectiveRole = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
   const access = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
-  return { session, actor, access, role };
+    ? await getUserAccess(supabase, session.adminUserId, effectiveRole, session.email)
+    : effectiveRole
+      ? accessFromLegacyRole(null, null, effectiveRole)
+      : null;
+  return { session, actor, access, role: effectiveRole };
 }
 
 function canManagePushNotices(
   access: Awaited<ReturnType<typeof actorContext>>["access"],
   role?: string | null
 ) {
-  return canUseStandardOrEmergencyPush(access, role) || !role;
+  return canUseStandardOrEmergencyPush(access, role);
 }
 
 export async function GET(request: Request) {
@@ -85,18 +92,18 @@ export async function GET(request: Request) {
     const [activeNotice, notices, managementReports] = await Promise.all([
       loadActiveStaffPushNotice(supabase),
       listStaffPushNotices(supabase),
-      canAccessManagementReports(session?.role) ? listManagementReports(supabase) : Promise.resolve([])
+      canAccessManagementReports(role) ? listManagementReports(supabase) : Promise.resolve([])
     ]);
 
     return NextResponse.json({
       activeNotice,
       notices,
       defaultNotices: DEFAULT_STAFF_PUSH_NOTICES,
-      managementReports: canAccessManagementReports(session?.role) ? managementReports : undefined,
+      managementReports: canAccessManagementReports(role) ? managementReports : undefined,
       currentUser: {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
-        role: session?.role ?? "owner_admin",
+        role: role ?? null,
         access
       }
     });

@@ -409,12 +409,11 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
+/** Read-only staff roles (viewer / overnight / maintenance / generic staff). */
 const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
   "view_front_desk_log",
-  "create_front_desk_log",
-  "edit_front_desk_log",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
@@ -844,7 +843,8 @@ export function isSuperAdminLegacyRole(legacyRole?: string | null) {
 
 /** Owner Admin and Manager Admin — full sidebar and utilities (matches middleware / API guards). */
 export function isFullAdminLegacyRole(legacyRole?: string | null) {
-  return legacyRole === "owner_admin" || legacyRole === "manager_admin" || !legacyRole;
+  // Missing/blank roles must never elevate to full admin.
+  return legacyRole === "owner_admin" || legacyRole === "manager_admin";
 }
 
 /** Owner Admin, Manager Admin, or Assistant Manager. */
@@ -1078,6 +1078,14 @@ export function canAccessAdminTab(
     return roleKey === "admin" || roleKey === "management" || roleKey === "super_admin";
   }
 
+  // Operations checklist is for floor handlers (+ leads/management/admins via early return).
+  if (tab === "checklist") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isAdminOrManagementLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole)) return true;
+    return isDogHandlerLegacyRole(legacyRole);
+  }
+
   // Fitdog payment alerts: allowlisted roles or explicit permission.
   if (tab === "fitdog_alerts") {
     if (board !== "staff") return false;
@@ -1233,16 +1241,22 @@ export function canAccessAdminTab(
   return hasPermission(effective, required);
 }
 
-/** Every authenticated dashboard user can open the Front Desk Communications Log. */
+/** Open the Front Desk Communications Log when the role has view access. */
 export function canAccessFrontDeskLogForRole(role?: string | null) {
   const access = accessFromLegacyRole(null, null, role);
   return hasPermission(access, "view_front_desk_log");
 }
 
-/** Every authenticated dashboard user can submit new Front Desk log entries. */
+/** Submit new Front Desk log entries when the role has create access. */
 export function canCreateFrontDeskLogForRole(role?: string | null) {
   const access = accessFromLegacyRole(null, null, role);
   return hasPermission(access, "create_front_desk_log");
+}
+
+/** Edit / reply / move Front Desk log entries when the role has edit access. */
+export function canEditFrontDeskLogForRole(role?: string | null) {
+  const access = accessFromLegacyRole(null, null, role);
+  return hasPermission(access, "edit_front_desk_log");
 }
 
 export function firstAccessibleAdminTab(

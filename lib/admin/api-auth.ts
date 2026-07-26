@@ -3,6 +3,7 @@ import { demoWriteBlockedMessage, isDemoSession } from "@/lib/demo/session";
 import { NextResponse } from "next/server";
 import {
   canCreateFrontDeskLogForRole,
+  canEditFrontDeskLogForRole,
   canAccessHrPanelsForUser,
   canReviewManagementSupportForUser,
   canReviewWriteUpsForUser,
@@ -35,12 +36,30 @@ import {
   isTeamLeaderRole
 } from "@/lib/admin/users";
 
-export function isAdminRequest(request: Request) {
-  if (getAdminSessionFromRequest(request)) return true;
-
+function hasValidAdminPasswordHeader(request: Request) {
   const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
   const headerPassword = request.headers.get("x-admin-password")?.trim();
   return Boolean(legacyPassword && headerPassword && headerPassword === legacyPassword);
+}
+
+export function isAdminRequest(request: Request) {
+  if (getAdminSessionFromRequest(request)) return true;
+  return hasValidAdminPasswordHeader(request);
+}
+
+/**
+ * Role used for API permission checks.
+ * Cookie session role wins. Password-header auth without a session is owner_admin.
+ * Missing/blank session roles never elevate.
+ */
+export function getEffectiveAdminRole(request: Request): string | null {
+  const session = getAdminSessionFromRequest(request);
+  if (session) {
+    const role = typeof session.role === "string" ? session.role.trim() : "";
+    return role || null;
+  }
+  if (hasValidAdminPasswordHeader(request)) return "owner_admin";
+  return null;
 }
 
 export function unauthorizedAdminResponse(body: Record<string, unknown> = { error: "Unauthorized." }) {
@@ -55,11 +74,11 @@ export function blockDemoWrite(request: Request) {
 }
 
 export function canManagePushNotices(role?: string | null) {
-  return canAccessPushNotices(role) || !role;
+  return canAccessPushNotices(role);
 }
 
 export function canManageStaffOperations(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || hasCoordinatorAccess(role) || !role;
+  return role === "owner_admin" || role === "manager_admin" || hasCoordinatorAccess(role);
 }
 
 export function canManageWhiteboardAdmin(role?: string | null) {
@@ -72,17 +91,17 @@ export function canCreatePushNotice(role?: string | null) {
 
 /** Edit Daily Reminder templates — admins and management only. */
 export function canEditDailyReminders(role?: string | null) {
-  return isFullAdminRole(role) || role === "management" || !role;
+  return isFullAdminRole(role) || role === "management" || role === "assistant_manager";
 }
 
 /** Send Daily Reminders early — admins, management, team leads, and coordinators. */
 export function canSendDailyReminderEarly(role?: string | null) {
-  return canAccessPushNotices(role) || !role;
+  return canAccessPushNotices(role);
 }
 
 /** Force resend a Daily Reminder — full admins only. */
 export function canForceResendDailyReminder(role?: string | null) {
-  return isFullAdminRole(role) || !role;
+  return isFullAdminRole(role);
 }
 
 export function canViewDailyReminderHistory(role?: string | null) {
@@ -102,15 +121,25 @@ export function canManageActiveIssues(role?: string | null) {
 }
 
 export function canPushDogHandlerComplaintNotice(role?: string | null) {
-  return canCreateDogHandlerComplaintNotice(role) || !role;
+  return canCreateDogHandlerComplaintNotice(role);
 }
 
 export function canCreateFrontDeskLog(role?: string | null) {
-  return canCreateFrontDeskLogForRole(role) || !role;
+  return canCreateFrontDeskLogForRole(role);
+}
+
+export function canEditFrontDeskLog(role?: string | null) {
+  return canEditFrontDeskLogForRole(role);
 }
 
 export function canPushGroomingRequest(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || role === "front_desk_coordinator" || role === "team_leader" || role === "groomer" || !role;
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "front_desk_coordinator" ||
+    role === "team_leader" ||
+    role === "groomer"
+  );
 }
 
 export function canClearGroomingRequest(role?: string | null) {
@@ -118,7 +147,7 @@ export function canClearGroomingRequest(role?: string | null) {
 }
 
 export function canAccessManagementReports(role?: string | null) {
-  return canViewManagementReports(role) || !role;
+  return canViewManagementReports(role);
 }
 
 export function canSubmitWriteUp(role?: string | null) {
@@ -126,7 +155,7 @@ export function canSubmitWriteUp(role?: string | null) {
 }
 
 export function canViewOwnWriteUps(role?: string | null) {
-  return userCanViewOwnWriteUps(role) || !role;
+  return userCanViewOwnWriteUps(role);
 }
 
 export function canSubmitGroomerComplaint(role?: string | null) {
@@ -134,15 +163,15 @@ export function canSubmitGroomerComplaint(role?: string | null) {
 }
 
 export function canViewOwnGroomerSubmissions(role?: string | null) {
-  return userCanViewOwnGroomerSubmissions(role) || !role;
+  return userCanViewOwnGroomerSubmissions(role);
 }
 
 export function canCreateTrainerEntry(role?: string | null) {
-  return userCanCreateTrainerEntry(role) || !role;
+  return userCanCreateTrainerEntry(role);
 }
 
 export function canSubmitTrainerComplaint(role?: string | null) {
-  return userCanSubmitTrainerComplaint(role) || !role;
+  return userCanSubmitTrainerComplaint(role);
 }
 
 /** Team leads (and admin/management) can file supply/accommodation requests. */
@@ -151,43 +180,43 @@ export function canSubmitTeamLeadRequest(role?: string | null) {
 }
 
 export function canViewOwnTrainerSubmissions(role?: string | null) {
-  return userCanViewOwnTrainerSubmissions(role) || !role;
+  return userCanViewOwnTrainerSubmissions(role);
 }
 
 export function canManagePackageCommissions(role?: string | null) {
-  return userCanManagePackageCommissions(role) || !role;
+  return userCanManagePackageCommissions(role);
 }
 
 export function canViewPackageCommissions(role?: string | null) {
-  return userCanViewPackageCommissions(role) || !role;
+  return userCanViewPackageCommissions(role);
 }
 
 export function canReviewManagementSupport(role?: string | null) {
-  return userCanReviewManagementSupport(role) || !role;
+  return userCanReviewManagementSupport(role);
 }
 
 export function canReviewWriteUps(role?: string | null) {
-  return userCanReviewWriteUps(role) || !role;
+  return userCanReviewWriteUps(role);
 }
 
 export function canAccessHrPanels(role?: string | null) {
-  return userCanAccessHrPanels(role) || !role;
+  return userCanAccessHrPanels(role);
 }
 
 export function canSubmitWriteUpWithAccess(access: UserAccess | null | undefined, role?: string | null) {
-  return canSubmitWriteUpForUser(access, role) || !role;
+  return canSubmitWriteUpForUser(access, role);
 }
 
 export function canReviewWriteUpsWithAccess(access: UserAccess | null | undefined, role?: string | null) {
-  return canReviewWriteUpsForUser(access, role) || !role;
+  return canReviewWriteUpsForUser(access, role);
 }
 
 export function canAccessHrPanelsWithAccess(access: UserAccess | null | undefined, role?: string | null) {
-  return canAccessHrPanelsForUser(access, role) || !role;
+  return canAccessHrPanelsForUser(access, role);
 }
 
 export function canReviewManagementSupportWithAccess(access: UserAccess | null | undefined, role?: string | null) {
-  return canReviewManagementSupportForUser(access, role) || !role;
+  return canReviewManagementSupportForUser(access, role);
 }
 
 export { canAccessCrossoverCommunication, canAccessFrontDeskLog, canAccessPushNotices, canViewStaffDirectory, canManageStaffDirectory };

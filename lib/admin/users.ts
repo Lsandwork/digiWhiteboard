@@ -105,12 +105,12 @@ export function hasCoordinatorAccess(role?: string | null) {
   return isStaffOpsLimitedRole(role);
 }
 
-/** Front Desk Shift Log — all authenticated dashboard users. */
+/** Front Desk Shift Log — roles with view_front_desk_log. */
 export function canAccessFrontDeskLog(role?: string | null) {
   return canAccessFrontDeskLogForRole(role);
 }
 
-/** Submit new Front Desk log entries — all authenticated dashboard users. */
+/** Submit new Front Desk log entries — roles with create_front_desk_log. */
 export function canCreateFrontDeskLog(role?: string | null) {
   return canCreateFrontDeskLogForRole(role);
 }
@@ -258,7 +258,8 @@ export function isStaffPanelLimitedRole(role?: string | null) {
 }
 
 export function isFullAdminRole(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || !role;
+  // Missing/blank roles must never elevate to full admin.
+  return role === "owner_admin" || role === "manager_admin";
 }
 
 /** Assistant Manager — management tier (not full admin). */

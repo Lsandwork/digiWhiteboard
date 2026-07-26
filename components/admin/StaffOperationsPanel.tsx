@@ -107,6 +107,11 @@ type StaffOpsPayload = {
   activity_logs: StaffActivityLog[];
   staff_directory: StaffDirectoryMember[];
   currentUser: { email: string | null; adminUserId: string | null; role: string };
+  permissions?: {
+    canCreate?: boolean;
+    canEdit?: boolean;
+    canView?: boolean;
+  };
 };
 
 type Filters = {
@@ -830,19 +835,27 @@ function CrossoverPage(props: {
       </div>
 
       <div className="crossover-dashboard__workspace">
-        <div className="crossover-dashboard__workspace-form">
-          <AddShiftLogEntryCard
-            form={form}
-            patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
-            busy={props.busy}
-            assignOptions={props.staffOptions}
-            onSubmit={() => submit()}
-            onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
-          />
-        </div>
-        <div className="crossover-dashboard__workspace-templates">
-          <QuickLogTemplatesSidebar selectedTemplateId={form.template_id} onPick={pickTemplate} />
-        </div>
+        {props.data?.permissions?.canCreate !== false ? (
+          <>
+            <div className="crossover-dashboard__workspace-form">
+              <AddShiftLogEntryCard
+                form={form}
+                patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
+                busy={props.busy}
+                assignOptions={props.staffOptions}
+                onSubmit={() => submit()}
+                onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
+              />
+            </div>
+            <div className="crossover-dashboard__workspace-templates">
+              <QuickLogTemplatesSidebar selectedTemplateId={form.template_id} onPick={pickTemplate} />
+            </div>
+          </>
+        ) : (
+          <div className="crossover-dashboard__workspace-form">
+            <p className="text-sm text-slate-300">View only — your role can read the Front Desk Log but cannot create entries.</p>
+          </div>
+        )}
         <div className="crossover-dashboard__workspace-archived">
           <ActiveShiftLogCard
             rows={archivedRows}

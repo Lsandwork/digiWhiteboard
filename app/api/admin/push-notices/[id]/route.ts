@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse, getEffectiveAdminRole } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { deleteStaffPushNotice, pushStaffNoticeById, updateStaffPushNotice } from "@/lib/staff/push-notices";
@@ -25,7 +25,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, actor } = actorFromRequest(request);
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
   if (!canManagePushNotices(role)) return forbiddenResponse();
 
   const { id } = await context.params;
@@ -60,7 +60,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session, actor } = actorFromRequest(request);
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
   if (!canManagePushNotices(role)) return forbiddenResponse();
 
   const { id } = await context.params;
@@ -100,7 +100,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const { session } = actorFromRequest(request);
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : session?.role;
+  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
   if (!canManagePushNotices(role)) return forbiddenResponse();
 
   const { id } = await context.params;

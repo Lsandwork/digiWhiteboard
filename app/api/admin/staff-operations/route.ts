@@ -4,8 +4,10 @@ import {
   canAccessCrossoverCommunication,
   canCreateFrontDeskLog,
   canCreateTrainerEntry,
+  canEditFrontDeskLog,
   canManageStaffDirectory,
   canManageStaffOperations,
+  getEffectiveAdminRole,
   isAdminRequest,
   unauthorizedAdminResponse
 } from "@/lib/admin/api-auth";
@@ -55,36 +57,42 @@ const CROSSOVER_ACTIONS = new Set([
 const NOTIFICATION_ACTIONS = new Set(["mark_notification_read", "mark_all_notifications_read"]);
 const STAFF_OPS_VIEW_PERMISSIONS = ["view_front_desk_log", "view_owner_follow_up", "view_active_issues"] as const;
 
-function canViewStaffOps(session: ReturnType<typeof getAdminSessionFromRequest>) {
-  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
+function canViewStaffOps(role: string | null, session: ReturnType<typeof getAdminSessionFromRequest>) {
+  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, role);
   return (
     hasAnyPermission(access, [...STAFF_OPS_VIEW_PERMISSIONS, "create_trainer_entry"]) ||
-    canManageStaffOperations(session?.role)
+    canManageStaffOperations(role)
   );
 }
 
-function canUseFrontDeskLog(session: ReturnType<typeof getAdminSessionFromRequest>) {
-  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
-  return hasPermission(access, "view_front_desk_log") || canAccessCrossoverCommunication(session?.role);
+function canUseFrontDeskLog(role: string | null, session: ReturnType<typeof getAdminSessionFromRequest>) {
+  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, role);
+  return hasPermission(access, "view_front_desk_log") || canAccessCrossoverCommunication(role);
 }
 
-function canCreateShiftLogEntry(session: ReturnType<typeof getAdminSessionFromRequest>) {
-  return canCreateFrontDeskLog(session?.role) || canCreateTrainerEntry(session?.role);
+function canCreateShiftLogEntry(role: string | null) {
+  return canCreateFrontDeskLog(role) || canCreateTrainerEntry(role);
+}
+
+function canMutateFrontDeskLog(role: string | null) {
+  return canEditFrontDeskLog(role) || canManageStaffOperations(role);
 }
 
 function actorFromRequest(request: Request) {
   const session = getAdminSessionFromRequest(request);
+  const role = getEffectiveAdminRole(request);
   return {
     session,
-    actor: session?.email ?? session?.adminUserId ?? "admin",
+    role,
+    actor: session?.email ?? session?.adminUserId ?? (role ? "admin" : "admin"),
     actorAdminId: normalizeAdminUserId(session?.adminUserId)
   };
 }
 
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session } = actorFromRequest(request);
-  if (!canViewStaffOps(session)) {
+  const { session, role } = actorFromRequest(request);
+  if (!canViewStaffOps(role, session)) {
     return staffOpsForbiddenResponse();
   }
 
@@ -93,7 +101,7 @@ export async function GET(request: Request) {
     const readerSession = {
       email: session?.email ?? null,
       adminUserId: session?.adminUserId ?? null,
-      role: session?.role ?? null
+      role: role ?? null
     };
     return NextResponse.json({
       ...state,
@@ -103,6 +111,11 @@ export async function GET(request: Request) {
         email: readerSession.email,
         adminUserId: readerSession.adminUserId,
         role: readerSession.role
+      },
+      permissions: {
+        canCreate: canCreateShiftLogEntry(role),
+        canEdit: canMutateFrontDeskLog(role),
+        canView: canUseFrontDeskLog(role, session)
       }
     });
   } catch (error) {
@@ -113,8 +126,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, actor, actorAdminId } = actorFromRequest(request);
-  if (!canViewStaffOps(session)) {
+  const { session, role, actor, actorAdminId } = actorFromRequest(request);
+  if (!canViewStaffOps(role, session)) {
     return staffOpsForbiddenResponse();
   }
 
@@ -123,7 +136,7 @@ export async function POST(request: Request) {
     const action = String(body.action ?? "");
     const supabase = getServiceSupabase();
 
-    if (action === "create_crossover" && !canCreateShiftLogEntry(session)) {
+    if (action === "create_crossover" && !canCreateShiftLogEntry(role)) {
       return crossoverForbiddenResponse();
     }
     if (
@@ -132,11 +145,11 @@ export async function POST(request: Request) {
         action === "delete_crossover" ||
         action === "move_crossover" ||
         action === "bulk_update_crossover") &&
-      !canUseFrontDeskLog(session)
+      !canMutateFrontDeskLog(role)
     ) {
       return crossoverForbiddenResponse();
     }
-    if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(session?.role) && !canManageStaffOperations(session?.role)) {
+    if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(role) && !canManageStaffOperations(role)) {
       return staffOpsForbiddenResponse();
     }
     if (
@@ -145,7 +158,7 @@ export async function POST(request: Request) {
       action !== "create_staff_member" &&
       action !== "update_staff_member" &&
       action !== "delete_staff_member" &&
-      !canManageStaffOperations(session?.role)
+      !canManageStaffOperations(role)
     ) {
       return staffOpsForbiddenResponse();
     }
@@ -175,7 +188,7 @@ export async function POST(request: Request) {
       result = await deleteCrossoverMessage(supabase, id, actor, {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
-        role: session?.role ?? null
+        role: role ?? null
       });
       auditAction = "staff.crossover.delete";
     } else if (action === "reply_crossover") {
@@ -197,16 +210,16 @@ export async function POST(request: Request) {
       result = await updateActiveIssue(supabase, id, body, actor);
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
-      if (!canManageStaffDirectory(session?.role)) return staffOpsForbiddenResponse();
+      if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       result = await createStaffDirectoryMember(supabase, body, actor, actorAdminId);
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
-      if (!canManageStaffDirectory(session?.role)) return staffOpsForbiddenResponse();
+      if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
       result = await updateStaffDirectoryMember(supabase, id, body, actor, actorAdminId);
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
-      if (!canManageStaffDirectory(session?.role)) return staffOpsForbiddenResponse();
+      if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
       await deleteStaffDirectoryMember(supabase, id, actor);
       result = { id };
@@ -234,7 +247,7 @@ export async function POST(request: Request) {
       const readerSession = {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
-        role: session?.role ?? null
+        role: role ?? null
       };
       result = await markStaffNotificationRead(supabase, notificationId, readerKey, readerSession);
       auditAction = "staff.notification.read";
@@ -243,7 +256,7 @@ export async function POST(request: Request) {
       const readerSession = {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
-        role: session?.role ?? null
+        role: role ?? null
       };
       const nextState = await markAllStaffNotificationsRead(supabase, readerKey, readerSession);
       // Return only this user's visible notifications after mark-all.

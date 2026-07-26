@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canEditDailyReminders, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canEditDailyReminders, isAdminRequest, unauthorizedAdminResponse, getEffectiveAdminRole } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { disableDailyReminder } from "@/lib/staff/daily-reminders";
@@ -13,7 +13,8 @@ export async function POST(request: Request, context: RouteContext) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  if (!canEditDailyReminders(session?.role)) {
+  const role = getEffectiveAdminRole(request);
+  if (!canEditDailyReminders(role)) {
     return NextResponse.json({ error: "You do not have permission to disable Daily Reminders." }, { status: 403 });
   }
 

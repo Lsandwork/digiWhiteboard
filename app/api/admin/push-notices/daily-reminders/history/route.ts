@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canViewDailyReminderHistory, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canViewDailyReminderHistory, isAdminRequest, unauthorizedAdminResponse, getEffectiveAdminRole } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getDailyReminderHistory } from "@/lib/staff/daily-reminders";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  if (!canViewDailyReminderHistory(session?.role)) {
+  const role = getEffectiveAdminRole(request);
+  if (!canViewDailyReminderHistory(role)) {
     return NextResponse.json({ error: "You do not have permission to view Daily Reminder history." }, { status: 403 });
   }
 

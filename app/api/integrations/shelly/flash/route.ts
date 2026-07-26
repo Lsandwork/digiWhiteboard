@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
+import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse, getEffectiveAdminRole } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import {
   clearShellyAlert,
@@ -14,7 +14,8 @@ export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  if (!canManagePushNotices(session?.role)) {
+  const role = getEffectiveAdminRole(request);
+  if (!canManagePushNotices(role)) {
     return NextResponse.json({ error: "You do not have permission to test the alert light." }, { status: 403 });
   }
 

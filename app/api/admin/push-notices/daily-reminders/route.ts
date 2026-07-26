@@ -4,7 +4,8 @@ import {
   canForceResendDailyReminder,
   canSendDailyReminderEarly,
   isAdminRequest,
-  unauthorizedAdminResponse
+  unauthorizedAdminResponse,
+  getEffectiveAdminRole
 } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { listDailyRemindersWithState, setSwingHandlerPresent } from "@/lib/staff/daily-reminders";
@@ -20,24 +21,25 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  if (!canSendDailyReminderEarly(session?.role)) return forbiddenResponse();
+  const role = getEffectiveAdminRole(request);
+  if (!canSendDailyReminderEarly(role)) return forbiddenResponse();
 
   try {
     const supabase = getServiceSupabase();
     const payload = await listDailyRemindersWithState(supabase, {
-      canForceResend: canForceResendDailyReminder(session?.role)
+      canForceResend: canForceResendDailyReminder(role)
     });
     return NextResponse.json({
       ...payload,
       permissions: {
-        canEdit: canEditDailyReminders(session?.role),
-        canSendEarly: canSendDailyReminderEarly(session?.role),
-        canForceResend: canForceResendDailyReminder(session?.role)
+        canEdit: canEditDailyReminders(role),
+        canSendEarly: canSendDailyReminderEarly(role),
+        canForceResend: canForceResendDailyReminder(role)
       },
       currentUser: {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
-        role: session?.role ?? null
+        role: role ?? null
       }
     });
   } catch (error) {
@@ -50,7 +52,8 @@ export async function PATCH(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  if (!canEditDailyReminders(session?.role)) {
+  const role = getEffectiveAdminRole(request);
+  if (!canEditDailyReminders(role)) {
     return NextResponse.json({ error: "You do not have permission to update swing handler status." }, { status: 403 });
   }
 
@@ -59,7 +62,7 @@ export async function PATCH(request: Request) {
     const supabase = getServiceSupabase();
     const swingHandlerPresent = await setSwingHandlerPresent(supabase, Boolean(body.swing_handler_present));
     const payload = await listDailyRemindersWithState(supabase, {
-      canForceResend: canForceResendDailyReminder(session?.role)
+      canForceResend: canForceResendDailyReminder(role)
     });
     return NextResponse.json({ ...payload, swingHandlerPresent });
   } catch (error) {

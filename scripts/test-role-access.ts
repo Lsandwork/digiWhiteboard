@@ -2,13 +2,16 @@ import assert from "node:assert/strict";
 import {
   accessFromLegacyRole,
   canAccessAdminTab,
+  canCreateFrontDeskLogForRole,
+  canEditFrontDeskLogForRole,
   firstAccessibleAdminTab,
+  isFullAdminLegacyRole,
   isLobbyDigiBoardOnlyLegacyRole,
   isStaffDigiBoardOnlyLegacyRole,
   legacyRoleToRoleKey
 } from "../lib/admin/permissions";
 import { ADMIN_TABS } from "../lib/admin/types";
-import type { AdminUserRole } from "../lib/admin/users";
+import { isFullAdminRole, type AdminUserRole } from "../lib/admin/users";
 
 const roles: AdminUserRole[] = [
   "owner_admin",
@@ -111,5 +114,45 @@ assert.equal(
 assert.equal(legacyRoleToRoleKey("overnight"), "overnight");
 assert.equal(legacyRoleToRoleKey("maintenance"), "maintenance");
 assert.equal(legacyRoleToRoleKey("unknown_role_xyz"), "viewer");
+
+assert.equal(isFullAdminLegacyRole(null), false, "null role is not full admin");
+assert.equal(isFullAdminLegacyRole(""), false, "empty role is not full admin");
+assert.equal(isFullAdminLegacyRole("viewer"), false, "viewer is not full admin");
+assert.equal(isFullAdminLegacyRole("owner_admin"), true, "owner_admin is full admin");
+assert.equal(isFullAdminRole(null), false, "null role is not full admin (users)");
+assert.equal(isFullAdminRole(""), false, "empty role is not full admin (users)");
+
+assert.equal(canCreateFrontDeskLogForRole("viewer"), false, "viewer cannot create front desk log");
+assert.equal(canEditFrontDeskLogForRole("viewer"), false, "viewer cannot edit front desk log");
+assert.equal(canCreateFrontDeskLogForRole("overnight"), false, "overnight cannot create front desk log");
+assert.equal(canEditFrontDeskLogForRole("maintenance"), false, "maintenance cannot edit front desk log");
+assert.equal(canCreateFrontDeskLogForRole("daycare"), true, "handlers can create front desk log");
+assert.equal(canEditFrontDeskLogForRole("daycare"), true, "handlers can edit front desk log");
+
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "viewer"), "checklist", "viewer", "staff"),
+  false,
+  "viewer cannot open checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "overnight"), "checklist", "overnight", "staff"),
+  false,
+  "overnight cannot open checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "checklist", "daycare", "staff"),
+  true,
+  "handlers can open checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "checklist", "team_leader", "staff"),
+  true,
+  "team leads can open checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, null), "users", null, "staff"),
+  false,
+  "missing role must not open admin-only tabs"
+);
 
 console.log("role access tests passed");
