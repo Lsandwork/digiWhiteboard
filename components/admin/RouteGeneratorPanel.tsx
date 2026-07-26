@@ -304,15 +304,7 @@ export function RouteGeneratorPanel() {
           .map((stop) => {
             const stopKind = String(stop.stop_kind ?? "customer");
             let label = String(stop.owner_name || stopKind || "Stop");
-            if (stopKind === "depot_start" || stopKind === "depot_end") {
-              if (!/hub|club/i.test(label)) {
-                label = String(route.vehicle_pool) === "club" ? "CLUB" : "HUB";
-              } else if (/club/i.test(label)) {
-                label = "CLUB";
-              } else {
-                label = "HUB";
-              }
-            }
+            // Keep optimizer labels (Fitdog Westwood Hub, Kenneth Hahn Trail, Huntington Dog Beach, Fitdog Club).
             return {
               id: String(stop.id),
               routeId: String(route.id),
@@ -376,8 +368,8 @@ export function RouteGeneratorPanel() {
             <h2 className="admin-page-title">Route Generator</h2>
           </div>
           <p className="admin-page-subtitle mt-1 max-w-3xl">
-            Pull live Fitdog signups (Beach Excursion, Adventure Hike, Trainer-Led Hike, Group Class), optimize Van
-            1/2/3/5/6 routes, and export validated Samsara CSVs.
+            Pull live Fitdog signups, build Van 1/2 (Hub↔Kenneth Hahn) and Van 3 (Hub↔Huntington) routes with Club
+            stops for dogs already at Fitdog, then export Samsara CSVs.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-admin-muted">
@@ -508,7 +500,7 @@ export function RouteGeneratorPanel() {
               <div>
                 <h3 className="text-base font-semibold text-white">Interactive map</h3>
                 <p className="text-xs text-admin-muted">
-                  Click a route card to focus it. HUB and CLUB bases are always marked.
+                  Click a route card to focus it. Hub, Club, Kenneth Hahn Trail, and Huntington Dog Beach are marked.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -633,12 +625,21 @@ export function RouteGeneratorPanel() {
           <h3 className="text-base font-semibold text-white">Setup checklist</h3>
           <ul className="space-y-2 text-sm text-admin-muted">
             <li>
-              HUB: {bootstrap?.locations?.hub?.address || "2140 Westwood Blvd, West Los Angeles, CA 90025"}
+              Fitdog Westwood Hub:{" "}
+              {bootstrap?.locations?.hub?.address || "2140 Westwood Blvd, West Los Angeles, CA 90025"}
               {bootstrap?.locations?.hub?.verified ? " · verified" : ""}
             </li>
             <li>
-              CLUB: {bootstrap?.locations?.club?.address || "1712 21st St, Santa Monica, CA 90404"}
+              Fitdog Club: {bootstrap?.locations?.club?.address || "1712 21st St, Santa Monica, CA 90404"}
               {bootstrap?.locations?.club?.verified ? " · verified" : ""}
+            </li>
+            <li>
+              Kenneth Hahn Trail: {bootstrap?.locations?.kenneth_hahn?.name || "Kenneth Hahn Trail"} (Van 1/2 Adventure
+              end / drop-off start)
+            </li>
+            <li>
+              Huntington Dog Beach: {bootstrap?.locations?.huntington?.name || "Huntington Dog Beach"} (Van 3 Beach end
+              / drop-off start)
             </li>
             <li>
               Active vans with capacity configured:{" "}
@@ -647,8 +648,8 @@ export function RouteGeneratorPanel() {
             </li>
             <li>Shadow mode: {String(bootstrap?.checklist?.shadow_mode ?? true)}</li>
             <li>
-              Home bases: club-pool vans start/end at CLUB (2 vans); outing-pool vans start/end at HUB (3 vans). Never
-              Van 4.
+              Pickup: Van 1/2 Hub→Kenneth Hahn; Van 3 Hub→Huntington. Drop-off reverses. Club stop only when dogs are
+              already at Fitdog. Never Van 4.
             </li>
             <li>Samsara template: upload under Settings → Integrations → Samsara Route Export before production export</li>
             <li>Fitdog integration: Connect under Settings → Integrations → Fitdog Route Report</li>
@@ -691,8 +692,10 @@ function RouteCard({
   onSelect?: () => void;
 }) {
   const customerStops = stops.filter((s) => s.stop_kind === "customer");
-  const homeStop = stops.find((s) => s.stop_kind === "depot_start");
-  const homeLabel = String(homeStop?.owner_name || (route.vehicle_pool === "club" ? "CLUB" : "HUB"));
+  const startStop = stops.find((s) => s.stop_kind === "depot_start");
+  const endStop = stops.find((s) => s.stop_kind === "depot_end");
+  const startLabel = String(startStop?.owner_name || "Fitdog Westwood Hub");
+  const endLabel = String(endStop?.owner_name || "Fitdog Westwood Hub");
   return (
     <article
       className={`admin-card p-4 transition ${
@@ -718,9 +721,8 @@ function RouteCard({
             {String(route.van_key).replace("van_", "Van ")} · {String(route.direction)} · {String(route.wave_name)}
           </h4>
           <p className="text-xs text-admin-muted">
-            {String(route.vehicle_pool)} pool · home {homeLabel} · {customerStops.length} stops ·{" "}
-            {String(route.total_dogs)} dogs · {String(route.estimated_distance_miles)} mi ·{" "}
-            {String(route.estimated_drive_minutes)} min
+            {startLabel} → {endLabel} · {customerStops.length} stops · {String(route.total_dogs)} dogs ·{" "}
+            {String(route.estimated_distance_miles)} mi · {String(route.estimated_drive_minutes)} min
           </p>
           {onSelect ? (
             <p className="mt-1 text-[11px] font-semibold text-fitdog-orange">
@@ -740,10 +742,7 @@ function RouteCard({
             .sort((a, b) => Number(a.sequence) - Number(b.sequence))
             .map((stop) => {
               const kind = String(stop.stop_kind);
-              const name =
-                kind === "depot_start" || kind === "depot_end"
-                  ? String(stop.owner_name || "HUB")
-                  : String(stop.owner_name || kind);
+              const name = String(stop.owner_name || kind);
               return (
                 <li key={String(stop.id)} className="rounded-lg border border-admin-border/60 px-3 py-2">
                   <div className="flex justify-between gap-2">

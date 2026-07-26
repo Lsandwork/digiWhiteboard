@@ -10,8 +10,10 @@ import { ADMIN_TABS } from "../lib/admin/types";
 import { parseAddress, householdKey } from "../lib/route-generator/address";
 import { capacityAllows, resolveLoadUnits, isServiceEligibleForVan } from "../lib/route-generator/capacity";
 import { assertNeverVan4, FITDOG_VAN_KEYS } from "../lib/route-generator/flags";
-import { groupHouseholds } from "../lib/route-generator/households";
+import { formatStopDisplayName, groupHouseholds } from "../lib/route-generator/households";
+import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
 import { optimizeRoutes } from "../lib/route-generator/optimizer";
+import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
 import {
   autoMapHeaders,
   looksLikeLoginPage,
@@ -243,13 +245,149 @@ assert.ok(opt.routes.every((r) => r.stops[0]?.stopKind === "depot_start"));
 assert.ok(opt.routes.every((r) => r.stops[r.stops.length - 1]?.stopKind === "depot_end"));
 for (const route of opt.routes) {
   const start = route.stops[0];
-  const expectedHome = route.vehiclePool === "club" ? "CLUB" : "HUB";
-  assert.equal(start?.ownerName, expectedHome, `${route.vanKey} should start at ${expectedHome}`);
+  const end = route.stops[route.stops.length - 1];
+  const endpoints = resolveRouteEndpoints({
+    vanKey: route.vanKey,
+    direction: "pickup",
+    serviceTypes: route.serviceTypes
+  });
+  assert.equal(
+    start?.ownerName,
+    DEFAULT_FITDOG_LOCATIONS[endpoints.startKey].name,
+    `${route.vanKey} should start at ${endpoints.startKey}`
+  );
+  assert.equal(
+    end?.ownerName,
+    DEFAULT_FITDOG_LOCATIONS[endpoints.endKey].name,
+    `${route.vanKey} should end at ${endpoints.endKey}`
+  );
   for (const service of route.serviceTypes) {
     const vehicle = vehicles.find((v) => v.vanKey === route.vanKey)!;
     assert.equal(vehicle.eligibleServices.includes(service), true, `${service} on ${route.vanKey}`);
   }
 }
+
+// Stop naming: dog (+ dog) + shared last name
+assert.equal(
+  formatStopDisplayName([
+    {
+      direction: "pickup",
+      reservationId: "1",
+      customerId: "c",
+      ownerFirstName: "Rose",
+      ownerLastName: "Reiss",
+      ownerFullName: "Rose Reiss",
+      dogId: "d1",
+      dogName: "Emmie",
+      serviceRaw: "Adventure Hikes",
+      serviceCanonical: "Adventure Hike",
+      addressRaw: "1 Main",
+      addressStreet: "1 Main",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90402",
+      ownerPhoneMasked: null,
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      dogSize: "Small",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: "h1",
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: {}
+    }
+  ]),
+  "Emmie Reiss"
+);
+
+// Facility dogs collapse to Fitdog Club stop (no home address stop)
+{
+  const facilityGroups = groupHouseholdsWithFacilities([
+    {
+      direction: "pickup",
+      reservationId: "r-club",
+      customerId: "c1",
+      ownerFirstName: "Mark",
+      ownerLastName: "Landecker",
+      ownerFullName: "Mark Landecker",
+      dogId: "3517",
+      dogName: "Baxter",
+      serviceRaw: "Adventure Hikes",
+      serviceCanonical: "Adventure Hike",
+      addressRaw: "1712 21st Street, Santa Monica, CA, 90404",
+      addressStreet: "1712 21st Street",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90404",
+      ownerPhoneMasked: null,
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      dogSize: "Medium",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: "club-addr",
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: { location_name: "Fitdog HQ" }
+    },
+    {
+      direction: "pickup",
+      reservationId: "r-home",
+      customerId: "c2",
+      ownerFirstName: "Tina",
+      ownerLastName: "Nguyen",
+      ownerFullName: "Tina Nguyen",
+      dogId: "9",
+      dogName: "Teddy",
+      serviceRaw: "Adventure Hikes",
+      serviceCanonical: "Adventure Hike",
+      addressRaw: "3219 Colorado Ave, Santa Monica, CA 90404",
+      addressStreet: "3219 Colorado Ave",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90404",
+      ownerPhoneMasked: null,
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      dogSize: "Small",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: "home-addr",
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: {}
+    }
+  ]);
+  const clubGroup = facilityGroups.find((g) => g.householdKey === "facility:club");
+  const homeGroup = facilityGroups.find((g) => g.dogCount === 1 && g.items[0]?.dogName === "Teddy");
+  assert.ok(clubGroup, "club facility group expected");
+  assert.equal(clubGroup?.ownerName, "Fitdog Club");
+  assert.equal(homeGroup?.ownerName, "Teddy Nguyen");
+}
+
+assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_1", direction: "pickup" }), {
+  startKey: "hub",
+  endKey: "kenneth_hahn"
+});
+assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_1", direction: "dropoff" }), {
+  startKey: "kenneth_hahn",
+  endKey: "hub"
+});
+assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_3", direction: "pickup" }), {
+  startKey: "hub",
+  endKey: "huntington"
+});
+assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_3", direction: "dropoff" }), {
+  startKey: "huntington",
+  endKey: "hub"
+});
 const again = optimizeRoutes({
   direction: "pickup",
   households,

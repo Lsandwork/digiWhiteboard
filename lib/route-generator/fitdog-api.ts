@@ -246,6 +246,8 @@ function buildItem(params: {
       ? "warning"
       : "ok";
 
+  const locationDetail =
+    direction === "pickup" ? product.pickup_location_detail : product.drop_off_location_detail;
   const raw: RawReportRow = {
     reservation_id: String(product.id),
     customer_id: customerId || "",
@@ -262,6 +264,7 @@ function buildItem(params: {
     dog_size: dogSize || "",
     weight: product.dog_detail?.weight != null ? String(product.dog_detail.weight) : "",
     location_notes: address.notes || "",
+    location_name: cleanText(locationDetail?.name) || "",
     occurrence_id: String(occurrence.id),
     class_id: String(occurrence.training_class ?? occurrence.training_class_detail?.id ?? ""),
     status: String(product.status_detail ?? product.status ?? "")
