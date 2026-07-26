@@ -201,6 +201,42 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("export_reports", "Export Reports", "Export report data."),
       p("view_admin_logs", "View Logs", "View admin audit logs.")
     ]
+  },
+  {
+    key: "ruffly",
+    label: "Ruffly Customer Care",
+    permissions: [
+      p("ruffly.view", "View Ruffly", "Open the Ruffly workspace."),
+      p("ruffly.dashboard.view", "Ruffly Overview", "View Ruffly executive dashboard metrics."),
+      p("ruffly.inbox.view", "View Inbox", "View shared customer conversations."),
+      p("ruffly.inbox.reply", "Reply in Inbox", "Send messages and internal notes."),
+      p("ruffly.inbox.assign", "Assign Conversations", "Assign inbox conversations to staff."),
+      p("ruffly.inbox.export", "Export Inbox", "Export conversation data."),
+      p("ruffly.contacts.view", "View Contacts", "View Ruffly contact records."),
+      p("ruffly.contacts.edit", "Edit Contacts", "Create and edit Ruffly contacts."),
+      p("ruffly.leads.view", "View Leads", "View the lead pipeline."),
+      p("ruffly.leads.edit", "Edit Leads", "Update lead stages and assignments."),
+      p("ruffly.reviews.view", "View Reviews", "View review requests and reviews."),
+      p("ruffly.reviews.respond", "Respond to Reviews", "Draft and manage review responses."),
+      p("ruffly.reviews.publish", "Publish Review Responses", "Publish approved review responses."),
+      p("ruffly.feedback.view", "View Feedback", "View private feedback."),
+      p("ruffly.feedback.resolve", "Resolve Feedback", "Manage feedback workflows."),
+      p("ruffly.campaigns.view", "View Campaigns", "View marketing campaigns."),
+      p("ruffly.campaigns.create", "Create Campaigns", "Create campaign drafts."),
+      p("ruffly.campaigns.approve", "Approve Campaigns", "Approve campaigns for send."),
+      p("ruffly.campaigns.send", "Send Campaigns", "Send approved campaigns."),
+      p("ruffly.automations.view", "View Automations", "View automation workflows."),
+      p("ruffly.automations.manage", "Manage Automations", "Create and activate automations."),
+      p("ruffly.webchat.manage", "Manage Web Chat", "Configure the Ruffly web chat widget."),
+      p("ruffly.ai.manage", "Manage AI", "Configure AI assistant and receptionist."),
+      p("ruffly.knowledge.manage", "Manage Knowledge Base", "Edit AI knowledge articles."),
+      p("ruffly.social.view", "View Social", "View social content workspace."),
+      p("ruffly.social.manage", "Manage Social", "Create and schedule social posts."),
+      p("ruffly.analytics.view", "View Ruffly Analytics", "View Ruffly reports."),
+      p("ruffly.integrations.manage", "Manage Ruffly Integrations", "Configure provider connections (Super Admin)."),
+      p("ruffly.settings.manage", "Manage Ruffly Settings", "Configure Ruffly setup and channel activation."),
+      p("ruffly.audit.view", "View Ruffly Audit Log", "View Ruffly audit history (Super Admin).")
+    ]
   }
 ];
 
