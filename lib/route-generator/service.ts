@@ -609,11 +609,19 @@ export async function generatePlanForRun(params: {
 
   const coords: Record<string, { lat: number; lng: number }> = {};
   [...pickupGroups, ...dropoffGroups].forEach((g, index) => {
-    if (g.householdKey === "facility:club" && locations.club.latitude != null && locations.club.longitude != null) {
+    if (
+      g.householdKey.startsWith("facility:club") &&
+      locations.club.latitude != null &&
+      locations.club.longitude != null
+    ) {
       coords[g.householdKey] = { lat: locations.club.latitude, lng: locations.club.longitude };
       return;
     }
-    if (g.householdKey === "facility:hub" && locations.hub.latitude != null && locations.hub.longitude != null) {
+    if (
+      g.householdKey.startsWith("facility:hub") &&
+      locations.hub.latitude != null &&
+      locations.hub.longitude != null
+    ) {
       coords[g.householdKey] = { lat: locations.hub.latitude, lng: locations.hub.longitude };
       return;
     }
