@@ -38,6 +38,10 @@
     {
       "path": "/api/cron/ruffly-jobs",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/route-generator-jobs",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

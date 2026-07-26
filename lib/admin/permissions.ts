@@ -69,6 +69,14 @@ export type PermissionKey =
   | "manage_fitdog_alerts"
   | "view_vet_visits"
   | "manage_vet_visits"
+  | "route_generator.view"
+  | "route_generator.pull_report"
+  | "route_generator.generate"
+  | "route_generator.edit"
+  | "route_generator.approve"
+  | "route_generator.export"
+  | "route_generator.manage_settings"
+  | "route_generator.view_audit"
   | "review_management_support"
   | "view_notifications"
   | "respond_to_notifications"
@@ -256,6 +264,14 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.manage_settings",
+  "route_generator.view_audit",
   "review_management_support",
   "view_notifications",
   "respond_to_notifications",
@@ -432,6 +448,13 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.view_audit",
   "view_hr_hub",
   "use_hr_consult",
   "view_analytics",
@@ -855,6 +878,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   track_incidents: "view_track_incidents",
   fitdog_alerts: "view_fitdog_alerts",
   vet_visits: "view_vet_visits",
+  route_generator: "route_generator.view",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
   ms_groomer_requests: "review_management_support",
@@ -1184,6 +1208,16 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     if (isMarketingLegacyRole(legacyRole)) return false;
     return true;
+  }
+
+  // Route Generator: Super Admin / Admin / Management only (never floor staff).
+  if (tab === "route_generator") {
+    if (board !== "staff") return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "route_generator.view")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
   }
 
   // Dedicated entry-log tabs are admin/management only — all staff use Front Desk Log instead.
