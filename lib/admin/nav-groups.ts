@@ -199,7 +199,8 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits", "route_generator"];
+// Route Generator first so it stays near the top of Management (and collapsed icon rail).
+const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["route_generator", "track_incidents", "vet_visits"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));

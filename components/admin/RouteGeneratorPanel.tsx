@@ -39,12 +39,20 @@ type Bootstrap = {
   } | null;
   checklist: Record<string, unknown>;
   mapColors: Record<string, string>;
+  latestPlan?: {
+    id: string;
+    operating_date?: string;
+    report_run_id?: string | null;
+    status?: string;
+    current_version?: number;
+  } | null;
 };
 
 type PlanBundle = {
   plan: {
     id: string;
     operating_date: string;
+    report_run_id?: string | null;
     status: string;
     current_version: number;
     summary: Record<string, number | string>;
@@ -77,26 +85,72 @@ export function RouteGeneratorPanel() {
   const [visibleVans, setVisibleVans] = useState<Record<string, boolean>>({});
   const [csvPreview, setCsvPreview] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("/api/admin/route-generator?view=bootstrap", { cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Unable to load Route Generator.");
-      setBootstrap(body as Bootstrap);
-      const vans: Record<string, boolean> = {};
-      for (const v of body.vehicles ?? []) vans[v.vanKey] = true;
-      setVisibleVans(vans);
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load Route Generator.", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [showToast]);
+  const hydratePlan = useCallback(
+    async (planId: string, options?: { quiet?: boolean }) => {
+      const response = await fetch(`/api/admin/route-generator?view=plan&planId=${encodeURIComponent(planId)}`, {
+        cache: "no-store"
+      });
+      const next = (await response.json()) as PlanBundle & { error?: string };
+      if (!response.ok) {
+        if (!options?.quiet) {
+          throw new Error(next.error || "Unable to load the latest route plan.");
+        }
+        return null;
+      }
+      setBundle(next);
+      if (next.plan?.report_run_id) setReportRunId(String(next.plan.report_run_id));
+      if (next.plan?.operating_date) setDate(String(next.plan.operating_date));
+      const summary = next.plan?.summary ?? {};
+      setPullMeta({
+        pickup: Number(summary.pickupDogs ?? next.items?.filter((i) => i.direction === "pickup").length ?? 0),
+        dropoff: Number(summary.dropoffDogs ?? next.items?.filter((i) => i.direction === "dropoff").length ?? 0),
+        warnings: []
+      });
+      return next;
+    },
+    []
+  );
+
+  const refresh = useCallback(
+    async (options?: { hydrateLatestPlan?: boolean }) => {
+      const hydrateLatestPlan = options?.hydrateLatestPlan !== false;
+      setLoading(true);
+      try {
+        const response = await fetch("/api/admin/route-generator?view=bootstrap", { cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || "Unable to load Route Generator.");
+        const nextBootstrap = body as Bootstrap;
+        setBootstrap(nextBootstrap);
+        const vans: Record<string, boolean> = {};
+        for (const v of body.vehicles ?? []) vans[v.vanKey] = true;
+        setVisibleVans(vans);
+
+        // Restore the latest saved plan so Generate/Approve/Export are usable after navigation.
+        if (hydrateLatestPlan && nextBootstrap.latestPlan?.id) {
+          await hydratePlan(nextBootstrap.latestPlan.id, { quiet: true });
+        } else if (hydrateLatestPlan && nextBootstrap.latestPlan?.report_run_id) {
+          setReportRunId(String(nextBootstrap.latestPlan.report_run_id));
+        }
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "Unable to load Route Generator.", "error");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [hydratePlan, showToast]
+  );
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    // Bring the panel into view when opening from the sidebar (esp. mobile / long pages).
+    const timer = window.setTimeout(() => {
+      document.getElementById("route-generator-panel")?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   async function postAction(action: string, payload: Record<string, unknown> = {}) {
     setBusy(true);
@@ -123,8 +177,10 @@ export function RouteGeneratorPanel() {
         dropoff: body.pull.dropoffItems.length,
         warnings: body.pull.warnings ?? []
       });
-      showToast("Report pulled and normalized.", "success");
-      await refresh();
+      setBundle(null);
+      showToast("Report pulled and normalized. Next: Generate Routes.", "success");
+      // Refresh connection/checklist only — keep the new reportRunId (don't rehydrate an older plan).
+      await refresh({ hydrateLatestPlan: false });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Pull failed.", "error");
     }
@@ -146,14 +202,13 @@ export function RouteGeneratorPanel() {
   }
 
   async function approve() {
-    if (!bundle?.plan.id) return;
+    if (!bundle?.plan.id) {
+      showToast("Generate routes before approving.", "error");
+      return;
+    }
     try {
       await postAction("approve_plan", { planId: bundle.plan.id });
-      const response = await fetch(`/api/admin/route-generator?view=plan&planId=${bundle.plan.id}`, {
-        cache: "no-store"
-      });
-      const next = await response.json();
-      setBundle(next);
+      await hydratePlan(bundle.plan.id);
       showToast("Plan approved.", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Approve failed.", "error");
@@ -161,7 +216,10 @@ export function RouteGeneratorPanel() {
   }
 
   async function exportCsv() {
-    if (!bundle?.plan.id) return;
+    if (!bundle?.plan.id) {
+      showToast("Generate and approve routes before exporting.", "error");
+      return;
+    }
     try {
       const body = await postAction("export_csv", { planId: bundle.plan.id });
       setCsvPreview(body.csv);
@@ -176,6 +234,37 @@ export function RouteGeneratorPanel() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Export failed.", "error");
     }
+  }
+
+  function onGenerateClick() {
+    if (busy) return;
+    if (!reportRunId) {
+      showToast("Pull a report first, then generate routes.", "error");
+      return;
+    }
+    void generateRoutes();
+  }
+
+  function onApproveClick() {
+    if (busy) return;
+    if (!bundle?.plan.id) {
+      showToast("Generate routes first, then approve.", "error");
+      return;
+    }
+    void approve();
+  }
+
+  function onExportClick() {
+    if (busy) return;
+    if (!bundle?.plan.id) {
+      showToast("Generate routes first, then approve and export.", "error");
+      return;
+    }
+    if (bundle.plan.status !== "approved") {
+      showToast("Approve the route plan before exporting CSV.", "error");
+      return;
+    }
+    void exportCsv();
   }
 
   const pickupRoutes = useMemo(
@@ -205,8 +294,19 @@ export function RouteGeneratorPanel() {
     return <p className="admin-empty-state-text">Loading Route Generator…</p>;
   }
 
+  if (!bootstrap) {
+    return (
+      <div id="route-generator-panel" className="admin-card space-y-3 p-6">
+        <p className="admin-empty-state-text">Unable to load Route Generator. Try Refresh.</p>
+        <button type="button" className="admin-btn-secondary" onClick={() => void refresh()}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
+    <div id="route-generator-panel" className="space-y-5">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -220,11 +320,11 @@ export function RouteGeneratorPanel() {
         <div className="flex flex-wrap items-center gap-2 text-xs text-admin-muted">
           <span>
             Connection:{" "}
-            <strong className="text-white">{bootstrap?.connection?.status ?? "disconnected"}</strong>
+            <strong className="text-white">{bootstrap.connection?.status ?? "disconnected"}</strong>
           </span>
           <span>
             Last pull:{" "}
-            {bootstrap?.connection?.last_successful_pull_at
+            {bootstrap.connection?.last_successful_pull_at
               ? new Date(bootstrap.connection.last_successful_pull_at).toLocaleString()
               : "—"}
           </span>
@@ -233,7 +333,7 @@ export function RouteGeneratorPanel() {
               Plan v{bundle.plan.current_version} · <strong className="text-white">{bundle.plan.status}</strong>
             </span>
           ) : null}
-          {!bootstrap?.featureEnabled ? (
+          {!bootstrap.featureEnabled ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-500/10 px-2 py-0.5 text-amber-200">
               <ShieldAlert className="h-3.5 w-3.5" /> Feature flag off (shadow/setup)
             </span>
@@ -256,13 +356,31 @@ export function RouteGeneratorPanel() {
             <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
             Pull Report
           </button>
-          <button type="button" className="admin-btn-secondary" disabled={busy || !reportRunId} onClick={() => void generateRoutes()}>
+          <button
+            type="button"
+            className="admin-btn-secondary"
+            disabled={busy}
+            title={!reportRunId ? "Pull a report first" : "Generate optimized van routes"}
+            onClick={onGenerateClick}
+          >
             Generate Routes
           </button>
-          <button type="button" className="admin-btn-secondary" disabled={busy || !bundle} onClick={() => void approve()}>
+          <button
+            type="button"
+            className="admin-btn-secondary"
+            disabled={busy}
+            title={!bundle ? "Generate routes first" : "Approve the current plan"}
+            onClick={onApproveClick}
+          >
             Approve Routes
           </button>
-          <button type="button" className="admin-btn-primary" disabled={busy || !bundle} onClick={() => void exportCsv()}>
+          <button
+            type="button"
+            className="admin-btn-primary"
+            disabled={busy}
+            title={!bundle ? "Generate routes first" : "Export approved plan as Samsara CSV"}
+            onClick={onExportClick}
+          >
             <Download className="h-4 w-4" />
             Export Samsara CSV
           </button>

@@ -32,6 +32,11 @@ assert.equal(
   true
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "route_generator", "owner_admin", "lobby"),
+  false,
+  "Route Generator must stay staff-board only even for Super Admin"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "route_generator", "assistant_manager", "staff"),
   true
 );

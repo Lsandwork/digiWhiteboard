@@ -1183,6 +1183,18 @@ export function canAccessAdminTab(
 ): boolean {
   if (tab === "demo_push") return options?.isDemo === true && board === "staff";
 
+  // Route Generator is staff-board only — check before the full-admin early return
+  // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
+  if (tab === "route_generator") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "route_generator.view")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
+  }
+
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
     return true;
   }
@@ -1208,16 +1220,6 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     if (isMarketingLegacyRole(legacyRole)) return false;
     return true;
-  }
-
-  // Route Generator: Super Admin / Admin / Management only (never floor staff).
-  if (tab === "route_generator") {
-    if (board !== "staff") return false;
-    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-    if (hasPermission(effective, "route_generator.view")) return true;
-    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
-    const roleKey = legacyRoleToRoleKey(legacyRole);
-    return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
   }
 
   // Dedicated entry-log tabs are admin/management only — all staff use Front Desk Log instead.

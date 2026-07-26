@@ -196,6 +196,13 @@ export function AdminDashboard() {
       return;
     }
 
+    // Keep Route Generator on staff board instead of bouncing to an unrelated tab.
+    if (tab === "route_generator" && board !== "staff") {
+      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
+      router.replace("/admin?board=staff&tab=route_generator");
+      return;
+    }
+
     if (!canAccessAdminTab(access, tab, effectiveRole, effectiveBoard, { isDemo })) {
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
       const fallbackBoard =
@@ -239,7 +246,13 @@ export function AdminDashboard() {
       router.replace("/admin?tab=users");
       return;
     }
-    const params = new URLSearchParams({ board, tab: nextTab });
+    // Route Generator only exists on the staff board — force board so the click
+    // never lands on lobby/marketing where the tab is inaccessible / empty.
+    const nextBoard = nextTab === "route_generator" ? "staff" : board;
+    if (nextTab === "route_generator" && typeof window !== "undefined") {
+      window.localStorage.setItem("fitdog_admin_board", "staff");
+    }
+    const params = new URLSearchParams({ board: nextBoard, tab: nextTab });
     if (extraParams) {
       for (const [key, value] of Object.entries(extraParams)) {
         if (value) params.set(key, value);
