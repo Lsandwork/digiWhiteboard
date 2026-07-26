@@ -90,6 +90,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   package_commissions: "Package & Class Commissions",
   track_incidents: "Track Incidents",
   fitdog_alerts: "Fitdog Alerts",
+  missed_calls: "Missed Calls",
   vet_visits: "Vet Visits",
   demo_push: "Demo Push",
   analytics: "Analytics",
@@ -136,6 +137,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   package_commissions: "Track package and class sales, confirm commissions, and review trainer earnings.",
   track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
   fitdog_alerts: "Failed payments, missed payments, card issues, and Fitdog sync health under Operations.",
+  missed_calls: "Vonage missed calls and voicemails from lonnie@fitdog.com Gmail under Front Desk.",
   vet_visits: "Log vet visits, alert admin/management, and track required owner follow-up until resolved.",
   crossover_communication: "Front desk handoff log between shifts.",
   owner_follow_up: "Track owner follow-ups and callbacks.",
@@ -187,6 +189,7 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "crossover_communication",
   "owner_follow_up",
   "active_issues",
+  "missed_calls",
   "fitdog_alerts",
   "walks_board"
 ];

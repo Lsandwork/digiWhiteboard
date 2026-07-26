@@ -67,6 +67,8 @@ export type PermissionKey =
   | "manage_track_incidents"
   | "view_fitdog_alerts"
   | "manage_fitdog_alerts"
+  | "view_missed_calls"
+  | "manage_missed_calls"
   | "view_vet_visits"
   | "manage_vet_visits"
   | "route_generator.view"
@@ -262,6 +264,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_track_incidents",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "view_missed_calls",
+  "manage_missed_calls",
   "view_vet_visits",
   "manage_vet_visits",
   "route_generator.view",
@@ -401,6 +405,8 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_own_groomer_submissions",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "view_missed_calls",
+  "manage_missed_calls",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -446,6 +452,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "manage_track_incidents",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "view_missed_calls",
+  "manage_missed_calls",
   "view_vet_visits",
   "manage_vet_visits",
   "route_generator.view",
@@ -614,6 +622,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "grooming_push",
   "owner_follow_up",
   "active_issues",
+  "missed_calls",
   "fitdog_alerts",
   "staff_directory",
   "bulk_photo_upload",
@@ -877,6 +886,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   package_commissions: "manage_package_commissions",
   track_incidents: "view_track_incidents",
   fitdog_alerts: "view_fitdog_alerts",
+  missed_calls: "view_missed_calls",
   vet_visits: "view_vet_visits",
   route_generator: "route_generator.view",
   ms_hub: "review_management_support",
@@ -1240,6 +1250,21 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     if (hasPermission(effective, "view_fitdog_alerts")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator"
+    );
+  }
+
+  // Missed Calls (Vonage via Gmail): Front Desk + management.
+  if (tab === "missed_calls") {
+    if (board !== "staff") return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "view_missed_calls")) return true;
     if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
     const roleKey = legacyRoleToRoleKey(legacyRole);
     return (
