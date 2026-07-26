@@ -483,6 +483,8 @@ export async function getOperationsAlertSummary(supabase: Db): Promise<Operation
         new_alerts: 0,
         failed_payments: 0,
         missed_payments: 0,
+        card_declined: 0,
+        other_notifications: 0,
         outstanding_amount: 0,
         resolved_today: 0,
         unacknowledged: 0,
@@ -503,6 +505,8 @@ export async function getOperationsAlertSummary(supabase: Db): Promise<Operation
       ["PAYMENT_FAILED", "CARD_DECLINED", "PAYMENT_PROCESSING_ERROR", "PAYMENT_RETRY_FAILED"].includes(String(row.alert_type))
     ).length,
     missed_payments: open.filter((row) => row.alert_type === "PAYMENT_MISSED").length,
+    card_declined: open.filter((row) => row.alert_type === "CARD_DECLINED").length,
+    other_notifications: open.filter((row) => row.alert_type === "FITDOG_NOTIFICATION").length,
     outstanding_amount: open.reduce((sum, row) => sum + normalizeUsdAmount(row.amount_due), 0),
     resolved_today: rows.filter((row) => row.resolved_at && new Date(String(row.resolved_at)) >= startOfDay).length,
     unacknowledged: open.filter((row) => !row.acknowledged_at && row.status === "new").length,
@@ -517,16 +521,23 @@ export async function listOperationsAlerts(supabase: Db, filters: OperationsAler
 
   const view = filters.view || "payment";
   if (view === "payment") {
-    query = query.in("alert_type", [
-      "PAYMENT_FAILED",
-      "PAYMENT_MISSED",
-      "CARD_DECLINED",
-      "CARD_EXPIRED",
-      "CARD_MISSING",
-      "PAYMENT_PROCESSING_ERROR",
-      "PAYMENT_RETRY_FAILED",
-      "OUTSTANDING_BALANCE"
-    ]).in("status", OPEN_ALERT_STATUSES);
+    query = query
+      .in("alert_type", [
+        "PAYMENT_FAILED",
+        "PAYMENT_MISSED",
+        "CARD_DECLINED",
+        "CARD_EXPIRED",
+        "CARD_MISSING",
+        "PAYMENT_PROCESSING_ERROR",
+        "PAYMENT_RETRY_FAILED",
+        "OUTSTANDING_BALANCE",
+        "FITDOG_NOTIFICATION"
+      ])
+      .in("status", OPEN_ALERT_STATUSES);
+  } else if (view === "card_declined") {
+    query = query.eq("alert_type", "CARD_DECLINED").in("status", OPEN_ALERT_STATUSES);
+  } else if (view === "other") {
+    query = query.neq("alert_type", "CARD_DECLINED").in("status", OPEN_ALERT_STATUSES);
   } else if (view === "resolved") {
     query = query.in("status", ["paid", "waived", "false_positive", "resolved"]);
   }

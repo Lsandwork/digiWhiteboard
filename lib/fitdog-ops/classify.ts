@@ -34,6 +34,7 @@ export function severityForAlertType(alertType: FitdogAlertType): FitdogAlertSev
     case "OUTSTANDING_BALANCE":
     case "FITDOG_SYNC_ERROR":
     case "PAYMENT_PROCESSING_ERROR":
+    case "FITDOG_NOTIFICATION":
       return "medium";
     case "PAYMENT_RESOLVED":
       return "low";

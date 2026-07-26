@@ -9,4 +9,5 @@ export * from "./reconcile";
 export * from "./store";
 export * from "./sync";
 export * from "./notifications";
+export * from "./notifications-parse";
 export * from "./providers";

@@ -16,7 +16,14 @@ import type {
 import { FITDOG_ALERT_TYPES, OPERATIONS_ALERT_STATUSES } from "@/lib/fitdog-ops/types";
 import { formatUsd } from "@/lib/fitdog-ops/money";
 
-type PanelView = "payment" | "all" | "resolved" | "sync" | "settings";
+type PanelView = "alerts" | "resolved" | "sync" | "settings";
+
+type AlertRow = OperationsAlert & { amount_due_label?: string };
+
+function alertWasUpdated(row: Pick<OperationsAlert, "created_at" | "updated_at">) {
+  if (!row.created_at || !row.updated_at) return false;
+  return new Date(row.updated_at).getTime() - new Date(row.created_at).getTime() > 2000;
+}
 
 type AssignableUser = { id: string; name: string; email: string; role: string };
 
@@ -63,9 +70,112 @@ function statusTone(status: string) {
   return "bg-sky-500/15 text-sky-100 border-sky-400/30";
 }
 
+function AlertSection({
+  title,
+  subtitle,
+  rows,
+  loading,
+  sortBy,
+  sortDir,
+  onToggleSort,
+  onOpen,
+  emptyLabel,
+  accent = false
+}: {
+  title: string;
+  subtitle: string;
+  rows: AlertRow[];
+  loading: boolean;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  onToggleSort: (column: string) => void;
+  onOpen: (id: string) => void;
+  emptyLabel: string;
+  accent?: boolean;
+}) {
+  return (
+    <section className={`admin-card overflow-x-auto ${accent ? "border-rose-400/40 ring-1 ring-rose-400/20" : ""}`}>
+      <div className={`border-b border-admin-border px-4 py-3 ${accent ? "bg-rose-500/10" : ""}`}>
+        <h3 className="text-lg font-black text-white">{title}</h3>
+        <p className="text-sm text-admin-muted">{subtitle}</p>
+      </div>
+      <table className="min-w-full text-left text-sm">
+        <thead>
+          <tr className="border-b border-admin-border text-admin-muted">
+            <SortableTh label="Priority" column="severity" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
+            <SortableTh label="Detected" column="detected_at" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
+            <th className="px-3 py-3 font-semibold">Alert Type</th>
+            <th className="px-3 py-3 font-semibold">Owner</th>
+            <th className="px-3 py-3 font-semibold">Dog</th>
+            <th className="px-3 py-3 font-semibold">Service</th>
+            <th className="px-3 py-3 font-semibold">Service Date</th>
+            <SortableTh label="Amount Due" column="amount_due" sortKey={sortBy} sortDir={sortDir} onToggle={onToggleSort} />
+            <th className="px-3 py-3 font-semibold">Details</th>
+            <th className="px-3 py-3 font-semibold">Status</th>
+            <th className="px-3 py-3 font-semibold">Updated</th>
+            <th className="px-3 py-3 font-semibold">Assigned To</th>
+            <th className="px-3 py-3 font-semibold">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const updated = alertWasUpdated(row);
+            return (
+              <tr key={row.id} className="border-b border-admin-border/60 hover:bg-white/[0.02]">
+                <td className="px-3 py-3">
+                  <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${severityTone(row.severity)}`}>
+                    {row.severity}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-admin-muted">{formatWhen(row.detected_at)}</td>
+                <td className="px-3 py-3 font-medium text-white">{row.alert_type}</td>
+                <td className="px-3 py-3 text-white">{row.owner_name}</td>
+                <td className="px-3 py-3 text-admin-muted">{row.dog_name || "—"}</td>
+                <td className="px-3 py-3 text-admin-muted">{row.service_name || "—"}</td>
+                <td className="px-3 py-3 text-admin-muted">{formatWhen(row.service_date)}</td>
+                <td className="px-3 py-3 font-semibold text-white">{row.amount_due_label || formatUsd(row.amount_due, row.currency)}</td>
+                <td className="px-3 py-3 text-admin-muted max-w-[280px] truncate" title={row.failure_reason || ""}>
+                  {row.failure_reason || "—"}
+                </td>
+                <td className="px-3 py-3">
+                  <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusTone(row.status)}`}>{row.status}</span>
+                </td>
+                <td className="px-3 py-3">
+                  {updated ? (
+                    <span className="rounded-full border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 text-xs font-semibold text-sky-100" title={formatWhen(row.updated_at)}>
+                      Updated
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-admin-border px-2 py-0.5 text-xs font-semibold text-admin-muted">
+                      New
+                    </span>
+                  )}
+                </td>
+                <td className="px-3 py-3 text-admin-muted">{row.assigned_user_name || "Unassigned"}</td>
+                <td className="px-3 py-3">
+                  <button type="button" className="text-fitdog-orange hover:underline" onClick={() => onOpen(row.id)}>
+                    Open
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+          {!loading && !rows.length ? (
+            <tr>
+              <td colSpan={13} className="px-3 py-8 text-center text-admin-muted">
+                {emptyLabel}
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 export function FitdogAlertsPanel() {
   const { showToast } = useToast();
-  const [panelView, setPanelView] = useState<PanelView>("payment");
+  const [panelView, setPanelView] = useState<PanelView>("alerts");
   const [data, setData] = useState<ListPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -96,7 +206,7 @@ export function FitdogAlertsPanel() {
     notes: ""
   });
 
-  const listView = panelView === "all" ? "all" : panelView === "resolved" ? "resolved" : "payment";
+  const listView = panelView === "resolved" ? "resolved" : "payment";
 
   const load = useCallback(async () => {
     if (panelView === "sync" || panelView === "settings") return;
@@ -245,8 +355,7 @@ export function FitdogAlertsPanel() {
   const summary = data?.summary;
   const tabs: Array<{ id: PanelView; label: string }> = useMemo(
     () => [
-      { id: "payment", label: "Payment Alerts" },
-      { id: "all", label: "All Fitdog Alerts" },
+      { id: "alerts", label: "Fitdog Alerts" },
       { id: "resolved", label: "Resolved" },
       { id: "sync", label: "Sync History" },
       { id: "settings", label: "Integration Settings" }
@@ -254,14 +363,23 @@ export function FitdogAlertsPanel() {
     []
   );
 
+  const declinedRows = useMemo(
+    () => ((data?.rows || []) as AlertRow[]).filter((row) => row.alert_type === "CARD_DECLINED"),
+    [data?.rows]
+  );
+  const otherRows = useMemo(
+    () => ((data?.rows || []) as AlertRow[]).filter((row) => row.alert_type !== "CARD_DECLINED"),
+    [data?.rows]
+  );
+
   return (
     <section className="space-y-5">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fitdog-orange">Operations · Fitdog Alerts</p>
-          <h2 className="mt-1 text-2xl font-black text-white">Payment & Fitdog Alerts</h2>
+          <h2 className="mt-1 text-2xl font-black text-white">Fitdog Alerts</h2>
           <p className="mt-1 text-sm text-admin-muted">
-            Failed payments, missed payments, card issues, and reconciliations from app.fitdog.com.
+            Card declines, cancellations, vaccinations, and payment issues synced from app.fitdog.com.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -296,12 +414,13 @@ export function FitdogAlertsPanel() {
 
       {panelView !== "sync" && panelView !== "settings" ? (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             {[
               { label: "New Alerts", value: summary?.new_alerts ?? 0 },
+              { label: "Card Declined", value: summary?.card_declined ?? declinedRows.length },
+              { label: "Other Alerts", value: summary?.other_notifications ?? otherRows.length },
               { label: "Failed Payments", value: summary?.failed_payments ?? 0 },
               { label: "Missed Payments", value: summary?.missed_payments ?? 0 },
-              { label: "Outstanding Amount", value: formatUsd(summary?.outstanding_amount ?? 0) },
               { label: "Resolved Today", value: summary?.resolved_today ?? 0 },
               { label: "Last Fitdog Sync", value: formatWhen(summary?.last_successful_sync_at) }
             ].map((card) => (
@@ -351,65 +470,54 @@ export function FitdogAlertsPanel() {
             </label>
           </div>
 
-          <div className="admin-card overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-admin-border text-admin-muted">
-                  <SortableTh label="Priority" column="severity" sortKey={sortBy} sortDir={sortDir} onToggle={(column) => { setSortBy(column); setSortDir(sortBy === column && sortDir === "asc" ? "desc" : "desc"); }} />
-                  <SortableTh label="Detected" column="detected_at" sortKey={sortBy} sortDir={sortDir} onToggle={(column) => { setSortBy(column); setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc"); }} />
-                  <th className="px-3 py-3 font-semibold">Alert Type</th>
-                  <th className="px-3 py-3 font-semibold">Owner</th>
-                  <th className="px-3 py-3 font-semibold">Dog</th>
-                  <th className="px-3 py-3 font-semibold">Service</th>
-                  <th className="px-3 py-3 font-semibold">Service Date</th>
-                  <SortableTh label="Amount Due" column="amount_due" sortKey={sortBy} sortDir={sortDir} onToggle={(column) => { setSortBy(column); setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc"); }} />
-                  <th className="px-3 py-3 font-semibold">Failure Reason</th>
-                  <th className="px-3 py-3 font-semibold">Attempts</th>
-                  <th className="px-3 py-3 font-semibold">Status</th>
-                  <th className="px-3 py-3 font-semibold">Assigned To</th>
-                  <th className="px-3 py-3 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.rows || []).map((row) => (
-                  <tr key={row.id} className="border-b border-admin-border/60 hover:bg-white/[0.02]">
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold capitalize ${severityTone(row.severity)}`}>
-                        {row.severity}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3 text-admin-muted">{formatWhen(row.detected_at)}</td>
-                    <td className="px-3 py-3 font-medium text-white">{row.alert_type}</td>
-                    <td className="px-3 py-3 text-white">{row.owner_name}</td>
-                    <td className="px-3 py-3 text-admin-muted">{row.dog_name || "—"}</td>
-                    <td className="px-3 py-3 text-admin-muted">{row.service_name || "—"}</td>
-                    <td className="px-3 py-3 text-admin-muted">{formatWhen(row.service_date)}</td>
-                    <td className="px-3 py-3 font-semibold text-white">{row.amount_due_label || formatUsd(row.amount_due, row.currency)}</td>
-                    <td className="px-3 py-3 text-admin-muted max-w-[220px] truncate" title={row.failure_reason || ""}>
-                      {row.failure_reason || "—"}
-                    </td>
-                    <td className="px-3 py-3 text-admin-muted">{row.payment_attempt_count}</td>
-                    <td className="px-3 py-3">
-                      <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${statusTone(row.status)}`}>{row.status}</span>
-                    </td>
-                    <td className="px-3 py-3 text-admin-muted">{row.assigned_user_name || "Unassigned"}</td>
-                    <td className="px-3 py-3">
-                      <button type="button" className="text-fitdog-orange hover:underline" onClick={() => void openDetail(row.id)}>
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!loading && !(data?.rows || []).length ? (
-                  <tr>
-                    <td colSpan={13} className="px-3 py-8 text-center text-admin-muted">
-                      No Fitdog alerts match these filters.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          {panelView === "alerts" ? (
+            <div className="space-y-5">
+              <AlertSection
+                title="Card declined — call to reschedule"
+                subtitle="Class cancellations caused by a declined credit card. Contact the customer to reschedule."
+                accent
+                rows={declinedRows}
+                loading={loading}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onToggleSort={(column) => {
+                  setSortBy(column);
+                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                }}
+                onOpen={(id) => void openDetail(id)}
+                emptyLabel="No open card-declined cancellations."
+              />
+              <AlertSection
+                title="Other Fitdog alerts"
+                subtitle="Cancellations, vaccinations, document uploads, and other payment issues."
+                rows={otherRows}
+                loading={loading}
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onToggleSort={(column) => {
+                  setSortBy(column);
+                  setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+                }}
+                onOpen={(id) => void openDetail(id)}
+                emptyLabel="No other open Fitdog alerts."
+              />
+            </div>
+          ) : (
+            <AlertSection
+              title="Resolved alerts"
+              subtitle="Paid, waived, false-positive, and closed Fitdog alerts."
+              rows={(data?.rows || []) as AlertRow[]}
+              loading={loading}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onToggleSort={(column) => {
+                setSortBy(column);
+                setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
+              }}
+              onOpen={(id) => void openDetail(id)}
+              emptyLabel="No resolved alerts match these filters."
+            />
+          )}
         </>
       ) : null}
 

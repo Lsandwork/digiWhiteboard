@@ -1,5 +1,6 @@
 import { fitdogEmployeeEmail, fitdogEmployeePassword } from "@/lib/fitdog-ops/config";
 import { decryptFitdogSession, encryptFitdogSession } from "@/lib/fitdog-ops/crypto";
+import { mapNotificationRows, type FitdogNotificationItem } from "@/lib/fitdog-ops/notifications-parse";
 import { sanitizeFitdogPayload } from "@/lib/fitdog-ops/sanitize";
 import type { FitdogIntegrationProvider, FitdogProviderSyncOptions, FitdogProviderSyncResult } from "@/lib/fitdog-ops/providers/types";
 import type { FitdogPaymentTransaction, FitdogServiceRecord } from "@/lib/fitdog-ops/types";
@@ -38,7 +39,7 @@ function extractRows(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload.filter((row) => row && typeof row === "object") as Record<string, unknown>[];
   if (!payload || typeof payload !== "object") return [];
   const obj = payload as Record<string, unknown>;
-  for (const key of ["data", "results", "items", "transactions", "payments", "services", "reservations"]) {
+  for (const key of ["data", "results", "items", "transactions", "payments", "services", "reservations", "notifications", "alerts"]) {
     if (Array.isArray(obj[key])) return extractRows(obj[key]);
   }
   return [];
@@ -147,12 +148,17 @@ export class FitdogPlaywrightProvider implements FitdogIntegrationProvider {
       const since = options.since || new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
       const payments: FitdogPaymentTransaction[] = [];
       const services: FitdogServiceRecord[] = [];
+      const notifications: FitdogNotificationItem[] = [];
 
       const endpoints = [
         `/api/payments?since=${encodeURIComponent(since)}`,
         `/api/transactions?since=${encodeURIComponent(since)}`,
         `/api/reservations?since=${encodeURIComponent(since)}&status=completed`,
-        `/dashboard/api/payments?since=${encodeURIComponent(since)}`
+        `/dashboard/api/payments?since=${encodeURIComponent(since)}`,
+        `/api/notifications?since=${encodeURIComponent(since)}`,
+        `/api/alerts?since=${encodeURIComponent(since)}`,
+        `/dashboard/api/notifications?since=${encodeURIComponent(since)}`,
+        `/api/v1/notifications?since=${encodeURIComponent(since)}`
       ];
 
       for (const endpoint of endpoints) {
@@ -171,7 +177,9 @@ export class FitdogPlaywrightProvider implements FitdogIntegrationProvider {
           }
           const rows = extractRows(json);
           for (const row of rows) {
-            if (/payment|transaction|charge/i.test(endpoint)) {
+            if (/notification|alert/i.test(endpoint)) {
+              notifications.push(...mapNotificationRows([row]));
+            } else if (/payment|transaction|charge/i.test(endpoint)) {
               const mapped = mapPayment(row);
               if (mapped) payments.push(mapped);
             } else {
@@ -183,6 +191,71 @@ export class FitdogPlaywrightProvider implements FitdogIntegrationProvider {
           parseFailures?.push({
             source_url: `https://app.fitdog.com${endpoint}`,
             error: error instanceof Error ? error.message : "Endpoint fetch failed."
+          });
+        }
+      }
+
+      // Notification feed DOM scrape (bell dropdown / notifications page).
+      if (!notifications.length) {
+        try {
+          await page.goto(DASHBOARD_URL, { waitUntil: "domcontentloaded", timeout: 45000 });
+          const bell = page.locator(
+            '[aria-label*="notification" i], [aria-label*="alert" i], button:has-text("Notifications"), [class*="notification"] button, header button'
+          ).first();
+          if ((await bell.count().catch(() => 0)) > 0) {
+            await bell.click({ timeout: 5000 }).catch(() => undefined);
+            await new Promise((resolve) => setTimeout(resolve, 800));
+          } else {
+            await page.goto(`${DASHBOARD_URL}/notifications`, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => undefined);
+          }
+
+          const scraped = await page.evaluate(() => {
+            const roots = Array.from(
+              document.querySelectorAll(
+                '[class*="notification"], [data-testid*="notification"], [role="listitem"], li, article'
+              )
+            );
+            const items: Array<{ text: string; time: string }> = [];
+            for (const node of roots) {
+              const text = (node.textContent || "").replace(/\s+/g, " ").trim();
+              if (!text || text.length < 12 || text.length > 600) continue;
+              if (
+                !/(cancel|declin|vaccination|uploaded|payment|class|card|invoice|reservation|document)/i.test(
+                  text
+                )
+              ) {
+                continue;
+              }
+              const timeEl = node.querySelector("time, [class*='time'], [class*='date'], small");
+              items.push({
+                text,
+                time: (timeEl?.textContent || "").replace(/\s+/g, " ").trim()
+              });
+              if (items.length >= 80) break;
+            }
+            // Deduplicate near-identical rows
+            const seen = new Set<string>();
+            return items.filter((item) => {
+              const key = item.text.toLowerCase();
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+          });
+
+          for (const [index, item] of scraped.entries()) {
+            notifications.push({
+              id: `dom-notif-${Buffer.from(item.text).toString("base64url").slice(0, 28)}-${index}`,
+              text: item.text,
+              detected_at: item.time || null,
+              source_url: "https://app.fitdog.com/dashboard",
+              raw: sanitizeFitdogPayload(item) as Record<string, unknown>
+            });
+          }
+        } catch (error) {
+          parseFailures?.push({
+            source_url: `${DASHBOARD_URL}/notifications`,
+            error: error instanceof Error ? error.message : "Notification feed scrape failed."
           });
         }
       }
@@ -231,7 +304,8 @@ export class FitdogPlaywrightProvider implements FitdogIntegrationProvider {
       return {
         payments,
         services,
-        records_scanned: payments.length + services.length,
+        notifications,
+        records_scanned: payments.length + services.length + notifications.length,
         parse_failures: parseFailures,
         checkpoint: { since: new Date().toISOString(), ...(options.checkpoint || {}) },
         encryptedSession,

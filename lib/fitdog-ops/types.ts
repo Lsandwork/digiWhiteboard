@@ -8,7 +8,8 @@ export const FITDOG_ALERT_TYPES = [
   "PAYMENT_RETRY_FAILED",
   "OUTSTANDING_BALANCE",
   "PAYMENT_RESOLVED",
-  "FITDOG_SYNC_ERROR"
+  "FITDOG_SYNC_ERROR",
+  "FITDOG_NOTIFICATION"
 ] as const;
 
 export type FitdogAlertType = (typeof FITDOG_ALERT_TYPES)[number];
@@ -276,6 +277,13 @@ export type FitdogSyncSnapshot = {
   invoices?: FitdogInvoiceRecord[];
   payments?: FitdogPaymentTransaction[];
   events?: NormalizedFitdogEvent[];
+  notifications?: Array<{
+    id: string;
+    text: string;
+    detected_at?: string | null;
+    source_url?: string | null;
+    raw?: Record<string, unknown>;
+  }>;
   checkpoint?: Record<string, unknown>;
   records_scanned?: number;
   parse_failures?: Array<{ source_url?: string | null; error: string; sanitized?: Record<string, unknown> }>;
@@ -285,6 +293,8 @@ export type OperationsAlertSummary = {
   new_alerts: number;
   failed_payments: number;
   missed_payments: number;
+  card_declined: number;
+  other_notifications: number;
   outstanding_amount: number;
   resolved_today: number;
   unacknowledged: number;
@@ -292,7 +302,7 @@ export type OperationsAlertSummary = {
 };
 
 export type OperationsAlertListFilters = {
-  view?: "payment" | "all" | "resolved";
+  view?: "payment" | "all" | "resolved" | "card_declined" | "other";
   q?: string;
   alertType?: FitdogAlertType | "all";
   status?: OperationsAlertStatus | "all";

@@ -7,6 +7,7 @@ import {
 } from "@/lib/fitdog-ops/classify";
 import { buildFitdogIdempotencyKey } from "@/lib/fitdog-ops/idempotency";
 import { isPositiveAmount, normalizeUsdAmount } from "@/lib/fitdog-ops/money";
+import { parseFitdogNotification } from "@/lib/fitdog-ops/notifications-parse";
 import type {
   FitdogAlertType,
   FitdogPaymentTransaction,
@@ -109,6 +110,45 @@ function eventToProposed(event: NormalizedFitdogEvent): ProposedAlert | null {
       discounted: Boolean(event.discounted)
     },
     source_url: event.source_url ?? null
+  };
+}
+
+function notificationToProposed(item: NonNullable<FitdogSyncSnapshot["notifications"]>[number]): ProposedAlert | null {
+  const parsed = parseFitdogNotification(item);
+  if (!parsed.text) return null;
+  const amountDue = 0;
+  return {
+    idempotency_key: buildFitdogIdempotencyKey({
+      source_event_id: parsed.id,
+      owner_id: parsed.owner_name,
+      dog_id: parsed.dog_name,
+      reservation_id: parsed.service_date,
+      invoice_id: null,
+      alert_type: parsed.alert_type,
+      amount_due: amountDue
+    }),
+    alert_type: parsed.alert_type,
+    severity: severityForAlertType(parsed.alert_type),
+    source_event_id: parsed.id,
+    source_record_id: parsed.id,
+    owner_id: null,
+    owner_name: parsed.owner_name || "Owner",
+    dog_id: null,
+    dog_name: parsed.dog_name,
+    reservation_id: null,
+    invoice_id: null,
+    transaction_id: null,
+    service_name: parsed.service_name,
+    service_date: parsed.service_date || parsed.detected_at,
+    amount_due: amountDue,
+    amount_paid: 0,
+    currency: "USD",
+    failure_reason: parsed.failure_reason,
+    payment_attempt_count: parsed.alert_type === "CARD_DECLINED" ? 1 : 0,
+    payment_method_brand: null,
+    payment_method_last_four: null,
+    package_credit_check: { source: "fitdog_notification_feed" },
+    source_url: parsed.source_url
   };
 }
 
@@ -386,6 +426,13 @@ export function reconcileFitdogSnapshot(
     createOrUpdate.push(proposed);
   }
 
+  for (const notification of snapshot.notifications || []) {
+    const proposed = notificationToProposed(notification);
+    if (!proposed || seen.has(proposed.idempotency_key)) continue;
+    seen.add(proposed.idempotency_key);
+    createOrUpdate.push(proposed);
+  }
+
   return {
     createOrUpdate,
     resolveMatches,
@@ -394,7 +441,8 @@ export function reconcileFitdogSnapshot(
       (snapshot.services?.length || 0) +
       (snapshot.invoices?.length || 0) +
       (snapshot.events?.length || 0) +
-      (snapshot.reservations?.length || 0)
+      (snapshot.reservations?.length || 0) +
+      (snapshot.notifications?.length || 0)
   };
 }
 

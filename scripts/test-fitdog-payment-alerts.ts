@@ -4,6 +4,10 @@ import { canManageFitdogAlerts, canViewFitdogAlerts } from "../lib/fitdog-ops/ac
 import { classifyPaymentFailure, serviceIsCovered } from "../lib/fitdog-ops/classify";
 import { buildFitdogIdempotencyKey } from "../lib/fitdog-ops/idempotency";
 import { formatUsd } from "../lib/fitdog-ops/money";
+import {
+  classifyFitdogNotificationText,
+  parseFitdogNotification
+} from "../lib/fitdog-ops/notifications-parse";
 import { normalizeFitdogWebhookPayload } from "../lib/fitdog-ops/providers/webhook";
 import {
   alertMatchesSuccessfulPayment,
@@ -298,6 +302,37 @@ import { sanitizeFitdogPayload } from "../lib/fitdog-ops/sanitize";
   assert.equal(formatUsd(45), "$45.00");
   assert.equal(formatUsd(45.5), "$45.50");
   assert.equal(formatUsd("12.3"), "$12.30");
+}
+
+// 13. Fitdog notification feed: card-declined class cancel is separated.
+{
+  const text =
+    "Lucia Atwood class, Reliable Recall, on 07/24/2026 Jake was cancelled due to their credit card being declined. Try to call the customer to reschedule class.";
+  assert.equal(classifyFitdogNotificationText(text), "CARD_DECLINED");
+  const parsed = parseFitdogNotification({ id: "n1", text });
+  assert.equal(parsed.alert_type, "CARD_DECLINED");
+  assert.equal(parsed.owner_name, "Lucia Atwood");
+  assert.equal(parsed.dog_name, "Jake");
+  assert.equal(parsed.service_name, "Reliable Recall");
+  assert.ok(parsed.service_date);
+
+  const result = reconcileFitdogSnapshot(
+    {
+      notifications: [
+        { id: "n1", text },
+        {
+          id: "n2",
+          text: "Scout cancelled their Trail Foundations for 07/24/2026."
+        },
+        { id: "n3", text: "Birdie has an expired vaccination." }
+      ]
+    },
+    { graceMinutes: 60 }
+  );
+  assert.equal(result.createOrUpdate.length, 3);
+  assert.equal(result.createOrUpdate.filter((row) => row.alert_type === "CARD_DECLINED").length, 1);
+  assert.equal(result.createOrUpdate.filter((row) => row.alert_type === "FITDOG_NOTIFICATION").length, 2);
+  assert.match(String(result.createOrUpdate.find((row) => row.alert_type === "CARD_DECLINED")?.failure_reason), /credit card being declined/i);
 }
 
 console.log("fitdog payment alerts tests passed");
