@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchVonageCallEmails, isGmailConfigured, probeGmailImap } from "@/lib/missed-calls/gmail-imap";
+import { loadGmailCredentials } from "@/lib/missed-calls/credentials";
+import { fetchVonageCallEmails, probeGmailImap } from "@/lib/missed-calls/gmail-imap";
 import { parseVonageEmail } from "@/lib/missed-calls/parse-vonage-email";
 import {
   finishSyncRun,
@@ -85,7 +86,8 @@ export async function syncMissedCallsFromGmail(params: {
   callsUpdated: number;
   message: string;
 }> {
-  if (!isGmailConfigured()) {
+  const creds = await loadGmailCredentials(params.supabase);
+  if (!creds.pass) {
     const run = await startSyncRun(params.supabase, {
       trigger: params.trigger,
       actorUserId: params.actorUserId
@@ -93,7 +95,8 @@ export async function syncMissedCallsFromGmail(params: {
     await finishSyncRun(params.supabase, {
       id: run.id,
       status: "skipped",
-      message: "Gmail IMAP is not configured (set GMAIL_IMAP_APP_PASSWORD)."
+      message:
+        "Gmail IMAP is not configured. Save a Google App Password in Missed Calls (or set GMAIL_IMAP_APP_PASSWORD)."
     });
     return {
       ok: false,
@@ -101,7 +104,8 @@ export async function syncMissedCallsFromGmail(params: {
       messagesScanned: 0,
       callsCreated: 0,
       callsUpdated: 0,
-      message: "Gmail IMAP is not configured (set GMAIL_IMAP_APP_PASSWORD)."
+      message:
+        "Gmail IMAP is not configured. Save a Google App Password in Missed Calls (or set GMAIL_IMAP_APP_PASSWORD)."
     };
   }
 
@@ -117,7 +121,9 @@ export async function syncMissedCallsFromGmail(params: {
   const errors: string[] = [];
 
   try {
-    const messages = await fetchVonageCallEmails();
+    const messages = await fetchVonageCallEmails({
+      auth: { user: creds.user, pass: creds.pass }
+    });
     messagesScanned = messages.length;
 
     for (const msg of messages) {
@@ -244,9 +250,10 @@ export async function syncMissedCallsFromGmail(params: {
   }
 }
 
-export async function testGmailConnection() {
-  if (!isGmailConfigured()) {
+export async function testGmailConnection(supabase: SupabaseClient) {
+  const creds = await loadGmailCredentials(supabase);
+  if (!creds.pass) {
     return { ok: false, message: "Gmail IMAP is not configured." };
   }
-  return probeGmailImap();
+  return probeGmailImap({ user: creds.user, pass: creds.pass });
 }

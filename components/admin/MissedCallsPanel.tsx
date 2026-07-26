@@ -43,6 +43,8 @@ export function MissedCallsPanel() {
   const [history, setHistory] = useState<MissedCallSyncRun[]>([]);
   const [selected, setSelected] = useState<MissedCall | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [appPasswordInput, setAppPasswordInput] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,6 +122,38 @@ export function MissedCallsPanel() {
     }
   };
 
+  const saveAppPassword = async () => {
+    setSavingPassword(true);
+    try {
+      const res = await fetch("/api/admin/missed-calls", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_gmail_password",
+          gmailUser: payload?.gmailUser || "lonnie@fitdog.com",
+          appPassword: appPasswordInput
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || json.message || "Failed to save App Password.");
+      if (json.probe && json.probe.ok === false) {
+        showToast(
+          `Saved, but Gmail test failed: ${json.probe.message || "check the App Password."}`,
+          "error"
+        );
+      } else {
+        showToast(json.probe?.message || "Gmail App Password saved and connected.", "success");
+        setAppPasswordInput("");
+      }
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Failed to save App Password.", "error");
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const audioSrc = useMemo(() => {
     if (!selected?.voicemail_storage_path) return null;
     return `/api/admin/missed-calls?view=audio&id=${encodeURIComponent(selected.id)}`;
@@ -147,9 +181,51 @@ export function MissedCallsPanel() {
       </div>
 
       {!payload?.gmailConfigured ? (
-        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Gmail IMAP is not connected yet. An app password for lonnie@fitdog.com must be set as{" "}
-          <code className="text-xs">GMAIL_IMAP_APP_PASSWORD</code> on the server.
+        <div className="space-y-3 rounded-lg border border-amber-400/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <p>
+            Gmail IMAP is not connected yet. Because 2FA is on for{" "}
+            <strong>{payload?.gmailUser || "lonnie@fitdog.com"}</strong>, Google requires a{" "}
+            <strong>Google App Password</strong> (not the normal login password).
+          </p>
+          <ol className="list-decimal space-y-1 pl-5 text-amber-50/90">
+            <li>
+              On your phone, open{" "}
+              <a
+                className="underline"
+                href="https://myaccount.google.com/apppasswords"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Google App Passwords
+              </a>{" "}
+              (approve 2FA if asked).
+            </li>
+            <li>Create an app password named “Fitdog Missed Calls”.</li>
+            <li>Paste the 16-character password below and save — then click Sync Gmail.</li>
+          </ol>
+          <div className="flex flex-wrap items-end gap-2 pt-1">
+            <label className="block min-w-[16rem] flex-1">
+              <span className="mb-1 block text-xs uppercase tracking-wide text-amber-100/80">
+                Google App Password
+              </span>
+              <input
+                type="password"
+                autoComplete="off"
+                className="admin-input w-full"
+                placeholder="xxxx xxxx xxxx xxxx"
+                value={appPasswordInput}
+                onChange={(e) => setAppPasswordInput(e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              className="admin-btn-primary"
+              disabled={savingPassword || appPasswordInput.trim().length < 8}
+              onClick={() => void saveAppPassword()}
+            >
+              {savingPassword ? "Saving…" : "Save & connect"}
+            </button>
+          </div>
         </div>
       ) : null}
 

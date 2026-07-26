@@ -18,13 +18,24 @@ export type GmailFetchMessage = {
   }>;
 };
 
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is not configured.`);
-  return value;
-}
+export type GmailImapAuth = {
+  user: string;
+  pass: string;
+  host?: string;
+  port?: number;
+  mailbox?: string;
+};
 
-export function getGmailImapConfig() {
+export type GmailImapConfig = {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  pass: string;
+  mailbox: string;
+};
+
+export function getEnvGmailImapConfig(): GmailImapConfig | null {
   const user =
     process.env.GMAIL_IMAP_USER?.trim() ||
     process.env.MISSED_CALLS_GMAIL_USER?.trim() ||
@@ -34,11 +45,7 @@ export function getGmailImapConfig() {
     process.env.MISSED_CALLS_GMAIL_APP_PASSWORD?.trim() ||
     process.env.GMAIL_IMAP_PASSWORD?.trim() ||
     "";
-  if (!pass) {
-    throw new Error(
-      "Gmail IMAP password is not configured. Set GMAIL_IMAP_APP_PASSWORD (Google App Password)."
-    );
-  }
+  if (!pass) return null;
   return {
     host: process.env.GMAIL_IMAP_HOST?.trim() || "imap.gmail.com",
     port: Number(process.env.GMAIL_IMAP_PORT || 993),
@@ -49,17 +56,42 @@ export function getGmailImapConfig() {
   };
 }
 
-export function isGmailConfigured(): boolean {
-  try {
-    getGmailImapConfig();
-    return true;
-  } catch {
-    return false;
+/** @deprecated Prefer resolveGmailImapConfig / auth overrides. */
+export function getGmailImapConfig(): GmailImapConfig {
+  const env = getEnvGmailImapConfig();
+  if (!env) {
+    throw new Error(
+      "Gmail IMAP password is not configured. Set GMAIL_IMAP_APP_PASSWORD or save an App Password in Missed Calls."
+    );
   }
+  return env;
 }
 
-async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T> {
-  const config = getGmailImapConfig();
+export function isGmailConfigured(): boolean {
+  return Boolean(getEnvGmailImapConfig());
+}
+
+export function buildGmailImapConfig(auth: GmailImapAuth): GmailImapConfig {
+  if (!auth.pass?.trim()) {
+    throw new Error(
+      "Gmail IMAP password is not configured. Set GMAIL_IMAP_APP_PASSWORD or save an App Password in Missed Calls."
+    );
+  }
+  return {
+    host: auth.host?.trim() || process.env.GMAIL_IMAP_HOST?.trim() || "imap.gmail.com",
+    port: auth.port || Number(process.env.GMAIL_IMAP_PORT || 993),
+    secure: true,
+    user: auth.user?.trim() || "lonnie@fitdog.com",
+    pass: auth.pass.trim(),
+    mailbox: auth.mailbox?.trim() || process.env.GMAIL_IMAP_MAILBOX?.trim() || "INBOX"
+  };
+}
+
+async function withClient<T>(
+  auth: GmailImapAuth | undefined,
+  fn: (client: ImapFlow, config: GmailImapConfig) => Promise<T>
+): Promise<T> {
+  const config = auth ? buildGmailImapConfig(auth) : getGmailImapConfig();
   const client = new ImapFlow({
     host: config.host,
     port: config.port,
@@ -70,7 +102,7 @@ async function withClient<T>(fn: (client: ImapFlow) => Promise<T>): Promise<T> {
   });
   await client.connect();
   try {
-    return await fn(client);
+    return await fn(client, config);
   } finally {
     try {
       await client.logout();
@@ -107,17 +139,15 @@ function attachmentList(parsed: ParsedMail): GmailFetchMessage["attachments"] {
 export async function fetchVonageCallEmails(params?: {
   lookbackDays?: number;
   maxMessages?: number;
+  auth?: GmailImapAuth;
 }): Promise<GmailFetchMessage[]> {
   const lookbackDays = params?.lookbackDays ?? Number(process.env.MISSED_CALLS_LOOKBACK_DAYS || 30);
   const maxMessages = params?.maxMessages ?? Number(process.env.MISSED_CALLS_MAX_MESSAGES || 80);
   const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
 
-  return withClient(async (client) => {
-    const config = getGmailImapConfig();
+  return withClient(params?.auth, async (client, config) => {
     const lock = await client.getMailboxLock(config.mailbox);
     try {
-      const sinceStr = since.toUTCString().replace(/^\w+, /, "").replace(/ GMT$/, "");
-      // Gmail IMAP supports advanced searches; keep queries simple for compatibility.
       let uids: number[] = [];
       const searches: Array<object> = [
         { from: "vonage", since },
@@ -139,7 +169,6 @@ export async function fetchVonageCallEmails(params?: {
       }
       uids = [...new Set(uids)].sort((a, b) => b - a).slice(0, maxMessages);
 
-      // Fallback: scan latest N messages if vendor searches return nothing.
       if (!uids.length) {
         const all = await client.search({ since }, { uid: true });
         const recent = (Array.isArray(all) ? all.map(Number) : []).sort((a, b) => b - a).slice(0, 120);
@@ -178,7 +207,6 @@ export async function fetchVonageCallEmails(params?: {
           html,
           attachments: attachmentList(parsed)
         });
-        void sinceStr;
       }
       return out.sort((a, b) => b.date.getTime() - a.date.getTime());
     } finally {
@@ -187,9 +215,13 @@ export async function fetchVonageCallEmails(params?: {
   });
 }
 
-export async function probeGmailImap(): Promise<{ ok: boolean; user: string; mailbox: string; message: string }> {
-  const config = getGmailImapConfig();
-  return withClient(async (client) => {
+export async function probeGmailImap(auth?: GmailImapAuth): Promise<{
+  ok: boolean;
+  user: string;
+  mailbox: string;
+  message: string;
+}> {
+  return withClient(auth, async (client, config) => {
     const status = await client.status(config.mailbox, { messages: true, unseen: true });
     return {
       ok: true,
@@ -199,6 +231,3 @@ export async function probeGmailImap(): Promise<{ ok: boolean; user: string; mai
     };
   });
 }
-
-// Keep requireEnv available for future OAuth helpers without unused warnings.
-void requireEnv;

@@ -12,8 +12,11 @@ import {
   listSyncRuns,
   markMissedCallStatus
 } from "@/lib/missed-calls/store";
+import {
+  getGmailSettingsPublic,
+  saveGmailAppPassword
+} from "@/lib/missed-calls/credentials";
 import { syncMissedCallsFromGmail, testGmailConnection } from "@/lib/missed-calls/sync";
-import { isGmailConfigured } from "@/lib/missed-calls/gmail-imap";
 import type { MissedCallStatus } from "@/lib/missed-calls/types";
 
 export const dynamic = "force-dynamic";
@@ -48,20 +51,26 @@ export async function GET(request: Request) {
     }
 
     if (view === "summary") {
-      const summary = await getMissedCallSummary(supabase);
+      const [summary, gmail] = await Promise.all([
+        getMissedCallSummary(supabase),
+        getGmailSettingsPublic(supabase)
+      ]);
       return NextResponse.json({
         summary,
-        gmailConfigured: isGmailConfigured(),
-        gmailUser: process.env.GMAIL_IMAP_USER?.trim() || "lonnie@fitdog.com"
+        gmailConfigured: gmail.has_app_password,
+        gmailUser: gmail.gmail_user
       });
     }
 
     if (view === "sync") {
-      const history = await listSyncRuns(supabase, 30);
+      const [history, gmail] = await Promise.all([
+        listSyncRuns(supabase, 30),
+        getGmailSettingsPublic(supabase)
+      ]);
       return NextResponse.json({
         history,
-        gmailConfigured: isGmailConfigured(),
-        gmailUser: process.env.GMAIL_IMAP_USER?.trim() || "lonnie@fitdog.com"
+        gmailConfigured: gmail.has_app_password,
+        gmailUser: gmail.gmail_user
       });
     }
 
@@ -100,15 +109,16 @@ export async function GET(request: Request) {
     }
 
     const status = (url.searchParams.get("status") || "all") as MissedCallStatus | "all";
-    const [list, summary] = await Promise.all([
+    const [list, summary, gmail] = await Promise.all([
       listMissedCalls(supabase, { status, limit: 150 }),
-      getMissedCallSummary(supabase)
+      getMissedCallSummary(supabase),
+      getGmailSettingsPublic(supabase)
     ]);
     return NextResponse.json({
       ...list,
       summary,
-      gmailConfigured: isGmailConfigured(),
-      gmailUser: process.env.GMAIL_IMAP_USER?.trim() || "lonnie@fitdog.com"
+      gmailConfigured: gmail.has_app_password,
+      gmailUser: gmail.gmail_user
     });
   } catch (error) {
     return NextResponse.json(
@@ -126,6 +136,8 @@ export async function POST(request: Request) {
     action?: string;
     id?: string;
     status?: MissedCallStatus;
+    appPassword?: string;
+    gmailUser?: string;
   };
 
   try {
@@ -139,8 +151,29 @@ export async function POST(request: Request) {
     }
 
     if (body.action === "test_gmail") {
-      const result = await testGmailConnection();
+      const result = await testGmailConnection(supabase);
       return NextResponse.json(result, { status: result.ok ? 200 : 502 });
+    }
+
+    if (body.action === "save_gmail_password") {
+      if (!body.appPassword?.trim()) {
+        return NextResponse.json({ error: "appPassword required" }, { status: 400 });
+      }
+      const settings = await saveGmailAppPassword(supabase, {
+        user: body.gmailUser,
+        appPassword: body.appPassword,
+        actorUserId: gate.session?.adminUserId ?? null
+      });
+      const probe = await testGmailConnection(supabase).catch((error) => ({
+        ok: false,
+        message: error instanceof Error ? error.message : String(error)
+      }));
+      return NextResponse.json({
+        settings,
+        gmailConfigured: settings.has_app_password,
+        gmailUser: settings.gmail_user,
+        probe
+      });
     }
 
     if (body.action === "set_status") {
