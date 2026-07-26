@@ -28,5 +28,27 @@ assert.match(readable, /admin-badge--green/, "status/green badges must remapped 
 assert.match(readable, /admin-icon-btn/, "action icon buttons must remapped for light canvases");
 assert.match(readable, /#1e3a8a/, "info text must use dark navy on light canvases");
 assert.match(readable, /#14532d/, "success text must use dark green on light canvases");
+assert.match(readable, /crossover-dashboard/, "Front Desk crossover tokens must remap on light canvases");
+assert.match(readable, /crossover-mobile-card__title/, "Front Desk mobile card titles must be dark on light canvases");
+assert.match(readable, /crossover-badge--priority-normal/, "priority chips must remap for light canvases");
+assert.match(readable, /shift-log-badge--type-general/, "GENERAL shift-note badges must remap for light canvases");
+assert.match(readable, /crossover-dashboard__page-title/, "page titles must force dark on light canvases");
+assert.match(readable, /crossover-table__subject-preview/, "table previews must force dark on light canvases");
+assert.match(readable, /crossover-urgent-pill--on/, "filter pills must remap on light canvases");
+assert.match(readable, /FINAL LINE OF DEFENSE/, "must include comprehensive clear/light text defense");
+assert.match(readable, /admin-content-main/, "must target admin-content-main canvas");
+
+const clearTheme = readFileSync(resolve(root, "lib/fitdog-dashboard/theme-clear.css"), "utf8");
+assert.match(clearTheme, /html\[data-theme="clear"\] \.crossover-dashboard/, "clear theme must remap crossover-dashboard tokens");
+assert.match(clearTheme, /--crossover-text: #12213a/, "clear crossover text must be dark");
+assert.match(clearTheme, /shift-log-badge--type-general/, "clear theme must remap GENERAL shift-note badges");
+
+assert.match(
+  globals,
+  /:is\(html\[data-theme="light"\], html\[data-theme="clear"\]\)/,
+  "globals light readability overrides must also apply in clear mode"
+);
+assert.match(globals, /\.crossover-table__subject-preview[\s\S]*?color:\s*var\(--crossover-muted\)/, "subject preview must use theme muted token");
+assert.match(globals, /\.crossover-field__label[\s\S]*?color:\s*var\(--crossover-muted\)/, "field labels must use theme muted token");
 
 console.log("theme readable canvas tests passed");

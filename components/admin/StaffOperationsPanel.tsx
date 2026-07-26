@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { OpsRowActions } from "@/components/admin/ui/OpsRowActions";
+import { RichText } from "@/components/admin/ui/RichText";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { htmlToPlainText } from "@/lib/html/rich-text";
 import type {
   ActiveIssue,
   CrossoverMessage,
@@ -1102,7 +1104,7 @@ function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, 
         <tbody>
           {rows.map((item) => (
             <tr key={item.id}>
-              <td><p className="crossover-table__subject-title">{item.title}</p><p className="crossover-table__subject-preview">{item.notes}</p></td>
+              <td><p className="crossover-table__subject-title">{item.title}</p><p className="crossover-table__subject-preview">{htmlToPlainText(item.notes ?? "")}</p></td>
               <td>{item.category}</td>
               <td>{item.source}</td>
               <td>{item.reported_by ?? "Front Desk"}</td>
@@ -1248,7 +1250,7 @@ function AutoReportedPanel({ items, onOpen }: { items: ActiveIssue[]; onOpen: (i
 
 function EscalationsSection({ items }: { items: ActiveIssue[] }) {
   const urgent = items.filter((item) => item.priority === "High" || item.priority === "Critical").slice(0, 4);
-  return <section className="admin-card p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-xl font-black text-white">Escalations & Follow-Up</h3><p className="text-sm text-admin-muted">High priority issues that require immediate action and follow-up.</p></div><span className="text-xs text-fitdog-orange">View all escalations</span></div><div className="grid gap-3 md:grid-cols-2">{urgent.map((item) => <article key={item.id} className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4"><Badge type="priority" value={item.priority} /><h4 className="mt-3 font-black text-white">{item.title}</h4><p className="mt-1 text-sm text-admin-muted">{item.notes}</p><p className="mt-3 text-xs text-admin-muted">Assigned to {item.assigned_to ?? "Unassigned"} • Due {formatDateTime(item.due_at)}</p></article>)}{!urgent.length ? <p className="text-sm text-admin-muted">No high priority escalations.</p> : null}</div></section>;
+  return <section className="admin-card p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-xl font-black text-white">Escalations & Follow-Up</h3><p className="text-sm text-admin-muted">High priority issues that require immediate action and follow-up.</p></div><span className="text-xs text-fitdog-orange">View all escalations</span></div><div className="grid gap-3 md:grid-cols-2">{urgent.map((item) => <article key={item.id} className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4"><Badge type="priority" value={item.priority} /><h4 className="mt-3 font-black text-white">{item.title}</h4><p className="mt-1 text-sm text-admin-muted"><RichText value={item.notes} plain empty="No notes." /></p><p className="mt-3 text-xs text-admin-muted">Assigned to {item.assigned_to ?? "Unassigned"} • Due {formatDateTime(item.due_at)}</p></article>)}{!urgent.length ? <p className="text-sm text-admin-muted">No high priority escalations.</p> : null}</div></section>;
 }
 
 function UpcomingSection({ items }: { items: OwnerFollowUp[] }) {
@@ -1352,7 +1354,9 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             <Badge type="priority" value={item.priority} />
             <Badge type="status" value={item.status} />
           </div>
-          <p className="whitespace-pre-wrap text-sm text-admin-muted">{description || "No notes provided."}</p>
+          <div className="text-sm text-admin-muted">
+            <RichText value={description} empty="No notes provided." />
+          </div>
         </div>
         {"assigned_to" in item ? (
           <SelectField

@@ -15,6 +15,7 @@ import {
 import { NotificationStatusBadge } from "@/components/admin/notifications/NotificationStatusBadge";
 import { NotificationTypeBadge } from "@/components/admin/notifications/NotificationTypeBadge";
 import { QUICK_REPLIES } from "@/lib/staff/notification-hub";
+import { RichText } from "@/components/admin/ui/RichText";
 
 const SUPPORT_STATUSES = ["Submitted", "In Review", "Needs More Info", "Resolved", "Closed"] as const;
 
@@ -234,22 +235,36 @@ export function NotificationResponseModal({
                       <p><strong>Employee:</strong> {report.write_up_details.employee_name} ({report.write_up_details.employee_department})</p>
                       <p><strong>Violation date:</strong> {report.write_up_details.violation_date}</p>
                       <p><strong>Documented by:</strong> {report.write_up_details.documented_by ?? report.created_by}</p>
-                      <p className="notif-response-details__full"><strong>Statement:</strong> {report.write_up_details.statement_of_violation}</p>
+                      <div className="notif-response-details__full">
+                        <strong>Statement:</strong>{" "}
+                        <RichText value={report.write_up_details.statement_of_violation} empty="" />
+                      </div>
                       {report.management_response ? (
-                        <p className="notif-response-details__full notif-response-details__highlight"><strong>Management response:</strong> {report.management_response}</p>
+                        <div className="notif-response-details__full notif-response-details__highlight">
+                          <strong>Management response:</strong>{" "}
+                          <RichText value={report.management_response} empty="" />
+                        </div>
                       ) : null}
                     </div>
                   ) : report?.groomer_submission_details ? (
-                    <p className="notif-response-details__full">{report.groomer_submission_details.description}</p>
+                    <div className="notif-response-details__full">
+                      <RichText value={report.groomer_submission_details.description} />
+                    </div>
                   ) : report ? (
-                    <p className="notif-response-details__full">{report.summary}</p>
+                    <div className="notif-response-details__full">
+                      <RichText value={report.summary} />
+                    </div>
                   ) : notification.linkedCrossover ? (
                     <div className="notif-response-details__grid">
                       <p><strong>Subject:</strong> {notification.linkedCrossover.subject}</p>
-                      <p className="notif-response-details__full">{notification.linkedCrossover.message}</p>
+                      <div className="notif-response-details__full">
+                        <RichText value={notification.linkedCrossover.message} />
+                      </div>
                     </div>
                   ) : (
-                    <p className="notif-response-details__full">{notification.body ?? notification.preview}</p>
+                    <div className="notif-response-details__full">
+                      <RichText value={notification.body ?? notification.preview} />
+                    </div>
                   )}
                 </div>
               </section>

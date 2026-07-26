@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Stethoscope } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
+import { RichText } from "@/components/admin/ui/RichText";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh } from "@/components/admin/ui/sortable-table";
 import { centsToDisplay } from "@/lib/staff/vet-visits/money";
@@ -378,49 +379,67 @@ export function VetVisitsPanel() {
 
       {drawer ? (
         <div className="admin-drawer-backdrop" onClick={() => setDrawer(null)}>
-          <aside className="admin-drawer-panel" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4">
-              <h3 className="text-lg font-black admin-text-emphasis">{drawer.visit_number}</h3>
-              <p className="text-sm text-admin-muted">
-                {drawer.dog_name} · {drawer.reason}
-              </p>
-            </div>
-            <div className="mb-4 grid gap-2 text-sm">
-              <p>
-                <span className="text-admin-muted">Owner:</span> {drawer.owner_name}
-              </p>
-              <p>
-                <span className="text-admin-muted">When:</span> {formatWhen(drawer.occurred_at)}
-              </p>
-              <p>
-                <span className="text-admin-muted">Clinic:</span> {drawer.vet_clinic || "—"}
-              </p>
-              <p>
-                <span className="text-admin-muted">Reported by:</span> {drawer.reported_by}
-              </p>
-              <p>
-                <span className="text-admin-muted">Bill:</span> {centsToDisplay(drawer.bill_total_cents)} (
-                {drawer.paid_by})
-              </p>
-              {drawer.receipt_url ? (
-                <p>
-                  <a
-                    href={drawer.receipt_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-sky-300 underline"
-                  >
-                    {drawer.receipt_label || "View receipt"}
-                  </a>
+          <aside className="admin-drawer-panel admin-detail-drawer" onClick={(e) => e.stopPropagation()}>
+            <header className="admin-detail-drawer__header">
+              <div>
+                <p className="admin-detail-drawer__kicker">Vet visit</p>
+                <h3 className="admin-detail-drawer__title">{drawer.visit_number}</h3>
+                <p className="admin-detail-drawer__subtitle">
+                  {drawer.dog_name} · {drawer.reason}
                 </p>
+              </div>
+            </header>
+
+            <section className="admin-detail-drawer__meta" aria-label="Visit details">
+              <div className="admin-detail-drawer__meta-item">
+                <span>Owner</span>
+                <strong>{drawer.owner_name || "—"}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>When</span>
+                <strong>{formatWhen(drawer.occurred_at)}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>Clinic</span>
+                <strong>{drawer.vet_clinic || "—"}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>Reported by</span>
+                <strong>{drawer.reported_by}</strong>
+              </div>
+              <div className="admin-detail-drawer__meta-item">
+                <span>Bill</span>
+                <strong>
+                  {centsToDisplay(drawer.bill_total_cents)} ({drawer.paid_by})
+                </strong>
+              </div>
+              {drawer.receipt_url ? (
+                <div className="admin-detail-drawer__meta-item">
+                  <span>Receipt</span>
+                  <strong>
+                    <a
+                      href={drawer.receipt_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-sky-300 underline"
+                    >
+                      {drawer.receipt_label || "View receipt"}
+                    </a>
+                  </strong>
+                </div>
               ) : null}
-              <p>
-                <span className="text-admin-muted">Notes:</span> {drawer.notes || "—"}
-              </p>
-            </div>
+            </section>
+
+            <section className="admin-detail-drawer__section">
+              <h4 className="admin-detail-drawer__section-title">Notes</h4>
+              <div className="admin-detail-drawer__notes-body">
+                <RichText value={drawer.notes} empty="No notes provided." />
+              </div>
+            </section>
+
             {data?.canManage ? (
-              <div className="grid gap-2">
-                <label className="grid gap-1 text-sm">
+              <section className="admin-detail-drawer__form" aria-label="Update visit">
+                <label>
                   <span className="admin-label">Management status</span>
                   <select
                     className="admin-input"
@@ -431,7 +450,7 @@ export function VetVisitsPanel() {
                     <option value="resolved">Resolved</option>
                   </select>
                 </label>
-                <label className="grid gap-1 text-sm">
+                <label>
                   <span className="admin-label">Owner follow-up</span>
                   <select
                     className="admin-input"
@@ -443,7 +462,7 @@ export function VetVisitsPanel() {
                     <option value="completed">Completed</option>
                   </select>
                 </label>
-                <label className="grid gap-1 text-sm">
+                <label>
                   <span className="admin-label">Assigned to</span>
                   <input
                     className="admin-input"
@@ -455,11 +474,14 @@ export function VetVisitsPanel() {
                     }}
                   />
                 </label>
-              </div>
+              </section>
             ) : null}
-            <button type="button" className="crossover-btn crossover-btn--ghost mt-4" onClick={() => setDrawer(null)}>
-              Close
-            </button>
+
+            <div className="admin-detail-drawer__footer">
+              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => setDrawer(null)}>
+                Close
+              </button>
+            </div>
           </aside>
         </div>
       ) : null}
