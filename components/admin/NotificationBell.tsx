@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { AlarmClock, Bell, BellRing, Footprints, X } from "lucide-react";
-import type { AdminTab } from "@/lib/admin/types";
+import { AlarmClock, Bell, BellRing, ChevronRight, Footprints, X } from "lucide-react";
+import { ADMIN_TABS, type AdminTab } from "@/lib/admin/types";
 import { playStaffPushNoticeAlarm, unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 
@@ -28,6 +28,12 @@ type BellNotificationItem = {
   createdAt: string;
   isWalkAlert: boolean;
 };
+
+function tabForBellItem(item: BellNotificationItem): AdminTab {
+  if (item.isWalkAlert) return "walks_board";
+  if ((ADMIN_TABS as string[]).includes(item.sourceTab)) return item.sourceTab as AdminTab;
+  return "notifications";
+}
 
 type BellPayload = {
   unreadCount: number;
@@ -196,136 +202,159 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
       </button>
 
       {open ? (
-        <div id={panelId} className="admin-notification-bell__panel" role="dialog" aria-label="Notifications">
-          <div className="admin-notification-bell__panel-head">
-            <div>
-              <p className="admin-notification-bell__kicker">Alerts</p>
-              <h2 className="admin-notification-bell__title">Notifications</h2>
-            </div>
-            <button
-              type="button"
-              className="admin-notification-bell__close"
-              aria-label="Close notifications"
-              onClick={() => setOpen(false)}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          {walkAlerts.length > 0 ? (
-            <section className="admin-notification-bell__section">
-              <div className="admin-notification-bell__section-head">
-                <h3>Walks Board — dogs need walks</h3>
-                <span className="admin-notification-bell__chip admin-notification-bell__chip--urgent">
-                  {data?.walkOverdueCount ? `${data.walkOverdueCount} overdue` : null}
-                  {data?.walkOverdueCount && data?.walkDueCount ? " · " : null}
-                  {data?.walkDueCount ? `${data.walkDueCount} due now` : null}
-                </span>
+        <>
+          <button
+            type="button"
+            className="admin-notification-bell__backdrop"
+            aria-label="Close notifications"
+            onClick={() => setOpen(false)}
+          />
+          <div id={panelId} className="admin-notification-bell__panel" role="dialog" aria-modal="true" aria-label="Notifications">
+            <div className="admin-notification-bell__panel-head">
+              <div>
+                <p className="admin-notification-bell__kicker">Alerts</p>
+                <h2 className="admin-notification-bell__title">Notifications</h2>
               </div>
-              <ul className="admin-notification-bell__list">
-                {walkAlerts.map((alert) => {
-                  const snoozeBusy = busyId === `snooze:${alert.id}`;
-                  const walkedBusy = busyId === `mark_walked:${alert.id}`;
-                  return (
-                    <li
-                      key={alert.id}
-                      className={`admin-notification-bell__walk-item admin-notification-bell__walk-item--${alert.urgency}`}
-                    >
-                      <div className="admin-notification-bell__walk-copy">
-                        <p className="admin-notification-bell__walk-name">{alert.dogName}</p>
-                        <p className="admin-notification-bell__walk-meta">
-                          {alert.walkTypeLabel} · {alert.countdown}
-                          {alert.snoozeUsed ? " · Snooze used" : ""}
-                        </p>
-                      </div>
-                      <div className="admin-notification-bell__walk-actions">
-                        <button
-                          type="button"
-                          className="crossover-btn crossover-btn--primary"
-                          disabled={Boolean(busyId)}
-                          onClick={() => void postWalkAction("mark_walked", alert)}
-                        >
-                          <Footprints className="h-3.5 w-3.5" />
-                          {walkedBusy ? "Saving…" : "Walked"}
-                        </button>
-                        {data?.canSnooze ? (
+              <button
+                type="button"
+                className="admin-notification-bell__close"
+                aria-label="Close notifications"
+                onClick={() => setOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {walkAlerts.length > 0 ? (
+              <section className="admin-notification-bell__section">
+                <div className="admin-notification-bell__section-head">
+                  <h3>Walks Board — dogs need walks</h3>
+                  <span className="admin-notification-bell__chip admin-notification-bell__chip--urgent">
+                    {data?.walkOverdueCount ? `${data.walkOverdueCount} overdue` : null}
+                    {data?.walkOverdueCount && data?.walkDueCount ? " · " : null}
+                    {data?.walkDueCount ? `${data.walkDueCount} due now` : null}
+                  </span>
+                </div>
+                <ul className="admin-notification-bell__list">
+                  {walkAlerts.map((alert) => {
+                    const snoozeBusy = busyId === `snooze:${alert.id}`;
+                    const walkedBusy = busyId === `mark_walked:${alert.id}`;
+                    return (
+                      <li
+                        key={alert.id}
+                        className={`admin-notification-bell__walk-item admin-notification-bell__walk-item--${alert.urgency}`}
+                      >
+                        <div className="admin-notification-bell__walk-copy">
+                          <p className="admin-notification-bell__walk-name">{alert.dogName}</p>
+                          <p className="admin-notification-bell__walk-meta">
+                            {alert.walkTypeLabel} · {alert.countdown}
+                            {alert.snoozeUsed ? " · Snooze used" : ""}
+                          </p>
+                        </div>
+                        <div className="admin-notification-bell__walk-actions">
                           <button
                             type="button"
-                            className="crossover-btn crossover-btn--outline"
-                            disabled={Boolean(busyId) || alert.snoozeUsed}
-                            title={
-                              alert.snoozeUsed
-                                ? "This reminder can only be snoozed once"
-                                : "Snooze for 1 hour (once only)"
-                            }
-                            onClick={() => void postWalkAction("snooze", alert)}
+                            className="crossover-btn crossover-btn--primary"
+                            disabled={Boolean(busyId)}
+                            onClick={() => void postWalkAction("mark_walked", alert)}
                           >
-                            <AlarmClock className="h-3.5 w-3.5" />
-                            {alert.snoozeUsed ? "Snooze Used" : snoozeBusy ? "Snoozing…" : "Snooze"}
+                            <Footprints className="h-3.5 w-3.5" />
+                            {walkedBusy ? "Saving…" : "Walked"}
                           </button>
-                        ) : null}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                          {data?.canSnooze ? (
+                            <button
+                              type="button"
+                              className="crossover-btn crossover-btn--outline"
+                              disabled={Boolean(busyId) || alert.snoozeUsed}
+                              title={
+                                alert.snoozeUsed
+                                  ? "This reminder can only be snoozed once"
+                                  : "Snooze for 1 hour (once only)"
+                              }
+                              onClick={() => void postWalkAction("snooze", alert)}
+                            >
+                              <AlarmClock className="h-3.5 w-3.5" />
+                              {alert.snoozeUsed ? "Snooze Used" : snoozeBusy ? "Snoozing…" : "Snooze"}
+                            </button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <button
+                  type="button"
+                  className="admin-notification-bell__link"
+                  onClick={() => {
+                    setOpen(false);
+                    onOpenTab("walks_board");
+                  }}
+                >
+                  Open Walks Board
+                </button>
+              </section>
+            ) : null}
+
+            <section className="admin-notification-bell__section">
+              <div className="admin-notification-bell__section-head">
+                <h3>Inbox</h3>
+                <div className="admin-notification-bell__section-actions">
+                  {data?.unreadCount ? (
+                    <span className="admin-notification-bell__chip">{data.unreadCount} unread</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="admin-notification-bell__clear"
+                    disabled={clearing || !data?.unreadCount}
+                    title="Clear inbox notifications. Alerts assigned to you stay open."
+                    onClick={() => void clearInbox()}
+                  >
+                    {clearing ? "Clearing…" : "Clear"}
+                  </button>
+                </div>
+              </div>
+              {recent.length === 0 ? (
+                <p className="admin-notification-bell__empty">
+                  {walkAlerts.length > 0 ? "No other unread notifications." : "You're all caught up."}
+                </p>
+              ) : (
+                <ul className="admin-notification-bell__list">
+                  {recent.map((item) => {
+                    const destination = tabForBellItem(item);
+                    return (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          className={`admin-notification-bell__item ${item.isWalkAlert ? "is-walk" : ""}`}
+                          onClick={() => {
+                            setOpen(false);
+                            onOpenTab(destination);
+                          }}
+                        >
+                          <p className="admin-notification-bell__item-title">{item.title}</p>
+                          {item.body ? <p className="admin-notification-bell__item-body">{item.body}</p> : null}
+                          <span className="admin-notification-bell__item-hint">
+                            View details <ChevronRight className="h-3.5 w-3.5" aria-hidden />
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               <button
                 type="button"
                 className="admin-notification-bell__link"
                 onClick={() => {
                   setOpen(false);
-                  onOpenTab("walks_board");
+                  onOpenTab("notifications");
                 }}
               >
-                Open Walks Board
+                View all notifications
               </button>
             </section>
-          ) : null}
-
-          <section className="admin-notification-bell__section">
-            <div className="admin-notification-bell__section-head">
-              <h3>Inbox</h3>
-              <div className="admin-notification-bell__section-actions">
-                {data?.unreadCount ? (
-                  <span className="admin-notification-bell__chip">{data.unreadCount} unread</span>
-                ) : null}
-                <button
-                  type="button"
-                  className="admin-notification-bell__clear"
-                  disabled={clearing || !data?.unreadCount}
-                  title="Clear inbox notifications. Alerts assigned to you stay open."
-                  onClick={() => void clearInbox()}
-                >
-                  {clearing ? "Clearing…" : "Clear"}
-                </button>
-              </div>
-            </div>
-            {recent.length === 0 ? (
-              <p className="admin-notification-bell__empty">
-                {walkAlerts.length > 0 ? "No other unread notifications." : "You're all caught up."}
-              </p>
-            ) : (
-              <ul className="admin-notification-bell__list">
-                {recent.map((item) => (
-                  <li key={item.id} className={`admin-notification-bell__item ${item.isWalkAlert ? "is-walk" : ""}`}>
-                    <p className="admin-notification-bell__item-title">{item.title}</p>
-                    {item.body ? <p className="admin-notification-bell__item-body">{item.body}</p> : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button
-              type="button"
-              className="admin-notification-bell__link"
-              onClick={() => {
-                setOpen(false);
-                onOpenTab("notifications");
-              }}
-            >
-              View all notifications
-            </button>
-          </section>
-        </div>
+          </div>
+        </>
       ) : null}
     </div>
   );

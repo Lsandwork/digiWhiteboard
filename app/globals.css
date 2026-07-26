@@ -11177,18 +11177,48 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   animation: walks-board-alert-pulse 1.5s ease-in-out infinite;
 }
 
+.admin-notification-bell__backdrop {
+  display: none;
+}
+
 .admin-notification-bell__panel {
   position: absolute;
   top: calc(100% + 0.55rem);
   right: 0;
+  z-index: 50;
   width: min(24rem, calc(100vw - 1.5rem));
+  max-width: min(24rem, calc(100vw - 1.5rem));
   max-height: min(70vh, 34rem);
   overflow: auto;
+  overscroll-behavior: contain;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 1rem;
   background: rgba(8, 17, 28, 0.98);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
   padding: 0.85rem;
+}
+
+/* Phones: full-width fixed sheet so the panel never clips off-screen */
+@media (max-width: 767px) {
+  .admin-notification-bell__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    background: rgba(8, 10, 14, 0.55);
+  }
+
+  .admin-notification-bell__panel {
+    position: fixed;
+    top: max(0.75rem, env(safe-area-inset-top, 0px));
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: auto;
+    width: auto;
+    max-width: none;
+    max-height: min(85dvh, calc(100dvh - 1.5rem - env(safe-area-inset-bottom, 0px)));
+    z-index: 80;
+  }
 }
 
 :is(html[data-theme="light"], html[data-theme="clear"]) .admin-notification-bell__panel {
@@ -11321,6 +11351,24 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   border-radius: 0.85rem;
   padding: 0.7rem 0.75rem;
   background: rgba(15, 23, 42, 0.55);
+  min-width: 0;
+}
+
+button.admin-notification-bell__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.admin-notification-bell__item:hover,
+button.admin-notification-bell__item:focus-visible {
+  border-color: rgba(255, 159, 28, 0.45);
+  background: rgba(255, 159, 28, 0.08);
+  outline: none;
 }
 
 :is(html[data-theme="light"], html[data-theme="clear"]) .admin-notification-bell__walk-item,
@@ -11343,6 +11391,8 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   font-size: 0.92rem;
   font-weight: 800;
   color: #fff;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 :is(html[data-theme="light"], html[data-theme="clear"]) .admin-notification-bell__walk-name,
@@ -11357,6 +11407,25 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   font-size: 0.78rem;
   font-weight: 600;
   color: #94a3b8;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-notification-bell__item-body {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.admin-notification-bell__item-hint {
+  margin-top: 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #ff9f1c;
 }
 
 .admin-notification-bell__walk-actions {
