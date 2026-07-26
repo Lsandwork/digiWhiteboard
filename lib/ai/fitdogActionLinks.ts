@@ -17,6 +17,7 @@ export type FitdogActionIntent =
   | "admin_panel"
   | "users"
   | "management_support"
+  | "package_commissions"
   | "none";
 
 export type FitdogActionLink = {
@@ -115,6 +116,11 @@ export const FITDOG_ACTION_LINKS: Record<Exclude<FitdogActionIntent, "none">, Ac
     label: "Open Management Support",
     href: `${STAFF}&tab=management_support`,
     permissions: ["review_management_support", "submit_write_up", "submit_groomer_complaint", "submit_trainer_complaint"]
+  },
+  package_commissions: {
+    label: "Open Package & Class Commissions",
+    href: `${STAFF}&tab=package_commissions`,
+    permissions: ["view_package_commissions", "manage_package_commissions"]
   }
 };
 
@@ -136,6 +142,9 @@ const INTENT_ALIASES: Record<string, FitdogActionIntent> = {
   admin_panel: "admin_panel",
   users: "users",
   management_support: "management_support",
+  package_commissions: "package_commissions",
+  commissions: "package_commissions",
+  package_and_class_commissions: "package_commissions",
   none: "none"
 };
 

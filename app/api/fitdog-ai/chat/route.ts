@@ -18,7 +18,12 @@ import {
   inferPushNoticeDraft,
   type FitdogAiChatHistoryItem
 } from "@/lib/ai/fitdogAiPushNotice";
-import { buildLocalChatFallback } from "@/lib/ai/fitdogAiLocalFallback";
+import { answerCommissionQuestion } from "@/lib/ai/fitdogAiCommissionAnswer";
+import {
+  buildLocalChatFallback,
+  FITDOG_AI_GLITCH_REPLY,
+  isGlitchAiReply
+} from "@/lib/ai/fitdogAiLocalFallback";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -95,6 +100,44 @@ async function respondFromParsed(params: {
   });
 }
 
+async function resolveReliableParsed(params: {
+  session: NonNullable<ReturnType<typeof getAdminSessionFromRequest>>;
+  context: Awaited<ReturnType<typeof buildFitdogUserContext>>;
+  message: string;
+  history: FitdogAiChatHistoryItem[];
+  parsed?: ReturnType<typeof normalizeChatJson> | null;
+}): Promise<ReturnType<typeof normalizeChatJson>> {
+  const { session, context, message, history, parsed } = params;
+
+  if (parsed?.reply?.trim() && !isGlitchAiReply(parsed.reply)) {
+    return parsed;
+  }
+
+  const commission = await answerCommissionQuestion({ session, context, message });
+  if (commission) {
+    return normalizeChatJson(commission, commission.reply);
+  }
+
+  const local = buildLocalChatFallback({ message, history, context });
+  if (local) {
+    return normalizeChatJson(local, local.reply);
+  }
+
+  return normalizeChatJson(
+    {
+      reply:
+        "I couldn't finish that answer cleanly. Ask me again in a second, or open the Fitdog page you need — Front Desk Log for shift notes, Package & Class Commissions for earnings, or Management Support for complaints.",
+      actionIntent: "front_desk_log",
+      secondaryActionIntent: "package_commissions",
+      tone: "normal",
+      needsEscalation: false,
+      escalationReason: "",
+      pushNotice: null
+    },
+    "Ask me again in a second."
+  );
+}
+
 export async function GET() {
   return NextResponse.json({ configured: isGeminiConfigured() });
 }
@@ -132,15 +175,15 @@ export async function POST(request: Request) {
     const toneHint = detectToneHint(message);
     const shortHistory = history.slice(-4);
 
+    // Deterministic ledger answers — never depend on Gemini for commission totals.
+    const commission = await answerCommissionQuestion({ session, context, message });
+    if (commission) {
+      const parsed = normalizeChatJson(commission, commission.reply);
+      return respondFromParsed({ session, context, message, history: shortHistory, parsed, toneHint });
+    }
+
     if (!isGeminiConfigured()) {
-      const local = buildLocalChatFallback({ message, history: shortHistory, context });
-      if (!local) {
-        return NextResponse.json(
-          { error: "Fitdog AI is not configured yet. Ask an admin to add GEMINI_API_KEY in Vercel." },
-          { status: 503 }
-        );
-      }
-      const parsed = normalizeChatJson(local, local.reply);
+      const parsed = await resolveReliableParsed({ session, context, message, history: shortHistory });
       return respondFromParsed({ session, context, message, history: shortHistory, parsed, toneHint });
     }
 
@@ -164,8 +207,8 @@ export async function POST(request: Request) {
       });
 
       const fallback: GeminiChatJson = {
-        reply: "Something glitched on my end. Jot down the time, dogs involved, and what you saw — then use the right Fitdog form.",
-        actionIntent: toneHint === "safety" ? "front_desk_log" : "file_complaint",
+        reply: FITDOG_AI_GLITCH_REPLY,
+        actionIntent: toneHint === "safety" ? "front_desk_log" : "none",
         secondaryActionIntent: "none",
         tone: toneHint ?? "normal",
         needsEscalation: toneHint === "safety",
@@ -174,11 +217,16 @@ export async function POST(request: Request) {
       };
 
       parsed = normalizeChatJson(parseGeminiJson<Partial<GeminiChatJson>>(text, fallback), fallback.reply);
+      parsed = await resolveReliableParsed({
+        session,
+        context,
+        message,
+        history: shortHistory,
+        parsed
+      });
     } catch (geminiError) {
-      console.error("[fitdog-ai/chat] Gemini failed, using local fallback:", geminiError);
-      const local = buildLocalChatFallback({ message, history: shortHistory, context });
-      if (!local) throw geminiError;
-      parsed = normalizeChatJson(local, local.reply);
+      console.error("[fitdog-ai/chat] Gemini failed, using reliable fallback:", geminiError);
+      parsed = await resolveReliableParsed({ session, context, message, history: shortHistory });
     }
 
     return respondFromParsed({ session, context, message, history: shortHistory, parsed, toneHint });
@@ -186,27 +234,26 @@ export async function POST(request: Request) {
     console.error("[fitdog-ai/chat] Request failed:", error);
     try {
       const context = await buildFitdogUserContext({ session, currentPage, lightweight: true });
-      const local = buildLocalChatFallback({ message, history: history.slice(-4), context });
-      if (local) {
-        const parsed = normalizeChatJson(local, local.reply);
-        return respondFromParsed({
-          session,
-          context,
-          message,
-          history: history.slice(-4),
-          parsed,
-          toneHint: detectToneHint(message)
-        });
-      }
+      const shortHistory = history.slice(-4);
+      const parsed = await resolveReliableParsed({ session, context, message, history: shortHistory });
+      return respondFromParsed({
+        session,
+        context,
+        message,
+        history: shortHistory,
+        parsed,
+        toneHint: detectToneHint(message)
+      });
     } catch (fallbackError) {
-      console.error("[fitdog-ai/chat] Local fallback failed:", fallbackError);
+      console.error("[fitdog-ai/chat] Reliable fallback failed:", fallbackError);
     }
 
     const context = await buildFitdogUserContext({ session, currentPage, lightweight: true }).catch(() => null);
     return NextResponse.json(
       {
         error: fitdogAiUserFacingError(error),
-        reply: "I'm having trouble responding right now. Write down what you saw while it's fresh and use the right Fitdog workflow.",
+        reply:
+          "I hit a snag answering that. Try one more time — or open Front Desk Log / Package & Class Commissions / Management Support while it's fresh.",
         actionLinks: context ? fallbackActionLinks(context.access, "normal") : [],
         tone: "normal"
       },
