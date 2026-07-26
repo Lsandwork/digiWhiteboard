@@ -569,7 +569,14 @@ export function BoardClient({
       setFetchStatus("ok");
       setLastSuccessAt(data.last_updated);
       hasSuccessfulLoadRef.current = true;
-      setConnection((current) => (castKeeperMode ? "polling" : current === "live" ? "live" : mode));
+      // Never leave the badge on "connecting" after a successful load.
+      // Realtime subscribe upgrades polling → live when Supabase connects.
+      setConnection((current) => {
+        if (castKeeperMode) return "polling";
+        if (current === "live") return "live";
+        if (mode === "connecting") return "polling";
+        return mode;
+      });
       castKeeper?.markDataFresh();
       });
     },
