@@ -199,11 +199,12 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const sortDir = (searchParams.get("sortDir") === "asc" ? "asc" : "desc") as "asc" | "desc";
 
   const isTrainer = Boolean(data?.currentUser?.isTrainerOnly);
-  const ledgerBodyText = isTrainer ? "text-2xl leading-snug" : "text-3xl leading-snug";
-  const ledgerHeadText = isTrainer ? "text-base" : "text-lg";
-  const ledgerTypeText = isTrainer ? "text-lg" : "text-xl";
-  const ledgerPillLarge = !isTrainer;
-  const ledgerCommentIcon = isTrainer ? "h-6 w-6" : "h-8 w-8";
+  const ledgerBodyText = isTrainer ? "text-sm leading-snug" : "text-base leading-snug";
+  const ledgerHeadText = isTrainer ? "text-[11px]" : "text-xs";
+  const ledgerTypeText = isTrainer ? "text-xs" : "text-sm";
+  const ledgerPillLarge = false;
+  const ledgerCommentIcon = isTrainer ? "h-4 w-4" : "h-5 w-5";
+  const ledgerCellPad = isTrainer ? "px-2.5 py-2" : "px-3 py-2.5";
   const canManage = Boolean(data?.canManage);
   const pageRowIds = useMemo(() => (data?.rows ?? []).map((row) => row.id), [data?.rows]);
   const allPageSelected = pageRowIds.length > 0 && pageRowIds.every((id) => selected.includes(id));
@@ -449,7 +450,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     <div className={embedded ? "" : "admin-page"}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className={`font-black admin-text-emphasis ${isTrainer ? "text-lg" : "text-xl"}`}>
+          <h2 className={`font-black admin-text-emphasis ${isTrainer ? "text-base" : "text-lg"}`}>
             {isTrainer ? "My Commissions" : "Package & Class Commissions"}
           </h2>
           <p className={`mt-1 text-admin-muted ${isTrainer ? "text-xs" : "text-sm"}`}>
@@ -512,7 +513,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           ].map(([label, value]) => (
             <div key={label} className="admin-surface-panel px-3 py-3">
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-admin-muted">{label}</p>
-              <p className={`mt-1 font-black admin-text-emphasis ${isTrainer ? "text-base" : "text-lg"}`}>{value}</p>
+              <p className={`mt-1 font-black admin-text-emphasis ${isTrainer ? "text-sm" : "text-base"}`}>{value}</p>
             </div>
           ))}
         </div>
@@ -658,14 +659,14 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           ) : null}
 
           <div className="admin-ledger-table-wrap">
-            <table className="min-w-[1800px] w-full border-collapse text-left">
+            <table className={`min-w-[1800px] w-full border-collapse text-left ${isTrainer ? "admin-ledger-table--compact" : ""}`}>
               <thead className="admin-ledger-table-head">
                 <tr className={`border-b border-[var(--border)] uppercase tracking-wide text-admin-muted ${ledgerHeadText}`}>
                   {canManage ? (
-                    <th className="px-4 py-4">
+                    <th className={ledgerCellPad}>
                       <input
                         type="checkbox"
-                        className="h-6 w-6"
+                        className={isTrainer ? "h-4 w-4" : "h-5 w-5"}
                         checked={allPageSelected}
                         ref={(el) => {
                           if (el) el.indeterminate = somePageSelected;
@@ -675,29 +676,29 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       />
                     </th>
                   ) : null}
-                  <SortableTh className="px-4 py-4" label="Status" column="approval_status" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Trainer" column="trainer_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Sale Date" column="sale_date" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Client" column="client_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Dog" column="dog_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Type / Package" column="package_or_class" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Gross" column="gross_amount_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <th className="px-4 py-4">Rate</th>
-                  <SortableTh className="px-4 py-4" label="Final" column="final_commission_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <SortableTh className="px-4 py-4" label="Source" column="source" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
-                  <th className="px-4 py-4">Comments</th>
+                  <SortableTh className={ledgerCellPad} label="Status" column="approval_status" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Trainer" column="trainer_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Sale Date" column="sale_date" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Client" column="client_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Dog" column="dog_name" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Type / Package" column="package_or_class" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Gross" column="gross_amount_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <th className={ledgerCellPad}>Rate</th>
+                  <SortableTh className={ledgerCellPad} label="Final" column="final_commission_cents" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <SortableTh className={ledgerCellPad} label="Source" column="source" sortKey={sortBy} sortDir={sortDir} onToggle={toggleLedgerSort} />
+                  <th className={ledgerCellPad}>Comments</th>
                 </tr>
               </thead>
               <tbody className={ledgerBodyText}>
                 {loading ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-admin-muted">
+                    <td colSpan={12} className={`${ledgerCellPad} py-6 text-admin-muted`}>
                       Loading commission ledger…
                     </td>
                   </tr>
                 ) : !data?.rows?.length ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-8 text-admin-muted">
+                    <td colSpan={12} className={`${ledgerCellPad} py-6 text-admin-muted`}>
                       No commission records match these filters.
                     </td>
                   </tr>
@@ -718,10 +719,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       }}
                     >
                       {canManage ? (
-                        <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                        <td className={ledgerCellPad} onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
-                            className="h-6 w-6"
+                            className={isTrainer ? "h-4 w-4" : "h-5 w-5"}
                             checked={isSelected}
                             aria-label={`Select commission for ${row.dog_name}`}
                             onClick={(e) => {
@@ -735,8 +736,8 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                           />
                         </td>
                       ) : null}
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col gap-2">
+                      <td className={ledgerCellPad}>
+                        <div className={`flex flex-col ${isTrainer ? "gap-1" : "gap-1.5"}`}>
                           {statusPill(row.approval_status.replace(/_/g, " "), row.approval_status === "approved" ? "green" : row.approval_status === "rejected" ? "rose" : "amber", ledgerPillLarge)}
                           {statusPill(row.payment_status.replace(/_/g, " "), row.payment_status === "paid" ? "sky" : "slate", ledgerPillLarge)}
                           {row.review_status === "needs_review" || row.has_open_comments
@@ -744,18 +745,18 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                             : null}
                         </div>
                       </td>
-                      <td className="px-4 py-4 admin-text-emphasis">{row.trainer_name}</td>
-                      <td className="px-4 py-4">{row.sale_date ?? "—"}</td>
-                      <td className="px-4 py-4">{row.client_name}</td>
-                      <td className="px-4 py-4 font-semibold admin-text-emphasis">{row.dog_name}</td>
-                      <td className="px-4 py-4">
+                      <td className={`${ledgerCellPad} admin-text-emphasis`}>{row.trainer_name}</td>
+                      <td className={ledgerCellPad}>{row.sale_date ?? "—"}</td>
+                      <td className={ledgerCellPad}>{row.client_name}</td>
+                      <td className={`${ledgerCellPad} font-semibold admin-text-emphasis`}>{row.dog_name}</td>
+                      <td className={ledgerCellPad}>
                         <div className={`uppercase text-admin-muted ${ledgerTypeText}`}>{row.commission_type.replace(/_/g, " ")}</div>
                         <div>{row.package_or_class}</div>
                       </td>
-                      <td className="px-4 py-4">{centsToDisplay(row.gross_amount_cents)}</td>
-                      <td className="px-4 py-4">{bpsToDisplay(row.commission_rate_bps) || "—"}</td>
-                      <td className="px-4 py-4 font-bold text-fitdog-orange">{centsToDisplay(row.final_commission_cents)}</td>
-                      <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <td className={ledgerCellPad}>{centsToDisplay(row.gross_amount_cents)}</td>
+                      <td className={ledgerCellPad}>{bpsToDisplay(row.commission_rate_bps) || "—"}</td>
+                      <td className={`${ledgerCellPad} font-bold text-fitdog-orange`}>{centsToDisplay(row.final_commission_cents)}</td>
+                      <td className={ledgerCellPad} onClick={(e) => e.stopPropagation()}>
                         {row.gingr_transaction_url ? (
                           <a
                             href={row.gingr_transaction_url}
@@ -770,9 +771,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                           <span className="text-admin-muted">{row.source || "—"}</span>
                         )}
                       </td>
-                      <td className="px-4 py-4">
+                      <td className={ledgerCellPad}>
                         {row.has_open_comments ? (
-                          <span className="inline-flex items-center gap-2 text-amber-200">
+                          <span className="inline-flex items-center gap-1.5 text-amber-200">
                             <MessageSquare className={ledgerCommentIcon} /> Open
                           </span>
                         ) : (
