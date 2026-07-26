@@ -34,7 +34,7 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
   daycare: ["front-desk-log", "dog-handler-basics"],
   driver: ["front-desk-log", "dog-handler-basics"],
   hiker: ["front-desk-log", "dog-handler-basics"],
-  marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast"],
+  marketing: ["marketing-account", "lobby-promotions", "marketing-cast-tv"],
   viewer: ["lobby-messages", "lobby-tv-cast"]
 };
 

@@ -1,9 +1,5 @@
 "use client";
 
-import {
-  renderCastIllustration,
-  type HelpCastIllustrationId
-} from "@/components/admin/help/CastHelpIllustrations";
 import type { HelpVisualStep } from "@/lib/admin/help-content";
 
 type HelpVisualMediaProps = {
@@ -11,15 +7,7 @@ type HelpVisualMediaProps = {
   variant?: "lobby" | "staff";
 };
 
-export function HelpVisualMedia({ step, variant = "lobby" }: HelpVisualMediaProps) {
-  if (step.illustration) {
-    return (
-      <div className="admin-help-visual-step-media">
-        {renderCastIllustration(step.illustration, variant, "admin-help-visual-step-illustration")}
-      </div>
-    );
-  }
-
+export function HelpVisualMedia({ step }: HelpVisualMediaProps) {
   if (step.video) {
     return (
       <div className="admin-help-visual-step-media">

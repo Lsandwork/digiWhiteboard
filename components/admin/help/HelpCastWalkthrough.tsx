@@ -2,26 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { Pause, Play } from "lucide-react";
-import {
-  CastButtonIllustration,
-  CastChromeIllustration,
-  CastPickerIllustration,
-  type HelpCastIllustrationId
-} from "@/components/admin/help/CastHelpIllustrations";
 
 type HelpCastWalkthroughProps = {
-  variant: "lobby" | "staff";
+  /** Marketing CAST-TV advertising slides only — staff/lobby TVs use HI Browser. */
+  variant: "marketing";
 };
 
-const STEPS: { id: HelpCastIllustrationId; label: string }[] = [
-  { id: "cast-chrome", label: "Open Chrome" },
-  { id: "cast-button", label: "Click Cast to TV" },
-  { id: "cast-picker", label: "Select the TV" }
-];
+const STEPS = [
+  {
+    id: "playlist",
+    label: "Manage CAST-TV slides",
+    image: "/help/cast-tv-marketing.png",
+    caption: "In Digi-Board → Marketing → CAST-TV, upload and order the advertising playlist for casttv.ruffops.com."
+  },
+  {
+    id: "display",
+    label: "Show on the ad TV",
+    image: "/help/cast-tv-marketing.png",
+    caption: "On the computer for the advertising TV, open Google Chrome, go to casttv.ruffops.com, then Cast to TV and pick that marketing display."
+  }
+] as const;
 
-const STEP_MS = 3800;
+const STEP_MS = 4200;
 
 export function HelpCastWalkthrough({ variant }: HelpCastWalkthroughProps) {
+  void variant;
   const [stepIndex, setStepIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
 
@@ -33,16 +38,14 @@ export function HelpCastWalkthrough({ variant }: HelpCastWalkthroughProps) {
     return () => window.clearInterval(timer);
   }, [playing]);
 
-  const step = STEPS[stepIndex];
+  const step = STEPS[stepIndex]!;
 
   return (
     <div className="admin-help-walkthrough">
       <div className="admin-help-walkthrough-header">
         <div>
-          <p className="admin-help-walkthrough-label">Screen demo</p>
-          <p className="admin-help-walkthrough-title">
-            {variant === "staff" ? "How to cast the staff board" : "How to cast the lobby board"}
-          </p>
+          <p className="admin-help-walkthrough-label">Real site demo</p>
+          <p className="admin-help-walkthrough-title">Cast advertising slides to the marketing TV</p>
         </div>
         <button
           type="button"
@@ -56,12 +59,12 @@ export function HelpCastWalkthrough({ variant }: HelpCastWalkthroughProps) {
       </div>
 
       <div className="admin-help-walkthrough-stage" key={step.id}>
-        {step.id === "cast-chrome" ? <CastChromeIllustration variant={variant} /> : null}
-        {step.id === "cast-button" ? <CastButtonIllustration variant={variant} /> : null}
-        {step.id === "cast-picker" ? <CastPickerIllustration variant={variant} /> : null}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={step.image} alt={step.label} className="admin-help-walkthrough-photo" />
+        <p className="admin-help-walkthrough-caption">{step.caption}</p>
       </div>
 
-      <div className="admin-help-walkthrough-steps" role="tablist" aria-label="Cast walkthrough steps">
+      <div className="admin-help-walkthrough-steps" role="tablist" aria-label="Marketing cast walkthrough steps">
         {STEPS.map((item, index) => (
           <button
             key={item.id}
