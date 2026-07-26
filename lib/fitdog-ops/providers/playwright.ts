@@ -1,10 +1,10 @@
 import { fitdogEmployeeEmail, fitdogEmployeePassword } from "@/lib/fitdog-ops/config";
 import { decryptFitdogSession, encryptFitdogSession } from "@/lib/fitdog-ops/crypto";
 import { mapNotificationRows, type FitdogNotificationItem } from "@/lib/fitdog-ops/notifications-parse";
+import { launchFitdogBrowser } from "@/lib/fitdog-ops/providers/browser";
 import { sanitizeFitdogPayload } from "@/lib/fitdog-ops/sanitize";
 import type { FitdogIntegrationProvider, FitdogProviderSyncOptions, FitdogProviderSyncResult } from "@/lib/fitdog-ops/providers/types";
 import type { FitdogPaymentTransaction, FitdogServiceRecord } from "@/lib/fitdog-ops/types";
-
 const LOGIN_URL = "https://app.fitdog.com/login";
 const DASHBOARD_URL = "https://app.fitdog.com/dashboard";
 
@@ -18,14 +18,6 @@ type CookieLike = {
   secure?: boolean;
   sameSite?: "Strict" | "Lax" | "None";
 };
-
-async function loadPlaywright() {
-  try {
-    return await import("playwright");
-  } catch {
-    throw new Error("Playwright is not available in this runtime. Install playwright and Chromium for Fitdog sync.");
-  }
-}
 
 function parseJsonSafe(text: string): unknown {
   try {
@@ -105,8 +97,8 @@ export class FitdogPlaywrightProvider implements FitdogIntegrationProvider {
       throw new Error("FITDOG_EMPLOYEE_EMAIL and FITDOG_EMPLOYEE_PASSWORD are required for Playwright mode.");
     }
 
-    const { chromium } = await loadPlaywright();
-    const browser = await chromium.launch({ headless: true });
+    const launched = await launchFitdogBrowser();
+    const browser = launched.browser;
     const context = await browser.newContext({
       userAgent: "FitdogOpsSync/1.0 (+https://staff.ruffops.com)"
     });
@@ -314,7 +306,7 @@ export class FitdogPlaywrightProvider implements FitdogIntegrationProvider {
       };
     } finally {
       await context.close().catch(() => undefined);
-      await browser.close().catch(() => undefined);
+      await launched.close();
     }
   }
 }

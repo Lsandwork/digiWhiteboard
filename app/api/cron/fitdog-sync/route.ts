@@ -5,6 +5,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+export const runtime = "nodejs";
 
 function isAuthorizedCron(request: Request) {
   const cronSecret = process.env.CRON_SECRET?.trim();

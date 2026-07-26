@@ -1,6 +1,18 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Keep Chromium/Playwright out of the Next bundler so Vercel can resolve native binaries.
+  serverExternalPackages: ["playwright-core", "@sparticuz/chromium", "playwright"],
+  outputFileTracingIncludes: {
+    "/api/admin/fitdog-alerts": [
+      "./node_modules/@sparticuz/chromium/**/*",
+      "./node_modules/playwright-core/**/*"
+    ],
+    "/api/cron/fitdog-sync": [
+      "./node_modules/@sparticuz/chromium/**/*",
+      "./node_modules/playwright-core/**/*"
+    ]
+  },
   images: {
     remotePatterns: [
       {

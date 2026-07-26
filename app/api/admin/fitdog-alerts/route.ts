@@ -23,7 +23,8 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { listAdminUsers } from "@/lib/admin/users";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
+export const runtime = "nodejs";
 
 async function requireAccess(request: Request) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };

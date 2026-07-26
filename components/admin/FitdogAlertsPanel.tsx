@@ -344,8 +344,14 @@ export function FitdogAlertsPanel() {
       const json = (await res.json()) as { error?: string; run?: FitdogSyncRun };
       if (!res.ok) throw new Error(json.error || "Action failed.");
       if (action === "sync") {
+        const detail =
+          json.run?.status === "failed"
+            ? json.run?.error_details || json.run?.message || "Unknown sync error"
+            : null;
         showToast(
-          `Sync ${json.run?.status}: ${json.run?.alerts_created ?? 0} created, ${json.run?.alerts_updated ?? 0} updated, ${json.run?.alerts_resolved ?? 0} resolved.`,
+          detail
+            ? `Sync failed: ${detail}`
+            : `Sync ${json.run?.status}: ${json.run?.alerts_created ?? 0} created, ${json.run?.alerts_updated ?? 0} updated, ${json.run?.alerts_resolved ?? 0} resolved.`,
           json.run?.status === "failed" ? "error" : "success"
         );
       } else {
