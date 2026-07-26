@@ -48,7 +48,7 @@ export const DEFAULT_FITDOG_LOCATIONS: FitdogLocationsConfig = {
     longitude: -118.3651,
     timezone: "America/Los_Angeles",
     verified: false,
-    note: "Adventure Hike destination for Van 1 / Van 2."
+    note: "Adventure destination for Van 1 / Van 2 (Mon–Fri) and Van 3 (Tue/Thu)."
   },
   huntington: {
     key: "huntington",
@@ -58,7 +58,7 @@ export const DEFAULT_FITDOG_LOCATIONS: FitdogLocationsConfig = {
     longitude: -117.9756,
     timezone: "America/Los_Angeles",
     verified: false,
-    note: "Beach Excursion destination for Van 3."
+    note: "Beach destination for Van 3 on Mon/Wed/Fri."
   }
 };
 
@@ -180,7 +180,12 @@ export type VanRouteEndpoints = {
   dropoffEnd: FitdogBaseKey;
 };
 
-/** Canonical van start/end bases for pickup and drop-off waves. */
+/**
+ * Canonical van start/end bases.
+ * - Van 1/2: Hub ↔ Kenneth Hahn (Mon–Fri outing)
+ * - Van 3: Hub ↔ Huntington (Mon/Wed/Fri) or Kenneth Hahn (Tue/Thu) — see endpointsForVan
+ * - Van 5/6: live at Club for taxi / group / training pickups (never Kenneth Hahn)
+ */
 export const DEFAULT_VAN_ROUTE_ENDPOINTS: Record<string, VanRouteEndpoints> = {
   van_1: {
     pickupStart: "hub",
@@ -201,20 +206,52 @@ export const DEFAULT_VAN_ROUTE_ENDPOINTS: Record<string, VanRouteEndpoints> = {
     dropoffEnd: "hub"
   },
   van_5: {
-    pickupStart: "hub",
-    pickupEnd: "kenneth_hahn",
-    dropoffStart: "kenneth_hahn",
-    dropoffEnd: "hub"
+    pickupStart: "club",
+    pickupEnd: "club",
+    dropoffStart: "club",
+    dropoffEnd: "club"
   },
   van_6: {
-    pickupStart: "hub",
-    pickupEnd: "kenneth_hahn",
-    dropoffStart: "kenneth_hahn",
-    dropoffEnd: "hub"
+    pickupStart: "club",
+    pickupEnd: "club",
+    dropoffStart: "club",
+    dropoffEnd: "club"
   }
 };
 
-export function endpointsForVan(vanKey: string): VanRouteEndpoints {
+/** Weekday in America/Los_Angeles: 0=Sun … 6=Sat. */
+export function weekdayInLosAngeles(date: string | Date | null | undefined): number | null {
+  if (date == null || date === "") return null;
+  const raw = typeof date === "string" ? date.trim() : date.toISOString().slice(0, 10);
+  const day = raw.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  // Noon UTC keeps the calendar day stable for LA (UTC-7/-8).
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "short"
+  }).formatToParts(new Date(`${day}T12:00:00.000Z`));
+  const wd = parts.find((p) => p.type === "weekday")?.value;
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return wd && wd in map ? map[wd]! : null;
+}
+
+/** Van 3: Huntington Mon/Wed/Fri; Kenneth Hahn Tue/Thu. Default Huntington when date unknown. */
+export function van3DestinationKey(operatingDate?: string | null): FitdogBaseKey {
+  const weekday = weekdayInLosAngeles(operatingDate);
+  if (weekday === 2 || weekday === 4) return "kenneth_hahn";
+  return "huntington";
+}
+
+export function endpointsForVan(vanKey: string, operatingDate?: string | null): VanRouteEndpoints {
+  if (vanKey === "van_3") {
+    const destination = van3DestinationKey(operatingDate);
+    return {
+      pickupStart: "hub",
+      pickupEnd: destination,
+      dropoffStart: destination,
+      dropoffEnd: "hub"
+    };
+  }
   return (
     DEFAULT_VAN_ROUTE_ENDPOINTS[vanKey] ?? {
       pickupStart: "hub",
@@ -226,28 +263,25 @@ export function endpointsForVan(vanKey: string): VanRouteEndpoints {
 }
 
 /**
- * Resolve start/end for a route. Beach-only vans/routes use Huntington;
- * Adventure / default outing vans use Kenneth Hahn.
+ * Resolve start/end for a route using van schedule + operating date.
+ * Van 5/6 stay Club-based. Van 3 destination flips by weekday.
  */
 export function resolveRouteEndpoints(params: {
   vanKey: string;
   direction: "pickup" | "dropoff";
   serviceTypes?: string[];
+  operatingDate?: string | null;
 }): { startKey: FitdogBaseKey; endKey: FitdogBaseKey } {
-  const base = endpointsForVan(params.vanKey);
-  const services = (params.serviceTypes || []).map((s) => s.toLowerCase());
-  const beachOnly =
-    params.vanKey === "van_3" ||
-    (services.includes("beach excursion") && !services.includes("adventure hike"));
+  const base = endpointsForVan(params.vanKey, params.operatingDate);
 
-  if (params.direction === "pickup") {
-    if (beachOnly) return { startKey: "hub", endKey: "huntington" };
-    if (params.vanKey === "van_1" || params.vanKey === "van_2" || params.vanKey === "van_5" || params.vanKey === "van_6") {
-      return { startKey: base.pickupStart, endKey: base.pickupEnd };
-    }
-    return { startKey: base.pickupStart, endKey: base.pickupEnd };
+  if (params.vanKey === "van_5" || params.vanKey === "van_6") {
+    return params.direction === "pickup"
+      ? { startKey: base.pickupStart, endKey: base.pickupEnd }
+      : { startKey: base.dropoffStart, endKey: base.dropoffEnd };
   }
 
-  if (beachOnly) return { startKey: "huntington", endKey: "hub" };
+  if (params.direction === "pickup") {
+    return { startKey: base.pickupStart, endKey: base.pickupEnd };
+  }
   return { startKey: base.dropoffStart, endKey: base.dropoffEnd };
 }

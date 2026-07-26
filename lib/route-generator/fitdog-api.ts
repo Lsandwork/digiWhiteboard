@@ -406,11 +406,13 @@ function summarizeProductDog(product: FitdogProduct): SkippedOccurrenceDog {
   };
 }
 
-/** Map a van choice to the canonical outing service used when promoting a skipped class. */
+/** Map a van choice to the canonical service used when promoting a skipped class. */
 export function serviceForAssignedVan(vanKey: string): CanonicalService {
   if (vanKey === "van_3") return "Beach Excursion";
   if (vanKey === "van_1" || vanKey === "van_2") return "Adventure Hike";
-  return "Adventure Hike";
+  // Van 5/6 live at the Club — training / group / taxi, not Hahn outings.
+  if (vanKey === "van_5" || vanKey === "van_6") return "Group Class";
+  return "Group Class";
 }
 
 /**

@@ -51,9 +51,22 @@ async function getSetting<T>(key: string, fallback: T): Promise<T> {
 const DEFAULT_VAN_SERVICES: Record<string, CanonicalService[]> = {
   van_1: ["Adventure Hike"],
   van_2: ["Adventure Hike"],
-  van_3: ["Beach Excursion"],
-  van_5: ["Adventure Hike", "Beach Excursion", "Trainer-Led Hike", "Group Class", "Taxi Service"],
-  van_6: ["Adventure Hike", "Beach Excursion", "Trainer-Led Hike", "Group Class", "Taxi Service"]
+  // Van 3 destination flips by weekday; it can carry Beach or Adventure.
+  van_3: ["Beach Excursion", "Adventure Hike"],
+  // Van 5/6 live at the Club — taxi, group class, training (not Hahn/Beach outings).
+  van_5: ["Trainer-Led Hike", "Group Class", "Taxi Service"],
+  van_6: ["Trainer-Led Hike", "Group Class", "Taxi Service"]
+};
+
+function vehiclePoolForVan(vanKey: string): "club" | "outing" {
+  return vanKey === "van_5" || vanKey === "van_6" ? "club" : "outing";
+}
+
+export type ReportRunMetadata = {
+  warnings: string[];
+  skippedOccurrences: SkippedOccurrence[];
+  gingrTaxiImported?: string[];
+  manualTaxiIds?: string[];
 };
 
 async function listVehicles(): Promise<VehicleCapacityConfig[]> {
@@ -62,17 +75,20 @@ async function listVehicles(): Promise<VehicleCapacityConfig[]> {
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => {
     const vanKey = String(row.van_key);
-    const vehiclePool = "outing" as const;
+    const vehiclePool = vehiclePoolForVan(vanKey);
     const storedServices = (row.eligible_services ?? []) as CanonicalService[];
     const eligibleServices = DEFAULT_VAN_SERVICES[vanKey] ?? storedServices;
+    const defaultHome = homeBaseForVehiclePool(vehiclePool);
+    // Van 5/6 always home at Club even if legacy rows still say hub/Hahn.
+    const homeBaseKey =
+      vanKey === "van_5" || vanKey === "van_6"
+        ? ("club" as const)
+        : normalizeBaseKey(String(row.starting_depot_key || defaultHome), defaultHome);
     return {
       vanKey,
       active: Boolean(row.active),
       vehiclePool,
-      homeBaseKey: normalizeBaseKey(
-        String(row.starting_depot_key || homeBaseForVehiclePool("outing")),
-        "hub"
-      ),
+      homeBaseKey,
       maxDogs: row.max_dogs == null ? null : Number(row.max_dogs),
       maxLoadUnits: row.max_load_units == null ? null : Number(row.max_load_units),
       maxLargeDogs: row.max_large_dogs == null ? null : Number(row.max_large_dogs),
@@ -81,6 +97,18 @@ async function listVehicles(): Promise<VehicleCapacityConfig[]> {
       capacityConfigured: Boolean(row.capacity_configured)
     };
   });
+}
+
+function asReportRunMetadata(value: unknown): ReportRunMetadata {
+  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const skipped = Array.isArray(raw.skippedOccurrences) ? (raw.skippedOccurrences as SkippedOccurrence[]) : [];
+  const warnings = Array.isArray(raw.warnings) ? (raw.warnings as string[]) : [];
+  return {
+    warnings,
+    skippedOccurrences: skipped,
+    gingrTaxiImported: Array.isArray(raw.gingrTaxiImported) ? (raw.gingrTaxiImported as string[]) : undefined,
+    manualTaxiIds: Array.isArray(raw.manualTaxiIds) ? (raw.manualTaxiIds as string[]) : undefined
+  };
 }
 
 async function getLocations(depot: DepotConfig): Promise<FitdogLocationsConfig> {
@@ -174,13 +202,6 @@ export async function getRouteGeneratorBootstrap() {
   };
 }
 
-export type ReportRunMetadata = {
-  warnings: string[];
-  skippedOccurrences: SkippedOccurrence[];
-  gingrTaxiImported?: string[];
-  manualTaxiIds?: string[];
-};
-
 function reportItemsFromNormalized(runId: string, items: NormalizedReportItem[]) {
   return items.map((item) => ({
     report_run_id: runId,
@@ -224,7 +245,7 @@ export async function pullReportForDate(params: {
     skippedOccurrences: pull.skippedOccurrences ?? []
   };
 
-  const { data: run, error } = await supabase
+  const { data: inserted, error } = await supabase
     .from("route_report_runs")
     .insert({
       operating_date: params.date,
@@ -245,7 +266,27 @@ export async function pullReportForDate(params: {
     })
     .select("*")
     .single();
-  if (error || !run) throw new Error(error?.message || "Unable to create report run.");
+  if (error || !inserted) throw new Error(error?.message || "Unable to create report run.");
+
+  let run = inserted;
+  // PostgREST can silently drop unknown columns if schema cache is stale — force metadata.
+  const persistedMeta = asReportRunMetadata(run.metadata);
+  if (
+    metadata.skippedOccurrences.length &&
+    !persistedMeta.skippedOccurrences.length
+  ) {
+    const { data: updated, error: metaError } = await supabase
+      .from("route_report_runs")
+      .update({ metadata })
+      .eq("id", run.id)
+      .select("*")
+      .single();
+    if (metaError) {
+      console.error("route_report_runs.metadata update failed", metaError.message);
+    } else if (updated) {
+      run = updated;
+    }
+  }
 
   const itemRows = reportItemsFromNormalized(run.id, [...pull.pickupItems, ...pull.dropoffItems]);
 
@@ -254,17 +295,26 @@ export async function pullReportForDate(params: {
     if (itemError) throw new Error(itemError.message);
   }
 
+  // Dual-write skipped list into source snapshots so UI can recover if metadata is empty.
   await supabase.from("route_report_source_files").insert([
     {
       report_run_id: run.id,
       direction: "pickup",
-      sanitized_snapshot: { csvPreview: pull.pickupCsv.slice(0, 4000) },
+      sanitized_snapshot: {
+        csvPreview: pull.pickupCsv.slice(0, 4000),
+        warnings: metadata.warnings,
+        skippedOccurrences: metadata.skippedOccurrences
+      },
       content_type: "text/csv"
     },
     {
       report_run_id: run.id,
       direction: "dropoff",
-      sanitized_snapshot: { csvPreview: pull.dropoffCsv.slice(0, 4000) },
+      sanitized_snapshot: {
+        csvPreview: pull.dropoffCsv.slice(0, 4000),
+        warnings: metadata.warnings,
+        skippedOccurrences: metadata.skippedOccurrences
+      },
       content_type: "text/csv"
     }
   ]);
@@ -294,7 +344,27 @@ export async function pullReportForDate(params: {
     }
   });
 
-  return { run, pull: { ...pull, skippedOccurrences: metadata.skippedOccurrences } };
+  // Always return in-memory skipped list even if DB metadata write was stripped.
+  return {
+    run: { ...run, metadata },
+    pull: { ...pull, skippedOccurrences: metadata.skippedOccurrences },
+    metadata
+  };
+}
+
+async function metadataFromSourceFiles(reportRunId: string): Promise<ReportRunMetadata | null> {
+  const supabase = getServiceSupabase();
+  const { data } = await supabase
+    .from("route_report_source_files")
+    .select("sanitized_snapshot")
+    .eq("report_run_id", reportRunId)
+    .eq("direction", "pickup")
+    .maybeSingle();
+  const snap = data?.sanitized_snapshot;
+  if (!snap || typeof snap !== "object") return null;
+  const meta = asReportRunMetadata(snap);
+  if (!meta.skippedOccurrences.length && !meta.warnings.length) return null;
+  return meta;
 }
 
 export async function getReportRun(reportRunId: string) {
@@ -302,7 +372,21 @@ export async function getReportRun(reportRunId: string) {
   const { data: run, error } = await supabase.from("route_report_runs").select("*").eq("id", reportRunId).single();
   if (error || !run) throw new Error(error?.message || "Report run not found.");
   const { data: items } = await supabase.from("route_report_items").select("*").eq("report_run_id", reportRunId);
-  return { run, items: items ?? [], metadata: (run.metadata || {}) as ReportRunMetadata };
+  let metadata = asReportRunMetadata(run.metadata);
+  if (!metadata.skippedOccurrences.length) {
+    const fromSource = await metadataFromSourceFiles(reportRunId);
+    if (fromSource?.skippedOccurrences.length) {
+      metadata = {
+        ...metadata,
+        ...fromSource,
+        skippedOccurrences: fromSource.skippedOccurrences,
+        warnings: metadata.warnings.length ? metadata.warnings : fromSource.warnings
+      };
+      // Best-effort heal empty metadata column for future loads.
+      await supabase.from("route_report_runs").update({ metadata }).eq("id", reportRunId);
+    }
+  }
+  return { run, items: items ?? [], metadata };
 }
 
 export async function assignSkippedOccurrence(params: {
@@ -636,6 +720,7 @@ export async function generatePlanForRun(params: {
     name: locations.hub.name || DEFAULT_FITDOG_LOCATIONS.hub.name
   };
 
+  const operatingDate = String(run.operating_date).slice(0, 10);
   const pickupOpt = optimizeRoutes({
     direction: "pickup",
     households: pickupGroups,
@@ -645,7 +730,8 @@ export async function generatePlanForRun(params: {
     sizeLoads,
     seed: `pickup:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
-    lockedVanByHousehold
+    lockedVanByHousehold,
+    operatingDate
   });
   const dropoffOpt = optimizeRoutes({
     direction: "dropoff",
@@ -656,7 +742,8 @@ export async function generatePlanForRun(params: {
     sizeLoads,
     seed: `dropoff:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
-    lockedVanByHousehold
+    lockedVanByHousehold,
+    operatingDate
   });
   if (activeUnconfigured.length) {
     pickupOpt.warnings.push(
@@ -785,9 +872,13 @@ export async function getPlanBundle(planId: string) {
     ? await supabase.from("route_report_items").select("*").eq("report_run_id", plan.report_run_id)
     : { data: [] as Array<Record<string, unknown>> };
 
-  const { data: reportRun } = plan.report_run_id
-    ? await supabase.from("route_report_runs").select("*").eq("id", plan.report_run_id).maybeSingle()
-    : { data: null };
+  let metadata: ReportRunMetadata = { warnings: [], skippedOccurrences: [] };
+  let reportRun: Record<string, unknown> | null = null;
+  if (plan.report_run_id) {
+    const loaded = await getReportRun(String(plan.report_run_id));
+    reportRun = loaded.run as Record<string, unknown>;
+    metadata = loaded.metadata;
+  }
 
   return {
     plan,
@@ -795,10 +886,7 @@ export async function getPlanBundle(planId: string) {
     stops: stops ?? [],
     items: items ?? [],
     reportRun,
-    metadata: ((reportRun as { metadata?: ReportRunMetadata } | null)?.metadata || {
-      warnings: [],
-      skippedOccurrences: []
-    }) as ReportRunMetadata
+    metadata
   };
 }
 

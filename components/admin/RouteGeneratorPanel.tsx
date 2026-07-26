@@ -133,14 +133,33 @@ export function RouteGeneratorPanel() {
         return null;
       }
       setBundle(next);
-      if (next.plan?.report_run_id) setReportRunId(String(next.plan.report_run_id));
-      if (next.plan?.operating_date) setDate(String(next.plan.operating_date));
+      const nextReportRunId = next.plan?.report_run_id ? String(next.plan.report_run_id) : null;
+      if (nextReportRunId) setReportRunId(nextReportRunId);
+      if (next.plan?.operating_date) setDate(String(next.plan.operating_date).slice(0, 10));
       const summary = next.plan?.summary ?? {};
+      let skipped = next.metadata?.skippedOccurrences ?? [];
+      let warnings = next.metadata?.warnings ?? [];
+      // Heal empty plan metadata by re-fetching the report run (source-file fallback).
+      if (nextReportRunId && !skipped.length) {
+        try {
+          const response = await fetch(
+            `/api/admin/route-generator?view=report_run&reportRunId=${encodeURIComponent(nextReportRunId)}`,
+            { cache: "no-store" }
+          );
+          const body = await response.json();
+          if (response.ok) {
+            skipped = body.metadata?.skippedOccurrences ?? skipped;
+            warnings = body.metadata?.warnings?.length ? body.metadata.warnings : warnings;
+          }
+        } catch {
+          // keep plan metadata
+        }
+      }
       setPullMeta({
         pickup: Number(summary.pickupDogs ?? next.items?.filter((i) => i.direction === "pickup").length ?? 0),
         dropoff: Number(summary.dropoffDogs ?? next.items?.filter((i) => i.direction === "dropoff").length ?? 0),
-        warnings: next.metadata?.warnings ?? [],
-        skippedOccurrences: next.metadata?.skippedOccurrences ?? []
+        warnings,
+        skippedOccurrences: skipped
       });
       return next;
     },
@@ -207,17 +226,20 @@ export function RouteGeneratorPanel() {
   async function pullReport() {
     try {
       const body = await postAction("pull_report", { date });
-      setReportRunId(body.run.id);
+      const runId = String(body.run.id);
+      setReportRunId(runId);
       const skipped =
-        (body.pull.skippedOccurrences as SkippedOccurrence[] | undefined) ||
+        (body.metadata?.skippedOccurrences as SkippedOccurrence[] | undefined) ||
+        (body.pull?.skippedOccurrences as SkippedOccurrence[] | undefined) ||
         (body.run?.metadata?.skippedOccurrences as SkippedOccurrence[] | undefined) ||
         [];
-      setPullMeta({
-        pickup: body.pull.pickupItems.length,
-        dropoff: body.pull.dropoffItems.length,
-        warnings: body.pull.warnings ?? [],
+      const nextMeta = {
+        pickup: Number(body.pull?.pickupItems?.length ?? body.run?.pickup_count ?? 0),
+        dropoff: Number(body.pull?.dropoffItems?.length ?? body.run?.dropoff_count ?? 0),
+        warnings: (body.pull?.warnings as string[] | undefined) ?? body.metadata?.warnings ?? [],
         skippedOccurrences: skipped
-      });
+      };
+      setPullMeta(nextMeta);
       setBundle(null);
       if (skipped.length) setTab("extras");
       showToast(
@@ -228,6 +250,15 @@ export function RouteGeneratorPanel() {
       );
       // Refresh connection/checklist only — keep the new reportRunId (don't rehydrate an older plan).
       await refresh({ hydrateLatestPlan: false });
+      // Re-assert pull meta after bootstrap refresh so a remount/race cannot wipe skipped rows.
+      setPullMeta(nextMeta);
+      if (skipped.length) {
+        try {
+          await refreshReportMeta(runId);
+        } catch {
+          setPullMeta(nextMeta);
+        }
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Pull failed.", "error");
     }
@@ -611,7 +642,11 @@ export function RouteGeneratorPanel() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <OverviewCard label="Pickup dogs" value={String(bundle?.plan.summary?.pickupDogs ?? pullMeta?.pickup ?? "—")} />
             <OverviewCard label="Drop-off dogs" value={String(bundle?.plan.summary?.dropoffDogs ?? pullMeta?.dropoff ?? "—")} />
-            <OverviewCard label="Vans used" value={String(bundle?.plan.summary?.vansUsed ?? "—")} />
+            <OverviewCard
+              label="Skipped classes"
+              value={String(pullMeta?.skippedOccurrences.length ?? 0)}
+              tone={pullMeta?.skippedOccurrences.some((row) => !row.assignedVanKey) ? "warn" : undefined}
+            />
             <OverviewCard label="Needs review" value={String(bundle?.plan.summary?.needsReview ?? needsReview.length ?? "—")} tone="warn" />
           </div>
 

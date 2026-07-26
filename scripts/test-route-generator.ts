@@ -456,14 +456,33 @@ assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_1", direction: "dropoff" }
   startKey: "kenneth_hahn",
   endKey: "hub"
 });
-assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_3", direction: "pickup" }), {
-  startKey: "hub",
-  endKey: "huntington"
+// Van 3 Mon/Wed/Fri → Huntington; Tue/Thu → Kenneth Hahn (2026-07-27 is Monday).
+assert.deepEqual(
+  resolveRouteEndpoints({ vanKey: "van_3", direction: "pickup", operatingDate: "2026-07-27" }),
+  { startKey: "hub", endKey: "huntington" }
+);
+assert.deepEqual(
+  resolveRouteEndpoints({ vanKey: "van_3", direction: "dropoff", operatingDate: "2026-07-27" }),
+  { startKey: "huntington", endKey: "hub" }
+);
+assert.deepEqual(
+  resolveRouteEndpoints({ vanKey: "van_3", direction: "pickup", operatingDate: "2026-07-28" }),
+  { startKey: "hub", endKey: "kenneth_hahn" }
+);
+assert.deepEqual(
+  resolveRouteEndpoints({ vanKey: "van_3", direction: "dropoff", operatingDate: "2026-07-30" }),
+  { startKey: "kenneth_hahn", endKey: "hub" }
+);
+assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_5", direction: "pickup" }), {
+  startKey: "club",
+  endKey: "club"
 });
-assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_3", direction: "dropoff" }), {
-  startKey: "huntington",
-  endKey: "hub"
+assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_6", direction: "dropoff" }), {
+  startKey: "club",
+  endKey: "club"
 });
+assert.equal(serviceForAssignedVan("van_5"), "Group Class");
+assert.equal(serviceForAssignedVan("van_6"), "Group Class");
 const again = optimizeRoutes({
   direction: "pickup",
   households,

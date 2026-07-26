@@ -139,24 +139,31 @@ async function main() {
     ]
   );
 
-  // Van routing: 1/2 Adventure→Kenneth Hahn, 3 Beach→Huntington, 5/6 overflow outing.
+  // Van routing: 1/2 Hahn M–F; 3 Beach M/W/F + Hahn T/Th; 5/6 Club taxi/group/training.
   await client.query(
     `update route_vehicle_configs
-     set vehicle_pool = 'outing',
-         starting_depot_key = 'hub',
+     set vehicle_pool = case
+           when van_key in ('van_5', 'van_6') then 'club'
+           else 'outing'
+         end,
+         starting_depot_key = case
+           when van_key in ('van_5', 'van_6') then 'club'
+           else 'hub'
+         end,
          ending_depot_key = case
+           when van_key in ('van_5', 'van_6') then 'club'
            when van_key = 'van_3' then 'huntington'
            else 'kenneth_hahn'
          end,
          eligible_services = case
            when van_key in ('van_1', 'van_2') then array['Adventure Hike']
-           when van_key = 'van_3' then array['Beach Excursion']
-           else array['Adventure Hike', 'Beach Excursion', 'Trainer-Led Hike', 'Group Class', 'Taxi Service']
+           when van_key = 'van_3' then array['Beach Excursion', 'Adventure Hike']
+           else array['Trainer-Led Hike', 'Group Class', 'Taxi Service']
          end,
          notes = case
-           when van_key in ('van_1', 'van_2') then 'PU: Hub→Kenneth Hahn Trail. DO: Kenneth Hahn→Hub. Club mid-stop when dogs are at Fitdog.'
-           when van_key = 'van_3' then 'PU: Hub→Huntington Dog Beach. DO: Huntington→Hub. Club mid-stop when dogs are at Fitdog.'
-           else 'Overflow outing van. Destination follows assigned services; Club mid-stop when dogs are at Fitdog.'
+           when van_key in ('van_1', 'van_2') then 'PU: Hub→Kenneth Hahn. DO: Kenneth Hahn→Hub (Mon–Fri). Club mid-stop when dogs are at Fitdog.'
+           when van_key = 'van_3' then 'Mon/Wed/Fri: Hub↔Huntington Dog Beach. Tue/Thu: Hub↔Kenneth Hahn. Club mid-stops for pickups/drop-offs.'
+           else 'Lives at Fitdog Club. Taxi, group class, and training-class pickups/drop-offs. Does not go to Kenneth Hahn.'
          end,
          updated_at = now()
      where van_key in ('van_1', 'van_2', 'van_3', 'van_5', 'van_6')`
