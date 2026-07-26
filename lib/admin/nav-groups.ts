@@ -98,7 +98,8 @@ const TAB_LABELS: Record<AdminTab, string> = {
   handler_shift_entry: "Handler Shift Entry Log",
   hr_pip: "Track PIP",
   remote_cast: "Remote Whiteboard Cast",
-  walks_board: "Walks Board"
+  walks_board: "Walks Board",
+  operations_checklist: "Operations Checklist"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -132,6 +133,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
   walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
+  operations_checklist:
+    "Shared daily operational checklist for every staff role, with personal task prioritization and permanent completion history.",
   staff_directory: "Edit staff names, roles, and contact info.",
   staff_create_user: "Create a new staff admin login.",
   users: "Manage admin users, roles, and permissions.",
@@ -170,6 +173,7 @@ const PUSH_TO_BOARD_TABS: AdminTab[] = [
 ];
 const FRONT_DESK_TABS: AdminTab[] = [
   "crossover_communication",
+  "operations_checklist",
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
@@ -373,7 +377,9 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication", "operations_checklist"], visible)
+      ])
     )
   );
 
@@ -446,7 +452,9 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication", "operations_checklist"], visible)
+      ])
     )
   );
 
@@ -502,7 +510,9 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "groomer_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication", "operations_checklist"], visible)
+      ])
     )
   );
 

@@ -72,6 +72,14 @@ assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yar
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "hr_hub", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "yard_links", "driver", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "walks_board", "driver", "staff"), true);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "operations_checklist", "driver", "staff"),
+  true
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "operations_checklist", "groomer", "staff"),
+  true
+);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "hr_hub", "driver", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "hiker"), "yard_links", "hiker", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "package_commissions", "trainer", "staff"), true);

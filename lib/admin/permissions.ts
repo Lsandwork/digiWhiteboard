@@ -469,6 +469,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 
 export const FRONT_DESK_COORDINATOR_TABS = [
   "crossover_communication",
+  "operations_checklist",
   "push_notices",
   "yard_push_notices",
   "grooming_push",
@@ -487,6 +488,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
 
 export const TEAM_LEADER_TABS = [
   "crossover_communication",
+  "operations_checklist",
   "push_notices",
   "yard_push_notices",
   "grooming_push",
@@ -502,6 +504,7 @@ export const TEAM_LEADER_TABS = [
 
 export const GROOMER_TABS = [
   "crossover_communication",
+  "operations_checklist",
   "grooming_push",
   "whiteboard_preview",
   "yard_links",
@@ -514,6 +517,7 @@ export const GROOMER_TABS = [
 
 export const TRAINER_TABS = [
   "crossover_communication",
+  "operations_checklist",
   "trainer_push",
   "trainer_entry",
   "package_commissions",
@@ -527,6 +531,7 @@ export const TRAINER_TABS = [
 
 export const DOG_HANDLER_TABS = [
   "crossover_communication",
+  "operations_checklist",
   "checklist",
   "walks_board",
   "notifications",
@@ -739,6 +744,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
+  operations_checklist: "view_admin_panel",
   settings: "view_admin_panel",
   help: "view_admin_panel",
   lobby_slideshow: "manage_lobby_board",
@@ -1049,6 +1055,9 @@ export function canAccessAdminTab(
 
   // Walks Board is available to every authenticated staff user on the staff board.
   if (tab === "walks_board") return board === "staff";
+
+  // Operations Checklist is available to every authenticated staff user on the staff board.
+  if (tab === "operations_checklist") return board === "staff";
 
   // Fitdog payment alerts are restricted to super_admin, admin, management, front_desk_coordinator.
   if (tab === "fitdog_alerts") {
