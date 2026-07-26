@@ -11,6 +11,10 @@ import {
 } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
+import {
+  FITDOG_LOGIN_REDIRECT_PATH,
+  shouldRedirectFitdogRootToLogin
+} from "@/lib/fitdog-domain";
 import { RUFFLY_REWRITE_TARGET, rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
 
 export async function middleware(request: NextRequest) {
@@ -24,6 +28,12 @@ export async function middleware(request: NextRequest) {
 
 async function runMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Staff login shortcut (fitdog.ruffops.com/) → admin login.
+  // Does not change staff.ruffops.com landing page behavior.
+  if (shouldRedirectFitdogRootToLogin(request.headers.get("host"), pathname)) {
+    return NextResponse.redirect(new URL(FITDOG_LOGIN_REDIRECT_PATH, request.url));
+  }
 
   // Lobby custom domain (lobby.ruffops.com/) → serve the Lobby Digital Whiteboard
   // via an internal rewrite. The browser URL stays on lobby.ruffops.com and the

@@ -19,6 +19,7 @@
     "test:role-access": "tsx scripts/test-role-access.ts",
     "test:ruffly": "tsx scripts/test-ruffly-core.ts && tsx scripts/test-ruffly-domain-routing.ts",
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
+    "test:fitdog-domain": "tsx scripts/test-fitdog-domain-routing.ts",
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
