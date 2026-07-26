@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { listStaffOps } from "@/lib/staff/admin-ops";
+import { writeAdminAuditLog } from "@/lib/admin/audit";
+import { clearStaffInboxNotifications, listStaffOps } from "@/lib/staff/admin-ops";
 import {
   countUnreadNotifications,
   notificationReaderKey,
@@ -152,4 +153,44 @@ export async function GET(request: Request) {
     walkAlerts,
     serverTime: new Date().toISOString()
   });
+}
+
+export async function POST(request: Request) {
+  if (!isAdminRequest(request)) return unauthorizedAdminResponse();
+
+  const session = getAdminSessionFromRequest(request);
+  if (!session?.email) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  try {
+    const body = (await request.json().catch(() => ({}))) as { action?: string };
+    const action = String(body.action || "clear_inbox");
+    if (action !== "clear_inbox" && action !== "clear_inbox_notifications") {
+      return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
+    }
+
+    const supabase = getServiceSupabase();
+    const readerSession = {
+      email: session.email ?? null,
+      adminUserId: session.adminUserId ?? null,
+      role: session.role ?? null
+    };
+    const readerKey = notificationReaderKey(readerSession.email, readerSession.adminUserId);
+    const next = await clearStaffInboxNotifications(supabase, readerKey, readerSession);
+    const unreadCount = countUnreadNotifications(next, readerSession);
+
+    void writeAdminAuditLog({
+      actorAdminId: session.adminUserId ?? null,
+      actorEmail: session.email ?? null,
+      action: "staff.notification.clear_inbox",
+      targetType: "staff_operations",
+      details: { unreadRemaining: unreadCount }
+    }).catch(() => undefined);
+
+    return NextResponse.json({ ok: true, unreadCount });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to clear inbox.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

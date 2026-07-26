@@ -345,6 +345,54 @@ export function markAllNotificationsRead(
   };
 }
 
+/** True when this notification is an open assignment for the current user. */
+export function isNotificationAssignedToSession(
+  notification: StaffNotification,
+  directory: StaffDirectoryMember[],
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  if (notification.type === "assignment") {
+    if (notification.target.kind === "staff_name") {
+      return matchesStaffNameTarget(notification.target, directory, session.email, session.adminUserId);
+    }
+    if (notification.target.kind === "staff_email") {
+      return notification.target.email.trim().toLowerCase() === session.email?.trim().toLowerCase();
+    }
+  }
+
+  const assignedTo = notification.assigned_to?.trim();
+  if (!assignedTo) return false;
+  const member = findMemberForSession(directory, session.email, session.adminUserId);
+  if (member?.name === assignedTo) return true;
+  if (session.email && assignedTo.toLowerCase() === session.email.trim().toLowerCase()) return true;
+  return false;
+}
+
+/**
+ * Clear the bell Inbox for this user by marking visible notifications read,
+ * while keeping unread any alerts still assigned to them.
+ */
+export function clearInboxNotificationsKeepingAssigned(
+  state: StaffOpsState,
+  readerKey: string,
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+) {
+  const visible = notificationsForSession(state, session);
+  const clearIds = new Set(
+    visible
+      .filter((notification) => !isNotificationAssignedToSession(notification, state.staff_directory, session))
+      .map((notification) => notification.id)
+  );
+  return {
+    ...state,
+    notifications: (state.notifications ?? []).map((notification) =>
+      clearIds.has(notification.id) && !notification.read_by.includes(readerKey)
+        ? { ...notification, read_by: [...notification.read_by, readerKey] }
+        : notification
+    )
+  };
+}
+
 export function coordinatorRolesInDirectory(directory: StaffDirectoryMember[]) {
   return directory.filter(
     (member) => member.status === "Active" && member.dashboard_role && COORDINATOR_ROLES.includes(member.dashboard_role)
