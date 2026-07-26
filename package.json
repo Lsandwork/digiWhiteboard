@@ -25,6 +25,8 @@
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
     "test:route-generator": "tsx scripts/test-route-generator.ts",
+    "setup:route-generator-shadow": "tsx scripts/setup-route-generator-shadow.ts",
+    "smoke:route-generator-shadow": "tsx scripts/run-route-generator-shadow-smoke.ts",
     "test:fitdog-alerts": "tsx scripts/test-fitdog-payment-alerts.ts",
     "test:package-commission-percent": "tsx scripts/test-package-commission-percent.ts",
     "test:package-commission-invoice-csv": "tsx scripts/test-package-commission-invoice-csv.ts",
