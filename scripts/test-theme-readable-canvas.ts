@@ -42,6 +42,11 @@ const clearTheme = readFileSync(resolve(root, "lib/fitdog-dashboard/theme-clear.
 assert.match(clearTheme, /html\[data-theme="clear"\] \.crossover-dashboard/, "clear theme must remap crossover-dashboard tokens");
 assert.match(clearTheme, /--crossover-text: #12213a/, "clear crossover text must be dark");
 assert.match(clearTheme, /shift-log-badge--type-general/, "clear theme must remap GENERAL shift-note badges");
+assert.match(clearTheme, /admin-btn-primary[\s\S]*?color:\s*#12213a/, "clear primary CTAs must use dark navy text");
+assert.match(clearTheme, /fitdog-dash-icon/, "clear theme must darken light dashboard icons on buttons");
+
+assert.match(readable, /Clear theme: dark navy labels/, "readable canvas must force dark labels on clear primary CTAs");
+assert.match(readable, /admin-header-brand/, "header brand text must remap on clear/light");
 
 assert.match(
   globals,
