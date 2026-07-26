@@ -35,12 +35,10 @@ type Props = {
 
 function baseLabel(stopKind: string, label: string) {
   if (stopKind !== "depot_start" && stopKind !== "depot_end") return label;
-  const upper = label.trim().toUpperCase();
-  if (upper.includes("CLUB")) return "CLUB";
-  if (upper.includes("HUB") || upper.includes("DEPOT") || upper.includes("FITDOG")) {
-    return upper.includes("CLUB") ? "CLUB" : upper.includes("HUB") ? "HUB" : label;
-  }
-  return label || "HUB";
+  const trimmed = label.trim();
+  if (!trimmed) return "Fitdog Westwood Hub";
+  // Keep destination names (Kenneth Hahn Trail / Huntington Dog Beach) and full Fitdog labels.
+  return trimmed;
 }
 
 export function RouteGeneratorMap({ routes, selectedRouteId, locations, onSelectRoute }: Props) {
@@ -103,8 +101,19 @@ export function RouteGeneratorMap({ routes, selectedRouteId, locations, onSelect
 
       const bounds: import("leaflet").LatLngExpression[] = [];
 
-      // Always show HUB + CLUB bases when coordinates exist.
-      for (const base of [locations?.hub, locations?.club].filter(Boolean)) {
+      // Always show operational bases + outing destinations when coordinates exist.
+      const baseColors: Record<string, string> = {
+        hub: "#f15f2a",
+        club: "#0ea5e9",
+        kenneth_hahn: "#22c55e",
+        huntington: "#a855f7"
+      };
+      for (const base of [
+        locations?.hub,
+        locations?.club,
+        locations?.kenneth_hahn,
+        locations?.huntington
+      ].filter(Boolean)) {
         if (base?.latitude == null || base.longitude == null) continue;
         const latLng: import("leaflet").LatLngExpression = [base.latitude, base.longitude];
         bounds.push(latLng);
@@ -112,7 +121,7 @@ export function RouteGeneratorMap({ routes, selectedRouteId, locations, onSelect
           radius: 9,
           color: "#0f172a",
           weight: 2,
-          fillColor: base.key === "hub" ? "#f15f2a" : "#0ea5e9",
+          fillColor: baseColors[base.key] || "#f15f2a",
           fillOpacity: 0.95
         }).bindPopup(
           `<strong>${base.name}</strong><br/>${base.address}${base.note ? `<br/><em>${base.note}</em>` : ""}`
@@ -123,7 +132,7 @@ export function RouteGeneratorMap({ routes, selectedRouteId, locations, onSelect
           icon: L.divIcon({
             className: "rg-base-label",
             html: `<span style="background:#0f172a;color:#fff;padding:2px 6px;border-radius:999px;font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.25)">${base.name}</span>`,
-            iconSize: [54, 20],
+            iconSize: [120, 20],
             iconAnchor: [-8, 10]
           })
         }).addTo(layer);

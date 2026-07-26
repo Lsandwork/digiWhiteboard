@@ -1,5 +1,6 @@
 import type { CanonicalService } from "@/lib/route-generator/flags";
 import { CLUB_SERVICES, OUTING_SERVICES, assertNeverVan4 } from "@/lib/route-generator/flags";
+import type { FitdogBaseKey } from "@/lib/route-generator/locations";
 
 export type DogSize = "Small" | "Medium" | "Large" | "Extra Large" | "Unknown";
 
@@ -7,8 +8,8 @@ export type VehicleCapacityConfig = {
   vanKey: string;
   active: boolean;
   vehiclePool: "club" | "outing";
-  /** Where the van starts/ends the day — HUB (outing) or CLUB (club pool). */
-  homeBaseKey?: "hub" | "club";
+  /** Default home base when route endpoints are not resolved (usually HUB). */
+  homeBaseKey?: FitdogBaseKey;
   maxDogs: number | null;
   maxLoadUnits: number | null;
   maxLargeDogs: number | null;

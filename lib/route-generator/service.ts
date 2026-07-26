@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { fitdogRouteReportProvider } from "@/lib/route-generator/fitdog-provider";
-import { groupHouseholds } from "@/lib/route-generator/households";
+import { groupHouseholdsWithFacilities } from "@/lib/route-generator/facility";
 import { optimizeRoutes, type DepotConfig } from "@/lib/route-generator/optimizer";
 import {
   autoMapSamsaraHeaders,
@@ -37,24 +37,36 @@ async function getSetting<T>(key: string, fallback: T): Promise<T> {
   return (data?.value as T) ?? fallback;
 }
 
+const DEFAULT_VAN_SERVICES: Record<string, CanonicalService[]> = {
+  van_1: ["Adventure Hike"],
+  van_2: ["Adventure Hike"],
+  van_3: ["Beach Excursion"],
+  van_5: ["Adventure Hike", "Beach Excursion", "Trainer-Led Hike", "Group Class", "Taxi Service"],
+  van_6: ["Adventure Hike", "Beach Excursion", "Trainer-Led Hike", "Group Class", "Taxi Service"]
+};
+
 async function listVehicles(): Promise<VehicleCapacityConfig[]> {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase.from("route_vehicle_configs").select("*").order("van_key");
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => {
-    const vehiclePool = row.vehicle_pool as "club" | "outing";
+    const vanKey = String(row.van_key);
+    const vehiclePool = "outing" as const;
+    const storedServices = (row.eligible_services ?? []) as CanonicalService[];
+    const eligibleServices = DEFAULT_VAN_SERVICES[vanKey] ?? storedServices;
     return {
-      vanKey: String(row.van_key),
+      vanKey,
       active: Boolean(row.active),
       vehiclePool,
       homeBaseKey: normalizeBaseKey(
-        String(row.starting_depot_key || row.ending_depot_key || homeBaseForVehiclePool(vehiclePool))
+        String(row.starting_depot_key || homeBaseForVehiclePool("outing")),
+        "hub"
       ),
       maxDogs: row.max_dogs == null ? null : Number(row.max_dogs),
       maxLoadUnits: row.max_load_units == null ? null : Number(row.max_load_units),
       maxLargeDogs: row.max_large_dogs == null ? null : Number(row.max_large_dogs),
       maxStops: row.max_stops == null ? null : Number(row.max_stops),
-      eligibleServices: (row.eligible_services ?? []) as CanonicalService[],
+      eligibleServices,
       capacityConfigured: Boolean(row.capacity_configured)
     };
   });
@@ -79,9 +91,27 @@ async function getLocations(depot: DepotConfig): Promise<FitdogLocationsConfig> 
           verified: depot.verified
         })
   };
+  const kennethHahn = {
+    ...DEFAULT_FITDOG_LOCATIONS.kenneth_hahn,
+    ...(stored?.kenneth_hahn ?? {})
+  };
+  const huntington = {
+    ...DEFAULT_FITDOG_LOCATIONS.huntington,
+    ...(stored?.huntington ?? {})
+  };
   return {
-    hub: { ...hub, key: "hub", name: hub.name || "HUB" },
-    club: { ...club, key: "club", name: club.name || "CLUB" }
+    hub: { ...hub, key: "hub", name: hub.name || DEFAULT_FITDOG_LOCATIONS.hub.name },
+    club: { ...club, key: "club", name: club.name || DEFAULT_FITDOG_LOCATIONS.club.name },
+    kenneth_hahn: {
+      ...kennethHahn,
+      key: "kenneth_hahn",
+      name: kennethHahn.name || DEFAULT_FITDOG_LOCATIONS.kenneth_hahn.name
+    },
+    huntington: {
+      ...huntington,
+      key: "huntington",
+      name: huntington.name || DEFAULT_FITDOG_LOCATIONS.huntington.name
+    }
   };
 }
 
@@ -321,21 +351,35 @@ export async function generatePlanForRun(params: {
     raw: row.raw ?? {}
   }));
 
-  const pickupGroups = groupHouseholds(normalized.filter((i) => i.direction === "pickup" && i.validationStatus !== "error"));
-  const dropoffGroups = groupHouseholds(normalized.filter((i) => i.direction === "dropoff" && i.validationStatus !== "error"));
+  const pickupGroups = groupHouseholdsWithFacilities(
+    normalized.filter((i) => i.direction === "pickup" && i.validationStatus !== "error"),
+    locations
+  );
+  const dropoffGroups = groupHouseholdsWithFacilities(
+    normalized.filter((i) => i.direction === "dropoff" && i.validationStatus !== "error"),
+    locations
+  );
   const needsReview = normalized.filter((i) => i.validationStatus !== "ok");
 
   const coords: Record<string, { lat: number; lng: number }> = {};
   [...pickupGroups, ...dropoffGroups].forEach((g, index) => {
+    if (g.householdKey === "facility:club" && locations.club.latitude != null && locations.club.longitude != null) {
+      coords[g.householdKey] = { lat: locations.club.latitude, lng: locations.club.longitude };
+      return;
+    }
+    if (g.householdKey === "facility:hub" && locations.hub.latitude != null && locations.hub.longitude != null) {
+      coords[g.householdKey] = { lat: locations.hub.latitude, lng: locations.hub.longitude };
+      return;
+    }
     coords[g.householdKey] = syntheticCoords(g.householdKey, index);
   });
 
   const effectiveDepot: DepotConfig = {
     ...depot,
-    latitude: locations.club.latitude ?? depot.latitude ?? 34.0249,
-    longitude: locations.club.longitude ?? depot.longitude ?? -118.4756,
-    address: locations.club.address || depot.address || "CLUB",
-    name: locations.club.name || "CLUB"
+    latitude: locations.hub.latitude ?? depot.latitude ?? 34.0447,
+    longitude: locations.hub.longitude ?? depot.longitude ?? -118.4323,
+    address: locations.hub.address || depot.address || DEFAULT_FITDOG_LOCATIONS.hub.address,
+    name: locations.hub.name || DEFAULT_FITDOG_LOCATIONS.hub.name
   };
 
   const pickupOpt = optimizeRoutes({

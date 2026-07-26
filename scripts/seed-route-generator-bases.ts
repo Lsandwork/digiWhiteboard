@@ -1,7 +1,9 @@
 /**
- * Seed Fitdog HUB + CLUB bases and assign van home bases.
- * HUB (outing, 3 vans): 2140 Westwood Blvd, West Los Angeles, CA 90025
- * CLUB (club pool, 2 vans): 1712 21st St, Santa Monica, CA 90404
+ * Seed Fitdog bases/destinations and van routing endpoints.
+ * - Hub: Fitdog Westwood Hub
+ * - Club: Fitdog Club (mid-route facility stop)
+ * - Kenneth Hahn Trail: Van 1/2 Adventure destination
+ * - Huntington Dog Beach: Van 3 Beach destination
  */
 import { Client } from "pg";
 import { loadEnvFiles } from "./load-env-local";
@@ -28,37 +30,79 @@ async function geocodeNominatim(address: string) {
   };
 }
 
+async function geocodeWithFallback(
+  key: keyof typeof DEFAULT_FITDOG_LOCATIONS,
+  fallback: { latitude: number; longitude: number }
+) {
+  const base = DEFAULT_FITDOG_LOCATIONS[key];
+  try {
+    const geo = await geocodeNominatim(base.address);
+    return { ...base, ...geo, verified: true };
+  } catch (error) {
+    console.warn(`Geocode failed for ${key}, using fallback coords.`, error);
+    return {
+      ...base,
+      latitude: fallback.latitude,
+      longitude: fallback.longitude,
+      verified: false,
+      displayName: base.address
+    };
+  }
+}
+
 async function main() {
   const password = process.env.SUPABASE_DB_PASSWORD;
   if (!password?.trim()) throw new Error("Missing SUPABASE_DB_PASSWORD");
 
-  const hubAddress = DEFAULT_FITDOG_LOCATIONS.hub.address;
-  const clubAddress = DEFAULT_FITDOG_LOCATIONS.club.address;
-
-  console.log("Geocoding HUB…", hubAddress);
-  const hubGeo = await geocodeNominatim(hubAddress);
+  console.log("Geocoding bases…");
+  const hub = await geocodeWithFallback("hub", {
+    latitude: DEFAULT_FITDOG_LOCATIONS.hub.latitude!,
+    longitude: DEFAULT_FITDOG_LOCATIONS.hub.longitude!
+  });
   await new Promise((r) => setTimeout(r, 1100));
-  console.log("Geocoding CLUB…", clubAddress);
-  const clubGeo = await geocodeNominatim(clubAddress);
+  const club = await geocodeWithFallback("club", {
+    latitude: DEFAULT_FITDOG_LOCATIONS.club.latitude!,
+    longitude: DEFAULT_FITDOG_LOCATIONS.club.longitude!
+  });
+  await new Promise((r) => setTimeout(r, 1100));
+  const kennethHahn = await geocodeWithFallback("kenneth_hahn", {
+    latitude: DEFAULT_FITDOG_LOCATIONS.kenneth_hahn.latitude!,
+    longitude: DEFAULT_FITDOG_LOCATIONS.kenneth_hahn.longitude!
+  });
+  await new Promise((r) => setTimeout(r, 1100));
+  const huntington = await geocodeWithFallback("huntington", {
+    latitude: DEFAULT_FITDOG_LOCATIONS.huntington.latitude!,
+    longitude: DEFAULT_FITDOG_LOCATIONS.huntington.longitude!
+  });
 
   const locations = {
     hub: {
-      ...DEFAULT_FITDOG_LOCATIONS.hub,
-      latitude: hubGeo.latitude,
-      longitude: hubGeo.longitude,
-      verified: true,
+      ...hub,
+      key: "hub",
       verified_at: new Date().toISOString(),
       verified_by: "ops-update-agent",
-      geocode_display_name: hubGeo.displayName
+      geocode_display_name: hub.displayName
     },
     club: {
-      ...DEFAULT_FITDOG_LOCATIONS.club,
-      latitude: clubGeo.latitude,
-      longitude: clubGeo.longitude,
-      verified: true,
+      ...club,
+      key: "club",
       verified_at: new Date().toISOString(),
       verified_by: "ops-update-agent",
-      geocode_display_name: clubGeo.displayName
+      geocode_display_name: club.displayName
+    },
+    kenneth_hahn: {
+      ...kennethHahn,
+      key: "kenneth_hahn",
+      verified_at: new Date().toISOString(),
+      verified_by: "ops-update-agent",
+      geocode_display_name: kennethHahn.displayName
+    },
+    huntington: {
+      ...huntington,
+      key: "huntington",
+      verified_at: new Date().toISOString(),
+      verified_by: "ops-update-agent",
+      geocode_display_name: huntington.displayName
     }
   };
 
@@ -75,37 +119,47 @@ async function main() {
     [JSON.stringify(locations)]
   );
 
-  // Keep legacy depot aligned to CLUB (primary facility contact).
   await client.query(
     `insert into route_generator_settings (key, value)
      values ('depot', $1::jsonb)
      on conflict (key) do update set value = excluded.value, updated_at = now()`,
     [
       JSON.stringify({
-        name: "CLUB",
-        address: clubAddress,
-        latitude: clubGeo.latitude,
-        longitude: clubGeo.longitude,
+        name: locations.hub.name,
+        address: locations.hub.address,
+        latitude: locations.hub.latitude,
+        longitude: locations.hub.longitude,
         geofence_radius_m: 100,
         timezone: "America/Los_Angeles",
         verified: true,
         verified_at: new Date().toISOString(),
         verified_by: "ops-update-agent",
-        note: "CLUB — hotel, daycare, training, and grooming center."
+        note: "Legacy depot field aligned to Fitdog Westwood Hub."
       })
     ]
   );
 
-  // Club pool → CLUB (2 vans). Outing pool → HUB (3 vans).
+  // Van routing: 1/2 Adventure→Kenneth Hahn, 3 Beach→Huntington, 5/6 overflow outing.
   await client.query(
     `update route_vehicle_configs
-     set starting_depot_key = case when vehicle_pool = 'club' then 'club' else 'hub' end,
-         ending_depot_key = case when vehicle_pool = 'club' then 'club' else 'hub' end,
-         notes = case
-           when vehicle_pool = 'club' then 'Starts/ends at CLUB (1712 21st St, Santa Monica).'
-           else 'Starts/ends at HUB (2140 Westwood Blvd, West Los Angeles).'
+     set vehicle_pool = 'outing',
+         starting_depot_key = 'hub',
+         ending_depot_key = case
+           when van_key = 'van_3' then 'huntington'
+           else 'kenneth_hahn'
          end,
-         updated_at = now()`
+         eligible_services = case
+           when van_key in ('van_1', 'van_2') then array['Adventure Hike']
+           when van_key = 'van_3' then array['Beach Excursion']
+           else array['Adventure Hike', 'Beach Excursion', 'Trainer-Led Hike', 'Group Class', 'Taxi Service']
+         end,
+         notes = case
+           when van_key in ('van_1', 'van_2') then 'PU: Hub→Kenneth Hahn Trail. DO: Kenneth Hahn→Hub. Club mid-stop when dogs are at Fitdog.'
+           when van_key = 'van_3' then 'PU: Hub→Huntington Dog Beach. DO: Huntington→Hub. Club mid-stop when dogs are at Fitdog.'
+           else 'Overflow outing van. Destination follows assigned services; Club mid-stop when dogs are at Fitdog.'
+         end,
+         updated_at = now()
+     where van_key in ('van_1', 'van_2', 'van_3', 'van_5', 'van_6')`
   );
 
   const { rows: checklistRows } = await client.query(
@@ -116,41 +170,27 @@ async function main() {
     depot_address_seeded: true,
     depot_verified_by_super_admin: true,
     hub_club_bases_configured: true,
-    hub_address: hubAddress,
-    club_address: clubAddress
+    outing_destinations_configured: true,
+    hub_address: locations.hub.address,
+    club_address: locations.club.address,
+    kenneth_hahn: locations.kenneth_hahn.name,
+    huntington: locations.huntington.name
   };
   await client.query(
-    `update route_generator_settings set value=$1::jsonb, updated_at=now() where key='feature_checklist'`,
+    `insert into route_generator_settings (key, value)
+     values ('feature_checklist', $1::jsonb)
+     on conflict (key) do update set value = excluded.value, updated_at = now()`,
     [JSON.stringify(checklist)]
   );
 
-  await client.query(
-    `insert into route_audit_events (action, entity_type, actor_email, actor_role, new_value, reason)
-     values
-       ('route_generator.settings_changed', 'locations', 'ops-update-agent', 'super_admin', $1::jsonb, 'HUB + CLUB bases configured'),
-       ('route_generator.vehicle_capacity_changed', 'route_vehicle_configs', 'ops-update-agent', 'super_admin', '{"home_bases":"hub_for_outing_club_for_club"}'::jsonb, 'Assigned van start/end bases')`,
-    [JSON.stringify({ hub: locations.hub, club: locations.club })]
-  );
-
   const { rows: vans } = await client.query(
-    `select van_key, vehicle_pool, starting_depot_key, ending_depot_key from route_vehicle_configs order by van_key`
+    `select van_key, vehicle_pool, starting_depot_key, ending_depot_key, eligible_services, notes
+     from route_vehicle_configs
+     order by van_key`
   );
-
+  console.log(JSON.stringify({ locations: Object.keys(locations), vans }, null, 2));
   await client.end();
-  console.log(
-    JSON.stringify(
-      {
-        ok: true,
-        locations: {
-          hub: { address: hubAddress, ...hubGeo },
-          club: { address: clubAddress, ...clubGeo }
-        },
-        vans
-      },
-      null,
-      2
-    )
-  );
+  console.log("Seeded Fitdog bases + van destinations.");
 }
 
 main().catch((error) => {

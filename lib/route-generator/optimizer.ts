@@ -17,6 +17,7 @@ import {
   DEFAULT_FITDOG_LOCATIONS,
   homeBaseForVehiclePool,
   resolveBaseLocation,
+  resolveRouteEndpoints,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
 
@@ -146,10 +147,10 @@ export function optimizeRoutes(params: {
   const warnings: string[] = [];
   const unassigned: HouseholdStopGroup[] = [];
   const locations: FitdogLocationsConfig = params.locations ?? {
-    hub: { ...DEFAULT_FITDOG_LOCATIONS.hub },
+    ...DEFAULT_FITDOG_LOCATIONS,
     club: {
       ...DEFAULT_FITDOG_LOCATIONS.club,
-      // Legacy single-depot configs map onto CLUB; keep the CLUB label.
+      // Legacy single-depot configs map onto CLUB when locations were never seeded.
       address: params.depot.address || DEFAULT_FITDOG_LOCATIONS.club.address,
       latitude: params.depot.latitude ?? DEFAULT_FITDOG_LOCATIONS.club.latitude,
       longitude: params.depot.longitude ?? DEFAULT_FITDOG_LOCATIONS.club.longitude,
@@ -306,36 +307,59 @@ export function optimizeRoutes(params: {
   for (const vanKey of FITDOG_VAN_KEYS) {
     const bucket = buckets.get(vanKey);
     if (!bucket || !bucket.stops.length) continue;
-    const home = resolveBaseLocation(locations, bucket.vehicle.homeBaseKey);
-    const depotCoord =
-      home.latitude != null && home.longitude != null
-        ? { lat: home.latitude, lng: home.longitude }
+
+    const serviceTypes = [
+      ...new Set(
+        bucket.stops.flatMap((s) =>
+          s.items.map((i) => i.serviceCanonical).filter(Boolean)
+        ) as CanonicalService[]
+      )
+    ];
+    const { startKey, endKey } = resolveRouteEndpoints({
+      vanKey,
+      direction: params.direction,
+      serviceTypes
+    });
+    const startBase = resolveBaseLocation(locations, startKey);
+    const endBase = resolveBaseLocation(locations, endKey);
+    const startCoord =
+      startBase.latitude != null && startBase.longitude != null
+        ? { lat: startBase.latitude, lng: startBase.longitude }
         : params.depot.latitude != null && params.depot.longitude != null
           ? { lat: params.depot.latitude, lng: params.depot.longitude }
           : null;
-    const ordered = nearestNeighborOrder(bucket.stops, depotCoord, rng);
+    const endCoord =
+      endBase.latitude != null && endBase.longitude != null
+        ? { lat: endBase.latitude, lng: endBase.longitude }
+        : startCoord;
+
+    // Prefer visiting Fitdog Club mid-route when facility dogs are on this van,
+    // otherwise keep nearest-neighbor from the start base.
+    const facilityStops = bucket.stops.filter((s) => String(s.householdKey || "").startsWith("facility:"));
+    const homeStops = bucket.stops.filter((s) => !String(s.householdKey || "").startsWith("facility:"));
+    const orderedHome = nearestNeighborOrder(homeStops, startCoord, rng);
+    const ordered =
+      params.direction === "pickup"
+        ? [...facilityStops, ...orderedHome]
+        : [...orderedHome, ...facilityStops];
+
     let distance = 0;
-    let prev = depotCoord;
+    let prev = startCoord;
     for (const stop of ordered) {
       if (prev && stop.coord) distance += haversineMiles(prev, stop.coord);
       prev = stop.coord ?? prev;
     }
-    if (prev && depotCoord) distance += haversineMiles(prev, depotCoord);
-
-    const baseName = home.name || (bucket.vehicle.homeBaseKey === "club" ? "CLUB" : "HUB");
-    const baseAddress = home.address || params.depot.address || baseName;
-    const baseLat = home.latitude ?? params.depot.latitude;
-    const baseLng = home.longitude ?? params.depot.longitude;
+    if (prev && endCoord) distance += haversineMiles(prev, endCoord);
 
     const stops: OptimizedStop[] = [
       {
         sequence: 0,
         stopKind: "depot_start",
         householdKey: null,
-        ownerName: baseName,
-        address: baseAddress,
-        latitude: baseLat,
-        longitude: baseLng,
+        ownerName: startBase.name,
+        address: startBase.address,
+        latitude: startBase.latitude,
+        longitude: startBase.longitude,
         dogCount: 0,
         loadUnits: 0,
         largeDogs: 0,
@@ -343,7 +367,7 @@ export function optimizeRoutes(params: {
         dogNames: [],
         reservationIds: [],
         locked: true,
-        notes: `Start at ${baseName}`
+        notes: `Start at ${startBase.name}`
       }
     ];
 
@@ -353,6 +377,7 @@ export function optimizeRoutes(params: {
           stop.items.map((i) => i.serviceCanonical).filter(Boolean) as CanonicalService[]
         )
       ];
+      const isFacility = String(stop.householdKey || "").startsWith("facility:");
       stops.push({
         sequence: index + 1,
         stopKind: "customer",
@@ -368,7 +393,11 @@ export function optimizeRoutes(params: {
         dogNames: stop.items.map((i) => i.dogName || "Dog"),
         reservationIds: stop.items.map((i) => i.reservationId || "").filter(Boolean),
         locked: Boolean(params.lockedVanByHousehold?.[stop.householdKey]),
-        notes: `${stop.dogCount} dog(s): ${stop.items.map((i) => i.dogName).join(", ")}`
+        notes: isFacility
+          ? `Fitdog facility stop — ${stop.dogCount} dog(s) already on-site: ${stop.items
+              .map((i) => i.dogName)
+              .join(", ")}`
+          : `${stop.dogCount} dog(s): ${stop.items.map((i) => i.dogName).join(", ")}`
       });
     });
 
@@ -376,10 +405,10 @@ export function optimizeRoutes(params: {
       sequence: ordered.length + 1,
       stopKind: "depot_end",
       householdKey: null,
-      ownerName: baseName,
-      address: baseAddress,
-      latitude: baseLat,
-      longitude: baseLng,
+      ownerName: endBase.name,
+      address: endBase.address,
+      latitude: endBase.latitude,
+      longitude: endBase.longitude,
       dogCount: 0,
       loadUnits: 0,
       largeDogs: 0,
@@ -387,7 +416,7 @@ export function optimizeRoutes(params: {
       dogNames: [],
       reservationIds: [],
       locked: true,
-      notes: `Return to ${baseName}`
+      notes: `End at ${endBase.name}`
     });
 
     routes.push({
@@ -399,9 +428,7 @@ export function optimizeRoutes(params: {
       totalDogs: bucket.dogs,
       loadUnitsUsed: bucket.load,
       largeDogs: bucket.large,
-      serviceTypes: [
-        ...new Set(ordered.flatMap((s) => s.items.map((i) => i.serviceCanonical).filter(Boolean) as CanonicalService[]))
-      ],
+      serviceTypes,
       warnings: [],
       estimatedDistanceMiles: Math.round(distance * 10) / 10,
       estimatedDriveMinutes: Math.round(distance * 3.2)
