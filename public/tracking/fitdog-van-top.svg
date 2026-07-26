@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 120" role="img" aria-label="Fitdog van">
+  <defs>
+    <linearGradient id="vanBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff9f1c"/>
+      <stop offset="100%" stop-color="#f15f2a"/>
+    </linearGradient>
+  </defs>
+  <rect x="18" y="8" width="44" height="96" rx="14" fill="url(#vanBody)" stroke="#102E66" stroke-width="3"/>
+  <rect x="24" y="18" width="32" height="22" rx="6" fill="#d9f3ff" stroke="#102E66" stroke-width="2"/>
+  <rect x="26" y="48" width="28" height="36" rx="5" fill="#fff7ed" stroke="#102E66" stroke-width="2"/>
+  <circle cx="28" cy="98" r="7" fill="#1f2937"/>
+  <circle cx="52" cy="98" r="7" fill="#1f2937"/>
+  <circle cx="40" cy="66" r="8" fill="#68f77f" stroke="#102E66" stroke-width="2"/>
+  <path d="M36 66c1.5-3 6.5-3 8 0-1.5 3-6.5 3-8 0z" fill="#102E66"/>
+  <text x="40" y="88" text-anchor="middle" font-size="9" font-family="Arial, sans-serif" fill="#102E66" font-weight="700">FD</text>
+</svg>

@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "id": "samsara-vehicle-van-1",
+      "gps": {
+        "latitude": 34.0195,
+        "longitude": -118.4912,
+        "heading": 95,
+        "speed": 8.2,
+        "time": "2026-07-26T16:05:00.000Z"
+      }
+    }
+  ],
+  "pagination": { "endCursor": "cursor-1", "hasNextPage": false }
+}

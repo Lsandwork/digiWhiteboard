@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80" role="img" aria-label="Home stop">
+  <path d="M32 4C18 4 8 16 8 30c0 18 24 46 24 46s24-28 24-46C56 16 46 4 32 4z" fill="#102E66"/>
+  <circle cx="32" cy="28" r="14" fill="#ff9f1c"/>
+  <ellipse cx="32" cy="34" rx="7" ry="5" fill="#102E66"/>
+  <circle cx="24" cy="24" r="3" fill="#102E66"/>
+  <circle cx="40" cy="24" r="3" fill="#102E66"/>
+  <circle cx="27" cy="19" r="2.5" fill="#102E66"/>
+  <circle cx="37" cy="19" r="2.5" fill="#102E66"/>
+</svg>

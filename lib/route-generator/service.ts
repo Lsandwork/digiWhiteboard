@@ -575,5 +575,20 @@ export async function exportSamsaraCsv(params: {
     reason: params.overrideReason
   });
 
-  return { fileName, csv: built.csv, validation: validation.report, job };
+  // Create owner live-tracking sessions from the exported plan (shadow-safe by default).
+  let trackingSessions: { created: number; tokensIssued: number } | null = null;
+  try {
+    const { createTrackingSessionsFromPlan } = await import("@/lib/live-tracking/sessions");
+    const created = await createTrackingSessionsFromPlan({
+      planId: params.planId,
+      actorAdminId: params.actorAdminId,
+      actorEmail: params.actorEmail,
+      actorRole: params.actorRole
+    });
+    trackingSessions = { created: created.created, tokensIssued: created.tokensIssued };
+  } catch {
+    trackingSessions = null;
+  }
+
+  return { fileName, csv: built.csv, validation: validation.report, job, trackingSessions };
 }

@@ -198,7 +198,15 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("route_generator.approve", "Route Generator: Approve", "Approve route plans for export."),
       p("route_generator.export", "Route Generator: Export", "Export validated Samsara CSV files."),
       p("route_generator.manage_settings", "Route Generator: Manage Settings", "Manage vans, depot, integrations, and templates."),
-      p("route_generator.view_audit", "Route Generator: View Audit", "View Route Generator audit events.")
+      p("route_generator.view_audit", "Route Generator: View Audit", "View Route Generator audit events."),
+      p("live_tracking.view", "Live Tracking: View", "View owner live-tracking sessions and health."),
+      p("live_tracking.manage", "Live Tracking: Manage", "Create sessions, mark arrived/completed, manage active tracking."),
+      p("live_tracking.send_test", "Live Tracking: Send Test", "Send staff test tracking notifications."),
+      p("live_tracking.resend_notification", "Live Tracking: Resend Notification", "Resend failed owner transportation notices."),
+      p("live_tracking.disable_session", "Live Tracking: Disable Session", "Revoke or regenerate owner tracking links."),
+      p("live_tracking.override_eta", "Live Tracking: Override ETA", "Manually override ETA for a stop."),
+      p("live_tracking.view_audit", "Live Tracking: View Audit", "View live-tracking audit history."),
+      p("live_tracking.manage_settings", "Live Tracking: Manage Settings", "Manage thresholds, templates, and provider settings.")
     ]
   },
   {
