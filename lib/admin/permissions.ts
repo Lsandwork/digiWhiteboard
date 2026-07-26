@@ -89,7 +89,37 @@ export type PermissionKey =
   | "manage_photo_upload_queue"
   | "download_photo_uploads"
   | "reopen_photo_upload_batches"
-  | "manage_photo_upload_settings";
+  | "manage_photo_upload_settings"
+  | "ruffly.view"
+  | "ruffly.dashboard.view"
+  | "ruffly.inbox.view"
+  | "ruffly.inbox.reply"
+  | "ruffly.inbox.assign"
+  | "ruffly.inbox.export"
+  | "ruffly.contacts.view"
+  | "ruffly.contacts.edit"
+  | "ruffly.leads.view"
+  | "ruffly.leads.edit"
+  | "ruffly.reviews.view"
+  | "ruffly.reviews.respond"
+  | "ruffly.reviews.publish"
+  | "ruffly.feedback.view"
+  | "ruffly.feedback.resolve"
+  | "ruffly.campaigns.view"
+  | "ruffly.campaigns.create"
+  | "ruffly.campaigns.approve"
+  | "ruffly.campaigns.send"
+  | "ruffly.automations.view"
+  | "ruffly.automations.manage"
+  | "ruffly.webchat.manage"
+  | "ruffly.ai.manage"
+  | "ruffly.knowledge.manage"
+  | "ruffly.social.view"
+  | "ruffly.social.manage"
+  | "ruffly.analytics.view"
+  | "ruffly.integrations.manage"
+  | "ruffly.settings.manage"
+  | "ruffly.audit.view";
 
 export type RoleKey =
   | "super_admin"
@@ -246,7 +276,37 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_photo_upload_queue",
   "download_photo_uploads",
   "reopen_photo_upload_batches",
-  "manage_photo_upload_settings"
+  "manage_photo_upload_settings",
+  "ruffly.view",
+  "ruffly.dashboard.view",
+  "ruffly.inbox.view",
+  "ruffly.inbox.reply",
+  "ruffly.inbox.assign",
+  "ruffly.inbox.export",
+  "ruffly.contacts.view",
+  "ruffly.contacts.edit",
+  "ruffly.leads.view",
+  "ruffly.leads.edit",
+  "ruffly.reviews.view",
+  "ruffly.reviews.respond",
+  "ruffly.reviews.publish",
+  "ruffly.feedback.view",
+  "ruffly.feedback.resolve",
+  "ruffly.campaigns.view",
+  "ruffly.campaigns.create",
+  "ruffly.campaigns.approve",
+  "ruffly.campaigns.send",
+  "ruffly.automations.view",
+  "ruffly.automations.manage",
+  "ruffly.webchat.manage",
+  "ruffly.ai.manage",
+  "ruffly.knowledge.manage",
+  "ruffly.social.view",
+  "ruffly.social.manage",
+  "ruffly.analytics.view",
+  "ruffly.integrations.manage",
+  "ruffly.settings.manage",
+  "ruffly.audit.view"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -257,6 +317,8 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "configure_integrations",
   "view_integration_status",
   "view_api_access",
+  "ruffly.integrations.manage",
+  "ruffly.audit.view",
   "manage_api_keys",
   "view_gingr_sync_settings",
   "manage_gingr_sync_settings",
@@ -324,7 +386,16 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
   ...STAFF_NOTIFICATION_PERMISSIONS,
-  ...STAFF_VIDEO_AI_PERMISSIONS
+  ...STAFF_VIDEO_AI_PERMISSIONS,
+  "ruffly.view",
+  "ruffly.dashboard.view",
+  "ruffly.inbox.view",
+  "ruffly.inbox.reply",
+  "ruffly.contacts.view",
+  "ruffly.contacts.edit",
+  "ruffly.leads.view",
+  "ruffly.leads.edit",
+  "ruffly.reviews.view"
 ];
 
 const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
@@ -371,7 +442,23 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "assign_notifications",
   "view_internal_notes",
   "create_internal_notes",
-  ...STAFF_VIDEO_AI_PERMISSIONS
+  ...STAFF_VIDEO_AI_PERMISSIONS,
+  "ruffly.view",
+  "ruffly.dashboard.view",
+  "ruffly.inbox.view",
+  "ruffly.inbox.reply",
+  "ruffly.inbox.assign",
+  "ruffly.contacts.view",
+  "ruffly.contacts.edit",
+  "ruffly.leads.view",
+  "ruffly.leads.edit",
+  "ruffly.reviews.view",
+  "ruffly.reviews.respond",
+  "ruffly.feedback.view",
+  "ruffly.feedback.resolve",
+  "ruffly.campaigns.view",
+  "ruffly.analytics.view",
+  "ruffly.ai.manage"
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -390,7 +477,12 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "view_package_commissions",
   "comment_package_commissions",
   ...STAFF_NOTIFICATION_PERMISSIONS,
-  ...STAFF_VIDEO_AI_PERMISSIONS
+  ...STAFF_VIDEO_AI_PERMISSIONS,
+  "ruffly.view",
+  "ruffly.inbox.view",
+  "ruffly.inbox.reply",
+  "ruffly.contacts.view",
+  "ruffly.leads.view"
 ];
 
 /** Groomer DigiBoard panel — grooming push, front desk log, video links, notifications, complaints/requests, profile. */
@@ -406,7 +498,11 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_request",
   "view_own_groomer_submissions",
   ...STAFF_NOTIFICATION_PERMISSIONS,
-  ...STAFF_VIDEO_AI_PERMISSIONS
+  ...STAFF_VIDEO_AI_PERMISSIONS,
+  "ruffly.view",
+  "ruffly.inbox.view",
+  "ruffly.inbox.reply",
+  "ruffly.leads.view"
 ];
 
 /** Read-only staff roles (viewer / overnight / maintenance / generic staff). */
@@ -426,7 +522,20 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "view_staff_whiteboard",
   "view_front_desk_log",
   "create_front_desk_log",
-  "manage_photo_upload_queue"
+  "manage_photo_upload_queue",
+  "ruffly.view",
+  "ruffly.dashboard.view",
+  "ruffly.campaigns.view",
+  "ruffly.campaigns.create",
+  "ruffly.campaigns.approve",
+  "ruffly.campaigns.send",
+  "ruffly.reviews.view",
+  "ruffly.reviews.respond",
+  "ruffly.social.view",
+  "ruffly.social.manage",
+  "ruffly.analytics.view",
+  "ruffly.webchat.manage",
+  "ruffly.contacts.view"
 ];
 
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
@@ -463,7 +572,16 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "manage_photo_upload_queue",
   "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
-  ...STAFF_VIDEO_AI_PERMISSIONS
+  ...STAFF_VIDEO_AI_PERMISSIONS,
+  "ruffly.view",
+  "ruffly.dashboard.view",
+  "ruffly.inbox.view",
+  "ruffly.inbox.reply",
+  "ruffly.inbox.assign",
+  "ruffly.contacts.view",
+  "ruffly.leads.view",
+  "ruffly.leads.edit",
+  "ruffly.feedback.view"
 ];
 
 export const FRONT_DESK_COORDINATOR_TABS = [

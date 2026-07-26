@@ -30,6 +30,14 @@
     {
       "path": "/api/cron/fitdog-sync",
       "schedule": "*/8 * * * *"
+    },
+    {
+      "path": "/api/cron/ruffly-reconcile",
+      "schedule": "15 */6 * * *"
+    },
+    {
+      "path": "/api/cron/ruffly-jobs",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

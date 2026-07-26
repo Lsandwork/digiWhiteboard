@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
+import { RUFFLY_REWRITE_TARGET, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
 
 export async function middleware(request: NextRequest) {
   try {
@@ -40,6 +41,22 @@ async function runMiddleware(request: NextRequest) {
   if (shouldRewriteCastTvRoot(request.headers.get("host"), pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = CAST_TV_REWRITE_TARGET;
+    return NextResponse.rewrite(url);
+  }
+
+  // Public Ruffly domain (ruffly.ruffops.com/) → public landing / widget host.
+  // Staff Ruffly remains on staff.ruffops.com/ruffly with admin session cookies.
+  if (shouldRewriteRufflyRoot(request.headers.get("host"), pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = RUFFLY_REWRITE_TARGET;
+    return NextResponse.rewrite(url);
+  }
+  if (
+    pathname === "/widget.js" &&
+    request.headers.get("host")?.toLowerCase().includes("ruffly.ruffops.com")
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/ruffly/widget.js";
     return NextResponse.rewrite(url);
   }
 
@@ -176,11 +193,32 @@ async function runMiddleware(request: NextRequest) {
     }
   }
 
+  // Staff Ruffly workspace (not public /ruffly/public* surfaces).
+  if (
+    (pathname === "/ruffly" || pathname.startsWith("/ruffly/")) &&
+    !pathname.startsWith("/ruffly/public") &&
+    !pathname.startsWith("/ruffly/review") &&
+    !pathname.startsWith("/ruffly/feedback") &&
+    !pathname.startsWith("/ruffly/consent") &&
+    !pathname.startsWith("/ruffly/campaign")
+  ) {
+    if (!session) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (session.mustChangePassword) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  // "/" is matched so lobby and CAST-TV custom-domain rewrites can run at the root.
+  // "/" is matched so lobby, CAST-TV, and Ruffly custom-domain rewrites can run at the root.
   // Non-custom hosts fall through to the normal Staff board at "/".
-  matcher: ["/", "/admin", "/admin/:path*", "/gingr"]
+  matcher: ["/", "/admin", "/admin/:path*", "/gingr", "/ruffly", "/ruffly/:path*"]
 };

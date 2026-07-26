@@ -9,8 +9,8 @@ export type NavLeaf = {
 
 export type NavRouteLeaf = {
   type: "route";
-  id: "gingr";
-  href: "/gingr";
+  id: "gingr" | "ruffly";
+  href: "/gingr" | "/ruffly";
   label: string;
 };
 
@@ -37,8 +37,15 @@ export const GINGR_NAV_ROUTE: NavRouteLeaf = {
   label: "Gingr"
 };
 
+export const RUFFLY_NAV_ROUTE: NavRouteLeaf = {
+  type: "route",
+  id: "ruffly",
+  href: "/ruffly",
+  label: "Ruffly"
+};
+
 export function appendAuthenticatedGlobalRoutes(entries: NavEntry[]): NavEntry[] {
-  const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE];
+  const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE, RUFFLY_NAV_ROUTE];
   const helpIndex = entries.findIndex((entry) => entry.type === "section" && entry.id === "help");
   if (helpIndex >= 0) {
     return [...entries.slice(0, helpIndex), ...globalSection, ...entries.slice(helpIndex)];
