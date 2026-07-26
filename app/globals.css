@@ -9122,6 +9122,18 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 }
 
 .fitdog-ai-window {
+  /* Self-contained high-contrast palette — ignore page theme muted tokens */
+  --fitdog-ai-fg: #ffffff;
+  --fitdog-ai-fg-strong: #ffffff;
+  --fitdog-ai-fg-muted: #e2e8f0;
+  --fitdog-ai-fg-soft: #cbd5e1;
+  --fitdog-ai-accent: #ffd089;
+  --fitdog-ai-accent-strong: #ffb347;
+  --fitdog-ai-surface: #0b1220;
+  --fitdog-ai-surface-elevated: #152033;
+  --fitdog-ai-bubble-user: #9a3412;
+  --fitdog-ai-bubble-assistant: #1e293b;
+
   position: fixed;
   right: max(0.75rem, env(safe-area-inset-right, 0px));
   bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
@@ -9132,9 +9144,10 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   flex-direction: column;
   overflow: hidden;
   border-radius: 1.25rem;
-  border: 1px solid rgba(255, 166, 0, 0.22);
-  background: #111827;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 176, 80, 0.45);
+  background: var(--fitdog-ai-surface);
+  color: var(--fitdog-ai-fg);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
 }
 
 .fitdog-ai-window__header {
@@ -9143,8 +9156,8 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.9rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(255, 166, 0, 0.08), transparent);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 166, 0, 0.14), transparent);
 }
 
 .fitdog-ai-window__title-wrap {
@@ -9155,12 +9168,13 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 
 .fitdog-ai-window__title {
   font-weight: 900;
-  color: #fff;
+  color: var(--fitdog-ai-fg-strong);
 }
 
 .fitdog-ai-window__subtitle {
   font-size: 0.72rem;
-  color: var(--admin-muted);
+  font-weight: 600;
+  color: var(--fitdog-ai-fg-muted);
 }
 
 .fitdog-ai-window__close {
@@ -9169,11 +9183,11 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 9999px;
-  color: #fff;
+  color: var(--fitdog-ai-fg-strong);
 }
 
 .fitdog-ai-window__close:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .fitdog-ai-window__tabs {
@@ -9192,12 +9206,13 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   padding: 0.55rem 0.65rem;
   font-size: 0.82rem;
   font-weight: 700;
-  color: var(--admin-muted);
+  color: var(--fitdog-ai-fg-muted);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .fitdog-ai-window__tabs button.is-active {
-  background: rgba(255, 166, 0, 0.12);
-  color: #ffd7a1;
+  background: rgba(255, 166, 0, 0.22);
+  color: var(--fitdog-ai-accent);
 }
 
 .fitdog-ai-window__alert,
@@ -9227,8 +9242,10 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 }
 
 .fitdog-ai-window__empty {
-  color: var(--admin-muted);
+  color: var(--fitdog-ai-fg-muted);
   font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .fitdog-ai-quick-actions {
@@ -9240,12 +9257,12 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 
 .fitdog-ai-quick-action {
   border-radius: 9999px;
-  border: 1px solid rgba(255, 166, 0, 0.22);
-  background: rgba(255, 166, 0, 0.08);
+  border: 1px solid rgba(255, 176, 80, 0.45);
+  background: rgba(255, 166, 0, 0.16);
   padding: 0.45rem 0.7rem;
   font-size: 0.76rem;
-  font-weight: 700;
-  color: #ffd7a1;
+  font-weight: 800;
+  color: var(--fitdog-ai-accent);
 }
 
 .fitdog-ai-message {
@@ -9276,7 +9293,7 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--crossover-gold);
+  color: var(--fitdog-ai-accent);
 }
 
 .fitdog-gemini-avatar {
@@ -9304,19 +9321,22 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 .fitdog-ai-message__bubble {
   max-width: 92%;
   border-radius: 1rem;
-  padding: 0.75rem 0.85rem;
-  font-size: 0.9rem;
-  line-height: 1.45;
+  padding: 0.8rem 0.9rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
 .fitdog-ai-message--user .fitdog-ai-message__bubble {
-  background: rgba(255, 166, 0, 0.16);
-  color: #fff;
+  background: var(--fitdog-ai-bubble-user);
+  color: #fff7ed;
+  border: 1px solid rgba(255, 237, 213, 0.35);
 }
 
 .fitdog-ai-message--assistant .fitdog-ai-message__bubble {
-  background: rgba(255, 255, 255, 0.06);
-  color: #f3f4f6;
+  background: var(--fitdog-ai-bubble-assistant);
+  color: #f8fafc;
+  border: 1px solid rgba(226, 232, 240, 0.22);
 }
 
 .fitdog-ai-message__actions {
@@ -9333,20 +9353,32 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   justify-content: center;
   min-height: 2.75rem;
   border-radius: 0.85rem;
-  border: 1px solid rgba(255, 166, 0, 0.28);
-  background: rgba(255, 166, 0, 0.1);
+  border: 1px solid rgba(255, 176, 80, 0.5);
+  background: rgba(255, 166, 0, 0.18);
   padding: 0.65rem 0.85rem;
   font-size: 0.84rem;
   font-weight: 800;
-  color: #ffd7a1;
+  color: var(--fitdog-ai-accent);
+}
+
+.fitdog-ai-listening {
+  margin: 0 0.75rem 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--fitdog-ai-accent);
 }
 
 .fitdog-ai-composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.55rem;
+  gap: 0.45rem;
   padding: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.fitdog-ai-composer:has(.fitdog-ai-mic) {
+  grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
 .fitdog-ai-composer textarea,
@@ -9354,28 +9386,62 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   width: 100%;
   resize: vertical;
   border-radius: 0.85rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  background: var(--fitdog-ai-surface-elevated);
   padding: 0.7rem 0.8rem;
-  color: #fff;
+  color: var(--fitdog-ai-fg-strong);
+  font-weight: 600;
   outline: none;
 }
 
+.fitdog-ai-composer textarea::placeholder,
+.fitdog-ai-field textarea::placeholder {
+  color: #94a3b8;
+  opacity: 1;
+}
+
+.fitdog-ai-mic,
 .fitdog-ai-send {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
+  min-width: 2.75rem;
   min-height: 2.75rem;
   border-radius: 0.85rem;
-  background: linear-gradient(135deg, #991b1b, #ea580c);
-  padding: 0.65rem 0.95rem;
   font-weight: 800;
   color: #fff;
 }
 
+.fitdog-ai-mic {
+  border: 1px solid rgba(226, 232, 240, 0.28);
+  background: #243247;
+}
+
+.fitdog-ai-mic.is-listening {
+  border-color: rgba(248, 113, 113, 0.65);
+  background: linear-gradient(135deg, #b91c1c, #ea580c);
+  animation: fitdog-ai-mic-pulse 1.2s ease-in-out infinite;
+}
+
+.fitdog-ai-mic:disabled,
 .fitdog-ai-send:disabled {
   opacity: 0.45;
+}
+
+.fitdog-ai-send {
+  background: linear-gradient(135deg, #991b1b, #ea580c);
+  padding: 0.65rem 0.95rem;
+}
+
+@keyframes fitdog-ai-mic-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(248, 113, 113, 0.08);
+  }
 }
 
 .fitdog-ai-typing {
@@ -9439,7 +9505,7 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   display: grid;
   gap: 0.4rem;
   font-size: 0.82rem;
-  color: var(--admin-muted);
+  color: var(--fitdog-ai-fg-muted, #e2e8f0);
 }
 
 .fitdog-ai-progress {
@@ -9468,7 +9534,7 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--crossover-gold);
+  color: var(--fitdog-ai-accent, #ffd089);
 }
 
 .fitdog-ai-video-card__title {
@@ -9522,7 +9588,7 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   gap: 0.35rem;
   padding-bottom: 0.35rem;
   font-size: 0.84rem;
-  color: var(--admin-muted);
+  color: var(--fitdog-ai-fg-muted, #e2e8f0);
 }
 
 .fitdog-ai-push-result,
@@ -9562,7 +9628,42 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   margin-top: 0.25rem;
   font-size: 0.84rem;
   line-height: 1.45;
-  color: rgba(226, 232, 240, 0.82);
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+/* Keep AI chat high-contrast even when page theme remaps muted tokens */
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window :is(
+    .fitdog-ai-window__title,
+    .fitdog-ai-window__subtitle,
+    .fitdog-ai-window__empty,
+    .fitdog-ai-message__bubble,
+    .fitdog-ai-composer textarea
+  ) {
+  color: inherit;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window__title,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-message--assistant .fitdog-ai-message__bubble,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-composer textarea {
+  color: #ffffff !important;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window__subtitle,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window__empty,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window__tabs button {
+  color: #e2e8f0 !important;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-window__tabs button.is-active,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-quick-action,
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-action-link {
+  color: #ffd089 !important;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .fitdog-ai-message--user .fitdog-ai-message__bubble {
+  color: #fff7ed !important;
 }
 
 .fitdog-ai-push-btn {

@@ -27,10 +27,38 @@ export type FitdogUserContext = {
   unreadNotificationCount: number;
 };
 
+type ContextCacheEntry = {
+  expiresAt: number;
+  value: FitdogUserContext;
+};
+
+const CONTEXT_CACHE_TTL_MS = 45_000;
+const contextCache = new Map<string, ContextCacheEntry>();
+
+function contextCacheKey(session: AdminSession, currentPage: string, lightweight: boolean) {
+  return [
+    session.adminUserId ?? "anon",
+    session.role ?? "",
+    session.email ?? "",
+    currentPage,
+    lightweight ? "lite" : "full"
+  ].join("|");
+}
+
 export async function buildFitdogUserContext(params: {
   session: AdminSession;
   currentPage?: string | null;
+  /** Skip slow submission/notification counts for snappy chat turns. */
+  lightweight?: boolean;
 }): Promise<FitdogUserContext> {
+  const currentPage = params.currentPage?.trim() || "/admin";
+  const lightweight = Boolean(params.lightweight);
+  const cacheKey = contextCacheKey(params.session, currentPage, lightweight);
+  const cached = contextCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { ...cached.value, currentPage };
+  }
+
   const supabase = getServiceSupabase();
   const access = params.session.adminUserId
     ? await getUserAccess(supabase, params.session.adminUserId, params.session.role, params.session.email)
@@ -40,46 +68,52 @@ export async function buildFitdogUserContext(params: {
   const department = access.departments.map((dept) => dept.replace(/_/g, " ")).join(", ");
 
   let unreadNotificationCount = 0;
-  try {
-    const staffOps = await listStaffOps(supabase);
-    unreadNotificationCount = countUnreadNotifications(staffOps, {
-      email: params.session.email,
-      adminUserId: params.session.adminUserId,
-      role: params.session.role
-    });
-  } catch (error) {
-    console.error("[fitdog-ai] Failed to load notification count:", error);
-  }
-
-  const actor = params.session.email ?? params.session.adminUserId ?? "admin";
   let complaints = 0;
   let requests = 0;
   let writeUps = 0;
-  try {
-    const [groomerComplaints, groomerRequests, trainerComplaints, trainerRequests, writeUpReports] = await Promise.all([
-      listGroomerSubmissionsForCreator(supabase, actor, "groomer_complaint", 100).catch(() => []),
-      listGroomerSubmissionsForCreator(supabase, actor, "groomer_request", 100).catch(() => []),
-      listTrainerSubmissionsForCreator(supabase, actor, "trainer_complaint", 100).catch(() => []),
-      listTrainerSubmissionsForCreator(supabase, actor, "trainer_request", 100).catch(() => []),
-      listWriteUpsForCreator(supabase, actor, 100).catch(() => [])
-    ]);
-    complaints = groomerComplaints.length + trainerComplaints.length;
-    requests = groomerRequests.length + trainerRequests.length;
-    writeUps = writeUpReports.length;
-  } catch (error) {
-    console.error("[fitdog-ai] Failed to load submission counts:", error);
+
+  if (!lightweight) {
+    try {
+      const staffOps = await listStaffOps(supabase);
+      unreadNotificationCount = countUnreadNotifications(staffOps, {
+        email: params.session.email,
+        adminUserId: params.session.adminUserId,
+        role: params.session.role
+      });
+    } catch (error) {
+      console.error("[fitdog-ai] Failed to load notification count:", error);
+    }
+
+    const actor = params.session.email ?? params.session.adminUserId ?? "admin";
+    try {
+      const [groomerComplaints, groomerRequests, trainerComplaints, trainerRequests, writeUpReports] = await Promise.all([
+        listGroomerSubmissionsForCreator(supabase, actor, "groomer_complaint", 100).catch(() => []),
+        listGroomerSubmissionsForCreator(supabase, actor, "groomer_request", 100).catch(() => []),
+        listTrainerSubmissionsForCreator(supabase, actor, "trainer_complaint", 100).catch(() => []),
+        listTrainerSubmissionsForCreator(supabase, actor, "trainer_request", 100).catch(() => []),
+        listWriteUpsForCreator(supabase, actor, 100).catch(() => [])
+      ]);
+      complaints = groomerComplaints.length + trainerComplaints.length;
+      requests = groomerRequests.length + trainerRequests.length;
+      writeUps = writeUpReports.length;
+    } catch (error) {
+      console.error("[fitdog-ai] Failed to load submission counts:", error);
+    }
   }
 
-  return {
+  const value: FitdogUserContext = {
     userId: params.session.adminUserId ?? null,
     userName,
     userRole: access.primaryRole,
     userRoleLabel: ROLE_LABELS[access.primaryRole] ?? access.displayLabel,
     department,
-    currentPage: params.currentPage?.trim() || "/admin",
+    currentPage,
     access,
     allowedActions: access.permissions,
     recentSubmissionCounts: { complaints, requests, writeUps },
     unreadNotificationCount
   };
+
+  contextCache.set(cacheKey, { value, expiresAt: Date.now() + CONTEXT_CACHE_TTL_MS });
+  return value;
 }
