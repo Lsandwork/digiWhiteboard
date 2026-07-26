@@ -370,6 +370,19 @@ export function AdminDashboard() {
   const canReviewWriteUps = canReviewWriteUpsForUser(userAccess, currentRole);
   const canReviewComplaints = canReviewManagementSupportForUser(userAccess, currentRole);
 
+  const isStaffOverview = tab === "overview" && board !== "lobby";
+  const publishPanel = (
+    <PublishPanel
+      board={board}
+      version={publishMeta.published_version ?? "v1.0.0"}
+      publishedAt={publishMeta.published_at ?? null}
+      publishedBy={publishMeta.published_by ?? null}
+      onPublish={() => void publishChanges()}
+      onViewHistory={() => setHistoryOpen(true)}
+      busy={busy}
+    />
+  );
+  const systemInfoPanel = <SystemInfoPanel board={board} dataSource={data.data_source} />;
   const preview = (
     <div className="space-y-4">
       <LivePreviewPanel
@@ -381,16 +394,13 @@ export function AdminDashboard() {
         activeCheckouts={data.active_checkouts}
         onFullscreen={() => setPreviewOpen(true)}
       />
-      <PublishPanel
-        board={board}
-        version={publishMeta.published_version ?? "v1.0.0"}
-        publishedAt={publishMeta.published_at ?? null}
-        publishedBy={publishMeta.published_by ?? null}
-        onPublish={() => void publishChanges()}
-        onViewHistory={() => setHistoryOpen(true)}
-        busy={busy}
-      />
-      <SystemInfoPanel board={board} dataSource={data.data_source} />
+      {/* On staff Overview these sit under Whiteboard & Gingr Health (left → right). */}
+      {!isStaffOverview ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          {publishPanel}
+          {systemInfoPanel}
+        </div>
+      ) : null}
     </div>
   );
 
@@ -451,7 +461,15 @@ export function AdminDashboard() {
               />
             </>
           ) : (
-            <OverviewPanel onNavigate={(nextTab) => setActiveTab(nextTab)} />
+            <OverviewPanel
+              onNavigate={(nextTab) => setActiveTab(nextTab)}
+              boardMetaPanels={
+                <>
+                  {publishPanel}
+                  {systemInfoPanel}
+                </>
+              }
+            />
           )
         ) : null}
 
