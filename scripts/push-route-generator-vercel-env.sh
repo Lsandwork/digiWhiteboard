@@ -54,15 +54,31 @@ SAMSARA_CSV_EXPORT_ENABLED=${ENABLE_FLAGS}
 SAMSARA_DIRECT_SYNC_ENABLED=false
 EOF
 
-echo "Pushing env vars to Vercel production..."
+# Non-interactive project link (fitdog-gingr-status-board / staff.ruffops.com)
+mkdir -p "$ROOT/.vercel"
+if [[ ! -f "$ROOT/.vercel/project.json" ]]; then
+  cat > "$ROOT/.vercel/project.json" <<'JSON'
+{"projectId":"prj_I6u5R1K459xYYLgQBZcqkzGOTI2Y","orgId":"team_pZmkcBCLvED2dwV2sZ6CwLuw","projectName":"fitdog-gingr-status-board"}
+JSON
+fi
+
+VERCEL_SCOPE_ARGS=(--token "$VERCEL_TOKEN" --scope bridge-tess)
+echo "Pushing env vars to Vercel production (fitdog-gingr-status-board)..."
 while IFS= read -r line || [[ -n "$line" ]]; do
   [[ -z "$line" || "$line" =~ ^# ]] && continue
+  [[ "$line" != *=* ]] && continue
   key="${line%%=*}"
   value="${line#*=}"
+  [[ -z "$key" ]] && continue
+  if [[ -z "$value" ]]; then
+    echo "  - $key (skipped — empty; set after worker deploy)"
+    npx --yes vercel@41.7.8 env rm "$key" production "${VERCEL_SCOPE_ARGS[@]}" --yes >/dev/null 2>&1 || true
+    continue
+  fi
   echo "  - $key"
   # Remove existing then add (vercel env add fails on duplicates without --force on some versions)
-  npx --yes vercel@41.7.8 env rm "$key" production --token "$VERCEL_TOKEN" --yes >/dev/null 2>&1 || true
-  printf '%s' "$value" | npx --yes vercel@41.7.8 env add "$key" production --token "$VERCEL_TOKEN" >/dev/null
+  npx --yes vercel@41.7.8 env rm "$key" production "${VERCEL_SCOPE_ARGS[@]}" --yes >/dev/null 2>&1 || true
+  printf '%s' "$value" | npx --yes vercel@41.7.8 env add "$key" production "${VERCEL_SCOPE_ARGS[@]}" >/dev/null
 done < "$OUT_ENV"
 
 rm -f "$OUT_ENV"

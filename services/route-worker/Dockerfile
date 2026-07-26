@@ -7,4 +7,5 @@ COPY app ./app
 
 ENV PORT=8091
 EXPOSE 8091
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8091"]
+# Render (and most hosts) inject PORT; keep 8091 as local default.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8091}"]

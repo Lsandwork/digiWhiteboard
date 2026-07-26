@@ -1,6 +1,6 @@
 # Route Generator — shadow-mode checklist
 
-Updated 2026-07-26 after enablement attempt.
+Updated 2026-07-26 after Vercel secret push + Render blueprint prep.
 
 ## Completed
 
@@ -10,40 +10,32 @@ Updated 2026-07-26 after enablement attempt.
 - [x] Service aliases seeded/reviewed
 - [x] Fixture Samsara template uploaded/active
 - [x] Fixture shadow smoke (parse → optimize → CSV) passed
-- [x] Route worker running + ephemeral public tunnel health OK  
-      `https://atlas-salt-continuity-psychological.trycloudflare.com/health`
-- [x] Fitdog connectivity probe executed — **MFA challenge** (not bypassed)
+- [x] Worker secrets generated (`.env.route-worker.local`, gitignored)
+- [x] Vercel Production env pushed for `fitdog-gingr-status-board` / `staff.ruffops.com`:
+  - `GOOGLE_MAPS_API_KEY`, `MAPS_PROVIDER=google`
+  - `ROUTE_WORKER_SIGNING_SECRET`, `ROUTE_WORKER_CALLBACK_SECRET`
+  - Feature flags explicitly **`false`**
+- [x] `render.yaml` + `scripts/deploy-route-worker-render.sh` added (Dockerfile listens on `$PORT`)
 
-## Blocked — needs human secrets / interactive auth
+## Blocked — needs human step
 
-- [ ] Paste worker secrets + Maps key into Vercel (`VERCEL_TOKEN` missing in agent)
-- [ ] Durable worker deploy (Railway/Render/Fly) replacing ephemeral trycloudflare URL
-- [ ] `GOOGLE_MAPS_API_KEY`
+- [ ] **Render API key** → deploy durable worker  
+      Create at https://dashboard.render.com/u/settings#api-keys then:
+      ```bash
+      export RENDER_API_KEY=...
+      ./scripts/deploy-route-worker-render.sh
+      export VERCEL_TOKEN=...
+      export GOOGLE_MAPS_API_KEY=...
+      export ROUTE_WORKER_URL=https://fitdog-route-worker-….onrender.com
+      ./scripts/push-route-generator-vercel-env.sh
+      npx vercel --prod --token "$VERCEL_TOKEN"
+      ```
+      Or: Render Dashboard → New → Blueprint → select this repo (`render.yaml`).
 - [ ] Interactive Fitdog reconnect (MFA) + real report selectors
 - [ ] Upload current company Samsara bulk-upload sample CSV
 - [ ] Real operating-day shadow comparison vs Hub Coordinator routes
-- [ ] Enable production flags on Vercel
-
-## One-command when secrets are available
-
-```bash
-export VERCEL_TOKEN=...                 # vercel.com/account/tokens
-export GOOGLE_MAPS_API_KEY=...
-export ROUTE_WORKER_URL=https://...     # durable worker URL
-
-# 1) Push secrets with flags still false
-./scripts/push-route-generator-vercel-env.sh
-
-# 2) Super Admin: reconnect Fitdog (MFA), upload real Samsara template,
-#    run a live shadow comparison day in Route Generator UI
-
-# 3) Only after checklist complete:
-ENABLE_ROUTE_GENERATOR_FLAGS=true ./scripts/push-route-generator-vercel-env.sh
-npx vercel --prod --token "$VERCEL_TOKEN"
-```
-
-Worker secrets live in gitignored `.env.route-worker.local`.
+- [ ] Enable production flags on Vercel (`ENABLE_ROUTE_GENERATOR_FLAGS=true`)
 
 ## Production flags
 
-**Still false.** Do not enable until the blocked items above are finished.
+**Still false.** Do not enable until Render worker health is green, Fitdog MFA reconnect works, real Samsara template is uploaded, and a real shadow day is reviewed.

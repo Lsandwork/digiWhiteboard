@@ -1,66 +1,54 @@
 # Route Generator — deployment
 
-## Applied in production Supabase (2026-07-26)
+## Applied in production (2026-07-26)
 
-- [x] `supabase/migrations/045_route_generator.sql` applied via `npm run db:push -- 045_route_generator.sql`
-- [x] Shadow setup script seeded depot (official public Fitdog address), provisional van capacities, service aliases, fixture Samsara template
-- [x] Local `services/route-worker` health-checked on `127.0.0.1:8091`
-- [x] Fixture shadow smoke: report parse → optimize → CSV validation passed
-- [ ] Production Vercel env flags remain **off** until Super Admin completes checklist below
+- [x] `supabase/migrations/045_route_generator.sql` applied
+- [x] Depot verified, van capacities confirmed, aliases + fixture Samsara template
+- [x] Fixture shadow smoke passed
+- [x] Vercel Production secrets pushed (`GOOGLE_MAPS_API_KEY`, worker signing secrets, flags=`false`)
+- [ ] Durable Render worker URL → `ROUTE_WORKER_URL` (needs `RENDER_API_KEY`)
+- [ ] Production flags remain **off** until shadow checklist complete
 
-## Operator commands
+## Vercel (done)
+
+Project: `fitdog-gingr-status-board` (`staff.ruffops.com`)
 
 ```bash
-# Apply only migration 045 (do not use db:push:all if older migrations fail)
-npm run db:push -- 045_route_generator.sql
-
-# Seed depot / provisional vans / aliases / Samsara fixture template
-npx tsx scripts/setup-route-generator-shadow.ts
-
-# Fixture shadow smoke (no service-role key required)
-npx tsx scripts/run-route-generator-shadow-smoke.ts
-
-# Local worker
-set -a; source .env.route-worker.local; set +a
-cd services/route-worker && uvicorn app.main:app --host 0.0.0.0 --port 8091
+export VERCEL_TOKEN=...
+export GOOGLE_MAPS_API_KEY=...
+# optional after Render deploy:
+export ROUTE_WORKER_URL=https://fitdog-route-worker-xxxx.onrender.com
+./scripts/push-route-generator-vercel-env.sh
+# flags stay false unless:
+ENABLE_ROUTE_GENERATOR_FLAGS=true ./scripts/push-route-generator-vercel-env.sh
+npx vercel --prod --token "$VERCEL_TOKEN"
 ```
 
-## Vercel env still required (not settable from this agent)
+## Render route-worker (next)
 
-Paste into Vercel Project → Settings → Environment Variables (Production):
+Repo includes `render.yaml` (Blueprint) and:
 
-| Variable | Value |
+```bash
+export RENDER_API_KEY=...   # dashboard.render.com → Account Settings → API Keys
+./scripts/deploy-route-worker-render.sh
+```
+
+Service settings:
+
+| Setting | Value |
 |---|---|
-| `ROUTE_GENERATOR_ENABLED` | `false` until checklist complete |
-| `FITDOG_REPORT_SYNC_ENABLED` | `false` until real Fitdog report connection works |
-| `ROUTE_OPTIMIZATION_ENABLED` | `false` until worker URL is live |
-| `SAMSARA_CSV_EXPORT_ENABLED` | `false` until company Samsara template uploaded |
-| `SAMSARA_DIRECT_SYNC_ENABLED` | `false` |
-| `GOOGLE_MAPS_API_KEY` | company Maps key |
-| `MAPS_PROVIDER` | `google` |
-| `ROUTE_WORKER_URL` | public worker URL after deploy |
-| `ROUTE_WORKER_SIGNING_SECRET` | from `.env.route-worker.local` |
-| `ROUTE_WORKER_CALLBACK_SECRET` | from `.env.route-worker.local` |
+| Root directory | `services/route-worker` |
+| Dockerfile | `./Dockerfile` (uses `$PORT`) |
+| Health check | `GET /health` |
+| Env | `ROUTE_WORKER_SIGNING_SECRET`, `ROUTE_WORKER_CALLBACK_SECRET` (same as Vercel) |
 
-Worker secrets were generated to **`.env.route-worker.local`** (gitignored).
-
-## Deploy route-worker (hosting credentials not available here)
-
-Deploy `services/route-worker` to Railway / Render / Fly.io / Cloud Run:
-
-1. Build with `services/route-worker/Dockerfile`
-2. Set `ROUTE_WORKER_SIGNING_SECRET` (same as Vercel)
-3. Optionally set `ROUTE_WORKER_CALLBACK_SECRET`
-4. Expose HTTPS URL → set `ROUTE_WORKER_URL` on Vercel
-5. Confirm `GET /health` returns `{ "status": "ok" }`
+After `/health` returns ok, set `ROUTE_WORKER_URL` on Vercel and redeploy.
 
 ## Fitdog / Samsara
 
-- Fitdog report connection remains **fixture** until Super Admin completes Connect Fitdog with authorized report selectors / API token.
-- Active Samsara template is the **fixture** sample. Replace by uploading the current company Samsara bulk-upload CSV in Route Generator settings before production export.
-- Depot address seeded from public Fitdog contact page (`1712 21st Street, Santa Monica, CA 90404`) with geocode — **`verified: false`** until Super Admin confirms.
-- Van capacities are provisional placeholders with **`capacity_configured: false`** until Super Admin confirms real numbers.
+- Fitdog report connection remains **fixture** until Super Admin completes Connect Fitdog (MFA).
+- Active Samsara template is the **fixture** sample. Replace with company bulk-upload CSV before production export.
 
 ## Do not enable production yet
 
-Keep all production flags false until shadow-mode checklist in [shadow-mode-checklist.md](./shadow-mode-checklist.md) is complete.
+Keep all production flags false until [shadow-mode-checklist.md](./shadow-mode-checklist.md) is complete.
