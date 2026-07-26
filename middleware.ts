@@ -200,7 +200,8 @@ async function runMiddleware(request: NextRequest) {
     !pathname.startsWith("/ruffly/review") &&
     !pathname.startsWith("/ruffly/feedback") &&
     !pathname.startsWith("/ruffly/consent") &&
-    !pathname.startsWith("/ruffly/campaign")
+    !pathname.startsWith("/ruffly/campaign") &&
+    pathname !== "/ruffly/widget.js"
   ) {
     if (!session) {
       const loginUrl = new URL("/admin/login", request.url);

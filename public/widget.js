@@ -4,10 +4,14 @@
 
   var script = document.currentScript;
   var key = (script && script.getAttribute("data-ruffly-key")) || "";
+  var apiBase =
+    (script && script.getAttribute("data-ruffly-api")) ||
+    "https://staff.ruffops.com";
+
   var root = document.createElement("div");
   root.id = "ruffly-chat-root";
   root.style.cssText =
-    "position:fixed;right:16px;bottom:16px;z-index:99999;font-family:system-ui,-apple-system,Segoe UI,sans-serif;";
+    "position:fixed;right:16px;bottom:16px;z-index:99999;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;";
 
   var button = document.createElement("button");
   button.type = "button";
@@ -23,7 +27,7 @@
   panel.innerHTML =
     '<div style="padding:14px 16px;background:#fff8f3;border-bottom:1px solid #ffe0cc;font-weight:700;color:#1f2933;">Ruffly · Fitdog Customer Care</div>' +
     '<div id="ruffly-chat-messages" style="flex:1;overflow:auto;padding:12px;font-size:14px;color:#334155;">' +
-    '<p>Hi — I’m Fitdog’s virtual assistant (not a human). Ask about services, or leave your name and dog’s name for our team.</p>' +
+    "<p>Hi — I’m Fitdog’s virtual assistant (not a human). Ask about services, or leave your name and dog’s name for our team.</p>" +
     "</div>" +
     '<form id="ruffly-chat-form" style="display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;">' +
     '<input id="ruffly-chat-input" aria-label="Message" placeholder="Type a message" style="flex:1;border:1px solid #d1d5db;border-radius:12px;padding:10px;" />' +
@@ -50,7 +54,7 @@
     bubble.textContent = "You: " + text;
     messages.appendChild(bubble);
     input.value = "";
-    fetch("/api/ruffly/public/webchat", {
+    fetch(apiBase.replace(/\/$/, "") + "/api/ruffly/public/webchat", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ message: text, siteKey: key, origin: location.origin })

@@ -11,12 +11,13 @@ export async function GET(request: Request) {
   try {
     const supabase = getServiceSupabase();
     const { data: settings } = await supabase.from("ruffly_settings").select("webchat_config, webchat_enabled").eq("id", "default").maybeSingle();
-    const snippet = `<script src="https://ruffly.ruffops.com/widget.js" async data-ruffly-key="PUBLIC_SITE_KEY"></script>`;
+    const snippet = `<script src="https://staff.ruffops.com/widget.js" async data-ruffly-key="PUBLIC_SITE_KEY" data-ruffly-api="https://staff.ruffops.com"></script>`;
     return NextResponse.json({
       enabled: Boolean(settings?.webchat_enabled),
       config: settings?.webchat_config ?? {},
       installSnippet: snippet,
-      publicScriptUrl: "https://ruffly.ruffops.com/widget.js"
+      publicScriptUrl: "https://staff.ruffops.com/widget.js",
+      note: "Use staff.ruffops.com/widget.js until ruffly.ruffops.com DNS is pointed at Vercel."
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load web chat settings.";
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         enabled: false,
         config: {},
-        installSnippet: `<script src="https://ruffly.ruffops.com/widget.js" async></script>`,
+        installSnippet: `<script src="https://staff.ruffops.com/widget.js" async data-ruffly-api="https://staff.ruffops.com"></script>`,
         warning: "Ruffly tables not migrated yet."
       });
     }
