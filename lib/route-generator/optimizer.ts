@@ -13,6 +13,7 @@ import {
   type VehicleCapacityConfig
 } from "@/lib/route-generator/capacity";
 import type { HouseholdStopGroup } from "@/lib/route-generator/households";
+import { formatStopDisplayName } from "@/lib/route-generator/households";
 import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
 import {
   DEFAULT_FITDOG_LOCATIONS,
@@ -464,4 +465,99 @@ export function optimizeRoutes(params: {
   if (routes.length && unassigned.length === 0 && warnings.length) label = "feasible_not_fully_optimized";
 
   return { label, seed, routes, unassigned, warnings };
+}
+
+/** Map reservation IDs from pickup routes → van that collected them. */
+export function vanByReservationFromPickupRoutes(
+  pickupRoutes: OptimizedRoute[]
+): Map<string, FitdogVanKey> {
+  const map = new Map<string, FitdogVanKey>();
+  for (const route of pickupRoutes) {
+    for (const stop of route.stops) {
+      if (stop.stopKind !== "customer") continue;
+      for (const reservationId of stop.reservationIds) {
+        const id = String(reservationId || "").trim();
+        if (!id) continue;
+        map.set(id, route.vanKey);
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * Drop-off vans must match pickup vans: a dog only rides Van 3 drop-off if Van 3 picked them up.
+ * Splits mixed households when dogs were collected by different vans.
+ */
+export function lockDropoffGroupsToPickupVans(params: {
+  pickupRoutes: OptimizedRoute[];
+  dropoffGroups: HouseholdStopGroup[];
+  existingLocks?: Record<string, FitdogVanKey>;
+}): {
+  dropoffGroups: HouseholdStopGroup[];
+  lockedVanByHousehold: Record<string, FitdogVanKey>;
+  warnings: string[];
+} {
+  const vanByReservation = vanByReservationFromPickupRoutes(params.pickupRoutes);
+  const lockedVanByHousehold: Record<string, FitdogVanKey> = { ...(params.existingLocks || {}) };
+  const warnings: string[] = [];
+  const nextGroups: HouseholdStopGroup[] = [];
+
+  for (const group of params.dropoffGroups) {
+    if (lockedVanByHousehold[group.householdKey]) {
+      nextGroups.push(group);
+      continue;
+    }
+
+    const byVan = new Map<FitdogVanKey | "unassigned", typeof group.items>();
+    for (const item of group.items) {
+      const reservationId = String(item.reservationId || "").trim();
+      const van = reservationId ? vanByReservation.get(reservationId) : undefined;
+      const key = (van || "unassigned") as FitdogVanKey | "unassigned";
+      const list = byVan.get(key) ?? [];
+      list.push(item);
+      byVan.set(key, list);
+    }
+
+    if (byVan.size <= 1) {
+      const only = [...byVan.keys()][0];
+      if (only && only !== "unassigned") {
+        lockedVanByHousehold[group.householdKey] = only;
+      } else if (only === "unassigned") {
+        warnings.push(
+          `${group.address || group.ownerName || "Stop"}: drop-off dog(s) had no matching pickup reservation — left unlocked.`
+        );
+      }
+      nextGroups.push(group);
+      continue;
+    }
+
+    // Same address, dogs collected by different vans → split so each van only drops its own dogs.
+    for (const [van, items] of byVan) {
+      if (van === "unassigned") {
+        warnings.push(
+          `${group.address || group.ownerName || "Stop"}: ${items.length} drop-off dog(s) had no matching pickup reservation.`
+        );
+        nextGroups.push({
+          ...group,
+          householdKey: `${group.householdKey}::unassigned`,
+          items,
+          dogCount: items.length,
+          ownerName: formatStopDisplayName(items)
+        });
+        continue;
+      }
+      const splitKey = `${group.householdKey}::${van}`;
+      lockedVanByHousehold[splitKey] = van;
+      nextGroups.push({
+        ...group,
+        householdKey: splitKey,
+        items,
+        dogCount: items.length,
+        ownerName: formatStopDisplayName(items)
+      });
+    }
+  }
+
+  return { dropoffGroups: nextGroups, lockedVanByHousehold, warnings };
 }
