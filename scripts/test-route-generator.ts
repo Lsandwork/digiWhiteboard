@@ -5,6 +5,8 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab
 } from "../lib/admin/permissions";
+import { buildAdminNav } from "../lib/admin/nav-groups";
+import { ADMIN_TABS } from "../lib/admin/types";
 import { parseAddress, householdKey } from "../lib/route-generator/address";
 import { capacityAllows, resolveLoadUnits, isServiceEligibleForVan } from "../lib/route-generator/capacity";
 import { assertNeverVan4, FITDOG_VAN_KEYS } from "../lib/route-generator/flags";
@@ -49,6 +51,29 @@ assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "route_generator", "trainer", "staff"),
   false
 );
+
+{
+  const access = accessFromLegacyRole(null, null, "owner_admin");
+  const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, "owner_admin", "staff"));
+  const nav = buildAdminNav(visible, "staff");
+  let section: string | null = null;
+  let routeGeneratorSection: string | null = null;
+  for (const entry of nav) {
+    if (entry.type === "section") {
+      section = entry.id;
+      continue;
+    }
+    if (entry.type === "item" && entry.tab === "route_generator") {
+      routeGeneratorSection = section;
+      break;
+    }
+  }
+  assert.equal(
+    routeGeneratorSection,
+    "staff_dashboard",
+    "Route Generator must stay under Dashboard so the nav click is always reachable"
+  );
+}
 
 // Never Van 4
 assert.deepEqual(FITDOG_VAN_KEYS.includes("van_4" as never), false);

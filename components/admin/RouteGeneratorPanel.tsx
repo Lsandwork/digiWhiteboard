@@ -354,11 +354,11 @@ export function RouteGeneratorPanel() {
         <div className="flex flex-wrap gap-2">
           <button type="button" className="admin-btn-primary" disabled={busy} onClick={() => void pullReport()}>
             <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
-            Pull Report
+            {busy ? "Working…" : "Pull Report"}
           </button>
           <button
             type="button"
-            className="admin-btn-secondary"
+            className={reportRunId ? "admin-btn-primary" : "admin-btn-secondary"}
             disabled={busy}
             title={!reportRunId ? "Pull a report first" : "Generate optimized van routes"}
             onClick={onGenerateClick}
@@ -367,7 +367,7 @@ export function RouteGeneratorPanel() {
           </button>
           <button
             type="button"
-            className="admin-btn-secondary"
+            className={bundle?.plan.id ? "admin-btn-primary" : "admin-btn-secondary"}
             disabled={busy}
             title={!bundle ? "Generate routes first" : "Approve the current plan"}
             onClick={onApproveClick}
@@ -376,9 +376,15 @@ export function RouteGeneratorPanel() {
           </button>
           <button
             type="button"
-            className="admin-btn-primary"
+            className={bundle?.plan.status === "approved" ? "admin-btn-primary" : "admin-btn-secondary"}
             disabled={busy}
-            title={!bundle ? "Generate routes first" : "Export approved plan as Samsara CSV"}
+            title={
+              !bundle
+                ? "Generate routes first"
+                : bundle.plan.status !== "approved"
+                  ? "Approve the route plan before exporting"
+                  : "Export approved plan as Samsara CSV"
+            }
             onClick={onExportClick}
           >
             <Download className="h-4 w-4" />

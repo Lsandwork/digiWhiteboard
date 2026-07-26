@@ -199,8 +199,7 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-// Route Generator first so it stays near the top of Management (and collapsed icon rail).
-const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["route_generator", "track_incidents", "vet_visits"];
+const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));
@@ -296,7 +295,22 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_dashboard",
         "Dashboard",
-        singles(["demo_push", "overview", "whiteboard_preview", "display", "remote_cast", "content", "analytics", "checklist"], visible)
+        // Route Generator sits under Dashboard (not buried in Management) so it stays
+        // visible without expanding a collapsed section / scrolling an icon rail.
+        singles(
+          [
+            "demo_push",
+            "overview",
+            "route_generator",
+            "whiteboard_preview",
+            "display",
+            "remote_cast",
+            "content",
+            "analytics",
+            "checklist"
+          ],
+          visible
+        )
       )
     );
 

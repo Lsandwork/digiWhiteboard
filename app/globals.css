@@ -5355,7 +5355,7 @@ html.lobby-tv-display .social-video-shell {
   position: fixed;
   right: 1rem;
   top: 1rem;
-  z-index: 80;
+  z-index: 120;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
@@ -5372,7 +5372,27 @@ html.lobby-tv-display .social-video-shell {
   padding: 0.75rem 0.85rem;
   font-size: 0.9rem;
   font-weight: 700;
+  /* Explicit light ink — Clear/Light themes otherwise inherit navy body text on this dark chip. */
+  color: #f8fafc;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="clear"] .admin-toast,
+html[data-theme="light"] .admin-toast {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: rgba(241, 95, 42, 0.45);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+}
+
+html[data-theme="clear"] .admin-toast--success,
+html[data-theme="light"] .admin-toast--success {
+  border-color: rgba(34, 197, 94, 0.55);
+}
+
+html[data-theme="clear"] .admin-toast--error,
+html[data-theme="light"] .admin-toast--error {
+  border-color: rgba(248, 113, 113, 0.65);
 }
 
 .admin-toast--success {

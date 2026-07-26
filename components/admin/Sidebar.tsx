@@ -103,15 +103,19 @@ function SidebarNavGroup({
   entry,
   activeTab,
   expanded,
+  collapsed,
   badgeCounts,
   onToggle,
+  onExpandSidebar,
   onSelect
 }: {
   entry: Extract<NavEntry, { type: "group" }>;
   activeTab: AdminTab;
   expanded: boolean;
+  collapsed?: boolean;
   badgeCounts?: Partial<Record<AdminTab, number>>;
   onToggle: () => void;
+  onExpandSidebar?: () => void;
   onSelect: (tab: AdminTab) => void;
 }) {
   const childActive = entry.children.some((child) => child.tab === activeTab);
@@ -124,7 +128,16 @@ function SidebarNavGroup({
         type="button"
         className={`admin-nav-item admin-nav-group__toggle ${childActive ? "admin-nav-item--active-parent" : ""}`}
         aria-expanded={expanded}
-        onClick={onToggle}
+        title={entry.label}
+        onClick={() => {
+          // Collapsed rail hides group children via CSS — toggling alone looks like a dead click.
+          if (collapsed) {
+            onExpandSidebar?.();
+            if (!expanded) onToggle();
+            return;
+          }
+          onToggle();
+        }}
       >
         {groupIcon ? (
           <FitdogDashboardIcon src={groupIcon} size={20} className="admin-nav-item__icon shrink-0" />
@@ -232,8 +245,10 @@ function NavEntryChildren({
   activeTab,
   activePath,
   expandedGroups,
+  collapsed,
   badgeCounts,
   onToggleGroup,
+  onExpandSidebar,
   onSelect,
   onNavigate
 }: {
@@ -241,8 +256,10 @@ function NavEntryChildren({
   activeTab: AdminTab;
   activePath?: string | null;
   expandedGroups: Set<string>;
+  collapsed?: boolean;
   badgeCounts?: Partial<Record<AdminTab, number>>;
   onToggleGroup: (id: string) => void;
+  onExpandSidebar?: () => void;
   onSelect: (tab: AdminTab) => void;
   onNavigate: () => void;
 }) {
@@ -267,8 +284,10 @@ function NavEntryChildren({
               entry={entry}
               activeTab={activeTab}
               expanded={expandedGroups.has(entry.id)}
+              collapsed={collapsed}
               badgeCounts={badgeCounts}
               onToggle={() => onToggleGroup(entry.id)}
+              onExpandSidebar={onExpandSidebar}
               onSelect={onSelect}
             />
           );
@@ -295,9 +314,11 @@ function NavEntryList({
   expandedGroups,
   expandedSections,
   forceExpandSections,
+  collapsed,
   badgeCounts,
   onToggleGroup,
   onToggleSection,
+  onExpandSidebar,
   onSelect,
   onNavigate
 }: {
@@ -307,9 +328,11 @@ function NavEntryList({
   expandedGroups: Set<string>;
   expandedSections: Set<string>;
   forceExpandSections: boolean;
+  collapsed?: boolean;
   badgeCounts?: Partial<Record<AdminTab, number>>;
   onToggleGroup: (id: string) => void;
   onToggleSection: (id: string) => void;
+  onExpandSidebar?: () => void;
   onSelect: (tab: AdminTab) => void;
   onNavigate: () => void;
 }) {
@@ -324,8 +347,10 @@ function NavEntryList({
             activeTab={activeTab}
             activePath={activePath}
             expandedGroups={expandedGroups}
+            collapsed={collapsed}
             badgeCounts={badgeCounts}
             onToggleGroup={onToggleGroup}
+            onExpandSidebar={onExpandSidebar}
             onSelect={onSelect}
             onNavigate={onNavigate}
           />
@@ -451,6 +476,17 @@ export function Sidebar({
     return () => window.clearTimeout(timer);
   }, [activeSectionId]);
 
+  useEffect(() => {
+    // Keep the active tab visible in long / collapsed icon rails.
+    const timer = window.setTimeout(() => {
+      const active = document.querySelector<HTMLElement>(
+        ".admin-sidebar button.admin-nav-item--active, .admin-sidebar a.admin-nav-item--active"
+      );
+      active?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, activePath, collapsed, expandedSections, expandedGroups]);
+
   const roleLabel = displayLabel ?? getAdminSidebarRoleLabel(role, username);
 
   function handleSelect(tab: AdminTab) {
@@ -514,9 +550,11 @@ export function Sidebar({
             expandedGroups={expandedGroups}
             expandedSections={expandedSections}
             forceExpandSections={collapsed}
+            collapsed={collapsed}
             badgeCounts={badgeCounts}
             onToggleGroup={toggleGroup}
             onToggleSection={toggleSection}
+            onExpandSidebar={collapsed ? onToggleCollapsed : undefined}
             onSelect={handleSelect}
             onNavigate={onMobileClose}
           />
