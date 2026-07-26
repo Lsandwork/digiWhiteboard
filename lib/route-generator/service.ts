@@ -3,7 +3,19 @@ import path from "node:path";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { fitdogRouteReportProvider } from "@/lib/route-generator/fitdog-provider";
 import { groupHouseholdsWithFacilities } from "@/lib/route-generator/facility";
+import {
+  promoteSkippedOccurrenceToItems,
+  serviceForAssignedVan,
+  type SkippedOccurrence
+} from "@/lib/route-generator/fitdog-api";
+import {
+  listGingrTaxiServicesByDate,
+  manualTaxiToReportItems,
+  taxiRowToReportItems,
+  type GingrTaxiServiceRow
+} from "@/lib/route-generator/gingr-taxi";
 import { optimizeRoutes, type DepotConfig } from "@/lib/route-generator/optimizer";
+import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import {
   autoMapSamsaraHeaders,
   buildCsv,
@@ -13,9 +25,8 @@ import {
   type SamsaraTemplate
 } from "@/lib/route-generator/samsara-csv";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
-import { FITDOG_VAN_KEYS, type FitdogVanKey } from "@/lib/route-generator/flags";
+import { FITDOG_VAN_KEYS, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
 import type { VehicleCapacityConfig, SizeLoadConfig } from "@/lib/route-generator/capacity";
-import type { CanonicalService } from "@/lib/route-generator/flags";
 import {
   DEFAULT_FITDOG_LOCATIONS,
   homeBaseForVehiclePool,
@@ -163,36 +174,16 @@ export async function getRouteGeneratorBootstrap() {
   };
 }
 
-export async function pullReportForDate(params: {
-  date: string;
-  actorAdminId?: string | null;
-  actorEmail?: string | null;
-  actorRole?: string | null;
-}) {
-  const supabase = getServiceSupabase();
-  const pull = await fitdogRouteReportProvider.pullForDate({ date: params.date });
+export type ReportRunMetadata = {
+  warnings: string[];
+  skippedOccurrences: SkippedOccurrence[];
+  gingrTaxiImported?: string[];
+  manualTaxiIds?: string[];
+};
 
-  const { data: run, error } = await supabase
-    .from("route_report_runs")
-    .insert({
-      operating_date: params.date,
-      status: pull.formatChanged ? "completed_with_warnings" : "completed",
-      source_mode: pull.sourceMode,
-      pickup_count: pull.pickupItems.length,
-      dropoff_count: pull.dropoffItems.length,
-      warning_count: pull.warnings.length,
-      error_count: [...pull.pickupItems, ...pull.dropoffItems].filter((i) => i.validationStatus === "error").length,
-      format_changed: pull.formatChanged,
-      started_by: params.actorAdminId ?? null,
-      started_by_email: params.actorEmail ?? null,
-      completed_at: new Date().toISOString()
-    })
-    .select("*")
-    .single();
-  if (error || !run) throw new Error(error?.message || "Unable to create report run.");
-
-  const itemRows = [...pull.pickupItems, ...pull.dropoffItems].map((item) => ({
-    report_run_id: run.id,
+function reportItemsFromNormalized(runId: string, items: NormalizedReportItem[]) {
+  return items.map((item) => ({
+    report_run_id: runId,
     direction: item.direction,
     reservation_id: item.reservationId,
     customer_id: item.customerId,
@@ -218,6 +209,45 @@ export async function pullReportForDate(params: {
     validation_reasons: item.validationReasons,
     raw: item.raw
   }));
+}
+
+export async function pullReportForDate(params: {
+  date: string;
+  actorAdminId?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
+}) {
+  const supabase = getServiceSupabase();
+  const pull = await fitdogRouteReportProvider.pullForDate({ date: params.date });
+  const metadata: ReportRunMetadata = {
+    warnings: pull.warnings,
+    skippedOccurrences: pull.skippedOccurrences ?? []
+  };
+
+  const { data: run, error } = await supabase
+    .from("route_report_runs")
+    .insert({
+      operating_date: params.date,
+      status:
+        pull.formatChanged || metadata.skippedOccurrences.length
+          ? "completed_with_warnings"
+          : "completed",
+      source_mode: pull.sourceMode,
+      pickup_count: pull.pickupItems.length,
+      dropoff_count: pull.dropoffItems.length,
+      warning_count: pull.warnings.length,
+      error_count: [...pull.pickupItems, ...pull.dropoffItems].filter((i) => i.validationStatus === "error").length,
+      format_changed: pull.formatChanged,
+      metadata,
+      started_by: params.actorAdminId ?? null,
+      started_by_email: params.actorEmail ?? null,
+      completed_at: new Date().toISOString()
+    })
+    .select("*")
+    .single();
+  if (error || !run) throw new Error(error?.message || "Unable to create report run.");
+
+  const itemRows = reportItemsFromNormalized(run.id, [...pull.pickupItems, ...pull.dropoffItems]);
 
   if (itemRows.length) {
     const { error: itemError } = await supabase.from("route_report_items").insert(itemRows);
@@ -256,10 +286,215 @@ export async function pullReportForDate(params: {
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
-    newValue: { date: params.date, pickup: pull.pickupItems.length, dropoff: pull.dropoffItems.length }
+    newValue: {
+      date: params.date,
+      pickup: pull.pickupItems.length,
+      dropoff: pull.dropoffItems.length,
+      skippedOccurrences: metadata.skippedOccurrences.length
+    }
   });
 
-  return { run, pull };
+  return { run, pull: { ...pull, skippedOccurrences: metadata.skippedOccurrences } };
+}
+
+export async function getReportRun(reportRunId: string) {
+  const supabase = getServiceSupabase();
+  const { data: run, error } = await supabase.from("route_report_runs").select("*").eq("id", reportRunId).single();
+  if (error || !run) throw new Error(error?.message || "Report run not found.");
+  const { data: items } = await supabase.from("route_report_items").select("*").eq("report_run_id", reportRunId);
+  return { run, items: items ?? [], metadata: (run.metadata || {}) as ReportRunMetadata };
+}
+
+export async function assignSkippedOccurrence(params: {
+  reportRunId: string;
+  occurrenceId: number;
+  vanKey: string;
+  actorAdminId?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
+}) {
+  if (!FITDOG_VAN_KEYS.includes(params.vanKey as FitdogVanKey)) {
+    throw new Error("Select Van 1, 2, 3, 5, or 6. Van 4 is not allowed.");
+  }
+  const supabase = getServiceSupabase();
+  const { run, metadata } = await getReportRun(params.reportRunId);
+  const skipped = [...(metadata.skippedOccurrences || [])];
+  const target = skipped.find((row) => row.occurrenceId === params.occurrenceId);
+  if (!target) throw new Error("That skipped class occurrence was not found on this report run.");
+  if (target.assignedVanKey) {
+    throw new Error(`Already assigned to ${target.assignedVanKey.replace("van_", "Van ")}.`);
+  }
+
+  const serviceCanonical = serviceForAssignedVan(params.vanKey);
+  const promoted = await promoteSkippedOccurrenceToItems({
+    occurrenceId: params.occurrenceId,
+    vanKey: params.vanKey,
+    serviceCanonical
+  });
+  if (!promoted.items.length) {
+    throw new Error("No scheduled dogs found on that class occurrence to assign.");
+  }
+
+  const { error: itemError } = await supabase
+    .from("route_report_items")
+    .insert(reportItemsFromNormalized(params.reportRunId, promoted.items));
+  if (itemError) throw new Error(itemError.message);
+
+  const nextSkipped = skipped.map((row) =>
+    row.occurrenceId === params.occurrenceId
+      ? {
+          ...row,
+          assignedVanKey: params.vanKey,
+          assignedService: serviceCanonical,
+          assignedAt: new Date().toISOString()
+        }
+      : row
+  );
+  const nextMetadata: ReportRunMetadata = {
+    ...metadata,
+    skippedOccurrences: nextSkipped
+  };
+  const pickupCount = (run.pickup_count || 0) + promoted.items.filter((i) => i.direction === "pickup").length;
+  const dropoffCount = (run.dropoff_count || 0) + promoted.items.filter((i) => i.direction === "dropoff").length;
+  const { data: updated, error: updateError } = await supabase
+    .from("route_report_runs")
+    .update({
+      metadata: nextMetadata,
+      pickup_count: pickupCount,
+      dropoff_count: dropoffCount,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", params.reportRunId)
+    .select("*")
+    .single();
+  if (updateError || !updated) throw new Error(updateError?.message || "Unable to update report run.");
+
+  await writeRouteAuditEvent({
+    action: "route_generator.skipped_occurrence_assigned",
+    entityType: "route_report_run",
+    entityId: params.reportRunId,
+    actorAdminId: params.actorAdminId,
+    actorEmail: params.actorEmail,
+    actorRole: params.actorRole,
+    newValue: {
+      occurrenceId: params.occurrenceId,
+      className: promoted.className,
+      vanKey: params.vanKey,
+      serviceCanonical,
+      dogCount: promoted.items.filter((i) => i.direction === "pickup").length
+    }
+  });
+
+  return {
+    run: updated,
+    metadata: nextMetadata,
+    assigned: {
+      occurrenceId: params.occurrenceId,
+      className: promoted.className,
+      vanKey: params.vanKey,
+      serviceCanonical,
+      itemCount: promoted.items.length
+    }
+  };
+}
+
+export async function addTaxiToReportRun(params: {
+  reportRunId: string;
+  source: "manual" | "gingr";
+  vanKey?: string | null;
+  gingrReservationId?: string | null;
+  gingrRow?: GingrTaxiServiceRow | null;
+  dogName?: string | null;
+  ownerName?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+  actorAdminId?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
+}) {
+  if (params.vanKey && !FITDOG_VAN_KEYS.includes(params.vanKey as FitdogVanKey)) {
+    throw new Error("Select Van 1, 2, 3, 5, or 6. Van 4 is not allowed.");
+  }
+  const supabase = getServiceSupabase();
+  const { run, metadata } = await getReportRun(params.reportRunId);
+  let items: NormalizedReportItem[] = [];
+
+  if (params.source === "gingr") {
+    let row = params.gingrRow || null;
+    if (!row && params.gingrReservationId) {
+      const gingr = await listGingrTaxiServicesByDate(String(run.operating_date));
+      row = gingr.services.find((service) => service.reservationId === params.gingrReservationId) || null;
+    }
+    if (!row) throw new Error("Select a Gingr taxi reservation to add.");
+    items = taxiRowToReportItems({ row, vanKey: params.vanKey });
+  } else {
+    if (!params.dogName?.trim() || !params.address?.trim()) {
+      throw new Error("Taxi entries need a dog name and address.");
+    }
+    items = manualTaxiToReportItems({
+      dogName: params.dogName,
+      ownerName: params.ownerName,
+      address: params.address,
+      city: params.city,
+      state: params.state,
+      zip: params.zip,
+      phone: params.phone,
+      notes: params.notes,
+      vanKey: params.vanKey
+    });
+  }
+
+  const { error: itemError } = await supabase
+    .from("route_report_items")
+    .insert(reportItemsFromNormalized(params.reportRunId, items));
+  if (itemError) throw new Error(itemError.message);
+
+  const nextMetadata: ReportRunMetadata = {
+    ...metadata,
+    gingrTaxiImported:
+      params.source === "gingr"
+        ? [...(metadata.gingrTaxiImported || []), String(items[0]?.reservationId)]
+        : metadata.gingrTaxiImported || [],
+    manualTaxiIds:
+      params.source === "manual"
+        ? [...(metadata.manualTaxiIds || []), String(items[0]?.reservationId)]
+        : metadata.manualTaxiIds || []
+  };
+  const pickupCount = (run.pickup_count || 0) + items.filter((i) => i.direction === "pickup").length;
+  const dropoffCount = (run.dropoff_count || 0) + items.filter((i) => i.direction === "dropoff").length;
+  const { data: updated, error: updateError } = await supabase
+    .from("route_report_runs")
+    .update({
+      metadata: nextMetadata,
+      pickup_count: pickupCount,
+      dropoff_count: dropoffCount,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", params.reportRunId)
+    .select("*")
+    .single();
+  if (updateError || !updated) throw new Error(updateError?.message || "Unable to update report run.");
+
+  await writeRouteAuditEvent({
+    action: "route_generator.taxi_added",
+    entityType: "route_report_run",
+    entityId: params.reportRunId,
+    actorAdminId: params.actorAdminId,
+    actorEmail: params.actorEmail,
+    actorRole: params.actorRole,
+    newValue: {
+      source: params.source,
+      vanKey: params.vanKey ?? null,
+      dogName: items[0]?.dogName,
+      reservationId: items[0]?.reservationId
+    }
+  });
+
+  return { run: updated, metadata: nextMetadata, items };
 }
 
 export async function generatePlanForRun(params: {
@@ -361,13 +596,32 @@ export async function generatePlanForRun(params: {
   );
   const needsReview = normalized.filter((i) => i.validationStatus !== "ok");
 
+  const lockedVanByHousehold: Record<string, FitdogVanKey> = {};
+  for (const group of [...pickupGroups, ...dropoffGroups]) {
+    for (const item of group.items) {
+      const locked = String((item.raw as Record<string, unknown> | undefined)?.locked_van || "").trim();
+      if (FITDOG_VAN_KEYS.includes(locked as FitdogVanKey)) {
+        lockedVanByHousehold[group.householdKey] = locked as FitdogVanKey;
+        break;
+      }
+    }
+  }
+
   const coords: Record<string, { lat: number; lng: number }> = {};
   [...pickupGroups, ...dropoffGroups].forEach((g, index) => {
-    if (g.householdKey === "facility:club" && locations.club.latitude != null && locations.club.longitude != null) {
+    if (
+      g.householdKey.startsWith("facility:club") &&
+      locations.club.latitude != null &&
+      locations.club.longitude != null
+    ) {
       coords[g.householdKey] = { lat: locations.club.latitude, lng: locations.club.longitude };
       return;
     }
-    if (g.householdKey === "facility:hub" && locations.hub.latitude != null && locations.hub.longitude != null) {
+    if (
+      g.householdKey.startsWith("facility:hub") &&
+      locations.hub.latitude != null &&
+      locations.hub.longitude != null
+    ) {
       coords[g.householdKey] = { lat: locations.hub.latitude, lng: locations.hub.longitude };
       return;
     }
@@ -390,7 +644,8 @@ export async function generatePlanForRun(params: {
     locations,
     sizeLoads,
     seed: `pickup:${run.operating_date}:${params.reportRunId}`,
-    coordsByHousehold: coords
+    coordsByHousehold: coords,
+    lockedVanByHousehold
   });
   const dropoffOpt = optimizeRoutes({
     direction: "dropoff",
@@ -400,7 +655,8 @@ export async function generatePlanForRun(params: {
     locations,
     sizeLoads,
     seed: `dropoff:${run.operating_date}:${params.reportRunId}`,
-    coordsByHousehold: coords
+    coordsByHousehold: coords,
+    lockedVanByHousehold
   });
   if (activeUnconfigured.length) {
     pickupOpt.warnings.push(
@@ -529,7 +785,21 @@ export async function getPlanBundle(planId: string) {
     ? await supabase.from("route_report_items").select("*").eq("report_run_id", plan.report_run_id)
     : { data: [] as Array<Record<string, unknown>> };
 
-  return { plan, routes: routes ?? [], stops: stops ?? [], items: items ?? [] };
+  const { data: reportRun } = plan.report_run_id
+    ? await supabase.from("route_report_runs").select("*").eq("id", plan.report_run_id).maybeSingle()
+    : { data: null };
+
+  return {
+    plan,
+    routes: routes ?? [],
+    stops: stops ?? [],
+    items: items ?? [],
+    reportRun,
+    metadata: ((reportRun as { metadata?: ReportRunMetadata } | null)?.metadata || {
+      warnings: [],
+      skippedOccurrences: []
+    }) as ReportRunMetadata
+  };
 }
 
 export async function approvePlan(params: {

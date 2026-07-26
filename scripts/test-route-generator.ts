@@ -14,6 +14,8 @@ import { formatStopDisplayName, groupHouseholds } from "../lib/route-generator/h
 import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
 import { optimizeRoutes } from "../lib/route-generator/optimizer";
 import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
+import { serviceForAssignedVan } from "../lib/route-generator/fitdog-api";
+import { manualTaxiToReportItems } from "../lib/route-generator/gingr-taxi";
 import {
   autoMapHeaders,
   looksLikeLoginPage,
@@ -365,11 +367,85 @@ assert.equal(
       raw: {}
     }
   ]);
-  const clubGroup = facilityGroups.find((g) => g.householdKey === "facility:club");
+  const clubGroup = facilityGroups.find((g) => g.householdKey === "facility:club:adventure-hike");
   const homeGroup = facilityGroups.find((g) => g.dogCount === 1 && g.items[0]?.dogName === "Teddy");
   assert.ok(clubGroup, "club facility group expected");
   assert.equal(clubGroup?.ownerName, "Fitdog Club");
   assert.equal(homeGroup?.ownerName, "Teddy Nguyen");
+
+  // Beach + Adventure club dropoffs must not share one stop group (keeps Emmie off Van 3).
+  const mixedFacility = groupHouseholdsWithFacilities([
+    {
+      direction: "dropoff",
+      reservationId: "beach-1",
+      customerId: "c-b",
+      ownerFirstName: "Karen",
+      ownerLastName: "Sears",
+      ownerFullName: "Karen Sears",
+      dogId: "luci",
+      dogName: "Luci",
+      serviceRaw: "Beach Excursion",
+      serviceCanonical: "Beach Excursion",
+      addressRaw: "1712 21st Street, Santa Monica, CA 90404",
+      addressStreet: "1712 21st Street",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90404",
+      ownerPhoneMasked: null,
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      dogSize: "Medium",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: "club",
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: { location_name: "Fitdog HQ" }
+    },
+    {
+      direction: "dropoff",
+      reservationId: "adv-1",
+      customerId: "c-a",
+      ownerFirstName: "Rose",
+      ownerLastName: "Reiss",
+      ownerFullName: "Rose Reiss",
+      dogId: "emmie",
+      dogName: "Emmie",
+      serviceRaw: "Adventure Hikes",
+      serviceCanonical: "Adventure Hike",
+      addressRaw: "1712 21st Street, Santa Monica, CA 90404",
+      addressStreet: "1712 21st Street",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90404",
+      ownerPhoneMasked: null,
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      dogSize: "Small",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: "club",
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: { location_name: "Fitdog HQ" }
+    }
+  ]);
+  const beachClub = mixedFacility.find((g) => g.householdKey === "facility:club:beach-excursion");
+  const adventureClub = mixedFacility.find((g) => g.householdKey === "facility:club:adventure-hike");
+  assert.ok(beachClub, "beach club group expected");
+  assert.ok(adventureClub, "adventure club group expected");
+  assert.deepEqual(
+    beachClub?.items.map((i) => i.dogName),
+    ["Luci"]
+  );
+  assert.deepEqual(
+    adventureClub?.items.map((i) => i.dogName),
+    ["Emmie"]
+  );
 }
 
 assert.deepEqual(resolveRouteEndpoints({ vanKey: "van_1", direction: "pickup" }), {
@@ -478,5 +554,24 @@ assert.ok(!built.csv.toLowerCase().includes("van 4"));
 // Dropoff fixture parses
 const dropParsed = parseCsv(dropoffCsv);
 assert.ok(dropParsed.rows.length >= 5);
+
+assert.equal(serviceForAssignedVan("van_1"), "Adventure Hike");
+assert.equal(serviceForAssignedVan("van_3"), "Beach Excursion");
+{
+  const taxiItems = manualTaxiToReportItems({
+    dogName: "Mochi",
+    ownerName: "Alex Rivera",
+    address: "123 Ocean Ave",
+    city: "Santa Monica",
+    zip: "90401",
+    vanKey: "van_5"
+  });
+  assert.equal(taxiItems.length, 2);
+  assert.equal(taxiItems[0]?.serviceCanonical, "Taxi Service");
+  assert.equal(taxiItems[0]?.serviceRaw, "Taxi");
+  assert.equal(taxiItems[0]?.raw.locked_van, "van_5");
+  assert.equal(taxiItems[0]?.direction, "pickup");
+  assert.equal(taxiItems[1]?.direction, "dropoff");
+}
 
 console.log("route-generator tests: ok");

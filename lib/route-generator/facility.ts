@@ -6,18 +6,46 @@ import {
   type FitdogBaseKey,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
-import { householdKey, parseAddress } from "@/lib/route-generator/address";
+import { parseAddress } from "@/lib/route-generator/address";
 import type { HouseholdStopGroup } from "@/lib/route-generator/households";
 import { formatStopDisplayName, groupHouseholds } from "@/lib/route-generator/households";
+import type { CanonicalService } from "@/lib/route-generator/flags";
 
 export type FacilityAwareItem = NormalizedReportItem & {
   facilityKey?: FitdogBaseKey | null;
   atFacility?: boolean;
 };
 
+function serviceSlug(service: string | null | undefined): string {
+  const cleaned = String(service || "unknown")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return cleaned || "unknown";
+}
+
+/** facility:club:adventure-hike — keeps Beach and Adventure Club stops on separate vans. */
+export function facilityHouseholdKey(
+  facilityKey: FitdogBaseKey,
+  serviceCanonical: CanonicalService | string | null | undefined
+): string {
+  return `facility:${facilityKey}:${serviceSlug(serviceCanonical)}`;
+}
+
+export function isFacilityHouseholdKey(value: string | null | undefined): boolean {
+  return String(value || "").startsWith("facility:");
+}
+
+export function facilityBaseKeyFromHousehold(value: string | null | undefined): FitdogBaseKey | null {
+  const match = String(value || "").match(/^facility:(hub|club|kenneth_hahn|huntington)(?::|$)/);
+  return (match?.[1] as FitdogBaseKey | undefined) ?? null;
+}
+
 /**
  * Mark dogs whose pickup/drop-off address is Fitdog Club/Hub (or Fitdog-named location).
  * Those dogs still ride the outing van, but via a facility stop — not a home stop.
+ * Facility household keys are split by service so Adventure and Beach never share one stop group.
  */
 export function annotateFacilityItems(
   items: NormalizedReportItem[],
@@ -42,6 +70,7 @@ export function annotateFacilityItems(
 
     const facility = resolveBaseLocation(locations, facilityKey);
     const parsed = parseAddress(facility.address);
+    const key = facilityHouseholdKey(facilityKey, item.serviceCanonical || item.serviceRaw);
     return {
       ...item,
       facilityKey,
@@ -52,7 +81,7 @@ export function annotateFacilityItems(
       addressCity: parsed.city,
       addressState: parsed.state,
       addressZip: parsed.zip,
-      householdKey: householdKey(parsed) || `facility:${facilityKey}`,
+      householdKey: key,
       specialNotes: [item.specialNotes, `At ${facility.name} — no home ${item.direction}`]
         .filter(Boolean)
         .join(" · "),
@@ -63,28 +92,48 @@ export function annotateFacilityItems(
   });
 }
 
-/** Group households and force Fitdog facility stop display names. */
+/** Group households and force Fitdog facility stop display names (per service). */
 export function groupHouseholdsWithFacilities(
   items: NormalizedReportItem[],
   locations: FitdogLocationsConfig = DEFAULT_FITDOG_LOCATIONS
 ): HouseholdStopGroup[] {
   const annotated = annotateFacilityItems(items, locations);
   const groups = groupHouseholds(annotated);
-  return groups.map((group) => {
-    const facilityItem = group.items.find((i) => (i as FacilityAwareItem).atFacility);
-    const facilityKey = (facilityItem as FacilityAwareItem | undefined)?.facilityKey;
+  const out: HouseholdStopGroup[] = [];
+
+  for (const group of groups) {
+    const facilityItem = group.items.find((i) => (i as FacilityAwareItem).atFacility) as
+      | FacilityAwareItem
+      | undefined;
+    const facilityKey = facilityItem?.facilityKey;
     if (!facilityKey) {
-      return {
+      out.push({
         ...group,
         ownerName: formatStopDisplayName(group.items)
-      };
+      });
+      continue;
     }
+
     const facility = resolveBaseLocation(locations, facilityKey);
-    return {
-      ...group,
-      householdKey: `facility:${facilityKey}`,
-      address: facility.address,
-      ownerName: facility.name
-    };
-  });
+    const byService = new Map<string, NormalizedReportItem[]>();
+    for (const item of group.items) {
+      const service = String(item.serviceCanonical || item.serviceRaw || "unknown");
+      const list = byService.get(service) || [];
+      list.push(item);
+      byService.set(service, list);
+    }
+
+    for (const [service, serviceItems] of byService) {
+      out.push({
+        householdKey: facilityHouseholdKey(facilityKey, service),
+        direction: group.direction,
+        address: facility.address,
+        ownerName: facility.name,
+        items: serviceItems,
+        dogCount: serviceItems.length
+      });
+    }
+  }
+
+  return out;
 }

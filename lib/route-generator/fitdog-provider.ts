@@ -9,7 +9,11 @@ import {
   type NormalizedReportItem
 } from "@/lib/route-generator/parser";
 import { isFitdogReportSyncEnabled } from "@/lib/route-generator/flags";
-import { canUseFitdogEmployeeApi, pullFitdogRouteReportFromApi } from "@/lib/route-generator/fitdog-api";
+import {
+  canUseFitdogEmployeeApi,
+  pullFitdogRouteReportFromApi,
+  type SkippedOccurrence
+} from "@/lib/route-generator/fitdog-api";
 
 export type FitdogPullResult = {
   sourceMode: "fixture" | "api" | "csv" | "browser_worker";
@@ -21,6 +25,7 @@ export type FitdogPullResult = {
   dropoffMapping: FieldMapping;
   formatChanged: boolean;
   warnings: string[];
+  skippedOccurrences: SkippedOccurrence[];
 };
 
 async function loadFixture(name: string) {
@@ -75,7 +80,8 @@ async function pullFromFixtures(params: {
     pickupMapping,
     dropoffMapping,
     formatChanged: pickupNorm.formatChanged || dropoffNorm.formatChanged,
-    warnings: params.warnings
+    warnings: params.warnings,
+    skippedOccurrences: []
   };
 }
 
@@ -152,7 +158,8 @@ export class FitdogRouteReportProvider {
       pickupMapping,
       dropoffMapping,
       formatChanged: false,
-      warnings
+      warnings,
+      skippedOccurrences: live.skippedOccurrences
     };
   }
 }

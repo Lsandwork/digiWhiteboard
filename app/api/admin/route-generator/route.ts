@@ -7,13 +7,17 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { canUseRouteGenerator, hasRoutePermission } from "@/lib/route-generator/access";
 import { isRouteGeneratorEnabled } from "@/lib/route-generator/flags";
 import {
+  addTaxiToReportRun,
+  assignSkippedOccurrence,
   approvePlan,
   exportSamsaraCsv,
   generatePlanForRun,
   getPlanBundle,
+  getReportRun,
   getRouteGeneratorBootstrap,
   pullReportForDate
 } from "@/lib/route-generator/service";
+import { listGingrTaxiServicesByDate } from "@/lib/route-generator/gingr-taxi";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +58,22 @@ export async function GET(request: Request) {
       const bundle = await getPlanBundle(planId);
       return NextResponse.json(bundle);
     }
+    if (view === "report_run") {
+      const reportRunId = url.searchParams.get("reportRunId");
+      if (!reportRunId) {
+        return NextResponse.json({ error: "reportRunId is required." }, { status: 400 });
+      }
+      const report = await getReportRun(reportRunId);
+      return NextResponse.json(report);
+    }
+    if (view === "gingr_taxi") {
+      const date = url.searchParams.get("date") || "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return NextResponse.json({ error: "Select a valid operating date (YYYY-MM-DD)." }, { status: 400 });
+      }
+      const taxi = await listGingrTaxiServicesByDate(date);
+      return NextResponse.json(taxi);
+    }
     if (view === "audit") {
       const auditGate = await requireAccess(request, "route_generator.view_audit");
       if ("error" in auditGate && auditGate.error) return auditGate.error;
@@ -93,7 +113,10 @@ export async function POST(request: Request) {
 
   const action = String(body.action ?? "");
   const permission =
-    action === "pull_report"
+    action === "pull_report" ||
+    action === "assign_skipped_occurrence" ||
+    action === "add_taxi" ||
+    action === "list_gingr_taxi"
       ? "route_generator.pull_report"
       : action === "generate_plan"
         ? "route_generator.generate"
@@ -117,6 +140,57 @@ export async function POST(request: Request) {
       }
       const result = await pullReportForDate({
         date,
+        actorAdminId: session.adminUserId,
+        actorEmail: session.email,
+        actorRole: session.role
+      });
+      return NextResponse.json(result);
+    }
+
+    if (action === "assign_skipped_occurrence") {
+      const reportRunId = String(body.reportRunId ?? "").trim();
+      const occurrenceId = Number(body.occurrenceId);
+      const vanKey = String(body.vanKey ?? "").trim();
+      if (!reportRunId || !Number.isFinite(occurrenceId) || !vanKey) {
+        return NextResponse.json({ error: "reportRunId, occurrenceId, and vanKey are required." }, { status: 400 });
+      }
+      const result = await assignSkippedOccurrence({
+        reportRunId,
+        occurrenceId,
+        vanKey,
+        actorAdminId: session.adminUserId,
+        actorEmail: session.email,
+        actorRole: session.role
+      });
+      return NextResponse.json(result);
+    }
+
+    if (action === "list_gingr_taxi") {
+      const date = String(body.date ?? "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return NextResponse.json({ error: "Select a valid operating date (YYYY-MM-DD)." }, { status: 400 });
+      }
+      const taxi = await listGingrTaxiServicesByDate(date);
+      return NextResponse.json(taxi);
+    }
+
+    if (action === "add_taxi") {
+      const reportRunId = String(body.reportRunId ?? "").trim();
+      if (!reportRunId) return NextResponse.json({ error: "reportRunId is required." }, { status: 400 });
+      const result = await addTaxiToReportRun({
+        reportRunId,
+        source: body.source === "gingr" ? "gingr" : "manual",
+        vanKey: body.vanKey ? String(body.vanKey) : null,
+        gingrReservationId: body.gingrReservationId ? String(body.gingrReservationId) : null,
+        gingrRow: (body.gingrRow as never) || null,
+        dogName: body.dogName ? String(body.dogName) : null,
+        ownerName: body.ownerName ? String(body.ownerName) : null,
+        address: body.address ? String(body.address) : null,
+        city: body.city ? String(body.city) : null,
+        state: body.state ? String(body.state) : null,
+        zip: body.zip ? String(body.zip) : null,
+        phone: body.phone ? String(body.phone) : null,
+        notes: body.notes ? String(body.notes) : null,
         actorAdminId: session.adminUserId,
         actorEmail: session.email,
         actorRole: session.role

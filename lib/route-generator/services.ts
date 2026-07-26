@@ -13,7 +13,9 @@ const DEFAULT_ALIASES: Record<string, CanonicalService> = {
   "group classes": "Group Class",
   taxi: "Taxi Service",
   "taxi service": "Taxi Service",
-  "taxi services": "Taxi Service"
+  "taxi services": "Taxi Service",
+  transport: "Taxi Service",
+  "additional taxi": "Taxi Service"
 };
 
 export function normalizeServiceName(

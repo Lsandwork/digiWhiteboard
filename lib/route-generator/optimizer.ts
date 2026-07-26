@@ -13,6 +13,7 @@ import {
   type VehicleCapacityConfig
 } from "@/lib/route-generator/capacity";
 import type { HouseholdStopGroup } from "@/lib/route-generator/households";
+import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
 import {
   DEFAULT_FITDOG_LOCATIONS,
   homeBaseForVehiclePool,
@@ -222,9 +223,10 @@ export function optimizeRoutes(params: {
     }
     const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical;
     if (service && !isServiceEligibleForVan(service, bucket.vehicle)) {
-      unassigned.push(stop);
-      warnings.push(`${stop.address}: locked van is not eligible for ${service}.`);
-      continue;
+      // Manual / skipped-class / taxi assignments may intentionally pin a service onto a van.
+      warnings.push(
+        `${stop.address}: locked onto ${lockedVan.replace("van_", "Van ")} even though default eligibility excludes ${service}.`
+      );
     }
     const check = capacityAllows({
       vehicle: bucket.vehicle,
@@ -335,8 +337,8 @@ export function optimizeRoutes(params: {
 
     // Prefer visiting Fitdog Club mid-route when facility dogs are on this van,
     // otherwise keep nearest-neighbor from the start base.
-    const facilityStops = bucket.stops.filter((s) => String(s.householdKey || "").startsWith("facility:"));
-    const homeStops = bucket.stops.filter((s) => !String(s.householdKey || "").startsWith("facility:"));
+    const facilityStops = bucket.stops.filter((s) => isFacilityHouseholdKey(s.householdKey));
+    const homeStops = bucket.stops.filter((s) => !isFacilityHouseholdKey(s.householdKey));
     const orderedHome = nearestNeighborOrder(homeStops, startCoord, rng);
     const ordered =
       params.direction === "pickup"
@@ -377,7 +379,7 @@ export function optimizeRoutes(params: {
           stop.items.map((i) => i.serviceCanonical).filter(Boolean) as CanonicalService[]
         )
       ];
-      const isFacility = String(stop.householdKey || "").startsWith("facility:");
+      const isFacility = isFacilityHouseholdKey(stop.householdKey);
       stops.push({
         sequence: index + 1,
         stopKind: "customer",
