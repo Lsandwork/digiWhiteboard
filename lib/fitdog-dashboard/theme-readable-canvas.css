@@ -750,3 +750,16 @@ html[data-theme="clear"] .admin-sidebar .admin-nav-item--active,
 html[data-theme="clear"] .admin-sidebar .admin-nav-item--active-parent {
   color: #fff7ed !important;
 }
+
+/* Toasts sit outside the light canvas — keep light text on the dark chip. */
+html[data-theme="clear"] .admin-toast,
+html[data-theme="clear"] .admin-toast *,
+html[data-theme="light"] .admin-toast,
+html[data-theme="light"] .admin-toast * {
+  color: #f8fafc !important;
+}
+
+html[data-theme="clear"] .admin-toast,
+html[data-theme="light"] .admin-toast {
+  background: #0f172a !important;
+}

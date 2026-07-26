@@ -1183,6 +1183,11 @@ export function canAccessAdminTab(
 ): boolean {
   if (tab === "demo_push") return options?.isDemo === true && board === "staff";
 
+  // Retired entry tools — deny before the full-admin early return so they leave admin/management nav.
+  if (tab === "trainer_entry" || tab === "handler_shift_entry") {
+    return false;
+  }
+
   // Route Generator is staff-board only — check before the full-admin early return
   // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
   if (tab === "route_generator") {
@@ -1220,16 +1225,6 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     if (isMarketingLegacyRole(legacyRole)) return false;
     return true;
-  }
-
-  // Dedicated entry-log tabs are admin/management only — all staff use Front Desk Log instead.
-  if (tab === "trainer_entry" || tab === "handler_shift_entry") {
-    if (board !== "staff") return false;
-    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
-    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
-    const roleKey = legacyRoleToRoleKey(legacyRole);
-    return roleKey === "admin" || roleKey === "management" || roleKey === "super_admin";
   }
 
   // Operations checklist is for floor handlers (+ leads/management/admins via early return).

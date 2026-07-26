@@ -191,8 +191,6 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "walks_board"
 ];
 
-/** Admin/management-only entry tools (staff use Front Desk Log instead). */
-const MANAGEMENT_ENTRY_TABS: AdminTab[] = ["trainer_entry", "handler_shift_entry"];
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
 const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
 const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer_complaints"];
@@ -342,7 +340,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
-          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS, ...MANAGEMENT_ENTRY_TABS], visible)
+          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)
         ]),
         true
       )
