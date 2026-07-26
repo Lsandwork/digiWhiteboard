@@ -117,7 +117,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   grooming_push: "Alert handlers when a dog needs grooming.",
   trainer_push: "Alert handlers when a dog needs training.",
   cast_videos: "Upload and push full-screen videos to displays.",
-  trainer_entry: "Log trainer check-ins and session notes.",
+  trainer_entry: "Admin/management trainer entry tool. Staff should use Front Desk Log.",
+  handler_shift_entry: "Admin/management handler entry tool. Staff should use Front Desk Log.",
   package_commissions: "Track package and class sales, confirm commissions, and review trainer earnings.",
   track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
   fitdog_alerts: "Failed payments, missed payments, card issues, and Fitdog sync health under Operations.",
@@ -145,7 +146,6 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   write_ups: "Submit and review your own write-up forms.",
   write_up_review: "Review all submitted employee write-ups.",
   complaint_review: "Review groomer, trainer, and staff complaints.",
-  handler_shift_entry: "Create handler shift log entries sent to Front Desk Log.",
   hr_pip: "Supportive growth plans with AI coaching, California-aware documentation, and manager check-ins.",
   remote_cast: "Control lobby and staff whiteboards on building displays from anywhere."
 };
@@ -173,9 +173,11 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
-  "trainer_entry",
   "walks_board"
 ];
+
+/** Admin/management-only entry tools (staff use Front Desk Log instead). */
+const MANAGEMENT_ENTRY_TABS: AdminTab[] = ["trainer_entry", "handler_shift_entry"];
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
 const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
 const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer_complaints"];
@@ -297,7 +299,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["handler_shift_entry", "bulk_photo_upload"], visible)
+          ...singles(["bulk_photo_upload"], visible)
         ])
       )
     );
@@ -310,7 +312,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
-          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)
+          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS, ...MANAGEMENT_ENTRY_TABS], visible)
         ]),
         true
       )
@@ -374,14 +376,6 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
       "trainer_operations",
       "Front Desk & Floor",
       compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
-    )
-  );
-
-  entries.push(
-    ...sectionEntries(
-      "trainer_training",
-      "Training",
-      compactEntries([...singles(["trainer_entry"], visible)])
     )
   );
 

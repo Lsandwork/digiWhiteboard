@@ -13,7 +13,7 @@ import type { AdminTab } from "../lib/admin/types";
 
 const trainerTabs: AdminTab[] = [
   "trainer_push",
-  "trainer_entry",
+  "crossover_communication",
   "package_commissions",
   "management_support",
   "notifications",
@@ -123,6 +123,16 @@ assert.equal(
   "Submit Request should not live under Front Desk Operations"
 );
 
+assert.equal(findNavSectionForTab(trainerNav, "crossover_communication"), "Front Desk & Floor");
+assert.equal(
+  trainerNav.some(
+    (entry) =>
+      (entry.type === "item" && entry.tab === "trainer_entry") ||
+      (entry.type === "group" && entry.children.some((child) => child.tab === "trainer_entry"))
+  ),
+  false,
+  "trainer nav should not include Trainer's Entry; use Front Desk Log"
+);
 assert.equal(findNavSectionForTab(trainerNav, "package_commissions"), "Commissions");
 assert.equal(findNavGroupForTab(trainerNav, "package_commissions"), "commissions");
 assert.equal(findNavSectionForTab(adminNav, "package_commissions"), "Commissions");

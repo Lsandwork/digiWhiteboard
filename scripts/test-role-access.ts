@@ -77,5 +77,25 @@ assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "hiker"), "yard_
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "package_commissions", "trainer", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "package_commissions", "assistant_manager", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "grooming_push", "groomer", "staff"), true);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "handler_shift_entry", "daycare", "staff"),
+  false,
+  "handlers use Front Desk Log instead of Handler Shift Entry Log"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "trainer_entry", "trainer", "staff"),
+  false,
+  "trainers use Front Desk Log instead of Trainer's Entry"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "handler_shift_entry", "assistant_manager", "staff"),
+  true,
+  "management can still open entry tools"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "manager_admin"), "trainer_entry", "manager_admin", "staff"),
+  true,
+  "admin can still open entry tools"
+);
 
 console.log("role access tests passed");

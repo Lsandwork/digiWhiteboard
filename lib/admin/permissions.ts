@@ -515,7 +515,6 @@ export const GROOMER_TABS = [
 export const TRAINER_TABS = [
   "crossover_communication",
   "trainer_push",
-  "trainer_entry",
   "package_commissions",
   "yard_links",
   "walks_board",
@@ -533,7 +532,6 @@ export const DOG_HANDLER_TABS = [
   "management_support",
   "bulk_photo_upload",
   "write_ups",
-  "handler_shift_entry",
   "help"
 ] as const;
 
@@ -1049,6 +1047,14 @@ export function canAccessAdminTab(
 
   // Walks Board is available to every authenticated staff user on the staff board.
   if (tab === "walks_board") return board === "staff";
+
+  // Dedicated entry-log tabs are admin/management only — all staff use Front Desk Log instead.
+  if (tab === "trainer_entry" || tab === "handler_shift_entry") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole ?? access?.primaryRole);
+    return roleKey === "admin" || roleKey === "management" || roleKey === "super_admin";
+  }
 
   // Fitdog payment alerts are restricted to super_admin, admin, management, front_desk_coordinator.
   if (tab === "fitdog_alerts") {
