@@ -102,7 +102,7 @@ function caseToAlertRow(report: ManagementReport): UrgentAlertRow {
     sla_due_at: due.toISOString(),
     sla_remaining_ms: due.getTime() - Date.now(),
     sla_total_ms: totalMs,
-    employee: report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? report.created_by ?? "—",
+    employee: report.employee_name ?? report.dog_handler_name ?? report.submitted_by_name ?? "—",
     department: report.department ?? "—",
     alert_type: alertTypeFromReport(report),
     summary: report.title || details.slice(0, 160),
