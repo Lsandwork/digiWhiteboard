@@ -9,6 +9,7 @@ import {
   Filter,
   MessageSquare,
   RefreshCw,
+  Trash2,
   Upload,
   X
 } from "lucide-react";
@@ -430,7 +431,13 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
       });
       const updated = result.results?.length ?? 0;
       const failed = result.errors?.length ?? 0;
-      if (failed > 0) {
+      if (bulkModal.action === "delete") {
+        if (failed > 0) {
+          showToast(`Deleted ${updated} row(s). ${failed} could not be deleted.`, "error");
+        } else {
+          showToast(`Deleted ${updated} row(s).`, "success");
+        }
+      } else if (failed > 0) {
         showToast(`Updated ${updated} record(s). ${failed} could not be updated.`, "error");
       } else {
         showToast(`Updated ${updated} record(s).`, "success");
@@ -640,6 +647,16 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                   {entry.label}
                 </button>
               ))}
+              {selected.length > 0 ? (
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  disabled={busy}
+                  onClick={() => openBulkModal("delete", "Delete", true)}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </button>
+              ) : null}
               {tab === "approval" && selected.length === 0 && pageRowIds.length > 0 ? (
                 <button
                   type="button"
@@ -1057,6 +1074,27 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 >
                   Process refund
                 </button>
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  onClick={() => {
+                    const reason = window.prompt("Delete reason (required):") ?? "";
+                    if (!reason.trim()) return;
+                    if (!window.confirm("Permanently delete this commission row?")) return;
+                    void postAction({ action: "delete", id: drawer.record.id, reason: reason.trim() })
+                      .then(() => {
+                        showToast("Commission row deleted.", "success");
+                        setDrawerId(null);
+                        setDrawer(null);
+                        return load();
+                      })
+                      .catch((error) => {
+                        showToast(error instanceof Error ? error.message : "Delete failed.", "error");
+                      });
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </button>
               </div>
             ) : null}
 
@@ -1084,9 +1122,11 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         }}
       >
         <p className="mb-3 text-sm text-admin-muted">
-          {bulkModal?.requiresReason
-            ? "This action will apply to every selected commission row. A reason is required."
-            : `Apply ${bulkModal?.label ?? "this action"} to ${bulkModal?.ids.length ?? 0} selected commission row(s)?`}
+          {bulkModal?.action === "delete"
+            ? "This permanently removes the selected commission row(s) from the ledger. Paid rows cannot be deleted. A reason is required."
+            : bulkModal?.requiresReason
+              ? "This action will apply to every selected commission row. A reason is required."
+              : `Apply ${bulkModal?.label ?? "this action"} to ${bulkModal?.ids.length ?? 0} selected commission row(s)?`}
         </p>
         {bulkModal?.requiresReason ? (
           <textarea

@@ -1,7 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 import { assertCanManage, assertNotManagementDestructive, trainerOwnsRecord } from "./auth";
 import { writeCommissionAudit } from "./audit";
-import { ensureCommissionLedgerBackfill, ensureCommissionSaleDatesRepaired } from "./backfill";
+import { ensureCommissionLedgerBackfill, ensureCommissionSaleDatesRepaired, ensureIvonneRejectedDuplicatesPurged } from "./backfill";
 import { mapDbRecord, computeMissingRequired } from "./map";
 import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import { trainerRateBpsForPackage } from "./location-rate";
@@ -175,6 +175,7 @@ export async function listCommissionRecords(
 ): Promise<CommissionListResult> {
   await ensureCommissionLedgerBackfill(supabase);
   await ensureCommissionSaleDatesRepaired(supabase);
+  await ensureIvonneRejectedDuplicatesPurged(supabase);
 
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
@@ -680,6 +681,10 @@ export async function bulkUpdateCommissionRecords(
         if (error) throw new Error(error.message);
         results.push(mapDbRecord(data as Record<string, unknown>));
         await writeCommissionAudit(supabase, { recordId: id, action: "archived", actor, reason: reason ?? null });
+      } else if (action === "delete") {
+        await deleteCommissionRecord(supabase, viewer, actor, id, reason ?? "Deleted from ledger selection");
+        // Deleted rows are gone — return a stub so callers can count successes.
+        results.push({ id } as PackageCommissionRecord);
       } else {
         throw new Error(`Unsupported bulk action: ${action}`);
       }
@@ -709,13 +714,105 @@ export async function deleteCommissionRecord(
   }
   if (!String(reason ?? "").trim()) throw new Error("A reason is required to delete a commission record.");
 
-  const { error } = await supabase.from("package_commission_records").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  // Audit first — FK on audit.record_id rejects inserts after the row is gone.
   await writeCommissionAudit(supabase, {
     recordId: id,
     action: "record_deleted",
     reason: reason ?? null,
     actor,
-    oldValue: JSON.stringify({ final: existing.final_commission_cents, dog: existing.dog_name })
+    oldValue: JSON.stringify({
+      final: existing.final_commission_cents,
+      dog: existing.dog_name,
+      client: existing.client_name,
+      sale_date: existing.sale_date,
+      trainer: existing.trainer_name
+    })
   });
+
+  const { error } = await supabase.from("package_commission_records").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Soft-archive rejected duplicate ledger rows for a trainer (default: Ivonne).
+ * Keeps one active row per same-day fingerprint (prefer non-rejected, then oldest).
+ */
+export async function purgeRejectedDuplicateCommissions(
+  supabase: SupabaseClient,
+  actor: CommissionActor,
+  options?: { trainerNameIncludes?: string }
+): Promise<{ archived: number; ids: string[] }> {
+  const trainerFilter = (options?.trainerNameIncludes ?? "ivonne").trim().toLowerCase();
+
+  const { data: rows, error } = await supabase
+    .from("package_commission_records")
+    .select(
+      "id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class, sale_date, final_commission_cents, approval_status, review_status, created_at"
+    )
+    .is("archived_at", null)
+    .ilike("trainer_name", `%${trainerFilter}%`)
+    .order("created_at", { ascending: true })
+    .limit(500);
+  if (error) throw new Error(error.message);
+
+  const groups = new Map<string, Array<(typeof rows)[number]>>();
+  for (const row of rows ?? []) {
+    const key = [
+      String(row.trainer_user_id ?? "").trim() || String(row.trainer_name ?? "").trim().toLowerCase(),
+      String(row.client_name ?? "").trim().toLowerCase(),
+      String(row.dog_name ?? "").trim().toLowerCase(),
+      String(row.package_or_class ?? "").trim().toLowerCase(),
+      String(row.sale_date ?? "").slice(0, 10),
+      String(Number(row.final_commission_cents) || 0)
+    ].join("|");
+    const list = groups.get(key) ?? [];
+    list.push(row);
+    groups.set(key, list);
+  }
+
+  const toArchive: string[] = [];
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => {
+      const aRejected =
+        a.approval_status === "rejected" || a.review_status === "rejected" ? 1 : 0;
+      const bRejected =
+        b.approval_status === "rejected" || b.review_status === "rejected" ? 1 : 0;
+      if (aRejected !== bRejected) return aRejected - bRejected; // keep non-rejected
+      return String(a.created_at).localeCompare(String(b.created_at));
+    });
+    const [, ...dupes] = sorted;
+    for (const dupe of dupes) {
+      // Only auto-remove rejected duplicates (never wipe an approved twin silently).
+      if (dupe.approval_status === "rejected" || dupe.review_status === "rejected") {
+        toArchive.push(String(dupe.id));
+      }
+    }
+  }
+
+  if (!toArchive.length) return { archived: 0, ids: [] };
+
+  const note = "Removed as rejected duplicate entry.";
+  const { error: updateError } = await supabase
+    .from("package_commission_records")
+    .update({
+      archived_at: new Date().toISOString(),
+      is_possible_duplicate: true,
+      internal_notes: note,
+      updated_at: new Date().toISOString()
+    })
+    .in("id", toArchive);
+  if (updateError) throw new Error(updateError.message);
+
+  for (const id of toArchive) {
+    await writeCommissionAudit(supabase, {
+      recordId: id,
+      action: "duplicate_removed",
+      reason: note,
+      actor,
+      metadata: { trainer_filter: trainerFilter }
+    });
+  }
+
+  return { archived: toArchive.length, ids: toArchive };
 }
