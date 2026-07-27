@@ -543,8 +543,8 @@ const rows = [
     stopName: "Depot",
     stopNotes: "start",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:00",
-    scheduledDeparture: "07/26/2026 07:05",
+    scheduledArrival: "",
+    scheduledDeparture: "7/26/2026 7:00",
     routeDate: "2026-07-26",
     stopOrder: 0,
     latitude: "34.01",
@@ -558,8 +558,8 @@ const rows = [
     stopName: "Alex Rivera",
     stopNotes: "2 dogs",
     stopAddress: "123 Ocean Ave, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:08",
-    scheduledDeparture: "07/26/2026 07:13",
+    scheduledArrival: "7/26/2026 7:08",
+    scheduledDeparture: "",
     routeDate: "2026-07-26",
     stopOrder: 1,
     latitude: "34.02",
@@ -573,8 +573,8 @@ const rows = [
     stopName: "Depot",
     stopNotes: "end",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:16",
-    scheduledDeparture: "07/26/2026 07:16",
+    scheduledArrival: "7/26/2026 7:16",
+    scheduledDeparture: "",
     routeDate: "2026-07-26",
     stopOrder: 2,
     latitude: "34.01",
@@ -608,7 +608,16 @@ const sched = synthesizeStopSchedule({
   stopIndex: 0,
   stopCount: 3
 });
-assert.equal(sched.arrival, "07/27/2026 07:00");
+assert.equal(sched.arrival, "");
+assert.equal(sched.departure, "7/27/2026 7:00");
+const sched2 = synthesizeStopSchedule({
+  operatingDate: "2026-07-27",
+  direction: "pickup",
+  stopIndex: 1,
+  stopCount: 3
+});
+assert.equal(sched2.arrival, "7/27/2026 7:08");
+assert.equal(sched2.departure, "");
 
 // Dropoff fixture parses
 const dropParsed = parseCsv(dropoffCsv);
@@ -893,6 +902,9 @@ assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
   });
   assert.ok(noteCsv.csv.includes("Phone: (413) 218-7041"));
   assert.ok(noteCsv.csv.includes("door code 9102"));
+  assert.ok(noteCsv.csv.includes(" · "), "Stop Notes must be flattened to one line for Samsara");
+  const noteLines = noteCsv.csv.trimEnd().split("\n");
+  assert.equal(noteLines.length, 2, "CSV must be header + one data row (no multiline notes)");
 }
 
 {
