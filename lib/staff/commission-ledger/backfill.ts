@@ -282,3 +282,41 @@ export async function ensureCommissionSaleDatesRepaired(supabase: SupabaseClient
 
   return { repaired };
 }
+
+const IVONNE_DUP_PURGE_KEY = "ivonne_rejected_dups_purged_v1";
+
+/**
+ * One-time cleanup: archive Ivonne's rejected duplicate commission rows.
+ * Triggered on ledger list until the settings flag is set.
+ */
+export async function ensureIvonneRejectedDuplicatesPurged(supabase: SupabaseClient) {
+  const { data: adminSettings } = await supabase
+    .from("admin_settings")
+    .select("settings")
+    .eq("id", "default")
+    .maybeSingle();
+  const settings = (adminSettings?.settings ?? {}) as Record<string, unknown>;
+  if (settings[IVONNE_DUP_PURGE_KEY]) {
+    return { archived: 0, skipped: true as const };
+  }
+
+  const { purgeRejectedDuplicateCommissions } = await import("./records");
+  const result = await purgeRejectedDuplicateCommissions(
+    supabase,
+    {
+      email: "system@ruffops.com",
+      adminUserId: null,
+      name: "system",
+      role: "system",
+      roleKey: "system"
+    },
+    { trainerNameIncludes: "ivonne" }
+  );
+
+  const nextSettings = { ...settings, [IVONNE_DUP_PURGE_KEY]: { at: new Date().toISOString(), ...result } };
+  await supabase
+    .from("admin_settings")
+    .upsert({ id: "default", settings: nextSettings, updated_at: new Date().toISOString() }, { onConflict: "id" });
+
+  return { ...result, skipped: false as const };
+}
