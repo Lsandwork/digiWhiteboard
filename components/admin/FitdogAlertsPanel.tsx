@@ -17,8 +17,7 @@ import {
   formatFitdogAlertType,
   formatOperationsAlertStatus,
   isClosedAlertStatus,
-  isDeclinedPaymentAlert,
-  isPaymentErrorAlert
+  isDeclinedPaymentAlert
 } from "@/lib/fitdog-ops/display";
 import { FITDOG_ALERT_TYPES, OPERATIONS_ALERT_STATUSES } from "@/lib/fitdog-ops/types";
 import { formatUsd } from "@/lib/fitdog-ops/money";
