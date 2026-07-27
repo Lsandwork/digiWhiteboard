@@ -51,14 +51,21 @@ html[data-theme="light"] .admin-nav-item {
 
 html[data-theme="light"] .admin-nav-item:hover {
   color: var(--fitdog-text);
-  background: var(--sidebar-item-hover);
+  background: rgba(15, 23, 42, 0.04);
 }
 
-html[data-theme="light"] .admin-nav-item--active {
-  color: var(--fitdog-orange);
-  background: var(--brand-soft);
-  border-color: rgba(249, 115, 22, 0.28);
-  box-shadow: inset 3px 0 0 var(--fitdog-orange);
+html[data-theme="light"] .admin-nav-item--active,
+html[data-theme="light"] .admin-nav-item--active-parent {
+  color: #0f172a;
+  background: #e8f1ff; /* Calendly-like soft active wash */
+  border: none;
+  box-shadow: none;
+}
+
+html[data-theme="light"] .admin-nav-item--active .admin-nav-item__icon,
+html[data-theme="light"] .admin-nav-item--active-parent .admin-nav-item__icon {
+  filter: none;
+  opacity: 1;
 }
 
 html[data-theme="light"] .admin-user-card {
@@ -308,8 +315,9 @@ html[data-theme="light"] .admin-nav-section--active {
 }
 
 html[data-theme="light"] .admin-tab--active {
-  border-bottom-color: var(--fitdog-orange);
-  color: var(--fitdog-text);
+  border-bottom-color: #006bff; /* Calendly blue underline */
+  color: #0f172a;
+  font-weight: 600;
 }
 
 html[data-theme="light"] .admin-status-dot {

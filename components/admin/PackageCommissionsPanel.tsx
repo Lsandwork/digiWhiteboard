@@ -526,12 +526,12 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         </div>
       ) : null}
 
-      <div className="mb-3 flex flex-wrap gap-2">
+      <div className="admin-tabs">
         {tabs.map((entry) => (
           <button
             key={entry.key}
             type="button"
-            className={`crossover-btn ${tab === entry.key ? "crossover-btn--active" : "crossover-btn--ghost"}`}
+            className={`admin-tab ${tab === entry.key ? "admin-tab--active" : ""}`}
             onClick={() => setParams({ pcTab: entry.key, page: "1" })}
           >
             {entry.label}

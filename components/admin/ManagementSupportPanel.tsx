@@ -628,24 +628,24 @@ function TeamLeadManagementSupportPanel({
         </div>
       </header>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="admin-tabs">
         <button
           type="button"
-          className={`crossover-btn ${panelSection === "write_up" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
+          className={`admin-tab ${panelSection === "write_up" ? "admin-tab--active" : ""}`}
           onClick={() => setPanelSection("write_up")}
         >
           Write-Ups
         </button>
         <button
           type="button"
-          className={`crossover-btn ${panelSection === "complaint" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
+          className={`admin-tab ${panelSection === "complaint" ? "admin-tab--active" : ""}`}
           onClick={() => setPanelSection("complaint")}
         >
           Complaints
         </button>
         <button
           type="button"
-          className={`crossover-btn ${panelSection === "request" ? "crossover-btn--active" : "crossover-btn--ghost"}`}
+          className={`admin-tab ${panelSection === "request" ? "admin-tab--active" : ""}`}
           onClick={() => setPanelSection("request")}
         >
           Requests

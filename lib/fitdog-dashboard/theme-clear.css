@@ -71,21 +71,20 @@ html[data-theme="clear"] .admin-nav-item {
 
 html[data-theme="clear"] .admin-nav-item:hover {
   color: #f8fafc;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 html[data-theme="clear"] .admin-nav-item--active,
 html[data-theme="clear"] .admin-nav-item--active-parent {
   color: #f8fafc;
-  background: linear-gradient(90deg, rgba(255, 111, 38, 0.14), rgba(21, 34, 50, 0.9));
-  border-color: rgba(255, 111, 38, 0.35);
-  box-shadow:
-    inset 3px 0 0 #ff6f26,
-    0 8px 18px rgba(0, 0, 0, 0.18);
+  background: rgba(255, 111, 38, 0.18);
+  border: none;
+  box-shadow: none;
 }
 
 html[data-theme="clear"] .admin-nav-group__children .admin-nav-item--active {
-  color: #ff8a4c;
+  color: #ffd7c2;
+  background: rgba(255, 111, 38, 0.14);
 }
 
 html[data-theme="clear"] .admin-user-card,
@@ -194,8 +193,9 @@ html[data-theme="clear"] .crossover-btn--outline:hover:not(:disabled) {
 }
 
 html[data-theme="clear"] .admin-tab--active {
-  border-bottom-color: var(--fitdog-orange);
+  border-bottom-color: #006bff;
   color: var(--fitdog-text);
+  font-weight: 600;
 }
 
 html[data-theme="clear"] .admin-header-brand__label,
