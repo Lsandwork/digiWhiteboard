@@ -522,10 +522,11 @@ const mappings = autoMapSamsaraHeaders(templateHeaders);
 assert.deepEqual(templateHeaders, [...SAMSARA_BULK_UPLOAD_HEADERS]);
 assert.deepEqual(getCanonicalSamsaraTemplate().headers, [...SAMSARA_BULK_UPLOAD_HEADERS]);
 assert.equal(mappings["Full Address"], "full_address");
-assert.equal(mappings["Notes"], "stop_notes");
+assert.equal(mappings["Stop Notes"], "stop_notes");
 assert.equal(mappings["Address Name"], null);
 assert.equal(mappings["Assigned Vehicle Name"], "assigned_vehicle");
-assert.equal(mappings["Scheduled Arrival Time"], "scheduled_arrival");
+assert.equal(mappings["Stop Arrival Time"], "scheduled_arrival");
+assert.equal(mappings["Stop Departure Time"], "scheduled_departure");
 for (const bad of SAMSARA_UNSUPPORTED_HEADERS) {
   assert.equal(
     (templateHeaders as string[]).includes(bad),
@@ -592,7 +593,11 @@ const validation = validateExport({
 assert.equal(validation.ok, true, JSON.stringify(validation.report));
 assert.ok(built.csv.includes("2026-07-26 AM Pickup - Van 01"));
 assert.ok(built.csv.includes("Full Address"));
-assert.ok(built.csv.includes("Scheduled Arrival Time"));
+assert.ok(built.csv.includes("Stop Arrival Time"));
+assert.ok(built.csv.includes("Stop Departure Time"));
+assert.ok(built.csv.includes("Stop Notes"));
+assert.ok(!built.csv.includes("Scheduled Arrival Time"));
+assert.ok(!/,Notes,/.test(built.csv.split("\n")[0] ?? ""));
 assert.ok(!built.csv.includes("Route Date"));
 assert.ok(!built.csv.includes("Stop Order"));
 assert.ok(!built.csv.toLowerCase().includes("van 4"));
