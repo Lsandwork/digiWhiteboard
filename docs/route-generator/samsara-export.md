@@ -18,18 +18,20 @@ In [cloud.samsara.com](https://cloud.samsara.com) → **Settings → API Tokens*
 1. Create (or edit) a token with:
    - **Read Vehicles**
    - **Read Vehicle Statistics**
-2. Set **tag access to the entire organization** (not a tag that excludes vans).
-3. Confirm vehicle names match: `Van 01`, `Van 02`, `Van 03`, `Van 05`, `Van 06` (never Van 04).
+2. Set **Tag Access = Entire Organization** (critical — a tag-scoped token returns an empty vehicle list even though the UI shows vans).
+3. Confirm vehicle names match (already correct in Fitdog org as of 2026-07-27):
 
-Gateway serials stored in `route_vehicle_configs` (fallback match):
-
-| Van | Samsara name | Serial |
+| Staff name | Samsara name | Notes from fleet UI |
 |---|---|---|
-| 1 | Van 01 | `GXPD-PPW-GEV` |
-| 2 | Van 02 | `GW6E-ADZ-ATK` |
-| 3 | Van 03 | `GVE5-PCJ-7KK` |
-| 5 | Van 05 | `GGR6-JKW-B6F` |
-| 6 | Van 06 | `GKEW-DZK-4NX` |
+| Van 1 | **Van 01** | 2018 Ford Transit Connect |
+| Van 2 | **Van 02** | 2018 Ford Transit Connect · VIN `NM0LS7E74J1371466` · plate `38516L2` |
+| Van 3 | **Van 03** | 2018 Ford Transit Connect |
+| Van 5 | **Van 05** | 2018 Nissan NV200 · VIN `3N6CM0KN6JK701997` · plate `69357N2` |
+| Van 6 | **Van 06** | 2021 Nissan NV200 · VIN `3N6CM0KN3MK705283` |
+
+Never Van 04. Do **not** rename away from `Van 01`… — our exporter and GPS matcher expect those exact labels.
+
+Gateway serials (DB fallback) live in `route_vehicle_configs` / `lib/route-generator/samsara-vans.ts`.
 
 ## 2. Verify the token locally
 

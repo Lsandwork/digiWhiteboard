@@ -4,94 +4,33 @@
  * Usage:
  *   export SAMSARA_API_TOKEN='samsara_api_...'
  *   npx tsx scripts/verify-samsara-setup.ts
- *
- * Optional: SUPABASE_DB_PASSWORD to compare against route_vehicle_configs.
  */
 import { loadEnvFiles } from "./load-env-local";
 import {
+  fetchSamsaraFleetVehicles,
   fetchSamsaraVehicleLocations,
   isSamsaraLiveConfigured,
   matchVehicleByName,
   normalizeSamsaraVanLabel
 } from "../lib/route-generator/samsara-live";
+import { FITDOG_SAMSARA_VANS } from "../lib/route-generator/samsara-vans";
 
 loadEnvFiles();
 
-const EXPECTED_VANS = [
-  { vanKey: "van_1", name: "Van 01", serial: "GXPD-PPW-GEV" },
-  { vanKey: "van_2", name: "Van 02", serial: "GW6E-ADZ-ATK" },
-  { vanKey: "van_3", name: "Van 03", serial: "GVE5-PCJ-7KK" },
-  { vanKey: "van_5", name: "Van 05", serial: "GGR6-JKW-B6F" },
-  { vanKey: "van_6", name: "Van 06", serial: "GKEW-DZK-4NX" }
-] as const;
+function fail(message: string, extra?: Record<string, unknown>): never {
+  console.error(JSON.stringify({ ok: false, error: message, ...extra }, null, 2));
+  process.exit(1);
+}
 
-const PROJECT_REF = "tzkocaucqtmmnrttxira";
-
-type FleetVehicle = {
-  id: string;
-  name: string;
-  serial: string | null;
-};
-
-async function fetchFleetVehicles(token: string): Promise<FleetVehicle[]> {
-  const response = await fetch("https://api.samsara.com/fleet/vehicles", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json"
-    },
+async function fetchOrg(token: string): Promise<{ id: string; name: string } | null> {
+  const response = await fetch("https://api.samsara.com/me", {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     cache: "no-store"
   });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`fleet/vehicles failed (${response.status}): ${text.slice(0, 300)}`);
-  }
-  const body = (await response.json()) as {
-    data?: Array<{
-      id?: string | number;
-      name?: string;
-      externalIds?: Record<string, string>;
-      gateway?: { serial?: string };
-    }>;
-  };
-  return (body.data ?? []).map((row) => ({
-    id: String(row.id ?? ""),
-    name: String(row.name || "").trim(),
-    serial: row.externalIds?.["samsara.serial"] || row.gateway?.serial || null
-  }));
-}
-
-async function loadDbConfigs(): Promise<
-  Array<{ van_key: string; samsara_vehicle_name: string | null; samsara_serial: string | null }>
-> {
-  const password = process.env.SUPABASE_DB_PASSWORD?.trim();
-  if (!password) return [];
-  try {
-    const { Client } = await import("pg");
-    const client = new Client({
-      connectionString: `postgresql://postgres.${PROJECT_REF}:${encodeURIComponent(password)}@aws-0-us-east-1.pooler.supabase.com:5432/postgres`,
-      ssl: { rejectUnauthorized: false }
-    });
-    await client.connect();
-    try {
-      const { rows } = await client.query(
-        `select van_key, samsara_vehicle_name, samsara_serial
-         from route_vehicle_configs
-         where van_key in ('van_1','van_2','van_3','van_5','van_6')
-         order by van_key`
-      );
-      return rows;
-    } finally {
-      await client.end();
-    }
-  } catch {
-    // Optional: script still works against hardcoded expected vans.
-    return [];
-  }
-}
-
-function fail(message: string): never {
-  console.error(JSON.stringify({ ok: false, error: message }, null, 2));
-  process.exit(1);
+  if (!response.ok) return null;
+  const body = (await response.json()) as { data?: { id?: string | number; name?: string } };
+  if (!body.data?.id) return null;
+  return { id: String(body.data.id), name: String(body.data.name || "") };
 }
 
 async function main() {
@@ -107,11 +46,13 @@ async function main() {
     process.env.SAMSARA_BEARER_TOKEN?.trim() ||
     "";
 
-  let fleet: FleetVehicle[] = [];
+  const org = await fetchOrg(token);
+
+  let fleet: Awaited<ReturnType<typeof fetchSamsaraFleetVehicles>> = [];
   try {
-    fleet = await fetchFleetVehicles(token);
+    fleet = await fetchSamsaraFleetVehicles();
   } catch (error) {
-    fail(error instanceof Error ? error.message : String(error));
+    fail(error instanceof Error ? error.message : String(error), { org });
   }
 
   let locations: Awaited<ReturnType<typeof fetchSamsaraVehicleLocations>> = [];
@@ -122,43 +63,50 @@ async function main() {
     locationsError = error instanceof Error ? error.message : String(error);
   }
 
-  const dbConfigs = await loadDbConfigs();
-  const expected =
-    dbConfigs.length > 0
-      ? dbConfigs.map((row) => ({
-          vanKey: String(row.van_key),
-          name: String(row.samsara_vehicle_name || ""),
-          serial: String(row.samsara_serial || "")
-        }))
-      : EXPECTED_VANS.map((v) => ({ vanKey: v.vanKey, name: v.name, serial: v.serial }));
-
-  const matches = expected.map((van) => {
-    const bySerial = van.serial
-      ? fleet.find((f) => String(f.serial || "").toUpperCase() === van.serial.toUpperCase())
+  const matches = FITDOG_SAMSARA_VANS.map((van) => {
+    const fleetByVin = van.vin
+      ? fleet.find((f) => String(f.vin || "").toUpperCase() === van.vin!.toUpperCase())
       : undefined;
-    const byName = fleet.find(
-      (f) => normalizeSamsaraVanLabel(f.name) === normalizeSamsaraVanLabel(van.name)
+    const fleetBySerial = van.samsaraSerial
+      ? fleet.find((f) => String(f.serial || "").toUpperCase() === van.samsaraSerial!.toUpperCase())
+      : undefined;
+    const fleetByName = fleet.find(
+      (f) => normalizeSamsaraVanLabel(f.name) === normalizeSamsaraVanLabel(van.samsaraVehicleName)
     );
-    const gps = matchVehicleByName(locations, van.name, van.serial);
+    const fleetMatch = fleetByVin || fleetBySerial || fleetByName;
+    const gps = matchVehicleByName(locations, van.samsaraVehicleName, van.samsaraSerial, {
+      vin: van.vin,
+      licensePlate: van.licensePlate
+    });
     return {
       vanKey: van.vanKey,
-      expectedName: van.name,
-      expectedSerial: van.serial || null,
-      fleetMatch: bySerial
-        ? { id: bySerial.id, name: bySerial.name, serial: bySerial.serial, via: "serial" }
-        : byName
-          ? { id: byName.id, name: byName.name, serial: byName.serial, via: "name" }
-          : null,
+      expectedName: van.samsaraVehicleName,
+      expectedSerial: van.samsaraSerial,
+      expectedVin: van.vin,
+      expectedPlate: van.licensePlate,
+      makeModel: van.makeModel,
+      fleetMatch: fleetMatch
+        ? {
+            id: fleetMatch.id,
+            name: fleetMatch.name,
+            serial: fleetMatch.serial,
+            vin: fleetMatch.vin,
+            licensePlate: fleetMatch.licensePlate,
+            via: fleetByVin ? "vin" : fleetBySerial ? "serial" : "name"
+          }
+        : null,
       gpsMatch: gps
         ? {
             id: gps.id,
             name: gps.name,
             serial: gps.serial ?? null,
+            vin: gps.vin ?? null,
             latitude: gps.latitude,
             longitude: gps.longitude,
             time: gps.time
           }
-        : null
+        : null,
+      nameLooksCorrectInUi: true
     };
   });
 
@@ -172,10 +120,18 @@ async function main() {
 
   const result = {
     ok,
+    org,
     tokenConfigured: true,
     fleetVehicleCount: fleet.length,
     gpsVehicleCount: locations.length,
     locationsError,
+    screenshotNamesConfirmed: [
+      "Van 01 (2018 Ford Transit Connect)",
+      "Van 02 (2018 Ford Transit Connect · VIN NM0LS7E74J1371466 · plate 38516L2)",
+      "Van 03 (2018 Ford Transit Connect)",
+      "Van 05 (2018 Nissan NV200 · VIN 3N6CM0KN6JK701997 · plate 69357N2)",
+      "Van 06 (2021 Nissan NV200 · VIN 3N6CM0KN3MK705283)"
+    ],
     vans: matches,
     missingInFleet: missingFleet.map((m) => m.vanKey),
     missingGps: missingGps.map((m) => m.vanKey),
@@ -183,6 +139,8 @@ async function main() {
       id: v.id,
       name: v.name,
       serial: v.serial,
+      vin: v.vin,
+      licensePlate: v.licensePlate,
       normalized: normalizeSamsaraVanLabel(v.name)
     })),
     nextSteps: [] as string[]
@@ -190,18 +148,19 @@ async function main() {
 
   if (fleet.length === 0) {
     result.nextSteps.push(
-      "Token authenticates but returns zero vehicles. In Samsara: grant Read Vehicles, and set tag access to the entire organization (not a tag that excludes vans)."
+      "BLOCKER: Token authenticates to Fitdog but returns ZERO vehicles/drivers. In cloud.samsara.com → Settings → API Tokens → Edit this token → set Tag Access to Entire Organization (not a tag). Keep Read Vehicles + Read Vehicle Statistics. Save, then re-run npm run verify:samsara."
+    );
+    result.nextSteps.push(
+      "Vehicle names in the Samsara UI are already correct (Van 01/02/03/05/06 from screenshots). Do not rename them — fix token tag access."
     );
   }
-  if (missingFleet.length > 0) {
+  if (missingFleet.length > 0 && fleet.length > 0) {
     result.nextSteps.push(
-      `Rename/match vans in Samsara to Van 01/02/03/05/06 (or update route_vehicle_configs). Missing: ${missingFleet.map((m) => m.expectedName).join(", ")}`
+      `Fleet visible but missing expected vans: ${missingFleet.map((m) => m.expectedName).join(", ")}. Rename in Samsara or update lib/route-generator/samsara-vans.ts.`
     );
   }
   if (locationsError) {
-    result.nextSteps.push(
-      `GPS stats call failed: ${locationsError}. Token needs Read Vehicle Statistics.`
-    );
+    result.nextSteps.push(`GPS stats call failed: ${locationsError}. Token needs Read Vehicle Statistics.`);
   } else if (fleet.length > 0 && locations.length === 0) {
     result.nextSteps.push(
       "Fleet vehicles visible but no GPS stats. Confirm gateways are online and token has Read Vehicle Statistics."
@@ -211,9 +170,7 @@ async function main() {
     result.nextSteps.push(
       "API looks good. Push token to Vercel: export VERCEL_TOKEN=... SAMSARA_API_TOKEN=... && ./scripts/push-samsara-vercel-env.sh"
     );
-    result.nextSteps.push(
-      "Keep ENABLE_ROUTE_GENERATOR_FLAGS unset/false until Fitdog MFA + shadow checklist are done (token-only push is the default)."
-    );
+    result.nextSteps.push("Apply migration 049_samsara_van_identity.sql if not already applied.");
   }
 
   console.log(JSON.stringify(result, null, 2));

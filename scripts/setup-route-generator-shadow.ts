@@ -75,12 +75,13 @@ async function main() {
 
   // Provisional shadow capacities — NOT marked configured for production.
   // Values are conservative placeholders for shadow-mode dry runs only.
+  // Samsara names must be zero-padded (Van 01…), matching cloud.samsara.com — never "Van 1".
   const provisional = [
-    { key: "van_1", pool: "club", dogs: 8, load: 10, large: 3, duration: 180, stops: 12, samsara: "Van 1" },
-    { key: "van_2", pool: "club", dogs: 8, load: 10, large: 3, duration: 180, stops: 12, samsara: "Van 2" },
-    { key: "van_3", pool: "outing", dogs: 10, load: 12, large: 4, duration: 240, stops: 14, samsara: "Van 3" },
-    { key: "van_5", pool: "outing", dogs: 10, load: 12, large: 4, duration: 240, stops: 14, samsara: "Van 5" },
-    { key: "van_6", pool: "outing", dogs: 10, load: 12, large: 4, duration: 240, stops: 14, samsara: "Van 6" }
+    { key: "van_1", pool: "club", dogs: 8, load: 10, large: 3, duration: 180, stops: 12, samsara: "Van 01" },
+    { key: "van_2", pool: "club", dogs: 8, load: 10, large: 3, duration: 180, stops: 12, samsara: "Van 02" },
+    { key: "van_3", pool: "outing", dogs: 10, load: 12, large: 4, duration: 240, stops: 14, samsara: "Van 03" },
+    { key: "van_5", pool: "outing", dogs: 10, load: 12, large: 4, duration: 240, stops: 14, samsara: "Van 05" },
+    { key: "van_6", pool: "outing", dogs: 10, load: 12, large: 4, duration: 240, stops: 14, samsara: "Van 06" }
   ];
 
   for (const van of provisional) {
