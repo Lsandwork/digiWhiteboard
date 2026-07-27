@@ -522,10 +522,11 @@ const mappings = autoMapSamsaraHeaders(templateHeaders);
 assert.deepEqual(templateHeaders, [...SAMSARA_BULK_UPLOAD_HEADERS]);
 assert.deepEqual(getCanonicalSamsaraTemplate().headers, [...SAMSARA_BULK_UPLOAD_HEADERS]);
 assert.equal(mappings["Full Address"], "full_address");
-assert.equal(mappings["Notes"], "stop_notes");
+assert.equal(mappings["Stop Notes"], "stop_notes");
 assert.equal(mappings["Address Name"], null);
 assert.equal(mappings["Assigned Vehicle Name"], "assigned_vehicle");
-assert.equal(mappings["Scheduled Arrival Time"], "scheduled_arrival");
+assert.equal(mappings["Stop Arrival Time"], "scheduled_arrival");
+assert.equal(mappings["Stop Departure Time"], "scheduled_departure");
 for (const bad of SAMSARA_UNSUPPORTED_HEADERS) {
   assert.equal(
     (templateHeaders as string[]).includes(bad),
@@ -542,8 +543,8 @@ const rows = [
     stopName: "Depot",
     stopNotes: "start",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:00",
-    scheduledDeparture: "07/26/2026 07:05",
+    scheduledArrival: "",
+    scheduledDeparture: "7/26/2026 7:00",
     routeDate: "2026-07-26",
     stopOrder: 0,
     latitude: "34.01",
@@ -557,8 +558,8 @@ const rows = [
     stopName: "Alex Rivera",
     stopNotes: "2 dogs",
     stopAddress: "123 Ocean Ave, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:08",
-    scheduledDeparture: "07/26/2026 07:13",
+    scheduledArrival: "7/26/2026 7:08",
+    scheduledDeparture: "",
     routeDate: "2026-07-26",
     stopOrder: 1,
     latitude: "34.02",
@@ -572,8 +573,8 @@ const rows = [
     stopName: "Depot",
     stopNotes: "end",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:16",
-    scheduledDeparture: "07/26/2026 07:16",
+    scheduledArrival: "7/26/2026 7:16",
+    scheduledDeparture: "",
     routeDate: "2026-07-26",
     stopOrder: 2,
     latitude: "34.01",
@@ -592,7 +593,11 @@ const validation = validateExport({
 assert.equal(validation.ok, true, JSON.stringify(validation.report));
 assert.ok(built.csv.includes("2026-07-26 AM Pickup - Van 01"));
 assert.ok(built.csv.includes("Full Address"));
-assert.ok(built.csv.includes("Scheduled Arrival Time"));
+assert.ok(built.csv.includes("Stop Arrival Time"));
+assert.ok(built.csv.includes("Stop Departure Time"));
+assert.ok(built.csv.includes("Stop Notes"));
+assert.ok(!built.csv.includes("Scheduled Arrival Time"));
+assert.ok(!/,Notes,/.test(built.csv.split("\n")[0] ?? ""));
 assert.ok(!built.csv.includes("Route Date"));
 assert.ok(!built.csv.includes("Stop Order"));
 assert.ok(!built.csv.toLowerCase().includes("van 4"));
@@ -603,7 +608,16 @@ const sched = synthesizeStopSchedule({
   stopIndex: 0,
   stopCount: 3
 });
-assert.equal(sched.arrival, "07/27/2026 07:00");
+assert.equal(sched.arrival, "");
+assert.equal(sched.departure, "7/27/2026 7:00");
+const sched2 = synthesizeStopSchedule({
+  operatingDate: "2026-07-27",
+  direction: "pickup",
+  stopIndex: 1,
+  stopCount: 3
+});
+assert.equal(sched2.arrival, "7/27/2026 7:08");
+assert.equal(sched2.departure, "");
 
 // Dropoff fixture parses
 const dropParsed = parseCsv(dropoffCsv);
@@ -888,6 +902,9 @@ assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
   });
   assert.ok(noteCsv.csv.includes("Phone: (413) 218-7041"));
   assert.ok(noteCsv.csv.includes("door code 9102"));
+  assert.ok(noteCsv.csv.includes(" · "), "Stop Notes must be flattened to one line for Samsara");
+  const noteLines = noteCsv.csv.trimEnd().split("\n");
+  assert.equal(noteLines.length, 2, "CSV must be header + one data row (no multiline notes)");
 }
 
 {

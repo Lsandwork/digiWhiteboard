@@ -1,28 +1,30 @@
 /**
  * Canonical Samsara dashboard bulk-upload headers (columns A–K).
- * Any other header names are rejected by cloud.samsara.com CSV upload.
- * Do not invent aliases — keep this list exact.
+ * Exact match to cloud.samsara.com "Create Routes Through Bulk CSV Upload" templates
+ * (Address Book + Lat/Long/Full Address samples). Editing these names fails upload.
  */
 export const SAMSARA_BULK_UPLOAD_HEADERS = [
   "Route Name",
   "Assigned Driver Username",
   "Assigned Vehicle Name",
   "Stop Name",
-  "Notes",
-  "Scheduled Arrival Time",
-  "Scheduled Departure Time",
+  "Stop Arrival Time",
+  "Stop Departure Time",
+  "Stop Notes",
   "Address Name",
   "Latitude",
   "Longitude",
   "Full Address"
 ] as const;
 
-/** Headers that previously caused Samsara "column headers are not supported". */
+/** Headers that cause Samsara "column headers are not supported". */
 export const SAMSARA_UNSUPPORTED_HEADERS = [
+  "Notes",
+  "Scheduled Arrival Time",
+  "Scheduled Departure Time",
   "Route Notes",
   "Assigned Vehicle",
   "Assigned Driver",
-  "Stop Notes",
   "Stop Address",
   "Scheduled Arrival",
   "Scheduled Departure",
@@ -113,26 +115,30 @@ export function autoMapSamsaraHeaders(headers: string[]): Record<string, string 
   return mapping;
 }
 
-/** Format a Date for Samsara route CSV upload in org-local wall time. */
+/** Format a Date for Samsara route CSV upload in org-local wall time.
+ * Matches dashboard examples: `m/d/yyyy H:mm` (e.g. 7/27/2026 7:05).
+ */
 export function formatSamsaraCsvDateTime(date: Date, timeZone = "America/Los_Angeles"): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
     minute: "2-digit",
     hour12: false
   }).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
-  const hour = get("hour") === "24" ? "00" : get("hour");
-  return `${get("month")}/${get("day")}/${get("year")} ${hour}:${get("minute")}`;
+  const hourRaw = get("hour");
+  const hour = hourRaw === "24" ? "0" : String(Number(hourRaw));
+  return `${Number(get("month"))}/${Number(get("day"))}/${get("year")} ${hour}:${get("minute")}`;
 }
 
 /**
- * Build spaced stop arrival/departure times for a route when ETAs were not persisted.
- * Pickup defaults to 07:00 PT; drop-off defaults to 15:30 PT.
+ * Build spaced stop arrival/departure times matching Samsara sample CSVs:
+ * - First stop: blank arrival, departure set (route start)
+ * - Later stops: arrival set, blank departure
  */
 export function synthesizeStopSchedule(params: {
   operatingDate: string; // YYYY-MM-DD
@@ -147,12 +153,27 @@ export function synthesizeStopSchedule(params: {
   const localStamp = `${params.operatingDate}T${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}:00`;
   const startMs = civilTimeToUtcMs(localStamp, "America/Los_Angeles");
   const arriveMs = startMs + params.stopIndex * minutesPerStop * 60_000;
-  const departMs =
-    arriveMs + (params.stopIndex === params.stopCount - 1 ? 0 : Math.min(5, minutesPerStop) * 60_000);
+  if (params.stopIndex === 0) {
+    return {
+      arrival: "",
+      departure: formatSamsaraCsvDateTime(new Date(arriveMs))
+    };
+  }
   return {
     arrival: formatSamsaraCsvDateTime(new Date(arriveMs)),
-    departure: formatSamsaraCsvDateTime(new Date(departMs))
+    departure: ""
   };
+}
+
+/** Samsara bulk upload often 500s on multiline Stop Notes — keep one line. */
+export function flattenSamsaraStopNotes(value: string | null | undefined): string {
+  return String(value || "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Convert a civil local datetime `YYYY-MM-DDTHH:mm:ss` in `timeZone` to UTC epoch ms. */
@@ -224,7 +245,11 @@ export function buildCsv(params: {
       if (!field) return "";
       const getter = FIELD_GETTERS[field];
       if (!getter) return "";
-      return escapeCsvCell(getter(row), template.delimiter);
+      let value = getter(row);
+      if (field === "stop_notes" || field === "notes") {
+        value = flattenSamsaraStopNotes(String(value));
+      }
+      return escapeCsvCell(value, template.delimiter);
     });
     lines.push(cells.join(template.delimiter));
   }
@@ -257,11 +282,23 @@ export function validateExport(params: {
   }
   if (!params.rows.length) errors.push("Export has no stop rows.");
   for (const row of params.rows) {
-    if (!row.scheduledArrival?.trim() || !row.scheduledDeparture?.trim()) {
-      errors.push(`Missing scheduled arrival/departure on route ${row.routeName}`);
+    const isFirst = row.stopOrder === Math.min(...params.rows.filter((r) => r.routeName === row.routeName).map((r) => r.stopOrder));
+    if (isFirst) {
+      if (!row.scheduledDeparture?.trim()) {
+        errors.push(`First stop on ${row.routeName} needs Stop Departure Time (leave arrival blank).`);
+      }
+    } else if (!row.scheduledArrival?.trim()) {
+      errors.push(`Missing Stop Arrival Time on route ${row.routeName} stop "${row.stopName}"`);
     }
     if (!row.stopAddress?.trim() && (!row.latitude || !row.longitude)) {
       errors.push(`Stop "${row.stopName}" on ${row.routeName} needs Full Address or lat/lng.`);
+    }
+    // Raw address mode: require all three; Address Name must stay blank (mapped null).
+    if (!row.latitude?.trim() || !row.longitude?.trim() || !row.stopAddress?.trim()) {
+      errors.push(`Stop "${row.stopName}" on ${row.routeName} needs Latitude, Longitude, and Full Address.`);
+    }
+    if (row.driverName?.trim() && row.vehicleName?.trim()) {
+      errors.push(`Route ${row.routeName} cannot assign both driver and vehicle.`);
     }
   }
 

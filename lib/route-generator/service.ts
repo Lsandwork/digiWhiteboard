@@ -1120,25 +1120,44 @@ export async function exportSamsaraCsv(params: {
         stopIndex,
         stopCount: routeStops.length
       });
-      const scheduledArrival =
-        etaArrival && !Number.isNaN(etaArrival.getTime())
-          ? formatSamsaraCsvDateTime(etaArrival)
-          : synthesized.arrival;
-      const scheduledDeparture =
-        etaDeparture && !Number.isNaN(etaDeparture.getTime())
-          ? formatSamsaraCsvDateTime(etaDeparture)
-          : synthesized.departure;
+      // Match Samsara sample CSVs: first stop = departure only; later = arrival only.
+      let scheduledArrival = synthesized.arrival;
+      let scheduledDeparture = synthesized.departure;
+      if (stopIndex === 0) {
+        scheduledArrival = "";
+        scheduledDeparture =
+          etaDeparture && !Number.isNaN(etaDeparture.getTime())
+            ? formatSamsaraCsvDateTime(etaDeparture)
+            : etaArrival && !Number.isNaN(etaArrival.getTime())
+              ? formatSamsaraCsvDateTime(etaArrival)
+              : synthesized.departure;
+      } else {
+        scheduledDeparture = "";
+        scheduledArrival =
+          etaArrival && !Number.isNaN(etaArrival.getTime())
+            ? formatSamsaraCsvDateTime(etaArrival)
+            : synthesized.arrival;
+      }
       // Prefer stop notes; include route wave context when present.
       const notesWithRoute =
         stopNotes.trim() ||
         `${route.wave_name || ""}`.trim();
+      const stopLabel =
+        String(stop.owner_name || "").trim() ||
+        (stop.stop_kind === "customer"
+          ? "Customer stop"
+          : stop.stop_kind === "start_depot" || stop.stop_kind === "depot"
+            ? "Start"
+            : stop.stop_kind === "end_depot"
+              ? "End"
+              : String(stop.stop_kind || "Stop"));
       rows.push({
         routeName,
         routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
         driverName: "",
-        stopName: stop.owner_name || stop.stop_kind,
+        stopName: stopLabel,
         stopNotes: notesWithRoute,
         stopAddress: stop.address || "",
         scheduledArrival,
