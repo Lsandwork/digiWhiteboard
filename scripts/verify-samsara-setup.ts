@@ -124,6 +124,7 @@ async function main() {
     tokenConfigured: true,
     fleetVehicleCount: fleet.length,
     gpsVehicleCount: locations.length,
+    addressSampleCount: 0 as number,
     locationsError,
     screenshotNamesConfirmed: [
       "Van 01 (2018 Ford Transit Connect)",
@@ -146,12 +147,38 @@ async function main() {
     nextSteps: [] as string[]
   };
 
+  let addressCount = 0;
+  try {
+    const addrRes = await fetch("https://api.samsara.com/addresses?limit=1", {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      cache: "no-store"
+    });
+    if (addrRes.ok) {
+      const addrBody = (await addrRes.json()) as { data?: unknown[] };
+      addressCount = addrBody.data?.length ?? 0;
+    }
+  } catch {
+    // ignore — diagnostic only
+  }
+  result.addressSampleCount = addressCount;
+
   if (fleet.length === 0) {
     result.nextSteps.push(
-      "BLOCKER: Token authenticates to Fitdog but returns ZERO vehicles/drivers. In cloud.samsara.com → Settings → API Tokens → Edit this token → set Tag Access to Entire Organization (not a tag). Keep Read Vehicles + Read Vehicle Statistics. Save, then re-run npm run verify:samsara."
+      "BLOCKER: Token reaches Fitdog org but returns ZERO vehicles, drivers, and gateways."
+    );
+    if (addressCount > 0) {
+      result.nextSteps.push(
+        "DIAGNOSIS: Token CAN read addresses (e.g. Apartments / Gate Code tags) but NOT fleet vehicles. That means Tag Access is still limited to address tags — not Entire Organization."
+      );
+    }
+    result.nextSteps.push(
+      "FIX in cloud.samsara.com → Settings → API Tokens → Edit the SAME token you exported → Tag Access = Entire Organization (do not pick Apartments/Gate Code/etc.) → scopes include Read Vehicles + Read Vehicle Statistics → Save."
     );
     result.nextSteps.push(
-      "Vehicle names in the Samsara UI are already correct (Van 01/02/03/05/06 from screenshots). Do not rename them — fix token tag access."
+      "If you created a NEW token, export that value here (the verifier is still using the old token). Regenerating invalidates the previous string."
+    );
+    result.nextSteps.push(
+      "Vehicle names in the Samsara UI are already correct (Van 01/02/03/05/06). Do not rename them."
     );
   }
   if (missingFleet.length > 0 && fleet.length > 0) {
