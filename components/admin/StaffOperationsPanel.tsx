@@ -617,17 +617,14 @@ function CrossoverPage(props: {
 }) {
   const [form, setForm] = useState<ShiftLogFormShape>(emptyShiftLogForm);
   const [filters, setFilters] = useState<ShiftLogFilters>(emptyShiftLogFilters);
-  const [dailyPage, setDailyPage] = useState(1);
   const [openPage, setOpenPage] = useState(1);
   const [archivedPage, setArchivedPage] = useState(1);
-  const [showAllDaily, setShowAllDaily] = useState(false);
   const [showAllOpen, setShowAllOpen] = useState(false);
   const [showAllArchived, setShowAllArchived] = useState(false);
   const todayLabel = useMemo(() => formatShiftLogDayLabel(), []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      setDailyPage(1);
       setOpenPage(1);
       setArchivedPage(1);
     }, 0);
@@ -767,9 +764,9 @@ function CrossoverPage(props: {
           <ActiveShiftLogCard
             rows={dailyRows}
             total={dailyRows.length}
-            page={dailyPage}
-            maxPage={Math.max(1, Math.ceil(dailyRows.length / PAGE_SIZE))}
-            pageSize={PAGE_SIZE}
+            page={1}
+            maxPage={1}
+            pageSize={Math.max(dailyRows.length, 1)}
             busy={props.busy}
             loading={props.loading}
             canPushToWhiteboard={canPushCrossoverToWhiteboard(props.data?.currentUser.role)}
@@ -778,7 +775,7 @@ function CrossoverPage(props: {
             filters={filters}
             setFilters={setFilters}
             assignOptions={assignOptions}
-            onPage={setDailyPage}
+            onPage={() => undefined}
             onRefresh={props.onRefresh}
             onMutate={props.onMutate}
             onDetail={props.onDetail}
@@ -792,8 +789,7 @@ function CrossoverPage(props: {
             showFilterBar={false}
             showRefresh={false}
             logBucket="crossover"
-            showAll={showAllDaily}
-            onToggleShowAll={() => setShowAllDaily((value) => !value)}
+            showAll
           />
           <ActiveShiftLogCard
             rows={openRows}
