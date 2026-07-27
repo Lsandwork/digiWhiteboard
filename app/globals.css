@@ -4036,9 +4036,9 @@ html.lobby-tv-display .social-video-shell {
   }
 
   .notif-hub-sidebar__item--active {
-    background: #e8f1ff;
+    background: rgba(0, 107, 255, 0.16);
     border-color: transparent;
-    color: #0f172a;
+    color: #f8fafc;
   }
 
   .notif-hub-sidebar__count {
