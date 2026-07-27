@@ -94,7 +94,7 @@ function SubmissionReviewCard({ report }: { report: ManagementReport }) {
         <p className="mt-2 text-sm text-admin-muted">{report.summary}</p>
       )}
       <p className="mt-3 text-xs text-admin-muted">
-        Submitted by {report.created_by ?? "staff"}
+        Submitted by {report.submitted_by_name ?? report.created_by ?? "staff"}
         {report.reviewed_by ? ` • Reviewed by ${report.reviewed_by}` : " • Awaiting admin/management review"}
       </p>
     </article>

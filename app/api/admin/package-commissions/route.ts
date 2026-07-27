@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveSessionDisplayName } from "@/lib/admin/actor-display";
 import {
   canManagePackageCommissions,
   canViewPackageCommissions,
@@ -79,11 +80,11 @@ function buildViewer(
   };
 }
 
-function actorFrom(session: ReturnType<typeof getAdminSessionFromRequest>) {
+function actorFrom(session: ReturnType<typeof getAdminSessionFromRequest>, displayName?: string | null) {
   return {
     email: session?.email ?? null,
     adminUserId: session?.adminUserId ?? null,
-    name: session?.email ?? null,
+    name: (displayName?.trim() || session?.email) ?? null,
     role: session?.role ?? null,
     roleKey: legacyRoleToRoleKey(session?.role ?? null)
   };
@@ -96,6 +97,7 @@ async function resolveAccess(request: Request) {
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
+  const displayName = await resolveSessionDisplayName(supabase, session);
 
   const canView =
     canViewPackageCommissions(role) ||
@@ -109,7 +111,16 @@ async function resolveAccess(request: Request) {
   const canComment =
     role === "trainer" || hasPermission(access, "comment_package_commissions") || canManage;
 
-  return { session, role, supabase, access, canView, canManage, canComment };
+  return {
+    session,
+    role,
+    supabase,
+    access,
+    canView,
+    canManage,
+    canComment,
+    actor: actorFrom(session, displayName)
+  };
 }
 
 function parseListFilters(url: URL): CommissionListFilters {
@@ -260,13 +271,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, supabase, access, canManage, canComment, canView } = await resolveAccess(request);
+  const { session, supabase, access, canManage, canComment, canView, actor } = await resolveAccess(request);
   if (!canView) {
     return NextResponse.json({ error: "You do not have permission to view package commissions." }, { status: 403 });
   }
 
   const viewer = buildViewer(session, access, canManage, canComment);
-  const actor = actorFrom(session);
   const body = (await request.json()) as Record<string, unknown>;
   const action = String(body.action ?? "create");
 

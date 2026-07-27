@@ -1,5 +1,6 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
+import { displayActorLabel, loadActorNameLookup } from "@/lib/admin/actor-display";
 import {
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
@@ -492,7 +493,47 @@ async function saveState(supabase: SupabaseClient, state: StaffOpsState) {
 }
 
 export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsState> {
-  return parseState(await loadState(supabase));
+  const state = parseState(await loadState(supabase));
+  return enrichStaffOpsActorLabels(supabase, state);
+}
+
+/** Rewrite display fields so emails never appear as the submitter/author label. Ownership identity stays on created_by. */
+export async function enrichStaffOpsActorLabels(supabase: SupabaseClient, state: StaffOpsState): Promise<StaffOpsState> {
+  const values: Array<string | null | undefined> = [];
+  for (const item of state.crossover_messages) {
+    values.push(item.submitted_by, item.created_by);
+  }
+  for (const reply of state.crossover_message_replies) {
+    values.push(reply.created_by);
+  }
+  for (const log of state.activity_logs) {
+    values.push(log.created_by);
+  }
+  for (const notice of state.notifications) {
+    values.push(notice.created_by);
+  }
+
+  const lookup = await loadActorNameLookup(supabase, values, state.staff_directory);
+
+  return {
+    ...state,
+    crossover_messages: state.crossover_messages.map((item) => ({
+      ...item,
+      submitted_by: displayActorLabel(item.submitted_by || item.created_by, lookup, "Staff")
+    })),
+    crossover_message_replies: state.crossover_message_replies.map((reply) => ({
+      ...reply,
+      created_by: displayActorLabel(reply.created_by, lookup, "Staff")
+    })),
+    activity_logs: state.activity_logs.map((log) => ({
+      ...log,
+      created_by: displayActorLabel(log.created_by, lookup, "Staff")
+    })),
+    notifications: state.notifications.map((notice) => ({
+      ...notice,
+      created_by: displayActorLabel(notice.created_by, lookup, notice.created_by ?? "System")
+    }))
+  };
 }
 
 export async function appendStaffOpsActivityEntries(
@@ -682,7 +723,12 @@ function markLinkedIssuePendingReview(state: StaffOpsState, sourceTable: "crosso
   };
 }
 
-export async function createCrossoverMessage(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {
+export async function createCrossoverMessage(
+  supabase: SupabaseClient,
+  input: Record<string, unknown>,
+  actor: string | null,
+  displayName?: string | null
+) {
   const subject = cleanString(input.subject);
   const rawDetails = cleanString(input.details ?? input.message);
   const logType = cleanString(input.log_type, "General Shift Note") || "General Shift Note";
@@ -696,6 +742,7 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
   const from = optionalString(input.from_department) ?? "Front Desk";
   const to = optionalString(input.to_department) ?? optionalString(input.assigned_team) ?? assignedTo ?? "Front Desk Team";
   const details = rawDetails;
+  const submitterLabel = cleanString(displayName) || actor;
   const record: CrossoverMessage = {
     id: newId(),
     subject,
@@ -720,8 +767,9 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
               .filter(([, value]) => value)
           )
         : null,
+    // Keep created_by as the stable identity (email/id) for ownership checks.
     created_by: actor,
-    submitted_by: actor,
+    submitted_by: submitterLabel,
     assigned_to: assignedTo,
     assigned_team: optionalString(input.assigned_team) ?? (assignedTo && assignedTo.includes("Team") ? assignedTo : null),
     reported_to: assignedTo ?? to,
@@ -742,10 +790,10 @@ export async function createCrossoverMessage(supabase: SupabaseClient, input: Re
   state = createActivityLog({ ...state, crossover_messages: sortNewest([record, ...state.crossover_messages]) }, {
     activity_type: "shift_log.created",
     title: `Log created: ${record.subject}`,
-    description: `${record.log_type} • ${shiftLogAssignedLabel(record)} • By ${actor ?? "Staff"}`,
+    description: `${record.log_type} • ${shiftLogAssignedLabel(record)} • By ${submitterLabel ?? "Staff"}`,
     source_table: "crossover_messages",
     source_id: record.id,
-    created_by: actor
+    created_by: submitterLabel
   });
 
   if (Boolean(input.create_owner_follow_up)) {
@@ -858,28 +906,30 @@ export async function replyToCrossoverMessage(
   id: string,
   message: unknown,
   actor: string | null,
-  updateType = "Internal Note"
+  updateType = "Internal Note",
+  displayName?: string | null
 ) {
   const text = cleanString(message);
   if (!text) throw new Error("Update text is required.");
   const state = await loadState(supabase);
   const parent = state.crossover_messages.find((item) => item.id === id);
   if (!parent) throw new Error("Shift log entry not found.");
+  const authorLabel = cleanString(displayName) || actor;
   const reply: CrossoverReply = {
     id: newId(),
     crossover_message_id: id,
     message: text,
     update_type: cleanString(updateType, "Internal Note") || "Internal Note",
-    created_by: actor,
+    created_by: authorLabel,
     created_at: nowIso()
   };
   const next = createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
     activity_type: "shift_log.update_added",
     title: "Update added to shift log",
-    description: `${actor ?? "Staff"}: ${text}`,
+    description: `${authorLabel ?? "Staff"}: ${text}`,
     source_table: "crossover_messages",
     source_id: id,
-    created_by: actor
+    created_by: authorLabel
   });
   await saveState(supabase, next);
   return reply;

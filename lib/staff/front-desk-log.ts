@@ -113,6 +113,31 @@ export function shiftLogSubmittedBy(item: CrossoverMessage) {
   return item.submitted_by?.trim() || item.created_by?.trim() || "Staff";
 }
 
+/** Display label for who submitted a shift log — resolves emails via staff directory when provided. */
+export function shiftLogSubmittedByLabel(
+  item: CrossoverMessage,
+  directory?: Array<{ name: string; email?: string | null; admin_user_id?: string | null }> | null
+) {
+  const raw = shiftLogSubmittedBy(item);
+  if (!directory?.length) return raw;
+  const needle = raw.trim().toLowerCase();
+  const member =
+    directory.find((entry) => entry.email?.trim().toLowerCase() === needle) ??
+    directory.find((entry) => entry.admin_user_id?.trim().toLowerCase() === needle);
+  if (member?.name?.trim()) return member.name.trim();
+  // If the stored value looks like an email and we couldn't map it, show local-part — not the full email.
+  if (raw.includes("@")) {
+    const local = raw.split("@")[0]?.replace(/[._]+/g, " ").trim();
+    if (local) {
+      return local
+        .split(/\s+/)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+    }
+  }
+  return raw;
+}
+
 export function shiftLogAssignedTo(item: CrossoverMessage) {
   return item.assigned_to?.trim() || item.assigned_team?.trim() || item.reported_to?.trim() || "Unassigned";
 }
@@ -285,8 +310,9 @@ export function normalizeShiftLogRecord(item: CrossoverMessage): CrossoverMessag
     log_type: item.log_type ?? "General Shift Note",
     details: item.details ?? item.message,
     message: item.details ?? item.message,
-    submitted_by: item.submitted_by ?? item.created_by,
-    created_by: item.submitted_by ?? item.created_by,
+    // Prefer submitted_by for display; keep created_by as the ownership identity (email/id).
+    submitted_by: item.submitted_by ?? item.created_by ?? null,
+    created_by: item.created_by ?? item.submitted_by ?? null,
     status: item.status === "Active" && !item.log_type ? "Open" : item.status,
     needs_management_review: item.needs_management_review ?? item.status === "Needs Management Review"
   };

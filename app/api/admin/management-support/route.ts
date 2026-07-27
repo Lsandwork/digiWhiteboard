@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveSessionDisplayName } from "@/lib/admin/actor-display";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import {
   canAccessManagementReports,
@@ -57,7 +58,8 @@ async function actorContext(request: Request) {
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
-  return { session, actor, access, role: session?.role };
+  const actorDisplayName = (await resolveSessionDisplayName(supabase, session)) ?? actor;
+  return { session, actor, actorDisplayName, access, role: session?.role, supabase };
 }
 
 const ADMIN_REPORT_TYPES = new Set([
@@ -203,12 +205,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, actor, access } = await actorContext(request);
+  const { session, actor, actorDisplayName, access, supabase } = await actorContext(request);
 
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action ?? "");
-    const supabase = getServiceSupabase();
 
     if (action === "create_write_up") {
       if (!canSubmitWriteUpForUser(access, session?.role)) {
@@ -224,7 +225,7 @@ export async function POST(request: Request) {
         employee_department: String(body.employee_department ?? ""),
         violation_date: String(body.violation_date ?? body.incident_date ?? ""),
         violation_time: body.violation_time ? String(body.violation_time) : body.incident_time ? String(body.incident_time) : null,
-        documented_by: body.documented_by ? String(body.documented_by) : actor,
+        documented_by: body.documented_by ? String(body.documented_by) : actorDisplayName,
         violation_types: violationTypes,
         violation_other: body.violation_other ? String(body.violation_other) : null,
         statement_of_violation: String(body.statement_of_violation ?? body.incident_description ?? ""),
@@ -244,16 +245,16 @@ export async function POST(request: Request) {
         action_to_be_taken: body.action_to_be_taken ? String(body.action_to_be_taken) : body.corrective_action ? String(body.corrective_action) : null,
         employee_signature: body.employee_signature ? String(body.employee_signature) : null,
         employee_signature_date: body.employee_signature_date ? String(body.employee_signature_date) : null,
-        manager_signature: body.manager_signature ? String(body.manager_signature) : body.team_lead_signature ? String(body.team_lead_signature) : actor,
+        manager_signature: body.manager_signature ? String(body.manager_signature) : body.team_lead_signature ? String(body.team_lead_signature) : actorDisplayName,
         manager_signature_date: body.manager_signature_date ? String(body.manager_signature_date) : null
       };
 
-      let report = await createEmployeeWriteUpReport(supabase, input, actor);
+      let report = await createEmployeeWriteUpReport(supabase, input, actor, actorDisplayName);
 
       const text_report = buildWarningNoticeTextReport(report.write_up_details!, {
         reportId: report.id,
         submittedAt: report.created_at,
-        submittedBy: actor
+        submittedBy: actorDisplayName
       });
 
       const pdfBytes = await generateWarningNoticePdf(report.write_up_details!);
@@ -280,7 +281,7 @@ export async function POST(request: Request) {
         priority: "Urgent",
         urgent: true,
         needsManagementReview: true,
-        actor
+        actor: actorDisplayName
       });
 
       await writeAdminAuditLog({
@@ -305,8 +306,8 @@ export async function POST(request: Request) {
 
       const description = String(body.description ?? "").trim();
       const report = action === "create_groomer_complaint"
-        ? await createGroomerComplaintReport(supabase, description, actor)
-        : await createGroomerRequestReport(supabase, description, actor);
+        ? await createGroomerComplaintReport(supabase, description, actor, actorDisplayName)
+        : await createGroomerRequestReport(supabase, description, actor, actorDisplayName);
 
       await dispatchStaffOpsNotificationEvent(supabase, {
         eventType: "auto_issue",
@@ -318,7 +319,7 @@ export async function POST(request: Request) {
         priority: "Urgent",
         urgent: true,
         needsManagementReview: true,
-        actor
+        actor: actorDisplayName
       });
 
       await writeAdminAuditLog({
@@ -340,8 +341,8 @@ export async function POST(request: Request) {
 
       const description = String(body.description ?? "").trim();
       const report = action === "create_trainer_complaint"
-        ? await createTrainerComplaintReport(supabase, description, actor)
-        : await createTrainerRequestReport(supabase, description, actor);
+        ? await createTrainerComplaintReport(supabase, description, actor, actorDisplayName)
+        : await createTrainerRequestReport(supabase, description, actor, actorDisplayName);
 
       await dispatchStaffOpsNotificationEvent(supabase, {
         eventType: "auto_issue",
@@ -353,7 +354,7 @@ export async function POST(request: Request) {
         priority: "Urgent",
         urgent: true,
         needsManagementReview: true,
-        actor
+        actor: actorDisplayName
       });
 
       await writeAdminAuditLog({
@@ -374,7 +375,7 @@ export async function POST(request: Request) {
       }
 
       const description = String(body.description ?? "").trim();
-      const report = await createTeamLeadRequestReport(supabase, description, actor);
+      const report = await createTeamLeadRequestReport(supabase, description, actor, actorDisplayName);
 
       await dispatchStaffOpsNotificationEvent(supabase, {
         eventType: "auto_issue",
@@ -386,7 +387,7 @@ export async function POST(request: Request) {
         priority: "Urgent",
         urgent: true,
         needsManagementReview: true,
-        actor
+        actor: actorDisplayName
       });
 
       await writeAdminAuditLog({

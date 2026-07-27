@@ -743,7 +743,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
               <p><span className="font-bold text-white">Status:</span> {selectedAlert.status}</p>
               <p><span className="font-bold text-white">Opened:</span> {formatWhen(selectedAlert.triggered_at)}</p>
               {selectedAlert.report?.created_by ? (
-                <p><span className="font-bold text-white">Submitted by:</span> {selectedAlert.report.submitted_by_name ?? selectedAlert.report.created_by}</p>
+                <p><span className="font-bold text-white">Submitted by:</span> {selectedAlert.report.submitted_by_name ?? "Staff"}</p>
               ) : null}
             </div>
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">

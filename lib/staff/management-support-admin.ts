@@ -100,7 +100,7 @@ export function mapReportToInboxRow(report: ManagementReport): SupportInboxRow {
     id: normalized.id,
     date_submitted: normalized.created_at,
     department: normalized.department ?? "Other",
-    submitted_by: normalized.submitted_by_name ?? normalized.created_by ?? "Staff",
+    submitted_by: normalized.submitted_by_name ?? "Staff",
     role: normalized.submitted_by_role ?? "staff",
     item_type: normalized.item_type === "request" ? "Request" : "Complaint",
     category: normalized.category ?? null,

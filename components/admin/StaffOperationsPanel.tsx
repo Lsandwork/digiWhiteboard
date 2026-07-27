@@ -70,6 +70,7 @@ import {
   resolveStatusForShiftLog,
   shiftLogDetails,
   shiftLogSubmittedBy,
+  shiftLogSubmittedByLabel,
   shiftLogType
 } from "@/lib/staff/front-desk-log";
 
@@ -1351,7 +1352,7 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
         {detail.type === "crossover" && "subject" in item ? (
           <div className="grid gap-2 rounded-2xl border border-admin-border bg-white/[0.03] p-4 text-sm text-admin-muted md:grid-cols-2">
             <p><span className="font-bold text-white">Log type:</span> {shiftLogType(item as CrossoverMessage)}</p>
-            <p><span className="font-bold text-white">Submitted by:</span> {shiftLogSubmittedBy(item as CrossoverMessage)}</p>
+            <p><span className="font-bold text-white">Submitted by:</span> {shiftLogSubmittedByLabel(item as CrossoverMessage, data?.staff_directory)}</p>
             <p><span className="font-bold text-white">Submitted:</span> {formatDateTime(item.created_at)}</p>
             <p><span className="font-bold text-white">Assigned to:</span> {(item as CrossoverMessage).assigned_to ?? (item as CrossoverMessage).assigned_team ?? "Unassigned"}</p>
             {(item as CrossoverMessage).related_dog_name ? <p><span className="font-bold text-white">Dog:</span> {(item as CrossoverMessage).related_dog_name}</p> : null}

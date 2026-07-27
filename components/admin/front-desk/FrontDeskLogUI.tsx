@@ -36,6 +36,7 @@ import {
   shiftLogAssignedTo,
   shiftLogDetails,
   shiftLogSubmittedBy,
+  shiftLogSubmittedByLabel,
   shiftLogType,
   type FrontDeskLogBucket,
   type ShiftLogType
@@ -47,7 +48,7 @@ import { htmlToPlainText } from "@/lib/html/rich-text";
 const SHIFT_LOG_SORT_ACCESSORS: SortAccessors<CrossoverMessage> = {
   subject: (item) => `${item.subject} ${shiftLogType(item)}`,
   dog_owner: (item) => `${item.related_dog_name ?? ""} ${item.related_owner_name ?? ""}`,
-  submitted_by: (item) => shiftLogSubmittedBy(item),
+  submitted_by: (item) => shiftLogSubmittedByLabel(item, undefined),
   assigned_to: (item) => shiftLogAssignedTo(item),
   priority: (item) => STAFF_PRIORITIES.indexOf(item.priority),
   due_logged: (item) => item.due_at || item.reminder_at || item.created_at,
@@ -591,7 +592,7 @@ export function ActiveShiftLogCard({
                     {item.related_dog_name ? <p>{item.related_dog_name}</p> : null}
                     {item.related_owner_name ? <p className="crossover-table__muted">{item.related_owner_name}</p> : !item.related_dog_name ? "—" : null}
                   </td>
-                  <td>{shiftLogSubmittedBy(item)}</td>
+                  <td>{shiftLogSubmittedByLabel(item, directory)}</td>
                   <td className="crossover-table__emphasis">{shiftLogAssignedTo(item)}</td>
                   <td><ShiftLogPriorityBadge priority={item.priority} urgent={item.urgent} /></td>
                   <td className="crossover-table__datetime">
@@ -652,7 +653,7 @@ export function ActiveShiftLogCard({
               </label>
               <ShiftLogPriorityBadge priority={item.priority} urgent={item.urgent} />
             </div>
-            <p className="crossover-mobile-card__meta">{shiftLogSubmittedBy(item)} • {formatDateTime(item.created_at)} • Assigned {shiftLogAssignedTo(item)}</p>
+            <p className="crossover-mobile-card__meta">{shiftLogSubmittedByLabel(item, directory)} • {formatDateTime(item.created_at)} • Assigned {shiftLogAssignedTo(item)}</p>
             <p className="crossover-mobile-card__preview">{htmlToPlainText(shiftLogDetails(item))}</p>
             <div className="crossover-mobile-card__footer">
               <ShiftLogStatusBadge status={item.status} />

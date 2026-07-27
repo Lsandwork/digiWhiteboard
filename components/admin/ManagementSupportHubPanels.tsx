@@ -83,7 +83,7 @@ function SupportDetailModal({
     <Modal open={open} title={item.title} onClose={onClose}>
       <div className="space-y-4 text-sm">
         <div className="grid gap-3 md:grid-cols-2">
-          <p><span className="font-bold text-white">Submitted by:</span> {item.submitted_by_name ?? item.created_by}</p>
+          <p><span className="font-bold text-white">Submitted by:</span> {item.submitted_by_name ?? "Staff"}</p>
           <p><span className="font-bold text-white">Role:</span> {item.submitted_by_role ?? "staff"}</p>
           <p><span className="font-bold text-white">Department:</span> {item.department}</p>
           <p><span className="font-bold text-white">Type:</span> {item.item_type ?? "complaint"}</p>

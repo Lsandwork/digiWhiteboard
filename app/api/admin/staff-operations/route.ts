@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveSessionDisplayName } from "@/lib/admin/actor-display";
 import { normalizeAdminUserId } from "@/lib/admin/users";
 import {
   canAccessCrossoverCommunication,
@@ -94,6 +95,13 @@ function actorFromRequest(request: Request) {
   };
 }
 
+async function actorContext(request: Request) {
+  const base = actorFromRequest(request);
+  const supabase = getServiceSupabase();
+  const actorDisplayName = (await resolveSessionDisplayName(supabase, base.session)) ?? base.actor;
+  return { ...base, supabase, actorDisplayName };
+}
+
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   const { session, role } = actorFromRequest(request);
@@ -131,7 +139,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, role, actor, actorAdminId } = actorFromRequest(request);
+  const { session, role, actor, actorAdminId, supabase, actorDisplayName } = await actorContext(request);
   if (!canViewStaffOps(role, session)) {
     return staffOpsForbiddenResponse();
   }
@@ -139,7 +147,6 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action ?? "");
-    const supabase = getServiceSupabase();
 
     if (action === "create_crossover" && !canCreateShiftLogEntry(role)) {
       return crossoverForbiddenResponse();
@@ -172,25 +179,25 @@ export async function POST(request: Request) {
     let auditAction = "staff.ops.action";
 
     if (action === "create_crossover") {
-      result = await createCrossoverMessage(supabase, body, actor);
+      result = await createCrossoverMessage(supabase, body, actor, actorDisplayName);
       auditAction = "staff.crossover.create";
     } else if (action === "update_crossover") {
       const id = String(body.id ?? "");
-      result = await updateCrossoverMessage(supabase, id, body, actor);
+      result = await updateCrossoverMessage(supabase, id, body, actorDisplayName);
       auditAction = "staff.crossover.update";
     } else if (action === "move_crossover") {
       const ids = Array.isArray(body.ids) ? body.ids.map((id: unknown) => String(id ?? "")) : [];
       const targetLog = String(body.target_log ?? "") as "crossover" | "open" | "archived";
-      result = await moveCrossoverMessages(supabase, ids, targetLog, actor);
+      result = await moveCrossoverMessages(supabase, ids, targetLog, actorDisplayName);
       auditAction = "staff.crossover.move";
     } else if (action === "bulk_update_crossover") {
       const ids = Array.isArray(body.ids) ? body.ids.map((id: unknown) => String(id ?? "")) : [];
-      result = await bulkUpdateCrossoverMessages(supabase, ids, body, actor);
+      result = await bulkUpdateCrossoverMessages(supabase, ids, body, actorDisplayName);
       auditAction = "staff.crossover.bulk_update";
     } else if (action === "delete_crossover") {
       const id = String(body.id ?? "");
       if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
-      result = await deleteCrossoverMessage(supabase, id, actor, {
+      result = await deleteCrossoverMessage(supabase, id, actorDisplayName, {
         email: session?.email ?? null,
         adminUserId: session?.adminUserId ?? null,
         role: role ?? null
@@ -198,35 +205,42 @@ export async function POST(request: Request) {
       auditAction = "staff.crossover.delete";
     } else if (action === "reply_crossover") {
       const id = String(body.id ?? "");
-      result = await replyToCrossoverMessage(supabase, id, body.message, actor, String(body.update_type ?? "Internal Note"));
+      result = await replyToCrossoverMessage(
+        supabase,
+        id,
+        body.message,
+        actor,
+        String(body.update_type ?? "Internal Note"),
+        actorDisplayName
+      );
       auditAction = "staff.shift_log.update";
     } else if (action === "create_follow_up") {
-      result = await createOwnerFollowUp(supabase, body, actor);
+      result = await createOwnerFollowUp(supabase, body, actorDisplayName);
       auditAction = "staff.follow_up.create";
     } else if (action === "update_follow_up") {
       const id = String(body.id ?? "");
-      result = await updateOwnerFollowUp(supabase, id, body, actor);
+      result = await updateOwnerFollowUp(supabase, id, body, actorDisplayName);
       auditAction = "staff.follow_up.update";
     } else if (action === "create_issue") {
-      result = await createActiveIssue(supabase, body, actor);
+      result = await createActiveIssue(supabase, body, actorDisplayName);
       auditAction = "staff.issue.create";
     } else if (action === "update_issue") {
       const id = String(body.id ?? "");
-      result = await updateActiveIssue(supabase, id, body, actor);
+      result = await updateActiveIssue(supabase, id, body, actorDisplayName);
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
-      result = await createStaffDirectoryMember(supabase, body, actor, actorAdminId);
+      result = await createStaffDirectoryMember(supabase, body, actorDisplayName, actorAdminId);
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
-      result = await updateStaffDirectoryMember(supabase, id, body, actor, actorAdminId);
+      result = await updateStaffDirectoryMember(supabase, id, body, actorDisplayName, actorAdminId);
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
-      await deleteStaffDirectoryMember(supabase, id, actor);
+      await deleteStaffDirectoryMember(supabase, id, actorDisplayName);
       result = { id };
       auditAction = "staff.directory.delete";
     } else if (action === "push_to_whiteboard") {
@@ -242,7 +256,7 @@ export async function POST(request: Request) {
           display_mode: body.priority === "Critical" || body.priority === "High" ? "urgent" : "normal",
           display_duration_minutes: body.display_duration_minutes ?? 5
         },
-        actor
+        actorDisplayName
       );
       auditAction = "staff.ops.push_to_whiteboard";
     } else if (action === "mark_notification_read") {

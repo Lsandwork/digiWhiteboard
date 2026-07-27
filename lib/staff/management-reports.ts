@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { displayActorLabel, loadActorNameLookup, looksLikeEmail } from "@/lib/admin/actor-display";
 import type { OwnerComplaintCategory } from "@/lib/staff/push-notices";
 import { getOwnerComplaintCategoryLabel } from "@/lib/staff/push-notices";
 
@@ -204,7 +205,8 @@ function normalizeReport(report: ManagementReport): ManagementReport {
     related_owner_name: report.related_owner_name ?? null,
     related_staff_name: report.related_staff_name ?? null,
     needed_by: report.needed_by ?? null,
-    submitted_by_name: report.submitted_by_name ?? report.created_by ?? null,
+    submitted_by_name:
+      report.submitted_by_name && !looksLikeEmail(report.submitted_by_name) ? report.submitted_by_name : null,
     submitted_by_role: report.submitted_by_role ?? roleForReportType(report.report_type),
     comments: report.comments ?? [],
     audit_history: report.audit_history ?? [],
@@ -306,14 +308,31 @@ function matchesCreator(report: ManagementReport, actor?: string | null) {
   return (report.created_by ?? "").trim().toLowerCase() === normalized;
 }
 
+export async function enrichManagementReports(
+  supabase: SupabaseClient,
+  reports: ManagementReport[]
+): Promise<ManagementReport[]> {
+  if (!reports.length) return reports;
+  const values = reports.flatMap((report) => [report.submitted_by_name, report.created_by, report.reviewed_by]);
+  const lookup = await loadActorNameLookup(supabase, values);
+  return reports.map((report) => {
+    const submittedLabel = displayActorLabel(report.submitted_by_name || report.created_by, lookup, "Staff");
+    return {
+      ...report,
+      submitted_by_name: submittedLabel,
+      reviewed_by: report.reviewed_by ? displayActorLabel(report.reviewed_by, lookup, report.reviewed_by) : report.reviewed_by
+    };
+  });
+}
+
 export async function listManagementReports(supabase: SupabaseClient, limit = 50): Promise<ManagementReport[]> {
   const state = await loadState(supabase);
-  return sortNewest(state.reports).slice(0, limit);
+  return enrichManagementReports(supabase, sortNewest(state.reports).slice(0, limit));
 }
 
 export async function listAllManagementReports(supabase: SupabaseClient): Promise<ManagementReport[]> {
   const state = await loadState(supabase);
-  return sortNewest(state.reports);
+  return enrichManagementReports(supabase, sortNewest(state.reports));
 }
 
 export async function getManagementReportById(supabase: SupabaseClient, id: string) {
@@ -340,9 +359,12 @@ export async function updateManagementReport(
 
 export async function listWriteUpsForCreator(supabase: SupabaseClient, actor: string, limit = 50): Promise<ManagementReport[]> {
   const state = await loadState(supabase);
-  return sortNewest(state.reports)
-    .filter((report) => report.report_type === "employee_write_up" && matchesCreator(report, actor))
-    .slice(0, limit);
+  return enrichManagementReports(
+    supabase,
+    sortNewest(state.reports)
+      .filter((report) => report.report_type === "employee_write_up" && matchesCreator(report, actor))
+      .slice(0, limit)
+  );
 }
 
 export async function listGroomerSubmissionsForCreator(
@@ -352,9 +374,12 @@ export async function listGroomerSubmissionsForCreator(
   limit = 50
 ): Promise<ManagementReport[]> {
   const state = await loadState(supabase);
-  return sortNewest(state.reports)
-    .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
-    .slice(0, limit);
+  return enrichManagementReports(
+    supabase,
+    sortNewest(state.reports)
+      .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
+      .slice(0, limit)
+  );
 }
 
 async function createGroomerSubmissionReport(
@@ -364,6 +389,7 @@ async function createGroomerSubmissionReport(
     title: string;
     description: string;
     actor: string | null;
+    submittedByName?: string | null;
   }
 ): Promise<ManagementReport> {
   const description = trimField(input.description, MAX_FIELD_LENGTH);
@@ -388,6 +414,7 @@ async function createGroomerSubmissionReport(
     reviewed_by: null,
     reviewed_at: null,
     created_by: input.actor,
+    submitted_by_name: trimField(input.submittedByName, 120) || null,
     created_at: now,
     updated_at: now
   };
@@ -400,26 +427,30 @@ async function createGroomerSubmissionReport(
 export async function createGroomerComplaintReport(
   supabase: SupabaseClient,
   description: string,
-  actor: string | null
+  actor: string | null,
+  submittedByName?: string | null
 ) {
   return createGroomerSubmissionReport(supabase, {
     reportType: "groomer_complaint",
     title: "Groomer Complaint",
     description,
-    actor
+    actor,
+    submittedByName
   });
 }
 
 export async function createGroomerRequestReport(
   supabase: SupabaseClient,
   description: string,
-  actor: string | null
+  actor: string | null,
+  submittedByName?: string | null
 ) {
   return createGroomerSubmissionReport(supabase, {
     reportType: "groomer_request",
     title: "Groomer Request",
     description,
-    actor
+    actor,
+    submittedByName
   });
 }
 
@@ -430,6 +461,7 @@ async function createTrainerSubmissionReport(
     title: string;
     description: string;
     actor: string | null;
+    submittedByName?: string | null;
   }
 ): Promise<ManagementReport> {
   const description = trimField(input.description, MAX_FIELD_LENGTH);
@@ -454,6 +486,7 @@ async function createTrainerSubmissionReport(
     reviewed_by: null,
     reviewed_at: null,
     created_by: input.actor,
+    submitted_by_name: trimField(input.submittedByName, 120) || null,
     created_at: now,
     updated_at: now
   };
@@ -470,34 +503,41 @@ export async function listTrainerSubmissionsForCreator(
   limit = 50
 ): Promise<ManagementReport[]> {
   const state = await loadState(supabase);
-  return sortNewest(state.reports)
-    .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
-    .slice(0, limit);
+  return enrichManagementReports(
+    supabase,
+    sortNewest(state.reports)
+      .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
+      .slice(0, limit)
+  );
 }
 
 export async function createTrainerComplaintReport(
   supabase: SupabaseClient,
   description: string,
-  actor: string | null
+  actor: string | null,
+  submittedByName?: string | null
 ) {
   return createTrainerSubmissionReport(supabase, {
     reportType: "trainer_complaint",
     title: "Trainer Complaint",
     description,
-    actor
+    actor,
+    submittedByName
   });
 }
 
 export async function createTrainerRequestReport(
   supabase: SupabaseClient,
   description: string,
-  actor: string | null
+  actor: string | null,
+  submittedByName?: string | null
 ) {
   return createTrainerSubmissionReport(supabase, {
     reportType: "trainer_request",
     title: "Trainer Request",
     description,
-    actor
+    actor,
+    submittedByName
   });
 }
 
@@ -508,15 +548,19 @@ export async function listTeamLeadSubmissionsForCreator(
   limit = 50
 ): Promise<ManagementReport[]> {
   const state = await loadState(supabase);
-  return sortNewest(state.reports)
-    .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
-    .slice(0, limit);
+  return enrichManagementReports(
+    supabase,
+    sortNewest(state.reports)
+      .filter((report) => report.report_type === reportType && matchesCreator(report, actor))
+      .slice(0, limit)
+  );
 }
 
 export async function createTeamLeadRequestReport(
   supabase: SupabaseClient,
   description: string,
-  actor: string | null
+  actor: string | null,
+  submittedByName?: string | null
 ): Promise<ManagementReport> {
   const trimmed = trimField(description, MAX_FIELD_LENGTH);
   if (!trimmed) throw new Error("Please enter details before submitting.");
@@ -540,6 +584,7 @@ export async function createTeamLeadRequestReport(
     reviewed_by: null,
     reviewed_at: null,
     created_by: actor,
+    submitted_by_name: trimField(submittedByName, 120) || null,
     created_at: now,
     updated_at: now
   };
@@ -557,6 +602,7 @@ export async function createDogHandlerComplaintReport(
     summary: string;
     pushNoticeId: string;
     actor: string | null;
+    submittedByName?: string | null;
   }
 ): Promise<ManagementReport> {
   const dog_handler_name = input.dogHandlerName.trim().slice(0, MAX_NAME_LENGTH);
@@ -583,6 +629,7 @@ export async function createDogHandlerComplaintReport(
     reviewed_by: null,
     reviewed_at: null,
     created_by: input.actor,
+    submitted_by_name: trimField(input.submittedByName, 120) || null,
     created_at: now,
     updated_at: now
   };
@@ -619,7 +666,8 @@ export type CreateEmployeeWriteUpInput = {
 export async function createEmployeeWriteUpReport(
   supabase: SupabaseClient,
   input: CreateEmployeeWriteUpInput,
-  actor: string | null
+  actor: string | null,
+  submittedByName?: string | null
 ): Promise<ManagementReport> {
   const employee_name = trimField(input.employee_name, MAX_NAME_LENGTH);
   const employee_department = trimField(input.employee_department, 80);
@@ -693,6 +741,7 @@ export async function createEmployeeWriteUpReport(
     reviewed_by: null,
     reviewed_at: null,
     created_by: actor,
+    submitted_by_name: trimField(submittedByName, 120) || null,
     created_at: now,
     updated_at: now
   };
