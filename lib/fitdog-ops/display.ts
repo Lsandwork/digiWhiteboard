@@ -43,6 +43,8 @@ export function formatFitdogAlertType(alertType: string | null | undefined) {
       return "Processing Error";
     case "PAYMENT_RETRY_FAILED":
       return "Retry Failed";
+    case "PAYMENT_ERROR":
+      return "Payment Error";
     case "OUTSTANDING_BALANCE":
       return "Outstanding Balance";
     case "PAYMENT_RESOLVED":
@@ -65,4 +67,15 @@ export function isDeclinedPaymentAlert(alert: {
     return true;
   }
   return false;
+}
+
+/** Card-update / charge failures from Fitdog PAYMENT ERROR notifications. */
+export function isPaymentErrorAlert(alert: {
+  alert_type?: FitdogAlertType | string | null;
+  failure_reason?: string | null;
+}) {
+  if (alert.alert_type === "PAYMENT_ERROR") return true;
+  return /PAYMENT\s*ERROR|needs to update credit card|Failed to charge amount/i.test(
+    String(alert.failure_reason || "")
+  );
 }

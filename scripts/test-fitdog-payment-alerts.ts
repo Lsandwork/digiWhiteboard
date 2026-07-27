@@ -401,4 +401,35 @@ import { sanitizeFitdogPayload } from "../lib/fitdog-ops/sanitize";
   assert.equal(isUsefulFitdogActivity("Lonnie Sandoval posted in Daily Notes on 2026-07-16"), false);
 }
 
+// 17. Fitdog PAYMENT ERROR notifications (card update / charge failures) parse as Payment Error.
+{
+  const text =
+    'PAYMENT ERROR Lisa Miller needs to update credit card information in order to book classes. Call to get updated information. Failed to charge amount None from card payment. The payment covers the following orders: class "Cool Tricks" on 07/27/2026 for dog Lila Charge ch_3TxpqOGpQvuGJWb30jPbF40I has already been captured.';
+  assert.equal(classifyFitdogNotificationText(text), "PAYMENT_ERROR");
+  assert.equal(isUsefulFitdogActivity(text), true);
+  const parsed = parseFitdogNotification({ id: "pay-err-1", text });
+  assert.equal(parsed.alert_type, "PAYMENT_ERROR");
+  assert.equal(parsed.owner_name, "Lisa Miller");
+  assert.equal(parsed.dog_name, "Lila");
+  assert.equal(parsed.service_name, "Cool Tricks");
+  assert.ok(parsed.service_date);
+  assert.equal(parsed.transaction_id, "ch_3TxpqOGpQvuGJWb30jPbF40I");
+  assert.equal(formatFitdogAlertType("PAYMENT_ERROR"), "Payment Error");
+  assert.equal(severityForAlertType("PAYMENT_ERROR"), "critical");
+
+  const result = reconcileFitdogSnapshot(
+    {
+      notifications: [{ id: "pay-err-1", text, detected_at: new Date().toISOString() }]
+    },
+    { graceMinutes: 60 }
+  );
+  const alert = result.createOrUpdate.find((row) => row.alert_type === "PAYMENT_ERROR");
+  assert.ok(alert);
+  assert.equal(alert?.severity, "critical");
+  assert.equal(alert?.owner_name, "Lisa Miller");
+  assert.equal(alert?.dog_name, "Lila");
+  assert.equal(alert?.service_name, "Cool Tricks");
+  assert.equal(alert?.transaction_id, "ch_3TxpqOGpQvuGJWb30jPbF40I");
+}
+
 console.log("fitdog payment alerts tests passed");

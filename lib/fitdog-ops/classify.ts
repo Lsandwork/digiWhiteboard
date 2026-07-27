@@ -13,6 +13,9 @@ export function classifyPaymentFailure(input: {
   event_type?: string | null;
 }): FitdogAlertType {
   const blob = `${input.failure_reason || ""} ${input.status || ""} ${input.event_type || ""}`;
+  if (/PAYMENT\s*ERROR|needs to update credit card|Failed to charge amount|has already been captured/i.test(blob)) {
+    return "PAYMENT_ERROR";
+  }
   if (MISSING.test(blob)) return "CARD_MISSING";
   if (EXPIRED.test(blob)) return "CARD_EXPIRED";
   if (RETRY.test(blob)) return "PAYMENT_RETRY_FAILED";
@@ -27,6 +30,7 @@ export function severityForAlertType(alertType: FitdogAlertType): FitdogAlertSev
     case "PAYMENT_MISSED":
     case "CARD_DECLINED":
     case "PAYMENT_RETRY_FAILED":
+    case "PAYMENT_ERROR":
       return "critical";
     case "CARD_EXPIRED":
     case "CARD_MISSING":

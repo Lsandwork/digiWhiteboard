@@ -95,7 +95,7 @@ async function main() {
         parsed.service_name,
         parsed.service_date,
         parsed.failure_reason,
-        parsed.alert_type === "CARD_DECLINED" ? 1 : 0,
+        parsed.alert_type === "CARD_DECLINED" || parsed.alert_type === "PAYMENT_ERROR" ? 1 : 0,
         status,
         JSON.stringify({ source: "fitdog_activity_stream" }),
         parsed.source_url,

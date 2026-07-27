@@ -118,9 +118,11 @@ function notificationToProposed(item: NonNullable<FitdogSyncSnapshot["notificati
   const parsed = parseFitdogNotification(item);
   if (!parsed.text) return null;
   const amountDue = 0;
-  // Declined Payments must always stay critical / urgent for staff alerting.
+  // Declined Payments / Payment Errors must always stay critical / urgent for staff alerting.
   const severity =
-    parsed.alert_type === "CARD_DECLINED" ? "critical" : severityForAlertType(parsed.alert_type);
+    parsed.alert_type === "CARD_DECLINED" || parsed.alert_type === "PAYMENT_ERROR"
+      ? "critical"
+      : severityForAlertType(parsed.alert_type);
   return {
     idempotency_key: buildFitdogIdempotencyKey({
       source_event_id: parsed.id,
@@ -141,14 +143,15 @@ function notificationToProposed(item: NonNullable<FitdogSyncSnapshot["notificati
     dog_name: parsed.dog_name,
     reservation_id: null,
     invoice_id: null,
-    transaction_id: null,
+    transaction_id: parsed.transaction_id ?? null,
     service_name: parsed.service_name,
     service_date: parsed.service_date || parsed.detected_at,
     amount_due: amountDue,
     amount_paid: 0,
     currency: "USD",
     failure_reason: parsed.failure_reason,
-    payment_attempt_count: parsed.alert_type === "CARD_DECLINED" ? 1 : 0,
+    payment_attempt_count:
+      parsed.alert_type === "CARD_DECLINED" || parsed.alert_type === "PAYMENT_ERROR" ? 1 : 0,
     payment_method_brand: null,
     payment_method_last_four: null,
     package_credit_check: { source: "fitdog_notification_feed" },
@@ -460,7 +463,7 @@ export function alertMatchesSuccessfulPayment(
   match: ProposedAlert["auto_resolve_match"]
 ): boolean {
   if (!match) return false;
-  if (!["PAYMENT_FAILED", "PAYMENT_MISSED", "CARD_DECLINED", "CARD_EXPIRED", "CARD_MISSING", "PAYMENT_PROCESSING_ERROR", "PAYMENT_RETRY_FAILED", "OUTSTANDING_BALANCE"].includes(alert.alert_type)) {
+  if (!["PAYMENT_FAILED", "PAYMENT_MISSED", "CARD_DECLINED", "CARD_EXPIRED", "CARD_MISSING", "PAYMENT_PROCESSING_ERROR", "PAYMENT_RETRY_FAILED", "PAYMENT_ERROR", "OUTSTANDING_BALANCE"].includes(alert.alert_type)) {
     return false;
   }
   if (match.invoice_id && alert.invoice_id && match.invoice_id === alert.invoice_id) return true;

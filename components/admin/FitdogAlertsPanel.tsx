@@ -17,7 +17,8 @@ import {
   formatFitdogAlertType,
   formatOperationsAlertStatus,
   isClosedAlertStatus,
-  isDeclinedPaymentAlert
+  isDeclinedPaymentAlert,
+  isPaymentErrorAlert
 } from "@/lib/fitdog-ops/display";
 import { FITDOG_ALERT_TYPES, OPERATIONS_ALERT_STATUSES } from "@/lib/fitdog-ops/types";
 import { formatUsd } from "@/lib/fitdog-ops/money";
@@ -37,7 +38,8 @@ type AlertRow = OperationsAlert & { amount_due_label?: string };
 const FAILED_PAYMENT_TYPES = new Set<string>([
   "PAYMENT_FAILED",
   "PAYMENT_PROCESSING_ERROR",
-  "PAYMENT_RETRY_FAILED"
+  "PAYMENT_RETRY_FAILED",
+  "PAYMENT_ERROR"
 ]);
 
 const SUMMARY_FOCUS_LABELS: Record<SummaryFocus, string> = {
@@ -626,7 +628,7 @@ export function FitdogAlertsPanel() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fitdog-orange">Operations · Fitdog Alerts</p>
           <h2 className="mt-1 text-2xl font-black text-white">Fitdog Alerts</h2>
           <p className="mt-1 text-sm text-admin-muted">
-            Card declines, cancellations, vaccinations, and payment issues synced from app.fitdog.com.
+            Card declines, payment errors, cancellations, vaccinations, and payment issues synced from app.fitdog.com.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
