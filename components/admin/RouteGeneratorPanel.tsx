@@ -851,7 +851,7 @@ export function RouteGeneratorPanel() {
               Pickup: Van 1/2 Hub→Kenneth Hahn; Van 3 Hub→Huntington. Drop-off reverses. Club stop only when dogs are
               already at Fitdog. Never Van 4.
             </li>
-            <li>Samsara template: upload under Settings → Integrations → Samsara Route Export before production export</li>
+            <li>Samsara: set SAMSARA_API_TOKEN (verify with npm run verify:samsara); CSV export uses official A–K headers</li>
             <li>Fitdog integration: Connect under Settings → Integrations → Fitdog Route Report</li>
           </ul>
           <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">

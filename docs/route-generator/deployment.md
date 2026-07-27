@@ -42,7 +42,8 @@ npx vercel --prod --token "$VERCEL_TOKEN"
 ## Fitdog / Samsara
 
 - Fitdog report connection remains **fixture** until Super Admin completes Connect Fitdog (MFA).
-- Active Samsara template is the **fixture** sample. Replace with company bulk-upload CSV before production export.
+- CSV export uses canonical Samsara A–K headers in code. See [samsara-export.md](./samsara-export.md) for API token verify + Vercel push.
+- Push live GPS token only (flags stay false): `./scripts/push-samsara-vercel-env.sh`
 
 ## Do not enable production yet
 

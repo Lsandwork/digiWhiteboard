@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# Push Samsara + Route Generator env vars to Vercel Production (staff.ruffops.com).
+# Push Samsara live-GPS token to Vercel (staff.ruffops.com).
+#
+# Default: token only — does NOT enable Route Generator production flags.
+# That matches the shadow-mode checklist (keep flags false until Fitdog MFA +
+# real shadow day are done). Live owner tracking works once the token is set.
+#
 # Usage:
 #   export VERCEL_TOKEN=...
 #   export SAMSARA_API_TOKEN='samsara_api_...'
 #   ./scripts/push-samsara-vercel-env.sh
+#
+# Optional — also flip Route Generator flags (only after checklist):
+#   ENABLE_ROUTE_GENERATOR_FLAGS=true ./scripts/push-samsara-vercel-env.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -15,8 +23,11 @@ fi
 
 if [[ -z "${SAMSARA_API_TOKEN:-}" ]]; then
   echo "ERROR: SAMSARA_API_TOKEN is required."
+  echo "Verify first: npx tsx scripts/verify-samsara-setup.ts"
   exit 1
 fi
+
+ENABLE_FLAGS="${ENABLE_ROUTE_GENERATOR_FLAGS:-false}"
 
 mkdir -p "$ROOT/.vercel"
 if [[ ! -f "$ROOT/.vercel/project.json" ]]; then
@@ -36,19 +47,38 @@ set_env() {
   printf '%s' "$value" | npx --yes vercel@41.7.8 env add "$key" "$env_name" "${VERCEL_SCOPE_ARGS[@]}" >/dev/null
 }
 
-echo "Pushing Samsara / Route Generator env to Vercel..."
+echo "Verifying Samsara token before push..."
+if ! npx --yes tsx "$ROOT/scripts/verify-samsara-setup.ts"; then
+  echo
+  echo "ERROR: verify-samsara-setup failed. Fix token/scopes/van names before pushing to Vercel."
+  exit 1
+fi
+
+echo
+echo "Pushing Samsara env to Vercel (ENABLE_ROUTE_GENERATOR_FLAGS=${ENABLE_FLAGS})..."
 for env_name in production preview development; do
   set_env SAMSARA_API_TOKEN "$SAMSARA_API_TOKEN" "$env_name"
-  set_env SAMSARA_CSV_EXPORT_ENABLED "true" "$env_name"
-  set_env SAMSARA_DIRECT_SYNC_ENABLED "false" "$env_name"
-  set_env ROUTE_GENERATOR_ENABLED "true" "$env_name"
-  set_env FITDOG_REPORT_SYNC_ENABLED "true" "$env_name"
-  set_env ROUTE_OPTIMIZATION_ENABLED "true" "$env_name"
   set_env NEXT_PUBLIC_SITE_URL "https://staff.ruffops.com" "$env_name"
+  set_env SAMSARA_DIRECT_SYNC_ENABLED "false" "$env_name"
+
+  if [[ "$ENABLE_FLAGS" == "true" ]]; then
+    set_env SAMSARA_CSV_EXPORT_ENABLED "true" "$env_name"
+    set_env ROUTE_GENERATOR_ENABLED "true" "$env_name"
+    set_env FITDOG_REPORT_SYNC_ENABLED "true" "$env_name"
+    set_env ROUTE_OPTIMIZATION_ENABLED "true" "$env_name"
+  else
+    echo "  - (flags unchanged — set ENABLE_ROUTE_GENERATOR_FLAGS=true to enable export/generator)"
+  fi
 done
 
+echo
 echo "Done. Trigger a production redeploy:"
 echo "  npx vercel --prod --token \"\$VERCEL_TOKEN\" --scope bridge-tess"
+echo
+if [[ "$ENABLE_FLAGS" != "true" ]]; then
+  echo "Route Generator production flags were NOT enabled (correct for shadow mode)."
+  echo "Owner live GPS will work after redeploy once SAMSARA_API_TOKEN is present."
+fi
 echo
 echo "Samsara token checklist:"
 echo "  - Scopes: Read Vehicles, Read Vehicle Statistics (GPS)"
