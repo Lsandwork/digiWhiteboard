@@ -33,6 +33,7 @@ import {
   getCanonicalSamsaraTemplate,
   SAMSARA_BULK_UPLOAD_HEADERS,
   SAMSARA_UNSUPPORTED_HEADERS,
+  dropoffStartTimeForVan,
   synthesizeStopSchedule,
   validateExport
 } from "../lib/route-generator/samsara-csv";
@@ -604,6 +605,53 @@ const sched = synthesizeStopSchedule({
   stopCount: 3
 });
 assert.equal(sched.arrival, "07/27/2026 07:00");
+
+// Drop-off start: Van 1/2/3 at 10:30; Van 5/6 (club / group class) at 12:00.
+assert.deepEqual(dropoffStartTimeForVan("van_1"), { hour: 10, minute: 30 });
+assert.deepEqual(dropoffStartTimeForVan("van_2"), { hour: 10, minute: 30 });
+assert.deepEqual(dropoffStartTimeForVan("van_3"), { hour: 10, minute: 30 });
+assert.deepEqual(dropoffStartTimeForVan("van_5"), { hour: 12, minute: 0 });
+assert.deepEqual(dropoffStartTimeForVan("van_6"), { hour: 12, minute: 0 });
+assert.equal(
+  synthesizeStopSchedule({
+    operatingDate: "2026-07-27",
+    direction: "dropoff",
+    stopIndex: 0,
+    stopCount: 3,
+    vanKey: "van_1"
+  }).arrival,
+  "07/27/2026 10:30"
+);
+assert.equal(
+  synthesizeStopSchedule({
+    operatingDate: "2026-07-27",
+    direction: "dropoff",
+    stopIndex: 0,
+    stopCount: 3,
+    vanKey: "van_3"
+  }).arrival,
+  "07/27/2026 10:30"
+);
+assert.equal(
+  synthesizeStopSchedule({
+    operatingDate: "2026-07-27",
+    direction: "dropoff",
+    stopIndex: 0,
+    stopCount: 3,
+    vanKey: "van_5"
+  }).arrival,
+  "07/27/2026 12:00"
+);
+assert.equal(
+  synthesizeStopSchedule({
+    operatingDate: "2026-07-27",
+    direction: "dropoff",
+    stopIndex: 0,
+    stopCount: 3,
+    vanKey: "van_6"
+  }).arrival,
+  "07/27/2026 12:00"
+);
 
 // Dropoff fixture parses
 const dropParsed = parseCsv(dropoffCsv);
