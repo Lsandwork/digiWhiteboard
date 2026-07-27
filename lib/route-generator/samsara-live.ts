@@ -5,6 +5,8 @@
  *   - Tag Access = Entire Organization (tag-scoped tokens return empty vehicle lists)
  */
 
+import { normalizeSamsaraSerial } from "@/lib/route-generator/samsara-vans";
+
 export type SamsaraVehicleLocation = {
   id: string;
   name: string;
@@ -159,10 +161,15 @@ export async function fetchSamsaraVehicleLocations(): Promise<SamsaraVehicleLoca
 export type MatchVehicleHints = {
   samsaraVehicleName?: string | null;
   samsaraSerial?: string | null;
+  samsaraVehicleId?: string | null;
   vin?: string | null;
   licensePlate?: string | null;
 };
 
+/**
+ * Match priority: vehicle id → exact name → serial → VIN (name-disambiguated) → plate → loose name.
+ * VIN alone is unsafe: Fitdog has a duplicate VIN on "Ignore this" and Van 06.
+ */
 export function matchVehicleByName(
   vehicles: SamsaraVehicleLocation[],
   samsaraVehicleName: string | null | undefined,
@@ -179,23 +186,43 @@ export function matchVehicleByName(
         };
 
   const name = hints.samsaraVehicleName ?? samsaraVehicleName;
-  const serial = String(hints.samsaraSerial ?? samsaraSerial ?? "")
-    .trim()
-    .toUpperCase();
+  const serial = normalizeSamsaraSerial(hints.samsaraSerial ?? samsaraSerial);
   const vin = normalizeVin(hints.vin);
   const plate = String(hints.licensePlate || "")
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "");
+  const vehicleId = String(hints.samsaraVehicleId || "").trim();
+  const target = normalizeSamsaraVanLabel(name);
 
-  if (vin) {
-    const byVin = vehicles.find((v) => normalizeVin(v.vin) === vin);
-    if (byVin) return byVin;
+  if (vehicleId) {
+    const byId = vehicles.find((v) => v.id === vehicleId);
+    if (byId) return byId;
   }
+
+  if (target) {
+    const exact = vehicles.find((v) => normalizeSamsaraVanLabel(v.name) === target);
+    if (exact) return exact;
+  }
+
   if (serial) {
-    const bySerial = vehicles.find((v) => String(v.serial || "").trim().toUpperCase() === serial);
+    const bySerial = vehicles.find((v) => normalizeSamsaraSerial(v.serial) === serial);
     if (bySerial) return bySerial;
   }
+
+  if (vin) {
+    const vinMatches = vehicles.filter((v) => normalizeVin(v.vin) === vin);
+    if (vinMatches.length === 1) return vinMatches[0];
+    if (vinMatches.length > 1 && target) {
+      const named = vinMatches.find((v) => normalizeSamsaraVanLabel(v.name) === target);
+      if (named) return named;
+    }
+    // Prefer real van labels over junk names like "Ignore this".
+    const vanLabeled = vinMatches.find((v) => /^van\s*\d+$/i.test(normalizeSamsaraVanLabel(v.name)));
+    if (vanLabeled) return vanLabeled;
+    if (vinMatches[0]) return vinMatches[0];
+  }
+
   if (plate) {
     const byPlate = vehicles.find(
       (v) =>
@@ -207,10 +234,7 @@ export function matchVehicleByName(
     if (byPlate) return byPlate;
   }
 
-  const target = normalizeSamsaraVanLabel(name);
   if (!target) return null;
-  const exact = vehicles.find((v) => normalizeSamsaraVanLabel(v.name) === target);
-  if (exact) return exact;
   const loose = vehicles.find((v) => {
     const n = normalizeSamsaraVanLabel(v.name);
     return n.includes(target) || target.includes(n);

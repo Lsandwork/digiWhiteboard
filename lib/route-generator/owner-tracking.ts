@@ -19,6 +19,7 @@ function matchHintsForTrackingRow(row: {
   return {
     samsaraVehicleName: row.samsara_vehicle_name || catalog?.samsaraVehicleName || null,
     samsaraSerial: row.samsara_serial || catalog?.samsaraSerial || null,
+    samsaraVehicleId: catalog?.samsaraVehicleId || null,
     vin: catalog?.vin || null,
     licensePlate: catalog?.licensePlate || null
   };

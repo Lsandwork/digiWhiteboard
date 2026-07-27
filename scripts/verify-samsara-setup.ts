@@ -13,7 +13,7 @@ import {
   matchVehicleByName,
   normalizeSamsaraVanLabel
 } from "../lib/route-generator/samsara-live";
-import { FITDOG_SAMSARA_VANS } from "../lib/route-generator/samsara-vans";
+import { FITDOG_SAMSARA_VANS, normalizeSamsaraSerial } from "../lib/route-generator/samsara-vans";
 
 loadEnvFiles();
 
@@ -64,23 +64,36 @@ async function main() {
   }
 
   const matches = FITDOG_SAMSARA_VANS.map((van) => {
-    const fleetByVin = van.vin
-      ? fleet.find((f) => String(f.vin || "").toUpperCase() === van.vin!.toUpperCase())
-      : undefined;
-    const fleetBySerial = van.samsaraSerial
-      ? fleet.find((f) => String(f.serial || "").toUpperCase() === van.samsaraSerial!.toUpperCase())
+    const fleetById = van.samsaraVehicleId
+      ? fleet.find((f) => f.id === van.samsaraVehicleId)
       : undefined;
     const fleetByName = fleet.find(
       (f) => normalizeSamsaraVanLabel(f.name) === normalizeSamsaraVanLabel(van.samsaraVehicleName)
     );
-    const fleetMatch = fleetByVin || fleetBySerial || fleetByName;
+    const fleetBySerial = van.samsaraSerial
+      ? fleet.find((f) => normalizeSamsaraSerial(f.serial) === normalizeSamsaraSerial(van.samsaraSerial))
+      : undefined;
+    const fleetByVin = van.vin
+      ? fleet.filter((f) => String(f.vin || "").toUpperCase() === van.vin!.toUpperCase())
+      : [];
+    const fleetMatch =
+      fleetById ||
+      fleetByName ||
+      fleetBySerial ||
+      (fleetByVin.length === 1
+        ? fleetByVin[0]
+        : fleetByVin.find(
+            (f) => normalizeSamsaraVanLabel(f.name) === normalizeSamsaraVanLabel(van.samsaraVehicleName)
+          ));
     const gps = matchVehicleByName(locations, van.samsaraVehicleName, van.samsaraSerial, {
+      samsaraVehicleId: van.samsaraVehicleId,
       vin: van.vin,
       licensePlate: van.licensePlate
     });
     return {
       vanKey: van.vanKey,
       expectedName: van.samsaraVehicleName,
+      expectedId: van.samsaraVehicleId,
       expectedSerial: van.samsaraSerial,
       expectedVin: van.vin,
       expectedPlate: van.licensePlate,
@@ -92,7 +105,13 @@ async function main() {
             serial: fleetMatch.serial,
             vin: fleetMatch.vin,
             licensePlate: fleetMatch.licensePlate,
-            via: fleetByVin ? "vin" : fleetBySerial ? "serial" : "name"
+            via: fleetById
+              ? "id"
+              : fleetByName
+                ? "name"
+                : fleetBySerial
+                  ? "serial"
+                  : "vin"
           }
         : null,
       gpsMatch: gps
@@ -105,8 +124,7 @@ async function main() {
             longitude: gps.longitude,
             time: gps.time
           }
-        : null,
-      nameLooksCorrectInUi: true
+        : null
     };
   });
 
