@@ -14,6 +14,7 @@ import {
 } from "./location-rate";
 import { calculatePercentCommissionCents, parseMoneyToCents } from "./money";
 import { parseCommissionDate } from "./dates";
+import { commissionDedupeKey, namesMatchCaseInsensitive } from "./dedupe";
 import type { CommissionActor, CommissionViewer } from "./types";
 
 export type ImportStageResult = {
@@ -22,6 +23,7 @@ export type ImportStageResult = {
   failed: number;
   warnings: number;
   duplicates: number;
+  skippedDuplicates: number;
   errors: { line: number; message: string; severity: string }[];
   records: { id: string }[];
 };
@@ -34,9 +36,50 @@ function parseSoldDate(value: unknown): string | null {
   return parseCommissionDate(value);
 }
 
+async function findExistingSameDayDuplicate(
+  supabase: SupabaseClient,
+  fields: {
+    trainerName: string;
+    trainerUserId?: string | null;
+    clientName: string;
+    dogName: string;
+    packageOrClass: string;
+    saleDate: string;
+    finalCommissionCents: number;
+  }
+): Promise<string | null> {
+  let query = supabase
+    .from("package_commission_records")
+    .select("id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
+    .eq("sale_date", fields.saleDate)
+    .eq("final_commission_cents", fields.finalCommissionCents)
+    .is("archived_at", null)
+    .limit(25);
+
+  if (fields.trainerUserId) {
+    query = query.eq("trainer_user_id", fields.trainerUserId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const match = (data ?? []).find((row) => {
+    const trainerOk = fields.trainerUserId
+      ? String(row.trainer_user_id ?? "") === fields.trainerUserId
+      : namesMatchCaseInsensitive(String(row.trainer_name ?? ""), fields.trainerName);
+    return (
+      trainerOk &&
+      namesMatchCaseInsensitive(String(row.client_name ?? ""), fields.clientName) &&
+      namesMatchCaseInsensitive(String(row.dog_name ?? ""), fields.dogName) &&
+      namesMatchCaseInsensitive(String(row.package_or_class ?? ""), fields.packageOrClass)
+    );
+  });
+  return match ? String(match.id) : null;
+}
+
 /**
  * Three-stage-ready importer: validates then creates ledger rows + import batch.
- * Uses Gingr invoice + legacy Fitdog CSV parsers.
+ * Skips same-day duplicates (existing ledger + within the CSV itself).
  */
 export async function importCommissionCsvToLedger(
   supabase: SupabaseClient,
@@ -55,6 +98,7 @@ export async function importCommissionCsvToLedger(
 
   const errors: ImportStageResult["errors"] = [];
   const previewRows: Array<Record<string, unknown>> = [];
+  const seenInBatch = new Set<string>();
   let warnings = 0;
   let duplicates = 0;
 
@@ -64,6 +108,13 @@ export async function importCommissionCsvToLedger(
     const dog = String(row.dog_name ?? "").trim();
     const client = String(row.owner_name ?? "").trim();
     const pkg = String(row.package_type ?? "").trim();
+    const trainerName = String(row.trainer_name ?? "").trim() || "Unassigned";
+    const matched =
+      row.trainer_user_id
+        ? null
+        : matchTrainerByName(trainerName, input.trainers);
+    const trainerUserId = (row.trainer_user_id as string) || matched?.id || null;
+    const resolvedTrainerName = matched?.full_name || trainerName;
     const grossCents = parseMoneyToCents(row.package_sale_amount);
     const rateBps = trainerRateBpsForPackage(pkg);
     const mode = String(row.commission_mode ?? "").toLowerCase();
@@ -83,35 +134,72 @@ export async function importCommissionCsvToLedger(
       warnings += 1;
     }
 
-    // Possible duplicate: same trainer+client+dog+package+date+amount
-    if (saleDate && dog && client) {
-      const { data: dupes } = await supabase
-        .from("package_commission_records")
-        .select("id")
-        .eq("dog_name", dog)
-        .eq("client_name", client)
-        .eq("package_or_class", pkg)
-        .eq("sale_date", saleDate)
-        .eq("final_commission_cents", finalCents)
-        .is("archived_at", null)
-        .limit(1);
-      if (dupes?.length) {
-        duplicates += 1;
-        warnings += 1;
-        issues.push("Possible duplicate");
-      }
-    }
-
-    if (issues.some((msg) => msg.startsWith("Missing dog") || msg.startsWith("Missing client") || msg.startsWith("Missing package") || msg.startsWith("Invalid"))) {
+    const hardError = issues.some(
+      (msg) =>
+        msg.startsWith("Missing dog") ||
+        msg.startsWith("Missing client") ||
+        msg.startsWith("Missing package") ||
+        msg.startsWith("Invalid")
+    );
+    if (hardError) {
       errors.push({ line: i + 1, message: issues.join("; "), severity: "error" });
       continue;
     }
+
+    // Same-day duplicate: skip (do not import).
+    if (saleDate && dog && client && pkg) {
+      const fingerprint = commissionDedupeKey({
+        trainerName: resolvedTrainerName,
+        trainerUserId,
+        clientName: client,
+        dogName: dog,
+        packageOrClass: pkg,
+        saleDate,
+        finalCommissionCents: finalCents
+      });
+
+      if (seenInBatch.has(fingerprint)) {
+        duplicates += 1;
+        errors.push({
+          line: i + 1,
+          message: "Duplicate in CSV (same trainer/client/dog/package/date/amount) — skipped",
+          severity: "duplicate"
+        });
+        continue;
+      }
+
+      const existingId = await findExistingSameDayDuplicate(supabase, {
+        trainerName: resolvedTrainerName,
+        trainerUserId,
+        clientName: client,
+        dogName: dog,
+        packageOrClass: pkg,
+        saleDate,
+        finalCommissionCents: finalCents
+      });
+      if (existingId) {
+        duplicates += 1;
+        errors.push({
+          line: i + 1,
+          message: "Duplicate same-day entry already in ledger — skipped",
+          severity: "duplicate"
+        });
+        continue;
+      }
+
+      seenInBatch.add(fingerprint);
+    }
+
     if (issues.length) {
+      warnings += 1;
       errors.push({ line: i + 1, message: issues.join("; "), severity: "warning" });
     }
 
     previewRows.push({
       ...row,
+      trainer_user_id: trainerUserId,
+      trainer_name: resolvedTrainerName,
+      trainer_email: (row.trainer_email as string) || matched?.email || null,
       _saleDate: saleDate,
       _finalCents: finalCents,
       _useInvoiceShare: useInvoiceShare,
@@ -142,6 +230,7 @@ export async function importCommissionCsvToLedger(
       failed: errors.filter((e) => e.severity === "error").length,
       warnings,
       duplicates,
+      skippedDuplicates: duplicates,
       errors,
       records: []
     };
@@ -173,7 +262,12 @@ export async function importCommissionCsvToLedger(
     await supabase.from("package_commission_import_errors").insert({
       batch_id: batch.id,
       row_number: err.line,
-      severity: err.severity === "warning" ? "warning" : err.message.includes("duplicate") ? "duplicate" : "error",
+      severity:
+        err.severity === "warning"
+          ? "warning"
+          : err.severity === "duplicate" || err.message.toLowerCase().includes("duplicate")
+            ? "duplicate"
+            : "error",
       message: err.message,
       raw_row: {}
     });
@@ -185,15 +279,11 @@ export async function importCommissionCsvToLedger(
 
   for (const row of previewRows) {
     try {
-      const matched =
-        row.trainer_user_id
-          ? null
-          : matchTrainerByName(String(row.trainer_name ?? ""), input.trainers);
       const useInvoiceShare = Boolean(row._useInvoiceShare);
       const created = await createCommissionRecord(supabase, viewer, actor, {
-        trainer_user_id: (row.trainer_user_id as string) || matched?.id || null,
-        trainer_name: matched?.full_name || String(row.trainer_name ?? "Unassigned"),
-        trainer_email: (row.trainer_email as string) || matched?.email || null,
+        trainer_user_id: (row.trainer_user_id as string) || null,
+        trainer_name: String(row.trainer_name ?? "Unassigned"),
+        trainer_email: (row.trainer_email as string) || null,
         sale_date: String(row._saleDate),
         service_date: String(row._saleDate),
         client_name: String(row.owner_name ?? ""),
@@ -206,6 +296,7 @@ export async function importCommissionCsvToLedger(
         source: "csv_import",
         import_batch_id: batch.id,
         internal_notes: row.notes ? String(row.notes) : null,
+        allow_duplicate: false,
         // Gingr invoice: honor Trainer Share ($) including $0.00 rows.
         ...(useInvoiceShare
           ? {
@@ -228,18 +319,21 @@ export async function importCommissionCsvToLedger(
       records.push({ id: created.id });
       imported += 1;
     } catch (error) {
-      failed += 1;
-      errors.push({
-        line: Number(row._line ?? 0),
-        message: error instanceof Error ? error.message : "Import failed",
-        severity: "error"
-      });
+      const message = error instanceof Error ? error.message : "Import failed";
+      const isDuplicate = /duplicate/i.test(message);
+      if (isDuplicate) {
+        duplicates += 1;
+        errors.push({ line: Number(row._line ?? 0), message, severity: "duplicate" });
+      } else {
+        failed += 1;
+        errors.push({ line: Number(row._line ?? 0), message, severity: "error" });
+      }
     }
   }
 
   await supabase
     .from("package_commission_import_batches")
-    .update({ imported_rows: imported, failed_rows: failed })
+    .update({ imported_rows: imported, failed_rows: failed, duplicate_rows: duplicates })
     .eq("id", batch.id);
 
   await writeCommissionAudit(supabase, {
@@ -247,7 +341,7 @@ export async function importCommissionCsvToLedger(
     entityId: batch.id,
     action: "csv_imported",
     actor,
-    metadata: { imported, failed, filename: input.filename ?? "paste.csv" }
+    metadata: { imported, failed, duplicates, filename: input.filename ?? "paste.csv" }
   });
 
   return {
@@ -256,6 +350,7 @@ export async function importCommissionCsvToLedger(
     failed,
     warnings,
     duplicates,
+    skippedDuplicates: duplicates,
     errors,
     records
   };

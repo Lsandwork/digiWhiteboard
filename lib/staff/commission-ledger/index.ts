@@ -1,3 +1,4 @@
+export * from "./dedupe";
 export * from "./types";
 export * from "./money";
 export * from "./location-rate";

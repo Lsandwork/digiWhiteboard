@@ -1214,14 +1214,13 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 const body = await postAction({ action: "import_csv", csv: csvText, filename: csvFileName ?? "paste.csv" });
                 const imported = Number(body.imported ?? body.created ?? 0);
                 const failed = Number(body.failed ?? 0);
+                const duplicates = Number(body.duplicates ?? body.skippedDuplicates ?? 0);
                 const errors = Array.isArray(body.errors) ? body.errors : [];
                 setImportResult({ imported, failed, errors });
-                showToast(
-                  failed
-                    ? `Imported ${imported} row(s); ${failed} failed or skipped.`
-                    : `Imported ${imported} row(s).`,
-                  failed ? "info" : "success"
-                );
+                const parts = [`Imported ${imported} row(s)`];
+                if (duplicates) parts.push(`${duplicates} duplicate(s) skipped`);
+                if (failed) parts.push(`${failed} failed`);
+                showToast(parts.join("; ") + ".", failed ? "info" : duplicates ? "info" : "success");
                 if (imported > 0) await load();
               } catch (error) {
                 showToast(error instanceof Error ? error.message : "Import failed.", "error");

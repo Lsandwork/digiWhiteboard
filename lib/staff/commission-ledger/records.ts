@@ -6,6 +6,7 @@ import { mapDbRecord, computeMissingRequired } from "./map";
 import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import { trainerRateBpsForPackage } from "./location-rate";
 import { calculatePercentCommissionCents, parseMoneyToCents, parsePercentToBps } from "./money";
+import { namesMatchCaseInsensitive } from "./dedupe";
 import type {
   ApprovalStatus,
   CommissionActor,
@@ -254,6 +255,8 @@ export type CreateCommissionInput = {
   import_batch_id?: string | null;
   rule_id?: string | null;
   rule_snapshot?: Record<string, unknown> | null;
+  /** When false (default for sales), reject same-day duplicates. */
+  allow_duplicate?: boolean;
 };
 
 export async function createCommissionRecord(
@@ -294,6 +297,44 @@ export async function createCommissionRecord(
   const serviceDate = parseCommissionDate(input.service_date) ?? saleDate;
   if (!saleDate) throw new Error("Sale date is required.");
 
+  const commissionType = input.commission_type ?? "package_sale";
+  const skipDedupe =
+    Boolean(input.allow_duplicate) ||
+    commissionType === "adjustment" ||
+    commissionType === "refund_reversal" ||
+    commissionType === "bonus";
+
+  if (!skipDedupe) {
+    let dupQuery = supabase
+      .from("package_commission_records")
+      .select("id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
+      .eq("sale_date", saleDate)
+      .eq("final_commission_cents", final)
+      .is("archived_at", null)
+      .limit(25);
+    if (input.trainer_user_id) {
+      dupQuery = dupQuery.eq("trainer_user_id", input.trainer_user_id);
+    }
+    const { data: dupes, error: dupError } = await dupQuery;
+    if (dupError) throw new Error(dupError.message);
+    const hit = (dupes ?? []).find((row) => {
+      const trainerOk = input.trainer_user_id
+        ? String(row.trainer_user_id ?? "") === input.trainer_user_id
+        : namesMatchCaseInsensitive(String(row.trainer_name ?? ""), trainerName);
+      return (
+        trainerOk &&
+        namesMatchCaseInsensitive(String(row.client_name ?? ""), client) &&
+        namesMatchCaseInsensitive(String(row.dog_name ?? ""), dog) &&
+        namesMatchCaseInsensitive(String(row.package_or_class ?? ""), packageOrClass)
+      );
+    });
+    if (hit) {
+      throw new Error(
+        "Duplicate same-day commission already exists for this trainer/client/dog/package/amount."
+      );
+    }
+  }
+
   const warnings = computeMissingRequired({
     trainer_name: trainerName,
     trainer_user_id: input.trainer_user_id ?? null,
@@ -312,7 +353,7 @@ export async function createCommissionRecord(
     service_date: serviceDate,
     client_name: client,
     dog_name: dog,
-    commission_type: input.commission_type ?? "package_sale",
+    commission_type: commissionType,
     package_or_class: packageOrClass,
     quantity: Number(input.quantity ?? 1),
     gross_amount_cents: gross,
@@ -347,7 +388,14 @@ export async function createCommissionRecord(
   };
 
   const { data, error } = await supabase.from("package_commission_records").insert(payload).select("*").single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/same_day_dedupe|duplicate key|unique constraint/i.test(error.message)) {
+      throw new Error(
+        "Duplicate same-day commission already exists for this trainer/client/dog/package/amount."
+      );
+    }
+    throw new Error(error.message);
+  }
   const record = mapDbRecord(data as Record<string, unknown>);
   await writeCommissionAudit(supabase, {
     recordId: record.id,
