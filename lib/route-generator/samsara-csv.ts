@@ -131,8 +131,21 @@ export function formatSamsaraCsvDateTime(date: Date, timeZone = "America/Los_Ang
 }
 
 /**
+ * Drop-off route start times (America/Los_Angeles):
+ * - Van 1 / 2 / 3 (outing): 10:30 — leave trail/beach for home drop-offs
+ * - Van 5 / 6 (club): 12:00 — after group classes end; Van 5 for taxi/club drop-offs
+ */
+export function dropoffStartTimeForVan(vanKey?: string | null): { hour: number; minute: number } {
+  const key = String(vanKey ?? "").trim().toLowerCase();
+  if (key === "van_5" || key === "van_6") return { hour: 12, minute: 0 };
+  // van_1, van_2, van_3 (and unknown outing vans)
+  return { hour: 10, minute: 30 };
+}
+
+/**
  * Build spaced stop arrival/departure times for a route when ETAs were not persisted.
- * Pickup defaults to 07:00 PT; drop-off defaults to 15:30 PT.
+ * Pickup defaults to 07:00 PT.
+ * Drop-off: Van 1/2/3 → 10:30 PT; Van 5/6 → 12:00 PT.
  */
 export function synthesizeStopSchedule(params: {
   operatingDate: string; // YYYY-MM-DD
@@ -140,10 +153,16 @@ export function synthesizeStopSchedule(params: {
   stopIndex: number;
   stopCount: number;
   minutesPerStop?: number;
+  vanKey?: string | null;
 }): { arrival: string; departure: string } {
   const minutesPerStop = params.minutesPerStop ?? 8;
-  const startHour = params.direction === "pickup" ? 7 : 15;
-  const startMinute = params.direction === "pickup" ? 0 : 30;
+  let startHour = 7;
+  let startMinute = 0;
+  if (params.direction === "dropoff") {
+    const drop = dropoffStartTimeForVan(params.vanKey);
+    startHour = drop.hour;
+    startMinute = drop.minute;
+  }
   const localStamp = `${params.operatingDate}T${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}:00`;
   const startMs = civilTimeToUtcMs(localStamp, "America/Los_Angeles");
   const arriveMs = startMs + params.stopIndex * minutesPerStop * 60_000;

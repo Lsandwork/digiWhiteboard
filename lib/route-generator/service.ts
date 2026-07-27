@@ -1118,7 +1118,8 @@ export async function exportSamsaraCsv(params: {
         operatingDate: String(bundle.plan.operating_date),
         direction,
         stopIndex,
-        stopCount: routeStops.length
+        stopCount: routeStops.length,
+        vanKey: String(route.van_key ?? "")
       });
       const scheduledArrival =
         etaArrival && !Number.isNaN(etaArrival.getTime())
