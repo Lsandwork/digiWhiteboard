@@ -45,16 +45,15 @@ async function findExistingSameDayDuplicate(
     dogName: string;
     packageOrClass: string;
     saleDate: string;
-    finalCommissionCents: number;
   }
 ): Promise<string | null> {
+  // Match trainer + client + dog + class + date (amount ignored).
   let query = supabase
     .from("package_commission_records")
     .select("id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
     .eq("sale_date", fields.saleDate)
-    .eq("final_commission_cents", fields.finalCommissionCents)
     .is("archived_at", null)
-    .limit(25);
+    .limit(40);
 
   if (fields.trainerUserId) {
     query = query.eq("trainer_user_id", fields.trainerUserId);
@@ -146,7 +145,7 @@ export async function importCommissionCsvToLedger(
       continue;
     }
 
-    // Same-day duplicate: skip (do not import).
+    // Same name + date + class: never import twice (ledger or within this CSV).
     if (saleDate && dog && client && pkg) {
       const fingerprint = commissionDedupeKey({
         trainerName: resolvedTrainerName,
@@ -154,15 +153,14 @@ export async function importCommissionCsvToLedger(
         clientName: client,
         dogName: dog,
         packageOrClass: pkg,
-        saleDate,
-        finalCommissionCents: finalCents
+        saleDate
       });
 
       if (seenInBatch.has(fingerprint)) {
         duplicates += 1;
         errors.push({
           line: i + 1,
-          message: "Duplicate in CSV (same trainer/client/dog/package/date/amount) — skipped",
+          message: "Duplicate in CSV (same trainer/name/date/class) — skipped",
           severity: "duplicate"
         });
         continue;
@@ -174,14 +172,13 @@ export async function importCommissionCsvToLedger(
         clientName: client,
         dogName: dog,
         packageOrClass: pkg,
-        saleDate,
-        finalCommissionCents: finalCents
+        saleDate
       });
       if (existingId) {
         duplicates += 1;
         errors.push({
           line: i + 1,
-          message: "Duplicate same-day entry already in ledger — skipped",
+          message: "Duplicate same name/date/class already in ledger — skipped",
           severity: "duplicate"
         });
         continue;
