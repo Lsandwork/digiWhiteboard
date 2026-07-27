@@ -9,7 +9,7 @@ const NOISE =
 export function isUsefulFitdogActivity(text: string) {
   if (!text.trim()) return false;
   if (NOISE.test(text)) return false;
-  return /(cancel|declin|vaccination|uploaded|payment|card|invoice|reservation|document|not marked as attended)/i.test(
+  return /(cancel|declin|vaccination|uploaded|payment|card|invoice|reservation|document|charge|not marked as attended)/i.test(
     text
   );
 }

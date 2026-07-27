@@ -336,7 +336,7 @@ export async function upsertProposedAlert(
         payment_method_last_four: proposed.payment_method_last_four,
         package_credit_check: proposed.package_credit_check,
         source_url: proposed.source_url,
-        severity: proposed.alert_type === "CARD_DECLINED" ? "critical" : proposed.severity,
+        severity: proposed.alert_type === "CARD_DECLINED" || proposed.alert_type === "PAYMENT_ERROR" ? "critical" : proposed.severity,
         updated_at: new Date().toISOString()
       })
       .eq("id", existing.id)
@@ -361,7 +361,7 @@ export async function upsertProposedAlert(
       source_record_id: proposed.source_record_id,
       idempotency_key: proposed.idempotency_key,
       alert_type: proposed.alert_type,
-      severity: proposed.alert_type === "CARD_DECLINED" ? "critical" : proposed.severity,
+      severity: proposed.alert_type === "CARD_DECLINED" || proposed.alert_type === "PAYMENT_ERROR" ? "critical" : proposed.severity,
       owner_id: proposed.owner_id,
       owner_name: proposed.owner_name,
       dog_id: proposed.dog_id,
@@ -502,7 +502,7 @@ export async function getOperationsAlertSummary(supabase: Db): Promise<Operation
   return {
     new_alerts: open.filter((row) => row.status === "new").length,
     failed_payments: open.filter((row) =>
-      ["PAYMENT_FAILED", "CARD_DECLINED", "PAYMENT_PROCESSING_ERROR", "PAYMENT_RETRY_FAILED"].includes(String(row.alert_type))
+      ["PAYMENT_FAILED", "CARD_DECLINED", "PAYMENT_PROCESSING_ERROR", "PAYMENT_RETRY_FAILED", "PAYMENT_ERROR"].includes(String(row.alert_type))
     ).length,
     missed_payments: open.filter((row) => row.alert_type === "PAYMENT_MISSED").length,
     card_declined: open.filter((row) => row.alert_type === "CARD_DECLINED").length,
@@ -530,6 +530,7 @@ export async function listOperationsAlerts(supabase: Db, filters: OperationsAler
         "CARD_MISSING",
         "PAYMENT_PROCESSING_ERROR",
         "PAYMENT_RETRY_FAILED",
+        "PAYMENT_ERROR",
         "OUTSTANDING_BALANCE",
         "FITDOG_NOTIFICATION"
       ])
@@ -695,6 +696,7 @@ export async function countUnacknowledgedPaymentAlerts(supabase: Db) {
       "CARD_MISSING",
       "PAYMENT_PROCESSING_ERROR",
       "PAYMENT_RETRY_FAILED",
+      "PAYMENT_ERROR",
       "OUTSTANDING_BALANCE"
     ]);
   if (error) {
