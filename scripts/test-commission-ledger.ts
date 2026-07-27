@@ -136,4 +136,44 @@ const trainerOptions = listCommissionTrainerOptions([
 assert.equal(trainerOptions.length, 1);
 assert.equal(trainerOptions[0]?.full_name, "Ivonne Campuzano");
 
+import { commissionDedupeKey, namesMatchCaseInsensitive } from "../lib/staff/commission-ledger/dedupe";
+
+assert.equal(
+  commissionDedupeKey({
+    trainerName: "Ivonne Campuzano",
+    clientName: "Debra Martin",
+    dogName: "Daisy",
+    packageOrClass: "PUPPY JUMPSTART",
+    saleDate: "2026-07-17",
+    finalCommissionCents: 49750
+  }),
+  commissionDedupeKey({
+    trainerName: " ivonne  campuzano ",
+    clientName: "DEBRA MARTIN",
+    dogName: "daisy",
+    packageOrClass: "puppy jumpstart",
+    saleDate: "2026-07-17",
+    finalCommissionCents: 49750
+  })
+);
+assert.equal(namesMatchCaseInsensitive("Van 01", "van 01"), true);
+assert.notEqual(
+  commissionDedupeKey({
+    trainerName: "Ivonne",
+    clientName: "A",
+    dogName: "B",
+    packageOrClass: "Pack",
+    saleDate: "2026-07-17",
+    finalCommissionCents: 100
+  }),
+  commissionDedupeKey({
+    trainerName: "Amanda",
+    clientName: "A",
+    dogName: "B",
+    packageOrClass: "Pack",
+    saleDate: "2026-07-17",
+    finalCommissionCents: 100
+  })
+);
+
 console.log("commission ledger: ok");
