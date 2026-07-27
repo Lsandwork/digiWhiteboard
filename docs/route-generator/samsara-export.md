@@ -1,5 +1,15 @@
 # Route Generator — Samsara export + owner ETA
 
+## CSV headers (required exact match)
+
+Export must use Samsara’s official bulk-upload columns A–K (from the dashboard sample templates):
+
+`Route Name, Assigned Driver Username, Assigned Vehicle Name, Stop Name, Stop Arrival Time, Stop Departure Time, Stop Notes, Address Name, Latitude, Longitude, Full Address`
+
+Wrong names that fail upload: `Notes`, `Scheduled Arrival Time`, `Scheduled Departure Time`.
+
+For raw lat/lng routes, leave **Address Name** blank and fill Latitude / Longitude / Full Address (do not mix Address Book names with coordinates on the same row).
+
 ## Samsara CSV Stop Notes (drivers)
 
 Every customer stop exported to Samsara includes:
