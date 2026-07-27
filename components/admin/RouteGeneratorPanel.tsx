@@ -641,7 +641,7 @@ export function RouteGeneratorPanel() {
         </section>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="admin-tabs">
         {(
           [
             ["overview", "Overview"],
@@ -657,9 +657,7 @@ export function RouteGeneratorPanel() {
           <button
             key={id}
             type="button"
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-              tab === id ? "bg-fitdog-orange text-black" : "bg-black/20 text-admin-muted hover:text-white"
-            }`}
+            className={`admin-tab ${tab === id ? "admin-tab--active" : ""}`}
             onClick={() => setTab(id)}
           >
             {label}

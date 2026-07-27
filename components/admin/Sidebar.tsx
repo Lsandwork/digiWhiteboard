@@ -61,8 +61,8 @@ function sectionContainsActive(
 
 function NavIcon({ tab }: { tab: AdminTab }) {
   const iconSrc = FITDOG_TAB_ICONS[tab];
-  if (iconSrc) return <FitdogDashboardIcon src={iconSrc} size={20} className="admin-nav-item__icon shrink-0" />;
-  return <span className="admin-nav-item__icon inline-block h-5 w-5 shrink-0 rounded bg-white/10" aria-hidden />;
+  if (iconSrc) return <FitdogDashboardIcon src={iconSrc} size={18} className="admin-nav-item__icon shrink-0" />;
+  return <span className="admin-nav-item__icon inline-block h-[18px] w-[18px] shrink-0 rounded bg-white/10" aria-hidden />;
 }
 
 function SidebarNavItem({
@@ -140,9 +140,9 @@ function SidebarNavGroup({
         }}
       >
         {groupIcon ? (
-          <FitdogDashboardIcon src={groupIcon} size={20} className="admin-nav-item__icon shrink-0" />
+          <FitdogDashboardIcon src={groupIcon} size={18} className="admin-nav-item__icon shrink-0" />
         ) : (
-          <span className="admin-nav-item__icon inline-block h-5 w-5 shrink-0 rounded bg-white/10" aria-hidden />
+          <span className="admin-nav-item__icon inline-block h-[18px] w-[18px] shrink-0 rounded bg-white/10" aria-hidden />
         )}
         <span className="flex-1 text-left">{entry.label}</span>
         {groupBadge > 0 ? (
@@ -234,7 +234,7 @@ function SidebarNavRouteItem({
         onNavigate();
       }}
     >
-      <Image src={icon} alt="" width={20} height={20} className="admin-nav-item__icon shrink-0 rounded-sm" />
+      <Image src={icon} alt="" width={18} height={18} className="admin-nav-item__icon shrink-0 rounded-sm" />
       <span>{label}</span>
     </Link>
   );
