@@ -153,7 +153,7 @@ assert.equal(
     dogName: "daisy",
     packageOrClass: "puppy jumpstart",
     saleDate: "2026-07-17",
-    finalCommissionCents: 49750
+    finalCommissionCents: 1 // amount ignored
   })
 );
 assert.equal(namesMatchCaseInsensitive("Van 01", "van 01"), true);
@@ -163,16 +163,33 @@ assert.notEqual(
     clientName: "A",
     dogName: "B",
     packageOrClass: "Pack",
-    saleDate: "2026-07-17",
-    finalCommissionCents: 100
+    saleDate: "2026-07-17"
   }),
   commissionDedupeKey({
     trainerName: "Amanda",
     clientName: "A",
     dogName: "B",
     packageOrClass: "Pack",
-    saleDate: "2026-07-17",
-    finalCommissionCents: 100
+    saleDate: "2026-07-17"
+  })
+);
+// Different amounts, same name/date/class → still a duplicate key
+assert.equal(
+  commissionDedupeKey({
+    trainerName: "Ivonne",
+    clientName: "Owner",
+    dogName: "Rex",
+    packageOrClass: "Group Class",
+    saleDate: "2026-07-20",
+    finalCommissionCents: 1000
+  }),
+  commissionDedupeKey({
+    trainerName: "Ivonne",
+    clientName: "Owner",
+    dogName: "Rex",
+    packageOrClass: "Group Class",
+    saleDate: "2026-07-20",
+    finalCommissionCents: 9999
   })
 );
 

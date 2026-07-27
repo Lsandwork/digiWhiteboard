@@ -31,6 +31,7 @@ import {
   listPayrollPeriods,
   listRecordAudit,
   previewCommissionRule,
+  purgeRejectedDuplicateCommissions,
   replyToCommentThread,
   reopenCommentThread,
   resolveCommentThread,
@@ -328,6 +329,12 @@ export async function POST(request: Request) {
       if (!canManage) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
       await deleteCommissionRecord(supabase, viewer, actor, String(body.id ?? ""), String(body.reason ?? ""));
       return NextResponse.json({ ok: true });
+    }
+
+    if (action === "purge_duplicates") {
+      if (!canManage) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+      const result = await purgeRejectedDuplicateCommissions(supabase, actor, { allTrainers: true });
+      return NextResponse.json({ ok: true, ...result });
     }
 
     if (action === "refund") {

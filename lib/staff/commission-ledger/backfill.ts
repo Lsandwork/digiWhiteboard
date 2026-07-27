@@ -283,10 +283,10 @@ export async function ensureCommissionSaleDatesRepaired(supabase: SupabaseClient
   return { repaired };
 }
 
-const IVONNE_DUP_PURGE_KEY = "ivonne_rejected_dups_purged_v1";
+const STRICT_DUP_PURGE_KEY = "strict_name_date_class_dups_purged_v1";
 
 /**
- * One-time cleanup: archive Ivonne's rejected duplicate commission rows.
+ * One-time cleanup: archive every duplicate same name/date/class commission row.
  * Triggered on ledger list until the settings flag is set.
  */
 export async function ensureIvonneRejectedDuplicatesPurged(supabase: SupabaseClient) {
@@ -296,7 +296,7 @@ export async function ensureIvonneRejectedDuplicatesPurged(supabase: SupabaseCli
     .eq("id", "default")
     .maybeSingle();
   const settings = (adminSettings?.settings ?? {}) as Record<string, unknown>;
-  if (settings[IVONNE_DUP_PURGE_KEY]) {
+  if (settings[STRICT_DUP_PURGE_KEY]) {
     return { archived: 0, skipped: true as const };
   }
 
@@ -310,10 +310,10 @@ export async function ensureIvonneRejectedDuplicatesPurged(supabase: SupabaseCli
       role: "system",
       roleKey: "system"
     },
-    { trainerNameIncludes: "ivonne" }
+    { allTrainers: true }
   );
 
-  const nextSettings = { ...settings, [IVONNE_DUP_PURGE_KEY]: { at: new Date().toISOString(), ...result } };
+  const nextSettings = { ...settings, [STRICT_DUP_PURGE_KEY]: { at: new Date().toISOString(), ...result } };
   await supabase
     .from("admin_settings")
     .upsert({ id: "default", settings: nextSettings, updated_at: new Date().toISOString() }, { onConflict: "id" });

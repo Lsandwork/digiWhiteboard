@@ -6,7 +6,7 @@ import { mapDbRecord, computeMissingRequired } from "./map";
 import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import { trainerRateBpsForPackage } from "./location-rate";
 import { calculatePercentCommissionCents, parseMoneyToCents, parsePercentToBps } from "./money";
-import { namesMatchCaseInsensitive } from "./dedupe";
+import { namesMatchCaseInsensitive, commissionDedupeKey } from "./dedupe";
 import type {
   ApprovalStatus,
   CommissionActor,
@@ -310,9 +310,8 @@ export async function createCommissionRecord(
       .from("package_commission_records")
       .select("id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
       .eq("sale_date", saleDate)
-      .eq("final_commission_cents", final)
       .is("archived_at", null)
-      .limit(25);
+      .limit(40);
     if (input.trainer_user_id) {
       dupQuery = dupQuery.eq("trainer_user_id", input.trainer_user_id);
     }
@@ -331,7 +330,7 @@ export async function createCommissionRecord(
     });
     if (hit) {
       throw new Error(
-        "Duplicate same-day commission already exists for this trainer/client/dog/package/amount."
+        "Duplicate commission already exists for this trainer/name/date/class. Same entry cannot be added twice."
       );
     }
   }
@@ -392,7 +391,7 @@ export async function createCommissionRecord(
   if (error) {
     if (/same_day_dedupe|duplicate key|unique constraint/i.test(error.message)) {
       throw new Error(
-        "Duplicate same-day commission already exists for this trainer/client/dog/package/amount."
+        "Duplicate commission already exists for this trainer/name/date/class. Same entry cannot be added twice."
       );
     }
     throw new Error(error.message);
@@ -734,37 +733,45 @@ export async function deleteCommissionRecord(
 }
 
 /**
- * Soft-archive rejected duplicate ledger rows for a trainer (default: Ivonne).
- * Keeps one active row per same-day fingerprint (prefer non-rejected, then oldest).
+ * Soft-archive duplicate ledger rows (same trainer + client + dog + class + date).
+ * Keeps one active row per fingerprint (prefer paid → approved → non-rejected → oldest).
  */
 export async function purgeRejectedDuplicateCommissions(
   supabase: SupabaseClient,
   actor: CommissionActor,
-  options?: { trainerNameIncludes?: string }
+  options?: { trainerNameIncludes?: string; allTrainers?: boolean }
 ): Promise<{ archived: number; ids: string[] }> {
-  const trainerFilter = (options?.trainerNameIncludes ?? "ivonne").trim().toLowerCase();
+  const trainerFilter = options?.trainerNameIncludes?.trim().toLowerCase() ?? "";
+  const allTrainers = Boolean(options?.allTrainers) || !trainerFilter;
 
-  const { data: rows, error } = await supabase
+  let query = supabase
     .from("package_commission_records")
     .select(
-      "id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class, sale_date, final_commission_cents, approval_status, review_status, created_at"
+      "id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class, sale_date, approval_status, review_status, payment_status, created_at"
     )
     .is("archived_at", null)
-    .ilike("trainer_name", `%${trainerFilter}%`)
     .order("created_at", { ascending: true })
-    .limit(500);
+    .limit(2000);
+  if (!allTrainers) {
+    query = query.ilike("trainer_name", `%${trainerFilter}%`);
+  }
+
+  const { data: rows, error } = await query;
   if (error) throw new Error(error.message);
 
   const groups = new Map<string, Array<(typeof rows)[number]>>();
   for (const row of rows ?? []) {
-    const key = [
-      String(row.trainer_user_id ?? "").trim() || String(row.trainer_name ?? "").trim().toLowerCase(),
-      String(row.client_name ?? "").trim().toLowerCase(),
-      String(row.dog_name ?? "").trim().toLowerCase(),
-      String(row.package_or_class ?? "").trim().toLowerCase(),
-      String(row.sale_date ?? "").slice(0, 10),
-      String(Number(row.final_commission_cents) || 0)
-    ].join("|");
+    const key = commissionDedupeKey({
+      trainerName: String(row.trainer_name ?? ""),
+      trainerUserId: row.trainer_user_id != null ? String(row.trainer_user_id) : null,
+      clientName: String(row.client_name ?? ""),
+      dogName: String(row.dog_name ?? ""),
+      packageOrClass: String(row.package_or_class ?? ""),
+      saleDate: String(row.sale_date ?? "").slice(0, 10)
+    });
+    if (!String(row.sale_date ?? "") || !String(row.dog_name ?? "").trim() || !String(row.package_or_class ?? "").trim()) {
+      continue;
+    }
     const list = groups.get(key) ?? [];
     list.push(row);
     groups.set(key, list);
@@ -774,35 +781,38 @@ export async function purgeRejectedDuplicateCommissions(
   for (const group of groups.values()) {
     if (group.length < 2) continue;
     const sorted = [...group].sort((a, b) => {
-      const aRejected =
-        a.approval_status === "rejected" || a.review_status === "rejected" ? 1 : 0;
-      const bRejected =
-        b.approval_status === "rejected" || b.review_status === "rejected" ? 1 : 0;
-      if (aRejected !== bRejected) return aRejected - bRejected; // keep non-rejected
+      const rank = (row: (typeof group)[number]) => {
+        if (row.payment_status === "paid") return 0;
+        if (row.approval_status === "approved") return 1;
+        if (row.approval_status === "rejected" || row.review_status === "rejected") return 3;
+        return 2;
+      };
+      const diff = rank(a) - rank(b);
+      if (diff !== 0) return diff;
       return String(a.created_at).localeCompare(String(b.created_at));
     });
-    const [, ...dupes] = sorted;
-    for (const dupe of dupes) {
-      // Only auto-remove rejected duplicates (never wipe an approved twin silently).
-      if (dupe.approval_status === "rejected" || dupe.review_status === "rejected") {
-        toArchive.push(String(dupe.id));
-      }
+    for (const dupe of sorted.slice(1)) {
+      toArchive.push(String(dupe.id));
     }
   }
 
   if (!toArchive.length) return { archived: 0, ids: [] };
 
-  const note = "Removed as rejected duplicate entry.";
-  const { error: updateError } = await supabase
-    .from("package_commission_records")
-    .update({
-      archived_at: new Date().toISOString(),
-      is_possible_duplicate: true,
-      internal_notes: note,
-      updated_at: new Date().toISOString()
-    })
-    .in("id", toArchive);
-  if (updateError) throw new Error(updateError.message);
+  const note = "Removed as duplicate same name/date/class entry.";
+  // Chunk updates to avoid oversized IN lists
+  for (let i = 0; i < toArchive.length; i += 100) {
+    const chunk = toArchive.slice(i, i + 100);
+    const { error: updateError } = await supabase
+      .from("package_commission_records")
+      .update({
+        archived_at: new Date().toISOString(),
+        is_possible_duplicate: true,
+        internal_notes: note,
+        updated_at: new Date().toISOString()
+      })
+      .in("id", chunk);
+    if (updateError) throw new Error(updateError.message);
+  }
 
   for (const id of toArchive) {
     await writeCommissionAudit(supabase, {
@@ -810,7 +820,7 @@ export async function purgeRejectedDuplicateCommissions(
       action: "duplicate_removed",
       reason: note,
       actor,
-      metadata: { trainer_filter: trainerFilter }
+      metadata: { trainer_filter: allTrainers ? "all" : trainerFilter, key: "name_date_class" }
     });
   }
 
