@@ -32,6 +32,13 @@ for (const tab of REQUIRED) {
   assert.ok((TEAM_LEADER_TABS as readonly string[]).includes(tab), `TEAM_LEADER_TABS includes ${tab}`);
 }
 
+assert.equal(
+  canAccessAdminTab(lead, "active_issues", "team_leader", "staff"),
+  true,
+  "team lead can open active_issues"
+);
+assert.ok((TEAM_LEADER_TABS as readonly string[]).includes("active_issues"), "TEAM_LEADER_TABS includes active_issues");
+
 const fdcTabs = [
   "crossover_communication",
   "owner_follow_up",

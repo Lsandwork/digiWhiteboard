@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { AdminBoardType } from "@/lib/admin/types";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { ensureAngelicaActiveIssues } from "@/lib/admin/ensure-angelica-active-issues";
 import { ensureRebecaFrontDeskPanel } from "@/lib/admin/ensure-rebeca-front-desk-panel";
 import { ensureRequiredFloorPanelPermissionsPersisted } from "@/lib/admin/ensure-required-floor-panel-permissions";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
   await migrateLegacyUserAccess(supabase).catch(() => undefined);
   await ensureRequiredFloorPanelPermissionsPersisted(supabase).catch(() => undefined);
   await ensureRebecaFrontDeskPanel(supabase).catch(() => undefined);
+  await ensureAngelicaActiveIssues(supabase).catch(() => undefined);
   const access = session?.adminUserId
 
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)

@@ -659,6 +659,7 @@ export const TEAM_LEADER_TABS = [
   "yard_push_notices",
   "grooming_push",
   "whiteboard_preview",
+  "active_issues",
   "route_generator",
   "bulk_photo_upload",
   "yard_links",
@@ -1315,6 +1316,32 @@ export function canAccessAdminTab(
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     if (isAdminOrManagementLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole)) return true;
     return isDogHandlerLegacyRole(legacyRole);
+  }
+
+  // Active Issues: allowlisted roles or explicit permission (before role tab allowlists).
+  if (tab === "active_issues") {
+    if (board !== "staff") return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "view_active_issues")) return true;
+    if (
+      hasAnyRole(effective, [
+        "super_admin",
+        "admin",
+        "management",
+        "front_desk_coordinator",
+        "team_leader"
+      ])
+    ) {
+      return true;
+    }
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator" ||
+      roleKey === "team_leader"
+    );
   }
 
   // Fitdog payment alerts: allowlisted roles or explicit permission.
