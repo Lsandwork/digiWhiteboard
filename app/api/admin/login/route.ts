@@ -3,7 +3,6 @@ import { verifyAdminCredentials } from "@/lib/admin/auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { checkLoginRateLimit, clearLoginAttempts, recordFailedLogin } from "@/lib/admin/rate-limit";
 import {
-  ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
   setAdminSessionCookie
 } from "@/lib/admin/session";

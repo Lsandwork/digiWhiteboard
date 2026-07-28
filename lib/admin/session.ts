@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
-import type { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
 
 export { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
@@ -108,7 +107,11 @@ export function getAdminSessionCookieOptions(
   };
 }
 
-type CookieWritable = Pick<NextResponse, "cookies">;
+type CookieWritable = {
+  cookies: {
+    set: (name: string, value: string, options?: Record<string, unknown>) => unknown;
+  };
+};
 
 /**
  * Clear host-only and shared *.ruffops.com session cookies.
