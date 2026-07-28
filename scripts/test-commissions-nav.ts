@@ -45,11 +45,15 @@ const teamLeadTabs: AdminTab[] = [
   "yard_push_notices",
   "grooming_push",
   "crossover_communication",
+  "route_generator",
+  "fitdog_alerts",
+  "walks_board",
+  "vet_visits",
+  "track_incidents",
   "bulk_photo_upload",
   "management_support",
   "notifications",
   "yard_links",
-  "walks_board",
   "settings",
   "help"
 ];
@@ -59,6 +63,11 @@ assert.equal(
   "Front Desk & Floor",
   "team leads must see Bulk Photo Upload in nav"
 );
+assert.equal(findNavSectionForTab(teamLeadNav, "route_generator"), "Dashboard");
+assert.equal(findNavSectionForTab(teamLeadNav, "fitdog_alerts"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "walks_board"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "vet_visits"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "track_incidents"), "Front Desk & Floor");
 
 const coordinatorTabs: AdminTab[] = [
   "push_notices",

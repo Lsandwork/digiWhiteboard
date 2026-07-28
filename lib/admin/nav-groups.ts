@@ -454,6 +454,16 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
   const visible = new Set(visibleTabs);
   const entries: NavEntry[] = [];
 
+  // Route Generator under Dashboard (same placement as buildAdminNav) so it is not
+  // buried in a collapsed Management section when the lead has access.
+  entries.push(
+    ...sectionEntries(
+      "team_lead_dashboard",
+      "Dashboard",
+      singles(["route_generator"], visible)
+    )
+  );
+
   entries.push(
     ...sectionEntries(
       "team_lead_push",
@@ -470,7 +480,9 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
       "team_lead_operations",
       "Front Desk & Floor",
       compactEntries([
-        group("front_desk", "Operations", ["crossover_communication"], visible),
+        // Use the shared Operations list so Sports App Alerts / Walks / Vet / Track
+        // appear whenever they are in visibleTabs (canAccessAdminTab already gated them).
+        group("front_desk", "Operations", FRONT_DESK_TABS, visible),
         ...singles(["bulk_photo_upload"], visible)
       ])
     )
@@ -488,7 +500,8 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_comms",
       "Communications",
-      compactEntries([...singles(["notifications", "yard_links", "walks_board"], visible)])
+      // walks_board lives under Operations (FRONT_DESK_TABS), not Communications.
+      compactEntries([...singles(["notifications", "yard_links"], visible)])
     )
   );
 

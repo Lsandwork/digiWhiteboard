@@ -399,12 +399,20 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
+  "receive_walks_board_reminders",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
   "view_track_incidents",
   "manage_track_incidents",
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.view_audit",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -596,10 +604,19 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
   "receive_walks_board_reminders",
+  "view_fitdog_alerts",
+  "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
   "view_track_incidents",
   "manage_track_incidents",
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.view_audit",
   "manage_photo_upload_queue",
   "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
@@ -622,6 +639,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "grooming_push",
   "owner_follow_up",
   "active_issues",
+  "route_generator",
   "fitdog_alerts",
   "walks_board",
   "vet_visits",
@@ -641,8 +659,10 @@ export const TEAM_LEADER_TABS = [
   "yard_push_notices",
   "grooming_push",
   "whiteboard_preview",
+  "route_generator",
   "bulk_photo_upload",
   "yard_links",
+  "fitdog_alerts",
   "walks_board",
   "vet_visits",
   "track_incidents",
@@ -1226,21 +1246,37 @@ export function canAccessAdminTab(
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     if (hasPermission(effective, "route_generator.view")) return true;
-    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
+    if (
+      hasAnyRole(effective, [
+        "super_admin",
+        "admin",
+        "management",
+        "front_desk_coordinator",
+        "team_leader"
+      ])
+    ) {
+      return true;
+    }
     const roleKey = legacyRoleToRoleKey(legacyRole);
     return (
       roleKey === "super_admin" ||
       roleKey === "admin" ||
       roleKey === "management" ||
+      roleKey === "front_desk_coordinator" ||
+      roleKey === "team_leader" ||
       isManagementLegacyRole(legacyRole)
     );
   }
 
-  // Management required floor panels (Sports App Alerts, Walks Board, Vet Visits, Track Incidents).
+  // Floor panels that Management / Front Desk / Team Lead must always retain
+  // (Sports App Alerts, Walks Board, Vet Visits, Track Incidents — Route Generator above).
   if (
     board === "staff" &&
     (MANAGEMENT_REQUIRED_PANEL_TABS as readonly string[]).includes(tab) &&
-    (isManagementLegacyRole(legacyRole) || hasAnyRole(access, ["management"]))
+    (isManagementLegacyRole(legacyRole) ||
+      isFrontDeskCoordinatorLegacyRole(legacyRole) ||
+      isTeamLeaderLegacyRole(legacyRole) ||
+      hasAnyRole(access, ["management", "front_desk_coordinator", "team_leader"]))
   ) {
     if (tab === "walks_board" && isMarketingLegacyRole(legacyRole)) return false;
     return true;
@@ -1286,13 +1322,24 @@ export function canAccessAdminTab(
     if (board !== "staff") return false;
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     if (hasPermission(effective, "view_fitdog_alerts")) return true;
-    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
+    if (
+      hasAnyRole(effective, [
+        "super_admin",
+        "admin",
+        "management",
+        "front_desk_coordinator",
+        "team_leader"
+      ])
+    ) {
+      return true;
+    }
     const roleKey = legacyRoleToRoleKey(legacyRole);
     return (
       roleKey === "super_admin" ||
       roleKey === "admin" ||
       roleKey === "management" ||
-      roleKey === "front_desk_coordinator"
+      roleKey === "front_desk_coordinator" ||
+      roleKey === "team_leader"
     );
   }
 
