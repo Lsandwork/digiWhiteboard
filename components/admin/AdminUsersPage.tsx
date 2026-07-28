@@ -36,7 +36,7 @@ type UsersPayload = {
 const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "super_admin", description: "Full system access including integrations, API, and permissions matrix." },
   { value: "admin", description: "Manage users and day-to-day admin tools (no integrations or permissions matrix)." },
-  { value: "management", description: "View and assign staff operations; receive management alerts." },
+  { value: "management", description: "Staff operations plus Route Generator, Sports App Alerts, Walks Board, Vet Visits, and Track Incidents." },
   { value: "front_desk_coordinator", description: "Push Notices, Yard Push, Grooming Push, Front Desk Log, Owner Follow Up, Active Issues, Sports App Alerts, Walks Board, Vet Visits, and Track Incidents." },
   { value: "team_leader", description: "Team Lead DigiBoard panel: push notices, grooming push, front desk log, Walks Board, Vet Visits, Track Incidents, video links, personal notifications, write-ups, and profile settings." },
 

@@ -652,6 +652,15 @@ export const TEAM_LEADER_TABS = [
   "help"
 ] as const;
 
+/** Panels that Management (Assistant Manager) accounts must always retain. */
+export const MANAGEMENT_REQUIRED_PANEL_TABS = [
+  "route_generator",
+  "fitdog_alerts",
+  "walks_board",
+  "vet_visits",
+  "track_incidents"
+] as const;
+
 export const GROOMER_TABS = [
   "crossover_communication",
   "grooming_push",
@@ -728,6 +737,7 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
     case "manager_admin":
       return "admin";
     case "assistant_manager":
+    case "management":
       return "management";
     case "daycare":
     case "dog_handler":
@@ -1001,9 +1011,18 @@ export function isFullAdminLegacyRole(legacyRole?: string | null) {
   return legacyRole === "owner_admin" || legacyRole === "manager_admin";
 }
 
-/** Owner Admin, Manager Admin, or Assistant Manager. */
+/** Owner Admin, Manager Admin, or Assistant Manager / Management. */
 export function isAdminOrManagementLegacyRole(legacyRole?: string | null) {
-  return isFullAdminLegacyRole(legacyRole) || legacyRole === "assistant_manager";
+  return (
+    isFullAdminLegacyRole(legacyRole) ||
+    legacyRole === "assistant_manager" ||
+    legacyRole === "management"
+  );
+}
+
+/** Assistant Manager and RBAC Management role key (legacy string). */
+export function isManagementLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "assistant_manager" || legacyRole === "management";
 }
 
 export function isSuperAdminAccess(access: UserAccess | null | undefined) {
@@ -1209,7 +1228,22 @@ export function canAccessAdminTab(
     if (hasPermission(effective, "route_generator.view")) return true;
     if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
     const roleKey = legacyRoleToRoleKey(legacyRole);
-    return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      isManagementLegacyRole(legacyRole)
+    );
+  }
+
+  // Management required floor panels (Sports App Alerts, Walks Board, Vet Visits, Track Incidents).
+  if (
+    board === "staff" &&
+    (MANAGEMENT_REQUIRED_PANEL_TABS as readonly string[]).includes(tab) &&
+    (isManagementLegacyRole(legacyRole) || hasAnyRole(access, ["management"]))
+  ) {
+    if (tab === "walks_board" && isMarketingLegacyRole(legacyRole)) return false;
+    return true;
   }
 
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {

@@ -3,6 +3,7 @@ import type { AdminBoardType } from "@/lib/admin/types";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { ensureRebecaFrontDeskPanel } from "@/lib/admin/ensure-rebeca-front-desk-panel";
+import { ensureRequiredFloorPanelPermissionsPersisted } from "@/lib/admin/ensure-required-floor-panel-permissions";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
 import { getAdminUserById } from "@/lib/admin/users";
 
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
 
   const session = getAdminSessionFromRequest(request);
   await migrateLegacyUserAccess(supabase).catch(() => undefined);
+  await ensureRequiredFloorPanelPermissionsPersisted(supabase).catch(() => undefined);
   await ensureRebecaFrontDeskPanel(supabase).catch(() => undefined);
   const access = session?.adminUserId
 
