@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
-  getAdminSessionCookieOptions,
-  getAdminSessionFromRequest
+  getAdminSessionFromRequest,
+  setAdminSessionCookie
 } from "@/lib/admin/session";
 import { DEMO_ROLE_OPTIONS } from "@/lib/demo/constants";
 import { isDemoSession } from "@/lib/demo/session";
@@ -38,11 +37,7 @@ export async function POST(request: Request) {
     });
 
     const response = NextResponse.json({ ok: true, demoRole: role });
-    response.cookies.set(
-      ADMIN_SESSION_COOKIE,
-      token,
-      getAdminSessionCookieOptions(undefined, request.headers.get("host"))
-    );
+    setAdminSessionCookie(response, token, request.headers.get("host"));
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to switch demo role.";

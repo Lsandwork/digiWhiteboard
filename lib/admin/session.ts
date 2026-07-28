@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
 
 export { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
@@ -82,13 +83,20 @@ export function verifyAdminSessionToken(token: string | undefined | null): Admin
   }
 }
 
+function shouldShareAcrossRuffops(requestHost?: string | null) {
+  const host = (requestHost ?? "").trim().toLowerCase().split(":", 1)[0];
+  return (
+    host === "ruffops.com" ||
+    host.endsWith(".ruffops.com") ||
+    process.env.ADMIN_COOKIE_DOMAIN === ".ruffops.com"
+  );
+}
+
 export function getAdminSessionCookieOptions(
   maxAgeSeconds = SESSION_TTL_MS / 1000,
   requestHost?: string | null
 ) {
-  const host = (requestHost ?? "").trim().toLowerCase().split(":", 1)[0];
-  const shareAcrossRuffops =
-    host === "ruffops.com" || host.endsWith(".ruffops.com") || process.env.ADMIN_COOKIE_DOMAIN === ".ruffops.com";
+  const shareAcrossRuffops = shouldShareAcrossRuffops(requestHost);
 
   return {
     httpOnly: true,
@@ -98,6 +106,41 @@ export function getAdminSessionCookieOptions(
     maxAge: maxAgeSeconds,
     ...(shareAcrossRuffops ? { domain: ".ruffops.com" as const } : {})
   };
+}
+
+type CookieWritable = Pick<NextResponse, "cookies">;
+
+/**
+ * Clear host-only and shared *.ruffops.com session cookies.
+ * Required after migrating cookie domain — otherwise logout appears broken
+ * because middleware still sees the uncleared duplicate cookie.
+ */
+export function clearAdminSessionCookies(response: CookieWritable, requestHost?: string | null) {
+  const expired = new Date(0);
+  const secure = process.env.NODE_ENV === "production" || shouldShareAcrossRuffops(requestHost);
+  const base = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure,
+    path: "/",
+    maxAge: 0,
+    expires: expired
+  };
+
+  // Host-only (pre-migration / preview).
+  response.cookies.set(ADMIN_SESSION_COOKIE, "", base);
+  // Shared across fitdog.ruffops.com / staff.ruffops.com / lobby.ruffops.com.
+  response.cookies.set(ADMIN_SESSION_COOKIE, "", { ...base, domain: ".ruffops.com" });
+}
+
+/** Set the session cookie after clearing any prior host-only / domain duplicates. */
+export function setAdminSessionCookie(
+  response: CookieWritable,
+  token: string,
+  requestHost?: string | null
+) {
+  clearAdminSessionCookies(response, requestHost);
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions(undefined, requestHost));
 }
 
 export async function getAdminSession() {

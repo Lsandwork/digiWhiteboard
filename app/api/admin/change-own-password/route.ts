@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import {
-  ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
-  getAdminSessionCookieOptions,
-  getAdminSessionFromRequest
+  getAdminSessionFromRequest,
+  setAdminSessionCookie
 } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { validatePasswordStrength } from "@/lib/admin/password";
@@ -63,10 +62,6 @@ export async function POST(request: Request) {
   });
 
   const response = NextResponse.json({ ok: true, role: existing.role });
-  response.cookies.set(
-    ADMIN_SESSION_COOKIE,
-    token,
-    getAdminSessionCookieOptions(undefined, request.headers.get("host"))
-  );
+  setAdminSessionCookie(response, token, request.headers.get("host"));
   return response;
 }

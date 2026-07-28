@@ -5,7 +5,7 @@ import { checkLoginRateLimit, clearLoginAttempts, recordFailedLogin } from "@/li
 import {
   ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
-  getAdminSessionCookieOptions
+  setAdminSessionCookie
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -67,11 +67,7 @@ export async function POST(request: Request) {
       forcePasswordChange: auth.forcePasswordChange ?? false,
       isDemo: auth.isDemo ?? false
     });
-    response.cookies.set(
-      ADMIN_SESSION_COOKIE,
-      token,
-      getAdminSessionCookieOptions(undefined, request.headers.get("host"))
-    );
+    setAdminSessionCookie(response, token, request.headers.get("host"));
     return response;
   } catch {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
