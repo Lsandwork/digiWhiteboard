@@ -973,7 +973,7 @@ function FollowUpPage(props: {
 function DesktopFollowUpTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, onToggleSort }: { rows: OwnerFollowUp[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: OwnerFollowUp) => void; sortKey: string; sortDir: "asc" | "desc"; onToggleSort: (column: string) => void }) {
   return (
     <div className="crossover-table-wrap hidden md:block">
-      <table className="crossover-table">
+      <table className="crossover-table follow-up-table">
         <thead><tr>
           <SortableTh label="Subject / Owner" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
           <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
@@ -987,14 +987,17 @@ function DesktopFollowUpTable({ rows, busy, onMutate, onDetail, sortKey, sortDir
         <tbody>
           {rows.map((item) => (
             <tr key={item.id}>
-              <td><p className="crossover-table__subject-title">{item.subject}</p><p className="crossover-table__muted">{item.owner_name}</p></td>
+              <td className="crossover-table__subject">
+                <p className="crossover-table__subject-title">{item.subject}</p>
+                <p className="crossover-table__muted">{item.owner_name}</p>
+              </td>
               <td>{item.dog_name ?? "N/A"}</td>
-              <td>{item.logged_by ?? "Front Desk"}</td>
+              <td className="crossover-table__meta">{item.logged_by ?? "Front Desk"}</td>
               <td className="crossover-table__emphasis">{item.assigned_to}</td>
-              <td><Badge type="priority" value={item.priority} urgent={item.urgent} /></td>
-              <td>{formatDateTime(item.due_date)}</td>
-              <td><Badge type="status" value={item.status} /></td>
-              <td>
+              <td className="crossover-table__badge-cell"><Badge type="priority" value={item.priority} urgent={item.urgent} /></td>
+              <td className="crossover-table__datetime">{formatDateTime(item.due_date)}</td>
+              <td className="crossover-table__badge-cell crossover-table__status-cell"><Badge type="status" value={item.status} /></td>
+              <td className="crossover-table__actions-col">
                 <OpsRowActions
                   busy={busy}
                   onDetail={() => onDetail(item)}
@@ -1099,7 +1102,7 @@ function IssuesPage(props: {
 function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, onToggleSort }: { rows: ActiveIssue[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void; sortKey: string; sortDir: "asc" | "desc"; onToggleSort: (column: string) => void }) {
   return (
     <div className="crossover-table-wrap hidden md:block">
-      <table className="crossover-table">
+      <table className="crossover-table active-issues-table">
         <thead><tr>
           <SortableTh label="Issue / Subject" column="title" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
           <SortableTh label="Category" column="category" sortKey={sortKey} sortDir={sortDir} onToggle={onToggleSort} />
@@ -1114,15 +1117,18 @@ function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, 
         <tbody>
           {rows.map((item) => (
             <tr key={item.id}>
-              <td><p className="crossover-table__subject-title">{item.title}</p><p className="crossover-table__subject-preview">{htmlToPlainText(item.notes ?? "")}</p></td>
+              <td className="crossover-table__subject">
+                <p className="crossover-table__subject-title">{item.title}</p>
+                <p className="crossover-table__subject-preview">{htmlToPlainText(item.notes ?? "")}</p>
+              </td>
               <td>{item.category}</td>
               <td>{item.source}</td>
-              <td>{item.reported_by ?? "Front Desk"}</td>
+              <td className="crossover-table__meta">{item.reported_by ?? "Front Desk"}</td>
               <td className="crossover-table__emphasis">{item.assigned_to ?? "Unassigned"}</td>
-              <td><Badge type="priority" value={item.priority} /></td>
-              <td>{formatDateTime(item.reported_at)}</td>
-              <td><Badge type="status" value={item.status} /></td>
-              <td>
+              <td className="crossover-table__badge-cell"><Badge type="priority" value={item.priority} /></td>
+              <td className="crossover-table__datetime">{formatDateTime(item.reported_at)}</td>
+              <td className="crossover-table__badge-cell crossover-table__status-cell"><Badge type="status" value={item.status} /></td>
+              <td className="crossover-table__actions-col">
                 <OpsRowActions
                   busy={busy}
                   onDetail={() => onDetail(item)}
@@ -1174,7 +1180,11 @@ function MobileCards<T>({ rows, render }: { rows: T[]; render: (item: T) => Reac
 function Badge({ type, value, urgent }: { type: "priority" | "status"; value: StaffOpsPriority | StaffOpsStatus; urgent?: boolean }) {
   if (type === "priority" && urgent) return <span className="crossover-badge crossover-badge--urgent">URGENT</span>;
   const label = typeof value === "string" ? value.toUpperCase() : value;
-  return <span className={type === "priority" ? priorityClass(value as StaffOpsPriority) : statusClass(value as StaffOpsStatus)}>{label}</span>;
+  return (
+    <span className={type === "priority" ? priorityClass(value as StaffOpsPriority) : statusClass(value as StaffOpsStatus)}>
+      {label}
+    </span>
+  );
 }
 
 function Field({ label, children, required = false }: { label: string; children: React.ReactNode; required?: boolean }) {

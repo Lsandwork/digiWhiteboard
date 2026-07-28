@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Eye, MoreHorizontal } from "lucide-react";
+import { Eye, MoreHorizontal } from "lucide-react";
 
 export type OpsRowMenuItem = {
   label: string;
@@ -12,12 +12,21 @@ export type OpsRowMenuItem = {
 type OpsRowActionsProps = {
   busy: boolean;
   onDetail: () => void;
-  onResolve: () => void;
+  /** Kept for call-site compatibility — Resolve lives in the overflow menu for a clean row. */
+  onResolve?: () => void;
+  resolveLabel?: string;
   menuItems: OpsRowMenuItem[];
   className?: string;
 };
 
-export function OpsRowActions({ busy, onDetail, onResolve, menuItems, className }: OpsRowActionsProps) {
+export function OpsRowActions({
+  busy,
+  onDetail,
+  onResolve,
+  resolveLabel = "Resolve",
+  menuItems,
+  className
+}: OpsRowActionsProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -30,21 +39,43 @@ export function OpsRowActions({ busy, onDetail, onResolve, menuItems, className 
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
+  const resolveItem: OpsRowMenuItem | null = onResolve
+    ? {
+        label: resolveLabel,
+        onClick: onResolve
+      }
+    : null;
+
+  const items = resolveItem
+    ? [resolveItem, ...menuItems.filter((item) => item.label.toLowerCase() !== resolveLabel.toLowerCase())]
+    : menuItems;
+
   return (
     <div className={`crossover-row-actions${className ? ` ${className}` : ""}`} ref={ref}>
-      <button type="button" className="crossover-icon-btn" disabled={busy} aria-label="View details" title="View details" onClick={onDetail}>
-        <Eye aria-hidden className="crossover-icon-btn__lucide" />
-      </button>
-      <button type="button" className="crossover-icon-btn crossover-icon-btn--resolve" disabled={busy} aria-label="Mark resolved" title="Mark resolved" onClick={onResolve}>
-        <CheckCircle2 aria-hidden className="crossover-icon-btn__lucide" />
+      <button
+        type="button"
+        className="fitdog-action-icon-btn"
+        disabled={busy}
+        aria-label="View details"
+        title="View details"
+        onClick={onDetail}
+      >
+        <Eye aria-hidden className="h-[1.1rem] w-[1.1rem]" />
       </button>
       <div className="crossover-more-menu">
-        <button type="button" className="crossover-icon-btn" disabled={busy} aria-label="More actions" onClick={() => setOpen((value) => !value)}>
-          <MoreHorizontal aria-hidden className="crossover-icon-btn__lucide" />
+        <button
+          type="button"
+          className="fitdog-action-icon-btn"
+          disabled={busy}
+          aria-label="More actions"
+          title="More actions"
+          onClick={() => setOpen((value) => !value)}
+        >
+          <MoreHorizontal aria-hidden className="h-[1.1rem] w-[1.1rem]" />
         </button>
         {open ? (
           <div className="crossover-more-menu__panel" role="menu">
-            {menuItems.map((item) => (
+            {items.map((item) => (
               <button
                 key={item.label}
                 type="button"
