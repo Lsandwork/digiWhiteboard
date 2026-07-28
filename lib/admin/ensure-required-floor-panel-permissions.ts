@@ -7,7 +7,7 @@ import { loadRolePermissionMatrix, saveRolePermissionMatrix } from "@/lib/admin/
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-const ENSURE_FLAG_KEY = "required_floor_panel_permissions_ensured_v4";
+const ENSURE_FLAG_KEY = "required_floor_panel_permissions_ensured_v5";
 
 async function readFlag(supabase: SupabaseClient): Promise<boolean> {
   const { data } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();

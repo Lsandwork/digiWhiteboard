@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
 
 export { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
@@ -107,43 +108,87 @@ export function getAdminSessionCookieOptions(
   };
 }
 
-type CookieWritable = {
-  cookies: {
-    set: (name: string, value: string, options?: Record<string, unknown>) => unknown;
-  };
-};
+function serializeSetCookie(
+  name: string,
+  value: string,
+  options: {
+    maxAge?: number;
+    expires?: Date;
+    path?: string;
+    domain?: string;
+    secure?: boolean;
+    httpOnly?: boolean;
+    sameSite?: "lax" | "strict" | "none" | "Lax" | "Strict" | "None";
+  }
+) {
+  const parts = [`${name}=${encodeURIComponent(value)}`];
+  if (options.maxAge != null) parts.push(`Max-Age=${Math.floor(options.maxAge)}`);
+  if (options.expires) parts.push(`Expires=${options.expires.toUTCString()}`);
+  parts.push(`Path=${options.path || "/"}`);
+  if (options.domain) parts.push(`Domain=${options.domain}`);
+  if (options.secure) parts.push("Secure");
+  if (options.httpOnly) parts.push("HttpOnly");
+  if (options.sameSite) {
+    const normalized =
+      options.sameSite === "lax" || options.sameSite === "Lax"
+        ? "Lax"
+        : options.sameSite === "strict" || options.sameSite === "Strict"
+          ? "Strict"
+          : "None";
+    parts.push(`SameSite=${normalized}`);
+  }
+  return parts.join("; ");
+}
 
 /**
- * Clear host-only and shared *.ruffops.com session cookies.
- * Required after migrating cookie domain — otherwise logout appears broken
- * because middleware still sees the uncleared duplicate cookie.
+ * Next.js `cookies.set()` keeps one cookie per name, so clearing both a host-only
+ * and Domain=.ruffops.com session requires raw Set-Cookie appends.
  */
-export function clearAdminSessionCookies(response: CookieWritable, requestHost?: string | null) {
+export function clearAdminSessionCookies(response: NextResponse, requestHost?: string | null) {
   const expired = new Date(0);
   const secure = process.env.NODE_ENV === "production" || shouldShareAcrossRuffops(requestHost);
   const base = {
-    httpOnly: true,
-    sameSite: "lax" as const,
-    secure,
-    path: "/",
     maxAge: 0,
-    expires: expired
+    expires: expired,
+    path: "/",
+    secure,
+    httpOnly: true,
+    sameSite: "lax" as const
   };
 
-  // Host-only (pre-migration / preview).
-  response.cookies.set(ADMIN_SESSION_COOKIE, "", base);
-  // Shared across fitdog.ruffops.com / staff.ruffops.com / lobby.ruffops.com.
-  response.cookies.set(ADMIN_SESSION_COOKIE, "", { ...base, domain: ".ruffops.com" });
+  // Prefer delete helpers when available, then force dual Set-Cookie headers.
+  try {
+    response.cookies.delete(ADMIN_SESSION_COOKIE);
+  } catch {
+    // ignore
+  }
+
+  response.headers.append("Set-Cookie", serializeSetCookie(ADMIN_SESSION_COOKIE, "", base));
+  response.headers.append(
+    "Set-Cookie",
+    serializeSetCookie(ADMIN_SESSION_COOKIE, "", { ...base, domain: ".ruffops.com" })
+  );
 }
 
 /** Set the session cookie after clearing any prior host-only / domain duplicates. */
 export function setAdminSessionCookie(
-  response: CookieWritable,
+  response: NextResponse,
   token: string,
   requestHost?: string | null
 ) {
   clearAdminSessionCookies(response, requestHost);
-  response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions(undefined, requestHost));
+  const options = getAdminSessionCookieOptions(undefined, requestHost);
+  response.headers.append(
+    "Set-Cookie",
+    serializeSetCookie(ADMIN_SESSION_COOKIE, token, {
+      maxAge: options.maxAge,
+      path: options.path,
+      domain: "domain" in options ? (options as { domain?: string }).domain : undefined,
+      secure: options.secure,
+      httpOnly: options.httpOnly,
+      sameSite: options.sameSite
+    })
+  );
 }
 
 export async function getAdminSession() {
