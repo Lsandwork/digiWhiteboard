@@ -617,7 +617,7 @@ export function PushNoticesPanel() {
               {history.length ? history.map((notice) => (
                 <tr key={notice.id}>
                   <td className="max-w-xs crossover-table__emphasis">{noticeHistoryTitle(notice)}</td>
-                  <td><PriorityBadge priority={notice.priority} /></td>
+                  <td className="crossover-table__badge-cell"><PriorityBadge priority={notice.priority} /></td>
                   <td>{noticeStatus(notice)}</td>
                   <td>{notice.created_by ?? "admin"}</td>
                   <td>{formatDateTime(notice.created_at)}</td>

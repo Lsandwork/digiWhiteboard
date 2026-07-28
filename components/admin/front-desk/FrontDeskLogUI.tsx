@@ -594,7 +594,9 @@ export function ActiveShiftLogCard({
                   </td>
                   <td>{shiftLogSubmittedByLabel(item, directory)}</td>
                   <td className="crossover-table__emphasis">{shiftLogAssignedTo(item)}</td>
-                  <td><ShiftLogPriorityBadge priority={item.priority} urgent={item.urgent} /></td>
+                  <td className="crossover-table__badge-cell">
+                    <ShiftLogPriorityBadge priority={item.priority} urgent={item.urgent} />
+                  </td>
                   <td className="crossover-table__datetime">
                     {reminderLabel(item) !== "—" ? (
                       <>
@@ -605,7 +607,9 @@ export function ActiveShiftLogCard({
                       <span>{formatDateTime(item.created_at)}</span>
                     )}
                   </td>
-                  <td><ShiftLogStatusBadge status={item.status} /></td>
+                  <td className="crossover-table__badge-cell crossover-table__status-cell">
+                    <ShiftLogStatusBadge status={item.status} />
+                  </td>
                   <td>{renderRowMenu(item)}</td>
                 </tr>
               );

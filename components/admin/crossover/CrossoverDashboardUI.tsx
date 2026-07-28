@@ -360,8 +360,8 @@ export function ActiveConversationsCard({
                   <td>{createdByLabel(directory, item.created_by)}</td>
                   <td className="crossover-table__emphasis">{reportedToLabel(item)}</td>
                   <td>{formatDateTime(item.created_at)}</td>
-                  <td><CrossoverPriorityBadge priority={item.priority} urgent={item.urgent} /></td>
-                  <td><CrossoverStatusBadge status={item.status} /></td>
+                  <td className="crossover-table__badge-cell"><CrossoverPriorityBadge priority={item.priority} urgent={item.urgent} /></td>
+                  <td className="crossover-table__badge-cell crossover-table__status-cell"><CrossoverStatusBadge status={item.status} /></td>
                   <td>
                     <CrossoverRowActions
                       busy={busy}

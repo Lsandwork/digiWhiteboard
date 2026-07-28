@@ -267,8 +267,8 @@ function SupportTable({
               <td>{row.submitted_by}</td>
               <td>{row.subject}</td>
               <td className="max-w-xs truncate">{htmlToPlainText(row.details_preview ?? "")}</td>
-              <td><span className={priorityBadgeClass(row.priority)}>{row.priority}</span></td>
-              <td><span className={statusBadgeClass(row.status)}>{row.status}</span></td>
+              <td className="crossover-table__badge-cell"><span className={priorityBadgeClass(row.priority)}>{row.priority}</span></td>
+              <td className="crossover-table__badge-cell crossover-table__status-cell"><span className={statusBadgeClass(row.status)}>{row.status}</span></td>
               <td>{row.assigned_to ?? "—"}</td>
               <td>{formatDateTime(row.last_updated)}</td>
               <td>
@@ -606,7 +606,7 @@ export function AdminTrainerEntriesPanel() {
                   <td>{entry.dog_name ?? "—"}</td>
                   <td>{entry.owner_name ?? "—"}</td>
                   <td>{entry.subject}</td>
-                  <td><span className={priorityBadgeClass(entry.priority)}>{entry.priority}</span></td>
+                  <td className="crossover-table__badge-cell"><span className={priorityBadgeClass(entry.priority)}>{entry.priority}</span></td>
                   <td>{entry.follow_up_needed ? "Yes" : "No"}</td>
                   <td>{entry.status}</td>
                 </tr>

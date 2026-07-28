@@ -5206,6 +5206,9 @@ html.lobby-tv-display .social-video-shell {
   text-transform: uppercase;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .admin-badge--green {
@@ -6506,9 +6509,21 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 .active-issues-table.crossover-table th:nth-child(3) { width: 9%; }
 .active-issues-table.crossover-table th:nth-child(4) { width: 11%; }
 .active-issues-table.crossover-table th:nth-child(5) { width: 10%; }
-.active-issues-table.crossover-table th:nth-child(6) { width: 8%; }
+.active-issues-table.crossover-table th:nth-child(6),
+.active-issues-table.crossover-table td:nth-child(6) {
+  width: 7.5rem;
+  min-width: 7.5rem;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  vertical-align: middle;
+}
 .active-issues-table.crossover-table th:nth-child(7) { width: 11%; }
-.active-issues-table.crossover-table th:nth-child(8) { width: 10%; }
+.active-issues-table.crossover-table th:nth-child(8),
+.active-issues-table.crossover-table td:nth-child(8) {
+  width: 6.5rem;
+  min-width: 6.5rem;
+}
 .active-issues-table.crossover-table th:nth-child(9),
 .active-issues-table.crossover-table td:nth-child(9) {
   width: 6.5rem;
@@ -6520,9 +6535,21 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 .follow-up-table.crossover-table th:nth-child(2) { width: 10%; }
 .follow-up-table.crossover-table th:nth-child(3) { width: 12%; }
 .follow-up-table.crossover-table th:nth-child(4) { width: 12%; }
-.follow-up-table.crossover-table th:nth-child(5) { width: 9%; }
+.follow-up-table.crossover-table th:nth-child(5),
+.follow-up-table.crossover-table td:nth-child(5) {
+  width: 7.5rem;
+  min-width: 7.5rem;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  vertical-align: middle;
+}
 .follow-up-table.crossover-table th:nth-child(6) { width: 12%; }
-.follow-up-table.crossover-table th:nth-child(7) { width: 10%; }
+.follow-up-table.crossover-table th:nth-child(7),
+.follow-up-table.crossover-table td:nth-child(7) {
+  width: 6.5rem;
+  min-width: 6.5rem;
+}
 .follow-up-table.crossover-table th:nth-child(8),
 .follow-up-table.crossover-table td:nth-child(8) {
   width: 6.5rem;
@@ -6530,7 +6557,9 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 }
 
 .crossover-table__badge-cell,
-.crossover-table__status-cell {
+.crossover-table__status-cell,
+.crossover-table td:has(> .crossover-badge),
+.crossover-table td:has(> .shift-log-badge) {
   vertical-align: middle;
   white-space: nowrap;
   overflow: visible;
@@ -6538,8 +6567,10 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   overflow-wrap: normal;
 }
 
-.crossover-table__status-cell .crossover-badge {
-  max-width: 100%;
+.crossover-table__status-cell .crossover-badge,
+.crossover-table__badge-cell .crossover-badge,
+.crossover-table td .crossover-badge {
+  max-width: none;
   white-space: nowrap;
 }
 
@@ -6794,14 +6825,20 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 .crossover-badge {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
+  max-width: none;
   border-radius: 9999px;
   padding: 0.28rem 0.62rem;
   font-size: 0.68rem;
   font-weight: 900;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
-.crossover-badge--priority-high {
+.crossover-badge--priority-high,
+.crossover-badge--warning {
   border: 1px solid rgba(253, 186, 36, 0.45);
   background: rgba(245, 158, 11, 0.16);
   color: #fde68a;
@@ -7227,6 +7264,9 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .shift-log-badge--type-complaint { background: rgba(239, 68, 68, 0.18); color: #fecaca; }
@@ -7288,7 +7328,7 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 }
 .shift-log-table.crossover-table th:nth-child(2),
 .shift-log-table th:nth-child(2) {
-  width: 28% !important;
+  width: 26% !important;
 }
 .shift-log-table.crossover-table th:nth-child(3),
 .shift-log-table th:nth-child(3) {
@@ -7303,16 +7343,30 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   width: 10% !important;
 }
 .shift-log-table.crossover-table th:nth-child(6),
-.shift-log-table th:nth-child(6) {
-  width: 8% !important;
+.shift-log-table th:nth-child(6),
+.shift-log-table.crossover-table td:nth-child(6),
+.shift-log-table td:nth-child(6) {
+  width: 7.5rem !important;
+  min-width: 7.5rem !important;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  vertical-align: middle;
 }
 .shift-log-table.crossover-table th:nth-child(7),
 .shift-log-table th:nth-child(7) {
-  width: 12% !important;
+  width: 11% !important;
 }
 .shift-log-table.crossover-table th:nth-child(8),
-.shift-log-table th:nth-child(8) {
-  width: 9% !important;
+.shift-log-table th:nth-child(8),
+.shift-log-table.crossover-table td:nth-child(8),
+.shift-log-table td:nth-child(8) {
+  width: 6.5rem !important;
+  min-width: 6.5rem !important;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  vertical-align: middle;
 }
 .shift-log-table.crossover-table th:nth-child(9),
 .shift-log-table th:nth-child(9) {
@@ -7445,6 +7499,9 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
 .shift-log-readable .crossover-badge {
   padding: 0.35rem 0.75rem;
   font-size: 0.8rem;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 .shift-log-readable .shift-log-badge {
