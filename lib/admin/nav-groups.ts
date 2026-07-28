@@ -190,10 +190,10 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "fitdog_alerts",
   "walks_board",
   "vet_visits",
-  "track_incidents"
+  "track_incidents",
+  "yard_links"
 ];
 
-const MEDIA_TABS: AdminTab[] = ["yard_links"];
 const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
 const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer_complaints"];
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
@@ -327,7 +327,6 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         "Front Desk & Floor",
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
-          ...singles(MEDIA_TABS, visible),
           ...singles(["bulk_photo_upload"], visible)
         ])
       )
@@ -404,7 +403,10 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication"], visible),
+        ...singles(["yard_links"], visible)
+      ])
     )
   );
 
@@ -429,7 +431,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_comms",
       "Communications",
-      compactEntries([...singles(["notifications", "yard_links", "walks_board"], visible)])
+      compactEntries([...singles(["notifications", "walks_board"], visible)])
     )
   );
 
@@ -480,8 +482,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
       "team_lead_operations",
       "Front Desk & Floor",
       compactEntries([
-        // Use the shared Operations list so Sports App Alerts / Walks / Vet / Track
-        // appear whenever they are in visibleTabs (canAccessAdminTab already gated them).
+        // Shared Operations list includes Sports App Alerts / Walks / Vet / Track / Video Links.
         group("front_desk", "Operations", FRONT_DESK_TABS, visible),
         ...singles(["bulk_photo_upload"], visible)
       ])
@@ -500,8 +501,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_comms",
       "Communications",
-      // walks_board lives under Operations (FRONT_DESK_TABS), not Communications.
-      compactEntries([...singles(["notifications", "yard_links"], visible)])
+      compactEntries([...singles(["notifications"], visible)])
     )
   );
 
@@ -541,7 +541,10 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "groomer_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication"], visible),
+        ...singles(["yard_links"], visible)
+      ])
     )
   );
 
@@ -557,7 +560,7 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "groomer_comms",
       "Communications",
-      compactEntries([...singles(["notifications", "yard_links", "walks_board"], visible)])
+      compactEntries([...singles(["notifications", "walks_board"], visible)])
     )
   );
 

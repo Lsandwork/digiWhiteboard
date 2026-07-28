@@ -68,6 +68,7 @@ assert.equal(findNavSectionForTab(teamLeadNav, "fitdog_alerts"), "Front Desk & F
 assert.equal(findNavSectionForTab(teamLeadNav, "walks_board"), "Front Desk & Floor");
 assert.equal(findNavSectionForTab(teamLeadNav, "vet_visits"), "Front Desk & Floor");
 assert.equal(findNavSectionForTab(teamLeadNav, "track_incidents"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "yard_links"), "Front Desk & Floor");
 
 const coordinatorTabs: AdminTab[] = [
   "push_notices",
@@ -139,6 +140,8 @@ assert.equal(
 );
 
 assert.equal(findNavSectionForTab(trainerNav, "crossover_communication"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(trainerNav, "yard_links"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(groomerNav, "yard_links"), "Front Desk & Floor");
 assert.equal(
   trainerNav.some(
     (entry) =>
@@ -196,5 +199,9 @@ assert.equal(findNavSectionForTab(adminWithSubmitNav, "track_incidents"), "Front
 assert.equal(findNavSectionForTab(adminWithSubmitNav, "vet_visits"), "Front Desk & Floor");
 assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "track_incidents"), "staff_operations");
 assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "vet_visits"), "staff_operations");
+
+const adminWithVideoLinksNav = buildAdminNav([...adminWithSubmitTabs, "yard_links"], "staff");
+assert.equal(findNavSectionForTab(adminWithVideoLinksNav, "yard_links"), "Front Desk & Floor");
+assert.equal(findNavSectionIdForTab(adminWithVideoLinksNav, "yard_links"), "staff_operations");
 
 console.log("commissions nav tests passed");
