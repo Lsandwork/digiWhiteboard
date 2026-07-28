@@ -3,8 +3,11 @@ import { ADMIN_SESSION_COOKIE, getAdminSessionCookieOptions } from "@/lib/admin/
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(ADMIN_SESSION_COOKIE, "", { ...getAdminSessionCookieOptions(0), maxAge: 0 });
+  response.cookies.set(ADMIN_SESSION_COOKIE, "", {
+    ...getAdminSessionCookieOptions(0, request.headers.get("host")),
+    maxAge: 0
+  });
   return response;
 }

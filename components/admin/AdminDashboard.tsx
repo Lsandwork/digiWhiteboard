@@ -118,11 +118,18 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase();
+    // fitdog.ruffops.com is staff DigiBoard only — keep users off lobby/marketing boards.
+    if (host === "fitdog.ruffops.com" && board !== "staff") {
+      window.localStorage.setItem("fitdog_admin_board", "staff");
+      router.replace(`/admin?board=staff&tab=${tab === "overview" && !searchParams.get("tab") ? "crossover_communication" : tab}`);
+      return;
+    }
     const stored = window.localStorage.getItem("fitdog_admin_board");
     if (!searchParams.get("board") && (stored === "staff" || stored === "marketing")) {
       router.replace(`/admin?board=${stored}`);
     }
-  }, [router, searchParams]);
+  }, [board, router, searchParams, tab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);

@@ -82,13 +82,21 @@ export function verifyAdminSessionToken(token: string | undefined | null): Admin
   }
 }
 
-export function getAdminSessionCookieOptions(maxAgeSeconds = SESSION_TTL_MS / 1000) {
+export function getAdminSessionCookieOptions(
+  maxAgeSeconds = SESSION_TTL_MS / 1000,
+  requestHost?: string | null
+) {
+  const host = (requestHost ?? "").trim().toLowerCase().split(":", 1)[0];
+  const shareAcrossRuffops =
+    host === "ruffops.com" || host.endsWith(".ruffops.com") || process.env.ADMIN_COOKIE_DOMAIN === ".ruffops.com";
+
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" || shareAcrossRuffops,
     path: "/",
-    maxAge: maxAgeSeconds
+    maxAge: maxAgeSeconds,
+    ...(shareAcrossRuffops ? { domain: ".ruffops.com" as const } : {})
   };
 }
 

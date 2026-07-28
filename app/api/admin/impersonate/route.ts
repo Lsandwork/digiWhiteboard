@@ -87,7 +87,11 @@ export async function POST(request: Request) {
     });
 
     const response = NextResponse.json({ ok: true, email: target.email, role: target.role });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    response.cookies.set(
+      ADMIN_SESSION_COOKIE,
+      token,
+      getAdminSessionCookieOptions(undefined, request.headers.get("host"))
+    );
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to log in as employee.";
@@ -125,7 +129,11 @@ export async function DELETE(request: Request) {
     });
 
     const response = NextResponse.json({ ok: true, email: session.impersonatorEmail });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    response.cookies.set(
+      ADMIN_SESSION_COOKIE,
+      token,
+      getAdminSessionCookieOptions(undefined, request.headers.get("host"))
+    );
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to return to your account.";

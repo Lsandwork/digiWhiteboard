@@ -38,7 +38,11 @@ export async function POST(request: Request) {
     });
 
     const response = NextResponse.json({ ok: true, demoRole: role });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    response.cookies.set(
+      ADMIN_SESSION_COOKIE,
+      token,
+      getAdminSessionCookieOptions(undefined, request.headers.get("host"))
+    );
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to switch demo role.";

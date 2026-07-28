@@ -67,7 +67,11 @@ export async function POST(request: Request) {
       forcePasswordChange: auth.forcePasswordChange ?? false,
       isDemo: auth.isDemo ?? false
     });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    response.cookies.set(
+      ADMIN_SESSION_COOKIE,
+      token,
+      getAdminSessionCookieOptions(undefined, request.headers.get("host"))
+    );
     return response;
   } catch {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });

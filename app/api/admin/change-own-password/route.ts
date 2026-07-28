@@ -63,6 +63,10 @@ export async function POST(request: Request) {
   });
 
   const response = NextResponse.json({ ok: true, role: existing.role });
-  response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+  response.cookies.set(
+    ADMIN_SESSION_COOKIE,
+    token,
+    getAdminSessionCookieOptions(undefined, request.headers.get("host"))
+  );
   return response;
 }
