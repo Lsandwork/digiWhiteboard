@@ -43,7 +43,7 @@ async function requireAccess(request: Request) {
         path: new URL(request.url).pathname
       })
     );
-    return { error: NextResponse.json({ error: "Fitdog Alerts access required." }, { status: 403 }) };
+    return { error: NextResponse.json({ error: "Sports App Alerts access required." }, { status: 403 }) };
   }
   return {
     session,
@@ -143,7 +143,7 @@ export async function GET(request: Request) {
       }))
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load Fitdog alerts.";
+    const message = error instanceof Error ? error.message : "Unable to load Sports App alerts.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
@@ -152,7 +152,7 @@ export async function POST(request: Request) {
   const gate = await requireAccess(request);
   if ("error" in gate && gate.error) return gate.error;
   if (!gate.canManage) {
-    return NextResponse.json({ error: "Manage Fitdog Alerts permission required." }, { status: 403 });
+    return NextResponse.json({ error: "Manage Sports App Alerts permission required." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
@@ -374,7 +374,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update Fitdog alert.";
+    const message = error instanceof Error ? error.message : "Unable to update Sports App alert.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

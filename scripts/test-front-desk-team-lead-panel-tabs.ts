@@ -46,7 +46,7 @@ const fdcTabs = [
 ] as const;
 const nav = buildAdminNav([...fdcTabs], "staff");
 const labels = JSON.stringify(nav);
-assert.match(labels, /Fitdog Alerts/);
+assert.match(labels, /Sports App Alerts/);
 assert.match(labels, /Walks Board/);
 assert.match(labels, /Vet Visits/);
 assert.match(labels, /Track Incidents/);

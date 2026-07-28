@@ -33,7 +33,7 @@ export function canManageFitdogAlerts(access: UserAccess | null | undefined, leg
 
 export function assertFitdogAlertsAccess(access: UserAccess | null | undefined, legacyRole?: string | null) {
   if (!canViewFitdogAlerts(access, legacyRole)) {
-    const err = new Error("Fitdog Alerts access required.");
+    const err = new Error("Sports App Alerts access required.");
     (err as Error & { status?: number }).status = 403;
     throw err;
   }

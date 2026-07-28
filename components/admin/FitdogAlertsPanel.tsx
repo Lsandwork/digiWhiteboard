@@ -394,7 +394,7 @@ export function FitdogAlertsPanel() {
       });
       const res = await fetch(`/api/admin/fitdog-alerts?${params}`, { cache: "no-store" });
       const json = (await res.json()) as ListPayload & { error?: string };
-      if (!res.ok) throw new Error(json.error || "Failed to load Fitdog alerts.");
+      if (!res.ok) throw new Error(json.error || "Failed to load Sports App alerts.");
       setData(json);
       setSettingsForm({
         integration_mode: json.settings.integration_mode,
@@ -406,7 +406,7 @@ export function FitdogAlertsPanel() {
         notes: json.settings.notes || ""
       });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Failed to load Fitdog alerts.", "error");
+      showToast(error instanceof Error ? error.message : "Failed to load Sports App alerts.", "error");
     } finally {
       setLoading(false);
     }
@@ -478,7 +478,7 @@ export function FitdogAlertsPanel() {
 
   async function runAction(action: string, extra: Record<string, unknown> = {}) {
     if (!data?.canManage && panelView !== "sync") {
-      showToast("You do not have permission to manage Fitdog alerts.", "error");
+      showToast("You do not have permission to manage Sports App alerts.", "error");
       return;
     }
     try {
@@ -523,7 +523,7 @@ export function FitdogAlertsPanel() {
   const summary = data?.summary;
   const tabs: Array<{ id: PanelView; label: string }> = useMemo(
     () => [
-      { id: "alerts", label: "Fitdog Alerts" },
+      { id: "alerts", label: "Sports App Alerts" },
       { id: "resolved", label: "Past Alerts" },
       { id: "sync", label: "Sync History" },
       { id: "settings", label: "Integration Settings" }
@@ -624,8 +624,8 @@ export function FitdogAlertsPanel() {
     <section className="space-y-5">
       <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fitdog-orange">Operations · Fitdog Alerts</p>
-          <h2 className="mt-1 text-2xl font-black text-white">Fitdog Alerts</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-fitdog-orange">Operations · Sports App Alerts</p>
+          <h2 className="mt-1 text-2xl font-black text-white">Sports App Alerts</h2>
           <p className="mt-1 text-sm text-admin-muted">
             Card declines, payment errors, cancellations, vaccinations, and payment issues synced from app.fitdog.com.
           </p>
@@ -877,7 +877,7 @@ export function FitdogAlertsPanel() {
                   emptyLabel="No open card-declined cancellations."
                 />
                 <AlertSection
-                  title="Other Fitdog alerts"
+                  title="Other Sports App alerts"
                   subtitle="Cancellations, vaccinations, document uploads, and other payment issues."
                   rows={otherRows}
                   loading={loading}
@@ -888,7 +888,7 @@ export function FitdogAlertsPanel() {
                     setSortDir(sortBy === column && sortDir === "desc" ? "asc" : "desc");
                   }}
                   onOpen={(id) => void openDetail(id)}
-                  emptyLabel="No other open Fitdog alerts."
+                  emptyLabel="No other open Sports App alerts."
                 />
               </>
             ) : (
@@ -910,7 +910,7 @@ export function FitdogAlertsPanel() {
                 />
                 <AlertSection
                   title="Other past alerts"
-                  subtitle="Failed payments, missed payments, notifications, and other closed Fitdog alerts — status RESOLVED."
+                  subtitle="Failed payments, missed payments, notifications, and other closed Sports App alerts — status RESOLVED."
                   rows={otherRows}
                   loading={loading}
                   sortBy={sortBy}

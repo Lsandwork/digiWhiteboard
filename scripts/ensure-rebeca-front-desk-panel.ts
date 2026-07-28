@@ -1,5 +1,5 @@
 /**
- * Ensure Rebeca’s DigiBoard panel includes Fitdog Alerts, Walks Board,
+ * Ensure Rebeca’s DigiBoard panel includes Sports App Alerts, Walks Board,
  * Vet Visits, and Track Incidents by setting her role to Front Desk Coordinator
  * and syncing user-access assignments.
  *
@@ -84,7 +84,7 @@ async function main() {
 
   const result = await ensureRebecaFrontDeskPanel(supabase, { force: true });
   console.log("\nEnsure result:", result);
-  console.log("\nDone. Rebeca should now see Fitdog Alerts, Walks Board, Vet Visits, and Track Incidents.");
+  console.log("\nDone. Rebeca should now see Sports App Alerts, Walks Board, Vet Visits, and Track Incidents.");
 }
 
 main().catch((error) => {

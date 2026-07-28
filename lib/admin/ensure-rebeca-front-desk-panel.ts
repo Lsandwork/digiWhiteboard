@@ -1,5 +1,5 @@
 /**
- * Ensure Rebeca’s DigiBoard panel includes Fitdog Alerts, Walks Board,
+ * Ensure Rebeca’s DigiBoard panel includes Sports App Alerts, Walks Board,
  * Vet Visits, and Track Incidents by setting her role to Front Desk Coordinator
  * (when she is not already an admin/management account) and syncing access.
  */

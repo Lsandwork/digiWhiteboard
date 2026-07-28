@@ -89,7 +89,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   admin_trainer_entries: "Trainer Entries",
   package_commissions: "Package & Class Commissions",
   track_incidents: "Track Incidents",
-  fitdog_alerts: "Fitdog Alerts",
+  fitdog_alerts: "Sports App Alerts",
   vet_visits: "Vet Visits",
   demo_push: "Demo Push",
   analytics: "Analytics",
