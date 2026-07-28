@@ -32,6 +32,10 @@
       "schedule": "*/8 * * * *"
     },
     {
+      "path": "/api/cron/pack-pro-training-sync",
+      "schedule": "0 15 * * *"
+    },
+    {
       "path": "/api/cron/ruffly-reconcile",
       "schedule": "15 */6 * * *"
     },

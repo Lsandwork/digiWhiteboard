@@ -91,6 +91,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   track_incidents: "Track Incidents",
   fitdog_alerts: "Sports App Alerts",
   vet_visits: "Vet Visits",
+  pack_pro_training: "Pack Pro Training",
   demo_push: "Demo Push",
   analytics: "Analytics",
   templates: "Message Templates",
@@ -137,6 +138,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
   fitdog_alerts: "Failed payments, missed payments, card issues, and Fitdog sync health under Operations.",
   vet_visits: "Log vet visits, alert admin/management, and track required owner follow-up until resolved.",
+  pack_pro_training: "Sync Pack Pro course progress for Fitdog employees and alert management when training is incomplete.",
   crossover_communication: "Front desk handoff log between shifts.",
   owner_follow_up: "Track owner follow-ups and callbacks.",
   active_issues: "Monitor open floor issues and escalations.",
@@ -340,7 +342,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
-          ...singles(["admin_trainer_entries"], visible)
+          ...singles(["admin_trainer_entries", "pack_pro_training"], visible)
         ]),
         true
       )

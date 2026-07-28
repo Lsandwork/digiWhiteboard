@@ -131,7 +131,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("view_vet_visits", "View Vet Visits", "View vet visit logs and owner follow-up status."),
       p("manage_vet_visits", "Manage Vet Visits", "Create and update vet visits."),
       p("view_track_incidents", "View Track Incidents", "View Gingr and manual incident reports."),
-      p("manage_track_incidents", "Manage Track Incidents", "Create, sync, and update track incidents.")
+      p("manage_track_incidents", "Manage Track Incidents", "Create, sync, and update track incidents."),
+      p("view_pack_pro_training", "View Pack Pro Training", "View Fitdog employee Pack Pro course progress."),
+      p("manage_pack_pro_training", "Manage Pack Pro Training", "Sync Pack Pro reports and send incomplete-training alerts.")
     ]
   },
   {

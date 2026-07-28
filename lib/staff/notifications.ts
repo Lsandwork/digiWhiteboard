@@ -26,7 +26,8 @@ export type StaffNotificationSourceTab =
   | "vet_visits"
   | "track_incidents"
   | "fitdog_alerts"
-  | "route_generator";
+  | "route_generator"
+  | "pack_pro_training";
 
 export type NotificationThreadStatus =
   | "open"

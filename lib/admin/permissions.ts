@@ -69,6 +69,8 @@ export type PermissionKey =
   | "manage_fitdog_alerts"
   | "view_vet_visits"
   | "manage_vet_visits"
+  | "view_pack_pro_training"
+  | "manage_pack_pro_training"
   | "route_generator.view"
   | "route_generator.pull_report"
   | "route_generator.generate"
@@ -264,6 +266,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
+  "view_pack_pro_training",
+  "manage_pack_pro_training",
   "route_generator.view",
   "route_generator.pull_report",
   "route_generator.generate",
@@ -460,6 +464,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
+  "view_pack_pro_training",
+  "manage_pack_pro_training",
   "route_generator.view",
   "route_generator.pull_report",
   "route_generator.generate",
@@ -921,6 +927,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   track_incidents: "view_track_incidents",
   fitdog_alerts: "view_fitdog_alerts",
   vet_visits: "view_vet_visits",
+  pack_pro_training: "view_pack_pro_training",
   route_generator: "route_generator.view",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
@@ -1387,6 +1394,15 @@ export function canAccessAdminTab(
       roleKey === "front_desk_coordinator" ||
       roleKey === "team_leader"
     );
+  }
+
+  // Pack Pro Training: admin + management only.
+  if (tab === "pack_pro_training") {
+    if (board !== "staff") return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "view_pack_pro_training")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
+    return isAdminOrManagementLegacyRole(legacyRole);
   }
 
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
