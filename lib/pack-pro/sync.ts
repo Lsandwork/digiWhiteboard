@@ -23,8 +23,43 @@ function courseStatus(percent: number): PackProCourseProgress["status"] {
   return "in_progress";
 }
 
-function normalizeEmail(value: string) {
+export function normalizePackProEmail(value: string) {
   return value.trim().toLowerCase();
+}
+
+function learnerIdForEmail(email: string) {
+  return createHash("sha1").update(normalizePackProEmail(email)).digest("hex").slice(0, 16);
+}
+
+/**
+ * Upsert learners by email so every Pack Pro sync updates the same rows in place.
+ * Never appends duplicates; learners removed from Pack Pro are dropped.
+ */
+export function upsertPackProLearnersByEmail(
+  previous: PackProLearnerRow[],
+  next: PackProLearnerRow[]
+): PackProLearnerRow[] {
+  const previousByEmail = new Map(
+    previous.map((learner) => [normalizePackProEmail(learner.email), learner] as const)
+  );
+  const merged = new Map<string, PackProLearnerRow>();
+
+  for (const learner of next) {
+    const email = normalizePackProEmail(learner.email);
+    if (!email) continue;
+    const prior = previousByEmail.get(email) ?? merged.get(email);
+    const id = prior?.id || learner.id || learnerIdForEmail(email);
+    merged.set(email, {
+      ...learner,
+      id,
+      email,
+      admin_user_id: learner.admin_user_id ?? prior?.admin_user_id ?? null
+    });
+  }
+
+  return [...merged.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
 }
 
 function buildLearnerRows(
@@ -33,15 +68,21 @@ function buildLearnerRows(
   syncedAt: string
 ): PackProLearnerRow[] {
   const requiredCount = PACK_PRO_REQUIRED_COURSES.length;
-  return raw.map((learner) => {
-    const courses: PackProCourseProgress[] = learner.courses.map((course) => {
-      const meta = PACK_PRO_REQUIRED_COURSES.find((item) => item.id === course.course_id)!;
+  const byEmail = new Map<string, PackProLearnerRow>();
+
+  for (const learner of raw) {
+    const email = normalizePackProEmail(learner.email);
+    if (!email) continue;
+
+    const courses: PackProCourseProgress[] = PACK_PRO_REQUIRED_COURSES.map((meta) => {
+      const found = learner.courses.find((item) => item.course_id === meta.id);
+      const percent = found?.percent ?? 0;
       return {
-        course_id: course.course_id,
+        course_id: meta.id,
         course_slug: meta.slug,
         course_title: meta.title,
-        percent: course.percent,
-        status: courseStatus(course.percent)
+        percent,
+        status: courseStatus(percent)
       };
     });
     const completedCount = courses.filter((course) => course.percent >= 100).length;
@@ -51,10 +92,10 @@ function buildLearnerRows(
     const incompleteCourses = courses
       .filter((course) => course.percent < 100)
       .map((course) => course.course_title);
-    const email = normalizeEmail(learner.email);
-    return {
-      id: createHash("sha1").update(email).digest("hex").slice(0, 16),
-      name: learner.name,
+
+    byEmail.set(email, {
+      id: learnerIdForEmail(email),
+      name: learner.name.trim() || email,
       email,
       admin_user_id: adminByEmail.get(email) ?? null,
       courses,
@@ -64,8 +105,12 @@ function buildLearnerRows(
       is_complete: incompleteCourses.length === 0,
       incomplete_courses: incompleteCourses,
       last_synced_at: syncedAt
-    };
-  });
+    });
+  }
+
+  return [...byEmail.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
 }
 
 export async function runPackProTrainingSync(
@@ -102,13 +147,14 @@ export async function runPackProTrainingSync(
     const pulled = await fetchPackProTrainingProgress();
     const admins = await listAdminUsers(supabase);
     const adminByEmail = new Map(
-      admins.map((user) => [normalizeEmail(user.email), user.id] as const)
+      admins.map((user) => [normalizePackProEmail(user.email), user.id] as const)
     );
     const syncedAt = new Date().toISOString();
-    const learners = buildLearnerRows(pulled.learners, adminByEmail, syncedAt);
+    const pulledLearners = buildLearnerRows(pulled.learners, adminByEmail, syncedAt);
+    const nextState = await loadPackProTrainingState(supabase);
+    const learners = upsertPackProLearnersByEmail(nextState.learners, pulledLearners);
     const incompleteCount = learners.filter((row) => !row.is_complete).length;
 
-    const nextState = await loadPackProTrainingState(supabase);
     nextState.learners = learners;
     nextState.group_id = pulled.groupId;
     nextState.last_synced_at = syncedAt;

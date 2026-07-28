@@ -8,6 +8,7 @@ import { buildAdminNav, findNavSectionForTab } from "@/lib/admin/nav-groups";
 import { PACK_PRO_REQUIRED_COURSES } from "@/lib/pack-pro/courses";
 import { canManagePackProTraining, canViewPackProTraining } from "@/lib/pack-pro/access";
 import { buildPackProSummary } from "@/lib/pack-pro/store";
+import { upsertPackProLearnersByEmail } from "@/lib/pack-pro/sync";
 import type { PackProLearnerRow } from "@/lib/pack-pro/types";
 
 assert.equal(PACK_PRO_REQUIRED_COURSES.length, 6);
@@ -85,5 +86,24 @@ assert.equal(summary.learner_count, 2);
 assert.equal(summary.complete_count, 1);
 assert.equal(summary.incomplete_count, 1);
 assert.equal(summary.average_percent, 75);
+
+const firstSync = upsertPackProLearnersByEmail([], learners);
+assert.equal(firstSync.length, 2);
+const secondSync = upsertPackProLearnersByEmail(firstSync, [
+  {
+    ...learners[0],
+    id: "different-id-should-not-duplicate",
+    overall_percent: 66,
+    completed_count: 4,
+    incomplete_courses: ["Leadership & Team Management", "Canine Health - First Aid & CPR"],
+    courses: learners[0].courses.map((course, index) =>
+      index === 3 ? { ...course, percent: 100, status: "completed" as const } : course
+    )
+  },
+  learners[1]
+]);
+assert.equal(secondSync.length, 2, "sync must not create duplicate learner rows");
+assert.equal(secondSync[0]?.id, firstSync[0]?.id, "stable learner id kept across syncs");
+assert.equal(secondSync.find((row) => row.email === "alex@fitdog.com")?.completed_count, 4);
 
 console.log("pack pro training tests passed");

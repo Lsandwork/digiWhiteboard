@@ -21,11 +21,32 @@ function emptyState(): PackProTrainingState {
   };
 }
 
+function dedupeLearners(learners: PackProLearnerRow[]): PackProLearnerRow[] {
+  const byEmail = new Map<string, PackProLearnerRow>();
+  for (const learner of learners) {
+    const email = String(learner.email ?? "")
+      .trim()
+      .toLowerCase();
+    if (!email) continue;
+    const prior = byEmail.get(email);
+    if (!prior) {
+      byEmail.set(email, { ...learner, email });
+      continue;
+    }
+    const priorTs = Date.parse(prior.last_synced_at || "") || 0;
+    const nextTs = Date.parse(learner.last_synced_at || "") || 0;
+    byEmail.set(email, nextTs >= priorTs ? { ...learner, id: prior.id, email } : prior);
+  }
+  return [...byEmail.values()].sort((a, b) =>
+    a.name.localeCompare(b.name, undefined, { sensitivity: "base" })
+  );
+}
+
 function parseState(value: unknown): PackProTrainingState {
   if (!value || typeof value !== "object") return emptyState();
   const raw = value as Partial<PackProTrainingState>;
   return {
-    learners: Array.isArray(raw.learners) ? (raw.learners as PackProLearnerRow[]) : [],
+    learners: dedupeLearners(Array.isArray(raw.learners) ? (raw.learners as PackProLearnerRow[]) : []),
     sync_runs: Array.isArray(raw.sync_runs) ? (raw.sync_runs as PackProSyncRun[]) : [],
     last_synced_at: typeof raw.last_synced_at === "string" ? raw.last_synced_at : null,
     last_alert_at: typeof raw.last_alert_at === "string" ? raw.last_alert_at : null,

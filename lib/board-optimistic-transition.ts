@@ -1,5 +1,4 @@
 import { mergeCheckoutDogs, preserveDogPhotos } from "@/lib/board-checkout-merge";
-import { isPromptedCheckoutDog } from "@/lib/checkout-prompt";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 
 function withoutDog(dogs: LiveDog[], dogId: string) {
@@ -47,7 +46,9 @@ export function applyOptimisticLiveBoardTransition(
     };
   }
 
-  if (next.display_status === "checking_out" && isPromptedCheckoutDog(next)) {
+  if (next.display_status === "checking_out") {
+    // Paint every active checkout immediately from Realtime — even if raw_payload
+    // is missing on the postgres_changes payload — so TV never waits on the poll.
     const checkingOut = preserveDogPhotos(previous.checking_out, mergeCheckoutDogs(previous.checking_out, [next]));
     const checkingIn = withoutDog(previous.checking_in, next.id);
     return {

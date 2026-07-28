@@ -34,7 +34,7 @@ import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_CAST_MS, BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
   expireStickyCheckoutDogs,
@@ -634,8 +634,9 @@ export function BoardClient({
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
 
     const clockIntervalMs = castKeeperMode ? 60_000 : 1000;
-    const nowIntervalMs = castKeeperMode ? 5_000 : 1000;
-    const fastPollIntervalMs = BOARD_CHECKOUT_POLL_MS;
+    const nowIntervalMs = 1000;
+    const fastPollIntervalMs =
+      castKeeperMode && connection !== "live" ? BOARD_CHECKOUT_POLL_CAST_MS : BOARD_CHECKOUT_POLL_MS;
     const fullPollIntervalMs = castKeeperMode
       ? 25_000
       : connection === "live"
@@ -692,10 +693,10 @@ export function BoardClient({
               const optimistic = applyOptimisticLiveBoardTransition(previous, next);
               return optimistic ?? previous;
             });
-            // Realtime events must bypass the short server caches; otherwise an
-            // immediate request can receive the pre-event snapshot and wait for
-            // the next poll. The fast endpoint covers both check-ins and
-            // prompted checkouts without waiting on the heavier Gingr request.
+            // Soft-nudge cast refresh listeners and force a cache-bypassing confirm fetch.
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("fitdog-cast-keeper-refresh"));
+            }
             void loadFastCheckoutsRef.current({ fresh: true });
           }
         )
