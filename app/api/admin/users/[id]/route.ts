@@ -43,6 +43,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const body = (await request.json()) as {
     full_name?: string;
     email?: string;
+    phone?: string | null;
     role?: AdminUserRole;
     primary_role?: RoleKey;
     additional_roles?: RoleKey[];
@@ -84,7 +85,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     email: body.email != null ? String(body.email).trim().toLowerCase() : undefined,
     role: body.role ?? body.primary_role ? legacyRole : undefined,
     status: body.status,
-    force_password_change: body.force_password_change
+    force_password_change: body.force_password_change,
+    phone: body.phone !== undefined ? body.phone : undefined
   });
 
   if (body.primary_role || body.additional_roles || body.departments) {
