@@ -22,6 +22,11 @@ import {
   resolveRouteEndpoints,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
+import {
+  heuristicDriveMinutes,
+  matrixLookup,
+  type TravelTimeMatrix
+} from "@/lib/route-generator/google-maps";
 import { buildCustomerStopNotes, formatPhoneForDriver } from "@/lib/route-generator/stop-notes";
 
 export type DepotConfig = {
@@ -108,10 +113,23 @@ function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: 
 
 type StopCoord = { lat: number; lng: number };
 
+function travelCostMinutes(
+  from: StopCoord | null | undefined,
+  to: StopCoord | null | undefined,
+  matrix: TravelTimeMatrix | null | undefined,
+  rng: () => number
+) {
+  if (!from || !to) return 50 + rng() * 5;
+  const hit = matrixLookup(matrix, from, to);
+  if (hit) return hit.minutes;
+  return heuristicDriveMinutes(from, to);
+}
+
 function nearestNeighborOrder(
   stops: Array<HouseholdStopGroup & { coord: StopCoord | null; load: number; large: number }>,
   depot: StopCoord | null,
-  rng: () => number
+  rng: () => number,
+  matrix?: TravelTimeMatrix | null
 ) {
   const remaining = [...stops];
   const ordered: typeof stops = [];
@@ -121,10 +139,9 @@ function nearestNeighborOrder(
     let bestScore = Number.POSITIVE_INFINITY;
     for (let i = 0; i < remaining.length; i += 1) {
       const stop = remaining[i]!;
-      const dist =
-        current && stop.coord ? haversineMiles(current, stop.coord) : 50 + rng() * 5;
-      if (dist < bestScore) {
-        bestScore = dist;
+      const cost = travelCostMinutes(current, stop.coord, matrix, rng);
+      if (cost < bestScore) {
+        bestScore = cost;
         bestIndex = i;
       }
     }
@@ -133,6 +150,45 @@ function nearestNeighborOrder(
     current = next.coord ?? current;
   }
   return ordered;
+}
+
+/** 2-opt improvement using traffic minutes when available — minimizes total drive time. */
+function twoOptImprove(
+  stops: Array<HouseholdStopGroup & { coord: StopCoord | null; load: number; large: number }>,
+  start: StopCoord | null,
+  end: StopCoord | null,
+  matrix: TravelTimeMatrix | null | undefined,
+  rng: () => number
+) {
+  if (stops.length < 3) return stops;
+  const path = [...stops];
+  const pathCost = (ordered: typeof path) => {
+    let total = 0;
+    let prev = start;
+    for (const stop of ordered) {
+      total += travelCostMinutes(prev, stop.coord, matrix, rng);
+      prev = stop.coord ?? prev;
+    }
+    total += travelCostMinutes(prev, end, matrix, rng);
+    return total;
+  };
+
+  let improved = true;
+  let guard = 0;
+  while (improved && guard < 40) {
+    improved = false;
+    guard += 1;
+    for (let i = 0; i < path.length - 1; i += 1) {
+      for (let k = i + 1; k < path.length; k += 1) {
+        const next = [...path.slice(0, i), ...path.slice(i, k + 1).reverse(), ...path.slice(k + 1)];
+        if (pathCost(next) + 0.01 < pathCost(path)) {
+          path.splice(0, path.length, ...next);
+          improved = true;
+        }
+      }
+    }
+  }
+  return path;
 }
 
 export function optimizeRoutes(params: {
@@ -148,7 +204,10 @@ export function optimizeRoutes(params: {
   lockedVanByHousehold?: Record<string, FitdogVanKey>;
   /** YYYY-MM-DD — drives Van 3 Huntington vs Kenneth Hahn schedule. */
   operatingDate?: string | null;
+  /** Traffic-aware drive-time matrix (Google Routes). Falls back to heuristic when null. */
+  travelMatrix?: TravelTimeMatrix | null;
 }): OptimizationResult {
+  const travelMatrix = params.travelMatrix ?? null;
   const seed = params.seed || `${params.direction}:${params.households.length}:${Date.now()}`;
   const rng = mulberry32(hashSeed(seed));
   const warnings: string[] = [];
@@ -289,11 +348,11 @@ export function optimizeRoutes(params: {
               : null;
         const last = bucket.stops[bucket.stops.length - 1];
         const from = last?.coord ?? depotCoord;
-        const dist = from && stop.coord ? haversineMiles(from, stop.coord) : 25;
-        return { bucket, check, dist };
+        const driveMinutes = travelCostMinutes(from, stop.coord, travelMatrix, rng);
+        return { bucket, check, driveMinutes };
       })
       .filter((c) => c.check.ok)
-      .sort((a, b) => a.dist - b.dist || a.bucket.dogs - b.bucket.dogs);
+      .sort((a, b) => a.driveMinutes - b.driveMinutes || a.bucket.dogs - b.bucket.dogs);
 
     if (candidates[0]) {
       const { bucket } = candidates[0];
@@ -346,19 +405,27 @@ export function optimizeRoutes(params: {
     // otherwise keep nearest-neighbor from the start base.
     const facilityStops = bucket.stops.filter((s) => isFacilityHouseholdKey(s.householdKey));
     const homeStops = bucket.stops.filter((s) => !isFacilityHouseholdKey(s.householdKey));
-    const orderedHome = nearestNeighborOrder(homeStops, startCoord, rng);
+    const nnHome = nearestNeighborOrder(homeStops, startCoord, rng, travelMatrix);
+    const orderedHome = twoOptImprove(nnHome, startCoord, endCoord, travelMatrix, rng);
     const ordered =
       params.direction === "pickup"
         ? [...facilityStops, ...orderedHome]
         : [...orderedHome, ...facilityStops];
 
     let distance = 0;
+    let driveMinutes = 0;
     let prev = startCoord;
     for (const stop of ordered) {
-      if (prev && stop.coord) distance += haversineMiles(prev, stop.coord);
+      if (prev && stop.coord) {
+        distance += haversineMiles(prev, stop.coord);
+        driveMinutes += travelCostMinutes(prev, stop.coord, travelMatrix, rng);
+      }
       prev = stop.coord ?? prev;
     }
-    if (prev && endCoord) distance += haversineMiles(prev, endCoord);
+    if (prev && endCoord) {
+      distance += haversineMiles(prev, endCoord);
+      driveMinutes += travelCostMinutes(prev, endCoord, travelMatrix, rng);
+    }
 
     const stops: OptimizedStop[] = [
       {
@@ -455,7 +522,7 @@ export function optimizeRoutes(params: {
       serviceTypes,
       warnings: [],
       estimatedDistanceMiles: Math.round(distance * 10) / 10,
-      estimatedDriveMinutes: Math.round(distance * 3.2)
+      estimatedDriveMinutes: Math.max(1, Math.round(driveMinutes))
     });
   }
 
@@ -463,6 +530,15 @@ export function optimizeRoutes(params: {
   if (unassigned.length) label = "needs_management_review";
   if (!routes.length && params.households.length) label = "infeasible";
   if (routes.length && unassigned.length === 0 && warnings.length) label = "feasible_not_fully_optimized";
+  if (travelMatrix?.provider === "google_routes") {
+    warnings.push("Routes optimized with Google live/historical traffic (TRAFFIC_AWARE_OPTIMAL).");
+  } else if (travelMatrix?.provider === "heuristic") {
+    warnings.push(
+      ...(travelMatrix.warnings.length
+        ? travelMatrix.warnings
+        : ["Traffic matrix unavailable — used road-distance heuristic."])
+    );
+  }
 
   return { label, seed, routes, unassigned, warnings };
 }

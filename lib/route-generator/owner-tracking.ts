@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import {
-  etaMinutesFromCoords,
+  etaMinutesWithLiveTraffic,
   fetchSamsaraVehicleLocations,
   isSamsaraLiveConfigured,
   matchVehicleByName
@@ -192,11 +192,12 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
       const vehicles = await fetchSamsaraVehicleLocations();
       const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
       if (match) {
-        etaMinutes = etaMinutesFromCoords(
+        const eta = await etaMinutesWithLiveTraffic(
           { lat: match.latitude, lng: match.longitude },
           { lat: Number(row.stop_latitude), lng: Number(row.stop_longitude) },
           match.speedMilesPerHour && match.speedMilesPerHour > 3 ? match.speedMilesPerHour : 18
         );
+        etaMinutes = eta.minutes;
         vehicle = {
           lat: match.latitude,
           lng: match.longitude,
@@ -276,11 +277,12 @@ export async function processOwnerEtaAlerts(): Promise<{
     const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
     if (!match) continue;
 
-    const etaMinutes = etaMinutesFromCoords(
+    const eta = await etaMinutesWithLiveTraffic(
       { lat: match.latitude, lng: match.longitude },
       { lat: Number(row.stop_latitude), lng: Number(row.stop_longitude) },
       match.speedMilesPerHour && match.speedMilesPerHour > 3 ? match.speedMilesPerHour : 18
     );
+    const etaMinutes = eta.minutes;
 
     const patch: Record<string, unknown> = {
       last_eta_minutes: etaMinutes,

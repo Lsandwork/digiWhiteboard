@@ -134,3 +134,28 @@ export function etaMinutesFromCoords(
   const minutes = (roadMiles / Math.max(8, speedMph)) * 60;
   return Math.max(1, Math.round(minutes));
 }
+
+/**
+ * Prefer Google Routes live traffic ETA; fall back to haversine heuristic.
+ * Uses the same traffic graph Google Maps uses (Waze has no public ETA API).
+ */
+export async function etaMinutesWithLiveTraffic(
+  from: { lat: number; lng: number },
+  to: { lat: number; lng: number },
+  speedMph = 18
+): Promise<{ minutes: number; source: "google_traffic" | "heuristic" }> {
+  try {
+    const { computeLiveDriveMinutes, isGoogleMapsConfigured } = await import(
+      "@/lib/route-generator/google-maps"
+    );
+    if (isGoogleMapsConfigured()) {
+      const live = await computeLiveDriveMinutes(from, to);
+      if (live != null && Number.isFinite(live)) {
+        return { minutes: live, source: "google_traffic" };
+      }
+    }
+  } catch {
+    // Fall through to heuristic.
+  }
+  return { minutes: etaMinutesFromCoords(from, to, speedMph), source: "heuristic" };
+}
