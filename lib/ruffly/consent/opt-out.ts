@@ -28,4 +28,4 @@ export function isSmsOptOutRequest(body: string): boolean {
 }
 
 export const OPT_OUT_CONFIRMATION =
-  "Fitdog: You are unsubscribed from marketing texts. Reply HELP for help. Transactional messages about your dog may still apply when necessary.";
+  "Fitdog: You are unsubscribed from all Fitdog texts. Reply HELP for help. Msg&data rates may apply.";

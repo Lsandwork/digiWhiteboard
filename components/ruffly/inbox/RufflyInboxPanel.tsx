@@ -18,6 +18,7 @@ export function RufflyInboxPanel() {
   const [items, setItems] = useState<Conversation[]>([]);
   const [filter, setFilter] = useState("open");
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
   const [messages, setMessages] = useState<Array<{ id: string; body: string; direction: string; created_at: string }>>(
     []
   );
@@ -44,21 +45,29 @@ export function RufflyInboxPanel() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  async function openConversation(id: string) {
+  async function openConversation(id: string, channelHint?: string) {
     setSelected(id);
+    if (channelHint) setSelectedChannel(channelHint);
     const response = await fetch(`/api/ruffly/inbox/${id}`, { cache: "no-store" });
     const body = await response.json();
-    if (response.ok) setMessages(body.messages ?? []);
+    if (response.ok) {
+      setMessages(body.messages ?? []);
+      const channel = body.conversation?.channel;
+      if (typeof channel === "string") setSelectedChannel(channel);
+    }
   }
 
   async function sendReply() {
     if (!selected || !draft.trim()) return;
     setBusy(true);
     try {
+      const payload: Record<string, string> = { action: "reply", body: draft };
+      // Use the conversation's channel; never force SMS on webchat/email threads.
+      if (selectedChannel) payload.channel = selectedChannel;
       const response = await fetch(`/api/ruffly/inbox/${selected}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "reply", body: draft, channel: "sms" })
+        body: JSON.stringify(payload)
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Send failed.");
@@ -81,7 +90,7 @@ export function RufflyInboxPanel() {
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {["open", "waiting_staff", "waiting_client", "snoozed", "closed"].map((value) => (
+        {["open", "waiting_staff", "waiting_client", "snoozed", "closed", "all"].map((value) => (
           <button
             key={value}
             type="button"
@@ -113,7 +122,7 @@ export function RufflyInboxPanel() {
                 <li key={item.id}>
                   <button
                     type="button"
-                    onClick={() => void openConversation(item.id)}
+                    onClick={() => void openConversation(item.id, item.channel)}
                     className={`block w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50 ${
                       selected === item.id ? "bg-orange-50" : ""
                     }`}

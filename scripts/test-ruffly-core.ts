@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "crypto";
-import { isSmsOptOutRequest } from "../lib/ruffly/consent/opt-out";
+import { isSmsOptOutRequest, OPT_OUT_CONFIRMATION } from "../lib/ruffly/consent/opt-out";
+import { isWithinQuietHours } from "../lib/ruffly/consent/quiet-hours";
 import { destinationsForFeedbackRating, isReviewGatingDisabled } from "../lib/ruffly/reviews/no-gating";
 import { detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
 import { RUFFLY_PERMISSIONS } from "../lib/ruffly/permissions";
@@ -22,6 +23,21 @@ assert.equal(isRufflyGingrBookingEnabled(), false);
 assert.equal(isSmsOptOutRequest("STOP"), true);
 assert.equal(isSmsOptOutRequest("please stop texting me"), true);
 assert.equal(isSmsOptOutRequest("Thanks for the update"), false);
+assert.match(OPT_OUT_CONFIRMATION, /unsubscribed from all Fitdog texts/i);
+assert.doesNotMatch(OPT_OUT_CONFIRMATION, /Transactional messages about your dog may still apply/i);
+
+assert.equal(
+  isWithinQuietHours({ start: "21:00", end: "08:00", timezone: "UTC" }, new Date("2026-07-30T22:30:00.000Z")),
+  true
+);
+assert.equal(
+  isWithinQuietHours({ start: "21:00", end: "08:00", timezone: "UTC" }, new Date("2026-07-30T15:00:00.000Z")),
+  false
+);
+assert.equal(
+  isWithinQuietHours({ start: "09:00", end: "17:00", timezone: "UTC" }, new Date("2026-07-30T12:00:00.000Z")),
+  true
+);
 
 assert.equal(isReviewGatingDisabled(), true);
 const low = destinationsForFeedbackRating(1, {
