@@ -210,6 +210,80 @@ export function belongsInArchivedLog(item: CrossoverMessage) {
   );
 }
 
+/** Matches "No leash" / "no leash" / "NO LEASH" as a phrase in any log text field. */
+const NO_LEASH_PATTERN = /\bno\s*leash\b/i;
+
+export function containsNoLeashText(
+  item: Pick<
+    CrossoverMessage,
+    "subject" | "message" | "details" | "log_type" | "template_title" | "related_dog_name" | "related_owner_name"
+  > & { template_field_values?: Record<string, string> | null }
+) {
+  const fieldValues = item.template_field_values
+    ? Object.values(item.template_field_values).filter((value) => typeof value === "string")
+    : [];
+  const haystack = [
+    item.subject,
+    item.message,
+    item.details,
+    item.log_type,
+    item.template_title,
+    item.related_dog_name,
+    item.related_owner_name,
+    ...fieldValues
+  ]
+    .filter((value) => typeof value === "string" && value.trim())
+    .join(" ");
+  return NO_LEASH_PATTERN.test(haystack);
+}
+
+/**
+ * Open "No leash" rows stay Open through the logged Pacific day, then auto-archive
+ * starting at the following day 12:00am Pacific.
+ */
+export function shouldAutoArchiveNoLeashOpenLog(
+  item: Pick<CrossoverMessage, "status" | "created_at" | "subject" | "message" | "details" | "log_type" | "template_title" | "related_dog_name" | "related_owner_name"> & {
+    template_field_values?: Record<string, string> | null;
+  },
+  now: Date = new Date()
+) {
+  if (item.status !== "Open") return false;
+  if (!containsNoLeashText(item)) return false;
+  const createdKey = pacificDateKey(item.created_at);
+  const todayKey = pacificDateKey(now);
+  if (!createdKey || !todayKey) return false;
+  return createdKey < todayKey;
+}
+
+/** True during the Pacific midnight hour (00:xx), including engines that report "24". */
+export function isPacificMidnightHour(now: Date = new Date()) {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone: FITDOG_TIMEZONE,
+    hour: "numeric",
+    hour12: false
+  }).format(now);
+  return hour === "0" || hour === "00" || hour === "24";
+}
+
+export function archiveNoLeashOpenLogs<T extends CrossoverMessage>(
+  messages: T[],
+  now: Date = new Date()
+): { messages: T[]; archivedIds: string[]; archivedAt: string } {
+  const archivedAt = now.toISOString();
+  const archivedIds: string[] = [];
+  const next = messages.map((item) => {
+    if (!shouldAutoArchiveNoLeashOpenLog(item, now)) return item;
+    archivedIds.push(item.id);
+    return {
+      ...item,
+      status: "Archived" as const,
+      archived_at: item.archived_at ?? archivedAt,
+      updated_at: archivedAt
+    };
+  });
+  return { messages: next, archivedIds, archivedAt };
+}
+
 export type FrontDeskLogBucket = "crossover" | "open" | "archived";
 
 export const FRONT_DESK_LOG_BUCKET_LABELS: Record<FrontDeskLogBucket, string> = {

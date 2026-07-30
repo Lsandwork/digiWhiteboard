@@ -2,6 +2,7 @@ import type { AdminUserRole } from "@/lib/admin/users";
 import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
 import { displayActorLabel, loadActorNameLookup } from "@/lib/admin/actor-display";
 import {
+  archiveNoLeashOpenLogs,
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
   isPacificToday,
@@ -493,8 +494,41 @@ async function saveState(supabase: SupabaseClient, state: StaffOpsState) {
 }
 
 export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsState> {
-  const state = parseState(await loadState(supabase));
+  // Catch up Open "No leash" rows that should have archived at Pacific midnight.
+  const { state } = await archiveDueNoLeashOpenLogs(supabase, { actor: "system:no-leash-auto-archive" });
   return enrichStaffOpsActorLabels(supabase, state);
+}
+
+/**
+ * Archive Open Front Desk / Open Log rows that contain "No leash" once their
+ * Pacific create-day is over (following day at 12:00am Pacific).
+ */
+export async function archiveDueNoLeashOpenLogs(
+  supabase: SupabaseClient,
+  options?: { actor?: string | null; now?: Date }
+): Promise<{ state: StaffOpsState; archivedIds: string[]; archived: number }> {
+  const now = options?.now ?? new Date();
+  const actor = options?.actor ?? "system:no-leash-auto-archive";
+  const loaded = parseState(await loadState(supabase));
+  const { messages, archivedIds } = archiveNoLeashOpenLogs(loaded.crossover_messages, now);
+  if (!archivedIds.length) {
+    return { state: loaded, archivedIds: [], archived: 0 };
+  }
+
+  let next: StaffOpsState = {
+    ...loaded,
+    crossover_messages: sortNewest(messages)
+  };
+  next = createActivityLog(next, {
+    activity_type: "shift_log.no_leash_auto_archived",
+    title: `Auto-archived ${archivedIds.length} No leash Open log entr${archivedIds.length === 1 ? "y" : "ies"}`,
+    description: archivedIds.slice(0, 8).join(", "),
+    source_table: "crossover_messages",
+    source_id: null,
+    created_by: actor
+  });
+  await saveState(supabase, next);
+  return { state: next, archivedIds, archived: archivedIds.length };
 }
 
 /** Rewrite display fields so emails never appear as the submitter/author label. Ownership identity stays on created_by. */

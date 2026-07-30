@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
 import {
+  archiveNoLeashOpenLogs,
   belongsInArchivedLog,
   belongsInCrossoverLog,
   belongsInOpenLog,
+  containsNoLeashText,
   isAssessmentDogLog,
-  resolveStatusForShiftLog
+  resolveStatusForShiftLog,
+  shouldAutoArchiveNoLeashOpenLog
 } from "@/lib/staff/front-desk-log";
 
 function base(partial: Partial<CrossoverMessage>): CrossoverMessage {
@@ -105,5 +108,43 @@ const checkedOutPast = base({
   resolved_at: new Date(Date.now() - 2 * 86400000).toISOString()
 });
 assert.equal(belongsInArchivedLog(checkedOutPast), true, "past Check Out goes to archive");
+
+const noLeashToday = base({
+  status: "Open",
+  subject: "No leash - Bella",
+  details: "Owner forgot leash",
+  created_at: new Date().toISOString()
+});
+assert.equal(containsNoLeashText(noLeashToday), true);
+assert.equal(shouldAutoArchiveNoLeashOpenLog(noLeashToday), false, "same-day No leash stays Open");
+assert.equal(belongsInOpenLog(noLeashToday), true);
+assert.equal(belongsInCrossoverLog(noLeashToday), true);
+
+const noLeashPast = base({
+  id: "no-leash-past",
+  status: "Open",
+  subject: "Forgot items",
+  details: "NO LEASH left at cubbies",
+  created_at: new Date(Date.now() - 2 * 86400000).toISOString()
+});
+assert.equal(containsNoLeashText(noLeashPast), true);
+assert.equal(shouldAutoArchiveNoLeashOpenLog(noLeashPast), true, "past Open No leash archives next day");
+
+const otherPastOpen = base({
+  id: "other-past",
+  status: "Open",
+  subject: "Missing collar",
+  details: "blue collar in laundry",
+  created_at: new Date(Date.now() - 2 * 86400000).toISOString()
+});
+assert.equal(containsNoLeashText(otherPastOpen), false);
+assert.equal(shouldAutoArchiveNoLeashOpenLog(otherPastOpen), false, "non No leash Open stays open");
+
+const archivedBatch = archiveNoLeashOpenLogs([noLeashToday, noLeashPast, otherPastOpen]);
+assert.deepEqual(archivedBatch.archivedIds, ["no-leash-past"]);
+assert.equal(archivedBatch.messages.find((row) => row.id === "no-leash-past")?.status, "Archived");
+assert.equal(archivedBatch.messages.find((row) => row.id === otherPastOpen.id)?.status, "Open");
+assert.equal(belongsInArchivedLog(archivedBatch.messages.find((row) => row.id === "no-leash-past")!), true);
+assert.equal(belongsInOpenLog(archivedBatch.messages.find((row) => row.id === "no-leash-past")!), false);
 
 console.log("front desk check-out tests passed");

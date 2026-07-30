@@ -13,14 +13,14 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORKER_ENV="$ROOT/.env.route-worker.local"
 OUT_ENV="$(mktemp)"
 
-if [[ -z "${VERCEL_TOKEN:-}" ]]; then
-  echo "ERROR: VERCEL_TOKEN is required."
+if [[ -z "${VERCEL_TOKEN:-}" || -z "${VERCEL_TOKEN// }" ]]; then
+  echo "ERROR: VERCEL_TOKEN is missing or empty."
   echo "Create one at https://vercel.com/account/tokens then: export VERCEL_TOKEN=..."
   exit 1
 fi
 
-if [[ -z "${GOOGLE_MAPS_API_KEY:-}" ]]; then
-  echo "ERROR: GOOGLE_MAPS_API_KEY is required."
+if [[ -z "${GOOGLE_MAPS_API_KEY:-}" || -z "${GOOGLE_MAPS_API_KEY// }" ]]; then
+  echo "ERROR: GOOGLE_MAPS_API_KEY is missing or empty."
   exit 1
 fi
 
