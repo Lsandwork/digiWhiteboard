@@ -39,18 +39,27 @@ if ! npx --yes vercel@latest --prod --token "$TOKEN" --scope "$SCOPE" --yes | te
   exit 1
 fi
 
+# Prefer JSON "url" when present; fall back to scanning pretty CLI lines.
 DEPLOY_HOST="$(
-  awk '
-    /https:\/\/fitdog-gingr-status-board-[a-z0-9-]+\.vercel\.app/ {
-      for (i = 1; i <= NF; i++) {
-        if ($i ~ /https:\/\/fitdog-gingr-status-board-[a-z0-9-]+\.vercel\.app/) {
-          gsub(/^https:\/\//, "", $i)
-          gsub(/[^a-zA-Z0-9.-].*$/, "", $i)
-          print $i
-          exit
-        }
-      }
+  node -e '
+    const fs = require("fs");
+    const text = fs.readFileSync(process.argv[1], "utf8");
+    const matchUrl = (value) => {
+      const m = String(value || "").match(/fitdog-gingr-status-board-[a-z0-9-]+\.vercel\.app/i);
+      return m ? m[0] : "";
+    };
+    let host = "";
+    for (const line of text.split(/\r?\n/).reverse()) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("{")) continue;
+      try {
+        const json = JSON.parse(trimmed);
+        host = matchUrl(json.url || json.deployment?.url || "");
+        if (host) break;
+      } catch {}
     }
+    if (!host) host = matchUrl(text);
+    process.stdout.write(host);
   ' "$DEPLOY_OUT"
 )"
 rm -f "$DEPLOY_OUT"
