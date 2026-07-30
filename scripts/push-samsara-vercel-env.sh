@@ -8,13 +8,16 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-if [[ -z "${VERCEL_TOKEN:-}" ]]; then
-  echo "ERROR: VERCEL_TOKEN is required (https://vercel.com/account/tokens)."
+if [[ -z "${VERCEL_TOKEN:-}" || -z "${VERCEL_TOKEN// }" ]]; then
+  echo "ERROR: VERCEL_TOKEN is missing or empty (https://vercel.com/account/tokens)."
+  echo "  export VERCEL_TOKEN=..."
+  echo "  ./scripts/deploy-prod-vercel.sh"
   exit 1
 fi
 
-if [[ -z "${SAMSARA_API_TOKEN:-}" ]]; then
-  echo "ERROR: SAMSARA_API_TOKEN is required."
+if [[ -z "${SAMSARA_API_TOKEN:-}" || -z "${SAMSARA_API_TOKEN// }" ]]; then
+  echo "ERROR: SAMSARA_API_TOKEN is missing or empty."
+  echo "Verify first: npx tsx scripts/verify-samsara-setup.ts"
   exit 1
 fi
 
@@ -47,8 +50,8 @@ for env_name in production preview development; do
   set_env NEXT_PUBLIC_SITE_URL "https://staff.ruffops.com" "$env_name"
 done
 
-echo "Done. Trigger a production redeploy:"
-echo "  npx vercel --prod --token \"\$VERCEL_TOKEN\" --scope bridge-tess"
+echo "Done. Trigger a production redeploy + domain alias:"
+echo "  ./scripts/deploy-prod-vercel.sh"
 echo
 echo "Samsara token checklist:"
 echo "  - Scopes: Read Vehicles, Read Vehicle Statistics (GPS)"
