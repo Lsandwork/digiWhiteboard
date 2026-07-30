@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import {
   formatAlertSmsBody,
+  isCriticalAlertSmsRole,
   shouldSendCriticalAlertSms
 } from "../lib/admin/alert-sms";
 import { normalizeAdminUserPhone } from "../lib/admin/users";
+
+assert.equal(isCriticalAlertSmsRole("owner_admin"), true);
+assert.equal(isCriticalAlertSmsRole("super_admin"), true);
+assert.equal(isCriticalAlertSmsRole("manager_admin"), true);
+assert.equal(isCriticalAlertSmsRole("assistant_manager"), true);
+assert.equal(isCriticalAlertSmsRole("front_desk_coordinator"), false);
+assert.equal(isCriticalAlertSmsRole("daycare", ["super_admin"]), true);
 
 assert.equal(shouldSendCriticalAlertSms({ priority: "Critical" }), true);
 assert.equal(shouldSendCriticalAlertSms({ priority: "Urgent" }), true);

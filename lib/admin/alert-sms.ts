@@ -6,7 +6,15 @@ import { phoneDigitsE164 } from "@/lib/route-generator/stop-notes";
 import type { StaffOpsPriority } from "@/lib/staff/admin-ops";
 import type { StaffOpsNotificationEvent } from "@/lib/staff/notifications";
 
+/** RBAC roles that receive critical/urgent alert SMS (includes Super Admin). */
 const ALERT_SMS_ROLES = new Set(["super_admin", "admin", "management"]);
+
+/** Legacy + RBAC roles for Super Admin / Admin / Management alert recipients. */
+export function isCriticalAlertSmsRole(role?: string | null, accessRoles?: string[] | null) {
+  if (isAdminOrManagementRole(role)) return true;
+  if (role === "owner_admin") return true;
+  return (accessRoles ?? []).some((value) => ALERT_SMS_ROLES.has(value));
+}
 
 export type CriticalAlertSmsInput = {
   title: string;
@@ -46,8 +54,7 @@ export function formatAlertSmsBody(title: string, body?: string | null) {
 }
 
 function userReceivesAlertSms(role: string | null | undefined, accessRoles: string[] | undefined) {
-  if (isAdminOrManagementRole(role)) return true;
-  return (accessRoles ?? []).some((value) => ALERT_SMS_ROLES.has(value));
+  return isCriticalAlertSmsRole(role, accessRoles);
 }
 
 export async function listCriticalAlertSmsRecipients(supabase: SupabaseClient) {

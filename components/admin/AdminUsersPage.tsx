@@ -125,8 +125,8 @@ export function AdminUsersPage() {
         <div>
           <h2 className="admin-page-title">Admin Users</h2>
           <p className="admin-page-subtitle">
-            Manage staff accounts, roles, departments, and password access. Add a mobile number on admin/management
-            accounts to receive critical and urgent alert texts.
+            Manage staff accounts, roles, departments, and password access. Add a mobile number on Super Admin, Admin,
+            and Management accounts to receive critical and urgent alert texts.
           </p>
         </div>
         {canManage ? (
