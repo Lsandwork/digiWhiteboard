@@ -72,6 +72,7 @@ export type AdminTab =
   | "package_commissions"
   | "track_incidents"
   | "fitdog_alerts"
+  | "missed_calls"
   | "vet_visits"
   | "analytics"
   | "templates"
@@ -127,6 +128,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "package_commissions",
   "track_incidents",
   "fitdog_alerts",
+  "missed_calls",
   "vet_visits",
   "analytics",
   "templates",

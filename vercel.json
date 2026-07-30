@@ -46,6 +46,10 @@
     {
       "path": "/api/cron/route-eta-alerts",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/missed-calls-sync",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

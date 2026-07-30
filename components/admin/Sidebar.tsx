@@ -430,14 +430,30 @@ export function Sidebar({
   const [badgeCounts, setBadgeCounts] = useState<Partial<Record<AdminTab, number>>>({});
 
   useEffect(() => {
-    if (!visibleTabs.includes("fitdog_alerts")) return;
+    const wantsFitdog = visibleTabs.includes("fitdog_alerts");
+    const wantsMissed = visibleTabs.includes("missed_calls");
+    if (!wantsFitdog && !wantsMissed) return;
     let cancelled = false;
     async function loadBadges() {
       try {
-        const res = await fetch("/api/admin/fitdog-alerts?view=badge", { cache: "no-store" });
-        if (!res.ok) return;
-        const json = (await res.json()) as { count?: number };
-        if (!cancelled) setBadgeCounts({ fitdog_alerts: Number(json.count || 0) });
+        const next: Partial<Record<AdminTab, number>> = {};
+        if (wantsFitdog) {
+          const res = await fetch("/api/admin/fitdog-alerts?view=badge", { cache: "no-store" });
+          if (res.ok) {
+            const json = (await res.json()) as { count?: number };
+            next.fitdog_alerts = Number(json.count || 0);
+          }
+        }
+        if (wantsMissed) {
+          const res = await fetch("/api/admin/missed-calls?view=badge", { cache: "no-store" });
+          if (res.ok) {
+            const json = (await res.json()) as { count?: number };
+            next.missed_calls = Number(json.count || 0);
+          }
+        }
+        if (!cancelled) {
+          setBadgeCounts((prev) => ({ ...prev, ...next }));
+        }
       } catch {
         // Badge fetch is best-effort.
       }

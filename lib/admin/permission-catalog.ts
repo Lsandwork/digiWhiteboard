@@ -127,7 +127,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("assign_active_issue", "Assign Active Issue", "Assign active issues."),
       p("resolve_active_issue", "Resolve Active Issue", "Resolve active issues."),
       p("view_fitdog_alerts", "View Fitdog Alerts", "View Fitdog payment and operations alerts under Operations."),
-      p("manage_fitdog_alerts", "Manage Fitdog Alerts", "Assign, resolve, and sync Fitdog payment alerts.")
+      p("manage_fitdog_alerts", "Manage Fitdog Alerts", "Assign, resolve, and sync Fitdog payment alerts."),
+      p("view_missed_calls", "View Missed Calls", "View Vonage missed calls and voicemails under Front Desk."),
+      p("manage_missed_calls", "Manage Missed Calls", "Sync Gmail and update missed call status.")
     ]
   },
   {
