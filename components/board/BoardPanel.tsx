@@ -92,9 +92,10 @@ export function BoardPanel(props: BoardPanelProps) {
 
       <div
         className={clsx(
-          "flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 sm:gap-4",
+          "board-panel-cards flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pr-1 sm:gap-4",
           count === 1 && "board-panel-cards--solo"
         )}
+        data-dog-count={count}
       >
         {mode === "in" ? (
           props.checkingInEntries.length ? (
