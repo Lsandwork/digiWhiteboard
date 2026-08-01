@@ -2,6 +2,10 @@
 
 Code lives under `lib/integrations/gingr/`.
 
+Auth matches Digi-board / Gingr public API: `key` query or form param against `https://{subdomain}.gingrapp.com/api/v1/...` (not Bearer headers, not `/api/owners`).
+
+Connection test probes `/api/v1/get_locations`, falling back to `/api/v1/reservation_types`.
+
 Env:
 - `GINGR_BASE_URL` (optional) or `GINGR_SUBDOMAIN`
 - `GINGR_API_KEY`
