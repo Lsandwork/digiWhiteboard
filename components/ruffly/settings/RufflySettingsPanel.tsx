@@ -132,6 +132,14 @@ export function RufflySettingsPanel({ enabled = true }: { enabled?: boolean }) {
               Step {Math.min(step + 1, SETUP_STEPS.length)} of {SETUP_STEPS.length}
               {settings.setup_completed ? " · Complete" : ""}
             </p>
+            <p className="mt-2 rounded-xl border border-orange-200 bg-white/70 px-3 py-2 text-sm text-slate-700">
+              Gingr allows only one webhook URL. Keep{" "}
+              <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">
+                https://staff.ruffops.com/api/gingr/webhook
+              </code>{" "}
+              in Gingr — DigiBoard fans verified events into Ruffly automatically. Do not switch Gingr to the
+              Ruffly-only webhook path.
+            </p>
             <ol className="mt-3 max-h-56 space-y-1 overflow-auto text-sm">
               {SETUP_STEPS.map((label, index) => (
                 <li key={label} className={index < step ? "text-emerald-700" : index === step ? "font-medium text-[#ff6f26]" : "text-slate-500"}>
