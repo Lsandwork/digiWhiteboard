@@ -426,7 +426,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
       "After login, you are routed to Staff Digital Whiteboard → Push Notices.",
-      "Use Front Desk Log → Crossover Log for today’s handoffs, Open Log for unresolved items, and Archived Log for prior closed entries.",
+      "Use Front Desk Log → Crossover Log for today’s handoffs, Open Log for today’s unresolved items, and Archived Log for previous-day notes (auto-archived at midnight Pacific).",
       "You can also use Owner Follow Up, Active Issues, Push Notices, Notifications, Walks Board, and Help Center.",
       "Staff Directory is view-only — search and review staff records, but you cannot add, edit, or delete entries.",
       "You can delete only Front Desk Log entries you created (unless you are Super Admin, Admin, or Management).",
