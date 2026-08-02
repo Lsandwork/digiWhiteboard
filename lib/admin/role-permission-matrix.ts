@@ -7,6 +7,7 @@ import {
 import {
   permissionsForRoles as staticPermissionsForRoles,
   ROLE_PERMISSIONS,
+  RUFFLY_ALLOWED_ROLES,
   type PermissionKey,
   type RoleKey
 } from "@/lib/admin/permissions";
@@ -17,6 +18,21 @@ const SETTINGS_STORE_KEY = "role_permission_matrix";
 
 function emptyMatrix(): RolePermissionMatrix {
   return {};
+}
+
+/** Hard policy: Ruffly is Front Desk + Management + Admin + Super Admin only. */
+function applyRufflyRoleAccessPolicy(matrix: RolePermissionMatrix): RolePermissionMatrix {
+  for (const role of Object.keys(matrix) as RoleKey[]) {
+    const roleMap = matrix[role];
+    if (!roleMap) continue;
+    for (const key of ALL_CATALOG_PERMISSION_KEYS) {
+      if (!key.startsWith("ruffly.")) continue;
+      if (!RUFFLY_ALLOWED_ROLES.has(role)) {
+        roleMap[key] = false;
+      }
+    }
+  }
+  return matrix;
 }
 
 export function buildDefaultRolePermissionMatrix(): RolePermissionMatrix {
@@ -38,7 +54,7 @@ export function buildDefaultRolePermissionMatrix(): RolePermissionMatrix {
       }
     }
   }
-  return matrix;
+  return applyRufflyRoleAccessPolicy(matrix);
 }
 
 function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): RolePermissionMatrix {
@@ -60,7 +76,7 @@ function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): 
       }
     }
   }
-  return merged;
+  return applyRufflyRoleAccessPolicy(merged);
 }
 
 export async function loadRolePermissionMatrix(supabase: SupabaseClient): Promise<RolePermissionMatrix> {
@@ -115,6 +131,8 @@ export function permissionsForRolesFromMatrix(roles: RoleKey[], matrix: RolePerm
 export function isPermissionLockedForRole(role: RoleKey, permission: PermissionKey): boolean {
   if (role === "super_admin") return true;
   if (role === "admin" && SUPER_ADMIN_ONLY_PERMISSIONS.has(permission)) return true;
+  // Ruffly stays Front Desk / Management / Admin / Super Admin only.
+  if (permission.startsWith("ruffly.") && !RUFFLY_ALLOWED_ROLES.has(role)) return true;
   return false;
 }
 
