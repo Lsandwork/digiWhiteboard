@@ -1378,7 +1378,9 @@ function AutoReportedPanel({ items, onOpen }: { items: ActiveIssue[]; onOpen: (i
 }
 
 function EscalationsSection({ items }: { items: ActiveIssue[] }) {
-  const urgent = items.filter((item) => item.priority === "High" || item.priority === "Critical").slice(0, 4);
+  const urgent = items
+    .filter((item) => item.status !== "Resolved" && (item.priority === "High" || item.priority === "Critical"))
+    .slice(0, 4);
   return <section className="admin-card p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-xl font-black text-white">Escalations & Follow-Up</h3><p className="text-sm text-admin-muted">High priority issues that require immediate action and follow-up.</p></div><span className="text-xs text-fitdog-orange">View all escalations</span></div><div className="grid gap-3 md:grid-cols-2">{urgent.map((item) => <article key={item.id} className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4"><Badge type="priority" value={item.priority} /><h4 className="mt-3 font-black text-white">{item.title}</h4><p className="mt-1 text-sm text-admin-muted"><RichText value={item.notes} plain empty="No notes." /></p><p className="mt-3 text-xs text-admin-muted">Assigned to {item.assigned_to ?? "Unassigned"} • Due {formatDateTime(item.due_at)}</p></article>)}{!urgent.length ? <p className="text-sm text-admin-muted">No high priority escalations.</p> : null}</div></section>;
 }
 
