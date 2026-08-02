@@ -191,23 +191,44 @@ export function belongsInCrossoverLog(item: CrossoverMessage) {
   return isPacificToday(item.created_at);
 }
 
-/** Open Log — unresolved / in-flight statuses (any date). */
+/**
+ * Open Log — unresolved / in-flight statuses logged today (Pacific).
+ * Previous-day notes leave Open at midnight and roll into Archived Log.
+ */
 export function belongsInOpenLog(item: CrossoverMessage) {
-  return isOpenShiftLogStatus(item.status);
+  return isOpenShiftLogStatus(item.status) && isPacificToday(item.created_at);
 }
 
 /**
  * Archived Log:
  * - Explicit Archived (any date)
- * - Past-dated Resolved / Check Out / Completed (not still on today's Crossover)
+ * - Any previous Pacific calendar day (handoff notes archive at midnight)
  */
 export function belongsInArchivedLog(item: CrossoverMessage) {
   if (belongsInCrossoverLog(item)) return false;
   if (item.status === "Archived") return true;
-  return (
-    !isPacificToday(item.created_at) &&
-    (item.status === "Resolved" || item.status === "Check Out" || item.status === "Completed")
+  return !isPacificToday(item.created_at);
+}
+
+/**
+ * Previous-day crossover notes (including New Dog Assessment / Check Out) receive
+ * status Archived at 12:00 AM Pacific. Same-day assessments stay on Crossover Log.
+ */
+export function shouldAutoArchivePreviousDayCrossover(item: Pick<CrossoverMessage, "status" | "created_at">) {
+  if (item.status === "Archived") return false;
+  return !isPacificToday(item.created_at);
+}
+
+/** True during the first Pacific hour after midnight (00:00–00:59 America/Los_Angeles). */
+export function isPacificMidnightHour(now: Date = new Date()) {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: FITDOG_TIMEZONE,
+      hour: "numeric",
+      hourCycle: "h23"
+    }).format(now)
   );
+  return hour === 0;
 }
 
 export type FrontDeskLogBucket = "crossover" | "open" | "archived";

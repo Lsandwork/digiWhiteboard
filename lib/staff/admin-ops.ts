@@ -8,6 +8,7 @@ import {
   pacificYesterdayIso,
   priorityRank,
   shouldAlertManagement,
+  shouldAutoArchivePreviousDayCrossover,
   shiftLogDetails
 } from "@/lib/staff/front-desk-log";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
@@ -493,8 +494,56 @@ async function saveState(supabase: SupabaseClient, state: StaffOpsState) {
 }
 
 export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsState> {
+  // Keep Open/Archived buckets correct even if the midnight cron has not fired yet.
+  await archivePreviousDayCrossoverMessages(supabase, "system:midnight-rollover");
   const state = parseState(await loadState(supabase));
   return enrichStaffOpsActorLabels(supabase, state);
+}
+
+/**
+ * Archive every crossover / Front Desk note from a previous Pacific calendar day.
+ * Runs at Pacific midnight via cron and on staff-ops load as a catch-up.
+ */
+export async function archivePreviousDayCrossoverMessages(
+  supabase: SupabaseClient,
+  actor: string | null = "system:midnight-rollover"
+) {
+  const state = await loadState(supabase);
+  const now = nowIso();
+  let archived = 0;
+  const crossover_messages = state.crossover_messages.map((item) => {
+    if (!shouldAutoArchivePreviousDayCrossover(item)) return item;
+    archived += 1;
+    return {
+      ...item,
+      status: "Archived" as const,
+      archived_at: item.archived_at ?? now,
+      updated_at: now
+    };
+  });
+
+  if (!archived) {
+    return { archived: 0, ids: [] as string[] };
+  }
+
+  const archivedIds = crossover_messages
+    .filter((item, index) => item.status === "Archived" && state.crossover_messages[index]?.status !== "Archived")
+    .map((item) => item.id);
+
+  let next: StaffOpsState = {
+    ...state,
+    crossover_messages: sortNewest(crossover_messages)
+  };
+  next = createActivityLog(next, {
+    activity_type: "shift_log.auto_archived",
+    title: `Auto-archived ${archived} previous-day crossover note${archived === 1 ? "" : "s"}`,
+    description: "Previous-day notes archive at 12:00 AM Pacific.",
+    source_table: "crossover_messages",
+    source_id: null,
+    created_by: actor
+  });
+  await saveState(supabase, next);
+  return { archived, ids: archivedIds };
 }
 
 /** Rewrite display fields so emails never appear as the submitter/author label. Ownership identity stays on created_by. */

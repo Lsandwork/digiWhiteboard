@@ -367,10 +367,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Open Staff Digital Whiteboard → Front Desk Log.",
       "Crossover Log shows current-day activity so every role can hand off the shift.",
-      "Open Log shows unresolved items that still need follow-up.",
-      "Archived Log shows prior-day resolved, completed, Check Out, and archived entries (including past imported notes).",
+      "Open Log shows today’s unresolved items that still need follow-up.",
+      "Previous-day crossover notes auto-archive at 12:00 AM Pacific and appear in Archived Log (status Archived).",
+      "Archived Log shows prior-day and explicitly archived entries (including past imported notes).",
       "Add a new entry with Add Shift Log Entry, or use Quick Templates for common log types.",
-      "For New Dog Assessment entries: choose Mark Check Out (Resolved). They stay on today’s Crossover Log — even if archived the same day — then move to Archived Log the next day.",
+      "For New Dog Assessment entries: choose Mark Check Out. They stay on today’s Crossover Log, then auto-archive (status Archived) at 12:00 AM Pacific the following day.",
       "Delete is only available for entries you created. Super Admin, Admin, and Management can delete any entry."
     ],
     tips: [
@@ -425,7 +426,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
       "After login, you are routed to Staff Digital Whiteboard → Push Notices.",
-      "Use Front Desk Log → Crossover Log for today’s handoffs, Open Log for unresolved items, and Archived Log for prior closed entries.",
+      "Use Front Desk Log → Crossover Log for today’s handoffs, Open Log for today’s unresolved items, and Archived Log for previous-day notes (auto-archived at midnight Pacific).",
       "You can also use Owner Follow Up, Active Issues, Push Notices, Notifications, Walks Board, and Help Center.",
       "Staff Directory is view-only — search and review staff records, but you cannot add, edit, or delete entries.",
       "You can delete only Front Desk Log entries you created (unless you are Super Admin, Admin, or Management).",
