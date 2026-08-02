@@ -210,7 +210,10 @@ export function belongsInArchivedLog(item: CrossoverMessage) {
   return !isPacificToday(item.created_at);
 }
 
-/** Previous-day crossover notes should receive status Archived at Pacific midnight. */
+/**
+ * Previous-day crossover notes (including New Dog Assessment / Check Out) receive
+ * status Archived at 12:00 AM Pacific. Same-day assessments stay on Crossover Log.
+ */
 export function shouldAutoArchivePreviousDayCrossover(item: Pick<CrossoverMessage, "status" | "created_at">) {
   if (item.status === "Archived") return false;
   return !isPacificToday(item.created_at);

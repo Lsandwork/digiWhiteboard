@@ -106,11 +106,30 @@ assert.equal(belongsInArchivedLog(resolvedPast), true, "past Resolved goes to ar
 assert.equal(shouldAutoArchivePreviousDayCrossover(resolvedPast), true);
 
 const checkedOutPast = base({
+  log_type: "New Dog Assessment",
+  subject: "New dog assessment - Remy",
   status: "Check Out",
   created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
   resolved_at: new Date(Date.now() - 2 * 86400000).toISOString()
 });
-assert.equal(belongsInArchivedLog(checkedOutPast), true, "past Check Out goes to archive");
+assert.equal(isAssessmentDogLog(checkedOutPast), true);
+assert.equal(belongsInCrossoverLog(checkedOutPast), false, "previous-day assessment leaves Crossover");
+assert.equal(belongsInArchivedLog(checkedOutPast), true, "past assessment Check Out goes to archive");
+assert.equal(
+  shouldAutoArchivePreviousDayCrossover(checkedOutPast),
+  true,
+  "previous-day assessment must auto-archive at Pacific midnight"
+);
+
+const openAssessmentPast = base({
+  log_type: "New Dog Assessment",
+  subject: "New dog assessment - still open",
+  status: "Open",
+  created_at: new Date(Date.now() - 2 * 86400000).toISOString()
+});
+assert.equal(isAssessmentDogLog(openAssessmentPast), true);
+assert.equal(belongsInOpenLog(openAssessmentPast), false);
+assert.equal(shouldAutoArchivePreviousDayCrossover(openAssessmentPast), true);
 
 const alreadyArchivedPast = base({
   status: "Archived",

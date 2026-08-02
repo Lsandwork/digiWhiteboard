@@ -371,7 +371,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Previous-day crossover notes auto-archive at 12:00 AM Pacific and appear in Archived Log (status Archived).",
       "Archived Log shows prior-day and explicitly archived entries (including past imported notes).",
       "Add a new entry with Add Shift Log Entry, or use Quick Templates for common log types.",
-      "For New Dog Assessment entries: choose Mark Check Out (Resolved). They stay on today’s Crossover Log — even if archived the same day — then move to Archived Log the next day.",
+      "For New Dog Assessment entries: choose Mark Check Out. They stay on today’s Crossover Log, then auto-archive (status Archived) at 12:00 AM Pacific the following day.",
       "Delete is only available for entries you created. Super Admin, Admin, and Management can delete any entry."
     ],
     tips: [
