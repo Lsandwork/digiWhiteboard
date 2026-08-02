@@ -19,6 +19,7 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import { htmlToPlainText } from "@/lib/html/rich-text";
 import type {
   ActiveIssue,
+  ActiveIssueReply,
   CrossoverMessage,
   CrossoverReply,
   IssueCategory,
@@ -105,6 +106,7 @@ type StaffOpsPayload = {
   crossover_message_replies: CrossoverReply[];
   owner_follow_ups: OwnerFollowUp[];
   active_issues: ActiveIssue[];
+  active_issue_replies: ActiveIssueReply[];
   activity_logs: StaffActivityLog[];
   staff_directory: StaffDirectoryMember[];
   currentUser: { email: string | null; adminUserId: string | null; role: string };
@@ -393,6 +395,13 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
         return {
           ...prev,
           crossover_message_replies: [reply, ...prev.crossover_message_replies.filter((item) => item.id !== reply.id)]
+        };
+      }
+      if (action === "reply_issue") {
+        const reply = result as ActiveIssueReply;
+        return {
+          ...prev,
+          active_issue_replies: [reply, ...(prev.active_issue_replies ?? []).filter((item) => item.id !== reply.id)]
         };
       }
       if (action === "delete_crossover") {
@@ -1297,7 +1306,16 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
       : "follow_up_notes" in item
         ? item.follow_up_notes
         : item.notes;
-  const replies = detail.type === "crossover" ? (data?.crossover_message_replies ?? []).filter((entry) => entry.crossover_message_id === item.id) : [];
+  const crossoverReplies =
+    detail.type === "crossover"
+      ? (data?.crossover_message_replies ?? []).filter((entry) => entry.crossover_message_id === item.id)
+      : [];
+  const issueReplies =
+    detail.type === "issues"
+      ? (data?.active_issue_replies ?? []).filter((entry) => entry.active_issue_id === item.id)
+      : [];
+  const issueResolutionNotes =
+    detail.type === "issues" && "resolution_notes" in item ? item.resolution_notes : null;
   const resolveStatus =
     detail.type === "crossover" ? resolveStatusForShiftLog(item as CrossoverMessage) : ("Resolved" as const);
   const resolveLabel =
@@ -1393,7 +1411,7 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
         {detail.type === "crossover" ? (
           <div className="grid gap-3">
             <h4 className="font-bold text-white">Updates / Internal Notes</h4>
-            {replies.map((entry) => (
+            {crossoverReplies.map((entry) => (
               <div key={entry.id} className="rounded-xl border border-admin-border p-3 text-sm text-admin-muted">
                 <p className="text-xs font-semibold uppercase tracking-wide text-fitdog-orange">{entry.update_type ?? "Internal Note"}</p>
                 <p className="mt-1 text-white">{entry.message}</p>
@@ -1429,9 +1447,66 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
           </div>
         ) : null}
         {detail.type === "issues" ? (
-          <Field label="Resolution notes">
-            <textarea className="admin-input min-h-[80px]" value={resolution} onChange={(event) => setResolution(event.target.value)} />
-          </Field>
+          <div className="grid gap-3">
+            <h4 className="font-bold text-white">Team Updates</h4>
+            <p className="text-xs text-admin-muted">
+              Shared with everyone who can open this issue. Add status remarks here so the whole team stays aligned.
+            </p>
+            {issueResolutionNotes &&
+            !issueReplies.some((entry) => entry.message === issueResolutionNotes) ? (
+              <div className="rounded-xl border border-admin-border p-3 text-sm text-admin-muted">
+                <p className="text-xs font-semibold uppercase tracking-wide text-fitdog-orange">Resolution</p>
+                <p className="mt-1 whitespace-pre-wrap text-white">{issueResolutionNotes}</p>
+              </div>
+            ) : null}
+            {[...issueReplies]
+              .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+              .map((entry) => (
+                <div key={entry.id} className="rounded-xl border border-admin-border p-3 text-sm text-admin-muted">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-fitdog-orange">
+                    {entry.update_type ?? "Update"}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-white">{entry.message}</p>
+                  <p className="mt-1 text-xs">
+                    {entry.created_by ?? "Staff"} • {formatDateTime(entry.created_at)}
+                  </p>
+                </div>
+              ))}
+            {!issueReplies.length && !issueResolutionNotes ? (
+              <p className="text-sm text-admin-muted">No team updates yet. Add the first remark below.</p>
+            ) : null}
+            <textarea
+              className="admin-input min-h-[80px]"
+              placeholder="Write an update for the team..."
+              value={reply}
+              onChange={(event) => setReply(event.target.value)}
+            />
+            <button
+              className="admin-btn-primary justify-self-end"
+              type="button"
+              disabled={busy || !reply.trim()}
+              onClick={() =>
+                void (async () => {
+                  const ok = await onMutate(
+                    "Unable to add update.",
+                    { action: "reply_issue", id: item.id, message: reply, update_type: "Update" },
+                    "Update added for the team."
+                  );
+                  if (ok) setReply("");
+                })()
+              }
+            >
+              Add Update
+            </button>
+            <Field label="Resolution notes (saved when you Resolve)">
+              <textarea
+                className="admin-input min-h-[80px]"
+                placeholder="Optional final resolution notes…"
+                value={resolution}
+                onChange={(event) => setResolution(event.target.value)}
+              />
+            </Field>
+          </div>
         ) : null}
       </div>
     </Modal>

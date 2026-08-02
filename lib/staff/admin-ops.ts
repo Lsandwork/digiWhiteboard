@@ -97,6 +97,15 @@ export type CrossoverReply = {
   created_at: string;
 };
 
+export type ActiveIssueReply = {
+  id: string;
+  active_issue_id: string;
+  message: string;
+  update_type?: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 export type OwnerFollowUp = {
   id: string;
   subject: string;
@@ -171,6 +180,7 @@ export type StaffOpsState = {
   crossover_message_replies: CrossoverReply[];
   owner_follow_ups: OwnerFollowUp[];
   active_issues: ActiveIssue[];
+  active_issue_replies: ActiveIssueReply[];
   activity_logs: StaffActivityLog[];
   staff_directory: StaffDirectoryMember[];
   notifications: StaffNotification[];
@@ -332,6 +342,7 @@ function emptyState(): StaffOpsState {
     crossover_message_replies: [],
     owner_follow_ups: [],
     active_issues: [],
+    active_issue_replies: [],
     activity_logs: [],
     staff_directory: DEFAULT_STAFF_DIRECTORY,
     notifications: []
@@ -416,6 +427,7 @@ function parseState(value: unknown): StaffOpsState {
     crossover_message_replies: sortNewest(Array.isArray(state.crossover_message_replies) ? state.crossover_message_replies : []),
     owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
     active_issues: sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
+    active_issue_replies: sortNewest(Array.isArray(state.active_issue_replies) ? state.active_issue_replies : []),
     activity_logs: sortNewest(Array.isArray(state.activity_logs) ? state.activity_logs : []).slice(0, 100),
     staff_directory: directory.map(normalizeStaffDirectoryMember),
     notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : [])
@@ -506,6 +518,9 @@ export async function enrichStaffOpsActorLabels(supabase: SupabaseClient, state:
   for (const reply of state.crossover_message_replies) {
     values.push(reply.created_by);
   }
+  for (const reply of state.active_issue_replies) {
+    values.push(reply.created_by);
+  }
   for (const log of state.activity_logs) {
     values.push(log.created_by);
   }
@@ -522,6 +537,10 @@ export async function enrichStaffOpsActorLabels(supabase: SupabaseClient, state:
       submitted_by: displayActorLabel(item.submitted_by || item.created_by, lookup, "Staff")
     })),
     crossover_message_replies: state.crossover_message_replies.map((reply) => ({
+      ...reply,
+      created_by: displayActorLabel(reply.created_by, lookup, "Staff")
+    })),
+    active_issue_replies: state.active_issue_replies.map((reply) => ({
       ...reply,
       created_by: displayActorLabel(reply.created_by, lookup, "Staff")
     })),
@@ -931,6 +950,50 @@ export async function replyToCrossoverMessage(
     source_id: id,
     created_by: authorLabel
   });
+  await saveState(supabase, next);
+  return reply;
+}
+
+export async function replyToActiveIssue(
+  supabase: SupabaseClient,
+  id: string,
+  message: unknown,
+  actor: string | null,
+  updateType = "Update",
+  displayName?: string | null
+) {
+  const text = cleanString(message);
+  if (!text) throw new Error("Update text is required.");
+  const state = await loadState(supabase);
+  const parent = state.active_issues.find((item) => item.id === id);
+  if (!parent) throw new Error("Active issue not found.");
+  const authorLabel = cleanString(displayName) || actor;
+  const reply: ActiveIssueReply = {
+    id: newId(),
+    active_issue_id: id,
+    message: text,
+    update_type: cleanString(updateType, "Update") || "Update",
+    created_by: authorLabel,
+    created_at: nowIso()
+  };
+  const touchedIssues = state.active_issues.map((item) =>
+    item.id === id ? { ...item, updated_at: reply.created_at } : item
+  );
+  const next = createActivityLog(
+    {
+      ...state,
+      active_issues: touchedIssues,
+      active_issue_replies: sortNewest([reply, ...state.active_issue_replies])
+    },
+    {
+      activity_type: "issue.update_added",
+      title: `Update added to issue: ${parent.title}`,
+      description: `${authorLabel ?? "Staff"}: ${text}`,
+      source_table: "active_issues",
+      source_id: id,
+      created_by: authorLabel
+    }
+  );
   await saveState(supabase, next);
   return reply;
 }
@@ -1371,11 +1434,20 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
   const now = nowIso();
   const state = await loadState(supabase);
   let updated: ActiveIssue | null = null;
+  let resolutionReplyText: string | null = null;
   const updatedState = {
     ...state,
     active_issues: state.active_issues.map((item) => {
       if (item.id !== id) return item;
       const status = normalizeStatus(patch.status, item.status);
+      // Never wipe prior resolution notes with an empty Resolve payload.
+      const nextResolutionNotes =
+        patch.resolution_notes !== undefined
+          ? optionalString(patch.resolution_notes) ?? item.resolution_notes
+          : item.resolution_notes;
+      if (patch.resolution_notes !== undefined) {
+        resolutionReplyText = optionalString(patch.resolution_notes);
+      }
       updated = {
         ...item,
         title: patch.title !== undefined ? cleanString(patch.title) : item.title,
@@ -1386,7 +1458,7 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
         due_at: patch.due_at !== undefined ? normalizeDate(patch.due_at) : item.due_at,
         status,
         notes: patch.notes !== undefined ? optionalString(patch.notes) : item.notes,
-        resolution_notes: patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes,
+        resolution_notes: nextResolutionNotes,
         related_owner_name: patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name) : item.related_owner_name,
         related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name) : item.related_dog_name,
         updated_at: now,
@@ -1397,11 +1469,30 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
   };
   if (!updated) throw new Error("Active issue not found.");
   const updatedRecord = updated as ActiveIssue;
+
+  let withReplies = updatedState;
+  if (resolutionReplyText) {
+    const reply: ActiveIssueReply = {
+      id: newId(),
+      active_issue_id: id,
+      message: resolutionReplyText,
+      update_type: updatedRecord.status === "Resolved" ? "Resolution" : "Update",
+      created_by: actor,
+      created_at: now
+    };
+    withReplies = {
+      ...updatedState,
+      active_issue_replies: sortNewest([reply, ...updatedState.active_issue_replies])
+    };
+  }
+
   const next = notifyState(
-    createActivityLog(updatedState, {
+    createActivityLog(withReplies, {
       activity_type: "issue.updated",
       title: `Updated issue: ${updatedRecord.title}`,
-      description: `Status: ${updatedRecord.status}`,
+      description: resolutionReplyText
+        ? `Status: ${updatedRecord.status} • ${resolutionReplyText}`
+        : `Status: ${updatedRecord.status}`,
       source_table: "active_issues",
       source_id: id,
       created_by: actor
@@ -1412,10 +1503,10 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
       sourceId: id,
       sourceTab: issueTab(),
       title: `Active issue updated: ${updatedRecord.title}`,
-      body: updatedRecord.notes,
+      body: resolutionReplyText || updatedRecord.notes,
       priority: updatedRecord.priority,
       assignedTo: updatedRecord.assigned_to,
-      mentionText: updatedRecord.notes,
+      mentionText: resolutionReplyText || updatedRecord.notes,
       actor
     }
   );

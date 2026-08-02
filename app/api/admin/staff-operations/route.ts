@@ -29,6 +29,7 @@ import {
   markStaffNotificationRead,
   moveCrossoverMessages,
   bulkUpdateCrossoverMessages,
+  replyToActiveIssue,
   replyToCrossoverMessage,
   updateActiveIssue,
   updateCrossoverMessage,
@@ -214,6 +215,18 @@ export async function POST(request: Request) {
         actorDisplayName
       );
       auditAction = "staff.shift_log.update";
+    } else if (action === "reply_issue") {
+      const id = String(body.id ?? "");
+      if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
+      result = await replyToActiveIssue(
+        supabase,
+        id,
+        body.message,
+        actor,
+        String(body.update_type ?? "Update"),
+        actorDisplayName
+      );
+      auditAction = "staff.issue.update";
     } else if (action === "create_follow_up") {
       result = await createOwnerFollowUp(supabase, body, actorDisplayName);
       auditAction = "staff.follow_up.create";
