@@ -5,7 +5,9 @@ import {
   belongsInCrossoverLog,
   belongsInOpenLog,
   isAssessmentDogLog,
-  resolveStatusForShiftLog
+  isPacificMidnightHour,
+  resolveStatusForShiftLog,
+  shouldAutoArchivePreviousDayCrossover
 } from "@/lib/staff/front-desk-log";
 
 function base(partial: Partial<CrossoverMessage>): CrossoverMessage {
@@ -42,6 +44,7 @@ const openToday = base({ status: "Open", created_at: new Date().toISOString() })
 assert.equal(belongsInCrossoverLog(openToday), true);
 assert.equal(belongsInOpenLog(openToday), true);
 assert.equal(belongsInArchivedLog(openToday), false);
+assert.equal(shouldAutoArchivePreviousDayCrossover(openToday), false);
 
 const inProgressToday = base({ status: "In Progress", created_at: new Date().toISOString() });
 assert.equal(belongsInCrossoverLog(inProgressToday), true, "today In Progress stays on crossover");
@@ -56,7 +59,7 @@ const resolvedToday = base({
   resolved_at: new Date().toISOString()
 });
 assert.equal(belongsInCrossoverLog(resolvedToday), true, "today Resolved stays on crossover");
-assert.equal(belongsInArchivedLog(resolvedToday), false, "today Resolved is not archived until Archive click");
+assert.equal(belongsInArchivedLog(resolvedToday), false, "today Resolved is not archived until midnight/Archive");
 
 const checkedOutToday = base({
   log_type: "New Dog Assessment",
@@ -81,15 +84,17 @@ const openPast = base({
   created_at: new Date(Date.now() - 3 * 86400000).toISOString()
 });
 assert.equal(belongsInCrossoverLog(openPast), false);
-assert.equal(belongsInOpenLog(openPast), true);
-assert.equal(belongsInArchivedLog(openPast), false);
+assert.equal(belongsInOpenLog(openPast), false, "previous-day Open leaves Open Log");
+assert.equal(belongsInArchivedLog(openPast), true, "previous-day Open lands in Archived Log");
+assert.equal(shouldAutoArchivePreviousDayCrossover(openPast), true);
 
 const inProgressPast = base({
   status: "In Progress",
   created_at: new Date(Date.now() - 2 * 86400000).toISOString()
 });
-assert.equal(belongsInOpenLog(inProgressPast), true);
-assert.equal(belongsInArchivedLog(inProgressPast), false);
+assert.equal(belongsInOpenLog(inProgressPast), false);
+assert.equal(belongsInArchivedLog(inProgressPast), true);
+assert.equal(shouldAutoArchivePreviousDayCrossover(inProgressPast), true);
 
 const resolvedPast = base({
   status: "Resolved",
@@ -98,6 +103,7 @@ const resolvedPast = base({
 });
 assert.equal(belongsInCrossoverLog(resolvedPast), false);
 assert.equal(belongsInArchivedLog(resolvedPast), true, "past Resolved goes to archive");
+assert.equal(shouldAutoArchivePreviousDayCrossover(resolvedPast), true);
 
 const checkedOutPast = base({
   status: "Check Out",
@@ -105,5 +111,15 @@ const checkedOutPast = base({
   resolved_at: new Date(Date.now() - 2 * 86400000).toISOString()
 });
 assert.equal(belongsInArchivedLog(checkedOutPast), true, "past Check Out goes to archive");
+
+const alreadyArchivedPast = base({
+  status: "Archived",
+  created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  archived_at: new Date(Date.now() - 2 * 86400000).toISOString()
+});
+assert.equal(shouldAutoArchivePreviousDayCrossover(alreadyArchivedPast), false);
+
+assert.equal(isPacificMidnightHour(new Date("2026-08-02T07:15:00.000Z")), true);
+assert.equal(isPacificMidnightHour(new Date("2026-08-02T15:00:00.000Z")), false);
 
 console.log("front desk check-out tests passed");

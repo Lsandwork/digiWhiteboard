@@ -367,8 +367,9 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Open Staff Digital Whiteboard → Front Desk Log.",
       "Crossover Log shows current-day activity so every role can hand off the shift.",
-      "Open Log shows unresolved items that still need follow-up.",
-      "Archived Log shows prior-day resolved, completed, Check Out, and archived entries (including past imported notes).",
+      "Open Log shows today’s unresolved items that still need follow-up.",
+      "Previous-day crossover notes auto-archive at 12:00 AM Pacific and appear in Archived Log (status Archived).",
+      "Archived Log shows prior-day and explicitly archived entries (including past imported notes).",
       "Add a new entry with Add Shift Log Entry, or use Quick Templates for common log types.",
       "For New Dog Assessment entries: choose Mark Check Out (Resolved). They stay on today’s Crossover Log — even if archived the same day — then move to Archived Log the next day.",
       "Delete is only available for entries you created. Super Admin, Admin, and Management can delete any entry."
