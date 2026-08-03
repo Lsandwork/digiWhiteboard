@@ -85,6 +85,25 @@ const viewer = accessFromLegacyRole("u2", "viewer@fitdog.com", "viewer");
 assert.equal(hasPermission(viewer, "ruffly.view"), false);
 
 const marketing = accessFromLegacyRole("u3", "m@fitdog.com", "marketing");
-assert.equal(hasPermission(marketing, "ruffly.campaigns.view"), true);
+assert.equal(hasPermission(marketing, "ruffly.view"), false);
+assert.equal(hasPermission(marketing, "ruffly.campaigns.view"), false);
+
+const frontDesk = accessFromLegacyRole("u4", "front@fitdog.com", "front_desk_coordinator");
+assert.equal(hasPermission(frontDesk, "ruffly.view"), true);
+assert.equal(hasPermission(frontDesk, "ruffly.inbox.reply"), true);
+assert.equal(hasPermission(frontDesk, "ruffly.settings.manage"), false);
+
+const management = accessFromLegacyRole("u5", "mgr@fitdog.com", "assistant_manager");
+assert.equal(hasPermission(management, "ruffly.view"), true);
+assert.equal(hasPermission(management, "ruffly.analytics.view"), true);
+assert.equal(hasPermission(management, "ruffly.integrations.manage"), false);
+
+const admin = accessFromLegacyRole("u6", "admin@fitdog.com", "manager_admin");
+assert.equal(hasPermission(admin, "ruffly.view"), true);
+assert.equal(hasPermission(admin, "ruffly.settings.manage"), true);
+assert.equal(hasPermission(admin, "ruffly.integrations.manage"), false);
+
+const trainer = accessFromLegacyRole("u7", "trainer@fitdog.com", "trainer");
+assert.equal(hasPermission(trainer, "ruffly.view"), false);
 
 console.log("ruffly core tests passed");
