@@ -129,7 +129,7 @@ export async function POST(request: Request) {
         .select("direction, body")
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: false })
-        .limit(8);
+        .limit(16);
       recentTurns = (prior || [])
         .slice()
         .reverse()

@@ -6,6 +6,7 @@ import { destinationsForFeedbackRating, isReviewGatingDisabled } from "../lib/ru
 import { AI_DISCLOSURE, detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
 import {
   craftWebchatReply,
+  detectWebchatIntent,
   isUnsafeWebchatReply,
   selectRelevantArticles
 } from "../lib/ruffly/ai/webchat-reply";
@@ -124,12 +125,12 @@ async function testWebchatReplies() {
   const nameReply = await craftWebchatReply({ message: "Jasper Lonnie Sandoval" });
   assert.match(nameReply.reply, /got it|how can I help/i);
   assert.doesNotMatch(nameReply.reply, /once articles are published/i);
-  const daycareReply = await craftWebchatReply({ message: "daycare" });
+  const daycareReply = await craftWebchatReply({ message: "whats daycare" });
+  assert.match(daycareReply.reply, /open play|webcam|report card/i);
   assert.match(daycareReply.reply, /daycare-assessment/i);
-  assert.match(daycareReply.reply, /\$20/i);
-  assert.doesNotMatch(daycareReply.reply, /got it/i);
+  assert.doesNotMatch(daycareReply.reply, /^For daycare, start with/i);
   const daycareAgain = await craftWebchatReply({ message: "I said daycare" });
-  assert.match(daycareAgain.reply, /daycare-assessment/i);
+  assert.match(daycareAgain.reply, /open play|webcam|assessment/i);
   assert.doesNotMatch(daycareAgain.reply, /got it/i);
   const trainingReply = await craftWebchatReply({ message: "I want a training consult" });
   assert.match(trainingReply.reply, /dog-training/i);
@@ -160,7 +161,27 @@ async function testWebchatReplies() {
     message: "What?",
     recentTurns: [{ role: "assistant", text: "meaning they are interested in both daycare" }]
   });
-  assert.match(confusedReply.reply, /Sorry about that|assessment/i);
+  assert.match(confusedReply.reply, /Sorry|reset|sign up|assessment/i);
+
+  // Reported production transcript: explain → boarding → both → signup (not assessment loop)
+  const turns: Array<{ role: "user" | "assistant"; text: string }> = [];
+  async function step(message: string) {
+    const result = await craftWebchatReply({ message, recentTurns: turns });
+    turns.push({ role: "user", text: message });
+    turns.push({ role: "assistant", text: result.reply });
+    return result.reply;
+  }
+  const t1 = await step("whats daycare");
+  assert.match(t1, /open play|webcam/i);
+  const t2 = await step("what boarding?");
+  assert.match(t2, /overnight|sleeping space|group walk/i);
+  assert.doesNotMatch(t2, /^For boarding, start with/i);
+  const t3 = await step("can I do both?");
+  assert.match(t3, /yes|one .*assessment|covers both/i);
+  const t4 = await step("no daycare and boarding. I want to sign up with fitdog");
+  assert.match(t4, /new_customer/i);
+  assert.doesNotMatch(t4, /^Book the \$20/i);
+  assert.equal(detectWebchatIntent("no daycare and boarding. I want to sign up with fitdog", turns.slice(0, -2)), "signup");
 }
 
 testWebchatReplies()
