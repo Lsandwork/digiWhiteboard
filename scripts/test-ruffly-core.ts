@@ -3,7 +3,9 @@ import { createHmac } from "crypto";
 import { isSmsOptOutRequest, OPT_OUT_CONFIRMATION } from "../lib/ruffly/consent/opt-out";
 import { isWithinQuietHours } from "../lib/ruffly/consent/quiet-hours";
 import { destinationsForFeedbackRating, isReviewGatingDisabled } from "../lib/ruffly/reviews/no-gating";
-import { detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
+import { AI_DISCLOSURE, detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
+import { craftWebchatReply, selectRelevantArticles } from "../lib/ruffly/ai/webchat-reply";
+import { RUFFLY_STARTER_KNOWLEDGE_ARTICLES } from "../lib/ruffly/knowledge/starter-articles";
 import { RUFFLY_PERMISSIONS } from "../lib/ruffly/permissions";
 import { accessFromLegacyRole, hasPermission } from "../lib/admin/permissions";
 import {
@@ -53,6 +55,10 @@ assert.equal(low.length, 2);
 
 const handoff = shouldHandoffToStaff(detectHandoffSignals("I want to speak to a real person about a refund"));
 assert.equal(handoff.handoff, true);
+assert.doesNotMatch(AI_DISCLOSURE, /not a human/i);
+
+const hoursMatches = selectRelevantArticles("what are the business hours?", RUFFLY_STARTER_KNOWLEDGE_ARTICLES, 2);
+assert.ok(hoursMatches.some((article) => /hour|location/i.test(article.title)));
 
 process.env.GINGR_WEBHOOK_SIGNATURE_KEY = "test-secret";
 const payload = {
@@ -106,4 +112,21 @@ assert.equal(hasPermission(admin, "ruffly.integrations.manage"), false);
 const trainer = accessFromLegacyRole("u7", "trainer@fitdog.com", "trainer");
 assert.equal(hasPermission(trainer, "ruffly.view"), false);
 
-console.log("ruffly core tests passed");
+async function testWebchatReplies() {
+  process.env.RUFFLY_AI_ENABLED = "false";
+  const hoursReply = await craftWebchatReply({ message: "what are the business hours?" });
+  assert.match(hoursReply.reply, /7:00/i);
+  assert.doesNotMatch(hoursReply.reply, /once articles are published/i);
+  const nameReply = await craftWebchatReply({ message: "Jasper Lonnie Sandoval" });
+  assert.match(nameReply.reply, /got it|how can I help/i);
+  assert.doesNotMatch(nameReply.reply, /once articles are published/i);
+}
+
+testWebchatReplies()
+  .then(() => {
+    console.log("ruffly core tests passed");
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

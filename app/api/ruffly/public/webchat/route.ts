@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { AI_DISCLOSURE, detectHandoffSignals, shouldHandoffToStaff } from "@/lib/ruffly/ai/guardrails";
+import { craftWebchatReply } from "@/lib/ruffly/ai/webchat-reply";
 import { isRufflyWebchatEnabled } from "@/lib/ruffly/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { hashToken, newOpaqueToken } from "@/lib/ruffly/tokens/signed-token";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const ALLOWED_ORIGINS = (process.env.RUFFLY_WEBCHAT_ALLOWED_ORIGINS || "https://fitdog.com,https://www.fitdog.com,https://ruffly.ruffops.com")
   .split(",")
@@ -74,6 +76,8 @@ export async function POST(request: Request) {
 
   let conversationId: string | null = null;
   let persisted = false;
+  let recentTurns: Array<{ role: "user" | "assistant"; text: string }> = [];
+
   try {
     const { data: visitor } = await supabase
       .from("ruffly_webchat_visitors")
@@ -114,6 +118,26 @@ export async function POST(request: Request) {
         original_message: message,
         priority: handoff.handoff ? "high" : "normal"
       });
+    } else {
+      await supabase
+        .from("ruffly_webchat_visitors")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("visitor_token_hash", visitorHash);
+
+      const { data: prior } = await supabase
+        .from("ruffly_messages")
+        .select("direction, body")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .limit(8);
+      recentTurns = (prior || [])
+        .slice()
+        .reverse()
+        .map((row) => ({
+          role: row.direction === "inbound" ? ("user" as const) : ("assistant" as const),
+          text: String(row.body || "")
+        }))
+        .filter((row) => row.text.trim());
     }
 
     if (conversationId) {
@@ -130,7 +154,8 @@ export async function POST(request: Request) {
           .update({
             last_message_preview: message.slice(0, 240),
             last_message_at: new Date().toISOString(),
-            status: handoff.handoff ? "waiting_staff" : "open"
+            status: handoff.handoff ? "waiting_staff" : "open",
+            ai_active: !handoff.handoff
           })
           .eq("id", conversationId);
       }
@@ -139,25 +164,47 @@ export async function POST(request: Request) {
     // Tables may not exist yet — still return a safe reply.
   }
 
-  if (handoff.handoff) {
-    return NextResponse.json({
-      reply: "I’m connecting you with a Fitdog team member who can help with that. Someone will follow up shortly.",
-      handoff: true,
-      reason: handoff.reason,
-      visitorToken: visitorRaw,
-      conversationId,
-      persisted,
-      disclosure: AI_DISCLOSURE
-    });
+  const crafted = await craftWebchatReply({
+    message,
+    recentTurns,
+    forceHandoff: handoff
+  });
+
+  if (conversationId && crafted.reply) {
+    try {
+      await supabase.from("ruffly_messages").insert({
+        conversation_id: conversationId,
+        direction: "outbound",
+        channel: "webchat",
+        body: crafted.reply,
+        metadata: {
+          used_ai: crafted.usedAi,
+          matched_titles: crafted.matchedTitles,
+          handoff: crafted.handoff,
+          reason: crafted.reason ?? null
+        }
+      });
+      await supabase
+        .from("ruffly_conversations")
+        .update({
+          last_message_preview: crafted.reply.slice(0, 240),
+          last_message_at: new Date().toISOString(),
+          status: crafted.handoff ? "waiting_staff" : "open"
+        })
+        .eq("id", conversationId);
+    } catch {
+      // reply still returned to visitor
+    }
   }
 
   return NextResponse.json({
-    reply:
-      "Thanks for reaching out! I can share approved Fitdog info from our knowledge base once articles are published. Leave your name and dog’s name and our team will follow up.",
-    handoff: false,
+    reply: crafted.reply,
+    handoff: crafted.handoff,
+    reason: crafted.reason,
     visitorToken: visitorRaw,
     conversationId,
     persisted,
+    usedAi: crafted.usedAi,
     disclosure: AI_DISCLOSURE
   });
 }

@@ -1,5 +1,5 @@
 export const AI_DISCLOSURE =
-  "Hi — I’m Fitdog’s virtual assistant (not a human). I can answer approved questions and connect you with our team.";
+  "Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, or training — I can also get a teammate for you.";
 
 export const AI_FORBIDDEN_BEHAVIORS = [
   "invent_availability",

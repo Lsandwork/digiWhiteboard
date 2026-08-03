@@ -34,7 +34,7 @@
   panel.innerHTML =
     '<div style="padding:14px 16px;background:#fff8f3;border-bottom:1px solid #ffe0cc;font-weight:700;color:#1f2933;">Ruffly · Fitdog Customer Care</div>' +
     '<div id="ruffly-chat-messages" style="flex:1;overflow:auto;padding:12px;font-size:14px;color:#334155;">' +
-    "<p>Hi — I’m Fitdog’s virtual assistant (not a human). Ask about services, or leave your name and dog’s name for our team.</p>" +
+    "<p>Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, or training — I can also get a teammate for you.</p>" +
     "</div>" +
     '<form id="ruffly-chat-form" style="display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;">' +
     '<input id="ruffly-chat-input" aria-label="Message" placeholder="Type a message" style="flex:1;border:1px solid #d1d5db;border-radius:12px;padding:10px;" />' +
