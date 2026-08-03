@@ -1,5 +1,4 @@
-import { after } from "next/server";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { resolveActiveCheckinDisplayUntil, shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
@@ -11,18 +10,6 @@ import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveDog } from "@/lib/types";
-
-/** Gingr only supports one webhook URL — fan out to Ruffly without blocking the board. */
-function fanOutToRuffly(payload: GingrWebhookPayload) {
-  if (!isRufflyEnabled() && process.env.RUFFLY_WEBHOOKS_ALWAYS_ACCEPT !== "true") return;
-  after(async () => {
-    try {
-      await ingestGingrWebhook(payload);
-    } catch {
-      // Board path must stay healthy even if Ruffly tables/jobs are unavailable.
-    }
-  });
-}
 
 export const dynamic = "force-dynamic";
 
