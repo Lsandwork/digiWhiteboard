@@ -59,13 +59,14 @@ export function extractUrls(text: string): string[] {
 /** Clean prose for chat bubbles — remove raw URLs (buttons carry the links). */
 export function stripUrlsFromReply(text: string): string {
   return String(text || "")
-    .replace(/https?:\/\/[^\s<>"']+/g, "")
-    .replace(/\s+(here|at|via)\s*[:.]?\s*$/gi, ".")
+    .replace(/https?:\/\/[^\s<>"']+/g, " ")
+    .replace(/\b(book it here|create your (fitdog )?club account here|create your account here|sign up here|schedule here|use|at|via|here)\s*[:.]?\s*/gi, " ")
     .replace(/\(\s*\)/g, "")
+    .replace(/\s*[:]\s*(?=[.!?])/g, "")
     .replace(/\s{2,}/g, " ")
-    .replace(/\s+([,.])/g, "$1")
-    .replace(/:\s*\./g, ".")
-    .replace(/\.\s*\./g, ".")
+    .replace(/\s+([,.!?])/g, "$1")
+    .replace(/([.!?])\s*\1+/g, "$1")
+    .replace(/^\s*[,.]\s*/g, "")
     .trim();
 }
 

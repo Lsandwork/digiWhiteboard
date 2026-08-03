@@ -176,36 +176,53 @@ function conversationMemory(recentTurns?: ChatTurn[]) {
   };
 }
 
+function withLinkTargets(prose: string, urls: string[]) {
+  return `${prose.trim()} ${urls.join(" ")}`.trim();
+}
+
 function explainDaycare() {
-  return `Daycare is open play in our Santa Monica yard with enrichment, daily report cards, and live webcams. Full day is about $49 (half day $37, hourly $15). New dogs start with a ${FITDOG_BOOKING.assessmentFee} assessment (${FITDOG_BOOKING.assessmentIncludes}): ${FITDOG_BOOKING.assessmentUrl}`;
+  return withLinkTargets(
+    `Daycare is open play in our Santa Monica yard with enrichment, daily report cards, and live webcams. Full day is about $49 (half day $37, hourly $15). New dogs start with a ${FITDOG_BOOKING.assessmentFee} assessment (${FITDOG_BOOKING.assessmentIncludes}). Tap below to book.`,
+    [FITDOG_BOOKING.assessmentUrl]
+  );
 }
 
 function explainBoarding() {
-  return `Boarding includes open-play daycare, a daily group walk, and a private sleeping space (about $70–80/night). It’s the same ${FITDOG_BOOKING.assessmentFee} assessment as daycare — one assessment covers both: ${FITDOG_BOOKING.assessmentUrl}`;
+  return withLinkTargets(
+    `Boarding includes open-play daycare, a daily group walk, and a private sleeping space (about $70–80/night). It’s the same ${FITDOG_BOOKING.assessmentFee} assessment as daycare — one assessment covers both. Tap below to book.`,
+    [FITDOG_BOOKING.assessmentUrl]
+  );
 }
 
 function explainBoth() {
-  return `Yes — one ${FITDOG_BOOKING.assessmentFee} assessment covers both daycare and boarding (${FITDOG_BOOKING.assessmentIncludes}). Book it here: ${FITDOG_BOOKING.assessmentUrl}. After you pass, create your club account at ${FITDOG_BOOKING.clubSignupUrl}`;
+  return withLinkTargets(
+    `Yes — one ${FITDOG_BOOKING.assessmentFee} assessment covers both daycare and boarding (${FITDOG_BOOKING.assessmentIncludes}). After you pass, create your club account. Tap below to continue.`,
+    [FITDOG_BOOKING.assessmentUrl, FITDOG_BOOKING.clubSignupUrl]
+  );
 }
 
 function signupClubReply(options?: { mentionAssessment?: boolean; mentionSports?: boolean }) {
+  const urls = [FITDOG_BOOKING.clubSignupUrl];
   const parts = [
-    `Create your Fitdog club account here: ${FITDOG_BOOKING.clubSignupUrl}.`,
+    "Create your Fitdog club account with the button below.",
     "That signup covers daycare, boarding, grooming, and private training."
   ];
   if (options?.mentionSports !== false) {
-    parts.push(`For Sports (beach trips, adventure hikes, group classes), use ${FITDOG_BOOKING.sportsSignupUrl}.`);
+    parts.push("For Sports (beach trips, adventure hikes, group classes), use Join Fitdog Sports below.");
+    urls.push(FITDOG_BOOKING.sportsSignupUrl);
   }
   if (options?.mentionAssessment) {
-    parts.push(
-      `If you still need daycare/boarding access, book the ${FITDOG_BOOKING.assessmentFee} assessment at ${FITDOG_BOOKING.assessmentUrl}.`
-    );
+    parts.push(`If you still need daycare/boarding access, book the ${FITDOG_BOOKING.assessmentFee} assessment below.`);
+    urls.push(FITDOG_BOOKING.assessmentUrl);
   }
-  return parts.join(" ");
+  return withLinkTargets(parts.join(" "), urls);
 }
 
 function assessmentReply(label: "daycare" | "boarding" | "daycare and boarding" | "daycare/boarding") {
-  return `Book the ${FITDOG_BOOKING.assessmentFee} ${label} assessment here: ${FITDOG_BOOKING.assessmentUrl}. It includes ${FITDOG_BOOKING.assessmentIncludes}. Then create your club account at ${FITDOG_BOOKING.clubSignupUrl}`;
+  return withLinkTargets(
+    `Book the ${FITDOG_BOOKING.assessmentFee} ${label} assessment below. It includes ${FITDOG_BOOKING.assessmentIncludes}. Then create your club account when you’re ready.`,
+    [FITDOG_BOOKING.assessmentUrl, FITDOG_BOOKING.clubSignupUrl]
+  );
 }
 
 /** Reject Gemini outputs that leak prompts or talk about the customer in third person. */
@@ -352,12 +369,21 @@ function replyForIntent(intent: Intent, message: string, recentTurns?: ChatTurn[
     case "location":
       return `We're at 1712 21st St, Santa Monica, CA 90404. Phone is (310) 828-3647. What were you hoping to set up?`;
     case "sports":
-      return `For Sports like beach excursions, adventure hikes, and group classes, sign up here: ${FITDOG_BOOKING.sportsSignupUrl}`;
+      return withLinkTargets(
+        "For Sports like beach excursions, adventure hikes, and group classes, tap Join Fitdog Sports below.",
+        [FITDOG_BOOKING.sportsSignupUrl]
+      );
     case "training":
       if (/\bprivate\b/.test(active) && /\b(sign|account)\b/.test(active)) {
-        return `Private training accounts start here: ${FITDOG_BOOKING.clubSignupUrl}. Free consults: ${FITDOG_BOOKING.trainingConsultUrl}`;
+        return withLinkTargets(
+          "Private training accounts start with Create Fitdog account below. Free consults are available too.",
+          [FITDOG_BOOKING.clubSignupUrl, FITDOG_BOOKING.trainingConsultUrl]
+        );
       }
-      return `Training consults are free — schedule here: ${FITDOG_BOOKING.trainingConsultUrl}. Group classes / beach / hikes: ${FITDOG_BOOKING.sportsSignupUrl}`;
+      return withLinkTargets(
+        "Training consults are free — tap below to book. For group classes, beach trips, or adventure hikes, use Join Fitdog Sports.",
+        [FITDOG_BOOKING.trainingConsultUrl, FITDOG_BOOKING.sportsSignupUrl]
+      );
     case "signup": {
       const raw = normalizeMessage(message);
       const rejectedClubServices =
@@ -376,16 +402,28 @@ function replyForIntent(intent: Intent, message: string, recentTurns?: ChatTurn[
       return assessmentReply("daycare/boarding");
     case "pricing": {
       if (/\bassessment\b/.test(active)) {
-        return `Assessments are ${FITDOG_BOOKING.assessmentFee} and include ${FITDOG_BOOKING.assessmentIncludes}. Book here: ${FITDOG_BOOKING.assessmentUrl}`;
+        return withLinkTargets(
+          `Assessments are ${FITDOG_BOOKING.assessmentFee} and include ${FITDOG_BOOKING.assessmentIncludes}. Tap below to book.`,
+          [FITDOG_BOOKING.assessmentUrl]
+        );
       }
       if (/\bdaycare\b/.test(active) && /\bboard/.test(active)) {
-        return `Daycare is about $15/hr or $49/full day; boarding is about $70–80/night. Both use the same ${FITDOG_BOOKING.assessmentFee} assessment: ${FITDOG_BOOKING.assessmentUrl}`;
+        return withLinkTargets(
+          `Daycare is about $15/hr or $49/full day; boarding is about $70–80/night. Both use the same ${FITDOG_BOOKING.assessmentFee} assessment.`,
+          [FITDOG_BOOKING.assessmentUrl]
+        );
       }
       if (/\bdaycare\b/.test(active)) {
-        return `Daycare rates: hourly $15, half day $37, full day $49. Assessment is ${FITDOG_BOOKING.assessmentFee}: ${FITDOG_BOOKING.assessmentUrl}`;
+        return withLinkTargets(
+          `Daycare rates: hourly $15, half day $37, full day $49. Assessment is ${FITDOG_BOOKING.assessmentFee}.`,
+          [FITDOG_BOOKING.assessmentUrl]
+        );
       }
       if (/\bboard/.test(active)) {
-        return `Boarding is about $70–80/night. Assessment is ${FITDOG_BOOKING.assessmentFee}: ${FITDOG_BOOKING.assessmentUrl}`;
+        return withLinkTargets(
+          `Boarding is about $70–80/night. Assessment is ${FITDOG_BOOKING.assessmentFee}.`,
+          [FITDOG_BOOKING.assessmentUrl]
+        );
       }
       return `Daycare is about $15/hr or $49/full day, boarding about $70–80/night, and grooming varies by coat. Assessments are ${FITDOG_BOOKING.assessmentFee}. Which service are you pricing?`;
     }
@@ -396,9 +434,15 @@ function replyForIntent(intent: Intent, message: string, recentTurns?: ChatTurn[
     case "both_services":
       return explainBoth();
     case "grooming":
-      return `We offer full-service grooming — baths, cut & style, nail trims, and spa packages (price depends on coat/breed). Create your account here: ${FITDOG_BOOKING.clubSignupUrl}`;
+      return withLinkTargets(
+        "We offer full-service grooming — baths, cut & style, nail trims, and spa packages (price depends on coat/breed). Create your account below.",
+        [FITDOG_BOOKING.clubSignupUrl]
+      );
     case "style_policies":
-      return `Fitdog is a full-service Santa Monica dog club built around open play, enrichment, and transparent care — live webcams and daily report cards for owners. New daycare/boarding dogs complete a ${FITDOG_BOOKING.assessmentFee} assessment first (${FITDOG_BOOKING.assessmentIncludes}). For vaccine lists or special cases, book an assessment or call (310) 828-3647. ${FITDOG_BOOKING.assessmentUrl}`;
+      return withLinkTargets(
+        `Fitdog is a full-service Santa Monica dog club built around open play, enrichment, and transparent care — live webcams and daily report cards for owners. New daycare/boarding dogs complete a ${FITDOG_BOOKING.assessmentFee} assessment first (${FITDOG_BOOKING.assessmentIncludes}). For vaccine lists or special cases, book an assessment below or call (310) 828-3647.`,
+        [FITDOG_BOOKING.assessmentUrl]
+      );
     case "name":
       return `Thanks — got it. How can I help you and your pup today? Daycare, boarding, grooming, training, or sports?`;
     case "greeting":
