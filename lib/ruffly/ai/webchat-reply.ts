@@ -47,7 +47,6 @@ function scoreArticle(message: string, article: WebchatKnowledgeArticle): number
   for (const token of tokens) {
     if (haystack.includes(token)) score += 1;
   }
-  // Boost common intents
   const lower = message.toLowerCase();
   if (/\b(hours?|open|close|when.*(open|close)|business hours)\b/.test(lower) && /hour|7:00|8:00|daily/.test(haystack)) {
     score += 8;
@@ -118,10 +117,10 @@ export async function loadPublishedKnowledgeArticles(): Promise<WebchatKnowledge
 }
 
 const SERVICE_OR_TOPIC_WORDS =
-  /\b(daycare|day\s*care|board(?:ing)?|groom(?:ing)?|train(?:ing)?|consult|sports?|beach|hike|adventure|hours?|pricing|price|cost|rates?|tour|assessment|schedule|book|sign.?up|account|location|address|parking|taxi|walks?|class(?:es)?)\b/i;
+  /\b(daycare|day\s*care|board(?:ing)?|groom(?:ing)?|train(?:ing)?|consult|sports?|beach|hike|adventure|hours?|pricing|price|cost|rates?|tour|assessment|schedule|book|sign.?up|account|location|address|parking|taxi|walks?|class(?:es)?|both)\b/i;
 
 const NON_NAME_PHRASES =
-  /\b(i said|you said|just said|like i said|yes|yeah|yep|no|nope|ok|okay|thanks|thank you|please|help|info|information|tell me|more|that one|the first|option)\b/i;
+  /\b(i said|you said|just said|like i said|yes|yeah|yep|yup|no|nope|ok|okay|thanks|thank you|please|help|info|information|tell me|more|that one|the first|option|both|what|huh|confused)\b/i;
 
 function looksLikeNameIntro(message: string): boolean {
   const trimmed = message.trim();
@@ -133,7 +132,6 @@ function looksLikeNameIntro(message: string): boolean {
     return true;
   }
 
-  // Bare name intros: 2–5 title-case tokens (e.g. "Jasper Lonnie Sandoval"), not service words.
   const tokens = trimmed.split(/\s+/);
   if (tokens.length < 2 || tokens.length > 5) return false;
   if (!/^[A-Za-z][A-Za-z\s'-]+$/.test(trimmed)) return false;
@@ -141,7 +139,109 @@ function looksLikeNameIntro(message: string): boolean {
   return titleCaseCount >= 2;
 }
 
-function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]): string | null {
+function recentAssistantText(recentTurns?: Array<{ role: "user" | "assistant"; text: string }>) {
+  return (recentTurns || [])
+    .filter((turn) => turn.role === "assistant")
+    .slice(-3)
+    .map((turn) => turn.text)
+    .join(" \n ");
+}
+
+function recentUserText(recentTurns?: Array<{ role: "user" | "assistant"; text: string }>) {
+  return (recentTurns || [])
+    .filter((turn) => turn.role === "user")
+    .slice(-3)
+    .map((turn) => turn.text)
+    .join(" \n ");
+}
+
+function assessmentAndSignupReply(label = "daycare/boarding") {
+  return `For ${label}, start with the ${FITDOG_BOOKING.assessmentFee} assessment here: ${FITDOG_BOOKING.assessmentUrl}. It includes ${FITDOG_BOOKING.assessmentIncludes}. After that, create your club account at ${FITDOG_BOOKING.clubSignupUrl}`;
+}
+
+/** Reject Gemini outputs that leak prompts or talk about the customer in third person. */
+export function isUnsafeWebchatReply(text: string): boolean {
+  const value = String(text || "").trim();
+  if (!value || value.length < 8) return true;
+  if (/^(customer|ruffly|fitdog|assistant|user)\s*:/i.test(value)) return true;
+  if (/\b(customer|user)\s*:/i.test(value)) return true;
+  if (/\b(meaning they|they are interested|the customer (said|wants|asked)|as an ai|language model)\b/i.test(value)) {
+    return true;
+  }
+  if (/^\*+\s*/.test(value) || /```/.test(value)) return true;
+  if (/["“]how much is\b/i.test(value) && value.length < 80) return true;
+  if (/\bKNOWLEDGE PACK\b|\bRECENT CHAT\b|\bRUFFLY:\b/i.test(value)) return true;
+  return false;
+}
+
+export function sanitizeWebchatReply(text: string): string | null {
+  let value = String(text || "")
+    .replace(/^RUFFLY:\s*/i, "")
+    .replace(/^Fitdog:\s*/i, "")
+    .trim();
+  if (isUnsafeWebchatReply(value)) return null;
+  // Drop accidental leading bullets / quote wrappers
+  value = value.replace(/^[-*]\s+/, "").replace(/^["']|["']$/g, "").trim();
+  if (isUnsafeWebchatReply(value)) return null;
+  return value;
+}
+
+function contextualFollowUpReply(
+  message: string,
+  recentTurns?: Array<{ role: "user" | "assistant"; text: string }>
+): string | null {
+  const lower = message.toLowerCase().replace(/\s+/g, " ").trim();
+  const priorBot = recentAssistantText(recentTurns).toLowerCase();
+  const priorUser = recentUserText(recentTurns).toLowerCase();
+  const short = lower.length <= 40;
+
+  if (!short && !/^(both|yes|yeah|yep|yup|ok|okay|sure|that|those|what|huh|confused)\b/.test(lower)) {
+    return null;
+  }
+
+  const confused = /^(what\??|huh\??|come again\??|confused|say that again\??)$/i.test(lower);
+  if (confused) {
+    return `Sorry about that — I can help with daycare, boarding, grooming, training, or sports. For daycare/boarding, book the ${FITDOG_BOOKING.assessmentFee} assessment here: ${FITDOG_BOOKING.assessmentUrl}`;
+  }
+
+  const askedWhichService = /which service|looking at|daycare|boarding|grooming/.test(priorBot);
+  const mentionedPricing = /\$|pricing|rate|assessment/.test(priorBot);
+  const both =
+    /\bboth\b/.test(lower) ||
+    /\bdaycare\b/.test(lower) && /\bboard/.test(lower) ||
+    (/\byes\b|\byeah\b|\bsure\b|\bok\b/.test(lower) && askedWhichService);
+
+  if (both && (askedWhichService || mentionedPricing || /daycare|board/.test(priorUser))) {
+    return assessmentAndSignupReply("daycare and boarding");
+  }
+
+  if (/\bdaycare\b/.test(lower) && (askedWhichService || mentionedPricing)) {
+    return assessmentAndSignupReply("daycare");
+  }
+
+  if (/\bboard/.test(lower) && (askedWhichService || mentionedPricing)) {
+    return assessmentAndSignupReply("boarding");
+  }
+
+  if (/\bgroom/.test(lower) && (askedWhichService || mentionedPricing)) {
+    return `For grooming, create a Fitdog account here: ${FITDOG_BOOKING.clubSignupUrl}. Want the desk to estimate a package for your dog’s coat?`;
+  }
+
+  if ((/\byes\b|\byeah\b|\bsure\b|\bok\b|\bplease\b/.test(lower) || lower === "link") && /assessment|book|link|schedule/.test(priorBot)) {
+    return assessmentAndSignupReply("daycare/boarding");
+  }
+
+  return null;
+}
+
+function deterministicReply(
+  message: string,
+  articles: WebchatKnowledgeArticle[],
+  recentTurns?: Array<{ role: "user" | "assistant"; text: string }>
+): string | null {
+  const contextual = contextualFollowUpReply(message, recentTurns);
+  if (contextual) return contextual;
+
   const lower = message.toLowerCase().replace(/\bi said\b/g, " ").replace(/\s+/g, " ").trim();
   const hours = articles.find((a) => /hour|location|about fitdog/i.test(a.title));
   const daycare = articles.find((a) => /daycare/i.test(a.title));
@@ -177,7 +277,7 @@ function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]
     wantsAssessment ||
     ((wantsSchedule || wantsSignup) && /\b(daycare|day\s*care|board(?:ing)?)\b/.test(lower))
   ) {
-    return `Schedule a daycare/boarding assessment here: ${FITDOG_BOOKING.assessmentUrl}. It's ${FITDOG_BOOKING.assessmentFee} and includes ${FITDOG_BOOKING.assessmentIncludes}. After that, create your club account at ${FITDOG_BOOKING.clubSignupUrl}`;
+    return assessmentAndSignupReply("daycare/boarding");
   }
 
   if (wantsSignup && /\b(groom(?:ing)?|private train)\b/.test(lower)) {
@@ -192,10 +292,20 @@ function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]
     if (/\b(assessment|tour)\b/.test(lower)) {
       return `Assessments are ${FITDOG_BOOKING.assessmentFee} and include ${FITDOG_BOOKING.assessmentIncludes}. Book here: ${FITDOG_BOOKING.assessmentUrl}`;
     }
+    if (/\b(daycare|day\s*care)\b/.test(lower) && /\bboard/.test(lower)) {
+      return `Daycare is about $15/hr or $49/full day, and boarding is about $70–80/night. Both start with the same ${FITDOG_BOOKING.assessmentFee} assessment: ${FITDOG_BOOKING.assessmentUrl}`;
+    }
     if (/\b(daycare|day\s*care)\b/.test(lower)) {
-      return `Published daycare rates: hourly $15, half day $37, full day $49. New dogs start with a ${FITDOG_BOOKING.assessmentFee} assessment (${FITDOG_BOOKING.assessmentUrl}). Want the booking link?`;
+      return `Published daycare rates: hourly $15, half day $37, full day $49. New dogs start with a ${FITDOG_BOOKING.assessmentFee} assessment: ${FITDOG_BOOKING.assessmentUrl}`;
+    }
+    if (/\bboard/.test(lower)) {
+      return `Boarding is about $70–80/night. New dogs start with a ${FITDOG_BOOKING.assessmentFee} assessment: ${FITDOG_BOOKING.assessmentUrl}`;
     }
     return `Happy to help with pricing — daycare starts around $15/hr or $49/full day, boarding about $70–80/night, and grooming packages vary by coat. Assessments are ${FITDOG_BOOKING.assessmentFee}. Which service are you looking at?`;
+  }
+
+  if (/\b(daycare|day\s*care)\b/.test(lower) && /\bboard/.test(lower)) {
+    return assessmentAndSignupReply("daycare and boarding");
   }
 
   if (/\b(daycare|day\s*care)\b/.test(lower) && daycare) {
@@ -211,7 +321,7 @@ function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]
   }
 
   if (/\b(tour|assessment|how (do|to) join|get started)\b/.test(lower)) {
-    return `New daycare/boarding pups start with a ${FITDOG_BOOKING.assessmentFee} assessment (${FITDOG_BOOKING.assessmentIncludes}): ${FITDOG_BOOKING.assessmentUrl}. Then sign up at ${FITDOG_BOOKING.clubSignupUrl}`;
+    return assessmentAndSignupReply("daycare/boarding");
   }
 
   if (looksLikeNameIntro(message)) {
@@ -234,30 +344,34 @@ async function geminiGroundedReply(input: {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || !input.articles.length) return null;
 
+  // Short / vague messages are unsafe for the model — use deterministic/context paths instead.
+  if (input.message.trim().length < 12) return null;
+
   const knowledgeBlock = input.articles
     .map((article, index) => `[${index + 1}] ${article.title}\n${article.content}`)
     .join("\n\n---\n\n");
 
   const historyBlock = (input.recentTurns || [])
-    .slice(-6)
+    .slice(-4)
     .map((turn) => `${turn.role === "user" ? "Customer" : "Fitdog"}: ${turn.text}`)
     .join("\n");
 
   const prompt = [
     "You are Ruffly, Fitdog Customer Care in Santa Monica.",
-    "Sound warm, concise, and human — like a sharp front-desk teammate texting.",
+    "Reply ONLY as the Fitdog teammate speaking directly to the customer.",
+    "Never narrate, summarize, or talk about the customer in third person.",
+    "Never output labels like Customer:, Fitdog:, RUFFLY:, or quote the chat log.",
     "Never claim to be a human person. Do not say you are an AI unless asked.",
     "ONLY use facts from the knowledge pack below. If the answer is not there, say you'll get a teammate to follow up — do not invent prices, availability, medical advice, or policies.",
     "When owners ask how to book, schedule, assess, or sign up, include the exact URLs from the knowledge pack.",
-    "Keep replies to 1–3 short sentences. Ask one useful follow-up when natural.",
-    "If the customer just shared a name or dog name, acknowledge it briefly and ask how you can help.",
+    "Keep replies to 1–3 short sentences.",
     "",
     "KNOWLEDGE PACK:",
     knowledgeBlock,
     "",
-    historyBlock ? `RECENT CHAT:\n${historyBlock}\n` : "",
-    `CUSTOMER: ${input.message}`,
-    "RUFFLY:"
+    historyBlock ? `RECENT CHAT (context only — do not copy this format):\n${historyBlock}\n` : "",
+    `Customer message: ${input.message}`,
+    "Your reply:"
   ].join("\n");
 
   const models = geminiModelRetryChain(resolveGeminiModel());
@@ -269,11 +383,11 @@ async function geminiGroundedReply(input: {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
-        generationConfig: { temperature: 0.55, maxOutputTokens: 220 }
+        generationConfig: { temperature: 0.35, maxOutputTokens: 180 }
       });
       const result = await model.generateContent(prompt);
-      const text = result.response.text()?.trim();
-      if (text) return text.replace(/^RUFFLY:\s*/i, "").trim();
+      const text = sanitizeWebchatReply(result.response.text() || "");
+      if (text) return text;
     } catch (error) {
       lastError = error;
       if (i < models.length - 1 && isGeminiModelNotFoundError(error)) continue;
@@ -307,8 +421,7 @@ export async function craftWebchatReply(input: {
   const matched = selectRelevantArticles(input.message, articles, 4);
   const corpus = matched.length ? matched : articles.slice(0, 3);
 
-  // Fast, grounded answers for common intents before calling the model.
-  const quick = deterministicReply(input.message, articles);
+  const quick = deterministicReply(input.message, articles, input.recentTurns);
   if (quick) {
     return {
       reply: quick,
@@ -333,8 +446,7 @@ export async function craftWebchatReply(input: {
   }
 
   return {
-    reply:
-      "Happy to help — I can cover hours, daycare, boarding, grooming, training, and tours. What are you looking for, and what's your dog's name?",
+    reply: `Happy to help — I can cover hours, daycare, boarding, grooming, training, and sports. For daycare/boarding, book the ${FITDOG_BOOKING.assessmentFee} assessment here: ${FITDOG_BOOKING.assessmentUrl}`,
     handoff: false,
     usedAi: false,
     matchedTitles: matched.map((article) => article.title)

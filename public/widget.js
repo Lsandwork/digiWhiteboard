@@ -116,7 +116,7 @@
       var part = parts[i];
       var candidate = buffer ? buffer + " " + part : part;
       var urlCount = (candidate.match(/https?:\/\//g) || []).length;
-      if (buffer && (candidate.length > 150 || urlCount > 1 || /^after that\b/i.test(part))) {
+      if (buffer && (candidate.length > 170 || urlCount > 1 || /^after that\b/i.test(part))) {
         chunks.push(buffer);
         buffer = part;
       } else {
@@ -125,8 +125,9 @@
     }
     if (buffer) chunks.push(buffer);
 
-    if (chunks.length > 3) {
-      chunks = [chunks[0], chunks.slice(1, -1).join(" "), chunks[chunks.length - 1]].filter(Boolean);
+    // Prefer at most two bubbles so replies stay snappy.
+    if (chunks.length > 2) {
+      chunks = [chunks[0], chunks.slice(1).join(" ")].filter(Boolean);
     }
     return chunks.length ? chunks : [raw];
   }
@@ -137,9 +138,11 @@
     });
   }
 
-  function typingDelay(text) {
+  function typingDelay(text, index) {
     var len = String(text || "").length;
-    return Math.min(1800, Math.max(650, 420 + len * 12));
+    // Keep the human feel without making owners wait forever.
+    var base = index === 0 ? 320 : 220;
+    return Math.min(900, Math.max(base, 180 + len * 6));
   }
 
   ensureStyles();
@@ -230,14 +233,14 @@
   }
 
   async function deliverBotReply(fullText) {
-    var sections = splitReply(fullText);
+    var sections = splitReply(fullText).slice(0, 2);
     for (var i = 0; i < sections.length; i += 1) {
       showTyping();
-      await delay(typingDelay(sections[i]));
+      await delay(typingDelay(sections[i], i));
       hideTyping();
       addBubble("bot", sections[i], true);
       if (i < sections.length - 1) {
-        await delay(280);
+        await delay(160);
       }
     }
   }
@@ -248,15 +251,11 @@
     greeted = true;
     setBusy(true);
     showTyping();
-    await delay(700);
-    hideTyping();
-    addBubble("bot", "Hi — I’m Ruffly with Fitdog Customer Care.", false);
-    showTyping();
-    await delay(850);
+    await delay(350);
     hideTyping();
     addBubble(
       "bot",
-      "Ask me about hours, daycare, boarding, grooming, training, or sports — I can also get a teammate for you.",
+      "Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, training, or sports — I can also get a teammate for you.",
       false
     );
     setBusy(false);

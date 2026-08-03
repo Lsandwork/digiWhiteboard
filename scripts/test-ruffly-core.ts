@@ -4,7 +4,11 @@ import { isSmsOptOutRequest, OPT_OUT_CONFIRMATION } from "../lib/ruffly/consent/
 import { isWithinQuietHours } from "../lib/ruffly/consent/quiet-hours";
 import { destinationsForFeedbackRating, isReviewGatingDisabled } from "../lib/ruffly/reviews/no-gating";
 import { AI_DISCLOSURE, detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
-import { craftWebchatReply, selectRelevantArticles } from "../lib/ruffly/ai/webchat-reply";
+import {
+  craftWebchatReply,
+  isUnsafeWebchatReply,
+  selectRelevantArticles
+} from "../lib/ruffly/ai/webchat-reply";
 import { RUFFLY_STARTER_KNOWLEDGE_ARTICLES } from "../lib/ruffly/knowledge/starter-articles";
 import { RUFFLY_PERMISSIONS } from "../lib/ruffly/permissions";
 import { accessFromLegacyRole, hasPermission } from "../lib/admin/permissions";
@@ -134,6 +138,29 @@ async function testWebchatReplies() {
   assert.match(sportsReply.reply, /app\.fitdog\.com\/sign-up/i);
   const accountReply = await craftWebchatReply({ message: "how do I create an account for boarding" });
   assert.match(accountReply.reply, /daycare-assessment|gingrapp\.com\/public\/new_customer/i);
+
+  assert.equal(isUnsafeWebchatReply('meaning they are interested in both daycare'), true);
+  assert.equal(isUnsafeWebchatReply('* Customer: "how much is'), true);
+  assert.equal(isUnsafeWebchatReply("We're open 7:00 a.m. to 8:00 p.m. daily."), false);
+
+  const bothReply = await craftWebchatReply({
+    message: "both",
+    recentTurns: [
+      { role: "user", text: "how much is daycare and boarding?" },
+      {
+        role: "assistant",
+        text: "Happy to help with pricing — daycare starts around $15/hr or $49/full day, boarding about $70–80/night. Assessments are $20. Which service are you looking at?"
+      }
+    ]
+  });
+  assert.match(bothReply.reply, /daycare-assessment/i);
+  assert.doesNotMatch(bothReply.reply, /meaning they|Customer:/i);
+
+  const confusedReply = await craftWebchatReply({
+    message: "What?",
+    recentTurns: [{ role: "assistant", text: "meaning they are interested in both daycare" }]
+  });
+  assert.match(confusedReply.reply, /Sorry about that|assessment/i);
 }
 
 testWebchatReplies()
