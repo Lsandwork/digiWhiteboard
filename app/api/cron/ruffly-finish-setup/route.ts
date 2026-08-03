@@ -7,10 +7,12 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 function authorized(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
   const header = request.headers.get("authorization") || "";
-  return header === `Bearer ${secret}`;
+  const bearer = header.startsWith("Bearer ") ? header.slice("Bearer ".length).trim() : "";
+  if (!bearer) return false;
+  const cron = process.env.CRON_SECRET?.trim();
+  const finish = process.env.RUFFLY_FINISH_SETUP_TOKEN?.trim();
+  return Boolean((cron && bearer === cron) || (finish && bearer === finish));
 }
 
 async function finishSetup() {
