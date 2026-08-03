@@ -15,6 +15,41 @@
     visitorToken = null;
   }
 
+  var URL_RE = /(https?:\/\/[^\s<>"']+[^\s<>"'.,!?);:])/g;
+
+  function appendLinkedText(container, text) {
+    var parts = String(text || "").split(URL_RE);
+    for (var i = 0; i < parts.length; i += 1) {
+      var part = parts[i];
+      if (!part) continue;
+      if (/^https?:\/\//i.test(part)) {
+        var link = document.createElement("a");
+        link.href = part;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = part;
+        link.style.cssText = "color:#c2410c;text-decoration:underline;word-break:break-all;";
+        container.appendChild(link);
+      } else {
+        container.appendChild(document.createTextNode(part));
+      }
+    }
+  }
+
+  function addMessage(prefix, text, linkify) {
+    var bubble = document.createElement("p");
+    bubble.style.cssText = "margin:0 0 10px;line-height:1.45;word-break:break-word;";
+    bubble.appendChild(document.createTextNode(prefix));
+    if (linkify) {
+      appendLinkedText(bubble, text);
+    } else {
+      bubble.appendChild(document.createTextNode(text));
+    }
+    messages.appendChild(bubble);
+    messages.scrollTop = messages.scrollHeight;
+    return bubble;
+  }
+
   var root = document.createElement("div");
   root.id = "ruffly-chat-root";
   root.style.cssText =
@@ -34,7 +69,7 @@
   panel.innerHTML =
     '<div style="padding:14px 16px;background:#fff8f3;border-bottom:1px solid #ffe0cc;font-weight:700;color:#1f2933;">Ruffly · Fitdog Customer Care</div>' +
     '<div id="ruffly-chat-messages" style="flex:1;overflow:auto;padding:12px;font-size:14px;color:#334155;">' +
-    "<p>Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, or training — I can also get a teammate for you.</p>" +
+    "<p style=\"margin:0 0 10px;line-height:1.45;\">Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, or training — I can also get a teammate for you.</p>" +
     "</div>" +
     '<form id="ruffly-chat-form" style="display:flex;gap:8px;padding:12px;border-top:1px solid #e5e7eb;">' +
     '<input id="ruffly-chat-input" aria-label="Message" placeholder="Type a message" style="flex:1;border:1px solid #d1d5db;border-radius:12px;padding:10px;" />' +
@@ -57,9 +92,7 @@
     event.preventDefault();
     var text = (input.value || "").trim();
     if (!text) return;
-    var bubble = document.createElement("p");
-    bubble.textContent = "You: " + text;
-    messages.appendChild(bubble);
+    addMessage("You: ", text, false);
     input.value = "";
     fetch(apiBase.replace(/\/$/, "") + "/api/ruffly/public/webchat", {
       method: "POST",
@@ -83,15 +116,10 @@
             /* ignore storage failures */
           }
         }
-        var reply = document.createElement("p");
-        reply.textContent = "Fitdog: " + (body.reply || body.error || "Thanks — our team will follow up.");
-        messages.appendChild(reply);
-        messages.scrollTop = messages.scrollHeight;
+        addMessage("Fitdog: ", body.reply || body.error || "Thanks — our team will follow up.", true);
       })
       .catch(function () {
-        var reply = document.createElement("p");
-        reply.textContent = "Fitdog: We couldn’t send that just now. Please try again shortly.";
-        messages.appendChild(reply);
+        addMessage("Fitdog: ", "We couldn’t send that just now. Please try again shortly.", false);
       });
   });
 })();
