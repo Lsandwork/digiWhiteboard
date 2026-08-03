@@ -9,6 +9,9 @@
    - Keep `RUFFLY_WEBCHAT_ENABLED` / `RUFFLY_AI_ENABLED` / `RUFFLY_VOICE_ENABLED` / campaign/automation flags off until tested
 4. DNS: CNAME `ruffly.ruffops.com` → Vercel project (add domain in Vercel).
 5. Configure Gingr webhook + Twilio inbound webhook (`/api/ruffly/webhooks/sms`).
+   - Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`
+   - Set `TWILIO_MESSAGING_SERVICE_SID` (Ruffly Fitdog service) so outbound SMS uses the registered sender pool
+   - US delivery requires either approved A2P 10DLC (Brand + Campaign) or an approved Toll-Free Verification — otherwise Twilio returns `30034` / `30032` and the handset gets nothing
 6. Super Admin: open `/ruffly` → Integrations → Test connection for each provider, then turn that channel’s sending/feature flag on.
 7. Do **not** advertise direct Gingr booking until Ruffly can create bookings inside Gingr (`isRufflyGingrBookingEnabled` stays false).
 

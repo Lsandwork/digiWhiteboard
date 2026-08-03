@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "crypto";
-import { isSmsOptOutRequest } from "../lib/ruffly/consent/opt-out";
+import { isSmsOptOutRequest, OPT_OUT_CONFIRMATION } from "../lib/ruffly/consent/opt-out";
+import { isWithinQuietHours } from "../lib/ruffly/consent/quiet-hours";
 import { destinationsForFeedbackRating, isReviewGatingDisabled } from "../lib/ruffly/reviews/no-gating";
 import { detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
 import { RUFFLY_PERMISSIONS } from "../lib/ruffly/permissions";
@@ -22,6 +23,21 @@ assert.equal(isRufflyGingrBookingEnabled(), false);
 assert.equal(isSmsOptOutRequest("STOP"), true);
 assert.equal(isSmsOptOutRequest("please stop texting me"), true);
 assert.equal(isSmsOptOutRequest("Thanks for the update"), false);
+assert.match(OPT_OUT_CONFIRMATION, /unsubscribed from all Fitdog texts/i);
+assert.doesNotMatch(OPT_OUT_CONFIRMATION, /Transactional messages about your dog may still apply/i);
+
+assert.equal(
+  isWithinQuietHours({ start: "21:00", end: "08:00", timezone: "UTC" }, new Date("2026-07-30T22:30:00.000Z")),
+  true
+);
+assert.equal(
+  isWithinQuietHours({ start: "21:00", end: "08:00", timezone: "UTC" }, new Date("2026-07-30T15:00:00.000Z")),
+  false
+);
+assert.equal(
+  isWithinQuietHours({ start: "09:00", end: "17:00", timezone: "UTC" }, new Date("2026-07-30T12:00:00.000Z")),
+  true
+);
 
 assert.equal(isReviewGatingDisabled(), true);
 const low = destinationsForFeedbackRating(1, {
@@ -69,6 +85,25 @@ const viewer = accessFromLegacyRole("u2", "viewer@fitdog.com", "viewer");
 assert.equal(hasPermission(viewer, "ruffly.view"), false);
 
 const marketing = accessFromLegacyRole("u3", "m@fitdog.com", "marketing");
-assert.equal(hasPermission(marketing, "ruffly.campaigns.view"), true);
+assert.equal(hasPermission(marketing, "ruffly.view"), false);
+assert.equal(hasPermission(marketing, "ruffly.campaigns.view"), false);
+
+const frontDesk = accessFromLegacyRole("u4", "front@fitdog.com", "front_desk_coordinator");
+assert.equal(hasPermission(frontDesk, "ruffly.view"), true);
+assert.equal(hasPermission(frontDesk, "ruffly.inbox.reply"), true);
+assert.equal(hasPermission(frontDesk, "ruffly.settings.manage"), false);
+
+const management = accessFromLegacyRole("u5", "mgr@fitdog.com", "assistant_manager");
+assert.equal(hasPermission(management, "ruffly.view"), true);
+assert.equal(hasPermission(management, "ruffly.analytics.view"), true);
+assert.equal(hasPermission(management, "ruffly.integrations.manage"), false);
+
+const admin = accessFromLegacyRole("u6", "admin@fitdog.com", "manager_admin");
+assert.equal(hasPermission(admin, "ruffly.view"), true);
+assert.equal(hasPermission(admin, "ruffly.settings.manage"), true);
+assert.equal(hasPermission(admin, "ruffly.integrations.manage"), false);
+
+const trainer = accessFromLegacyRole("u7", "trainer@fitdog.com", "trainer");
+assert.equal(hasPermission(trainer, "ruffly.view"), false);
 
 console.log("ruffly core tests passed");

@@ -27,6 +27,15 @@ export async function GET(request: Request, context: Ctx) {
     if (cErr) throw cErr;
     if (mErr) throw mErr;
     if (!conversation) return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
+
+    if ((conversation.unread_count ?? 0) > 0) {
+      await supabase
+        .from("ruffly_conversations")
+        .update({ unread_count: 0, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      conversation.unread_count = 0;
+    }
+
     return NextResponse.json({ conversation, messages: messages ?? [] });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load conversation.";
@@ -101,11 +110,21 @@ export async function POST(request: Request, context: Ctx) {
     if (!conversation) return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
 
     const channel = String(body.channel ?? conversation.channel ?? "sms");
-    if (channel === "sms" && conversation.contact_id) {
+    let deliveryStatus = "queued";
+    let providerMessageId: string | null = null;
+
+    if (channel === "sms") {
+      if (!conversation.contact_id) {
+        return NextResponse.json(
+          { error: "This conversation has no linked contact, so SMS cannot be sent." },
+          { status: 400 }
+        );
+      }
       const gate = await canSendToContact({
         contactId: conversation.contact_id,
         channel: "sms",
-        purpose: "transactional"
+        purpose: "transactional",
+        respectQuietHours: false
       });
       if (!gate.allowed) {
         return NextResponse.json({ error: gate.reason || "Send blocked by consent rules." }, { status: 403 });
@@ -115,11 +134,24 @@ export async function POST(request: Request, context: Ctx) {
         .select("phone, phone_normalized")
         .eq("id", conversation.contact_id)
         .maybeSingle();
-      if (isRufflySmsSendingEnabled() && contact?.phone) {
-        const sms = getSmsProvider();
-        const sent = await sms.send({ to: contact.phone, body: text, purpose: "transactional" });
-        if (!sent.ok) return NextResponse.json({ error: sent.error || "SMS failed." }, { status: 502 });
+      const to = contact?.phone || contact?.phone_normalized;
+      if (!to) {
+        return NextResponse.json({ error: "Contact has no phone number." }, { status: 400 });
       }
+      if (!isRufflySmsSendingEnabled()) {
+        return NextResponse.json(
+          { error: "SMS sending is disabled. Enable RUFFLY_SENDING_SMS_ENABLED to reply by text." },
+          { status: 503 }
+        );
+      }
+      const sms = getSmsProvider();
+      if (!sms.isConfigured()) {
+        return NextResponse.json({ error: "SMS provider is not configured." }, { status: 503 });
+      }
+      const sent = await sms.send({ to, body: text, purpose: "transactional" });
+      if (!sent.ok) return NextResponse.json({ error: sent.error || "SMS failed." }, { status: 502 });
+      deliveryStatus = "sent";
+      providerMessageId = sent.providerMessageId ?? null;
     }
 
     const { data: message, error } = await supabase
@@ -130,7 +162,8 @@ export async function POST(request: Request, context: Ctx) {
         channel,
         body: text,
         sender_admin_id: auth.session?.adminUserId ?? null,
-        delivery_status: "queued"
+        delivery_status: deliveryStatus,
+        provider_message_id: providerMessageId
       })
       .select("*")
       .single();
@@ -142,6 +175,7 @@ export async function POST(request: Request, context: Ctx) {
         last_message_at: new Date().toISOString(),
         last_message_preview: text.slice(0, 240),
         status: "waiting_client",
+        unread_count: 0,
         updated_at: new Date().toISOString()
       })
       .eq("id", id);

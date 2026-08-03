@@ -26,6 +26,38 @@ async function parseBody(request: Request) {
   return params;
 }
 
+async function ensureContactForPhone(phone: string, phoneNormalized: string) {
+  const supabase = getServiceSupabase();
+  const { data: existing } = await supabase
+    .from("ruffly_contacts")
+    .select("id")
+    .eq("phone_normalized", phoneNormalized)
+    .maybeSingle();
+  if (existing?.id) return existing.id;
+
+  const { data: created, error } = await supabase
+    .from("ruffly_contacts")
+    .insert({
+      phone,
+      phone_normalized: phoneNormalized,
+      client_status: "lead",
+      preferred_channel: "sms",
+      lead_source: "inbound_sms"
+    })
+    .select("id")
+    .single();
+  if (error) {
+    // Race: another webhook may have inserted the same phone.
+    const { data: raced } = await supabase
+      .from("ruffly_contacts")
+      .select("id")
+      .eq("phone_normalized", phoneNormalized)
+      .maybeSingle();
+    return raced?.id ?? null;
+  }
+  return created?.id ?? null;
+}
+
 export async function POST(request: Request) {
   const params = await parseBody(request).catch(() => null);
   if (!params) return NextResponse.json({ error: "Invalid body." }, { status: 400 });
@@ -56,12 +88,7 @@ export async function POST(request: Request) {
 
   let contactId: string | null = null;
   if (phoneNormalized) {
-    const { data: contact } = await supabase
-      .from("ruffly_contacts")
-      .select("id")
-      .eq("phone_normalized", phoneNormalized)
-      .maybeSingle();
-    contactId = contact?.id ?? null;
+    contactId = await ensureContactForPhone(from, phoneNormalized);
   }
 
   if (isSmsOptOutRequest(body)) {
@@ -78,10 +105,11 @@ export async function POST(request: Request) {
   }
 
   let conversationId: string | null = null;
+  let previousUnread = 0;
   if (contactId) {
     const { data: existing } = await supabase
       .from("ruffly_conversations")
-      .select("id")
+      .select("id, unread_count")
       .eq("contact_id", contactId)
       .eq("channel", "sms")
       .neq("status", "closed")
@@ -89,6 +117,7 @@ export async function POST(request: Request) {
       .limit(1)
       .maybeSingle();
     conversationId = existing?.id ?? null;
+    previousUnread = existing?.unread_count ?? 0;
   }
 
   if (!conversationId) {
@@ -99,11 +128,13 @@ export async function POST(request: Request) {
         channel: "sms",
         status: "waiting_staff",
         last_message_preview: body.slice(0, 240),
-        last_message_at: new Date().toISOString()
+        last_message_at: new Date().toISOString(),
+        unread_count: 1
       })
       .select("id")
       .single();
     conversationId = created?.id ?? null;
+    previousUnread = 0;
   }
 
   if (conversationId) {
@@ -117,14 +148,15 @@ export async function POST(request: Request) {
     await supabase
       .from("ruffly_conversations")
       .update({
+        contact_id: contactId,
         status: "waiting_staff",
         last_message_at: new Date().toISOString(),
         last_message_preview: body.slice(0, 240),
-        unread_count: 1,
+        unread_count: previousUnread + 1,
         updated_at: new Date().toISOString()
       })
       .eq("id", conversationId);
   }
 
-  return NextResponse.json({ ok: true, conversationId });
+  return NextResponse.json({ ok: true, conversationId, contactId });
 }

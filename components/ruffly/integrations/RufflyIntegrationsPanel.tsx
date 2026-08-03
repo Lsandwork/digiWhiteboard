@@ -7,6 +7,8 @@ type Integration = {
   displayName: string;
   status: string;
   configured: boolean;
+  kind?: "live" | "planned";
+  note?: string | null;
   lastSuccessAt?: string | null;
   lastError?: string | null;
   test?: { ok: boolean; message: string } | null;
@@ -71,8 +73,8 @@ export function RufflyIntegrationsPanel({ enabled = true }: { enabled?: boolean 
         <div>
           <h2 className="text-2xl font-semibold tracking-tight text-[#1f2933]">Integrations</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Test provider connections. Secrets are never shown after save. Approve each channel only after a successful
-            test, then enable its sending flag in Vercel.
+            Live channels can be tested here. Cards marked Coming soon are not wired in code yet — they need a build pass,
+            not just a password.
           </p>
         </div>
         <button type="button" onClick={() => void load()} className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm">
@@ -97,32 +99,40 @@ export function RufflyIntegrationsPanel({ enabled = true }: { enabled?: boolean 
         <div className="grid gap-3 md:grid-cols-2">
           {items.map((item) => {
             const result = results[item.provider];
+            const planned = item.kind === "planned" || item.status === "coming_soon";
             return (
               <article key={item.provider} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="font-semibold text-[#1f2933]">{item.displayName}</h3>
-                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{item.status.replaceAll("_", " ")}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                      {item.status.replaceAll("_", " ")}
+                    </p>
                   </div>
                   <span
                     className={`rounded-full px-2 py-1 text-[11px] font-semibold ${
-                      item.configured ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-800"
+                      planned
+                        ? "bg-slate-100 text-slate-700"
+                        : item.configured
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-800"
                     }`}
                   >
-                    {item.configured ? "Credentials present" : "Setup required"}
+                    {planned ? "Coming soon" : item.configured ? "Credentials present" : "Setup required"}
                   </span>
                 </div>
+                {item.note ? <p className="mt-3 text-sm text-slate-600">{item.note}</p> : null}
                 {result ? (
                   <p className={`mt-3 text-sm ${result.ok ? "text-emerald-700" : "text-rose-700"}`}>{result.message}</p>
                 ) : null}
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={busyProvider === item.provider}
+                    disabled={busyProvider === item.provider || planned}
                     onClick={() => void testProvider(item.provider)}
                     className="rounded-xl bg-[#ff6f26] px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    {busyProvider === item.provider ? "Testing…" : "Test connection"}
+                    {planned ? "Not available yet" : busyProvider === item.provider ? "Testing…" : "Test connection"}
                   </button>
                 </div>
               </article>
@@ -132,9 +142,10 @@ export function RufflyIntegrationsPanel({ enabled = true }: { enabled?: boolean 
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-        After a successful test, enable only that channel’s env flag (`RUFFLY_SENDING_SMS_ENABLED`,
-        `RUFFLY_SENDING_EMAIL_ENABLED`, `RUFFLY_WEBCHAT_ENABLED`, etc.). Do not enable Gingr booking advertising — Ruffly
-        does not create Gingr reservations yet.
+        Live today: Gingr, Twilio SMS, Resend Email, Gemini, and Web Chat. After a successful test on a live channel,
+        keep that channel’s Vercel flag on (`RUFFLY_SENDING_SMS_ENABLED`, `RUFFLY_SENDING_EMAIL_ENABLED`,
+        `RUFFLY_WEBCHAT_ENABLED`, etc.). Google / Facebook / Instagram / WhatsApp / AI Voice still need product work —
+        see `docs/ruffly-integrations-owner-guide.md`.
       </div>
     </div>
   );

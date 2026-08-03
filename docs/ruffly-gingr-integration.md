@@ -2,14 +2,23 @@
 
 Code lives under `lib/integrations/gingr/`.
 
+Auth matches Digi-board / Gingr public API: `key` query or form param against `https://{subdomain}.gingrapp.com/api/v1/...` (not Bearer headers, not `/api/owners`).
+
+Connection test probes `/api/v1/get_locations`, falling back to `/api/v1/reservation_types`.
+
 Env:
 - `GINGR_BASE_URL` (optional) or `GINGR_SUBDOMAIN`
 - `GINGR_API_KEY`
 - `GINGR_LOCATION_ID`
 - `GINGR_WEBHOOK_SIGNATURE_KEY`
 
-Staff webhook URL (Ruffly):
-`https://staff.ruffops.com/api/ruffly/webhooks/gingr`
+Gingr allows **only one** webhook URL. Keep DigiBoard as the registered endpoint:
+
+`https://staff.ruffops.com/api/gingr/webhook`
+
+That route fans verified events into Ruffly (`ingestGingrWebhook`) automatically when `RUFFLY_ENABLED=true`.
+
+Do **not** point Gingr at `/api/ruffly/webhooks/gingr` — that would stop Staff/Lobby boards from updating. The Ruffly-only route remains available for diagnostics/replay, but production Gingr UI must stay on DigiBoard.
 
 Signature verification matches the existing board webhook HMAC (`webhook_type + entity_id + entity_type`).
 
