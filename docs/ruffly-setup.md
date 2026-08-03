@@ -10,7 +10,7 @@ Steps (tracked on `ruffly_settings.setup_step`; UI shows a 20-step list):
    `https://staff.ruffops.com/api/gingr/webhook`  
    Gingr allows only one webhook; DigiBoard fans events into Ruffly. Do not switch Gingr to `/api/ruffly/webhooks/gingr`.
 5. Initial contact sync
-6. SMS / email providers
+6. SMS / email providers (Twilio US SMS needs A2P 10DLC or verified toll-free; credentials alone are not enough)
 7. Consent wording
 8. Review destinations
 9. Web chat install
