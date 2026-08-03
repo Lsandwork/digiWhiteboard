@@ -20,3 +20,14 @@ Steps (tracked on `ruffly_settings.setup_step`; UI shows a 20-step list):
 13. Review automation templates (leave draft)
 14. Test SMS/email/webchat
 15. Launch (`setup_completed=true`) and enable sending channels explicitly
+
+## One-shot finish (ops)
+
+After deploy:
+
+```bash
+curl -X POST "https://staff.ruffops.com/api/cron/ruffly-finish-setup" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+Marks launch complete, seeds starter Knowledge Base articles, and runs a Gingr contact reconcile.
