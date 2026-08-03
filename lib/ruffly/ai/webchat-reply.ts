@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { geminiModelRetryChain, isGeminiModelNotFoundError, resolveGeminiModel } from "@/lib/hr/gemini-config";
 import { isRufflyAiEnabled } from "@/lib/ruffly/flags";
+import { FITDOG_BOOKING, fitdogBookingKnowledgeContent } from "@/lib/ruffly/knowledge/booking-links";
 import { RUFFLY_STARTER_KNOWLEDGE_ARTICLES } from "@/lib/ruffly/knowledge/starter-articles";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -18,6 +19,18 @@ export type WebchatReplyResult = {
   usedAi: boolean;
   matchedTitles: string[];
 };
+
+const BOOKING_KNOWLEDGE_ARTICLE: WebchatKnowledgeArticle = {
+  title: "How to book and sign up — Fitdog links",
+  category: "Onboarding",
+  content: fitdogBookingKnowledgeContent(),
+  source: FITDOG_BOOKING.assessmentUrl
+};
+
+function withBookingKnowledge(articles: WebchatKnowledgeArticle[]): WebchatKnowledgeArticle[] {
+  const withoutStale = articles.filter((article) => !/how to book and sign up/i.test(article.title));
+  return [BOOKING_KNOWLEDGE_ARTICLE, ...withoutStale];
+}
 
 function tokenize(text: string): string[] {
   return text
@@ -48,7 +61,13 @@ function scoreArticle(message: string, article: WebchatKnowledgeArticle): number
   if (/\b(daycare|day care)\b/.test(lower) && /daycare/.test(haystack)) score += 4;
   if (/\b(board|boarding|overnight)\b/.test(lower) && /board/.test(haystack)) score += 4;
   if (/\b(groom|grooming|bath|haircut)\b/.test(lower) && /groom/.test(haystack)) score += 4;
-  if (/\b(train|training|class)\b/.test(lower) && /train/.test(haystack)) score += 4;
+  if (/\b(train|training|consult)\b/.test(lower) && /train|consult/.test(haystack)) score += 4;
+  if (
+    /\b(schedule|book|sign.?up|assessment|tour|account|sports|beach|hike|adventure|class(?:es)?)\b/.test(lower) &&
+    /assessment|signup|sign-up|consult|sports|gingrapp|app\.fitdog/.test(haystack)
+  ) {
+    score += 10;
+  }
   return score;
 }
 
@@ -76,26 +95,30 @@ export async function loadPublishedKnowledgeArticles(): Promise<WebchatKnowledge
       .order("updated_at", { ascending: false })
       .limit(40);
     if (!error && data?.length) {
-      return data.map((row) => ({
-        title: String(row.title),
-        category: String(row.category),
-        content: String(row.content || ""),
-        source: row.source ? String(row.source) : null
-      }));
+      return withBookingKnowledge(
+        data.map((row) => ({
+          title: String(row.title),
+          category: String(row.category),
+          content: String(row.content || ""),
+          source: row.source ? String(row.source) : null
+        }))
+      );
     }
   } catch {
     // fall through to starter pack
   }
-  return RUFFLY_STARTER_KNOWLEDGE_ARTICLES.map((article) => ({
-    title: article.title,
-    category: article.category,
-    content: article.content,
-    source: article.source
-  }));
+  return withBookingKnowledge(
+    RUFFLY_STARTER_KNOWLEDGE_ARTICLES.map((article) => ({
+      title: article.title,
+      category: article.category,
+      content: article.content,
+      source: article.source
+    }))
+  );
 }
 
 const SERVICE_OR_TOPIC_WORDS =
-  /\b(daycare|day\s*care|board(?:ing)?|groom(?:ing)?|train(?:ing)?|hours?|pricing|price|cost|rates?|tour|assessment|location|address|parking|taxi|walks?)\b/i;
+  /\b(daycare|day\s*care|board(?:ing)?|groom(?:ing)?|train(?:ing)?|consult|sports?|beach|hike|adventure|hours?|pricing|price|cost|rates?|tour|assessment|schedule|book|sign.?up|account|location|address|parking|taxi|walks?|class(?:es)?)\b/i;
 
 const NON_NAME_PHRASES =
   /\b(i said|you said|just said|like i said|yes|yeah|yep|no|nope|ok|okay|thanks|thank you|please|help|info|information|tell me|more|that one|the first|option)\b/i;
@@ -125,49 +148,78 @@ function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]
   const boarding = articles.find((a) => /board/i.test(a.title));
   const grooming = articles.find((a) => /groom/i.test(a.title));
   const pricing = articles.find((a) => /pric/i.test(a.title));
-  const tour = articles.find((a) => /tour|join|assessment/i.test(a.title));
+
+  const wantsSports = /\b(sports?|beach|adventure|hike|hiking|excursion|group class(?:es)?)\b/.test(lower);
+  const wantsAssessment = /\b(assessment|tour|evaluate|temperament)\b/.test(lower);
+  const wantsSignup = /\b(sign\s*up|signup|create (an )?account|new (customer|account)|register)\b/.test(lower);
+  const wantsSchedule = /\b(schedule|book|booking|reserve|set up|get started|how (do|to) join|start)\b/.test(lower);
 
   if (/\b(hours?|open|close|business hours|when are you)\b/.test(lower) && hours) {
-    return `We're typically open 7:00 a.m. to 8:00 p.m. daily at 1712 21st St, Santa Monica. Want help with daycare, boarding, or booking a tour?`;
+    return `We're typically open 7:00 a.m. to 8:00 p.m. daily at 1712 21st St, Santa Monica. Want help with daycare, boarding, or booking an assessment?`;
   }
 
   if (/\b(address|where are you|location|directions)\b/.test(lower) && hours) {
     return `We're at 1712 21st St, Santa Monica, CA 90404. Phone is (310) 828-3647 if you'd rather call. What were you hoping to set up?`;
   }
 
-  if (/\b(price|pricing|cost|how much|rate)\b/.test(lower) && (pricing || daycare)) {
-    if (/\b(daycare|day\s*care)\b/.test(lower)) {
-      return `Published daycare rates: hourly $15, half day $37, full day $49 (packages available too). Want boarding or grooming numbers as well, or help booking a tour?`;
+  if (wantsSports) {
+    return `For Sports like beach excursions, adventure hikes, and group classes, sign up here: ${FITDOG_BOOKING.sportsSignupUrl}`;
+  }
+
+  if (/\b(train(?:ing)?|consult)\b/.test(lower)) {
+    if (/\b(private train|private training)\b/.test(lower) && wantsSignup) {
+      return `For a private training account, sign up here: ${FITDOG_BOOKING.clubSignupUrl}. Free training consults are at ${FITDOG_BOOKING.trainingConsultUrl}`;
     }
-    return `Happy to help with pricing — daycare starts around $15/hr or $49/full day, boarding about $70–80/night, and grooming packages vary by coat. Which service are you looking at?`;
+    return `Training consults are free — schedule here: ${FITDOG_BOOKING.trainingConsultUrl}. If you want group classes, beach trips, or adventure hikes instead, use ${FITDOG_BOOKING.sportsSignupUrl}`;
+  }
+
+  if (
+    wantsAssessment ||
+    ((wantsSchedule || wantsSignup) && /\b(daycare|day\s*care|board(?:ing)?)\b/.test(lower))
+  ) {
+    return `Schedule a daycare/boarding assessment here: ${FITDOG_BOOKING.assessmentUrl}. It's ${FITDOG_BOOKING.assessmentFee} and includes ${FITDOG_BOOKING.assessmentIncludes}. After that, create your club account at ${FITDOG_BOOKING.clubSignupUrl}`;
+  }
+
+  if (wantsSignup && /\b(groom(?:ing)?|private train)\b/.test(lower)) {
+    return `You can create a Fitdog account for grooming or private training here: ${FITDOG_BOOKING.clubSignupUrl}`;
+  }
+
+  if (wantsSignup) {
+    return `Club account (daycare, boarding, grooming, private training): ${FITDOG_BOOKING.clubSignupUrl}. Sports / group classes / beach / hikes: ${FITDOG_BOOKING.sportsSignupUrl}. New to daycare or boarding? Start with the assessment: ${FITDOG_BOOKING.assessmentUrl}`;
+  }
+
+  if (/\b(price|pricing|cost|how much|rate)\b/.test(lower) && (pricing || daycare)) {
+    if (/\b(assessment|tour)\b/.test(lower)) {
+      return `Assessments are ${FITDOG_BOOKING.assessmentFee} and include ${FITDOG_BOOKING.assessmentIncludes}. Book here: ${FITDOG_BOOKING.assessmentUrl}`;
+    }
+    if (/\b(daycare|day\s*care)\b/.test(lower)) {
+      return `Published daycare rates: hourly $15, half day $37, full day $49. New dogs start with a ${FITDOG_BOOKING.assessmentFee} assessment (${FITDOG_BOOKING.assessmentUrl}). Want the booking link?`;
+    }
+    return `Happy to help with pricing — daycare starts around $15/hr or $49/full day, boarding about $70–80/night, and grooming packages vary by coat. Assessments are ${FITDOG_BOOKING.assessmentFee}. Which service are you looking at?`;
   }
 
   if (/\b(daycare|day\s*care)\b/.test(lower) && daycare) {
-    return `Daycare is open play in our big yard with enrichment, plus daily report cards and live webcams. New dogs usually need a quick tour & assessment first — want help getting that scheduled?`;
+    return `Daycare is open play with enrichment, report cards, and live webcams. New dogs book a ${FITDOG_BOOKING.assessmentFee} assessment first (${FITDOG_BOOKING.assessmentIncludes}): ${FITDOG_BOOKING.assessmentUrl}. After that, create your account at ${FITDOG_BOOKING.clubSignupUrl}`;
   }
 
   if (/\b(board(?:ing)?|overnight)\b/.test(lower) && boarding) {
-    return `Boarding includes daycare-style open play, a daily group walk, and a private sleeping space (Den / Petite Suite / Suite). Published nights run about $70–80 before packages. Want me to walk you through booking?`;
+    return `Boarding includes open-play daycare, a daily group walk, and a private sleeping space (about $70–80/night). New dogs need the same ${FITDOG_BOOKING.assessmentFee} assessment: ${FITDOG_BOOKING.assessmentUrl}. Club signup: ${FITDOG_BOOKING.clubSignupUrl}`;
   }
 
   if (/\b(groom(?:ing)?|bath|haircut)\b/.test(lower) && grooming) {
-    return `We offer full-service grooming — baths, cut & style, nail trims, and spa packages. Final price depends on coat and breed; want a rough package range or to connect with the desk for an estimate?`;
+    return `We offer full-service grooming — baths, cut & style, nail trims, and spa packages (price depends on coat/breed). Create a Fitdog account here: ${FITDOG_BOOKING.clubSignupUrl}. Want the desk to give you an estimate?`;
   }
 
-  if (/\b(train(?:ing)?|class(?:es)?)\b/.test(lower)) {
-    return `We offer training and classes at the Santa Monica club. Tell me if you're looking for group classes or something more individual and I can point you the right way — or loop in a teammate.`;
-  }
-
-  if (/\b(tour|assessment|how (do|to) join|get started)\b/.test(lower) && (tour || daycare)) {
-    return `New pups usually start with a tour & assessment before daycare. You can book that on fitdog.com or I can have the front desk follow up — what's your dog's name?`;
+  if (/\b(tour|assessment|how (do|to) join|get started)\b/.test(lower)) {
+    return `New daycare/boarding pups start with a ${FITDOG_BOOKING.assessmentFee} assessment (${FITDOG_BOOKING.assessmentIncludes}): ${FITDOG_BOOKING.assessmentUrl}. Then sign up at ${FITDOG_BOOKING.clubSignupUrl}`;
   }
 
   if (looksLikeNameIntro(message)) {
-    return `Thanks — got it. How can I help you and your pup today? Daycare, boarding, grooming, training, or something else?`;
+    return `Thanks — got it. How can I help you and your pup today? Daycare, boarding, grooming, training, or sports?`;
   }
 
   if (/\b(hi|hello|hey)\b/.test(lower) && lower.length < 24) {
-    return `Hey! Welcome to Fitdog. I can help with hours, daycare, boarding, grooming, training, or getting a tour set up. What do you need?`;
+    return `Hey! Welcome to Fitdog. I can help with hours, daycare, boarding, grooming, training, sports, or getting an assessment booked. What do you need?`;
   }
 
   return null;
@@ -196,6 +248,7 @@ async function geminiGroundedReply(input: {
     "Sound warm, concise, and human — like a sharp front-desk teammate texting.",
     "Never claim to be a human person. Do not say you are an AI unless asked.",
     "ONLY use facts from the knowledge pack below. If the answer is not there, say you'll get a teammate to follow up — do not invent prices, availability, medical advice, or policies.",
+    "When owners ask how to book, schedule, assess, or sign up, include the exact URLs from the knowledge pack.",
     "Keep replies to 1–3 short sentences. Ask one useful follow-up when natural.",
     "If the customer just shared a name or dog name, acknowledge it briefly and ask how you can help.",
     "",

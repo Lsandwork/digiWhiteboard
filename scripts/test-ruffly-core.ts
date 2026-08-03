@@ -121,11 +121,19 @@ async function testWebchatReplies() {
   assert.match(nameReply.reply, /got it|how can I help/i);
   assert.doesNotMatch(nameReply.reply, /once articles are published/i);
   const daycareReply = await craftWebchatReply({ message: "daycare" });
-  assert.match(daycareReply.reply, /open play|tour/i);
+  assert.match(daycareReply.reply, /daycare-assessment/i);
+  assert.match(daycareReply.reply, /\$20/i);
   assert.doesNotMatch(daycareReply.reply, /got it/i);
   const daycareAgain = await craftWebchatReply({ message: "I said daycare" });
-  assert.match(daycareAgain.reply, /open play|tour/i);
+  assert.match(daycareAgain.reply, /daycare-assessment/i);
   assert.doesNotMatch(daycareAgain.reply, /got it/i);
+  const trainingReply = await craftWebchatReply({ message: "I want a training consult" });
+  assert.match(trainingReply.reply, /dog-training/i);
+  assert.match(trainingReply.reply, /free/i);
+  const sportsReply = await craftWebchatReply({ message: "beach excursion signup" });
+  assert.match(sportsReply.reply, /app\.fitdog\.com\/sign-up/i);
+  const accountReply = await craftWebchatReply({ message: "how do I create an account for boarding" });
+  assert.match(accountReply.reply, /daycare-assessment|gingrapp\.com\/public\/new_customer/i);
 }
 
 testWebchatReplies()
