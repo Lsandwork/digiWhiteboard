@@ -202,7 +202,7 @@ function explainBoth() {
 }
 
 function signupClubReply(options?: { mentionAssessment?: boolean; mentionSports?: boolean }) {
-  const urls = [FITDOG_BOOKING.clubSignupUrl];
+  const urls: string[] = [FITDOG_BOOKING.clubSignupUrl];
   const parts = [
     "Create your Fitdog club account with the button below.",
     "That signup covers daycare, boarding, grooming, and private training."
