@@ -94,26 +94,38 @@ export async function loadPublishedKnowledgeArticles(): Promise<WebchatKnowledge
   }));
 }
 
+const SERVICE_OR_TOPIC_WORDS =
+  /\b(daycare|day\s*care|board(?:ing)?|groom(?:ing)?|train(?:ing)?|hours?|pricing|price|cost|rates?|tour|assessment|location|address|parking|taxi|walks?)\b/i;
+
+const NON_NAME_PHRASES =
+  /\b(i said|you said|just said|like i said|yes|yeah|yep|no|nope|ok|okay|thanks|thank you|please|help|info|information|tell me|more|that one|the first|option)\b/i;
+
 function looksLikeNameIntro(message: string): boolean {
   const trimmed = message.trim();
-  if (trimmed.length > 80) return false;
+  if (trimmed.length > 80 || trimmed.length < 2) return false;
   if (/[?]/.test(trimmed)) return false;
-  // "Jasper Lonnie Sandoval" / "I'm Lonnie, dog Buddy"
-  return (
-    /\b(my name is|i'?m|this is)\b/i.test(trimmed) ||
-    (trimmed.split(/\s+/).length <= 5 && /^[A-Za-z][A-Za-z\s'-]+$/.test(trimmed))
-  );
+  if (SERVICE_OR_TOPIC_WORDS.test(trimmed) || NON_NAME_PHRASES.test(trimmed)) return false;
+
+  if (/\b(my name is|i'?m|this is|dog'?s name is|my dog is)\b/i.test(trimmed)) {
+    return true;
+  }
+
+  // Bare name intros: 2–5 title-case tokens (e.g. "Jasper Lonnie Sandoval"), not service words.
+  const tokens = trimmed.split(/\s+/);
+  if (tokens.length < 2 || tokens.length > 5) return false;
+  if (!/^[A-Za-z][A-Za-z\s'-]+$/.test(trimmed)) return false;
+  const titleCaseCount = tokens.filter((token) => /^[A-Z][a-zA-Z'-]*$/.test(token)).length;
+  return titleCaseCount >= 2;
 }
 
 function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]): string | null {
-  const lower = message.toLowerCase();
+  const lower = message.toLowerCase().replace(/\bi said\b/g, " ").replace(/\s+/g, " ").trim();
   const hours = articles.find((a) => /hour|location|about fitdog/i.test(a.title));
   const daycare = articles.find((a) => /daycare/i.test(a.title));
+  const boarding = articles.find((a) => /board/i.test(a.title));
+  const grooming = articles.find((a) => /groom/i.test(a.title));
   const pricing = articles.find((a) => /pric/i.test(a.title));
-
-  if (looksLikeNameIntro(message)) {
-    return `Thanks — got it. How can I help you and your pup today? Daycare, boarding, grooming, training, or something else?`;
-  }
+  const tour = articles.find((a) => /tour|join|assessment/i.test(a.title));
 
   if (/\b(hours?|open|close|business hours|when are you)\b/.test(lower) && hours) {
     return `We're typically open 7:00 a.m. to 8:00 p.m. daily at 1712 21st St, Santa Monica. Want help with daycare, boarding, or booking a tour?`;
@@ -124,14 +136,34 @@ function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]
   }
 
   if (/\b(price|pricing|cost|how much|rate)\b/.test(lower) && (pricing || daycare)) {
-    if (/\b(daycare|day care)\b/.test(lower)) {
+    if (/\b(daycare|day\s*care)\b/.test(lower)) {
       return `Published daycare rates: hourly $15, half day $37, full day $49 (packages available too). Want boarding or grooming numbers as well, or help booking a tour?`;
     }
     return `Happy to help with pricing — daycare starts around $15/hr or $49/full day, boarding about $70–80/night, and grooming packages vary by coat. Which service are you looking at?`;
   }
 
-  if (/\b(daycare|day care)\b/.test(lower) && daycare) {
-    return `Daycare is open play in our big yard with enrichment and daily report cards/webcams for owners. New dogs usually need a quick tour & assessment first. Want me to point you to scheduling that?`;
+  if (/\b(daycare|day\s*care)\b/.test(lower) && daycare) {
+    return `Daycare is open play in our big yard with enrichment, plus daily report cards and live webcams. New dogs usually need a quick tour & assessment first — want help getting that scheduled?`;
+  }
+
+  if (/\b(board(?:ing)?|overnight)\b/.test(lower) && boarding) {
+    return `Boarding includes daycare-style open play, a daily group walk, and a private sleeping space (Den / Petite Suite / Suite). Published nights run about $70–80 before packages. Want me to walk you through booking?`;
+  }
+
+  if (/\b(groom(?:ing)?|bath|haircut)\b/.test(lower) && grooming) {
+    return `We offer full-service grooming — baths, cut & style, nail trims, and spa packages. Final price depends on coat and breed; want a rough package range or to connect with the desk for an estimate?`;
+  }
+
+  if (/\b(train(?:ing)?|class(?:es)?)\b/.test(lower)) {
+    return `We offer training and classes at the Santa Monica club. Tell me if you're looking for group classes or something more individual and I can point you the right way — or loop in a teammate.`;
+  }
+
+  if (/\b(tour|assessment|how (do|to) join|get started)\b/.test(lower) && (tour || daycare)) {
+    return `New pups usually start with a tour & assessment before daycare. You can book that on fitdog.com or I can have the front desk follow up — what's your dog's name?`;
+  }
+
+  if (looksLikeNameIntro(message)) {
+    return `Thanks — got it. How can I help you and your pup today? Daycare, boarding, grooming, training, or something else?`;
   }
 
   if (/\b(hi|hello|hey)\b/.test(lower) && lower.length < 24) {

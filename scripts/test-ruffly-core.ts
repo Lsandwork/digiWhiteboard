@@ -120,6 +120,12 @@ async function testWebchatReplies() {
   const nameReply = await craftWebchatReply({ message: "Jasper Lonnie Sandoval" });
   assert.match(nameReply.reply, /got it|how can I help/i);
   assert.doesNotMatch(nameReply.reply, /once articles are published/i);
+  const daycareReply = await craftWebchatReply({ message: "daycare" });
+  assert.match(daycareReply.reply, /open play|tour/i);
+  assert.doesNotMatch(daycareReply.reply, /got it/i);
+  const daycareAgain = await craftWebchatReply({ message: "I said daycare" });
+  assert.match(daycareAgain.reply, /open play|tour/i);
+  assert.doesNotMatch(daycareAgain.reply, /got it/i);
 }
 
 testWebchatReplies()
