@@ -30,7 +30,7 @@ export default function RufflyPublicHomePage() {
       </div>
       {siteKey ? (
         // eslint-disable-next-line @next/next/no-sync-scripts
-        <script src="/widget.js" async data-ruffly-key={siteKey} data-ruffly-api={apiBase} />
+        <script src="/widget.js?v=linkify-1" async data-ruffly-key={siteKey} data-ruffly-api={apiBase} />
       ) : null}
     </main>
   );
