@@ -181,15 +181,15 @@ function explainBoth() {
 
 function signupClubReply(options?: { mentionAssessment?: boolean; mentionSports?: boolean }) {
   const parts = [
-    `Create your Fitdog club account here: ${FITDOG_BOOKING.clubSignupUrl}`,
-    "That signup is for daycare, boarding, grooming, and private training."
+    `Create your Fitdog club account here: ${FITDOG_BOOKING.clubSignupUrl}.`,
+    "That signup covers daycare, boarding, grooming, and private training."
   ];
   if (options?.mentionSports !== false) {
-    parts.push(`For Sports (beach trips, adventure hikes, group classes), use ${FITDOG_BOOKING.sportsSignupUrl}`);
+    parts.push(`For Sports (beach trips, adventure hikes, group classes), use ${FITDOG_BOOKING.sportsSignupUrl}.`);
   }
   if (options?.mentionAssessment) {
     parts.push(
-      `If you still need daycare/boarding access, book the ${FITDOG_BOOKING.assessmentFee} assessment at ${FITDOG_BOOKING.assessmentUrl}`
+      `If you still need daycare/boarding access, book the ${FITDOG_BOOKING.assessmentFee} assessment at ${FITDOG_BOOKING.assessmentUrl}.`
     );
   }
   return parts.join(" ");
@@ -325,11 +325,17 @@ function replyForIntent(intent: Intent, message: string, recentTurns?: ChatTurn[
         return `Private training accounts start here: ${FITDOG_BOOKING.clubSignupUrl}. Free consults: ${FITDOG_BOOKING.trainingConsultUrl}`;
       }
       return `Training consults are free — schedule here: ${FITDOG_BOOKING.trainingConsultUrl}. Group classes / beach / hikes: ${FITDOG_BOOKING.sportsSignupUrl}`;
-    case "signup":
+    case "signup": {
+      const raw = normalizeMessage(message);
+      const rejectedClubServices =
+        /\b(no|not|never|dont|don't|do not)\b/.test(raw) && /\b(daycare|day care|boarding)\b/.test(raw);
       return signupClubReply({
-        mentionAssessment: memory.discussedDaycare || memory.discussedBoarding || memory.offeredAssessment,
+        // If they explicitly said no daycare/boarding, don't push assessment again.
+        mentionAssessment:
+          !rejectedClubServices && (memory.discussedDaycare || memory.discussedBoarding || memory.offeredAssessment),
         mentionSports: true
       });
+    }
     case "assessment":
       if (memory.discussedDaycare && memory.discussedBoarding) return assessmentReply("daycare and boarding");
       if (/\bboard/.test(active) && !/\bdaycare\b/.test(active)) return assessmentReply("boarding");

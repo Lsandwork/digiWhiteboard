@@ -180,7 +180,7 @@ async function testWebchatReplies() {
   assert.match(t3, /yes|one .*assessment|covers both/i);
   const t4 = await step("no daycare and boarding. I want to sign up with fitdog");
   assert.match(t4, /new_customer/i);
-  assert.doesNotMatch(t4, /^Book the \$20/i);
+  assert.doesNotMatch(t4, /assessment/i);
   assert.equal(detectWebchatIntent("no daycare and boarding. I want to sign up with fitdog", turns.slice(0, -2)), "signup");
 }
 
