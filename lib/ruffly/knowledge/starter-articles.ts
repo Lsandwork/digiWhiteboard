@@ -29,6 +29,21 @@ export const RUFFLY_STARTER_KNOWLEDGE_ARTICLES: StarterKnowledgeArticle[] = [
     ].join("\n\n")
   },
   {
+    title: "Fitdog style and club policies",
+    category: "General",
+    location: "Santa Monica",
+    source: "https://www.fitdog.com/",
+    content: [
+      "Fitdog style: a warm, high-energy Santa Monica dog club focused on open play, enrichment, and keeping owners connected with live webcams and daily report cards.",
+      "Club experience: loving experienced team, personalized care, and structured socialization in a large play yard.",
+      "Getting started policy: new daycare and boarding dogs complete a temperament assessment before joining group play.",
+      `Assessment policy: ${FITDOG_BOOKING.assessmentFee}, and it includes ${FITDOG_BOOKING.assessmentIncludes}.`,
+      "Transparency policy: owners can check in through webcams and receive daily report cards while their dog is at the club.",
+      "Safety-first policy: if a dog needs a different setup, or if there is a medical concern, injury, bite, or billing dispute, staff handles it directly — Ruffly should hand off.",
+      "Do not invent detailed legal terms, vaccine lists, or unpublished house rules. For specifics beyond this pack, invite the guest to book an assessment or call (310) 828-3647."
+    ].join("\n\n")
+  },
+  {
     title: "How to book and sign up — Fitdog links",
     category: "Onboarding",
     location: "Santa Monica",

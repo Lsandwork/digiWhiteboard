@@ -15,6 +15,60 @@ export const FITDOG_BOOKING = {
   sportsSignupUrl: "https://app.fitdog.com/sign-up"
 } as const;
 
+export type FitdogWebchatAction = {
+  id: string;
+  label: string;
+  url: string;
+  primary?: boolean;
+};
+
+export const FITDOG_WEBCHAT_ACTIONS: FitdogWebchatAction[] = [
+  {
+    id: "assessment",
+    label: "Book $20 assessment",
+    url: FITDOG_BOOKING.assessmentUrl,
+    primary: true
+  },
+  {
+    id: "club_signup",
+    label: "Create Fitdog account",
+    url: FITDOG_BOOKING.clubSignupUrl
+  },
+  {
+    id: "training_consult",
+    label: "Book free training consult",
+    url: FITDOG_BOOKING.trainingConsultUrl
+  },
+  {
+    id: "sports_signup",
+    label: "Join Fitdog Sports",
+    url: FITDOG_BOOKING.sportsSignupUrl
+  }
+];
+
+export function actionsForUrls(urls: string[]): FitdogWebchatAction[] {
+  const wanted = new Set(urls.map((url) => url.replace(/\/$/, "").toLowerCase()));
+  return FITDOG_WEBCHAT_ACTIONS.filter((action) => wanted.has(action.url.replace(/\/$/, "").toLowerCase()));
+}
+
+export function extractUrls(text: string): string[] {
+  const matches = String(text || "").match(/https?:\/\/[^\s<>"']+/g) || [];
+  return [...new Set(matches.map((url) => url.replace(/[.,!?);:]+$/g, "")))];
+}
+
+/** Clean prose for chat bubbles — remove raw URLs (buttons carry the links). */
+export function stripUrlsFromReply(text: string): string {
+  return String(text || "")
+    .replace(/https?:\/\/[^\s<>"']+/g, "")
+    .replace(/\s+(here|at|via)\s*[:.]?\s*$/gi, ".")
+    .replace(/\(\s*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+([,.])/g, "$1")
+    .replace(/:\s*\./g, ".")
+    .replace(/\.\s*\./g, ".")
+    .trim();
+}
+
 export function fitdogBookingKnowledgeContent(): string {
   return [
     "Use these exact Fitdog links when owners ask how to book, schedule, assess, or sign up:",

@@ -10,13 +10,15 @@
   var VISITOR_KEY = "ruffly_visitor_token";
   var visitorToken = null;
   var busy = false;
+  var userMessageCount = 0;
+  var serviceInterest = false;
+  var promoShown = false;
   try {
     visitorToken = window.localStorage.getItem(VISITOR_KEY);
   } catch (e) {
     visitorToken = null;
   }
 
-  var URL_RE = /(https?:\/\/[^\s<>"']+[^\s<>"'.,!?);:])/g;
   var STYLE_ID = "ruffly-widget-styles";
 
   function ensureStyles() {
@@ -29,11 +31,11 @@
     var style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent =
-      "#ruffly-chat-root{--ruffly-orange:#ff6f26;--ruffly-ink:#1f2933;--ruffly-muted:#64748b;--ruffly-line:#ece7e2;--ruffly-soft:#fff7f2;--ruffly-bot:#f4f1ee;font-family:Figtree,ui-sans-serif,system-ui,sans-serif;}" +
+      "#ruffly-chat-root{--ruffly-orange:#ff6f26;--ruffly-ink:#1f2933;--ruffly-muted:#64748b;--ruffly-line:#ece7e2;--ruffly-bot:#f4f1ee;font-family:Figtree,ui-sans-serif,system-ui,sans-serif;}" +
       "#ruffly-chat-root *{box-sizing:border-box;}" +
       "#ruffly-chat-root .rw-launcher{background:var(--ruffly-orange);color:#fff;border:0;border-radius:999px;padding:13px 18px;font:600 14px Figtree,sans-serif;cursor:pointer;box-shadow:0 10px 28px rgba(255,111,38,.35);transition:transform .15s ease,box-shadow .15s ease;}" +
-      "#ruffly-chat-root .rw-launcher:hover{transform:translateY(-1px);box-shadow:0 14px 30px rgba(255,111,38,.4);}" +
-      "#ruffly-chat-root .rw-panel{width:min(380px,calc(100vw - 24px));height:min(560px,calc(100vh - 96px));margin-bottom:12px;background:#fff;border:1px solid var(--ruffly-line);border-radius:22px;box-shadow:0 24px 60px rgba(31,41,51,.18);display:flex;flex-direction:column;overflow:hidden;animation:rw-rise .22s ease;}" +
+      "#ruffly-chat-root .rw-launcher:hover{transform:translateY(-1px);}" +
+      "#ruffly-chat-root .rw-panel{width:min(390px,calc(100vw - 24px));height:min(580px,calc(100vh - 96px));margin-bottom:12px;background:#fff;border:1px solid var(--ruffly-line);border-radius:22px;box-shadow:0 24px 60px rgba(31,41,51,.18);display:flex;flex-direction:column;overflow:hidden;animation:rw-rise .22s ease;}" +
       "#ruffly-chat-root .rw-header{padding:14px 16px;background:linear-gradient(180deg,#fff9f5 0%,#fff 100%);border-bottom:1px solid var(--ruffly-line);display:flex;align-items:center;gap:12px;}" +
       "#ruffly-chat-root .rw-avatar{width:38px;height:38px;border-radius:12px;background:var(--ruffly-orange);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;}" +
       "#ruffly-chat-root .rw-title{font-weight:700;font-size:15px;color:var(--ruffly-ink);line-height:1.2;}" +
@@ -43,12 +45,19 @@
       "#ruffly-chat-root .rw-row{display:flex;width:100%;}" +
       "#ruffly-chat-root .rw-row.bot{justify-content:flex-start;}" +
       "#ruffly-chat-root .rw-row.user{justify-content:flex-end;}" +
-      "#ruffly-chat-root .rw-bubble{max-width:86%;padding:11px 13px;border-radius:16px;font-size:14px;line-height:1.45;word-break:break-word;animation:rw-pop .18s ease;}" +
+      "#ruffly-chat-root .rw-col{display:flex;flex-direction:column;gap:8px;max-width:92%;}" +
+      "#ruffly-chat-root .rw-bubble{padding:11px 13px;border-radius:16px;font-size:14px;line-height:1.45;word-break:break-word;animation:rw-pop .18s ease;}" +
       "#ruffly-chat-root .rw-bubble.bot{background:var(--ruffly-bot);color:var(--ruffly-ink);border-bottom-left-radius:6px;}" +
-      "#ruffly-chat-root .rw-bubble.user{background:var(--ruffly-orange);color:#fff;border-bottom-right-radius:6px;}" +
-      "#ruffly-chat-root .rw-bubble a{color:#9a3412;font-weight:600;text-decoration:underline;word-break:break-all;}" +
-      "#ruffly-chat-root .rw-bubble.user a{color:#fff;}" +
-      "#ruffly-chat-root .rw-meta{font-size:11px;color:var(--ruffly-muted);margin:0 4px;}" +
+      "#ruffly-chat-root .rw-bubble.user{background:var(--ruffly-orange);color:#fff;border-bottom-right-radius:6px;max-width:86%;}" +
+      "#ruffly-chat-root .rw-actions{display:flex;flex-wrap:wrap;gap:8px;}" +
+      "#ruffly-chat-root .rw-action{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;padding:10px 14px;font:700 13px Figtree,sans-serif;text-decoration:none;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;}" +
+      "#ruffly-chat-root .rw-action.primary{background:var(--ruffly-orange);color:#fff;box-shadow:0 8px 18px rgba(255,111,38,.28);}" +
+      "#ruffly-chat-root .rw-action.secondary{background:#fff;color:#9a3412;border:1px solid #fdba8c;}" +
+      "#ruffly-chat-root .rw-action:hover{transform:translateY(-1px);}" +
+      "#ruffly-chat-root .rw-promo{margin-top:2px;padding:14px;border-radius:18px;background:linear-gradient(145deg,#fff7f2 0%,#ffe8d6 100%);border:1px solid #ffd2b3;box-shadow:0 10px 24px rgba(255,111,38,.12);animation:rw-rise .28s ease;}" +
+      "#ruffly-chat-root .rw-promo-kicker{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#c2410c;margin-bottom:4px;}" +
+      "#ruffly-chat-root .rw-promo-title{font-size:16px;font-weight:700;color:var(--ruffly-ink);line-height:1.25;margin:0 0 4px;}" +
+      "#ruffly-chat-root .rw-promo-copy{font-size:13px;color:var(--ruffly-muted);margin:0 0 12px;line-height:1.4;}" +
       "#ruffly-chat-root .rw-typing{display:inline-flex;align-items:center;gap:5px;padding:12px 14px;background:var(--ruffly-bot);border-radius:16px;border-bottom-left-radius:6px;}" +
       "#ruffly-chat-root .rw-typing span{width:7px;height:7px;border-radius:50%;background:#94a3b8;animation:rw-bounce 1.1s infinite ease-in-out;}" +
       "#ruffly-chat-root .rw-typing span:nth-child(2){animation-delay:.15s;}" +
@@ -64,72 +73,21 @@
     document.head.appendChild(style);
   }
 
-  function appendLinkedText(container, text) {
-    var parts = String(text || "").split(URL_RE);
-    for (var i = 0; i < parts.length; i += 1) {
-      var part = parts[i];
-      if (!part) continue;
-      if (/^https?:\/\//i.test(part)) {
-        var link = document.createElement("a");
-        link.href = part;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = part;
-        container.appendChild(link);
-      } else {
-        container.appendChild(document.createTextNode(part));
-      }
-    }
-  }
-
   function splitReply(text) {
     var raw = String(text || "").trim();
     if (!raw) return [];
-
-    var tokens = [];
-    var protectedText = raw
-      .replace(URL_RE, function (url) {
-        tokens.push(url);
-        return "%%T" + (tokens.length - 1) + "%%";
-      })
-      .replace(/\b([ap])\.m\./gi, function (match) {
-        tokens.push(match);
-        return "%%T" + (tokens.length - 1) + "%%";
-      });
-
-    function restore(value) {
-      return value.replace(/%%T(\d+)%%/g, function (_, index) {
-        return tokens[Number(index)] || "";
-      });
+    // Keep replies intact unless there is a clear second beat.
+    var parts = raw.split(/\s+(?=After that\b|Then create\b|Then sign\b)/i).map(function (part) {
+      return part.trim();
+    }).filter(Boolean);
+    if (parts.length > 2) {
+      parts = [parts[0], parts.slice(1).join(" ")];
     }
-
-    var parts = protectedText
-      .split(/\s+(?=After that\b)|(?<=[.!?])\s+(?=[A-Z])/g)
-      .map(function (part) {
-        return restore(part).trim();
-      })
-      .filter(Boolean);
-
-    var chunks = [];
-    var buffer = "";
-    for (var i = 0; i < parts.length; i += 1) {
-      var part = parts[i];
-      var candidate = buffer ? buffer + " " + part : part;
-      var urlCount = (candidate.match(/https?:\/\//g) || []).length;
-      if (buffer && (candidate.length > 170 || urlCount > 1 || /^after that\b/i.test(part))) {
-        chunks.push(buffer);
-        buffer = part;
-      } else {
-        buffer = candidate;
-      }
+    // Avoid tiny dangling fragments.
+    if (parts.length === 2 && parts[1].length < 24) {
+      return [raw];
     }
-    if (buffer) chunks.push(buffer);
-
-    // Prefer at most two bubbles so replies stay snappy.
-    if (chunks.length > 2) {
-      chunks = [chunks[0], chunks.slice(1).join(" ")].filter(Boolean);
-    }
-    return chunks.length ? chunks : [raw];
+    return parts.length ? parts : [raw];
   }
 
   function delay(ms) {
@@ -140,9 +98,8 @@
 
   function typingDelay(text, index) {
     var len = String(text || "").length;
-    // Keep the human feel without making owners wait forever.
-    var base = index === 0 ? 320 : 220;
-    return Math.min(900, Math.max(base, 180 + len * 6));
+    var base = index === 0 ? 280 : 180;
+    return Math.min(700, Math.max(base, 140 + len * 4));
   }
 
   ensureStyles();
@@ -199,20 +156,73 @@
     presence.textContent = next ? "Ruffly is typing…" : "Online · usually replies in a moment";
   }
 
-  function addBubble(role, text, linkify) {
+  function scrollToBottom() {
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  function addUserBubble(text) {
     var row = document.createElement("div");
-    row.className = "rw-row " + role;
+    row.className = "rw-row user";
     var bubble = document.createElement("div");
-    bubble.className = "rw-bubble " + role;
-    if (linkify) {
-      appendLinkedText(bubble, text);
-    } else {
-      bubble.textContent = text;
-    }
+    bubble.className = "rw-bubble user";
+    bubble.textContent = text;
     row.appendChild(bubble);
     messages.appendChild(row);
-    messages.scrollTop = messages.scrollHeight;
-    return row;
+    scrollToBottom();
+  }
+
+  function addBotBubble(text) {
+    var row = document.createElement("div");
+    row.className = "rw-row bot";
+    var bubble = document.createElement("div");
+    bubble.className = "rw-bubble bot";
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    messages.appendChild(row);
+    scrollToBottom();
+  }
+
+  function addActions(actions) {
+    if (!actions || !actions.length) return;
+    var row = document.createElement("div");
+    row.className = "rw-row bot";
+    var col = document.createElement("div");
+    col.className = "rw-col";
+    var wrap = document.createElement("div");
+    wrap.className = "rw-actions";
+    actions.forEach(function (action) {
+      var link = document.createElement("a");
+      link.className = "rw-action " + (action.primary ? "primary" : "secondary");
+      link.href = action.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = action.label;
+      wrap.appendChild(link);
+    });
+    col.appendChild(wrap);
+    row.appendChild(col);
+    messages.appendChild(row);
+    scrollToBottom();
+  }
+
+  function maybeShowPromo() {
+    if (promoShown || !serviceInterest || userMessageCount < 5) return;
+    promoShown = true;
+    var row = document.createElement("div");
+    row.className = "rw-row bot";
+    var card = document.createElement("div");
+    card.className = "rw-promo";
+    card.innerHTML =
+      '<div class="rw-promo-kicker">Ready when you are</div>' +
+      '<p class="rw-promo-title">Get your pup started at Fitdog</p>' +
+      '<p class="rw-promo-copy">Book the $20 assessment for daycare/boarding, or create your Fitdog account in under a minute.</p>' +
+      '<div class="rw-actions">' +
+      '<a class="rw-action primary" target="_blank" rel="noopener noreferrer" href="https://www.fitdog.com/daycare-assessment/">Book assessment</a>' +
+      '<a class="rw-action secondary" target="_blank" rel="noopener noreferrer" href="https://fitdog.portal.gingrapp.com/public/new_customer">Create account</a>' +
+      "</div>";
+    row.appendChild(card);
+    messages.appendChild(row);
+    scrollToBottom();
   }
 
   function showTyping() {
@@ -222,7 +232,7 @@
     typingRow.setAttribute("aria-label", "Ruffly is typing");
     typingRow.innerHTML = '<div class="rw-typing"><span></span><span></span><span></span></div>';
     messages.appendChild(typingRow);
-    messages.scrollTop = messages.scrollHeight;
+    scrollToBottom();
   }
 
   function hideTyping() {
@@ -232,17 +242,20 @@
     typingRow = null;
   }
 
-  async function deliverBotReply(fullText) {
+  async function deliverBotReply(fullText, actions) {
     var sections = splitReply(fullText).slice(0, 2);
     for (var i = 0; i < sections.length; i += 1) {
       showTyping();
       await delay(typingDelay(sections[i], i));
       hideTyping();
-      addBubble("bot", sections[i], true);
-      if (i < sections.length - 1) {
-        await delay(160);
-      }
+      addBotBubble(sections[i]);
+      if (i < sections.length - 1) await delay(120);
     }
+    if (actions && actions.length) {
+      await delay(120);
+      addActions(actions);
+    }
+    maybeShowPromo();
   }
 
   var greeted = false;
@@ -251,12 +264,10 @@
     greeted = true;
     setBusy(true);
     showTyping();
-    await delay(350);
+    await delay(300);
     hideTyping();
-    addBubble(
-      "bot",
-      "Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, training, or sports — I can also get a teammate for you.",
-      false
+    addBotBubble(
+      "Hi — I’m Ruffly with Fitdog Customer Care. Ask me about hours, daycare, boarding, grooming, training, or sports — I can also get a teammate for you."
     );
     setBusy(false);
   }
@@ -267,7 +278,8 @@
     var text = (input.value || "").trim();
     if (!text) return;
 
-    addBubble("user", text, false);
+    userMessageCount += 1;
+    addUserBubble(text);
     input.value = "";
     setBusy(true);
     showTyping();
@@ -291,15 +303,19 @@
           try {
             window.localStorage.setItem(VISITOR_KEY, visitorToken);
           } catch (e) {
-            /* ignore storage failures */
+            /* ignore */
           }
         }
+        if (body && body.serviceInterest) serviceInterest = true;
         hideTyping();
-        return deliverBotReply(body.reply || body.error || "Thanks — our team will follow up.");
+        return deliverBotReply(
+          body.reply || body.error || "Thanks — our team will follow up.",
+          body.actions || []
+        );
       })
       .catch(function () {
         hideTyping();
-        return deliverBotReply("We couldn’t send that just now. Please try again shortly.");
+        return deliverBotReply("We couldn’t send that just now. Please try again shortly.", []);
       })
       .then(function () {
         setBusy(false);

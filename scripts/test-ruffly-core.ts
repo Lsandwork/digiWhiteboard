@@ -142,7 +142,13 @@ async function testWebchatReplies() {
 
   assert.equal(isUnsafeWebchatReply('meaning they are interested in both daycare'), true);
   assert.equal(isUnsafeWebchatReply('* Customer: "how much is'), true);
+  assert.equal(isUnsafeWebchatReply("We are a full-"), true);
   assert.equal(isUnsafeWebchatReply("We're open 7:00 a.m. to 8:00 p.m. daily."), false);
+
+  const styleReply = await craftWebchatReply({ message: "tell me fitdog style and policies" });
+  assert.match(styleReply.displayReply || styleReply.reply, /open play|webcam|assessment/i);
+  assert.doesNotMatch(styleReply.displayReply || styleReply.reply, /We are a full-/i);
+  assert.ok(styleReply.actions.some((action) => /assessment/i.test(action.label)));
 
   const bothReply = await craftWebchatReply({
     message: "both",

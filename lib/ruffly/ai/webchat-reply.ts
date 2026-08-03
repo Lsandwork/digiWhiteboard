@@ -1,7 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { geminiModelRetryChain, isGeminiModelNotFoundError, resolveGeminiModel } from "@/lib/hr/gemini-config";
 import { isRufflyAiEnabled } from "@/lib/ruffly/flags";
-import { FITDOG_BOOKING, fitdogBookingKnowledgeContent } from "@/lib/ruffly/knowledge/booking-links";
+import {
+  actionsForUrls,
+  extractUrls,
+  FITDOG_BOOKING,
+  FitdogWebchatAction,
+  fitdogBookingKnowledgeContent,
+  stripUrlsFromReply
+} from "@/lib/ruffly/knowledge/booking-links";
 import { RUFFLY_STARTER_KNOWLEDGE_ARTICLES } from "@/lib/ruffly/knowledge/starter-articles";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -14,10 +21,13 @@ export type WebchatKnowledgeArticle = {
 
 export type WebchatReplyResult = {
   reply: string;
+  displayReply: string;
+  actions: FitdogWebchatAction[];
   handoff: boolean;
   reason?: string;
   usedAi: boolean;
   matchedTitles: string[];
+  serviceInterest: boolean;
 };
 
 type ChatTurn = { role: "user" | "assistant"; text: string };
@@ -47,10 +57,6 @@ function stripNegatedPhrases(lower: string) {
     .trim();
 }
 
-function mentions(haystack: string, pattern: RegExp) {
-  return pattern.test(haystack);
-}
-
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
@@ -69,6 +75,9 @@ function scoreArticle(message: string, article: WebchatKnowledgeArticle): number
   const lower = message.toLowerCase();
   if (/\b(hours?|open|close|business hours)\b/.test(lower) && /hour|7:00|8:00|daily/.test(haystack)) score += 8;
   if (/\b(address|where|location|parking)\b/.test(lower) && /1712|santa monica|address/.test(haystack)) score += 8;
+  if (/\b(style|culture|vibe|policies|policy|about fitdog)\b/.test(lower) && /style|policy|webcam|open play|full-service/.test(haystack)) {
+    score += 10;
+  }
   if (/\b(price|pricing|cost|rate|how much)\b/.test(lower) && /\$|pricing|rate/.test(haystack)) score += 8;
   if (/\b(daycare|day care)\b/.test(lower) && /daycare/.test(haystack)) score += 4;
   if (/\b(board|boarding|overnight)\b/.test(lower) && /board/.test(haystack)) score += 4;
@@ -211,7 +220,29 @@ export function isUnsafeWebchatReply(text: string): boolean {
   if (/^\*+\s*/.test(value) || /```/.test(value)) return true;
   if (/["“]how much is\b/i.test(value) && value.length < 80) return true;
   if (/\bKNOWLEDGE PACK\b|\bRECENT CHAT\b|\bRUFFLY:\b/i.test(value)) return true;
+  // Truncated / cut-off model output (e.g. "We are a full-")
+  if (/[-–—]$/.test(value) || /\b(a|the|and|or|with|for|to|of|our|we are)\s*$/i.test(value)) return true;
   return false;
+}
+
+export function isServiceInterestMessage(message: string): boolean {
+  return /\b(daycare|day care|board(?:ing)?|groom(?:ing)?|train(?:ing)?|sports?|beach|assessment|tour|sign\s*up|pricing|price|how much|both|package|class(?:es)?)\b/i.test(
+    message
+  );
+}
+
+function finalizeReply(reply: string, matchedTitles: string[], usedAi: boolean, extras?: Partial<WebchatReplyResult>): WebchatReplyResult {
+  const actions = actionsForUrls(extractUrls(reply));
+  return {
+    reply,
+    displayReply: stripUrlsFromReply(reply) || reply,
+    actions,
+    handoff: false,
+    usedAi,
+    matchedTitles,
+    serviceInterest: false,
+    ...extras
+  };
 }
 
 export function sanitizeWebchatReply(text: string): string | null {
@@ -238,6 +269,7 @@ type Intent =
   | "explain_boarding"
   | "both_services"
   | "grooming"
+  | "style_policies"
   | "name"
   | "greeting"
   | "ack_yes"
@@ -257,6 +289,7 @@ export function detectWebchatIntent(message: string, recentTurns?: ChatTurn[]): 
 
   if (/\b(hours?|open|close|business hours|when are you)\b/.test(active)) return "hours";
   if (/\b(address|where are you|location|directions)\b/.test(active)) return "location";
+  if (/\b(style|culture|vibe|policies|policy|about fitdog|how (does|do) fitdog)\b/.test(raw)) return "style_policies";
   if (/\b(sports?|beach|adventure|hike|hiking|excursion|group class(?:es)?)\b/.test(active)) return "sports";
   if (/\b(train(?:ing)?|consult)\b/.test(active)) return "training";
 
@@ -364,6 +397,8 @@ function replyForIntent(intent: Intent, message: string, recentTurns?: ChatTurn[
       return explainBoth();
     case "grooming":
       return `We offer full-service grooming — baths, cut & style, nail trims, and spa packages (price depends on coat/breed). Create your account here: ${FITDOG_BOOKING.clubSignupUrl}`;
+    case "style_policies":
+      return `Fitdog is a full-service Santa Monica dog club built around open play, enrichment, and transparent care — live webcams and daily report cards for owners. New daycare/boarding dogs complete a ${FITDOG_BOOKING.assessmentFee} assessment first (${FITDOG_BOOKING.assessmentIncludes}). For vaccine lists or special cases, book an assessment or call (310) 828-3647. ${FITDOG_BOOKING.assessmentUrl}`;
     case "name":
       return `Thanks — got it. How can I help you and your pup today? Daycare, boarding, grooming, training, or sports?`;
     case "greeting":
@@ -422,7 +457,7 @@ async function geminiGroundedReply(input: {
     "Never narrate or talk about the customer in third person.",
     "Never output labels like Customer:, Fitdog:, RUFFLY:, or quote the chat log.",
     "ONLY use facts from the knowledge pack. Include exact URLs when directing them to book or sign up.",
-    "Keep replies to 1–3 short sentences.",
+    "Keep replies to 1–3 complete short sentences. Never cut off mid-word or mid-sentence.",
     "",
     "KNOWLEDGE PACK:",
     knowledgeBlock,
@@ -441,7 +476,7 @@ async function geminiGroundedReply(input: {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
-        generationConfig: { temperature: 0.3, maxOutputTokens: 180 }
+        generationConfig: { temperature: 0.3, maxOutputTokens: 320 }
       });
       const result = await model.generateContent(prompt);
       const text = sanitizeWebchatReply(result.response.text() || "");
@@ -462,15 +497,15 @@ export async function craftWebchatReply(input: {
   recentTurns?: ChatTurn[];
   forceHandoff?: { handoff: boolean; reason?: string };
 }): Promise<WebchatReplyResult> {
+  const serviceInterest = isServiceInterestMessage(input.message);
+
   if (input.forceHandoff?.handoff) {
-    return {
-      reply:
-        "I want to make sure you get the right help on that — I'm looping in a Fitdog teammate now. Someone will follow up shortly.",
-      handoff: true,
-      reason: input.forceHandoff.reason,
-      usedAi: false,
-      matchedTitles: []
-    };
+    return finalizeReply(
+      "I want to make sure you get the right help on that — I'm looping in a Fitdog teammate now. Someone will follow up shortly.",
+      [],
+      false,
+      { handoff: true, reason: input.forceHandoff.reason, serviceInterest }
+    );
   }
 
   const articles = await loadPublishedKnowledgeArticles();
@@ -479,12 +514,7 @@ export async function craftWebchatReply(input: {
 
   const quick = deterministicReply(input.message, articles, input.recentTurns);
   if (quick) {
-    return {
-      reply: quick,
-      handoff: false,
-      usedAi: false,
-      matchedTitles: matched.map((article) => article.title)
-    };
+    return finalizeReply(quick, matched.map((article) => article.title), false, { serviceInterest });
   }
 
   const aiText = await geminiGroundedReply({
@@ -493,18 +523,13 @@ export async function craftWebchatReply(input: {
     recentTurns: input.recentTurns
   });
   if (aiText) {
-    return {
-      reply: aiText,
-      handoff: false,
-      usedAi: true,
-      matchedTitles: corpus.map((article) => article.title)
-    };
+    return finalizeReply(aiText, corpus.map((article) => article.title), true, { serviceInterest });
   }
 
-  return {
-    reply: `Happy to help — tell me if you want daycare/boarding info, the ${FITDOG_BOOKING.assessmentFee} assessment link, or a Fitdog signup link.`,
-    handoff: false,
-    usedAi: false,
-    matchedTitles: matched.map((article) => article.title)
-  };
+  return finalizeReply(
+    `Happy to help — tell me if you want daycare/boarding info, the ${FITDOG_BOOKING.assessmentFee} assessment, or a Fitdog signup link. ${FITDOG_BOOKING.assessmentUrl}`,
+    matched.map((article) => article.title),
+    false,
+    { serviceInterest }
+  );
 }

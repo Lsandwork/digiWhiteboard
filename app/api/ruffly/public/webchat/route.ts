@@ -198,7 +198,10 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
-    reply: crafted.reply,
+    reply: crafted.displayReply || crafted.reply,
+    fullReply: crafted.reply,
+    actions: crafted.actions,
+    serviceInterest: crafted.serviceInterest,
     handoff: crafted.handoff,
     reason: crafted.reason,
     visitorToken: visitorRaw,
