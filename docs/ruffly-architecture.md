@@ -61,3 +61,4 @@ Vercel cron invokes `/api/cron/ruffly-reconcile` and `/api/cron/ruffly-jobs`. Du
 - No invented availability, prices, or Gingr writes without an explicit tested write path.
 - AI uses only published, customer-visible knowledge articles.
 - Do not break lobby / staff / casttv hosts or existing `/api/gingr/webhook`.
+- Gingr allows only one webhook URL — DigiBoard owns it and fans out into Ruffly.

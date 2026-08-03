@@ -5,8 +5,7 @@ import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/li
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
-import { ingestGingrWebhook } from "@/lib/integrations/gingr/webhooks/process";
-import { isRufflyEnabled } from "@/lib/ruffly/flags";
+import { fanoutVerifiedGingrWebhookToRuffly } from "@/lib/integrations/gingr/webhooks/fanout";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -106,8 +105,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 403 });
   }
 
-  // Keep Digi-board as the single Gingr webhook target; Ruffly receives a copy.
-  fanOutToRuffly(payload);
+  // Gingr allows only one webhook URL — keep DigiBoard as the registered endpoint
+  // and fan verified events into Ruffly without blocking board processing.
+  fanoutVerifiedGingrWebhookToRuffly(payload);
 
   if (payload.entity_id) {
     const dedupeSince = new Date(Date.now() - 30_000).toISOString();

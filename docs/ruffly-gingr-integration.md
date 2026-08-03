@@ -12,16 +12,13 @@ Env:
 - `GINGR_LOCATION_ID`
 - `GINGR_WEBHOOK_SIGNATURE_KEY`
 
-Gingr Custom Configurations only supports **one** webhook URL. Keep Digi-board as the target:
+Gingr allows **only one** webhook URL. Keep DigiBoard as the registered endpoint:
 
 `https://staff.ruffops.com/api/gingr/webhook`
 
-That board endpoint fans out a copy into Ruffly (`ingestGingrWebhook`) so contacts/leads/review jobs still run. Do **not** point Gingr directly at `/api/ruffly/webhooks/gingr` or the whiteboard will stop updating.
+That route fans verified events into Ruffly (`ingestGingrWebhook`) automatically when `RUFFLY_ENABLED=true`.
 
-The webhook signature key in Gingr must match `GINGR_WEBHOOK_SIGNATURE_KEY` in Vercel.
-
-Optional dedicated Ruffly URL (testing only):
-`https://staff.ruffops.com/api/ruffly/webhooks/gingr`
+Do **not** point Gingr at `/api/ruffly/webhooks/gingr` — that would stop Staff/Lobby boards from updating. The Ruffly-only route remains available for diagnostics/replay, but production Gingr UI must stay on DigiBoard.
 
 Signature verification matches the existing board webhook HMAC (`webhook_type + entity_id + entity_type`).
 
