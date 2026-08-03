@@ -123,8 +123,11 @@ function deterministicReply(message: string, articles: WebchatKnowledgeArticle[]
     return `We're at 1712 21st St, Santa Monica, CA 90404. Phone is (310) 828-3647 if you'd rather call. What were you hoping to set up?`;
   }
 
-  if (/\b(price|pricing|cost|how much|rate)\b/.test(lower) && pricing) {
-    return `Happy to help with pricing. Published rates are on fitdog.com/pricing — daycare, boarding, and grooming each have their own packages. Which service are you looking at?`;
+  if (/\b(price|pricing|cost|how much|rate)\b/.test(lower) && (pricing || daycare)) {
+    if (/\b(daycare|day care)\b/.test(lower)) {
+      return `Published daycare rates: hourly $15, half day $37, full day $49 (packages available too). Want boarding or grooming numbers as well, or help booking a tour?`;
+    }
+    return `Happy to help with pricing — daycare starts around $15/hr or $49/full day, boarding about $70–80/night, and grooming packages vary by coat. Which service are you looking at?`;
   }
 
   if (/\b(daycare|day care)\b/.test(lower) && daycare) {
