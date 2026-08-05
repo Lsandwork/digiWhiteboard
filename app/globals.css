@@ -5718,7 +5718,7 @@ html[data-theme="light"] .admin-toast--error {
 .admin-drawer-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 70;
   display: flex;
   justify-content: flex-end;
   background: var(--overlay, rgba(0, 0, 0, 0.5));
@@ -5732,6 +5732,7 @@ html[data-theme="light"] .admin-toast--error {
   border-left: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   background: var(--surface, #0b1220);
   padding: 1.25rem;
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
   box-shadow: -12px 0 40px var(--shadow-color, rgba(0, 0, 0, 0.35));
 }
 
@@ -6038,19 +6039,141 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   }
 }
 
+/* Short/full header labels: desktop shows full text */
+.admin-header__label-short {
+  display: none;
+}
+
+.admin-header__label-full {
+  display: inline;
+}
+
+.fitdog-alert-filters__summary {
+  cursor: pointer;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.fitdog-alert-filters__summary::-webkit-details-marker {
+  display: none;
+}
+
+.fitdog-alert-filters__more[open] .fitdog-alert-filters__summary {
+  border-color: rgba(255, 111, 38, 0.45);
+  color: #ffd7a1;
+}
+
 @media (max-width: 767px) {
   .admin-main {
-    padding: 1rem 0.85rem 1.5rem;
+    padding: 0.85rem 0.75rem calc(6.5rem + env(safe-area-inset-bottom, 0px));
   }
 
   .admin-header {
-    margin-bottom: 1rem;
+    margin-bottom: 0.85rem;
   }
 
   .admin-content-grid {
     gap: 0.85rem;
   }
+
+  .admin-page-title {
+    font-size: clamp(1.35rem, 5.5vw, 1.75rem);
+    line-height: 1.15;
+  }
+
+  .admin-page-subtitle {
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .admin-header__label-full {
+    display: none;
+  }
+
+  .admin-header__label-short {
+    display: inline;
+  }
+
+  .admin-header__utils {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  .admin-header__primary-btn {
+    grid-column: 1 / -1;
+  }
+
+  .admin-header__meta {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .admin-header-brand > div {
+    display: none;
+  }
+
+  .admin-drawer-panel {
+    max-width: 100%;
+    padding: 1rem 0.9rem calc(5.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .admin-drawer-backdrop {
+    align-items: stretch;
+  }
+
+  .fitdog-alert-filters__more:not([open]) {
+    margin-top: 0;
+  }
+
+  .crossover-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+
+  .crossover-filters > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .crossover-mobile-card {
+    overflow: visible;
+  }
+
+  .crossover-mobile-card__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .crossover-mobile-card__footer .crossover-btn,
+  .crossover-mobile-card__footer button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .crossover-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+
+  .ms-command-toolbar {
+    gap: 0.65rem;
+  }
+
+  .notif-hub-list {
+    max-height: min(62dvh, 720px);
+  }
 }
+
 
 /* ── Crossover Messaging Dashboard ── */
 .crossover-dashboard {

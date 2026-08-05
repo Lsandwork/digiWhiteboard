@@ -391,8 +391,8 @@ export function SupportCommandCenter({ onNavigate }: Props) {
         ))}
       </div>
 
-      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#12161c]/95 p-3 backdrop-blur">
-        <div className="relative min-w-[220px] flex-1">
+      <div className="ms-command-toolbar sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-[#12161c]/95 p-3 backdrop-blur">
+        <div className="relative min-w-0 w-full flex-1 md:min-w-[220px]">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-muted" />
           <input
             className="admin-input w-full pl-10"
@@ -401,18 +401,20 @@ export function SupportCommandCenter({ onNavigate }: Props) {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => { setQuery(""); setFocus("all"); }}>
-          Clear filters
-        </button>
-        <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => onNavigate?.("ms_groomer_complaints")}>
-          Complaints log
-        </button>
-        <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => onNavigate?.("ms_groomer_requests")}>
-          Requests log
-        </button>
-        <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => onNavigate?.("hr_pip")}>
-          Track PIP
-        </button>
+        <div className="ms-command-toolbar__links flex w-full gap-2 overflow-x-auto pb-0.5 md:w-auto md:flex-wrap md:overflow-visible">
+          <button type="button" className="crossover-btn crossover-btn--ghost shrink-0" onClick={() => { setQuery(""); setFocus("all"); }}>
+            Clear filters
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--ghost shrink-0" onClick={() => onNavigate?.("ms_groomer_complaints")}>
+            Complaints log
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--ghost shrink-0" onClick={() => onNavigate?.("ms_groomer_requests")}>
+            Requests log
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--ghost shrink-0" onClick={() => onNavigate?.("hr_pip")}>
+            Track PIP
+          </button>
+        </div>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -429,7 +431,53 @@ export function SupportCommandCenter({ onNavigate }: Props) {
                 View all alerts
               </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="space-y-2 p-3 md:hidden">
+              {loading && !data ? (
+                <p className="py-8 text-center text-sm text-admin-muted">Loading alerts…</p>
+              ) : filteredAlerts.length ? (
+                filteredAlerts.map((alert) => (
+                  <article key={alert.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className={`rounded border px-2 py-0.5 text-xs font-semibold ${severityClass(alert.severity)}`}>
+                        {alert.severity}
+                      </span>
+                      <span className={`text-xs ${alert.sla_remaining_ms < 0 ? "text-rose-300" : "text-admin-muted"}`}>
+                        {formatSla(alert.sla_remaining_ms)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-white">{alert.employee}</p>
+                    <p className="mt-0.5 text-xs text-admin-muted">
+                      {alert.department} · {alert.alert_type} · {formatWhen(alert.triggered_at)}
+                    </p>
+                    <p className="mt-2 line-clamp-3 text-sm text-admin-muted">{alert.summary}</p>
+                    <p className="mt-2 text-xs text-admin-muted">
+                      Manager: {alert.assigned_manager || "Unassigned"} · Ack: {alert.acknowledged ? "Yes" : "No"}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" className="admin-btn-secondary min-h-10 flex-1" onClick={() => setSelectedAlert(alert)}>
+                        <Eye className="h-4 w-4" /> View
+                      </button>
+                      {alert.source === "support_case" ? (
+                        <button
+                          type="button"
+                          className="admin-btn-secondary min-h-10 flex-1"
+                          disabled={busyId === alert.source_id}
+                          onClick={() => void runCaseAction("acknowledge", alert.source_id)}
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> Ack
+                        </button>
+                      ) : null}
+                      <button type="button" className="admin-btn-ghost min-h-10 px-3" aria-label="More" onClick={() => setSelectedAlert(alert)}>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="py-10 text-center text-sm text-admin-muted">No urgent alerts require attention.</p>
+              )}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-black/25 text-xs uppercase tracking-wide text-admin-muted">
                   <tr>
@@ -499,7 +547,40 @@ export function SupportCommandCenter({ onNavigate }: Props) {
                 View all PIPs
               </button>
             </div>
-            <div className="overflow-x-auto">
+            <div className="space-y-2 p-3 md:hidden">
+              {filteredPips.length ? (
+                filteredPips.map((pip) => (
+                  <article key={pip.id} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-white">{pip.employee_name}</p>
+                      <span className={`text-xs font-semibold ${riskClass(pip.risk_level)}`}>{pip.risk_level}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-admin-muted">
+                      {pip.department || "—"} · {pip.stage} · Next {pip.next_review_date || "—"}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                        <div className="h-full rounded-full bg-fitdog-orange" style={{ width: `${pip.progress_percent}%` }} />
+                      </div>
+                      <span className="text-xs text-admin-muted">{pip.progress_percent}%</span>
+                    </div>
+                    <p className="mt-2 text-xs text-admin-muted">
+                      Manager: {pip.manager_name || "—"} · Docs: {pip.documentation_status}
+                    </p>
+                    <button
+                      type="button"
+                      className="admin-btn-secondary mt-3 min-h-10 w-full"
+                      onClick={() => onNavigate?.("hr_pip")}
+                    >
+                      Open PIP
+                    </button>
+                  </article>
+                ))
+              ) : (
+                <p className="py-10 text-center text-sm text-admin-muted">No active PIPs match this view.</p>
+              )}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-black/25 text-xs uppercase tracking-wide text-admin-muted">
                   <tr>
