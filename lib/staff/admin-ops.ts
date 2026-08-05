@@ -554,6 +554,10 @@ export async function dispatchStaffOpsNotificationEvent(
   let state = await loadState(supabase);
   state = notifyState(state, event);
   await saveState(supabase, state);
+  // Critical/Urgent escalations also email Super Admin (lonnie@fitdog.com).
+  void import("@/lib/admin/alert-email")
+    .then(({ maybeEmailStaffOpsCriticalAlert }) => maybeEmailStaffOpsCriticalAlert(supabase, event))
+    .catch(() => undefined);
 }
 
 export async function dispatchPersonalStaffEmailNotification(

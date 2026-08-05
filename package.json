@@ -43,6 +43,7 @@
     "check:display-health": "tsx scripts/check-display-health.ts",
     "test:whiteboard-state": "tsx scripts/test-whiteboard-state.ts",
     "test:shelly-alert": "tsx scripts/test-shelly-alert.ts",
+    "test:critical-alert-email": "tsx scripts/test-critical-alert-email.ts",
     "test:daily-reminders": "tsx scripts/test-daily-reminders.ts",
     "test:write-up-access": "tsx scripts/test-write-up-access.ts",
     "test:help-center-roles": "tsx scripts/test-help-center-roles.ts",
