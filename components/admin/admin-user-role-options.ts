@@ -3,9 +3,9 @@ import { ROLE_LABELS, type DepartmentKey, type RoleKey } from "@/lib/admin/permi
 export const PRIMARY_ROLE_OPTIONS: { value: RoleKey; description: string }[] = [
   { value: "super_admin", description: "Full system access including integrations, API, and permissions matrix." },
   { value: "admin", description: "Manage users and day-to-day admin tools (no integrations or permissions matrix)." },
-  { value: "management", description: "View and assign staff operations; receive management alerts." },
-  { value: "front_desk_coordinator", description: "Push Notices, Yard Push, Front Desk Log, Owner Follow Up, Active Issues." },
-  { value: "team_leader", description: "Team Lead panel: push notices, grooming push, front desk log, and more." },
+  { value: "management", description: "Staff operations plus Route Generator, Sports App Alerts, Walks Board, Vet Visits, and Track Incidents." },
+  { value: "front_desk_coordinator", description: "Push Notices, Yard Push, Front Desk Log, Owner Follow Up, Active Issues, Route Generator, Sports App Alerts, Walks Board, Vet Visits, and Track Incidents." },
+  { value: "team_leader", description: "Team Lead panel: push notices, grooming push, front desk log, Route Generator, Sports App Alerts, Walks Board, Vet Visits, Track Incidents, and more." },
   { value: "groomer", description: "Groomer panel: grooming push, front desk log, notifications, and profile." },
   { value: "trainer", description: "Trainer panel: trainer push, shift log entry, and package & class commissions." },
   { value: "daycare", description: "Dog Handler staff board access." },

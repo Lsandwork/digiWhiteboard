@@ -73,6 +73,7 @@ export type AdminTab =
   | "track_incidents"
   | "fitdog_alerts"
   | "vet_visits"
+  | "pack_pro_training"
   | "analytics"
   | "templates"
   | "notifications"
@@ -128,6 +129,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "track_incidents",
   "fitdog_alerts",
   "vet_visits",
+  "pack_pro_training",
   "analytics",
   "templates",
   "notifications",
@@ -164,9 +166,10 @@ export const ADMIN_SUPPORT_TABS = [
 ] as const;
 
 export function parseAdminBoardType(value: string | null | undefined): AdminBoardType {
-  if (value === "staff") return "staff";
+  if (value === "lobby") return "lobby";
   if (value === "marketing") return "marketing";
-  return "lobby";
+  // Default DigiBoard admin to staff so Operations / Route Generator panels are visible.
+  return "staff";
 }
 
 export function parseAdminTab(value: string | null): AdminTab {
