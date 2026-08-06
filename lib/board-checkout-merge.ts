@@ -2,9 +2,11 @@ import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
-export const BOARD_CHECKOUT_POLL_MIN_MS = 1500;
+export const BOARD_CHECKOUT_POLL_MIN_MS = 500;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
-export const BOARD_CHECKOUT_POLL_MS = 1500;
+export const BOARD_CHECKOUT_POLL_MS = 1000;
+/** TV / cast fallback poll when Realtime is not connected — keep as tight as practical. */
+export const BOARD_CHECKOUT_POLL_CAST_MS = 500;
 export const BOARD_FULL_SYNC_POLL_MS = 20_000;
 /** Full board sync interval when Supabase Realtime is connected. */
 export const BOARD_FULL_SYNC_POLL_LIVE_MS = 60_000;
@@ -20,8 +22,8 @@ export const BOARD_FAST_FETCH_TIMEOUT_MS = 4000;
 /** Consecutive empty basket polls before clearing all checkout rows. */
 export const EMPTY_BASKET_CONFIRM_POLLS = 2;
 
-/** Webhook checkouts may show briefly before the Gingr basket cache includes them. */
-export const WEBHOOK_BASKET_ADD_GRACE_MS = 12_000;
+/** Webhook checkouts stay visible for the full display window (not only a short basket grace). */
+export const WEBHOOK_BASKET_ADD_GRACE_MS = 5 * 60_000;
 
 export function sortCheckoutDogs(dogs: LiveDog[]) {
   return [...dogs].sort(
@@ -128,13 +130,15 @@ export function isFastWebhookTransition(dog: LiveDog) {
 
 export function isWebhookCheckoutWithinAddGrace(dog: LiveDog, nowMs = Date.now()) {
   if (!isFastWebhookTransition(dog) || dog.display_status !== "checking_out") return false;
-  const started = dog.status_started_at ?? dog.updated_at;
-  if (!started) return false;
-  const startedMs = new Date(started).getTime();
-  return Number.isFinite(startedMs) && nowMs - startedMs <= WEBHOOK_BASKET_ADD_GRACE_MS;
+  // Always show live webhook checkouts on TV/staff board until they expire or are cleared.
+  // Basket cache lag must never hide a prompted checkout.
+  if (dog.hidden) return false;
+  const until = dog.display_until ? new Date(dog.display_until).getTime() : null;
+  if (until != null && Number.isFinite(until) && until <= nowMs) return false;
+  return true;
 }
 
-/** Show when in basket, or briefly after webhook prompt while basket cache catches up. */
+/** Show when in basket, or whenever a live webhook checkout is still active. */
 export function shouldShowCheckoutAgainstBasket(dog: LiveDog, gingrCheckoutKeys: Set<string>, nowMs = Date.now()) {
   if (isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)) return true;
   return isWebhookCheckoutWithinAddGrace(dog, nowMs);

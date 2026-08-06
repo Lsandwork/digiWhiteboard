@@ -42,20 +42,33 @@ const webhookCheckout = dog({
   display_status: "checking_out",
   status_started_at: new Date(recentMs).toISOString(),
   updated_at: new Date(recentMs).toISOString(),
+  display_until: new Date(recentMs + 240_000).toISOString(),
   raw_payload: { source: "gingr_webhook", webhook_type: "checking_out" }
 });
 
 assert.equal(includePromptedCheckoutInBoard(webhookCheckout, new Set(), recentMs), true);
 
-const staleCheckout = dog({
+const expiredWebhook = dog({
   current_status: "checking_out",
   display_status: "checking_out",
   status_started_at: "2020-01-01T12:00:00.000Z",
   updated_at: "2020-01-01T12:00:00.000Z",
+  display_until: "2020-01-01T12:04:00.000Z",
   raw_payload: { source: "gingr_webhook", webhook_type: "checking_out" }
 });
-assert.equal(includePromptedCheckoutInBoard(staleCheckout, new Set(), recentMs), false);
-assert.equal(includePromptedCheckoutInBoard(staleCheckout, new Set(["res:res-1"]), recentMs), true);
+assert.equal(includePromptedCheckoutInBoard(expiredWebhook, new Set(), recentMs), false);
+assert.equal(includePromptedCheckoutInBoard(expiredWebhook, new Set(["res:res-1"]), recentMs), true);
+
+const activeWebhookNoBasket = dog({
+  current_status: "checking_out",
+  display_status: "checking_out",
+  status_started_at: new Date(recentMs - 60_000).toISOString(),
+  updated_at: new Date(recentMs - 60_000).toISOString(),
+  display_until: new Date(recentMs + 240_000).toISOString(),
+  raw_payload: { source: "gingr_webhook", webhook_type: "checking_out" }
+});
+assert.equal(includePromptedCheckoutInBoard(activeWebhookNoBasket, new Set(), recentMs), true);
+
 assert.equal(
   includePromptedCheckoutInBoard(
     dog({
@@ -76,6 +89,17 @@ assert.equal(optimisticCheckin?.checking_in[0]?.animal_name, "Atlas");
 const optimisticCheckout = applyOptimisticLiveBoardTransition(emptyBoard, webhookCheckout);
 assert.ok(optimisticCheckout);
 assert.equal(optimisticCheckout?.checking_out.length, 1);
+
+const optimisticCheckoutNoPayload = applyOptimisticLiveBoardTransition(
+  emptyBoard,
+  dog({
+    current_status: "checking_out",
+    display_status: "checking_out",
+    raw_payload: null
+  })
+);
+assert.ok(optimisticCheckoutNoPayload);
+assert.equal(optimisticCheckoutNoPayload?.checking_out.length, 1);
 
 const optimisticRemove = applyOptimisticLiveBoardTransition(
   {

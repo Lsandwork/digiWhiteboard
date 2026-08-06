@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { ADMIN_SESSION_COOKIE, getAdminSessionCookieOptions } from "@/lib/admin/session";
+import { clearAdminSessionCookies } from "@/lib/admin/session";
 
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(ADMIN_SESSION_COOKIE, "", { ...getAdminSessionCookieOptions(0), maxAge: 0 });
+  clearAdminSessionCookies(response, request.headers.get("host"));
   return response;
 }

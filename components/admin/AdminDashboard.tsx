@@ -27,6 +27,7 @@ import { PackageCommissionsPanel } from "@/components/admin/PackageCommissionsPa
 import { TrackIncidentsPanel } from "@/components/admin/TrackIncidentsPanel";
 import { FitdogAlertsPanel } from "@/components/admin/FitdogAlertsPanel";
 import { VetVisitsPanel } from "@/components/admin/VetVisitsPanel";
+import { PackProTrainingPanel } from "@/components/admin/PackProTrainingPanel";
 import { RouteGeneratorPanel } from "@/components/admin/RouteGeneratorPanel";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
@@ -118,11 +119,18 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase();
+    // fitdog.ruffops.com is staff DigiBoard only — keep users off lobby/marketing boards.
+    if (host === "fitdog.ruffops.com" && board !== "staff") {
+      window.localStorage.setItem("fitdog_admin_board", "staff");
+      router.replace(`/admin?board=staff&tab=${tab === "overview" && !searchParams.get("tab") ? "crossover_communication" : tab}`);
+      return;
+    }
     const stored = window.localStorage.getItem("fitdog_admin_board");
     if (!searchParams.get("board") && (stored === "staff" || stored === "marketing")) {
       router.replace(`/admin?board=${stored}`);
     }
-  }, [router, searchParams]);
+  }, [board, router, searchParams, tab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);
@@ -327,9 +335,13 @@ export function AdminDashboard() {
   }
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.replace("/admin/login");
-    router.refresh();
+    try {
+      await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin", cache: "no-store" });
+    } catch {
+      // Still leave the app UI even if the network call fails.
+    }
+    // Hard navigation so middleware re-reads cleared cookies (router.replace can keep a stale session).
+    window.location.assign("/admin/login");
   }
 
   function openBoard() {
@@ -364,7 +376,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "pack_pro_training", "package_commissions", "track_incidents", "vet_visits", "route_generator", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -603,6 +615,7 @@ export function AdminDashboard() {
         {tab === "track_incidents" ? <TrackIncidentsPanel /> : null}
         {tab === "fitdog_alerts" ? <FitdogAlertsPanel /> : null}
         {tab === "vet_visits" ? <VetVisitsPanel /> : null}
+        {tab === "pack_pro_training" ? <PackProTrainingPanel /> : null}
         {tab === "route_generator" ? <RouteGeneratorPanel /> : null}
 
         {tab === "hr_hub" ? (

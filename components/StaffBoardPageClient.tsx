@@ -26,6 +26,11 @@ export function StaffBoardPageClient() {
       route="/staff-cast"
       enabled
       allowStaleReload={!chromecastReceiver}
+      onContentUpdate={() => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("fitdog-cast-keeper-refresh"));
+        }
+      }}
     >
       <BoardClient castKeeperMode overlaysEnabled />
     </CastKeeperProvider>

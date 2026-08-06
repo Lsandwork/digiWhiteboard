@@ -10,7 +10,8 @@ export const FITDOG_ALERT_ALLOWED_ROLES: RoleKey[] = [
   "super_admin",
   "admin",
   "management",
-  "front_desk_coordinator"
+  "front_desk_coordinator",
+  "team_leader"
 ];
 
 export function isFitdogAlertsRole(role?: string | null): boolean {
@@ -28,12 +29,18 @@ export function canManageFitdogAlerts(access: UserAccess | null | undefined, leg
   if (hasPermission(access, "manage_fitdog_alerts")) return true;
   if (!legacyRole && !access) return false;
   const primary = legacyRoleToRoleKey(legacyRole ?? access?.primaryRole ?? null);
-  return primary === "super_admin" || primary === "admin" || primary === "management" || primary === "front_desk_coordinator";
+  return (
+    primary === "super_admin" ||
+    primary === "admin" ||
+    primary === "management" ||
+    primary === "front_desk_coordinator" ||
+    primary === "team_leader"
+  );
 }
 
 export function assertFitdogAlertsAccess(access: UserAccess | null | undefined, legacyRole?: string | null) {
   if (!canViewFitdogAlerts(access, legacyRole)) {
-    const err = new Error("Fitdog Alerts access required.");
+    const err = new Error("Sports App Alerts access required.");
     (err as Error & { status?: number }).status = 403;
     throw err;
   }

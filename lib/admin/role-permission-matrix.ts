@@ -41,6 +41,42 @@ export function buildDefaultRolePermissionMatrix(): RolePermissionMatrix {
   return matrix;
 }
 
+const FLOOR_PANEL_LOCK_PERMISSIONS: PermissionKey[] = [
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.view_audit",
+  "view_fitdog_alerts",
+  "manage_fitdog_alerts",
+  "receive_walks_board_reminders",
+  "view_vet_visits",
+  "manage_vet_visits",
+  "view_track_incidents",
+  "manage_track_incidents"
+];
+
+/** Panel permissions that must stay enabled for floor roles even if an older matrix snapshot disabled them. */
+const REQUIRED_FLOOR_PANEL_PERMISSIONS: Partial<Record<RoleKey, PermissionKey[]>> = {
+  management: [...FLOOR_PANEL_LOCK_PERMISSIONS],
+  front_desk_coordinator: [...FLOOR_PANEL_LOCK_PERMISSIONS],
+  team_leader: [...FLOOR_PANEL_LOCK_PERMISSIONS]
+};
+
+function applyRequiredFloorPanelPermissions(matrix: RolePermissionMatrix) {
+  for (const [role, permissions] of Object.entries(REQUIRED_FLOOR_PANEL_PERMISSIONS) as Array<
+    [RoleKey, PermissionKey[]]
+  >) {
+    if (!matrix[role]) matrix[role] = {};
+    for (const permission of permissions) {
+      matrix[role][permission] = true;
+    }
+  }
+  return matrix;
+}
+
 function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): RolePermissionMatrix {
   const merged = buildDefaultRolePermissionMatrix();
   for (const role of Object.keys(merged)) {
@@ -60,7 +96,7 @@ function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): 
       }
     }
   }
-  return merged;
+  return applyRequiredFloorPanelPermissions(merged);
 }
 
 export async function loadRolePermissionMatrix(supabase: SupabaseClient): Promise<RolePermissionMatrix> {
@@ -91,8 +127,11 @@ export function permissionsForRoleFromMatrix(role: RoleKey, matrix: RolePermissi
   if (role === "super_admin") {
     return [...ROLE_PERMISSIONS.super_admin];
   }
-  const roleMap = matrix[role];
-  if (!roleMap) {
+  const roleMap = { ...(matrix[role] ?? {}) };
+  for (const permission of REQUIRED_FLOOR_PANEL_PERMISSIONS[role] ?? []) {
+    roleMap[permission] = true;
+  }
+  if (!matrix[role] && Object.keys(roleMap).length === 0) {
     return staticPermissionsForRoles([role]);
   }
   const enabled = ALL_CATALOG_PERMISSION_KEYS.filter((key) => roleMap[key]);
@@ -115,6 +154,8 @@ export function permissionsForRolesFromMatrix(roles: RoleKey[], matrix: RolePerm
 export function isPermissionLockedForRole(role: RoleKey, permission: PermissionKey): boolean {
   if (role === "super_admin") return true;
   if (role === "admin" && SUPER_ADMIN_ONLY_PERMISSIONS.has(permission)) return true;
+  const required = REQUIRED_FLOOR_PANEL_PERMISSIONS[role];
+  if (required?.includes(permission)) return true;
   return false;
 }
 
