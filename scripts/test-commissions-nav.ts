@@ -45,11 +45,15 @@ const teamLeadTabs: AdminTab[] = [
   "yard_push_notices",
   "grooming_push",
   "crossover_communication",
+  "route_generator",
+  "fitdog_alerts",
+  "walks_board",
+  "vet_visits",
+  "track_incidents",
   "bulk_photo_upload",
   "management_support",
   "notifications",
   "yard_links",
-  "walks_board",
   "settings",
   "help"
 ];
@@ -59,6 +63,11 @@ assert.equal(
   "Front Desk & Floor",
   "team leads must see Bulk Photo Upload in nav"
 );
+assert.equal(findNavSectionForTab(teamLeadNav, "route_generator"), "Dashboard");
+assert.equal(findNavSectionForTab(teamLeadNav, "fitdog_alerts"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "walks_board"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "vet_visits"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(teamLeadNav, "track_incidents"), "Front Desk & Floor");
 
 const coordinatorTabs: AdminTab[] = [
   "push_notices",
@@ -183,9 +192,9 @@ assert.ok(
   "Management section should bucket its tab links for collapsible nav"
 );
 assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "ms_hub"), "staff_management");
-assert.equal(findNavSectionForTab(adminWithSubmitNav, "track_incidents"), "Management");
-assert.equal(findNavSectionForTab(adminWithSubmitNav, "vet_visits"), "Management");
-assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "track_incidents"), "staff_management");
-assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "vet_visits"), "staff_management");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "track_incidents"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "vet_visits"), "Front Desk & Floor");
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "track_incidents"), "staff_operations");
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "vet_visits"), "staff_operations");
 
 console.log("commissions nav tests passed");
