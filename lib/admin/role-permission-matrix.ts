@@ -41,6 +41,36 @@ export function buildDefaultRolePermissionMatrix(): RolePermissionMatrix {
   return matrix;
 }
 
+/** Panel permissions that must stay enabled for floor roles even if an older matrix snapshot disabled them. */
+const REQUIRED_FLOOR_PANEL_PERMISSIONS: Partial<Record<RoleKey, PermissionKey[]>> = {
+  front_desk_coordinator: [
+    "view_fitdog_alerts",
+    "manage_fitdog_alerts",
+    "view_vet_visits",
+    "manage_vet_visits",
+    "view_track_incidents",
+    "manage_track_incidents"
+  ],
+  team_leader: [
+    "view_vet_visits",
+    "manage_vet_visits",
+    "view_track_incidents",
+    "manage_track_incidents"
+  ]
+};
+
+function applyRequiredFloorPanelPermissions(matrix: RolePermissionMatrix) {
+  for (const [role, permissions] of Object.entries(REQUIRED_FLOOR_PANEL_PERMISSIONS) as Array<
+    [RoleKey, PermissionKey[]]
+  >) {
+    if (!matrix[role]) matrix[role] = {};
+    for (const permission of permissions) {
+      matrix[role][permission] = true;
+    }
+  }
+  return matrix;
+}
+
 function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): RolePermissionMatrix {
   const merged = buildDefaultRolePermissionMatrix();
   for (const role of Object.keys(merged)) {
@@ -60,7 +90,7 @@ function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): 
       }
     }
   }
-  return merged;
+  return applyRequiredFloorPanelPermissions(merged);
 }
 
 export async function loadRolePermissionMatrix(supabase: SupabaseClient): Promise<RolePermissionMatrix> {

@@ -127,7 +127,11 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("assign_active_issue", "Assign Active Issue", "Assign active issues."),
       p("resolve_active_issue", "Resolve Active Issue", "Resolve active issues."),
       p("view_fitdog_alerts", "View Fitdog Alerts", "View Fitdog payment and operations alerts under Operations."),
-      p("manage_fitdog_alerts", "Manage Fitdog Alerts", "Assign, resolve, and sync Fitdog payment alerts.")
+      p("manage_fitdog_alerts", "Manage Fitdog Alerts", "Assign, resolve, and sync Fitdog payment alerts."),
+      p("view_vet_visits", "View Vet Visits", "View vet visit logs and owner follow-up status."),
+      p("manage_vet_visits", "Manage Vet Visits", "Create and update vet visits."),
+      p("view_track_incidents", "View Track Incidents", "View Gingr and manual incident reports."),
+      p("manage_track_incidents", "Manage Track Incidents", "Create, sync, and update track incidents.")
     ]
   },
   {
