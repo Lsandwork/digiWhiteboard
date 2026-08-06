@@ -85,6 +85,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     full_name?: string;
     email?: string;
+    phone?: string | null;
     role?: AdminUserRole;
     primary_role?: RoleKey;
     additional_roles?: RoleKey[];
@@ -142,7 +143,8 @@ export async function POST(request: Request) {
       password,
       role: legacyRole,
       force_password_change: body.force_password_change ?? true,
-      created_by: normalizeAdminUserId(session?.adminUserId)
+      created_by: normalizeAdminUserId(session?.adminUserId),
+      phone: body.phone
     });
 
     await setUserAccess(supabase, user.id, {

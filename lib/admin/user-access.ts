@@ -76,6 +76,11 @@ async function loadState(supabase: SupabaseClient): Promise<UserAccessState> {
   return parseState(settings[SETTINGS_STORE_KEY]);
 }
 
+/** Read-only access assignments for alert fanout (SMS recipients, etc.). */
+export async function loadAdminUserAccessAssignments(supabase: SupabaseClient) {
+  return loadState(supabase);
+}
+
 function resolveUserPermissions(
   roles: RoleKey[],
   matrix: Awaited<ReturnType<typeof loadRolePermissionMatrix>>,

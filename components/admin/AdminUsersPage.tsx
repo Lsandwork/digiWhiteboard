@@ -124,7 +124,10 @@ export function AdminUsersPage() {
       <header className="admin-page-header">
         <div>
           <h2 className="admin-page-title">Admin Users</h2>
-          <p className="admin-page-subtitle">Manage staff accounts, roles, departments, and password access.</p>
+          <p className="admin-page-subtitle">
+            Manage staff accounts, roles, departments, and password access. Add a mobile number on Super Admin, Admin,
+            and Management accounts to receive critical and urgent alert texts.
+          </p>
         </div>
         {canManage ? (
           <button type="button" className="admin-btn-primary inline-flex items-center gap-2" onClick={() => setAddOpen(true)}>
@@ -163,6 +166,12 @@ export function AdminUsersPage() {
           emptyDescription="Add your first admin user to share dashboard access safely."
           columns={[
             { key: "name", header: "Name", getSortValue: (row) => row.full_name, render: (row) => <span className="font-semibold text-white">{row.full_name}</span> },
+            {
+              key: "phone",
+              header: "Phone",
+              getSortValue: (row) => row.phone ?? "",
+              render: (row) => <span className="text-slate-300">{row.phone || "—"}</span>
+            },
             { key: "email", header: "Email / Username", getSortValue: (row) => row.email, render: (row) => row.email },
             {
               key: "role",
@@ -493,6 +502,7 @@ function AddUserModal({
   const [form, setForm] = useState({
     full_name: "",
     email: "",
+    phone: "",
     primary_role: "front_desk_coordinator" as RoleKey,
     additional_roles: [] as RoleKey[],
     departments: ["front_desk"] as DepartmentKey[],
@@ -507,6 +517,7 @@ function AddUserModal({
       setForm({
         full_name: "",
         email: "",
+        phone: "",
         primary_role: "front_desk_coordinator",
         additional_roles: [],
         departments: ["front_desk"],
@@ -530,6 +541,16 @@ function AddUserModal({
       <div className="grid gap-4">
         <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
         <Field label="Email / username"><input className="admin-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+        <Field label="Mobile phone (alert SMS)">
+          <input
+            className="admin-input"
+            type="tel"
+            inputMode="tel"
+            placeholder="+1 310 555 0100"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          />
+        </Field>
         <PrimaryRoleChoiceGroup value={form.primary_role} actorIsSuperAdmin={actorIsSuperAdmin} onChange={(primary_role) => setForm({ ...form, primary_role })} />
         <MultiSelectChips
           label="Additional roles"
@@ -577,6 +598,7 @@ function EditUserModal({
   const [form, setForm] = useState({
     full_name: user.full_name,
     email: user.email,
+    phone: user.phone ?? "",
     primary_role: initialAccess.primaryRole,
     additional_roles: initialAccess.roles.filter((role) => role !== initialAccess.primaryRole),
     departments: initialAccess.departments,
@@ -589,6 +611,7 @@ function EditUserModal({
       setForm({
         full_name: user.full_name,
         email: user.email,
+        phone: user.phone ?? "",
         primary_role: access.primaryRole,
         additional_roles: access.roles.filter((role) => role !== access.primaryRole),
         departments: access.departments,
@@ -613,6 +636,17 @@ function EditUserModal({
         ) : null}
         <Field label="Full name"><input className="admin-input" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} disabled={readOnly} /></Field>
         <Field label="Email / username"><input className="admin-input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} disabled={readOnly} /></Field>
+        <Field label="Mobile phone (alert SMS)">
+          <input
+            className="admin-input"
+            type="tel"
+            inputMode="tel"
+            placeholder="+1 310 555 0100"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            disabled={readOnly}
+          />
+        </Field>
         <PrimaryRoleChoiceGroup value={form.primary_role} actorIsSuperAdmin={actorIsSuperAdmin} onChange={(primary_role) => setForm({ ...form, primary_role })} />
         <MultiSelectChips
           label="Additional roles"

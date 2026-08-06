@@ -298,9 +298,22 @@ export type AdminUserRecord = {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  /** Mobile for critical/urgent alert SMS (admin/management recipients). */
+  phone?: string | null;
   avatar_url?: string | null;
   theme_preference?: "light" | "dark";
 };
+
+/** Normalize staff phone for storage; empty clears the field. */
+export function normalizeAdminUserPhone(phone: string | null | undefined) {
+  const raw = String(phone ?? "").trim();
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  if (digits.length >= 10) return `+${digits}`;
+  return raw;
+}
 
 export type AdminUserPublic = Omit<AdminUserRecord, "password_hash">;
 
@@ -430,12 +443,30 @@ export async function findAdminUserByEmail(supabase: SupabaseClient, email: stri
   return null;
 }
 
+const ADMIN_USER_PUBLIC_COLUMNS =
+  "id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by, phone, avatar_url";
+
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
   const { data, error } = await supabase
     .from("admin_users")
-    .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
+    .select(ADMIN_USER_PUBLIC_COLUMNS)
     .order("created_at", { ascending: true });
   if (error) {
+    // Older DBs without phone yet — retry without the column.
+    if (error.message?.includes("phone") || error.code === "42703") {
+      const fallback = await supabase
+        .from("admin_users")
+        .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by, avatar_url")
+        .order("created_at", { ascending: true });
+      if (fallback.error) {
+        if (isMissingAdminUsersTable(fallback.error)) {
+          const state = await loadFallbackAdminUsersState(supabase);
+          return state.users.map(sanitizeAdminUser);
+        }
+        throwAdminUserError(fallback.error);
+      }
+      return (fallback.data ?? []) as AdminUserPublic[];
+    }
     if (isMissingAdminUsersTable(error)) {
       const state = await loadFallbackAdminUsersState(supabase);
       return state.users.map(sanitizeAdminUser);
@@ -486,9 +517,11 @@ export async function createAdminUser(
     role: AdminUserRole;
     force_password_change?: boolean;
     created_by?: string | null;
+    phone?: string | null;
   }
 ) {
   const password_hash = await hashAdminPassword(input.password);
+  const phone = normalizeAdminUserPhone(input.phone);
   const { data, error } = await supabase
     .from("admin_users")
     .insert({
@@ -497,9 +530,10 @@ export async function createAdminUser(
       password_hash,
       role: input.role,
       force_password_change: input.force_password_change ?? false,
-      created_by: normalizeAdminUserId(input.created_by)
+      created_by: normalizeAdminUserId(input.created_by),
+      phone
     })
-    .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
+    .select(ADMIN_USER_PUBLIC_COLUMNS)
     .single();
   if (error) {
     if (isMissingAdminUsersTable(error)) {
@@ -520,10 +554,28 @@ export async function createAdminUser(
         last_login_at: null,
         created_at: now,
         updated_at: now,
-        created_by: normalizeAdminUserId(input.created_by)
+        created_by: normalizeAdminUserId(input.created_by),
+        phone
       };
       await saveFallbackAdminUsersState(supabase, { users: [...state.users, user] });
       return sanitizeAdminUser(user);
+    }
+    // Retry without phone if migration not applied yet.
+    if (error.message?.includes("phone") || error.code === "42703") {
+      const retry = await supabase
+        .from("admin_users")
+        .insert({
+          full_name: input.full_name.trim(),
+          email: input.email.trim().toLowerCase(),
+          password_hash,
+          role: input.role,
+          force_password_change: input.force_password_change ?? false,
+          created_by: normalizeAdminUserId(input.created_by)
+        })
+        .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
+        .single();
+      if (retry.error) throwAdminUserError(retry.error);
+      return retry.data as AdminUserPublic;
     }
     throwAdminUserError(error);
   }
@@ -533,7 +585,7 @@ export async function createAdminUser(
 export async function updateAdminUser(
   supabase: SupabaseClient,
   id: string,
-  patch: Partial<Pick<AdminUserRecord, "full_name" | "email" | "role" | "status" | "force_password_change">>
+  patch: Partial<Pick<AdminUserRecord, "full_name" | "email" | "role" | "status" | "force_password_change" | "phone">>
 ) {
   const normalizedPatch = { ...patch };
   if (normalizedPatch.email) {
@@ -544,12 +596,15 @@ export async function updateAdminUser(
     }
     normalizedPatch.email = nextEmail;
   }
+  if ("phone" in normalizedPatch) {
+    normalizedPatch.phone = normalizeAdminUserPhone(normalizedPatch.phone);
+  }
 
   const { data, error } = await supabase
     .from("admin_users")
     .update({ ...normalizedPatch, updated_at: new Date().toISOString() })
     .eq("id", id)
-    .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
+    .select(ADMIN_USER_PUBLIC_COLUMNS)
     .maybeSingle();
   if (error) {
     if (isMissingAdminUsersTable(error)) {
@@ -570,6 +625,18 @@ export async function updateAdminUser(
         users: state.users.map((user) => (user.id === id ? updated : user))
       });
       return sanitizeAdminUser(updated);
+    }
+    if ((error.message?.includes("phone") || error.code === "42703") && "phone" in normalizedPatch) {
+      const { phone: _phone, ...withoutPhone } = normalizedPatch;
+      const retry = await supabase
+        .from("admin_users")
+        .update({ ...withoutPhone, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .select("id, full_name, email, role, status, force_password_change, last_login_at, created_at, updated_at, created_by")
+        .maybeSingle();
+      if (retry.error) throwAdminUserError(retry.error);
+      if (!retry.data) throw new Error("Admin user not found.");
+      return retry.data as AdminUserPublic;
     }
     throwAdminUserError(error);
   }
