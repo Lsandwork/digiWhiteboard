@@ -8,7 +8,7 @@ Steps (tracked on `ruffly_settings.setup_step`):
 3. Connect/test Gingr
 4. Register Gingr webhook
 5. Initial contact sync
-6. SMS / email providers
+6. SMS / email providers (Twilio US SMS needs A2P 10DLC or verified toll-free; credentials alone are not enough)
 7. Consent wording
 8. Review destinations
 9. Web chat install

@@ -10,6 +10,8 @@
 ## SMS (Twilio-compatible)
 - Endpoint: `POST /api/ruffly/webhooks/sms`
 - Handles opt-out language and inbound inbox messages
+- Status callback: `POST /api/ruffly/webhooks/sms-status` (delivery/undelivered + Twilio error codes)
+- Prefer `TWILIO_MESSAGING_SERVICE_SID` for outbound sends (A2P / toll-free sender pool)
 
 ## Replay
 Super Admin can re-queue failed events by inserting a `gingr_webhook_process` job for the event id (Integrations → logs UI planned; API job enqueue available).
