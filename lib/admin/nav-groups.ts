@@ -53,9 +53,13 @@ export const AUTOMATIC_BLOG_NAV_ROUTE: NavRouteLeaf = {
 
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
-  options?: { includeRuffly?: boolean }
+  options?: { includeRuffly?: boolean; includeRouteGenerator?: boolean }
 ): NavEntry[] {
-  const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE];
+  const globalSection: NavEntry[] = [section("global_apps", "Applications")];
+  if (options?.includeRouteGenerator) {
+    globalSection.push(leaf("route_generator"));
+  }
+  globalSection.push(GINGR_NAV_ROUTE);
   if (options?.includeRuffly !== false) {
     globalSection.push(RUFFLY_NAV_ROUTE);
   }
@@ -77,20 +81,12 @@ export function insertBlogGeneratorIntoDashboard(entries: NavEntry[], includeBlo
     (entry) => entry.type === "section" && entry.id === "staff_dashboard"
   );
   if (dashboardIdx >= 0) {
-    // Keep Blog Generator near the top of Dashboard (after Route Generator when present)
-    // so it is not buried under the fold / collapsed section scroll.
+    // Keep Blog Generator near the top of Dashboard so it is not buried under the fold.
     let sectionEnd = dashboardIdx + 1;
-    let insertAt = dashboardIdx + 1;
-    let afterRouteGenerator = -1;
     while (sectionEnd < entries.length && entries[sectionEnd].type !== "section") {
-      const entry = entries[sectionEnd];
-      if (entry.type === "item" && entry.tab === "route_generator") {
-        afterRouteGenerator = sectionEnd + 1;
-      }
       sectionEnd += 1;
     }
-    if (afterRouteGenerator >= 0) insertAt = afterRouteGenerator;
-    else if (sectionEnd > dashboardIdx + 1) insertAt = Math.min(dashboardIdx + 3, sectionEnd);
+    const insertAt = sectionEnd > dashboardIdx + 1 ? Math.min(dashboardIdx + 1, sectionEnd) : dashboardIdx + 1;
     return [...entries.slice(0, insertAt), AUTOMATIC_BLOG_NAV_ROUTE, ...entries.slice(insertAt)];
   }
 
@@ -339,13 +335,11 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       ...sectionEntries(
         "staff_dashboard",
         "Dashboard",
-        // Route Generator sits under Dashboard (not buried in Management) so it stays
-        // visible without expanding a collapsed section / scrolling an icon rail.
+        // Route Generator lives under Applications (with Gingr / Ruffly).
         singles(
           [
             "demo_push",
             "overview",
-            "route_generator",
             "whiteboard_preview",
             "display",
             "remote_cast",
@@ -642,7 +636,8 @@ export function buildStaffPanelNav(
   else entries = buildAdminNav(visibleTabs, board);
   entries = insertBlogGeneratorIntoDashboard(entries, roleCanSeeBlogNav(role));
   return appendAuthenticatedGlobalRoutes(entries, {
-    includeRuffly: roleCanSeeRufflyNav(role)
+    includeRuffly: roleCanSeeRufflyNav(role),
+    includeRouteGenerator: visibleTabs.includes("route_generator")
   });
 }
 

@@ -654,6 +654,13 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "receive_walks_board_reminders",
   "manage_photo_upload_queue",
   "download_photo_uploads",
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.view_audit",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -696,6 +703,7 @@ export const TEAM_LEADER_TABS = [
   "walks_board",
   "notifications",
   "management_support",
+  "route_generator",
   "settings",
   "help"
 ] as const;
@@ -986,7 +994,8 @@ export const PERMISSION_PREVIEW_LABELS: Partial<Record<PermissionKey, string>> =
   view_staff_directory: "Staff Directory",
   view_integration_status: "Integrations Status",
   manage_templates: "Templates",
-  receive_admin_alerts: "Management Alerts"
+  receive_admin_alerts: "Management Alerts",
+  "route_generator.view": "Route Generator"
 };
 
 export function previewLabelsForAccess(access: UserAccess): string[] {

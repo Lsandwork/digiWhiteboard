@@ -183,14 +183,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ]
   },
   {
-    key: "hr_staff",
-    label: "HR & Staff Directory",
+    key: "applications",
+    label: "Applications",
     permissions: [
-      p("view_staff_directory", "View Staff Directory", "View staff directory."),
-      p("manage_staff_directory", "Manage Staff Directory", "Edit staff directory entries."),
-      p("view_package_commissions", "View Package & Class Commissions", "View trainer package and class commissions."),
-      p("comment_package_commissions", "Comment on Commissions", "Add comments or disputes to commission rows."),
-      p("manage_package_commissions", "Manage Package & Class Commissions", "Add, confirm, and administer trainer commissions."),
       p("route_generator.view", "Route Generator: View", "View Route Generator plans and maps."),
       p("route_generator.pull_report", "Route Generator: Pull Report", "Pull Fitdog pickup/drop-off reports."),
       p("route_generator.generate", "Route Generator: Generate", "Generate and re-optimize routes."),
@@ -199,6 +194,17 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("route_generator.export", "Route Generator: Export", "Export validated Samsara CSV files."),
       p("route_generator.manage_settings", "Route Generator: Manage Settings", "Manage vans, depot, integrations, and templates."),
       p("route_generator.view_audit", "Route Generator: View Audit", "View Route Generator audit events.")
+    ]
+  },
+  {
+    key: "hr_staff",
+    label: "HR & Staff Directory",
+    permissions: [
+      p("view_staff_directory", "View Staff Directory", "View staff directory."),
+      p("manage_staff_directory", "Manage Staff Directory", "Edit staff directory entries."),
+      p("view_package_commissions", "View Package & Class Commissions", "View trainer package and class commissions."),
+      p("comment_package_commissions", "Comment on Commissions", "Add comments or disputes to commission rows."),
+      p("manage_package_commissions", "Manage Package & Class Commissions", "Add, confirm, and administer trainer commissions.")
     ]
   },
   {

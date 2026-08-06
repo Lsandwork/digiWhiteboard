@@ -157,9 +157,11 @@ const dashboardIdx = adminNav.findIndex((entry) => entry.type === "section" && e
 assert.ok(dashboardIdx >= 0, "staff panel should include Dashboard");
 const blogIdx = adminNav.findIndex((entry) => entry.type === "route" && entry.id === "automatic-blog");
 assert.ok(blogIdx > dashboardIdx, "Blog Generator should sit under Dashboard");
+const appsIdx = adminNav.findIndex((entry) => entry.type === "section" && entry.id === "global_apps");
+assert.ok(appsIdx >= 0, "Applications section should exist");
 const routeGenIdx = adminNav.findIndex((entry) => entry.type === "item" && entry.tab === "route_generator");
-assert.ok(routeGenIdx > dashboardIdx, "Route Generator should be under Dashboard");
-assert.equal(blogIdx, routeGenIdx + 1, "Blog Generator should sit directly under Route Generator");
+assert.ok(routeGenIdx > appsIdx, "Route Generator should be under Applications");
+assert.ok(blogIdx < appsIdx, "Blog Generator should not live under Applications");
 const nextSectionAfterDashboard = adminNav.findIndex(
   (entry, index) => index > dashboardIdx && entry.type === "section"
 );
@@ -167,8 +169,16 @@ assert.ok(
   nextSectionAfterDashboard < 0 || blogIdx < nextSectionAfterDashboard,
   "Blog Generator must remain inside the Dashboard section"
 );
-const appsIdx = adminNav.findIndex((entry) => entry.type === "section" && entry.id === "global_apps");
-assert.ok(appsIdx < 0 || blogIdx < appsIdx, "Blog Generator should not live under Applications");
+
+const teamLeadNav = buildStaffPanelNav(staffTabs, "staff", "team_leader");
+assert.ok(
+  teamLeadNav.some((entry) => entry.type === "item" && entry.tab === "route_generator"),
+  "Team Leads with Route Generator access should see it under Applications"
+);
+assert.ok(
+  teamLeadNav.some((entry) => entry.type === "section" && entry.id === "global_apps"),
+  "Team Lead nav should include Applications"
+);
 
 const trainerNav = buildStaffPanelNav(staffTabs, "staff", "trainer");
 assert.equal(

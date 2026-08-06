@@ -5,7 +5,7 @@ import {
   accessFromLegacyRole,
   canAccessAdminTab
 } from "../lib/admin/permissions";
-import { buildAdminNav } from "../lib/admin/nav-groups";
+import { buildAdminNav, buildStaffPanelNav } from "../lib/admin/nav-groups";
 import { ADMIN_TABS } from "../lib/admin/types";
 import { parseAddress, householdKey } from "../lib/route-generator/address";
 import { capacityAllows, resolveLoadUnits, isServiceEligibleForVan } from "../lib/route-generator/capacity";
@@ -70,11 +70,16 @@ assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "route_generator", "trainer", "staff"),
   false
 );
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "route_generator", "team_leader", "staff"),
+  true,
+  "Team Leads with transportation access can open Route Generator"
+);
 
 {
   const access = accessFromLegacyRole(null, null, "owner_admin");
   const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, "owner_admin", "staff"));
-  const nav = buildAdminNav(visible, "staff");
+  const nav = buildStaffPanelNav(visible, "staff", "owner_admin");
   let section: string | null = null;
   let routeGeneratorSection: string | null = null;
   for (const entry of nav) {
@@ -89,8 +94,18 @@ assert.equal(
   }
   assert.equal(
     routeGeneratorSection,
-    "staff_dashboard",
-    "Route Generator must stay under Dashboard so the nav click is always reachable"
+    "global_apps",
+    "Route Generator must sit under Applications with Gingr / Ruffly"
+  );
+
+  const marlonNav = buildStaffPanelNav(
+    ADMIN_TABS.filter((tab) => canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), tab, "team_leader", "staff")),
+    "staff",
+    "team_leader"
+  );
+  assert.ok(
+    marlonNav.some((entry) => entry.type === "item" && entry.tab === "route_generator"),
+    "marlon@fitdog.com (Team Lead) must see Route Generator under Applications"
   );
 }
 
