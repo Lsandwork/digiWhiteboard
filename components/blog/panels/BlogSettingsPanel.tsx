@@ -114,6 +114,41 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
           </select>
         </label>
         <label className="block text-sm">
+          <span className="mb-1 block">Help overview video URL (optional)</span>
+          <input
+            type="url"
+            className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
+            placeholder="https://…/blog-generator-overview.mp4"
+            value={String(
+              ((settings.provider_config as Record<string, unknown> | undefined)?.help_tutorial_video_url as string) || ""
+            )}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                provider_config: {
+                  ...((settings.provider_config as Record<string, unknown>) || {}),
+                  help_tutorial_video_url: e.target.value
+                }
+              })
+            }
+            onBlur={() =>
+              void save({
+                provider_config: {
+                  ...((settings.provider_config as Record<string, unknown>) || {}),
+                  help_tutorial_video_url: String(
+                    ((settings.provider_config as Record<string, unknown> | undefined)?.help_tutorial_video_url as string) ||
+                      ""
+                  ).trim() || null
+                }
+              })
+            }
+          />
+          <span className="mt-1 block text-xs text-slate-500">
+            Powers the “Watch 2-Minute Overview” button on the How to Use guide. Leave blank to show “Tutorial Video Not
+            Configured.” You can also set NEXT_PUBLIC_BLOG_TUTORIAL_VIDEO_URL.
+          </span>
+        </label>
+        <label className="block text-sm">
           <span className="mb-1 block">Public AI disclosure (optional)</span>
           <textarea
             className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
+import { BlogContextualHelpLink } from "@/components/blog/help/BlogContextualHelpLink";
+import type { BlogHelpStepId } from "@/lib/blog/help-guide";
 
 type Article = {
   id: string;
@@ -15,9 +17,19 @@ type Article = {
   updated_at?: string;
 };
 
+function helpStepForTitle(title: string): BlogHelpStepId | null {
+  const lower = title.toLowerCase();
+  if (lower.includes("review")) return "review";
+  if (lower.includes("calendar") || lower.includes("scheduled")) return "publish";
+  if (lower.includes("draft")) return "create";
+  if (lower.includes("published")) return "performance";
+  return null;
+}
+
 export function BlogArticlesPanel({ title, statuses }: { title: string; statuses: string }) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const helpStep = helpStepForTitle(title);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,9 +50,12 @@ export function BlogArticlesPanel({ title, statuses }: { title: string; statuses
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-xl font-semibold">{title}</h2>
-        <p className="text-sm text-slate-600">Statuses: {statuses}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">{title}</h2>
+          <p className="text-sm text-slate-600">Statuses: {statuses}</p>
+        </div>
+        {helpStep ? <BlogContextualHelpLink step={helpStep} /> : null}
       </div>
       {error ? <p className="text-sm text-amber-700">{error}</p> : null}
       <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
@@ -57,7 +72,7 @@ export function BlogArticlesPanel({ title, statuses }: { title: string; statuses
             {articles.map((article) => (
               <tr key={article.id} className="border-t border-slate-100 dark:border-slate-800">
                 <td className="px-3 py-2">
-                  <Link href={`${BLOG_APP_PATH}?page=editor&id=${article.id}`} className="text-emerald-700 hover:underline">
+                  <Link href={`${BLOG_APP_PATH}?page=editor&id=${article.id}`} className="text-[var(--fitdog-orange,#ff6f26)] hover:underline">
                     {article.title}
                   </Link>
                 </td>

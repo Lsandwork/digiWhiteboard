@@ -14,6 +14,7 @@ import { BlogMediaPanel } from "@/components/blog/panels/BlogMediaPanel";
 import { BlogSetupWizardPanel } from "@/components/blog/panels/BlogSetupWizardPanel";
 import { BlogGenericPanel } from "@/components/blog/panels/BlogGenericPanel";
 import { BlogUnavailablePanel } from "@/components/blog/panels/BlogUnavailablePanel";
+import { BlogHelpRedirect } from "@/components/blog/help/BlogHelpRedirect";
 
 type Props = {
   page: BlogPageId;
@@ -145,6 +146,8 @@ export function BlogWorkspace({
           actionHref="/admin/automatic-blog?page=settings"
         />
       );
+    case "help":
+      return <BlogHelpRedirect />;
     default:
       return (
         <BlogDashboardPanel

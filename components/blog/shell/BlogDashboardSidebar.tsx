@@ -13,6 +13,7 @@ import {
   FileText,
   FolderOpen,
   Gauge,
+  HelpCircle,
   Image as ImageIcon,
   LayoutDashboard,
   Mail,
@@ -29,6 +30,7 @@ import {
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
 import { BLOG_DASHBOARD_NAV, type BlogDashboardNavItem } from "@/lib/blog/dashboard-nav";
 import { FITDOG_BLOG_LOGO } from "@/lib/blog/brand";
+import { BLOG_HELP_GUIDE_PATH } from "@/lib/blog/help-guide";
 import type { BlogPageId } from "@/lib/blog/constants";
 
 const ICONS: Record<string, typeof LayoutDashboard> = {
@@ -52,7 +54,8 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   analytics: BarChart3,
   "search-console": Search,
   settings: Settings,
-  promotions: Gauge
+  promotions: Gauge,
+  help: HelpCircle
 };
 
 type Counts = Partial<Record<NonNullable<BlogDashboardNavItem["badgeKey"]>, number>>;
@@ -115,10 +118,10 @@ export function BlogDashboardSidebar({
               <div key={section.id} className="blog-dash__nav-section">
                 {!collapsed ? <p className="blog-dash__nav-label">{section.label}</p> : null}
                 {items.map((item) => {
-                  const active = page === item.id || (item.id === "overview" && page === "overview");
+                  const href = item.id === "help" ? BLOG_HELP_GUIDE_PATH : `${BLOG_APP_PATH}?page=${item.id}`;
+                  const active = item.id === "help" ? false : page === item.id || (item.id === "overview" && page === "overview");
                   const Icon = ICONS[item.id] || LayoutDashboard;
                   const badge = item.badgeKey ? formatBadge(counts[item.badgeKey]) : null;
-                  const href = `${BLOG_APP_PATH}?page=${item.id}`;
                   return (
                     <Link
                       key={item.id}

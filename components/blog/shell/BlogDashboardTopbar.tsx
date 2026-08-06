@@ -253,7 +253,7 @@ export function BlogDashboardTopbar({
           <Bell className="h-4 w-4" />
           {notificationCount > 0 ? <span className="blog-dash__notif-dot">{notificationCount > 9 ? "9+" : notificationCount}</span> : null}
         </Link>
-        <Link href={`${BLOG_APP_PATH}?page=setup`} className="blog-dash__icon-btn" aria-label="Help and setup">
+        <Link href="/admin/blog/help/how-to-use-blog-generator" className="blog-dash__icon-btn" aria-label="Help and how to use">
           <HelpCircle className="h-4 w-4" />
         </Link>
         <div className="relative">

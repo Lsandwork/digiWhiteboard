@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
+import { BlogContextualHelpLink } from "@/components/blog/help/BlogContextualHelpLink";
 
 type Topic = { id: string; title: string; topic_quality_score?: number; status: string; reader_concern?: string };
 
@@ -65,6 +66,9 @@ export function BlogGeneratePanel() {
           Runs topic brief → Human-First Writer → empathy, practical, natural-voice, SEO, fact-check, brand, and final human-quality agents.
           Auto-publish stays off.
         </p>
+        <div className="mt-2">
+          <BlogContextualHelpLink step="create" label="Learn how to create articles" />
+        </div>
       </div>
       <label className="block text-sm">
         <span className="mb-1 block font-medium">Approved / scored topic</span>

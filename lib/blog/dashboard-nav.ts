@@ -67,7 +67,8 @@ export const BLOG_DASHBOARD_NAV: BlogDashboardNavSection[] = [
     label: "SETTINGS",
     items: [
       { id: "settings", label: "Blog Settings", permission: "blog.manage_automation" },
-      { id: "promotions", label: "Promotions", permission: "blog.manage_brand" }
+      { id: "promotions", label: "Promotions", permission: "blog.manage_brand" },
+      { id: "help", label: "How to Use", permission: "blog.view" }
     ]
   }
 ];

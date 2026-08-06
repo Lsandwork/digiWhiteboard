@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { BlogContextualHelpLink } from "@/components/blog/help/BlogContextualHelpLink";
 
 type Topic = {
   id: string;
@@ -82,6 +83,9 @@ export function BlogTopicsPanel() {
         <div>
           <h2 className="text-xl font-semibold">Topic Ideas</h2>
           <p className="text-sm text-slate-600">Minimum Topic Quality Score: 85. Weak generic topics are rejected.</p>
+          <div className="mt-2">
+            <BlogContextualHelpLink step="topics" label="Learn how to generate topics" />
+          </div>
         </div>
         <button
           type="button"

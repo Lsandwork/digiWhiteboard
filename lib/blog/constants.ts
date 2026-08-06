@@ -68,6 +68,7 @@ export const BLOG_NAV_PAGES = [
   { id: "audit", label: "Audit Log", permission: "blog.view_audit_log" },
   { id: "settings", label: "Blog Settings", permission: "blog.manage_automation" },
   { id: "promotions", label: "Promotions", permission: "blog.manage_brand" },
+  { id: "help", label: "How to Use", permission: "blog.view" },
   { id: "setup", label: "Setup Wizard", permission: "blog.manage_providers" },
   { id: "editor", label: "Article Editor", permission: "blog.edit" }
 ] as const;

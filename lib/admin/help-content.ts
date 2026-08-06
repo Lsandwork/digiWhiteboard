@@ -58,6 +58,44 @@ export const HELP_CATEGORIES: HelpCategory[] = [
 
 export const HELP_ARTICLES: HelpArticle[] = [
   {
+    id: "blog-generator-how-to",
+    title: "How to Use the Fitdog Blog Generator",
+    summary: "Create topics, generate drafts, review, schedule, and publish Fitdog blog content in RuffOps.",
+    category: "Admin Dashboard",
+    keywords: [
+      "blog",
+      "blog generator",
+      "fitdog blog",
+      "topics",
+      "articles",
+      "seo",
+      "publish",
+      "automatic blog",
+      "content"
+    ],
+    steps: [
+      "Open the Fitdog Help Center guide for a full walkthrough with screenshots.",
+      "Use Topics to score and save ideas, then Blog Generator to create drafts.",
+      "Review in Needs Review before Approving, Scheduling, or Publishing.",
+      "Check Performance for live publish and subscriber metrics — unavailable analytics stay labeled honestly."
+    ],
+    tips: [
+      "Never approve an article just because it is complete.",
+      "Auto-publish stays off unless an authorized admin enables it."
+    ],
+    links: [
+      {
+        label: "Open How to Use guide",
+        href: "/admin/blog/help/how-to-use-blog-generator"
+      },
+      {
+        label: "Open Blog Generator",
+        href: "/admin/automatic-blog"
+      }
+    ],
+    audiences: ["admin"]
+  },
+  {
     id: "what-is-this",
     title: "What are these whiteboards?",
     summary: "Two separate screens: one for guests in the lobby, one for staff at the desk.",
