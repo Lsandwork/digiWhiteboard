@@ -59,7 +59,8 @@
     "compress:social-moments": "tsx scripts/compress-social-moments.ts",
     "test:blog": "tsx scripts/test-automatic-blog.ts && tsx scripts/test-fitdog-blog-public.ts",
     "test:blog-public": "tsx scripts/test-fitdog-blog-public.ts",
-    "blog:activate": "tsx scripts/activate-automatic-blog.ts"
+    "blog:activate": "tsx scripts/activate-automatic-blog.ts",
+    "blog:seed": "tsx scripts/seed-blog-via-pg.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
