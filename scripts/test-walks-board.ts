@@ -164,7 +164,7 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
   const permissions = readFileSync(join(process.cwd(), "lib/admin/permissions.ts"), "utf8");
   assert.match(permissions, /walks_board/);
   assert.match(permissions, /receive_walks_board_reminders/);
-  assert.match(permissions, /if \(tab === "walks_board"\) return board === "staff"/);
+  assert.match(permissions, /if \(tab === "walks_board"\) \{\s*if \(board !== "staff"\) return false;/);
 
   const nav = readFileSync(join(process.cwd(), "lib/admin/nav-groups.ts"), "utf8");
   assert.match(nav, /FRONT_DESK_TABS:[\s\S]*"walks_board"/);
