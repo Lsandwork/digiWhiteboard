@@ -4,6 +4,7 @@ import { BlogPageClient } from "@/components/blog/shell/BlogPageClient";
 import { getAdminSession } from "@/lib/admin/session";
 import { canAccessBlogGenerator, hasPermission } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
+import { getAdminUserById } from "@/lib/admin/users";
 import { isBlogEnabled } from "@/lib/blog/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -31,10 +32,18 @@ export default async function AutomaticBlogPage() {
     redirect("/admin?board=staff&tab=crossover_communication");
   }
 
+  const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
+
   return (
     <ToastProvider>
       <main className="admin-theme min-h-screen">
-        <BlogPageClient username={session.email ?? "admin"} role={session.role ?? "staff"} access={access} />
+        <BlogPageClient
+          username={session.email ?? "admin"}
+          role={session.role ?? "staff"}
+          access={access}
+          displayName={adminUser?.full_name || session.email?.split("@")[0] || "Admin"}
+          avatarUrl={adminUser?.avatar_url || null}
+        />
       </main>
     </ToastProvider>
   );

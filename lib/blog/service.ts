@@ -503,4 +503,41 @@ export function newIdempotencyKey(prefix = "blog") {
   return `${prefix}-${randomUUID()}`;
 }
 
+/** Create a blank manual draft for the editor (Write Manually). */
+export async function createManualDraftArticle(input?: { title?: string; createdBy?: string }) {
+  const supabase = getServiceSupabase();
+  const title = (input?.title || "Untitled draft").trim() || "Untitled draft";
+  const baseSlug = slugifyBlogTitle(title) || `draft-${Date.now()}`;
+  let slug = baseSlug;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = attempt === 0 ? slug : `${baseSlug}-${attempt + 1}`;
+    const { data: existing } = await supabase.from("blog_articles").select("id").eq("slug", candidate).maybeSingle();
+    if (!existing) {
+      slug = candidate;
+      break;
+    }
+    slug = `${baseSlug}-${randomUUID().slice(0, 8)}`;
+  }
+
+  const { data, error } = await supabase
+    .from("blog_articles")
+    .insert({
+      title,
+      slug,
+      excerpt: "",
+      body_markdown: "",
+      body_html: "",
+      status: "DRAFTING",
+      audience: "dog_owners",
+      author_profile: "Fitdog Team",
+      ai_assistance: { drafting: false, research: false, seo: false, note: "Manual draft created from Blog Dashboard." },
+      created_by: input?.createdBy ?? null
+    })
+    .select("id, title, slug, status")
+    .single();
+  if (error) throw error;
+  await writeBlogAudit(input?.createdBy, "article.manual_draft_created", "article", data.id, { title, slug });
+  return data;
+}
+
 export { slugifyBlogTitle };

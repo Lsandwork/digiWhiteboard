@@ -41,7 +41,7 @@ assert.equal(DEFAULT_HUMAN_SCORE_THRESHOLD, 90);
 assert.equal(DEFAULT_TOPIC_SCORE_THRESHOLD, 85);
 assert.ok(BLOG_STATUSES.includes("HUMAN_REVIEW"));
 assert.ok(BLOG_STATUSES.includes("PUBLISHED"));
-assert.ok(BLOG_NAV_PAGES.length >= 28);
+assert.ok(BLOG_NAV_PAGES.length >= 35);
 assert.ok(BLOG_PERMISSIONS.includes("blog.view"));
 assert.ok(BLOG_PERMISSIONS.includes("blog.publish"));
 assert.ok(BANNED_FILLER_PHRASES.some((p) => /fast-paced world/i.test(p)));

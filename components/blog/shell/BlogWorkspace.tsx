@@ -2,7 +2,7 @@
 
 import type { UserAccess } from "@/lib/admin/permissions";
 import type { BlogPageId } from "@/lib/blog/constants";
-import { BlogOverviewPanel } from "@/components/blog/panels/BlogOverviewPanel";
+import { BlogDashboardPanel } from "@/components/blog/dashboard/BlogDashboardPanel";
 import { BlogTopicsPanel } from "@/components/blog/panels/BlogTopicsPanel";
 import { BlogGeneratePanel } from "@/components/blog/panels/BlogGeneratePanel";
 import { BlogArticlesPanel } from "@/components/blog/panels/BlogArticlesPanel";
@@ -13,34 +13,63 @@ import { BlogKnowledgePanel } from "@/components/blog/panels/BlogKnowledgePanel"
 import { BlogMediaPanel } from "@/components/blog/panels/BlogMediaPanel";
 import { BlogSetupWizardPanel } from "@/components/blog/panels/BlogSetupWizardPanel";
 import { BlogGenericPanel } from "@/components/blog/panels/BlogGenericPanel";
+import { BlogUnavailablePanel } from "@/components/blog/panels/BlogUnavailablePanel";
 
 type Props = {
   page: BlogPageId;
   articleId: string | null;
   role: string;
   access: UserAccess;
+  canCreate?: boolean;
+  canSubmitIdea?: boolean;
+  onDashboardCounts?: (counts: Record<string, number>) => void;
 };
 
-export function BlogWorkspace({ page, articleId }: Props) {
+export function BlogWorkspace({
+  page,
+  articleId,
+  canCreate = false,
+  canSubmitIdea = false,
+  onDashboardCounts
+}: Props) {
   if (page === "editor" || articleId) {
     return <BlogEditorPanel articleId={articleId} />;
   }
 
   switch (page) {
     case "overview":
-      return <BlogOverviewPanel />;
+      return (
+        <BlogDashboardPanel
+          canCreate={canCreate}
+          canSubmitIdea={canSubmitIdea}
+          onCounts={onDashboardCounts}
+        />
+      );
     case "topics":
       return <BlogTopicsPanel />;
     case "generate":
       return <BlogGeneratePanel />;
+    case "articles":
+      return (
+        <BlogArticlesPanel
+          title="All Articles"
+          statuses="DRAFTING,EDITING,PRACTICAL_REVIEW,EMPATHY_REVIEW,NATURAL_VOICE_REVIEW,SEO_REVIEW,NEEDS_CHANGES,IMAGE_SELECTION,IMAGE_REVIEW,FACT_CHECK,BRAND_REVIEW,HUMAN_REVIEW,APPROVED,SCHEDULED,PUBLISHED,FAILED,ARCHIVED"
+        />
+      );
     case "drafts":
-      return <BlogArticlesPanel title="Drafts & in progress" statuses="DRAFTING,EDITING,PRACTICAL_REVIEW,EMPATHY_REVIEW,NATURAL_VOICE_REVIEW,SEO_REVIEW,NEEDS_CHANGES,IMAGE_SELECTION,IMAGE_REVIEW,FACT_CHECK,BRAND_REVIEW" />;
+      return (
+        <BlogArticlesPanel
+          title="Drafts"
+          statuses="DRAFTING,EDITING,PRACTICAL_REVIEW,EMPATHY_REVIEW,NATURAL_VOICE_REVIEW,SEO_REVIEW,NEEDS_CHANGES,IMAGE_SELECTION,IMAGE_REVIEW,FACT_CHECK,BRAND_REVIEW,BRIEF_READY,RESEARCHING,OUTLINING"
+        />
+      );
     case "human-review":
-      return <BlogArticlesPanel title="Human Review" statuses="HUMAN_REVIEW" />;
+      return <BlogArticlesPanel title="Needs Review" statuses="HUMAN_REVIEW" />;
     case "needs-approval":
-      return <BlogArticlesPanel title="Needs Approval" statuses="HUMAN_REVIEW,FACT_CHECK,IMAGE_REVIEW" />;
+    case "approved":
+      return <BlogArticlesPanel title="Approved" statuses="APPROVED" />;
     case "scheduled":
-      return <BlogArticlesPanel title="Scheduled" statuses="SCHEDULED,APPROVED" />;
+      return <BlogArticlesPanel title="Scheduled" statuses="SCHEDULED" />;
     case "published":
       return <BlogArticlesPanel title="Published" statuses="PUBLISHED" />;
     case "failed":
@@ -48,20 +77,31 @@ export function BlogWorkspace({ page, articleId }: Props) {
     case "archived":
       return <BlogArticlesPanel title="Archived" statuses="ARCHIVED" />;
     case "calendar":
-      return <BlogArticlesPanel title="Content Calendar" statuses="APPROVED,SCHEDULED,PUBLISHED" />;
+      return <BlogArticlesPanel title="Content Calendar" statuses="APPROVED,SCHEDULED,DRAFTING,HUMAN_REVIEW" />;
+    case "categories":
+      return <BlogGenericPanel title="Categories" endpoint="/api/blog/taxonomy?type=categories" listKey="items" />;
+    case "tags":
+      return <BlogGenericPanel title="Tags" endpoint="/api/blog/taxonomy?type=tags" listKey="items" />;
+    case "authors":
+      return <BlogGenericPanel title="Authors" endpoint="/api/blog/taxonomy?type=authors" listKey="items" />;
+    case "newsletter":
+      return <BlogGenericPanel title="Newsletter Subscribers" endpoint="/api/blog/newsletter" listKey="subscribers" />;
+    case "promotions":
+      return <BlogGenericPanel title="Promotions" endpoint="/api/blog/promotions" listKey="promotions" />;
     case "knowledge":
       return <BlogKnowledgePanel />;
     case "media":
     case "image-approvals":
       return <BlogMediaPanel approvalsOnly={page === "image-approvals"} />;
     case "providers":
+    case "agents":
       return <BlogProvidersPanel />;
     case "settings":
     case "editorial":
     case "automation":
     case "brand-voice":
     case "publishing":
-      return <BlogSettingsPanel focus={page} />;
+      return <BlogSettingsPanel focus={page === "automation" ? "automation" : page} />;
     case "setup":
       return <BlogSetupWizardPanel />;
     case "pillars":
@@ -90,9 +130,28 @@ export function BlogWorkspace({ page, articleId }: Props) {
     case "analytics":
     case "costs":
       return (
-        <BlogOverviewPanel />
+        <BlogDashboardPanel
+          canCreate={canCreate}
+          canSubmitIdea={canSubmitIdea}
+          onCounts={onDashboardCounts}
+        />
+      );
+    case "search-console":
+      return (
+        <BlogUnavailablePanel
+          title="Search Console"
+          reason="Google Search Console is not connected to RuffOps yet."
+          actionLabel="Open Blog Settings"
+          actionHref="/admin/automatic-blog?page=settings"
+        />
       );
     default:
-      return <BlogOverviewPanel />;
+      return (
+        <BlogDashboardPanel
+          canCreate={canCreate}
+          canSubmitIdea={canSubmitIdea}
+          onCounts={onDashboardCounts}
+        />
+      );
   }
 }

@@ -2,13 +2,16 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
 
 type Topic = { id: string; title: string; topic_quality_score?: number; status: string; reader_concern?: string };
 
 export function BlogGeneratePanel() {
+  const searchParams = useSearchParams();
+  const presetTopicId = searchParams.get("topicId") || "";
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [topicId, setTopicId] = useState("");
+  const [topicId, setTopicId] = useState(presetTopicId);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [articleId, setArticleId] = useState<string | null>(null);
@@ -22,10 +25,14 @@ export function BlogGeneratePanel() {
           (t: Topic) => t.status !== "rejected" && t.status !== "archived" && Number(t.topic_quality_score || 0) >= 85
         );
         setTopics(usable);
-        if (usable[0]) setTopicId(usable[0].id);
+        if (presetTopicId && usable.some((t: Topic) => t.id === presetTopicId)) {
+          setTopicId(presetTopicId);
+        } else if (usable[0]) {
+          setTopicId(usable[0].id);
+        }
       }
     })();
-  }, []);
+  }, [presetTopicId]);
 
   async function generate() {
     if (!topicId) return;
@@ -53,7 +60,7 @@ export function BlogGeneratePanel() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <h2 className="text-xl font-semibold">Generate Article</h2>
+        <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Blog Generator</h2>
         <p className="text-sm text-slate-600">
           Runs topic brief → Human-First Writer → empathy, practical, natural-voice, SEO, fact-check, brand, and final human-quality agents.
           Auto-publish stays off.
@@ -80,13 +87,13 @@ export function BlogGeneratePanel() {
         type="button"
         disabled={busy || !topicId}
         onClick={() => void generate()}
-        className="rounded-md bg-emerald-700 px-4 py-2 text-sm text-white disabled:opacity-50"
+        className="rounded-md bg-[var(--fitdog-orange,#ff6f26)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
       >
         {busy ? "Generating…" : "Generate draft"}
       </button>
       {message ? <p className="text-sm text-slate-800 dark:text-slate-200">{message}</p> : null}
       {articleId ? (
-        <Link href={`${BLOG_APP_PATH}?page=editor&id=${articleId}`} className="inline-block text-sm text-emerald-700 hover:underline">
+        <Link href={`${BLOG_APP_PATH}?page=editor&id=${articleId}`} className="inline-block text-sm text-[var(--fitdog-orange,#ff6f26)] hover:underline">
           Open in editor
         </Link>
       ) : null}
