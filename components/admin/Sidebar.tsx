@@ -487,6 +487,24 @@ export function Sidebar({
   }, [activeSectionId]);
 
   useEffect(() => {
+    // Blog Generator lives under Dashboard — keep that section open for entitled roles
+    // so the tab is visible without hunting through collapsed sections.
+    const hasBlogGenerator = navEntries.some(
+      (entry) => entry.type === "route" && entry.id === "automatic-blog"
+    );
+    if (!hasBlogGenerator) return;
+    const timer = window.setTimeout(() => {
+      setExpandedSections((current) => {
+        if (current.has("staff_dashboard")) return current;
+        const next = new Set(current);
+        next.add("staff_dashboard");
+        return next;
+      });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [navEntries]);
+
+  useEffect(() => {
     // Keep the active tab visible in long / collapsed icon rails.
     const timer = window.setTimeout(() => {
       const active = document.querySelector<HTMLElement>(

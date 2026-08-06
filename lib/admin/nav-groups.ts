@@ -77,10 +77,20 @@ export function insertBlogGeneratorIntoDashboard(entries: NavEntry[], includeBlo
     (entry) => entry.type === "section" && entry.id === "staff_dashboard"
   );
   if (dashboardIdx >= 0) {
+    // Keep Blog Generator near the top of Dashboard (after Route Generator when present)
+    // so it is not buried under the fold / collapsed section scroll.
+    let sectionEnd = dashboardIdx + 1;
     let insertAt = dashboardIdx + 1;
-    while (insertAt < entries.length && entries[insertAt].type !== "section") {
-      insertAt += 1;
+    let afterRouteGenerator = -1;
+    while (sectionEnd < entries.length && entries[sectionEnd].type !== "section") {
+      const entry = entries[sectionEnd];
+      if (entry.type === "item" && entry.tab === "route_generator") {
+        afterRouteGenerator = sectionEnd + 1;
+      }
+      sectionEnd += 1;
     }
+    if (afterRouteGenerator >= 0) insertAt = afterRouteGenerator;
+    else if (sectionEnd > dashboardIdx + 1) insertAt = Math.min(dashboardIdx + 3, sectionEnd);
     return [...entries.slice(0, insertAt), AUTOMATIC_BLOG_NAV_ROUTE, ...entries.slice(insertAt)];
   }
 

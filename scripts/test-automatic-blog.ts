@@ -157,6 +157,9 @@ const dashboardIdx = adminNav.findIndex((entry) => entry.type === "section" && e
 assert.ok(dashboardIdx >= 0, "staff panel should include Dashboard");
 const blogIdx = adminNav.findIndex((entry) => entry.type === "route" && entry.id === "automatic-blog");
 assert.ok(blogIdx > dashboardIdx, "Blog Generator should sit under Dashboard");
+const routeGenIdx = adminNav.findIndex((entry) => entry.type === "item" && entry.tab === "route_generator");
+assert.ok(routeGenIdx > dashboardIdx, "Route Generator should be under Dashboard");
+assert.equal(blogIdx, routeGenIdx + 1, "Blog Generator should sit directly under Route Generator");
 const nextSectionAfterDashboard = adminNav.findIndex(
   (entry, index) => index > dashboardIdx && entry.type === "section"
 );
