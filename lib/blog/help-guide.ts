@@ -54,18 +54,56 @@ export const BLOG_HELP_LINKS = {
   publicBlog: "/blog"
 } as const;
 
+/** Pro Tips copy aligned to the approved mockup (sidebar panel). */
 export const BLOG_HELP_PRO_TIPS = [
-  "Start with Topic Ideas for strong, specific topics, then score and save them.",
-  "Review and personalize important sections before approval — never approve on completeness alone.",
-  "Include local Los Angeles or Santa Monica relevance only when it adds real value.",
-  "Use approved real photos from the Fitdog Media Library whenever possible.",
-  "Schedule useful content consistently rather than publishing low-quality articles too often.",
-  "Verify all health, safety, legal, and nutrition claims before approval.",
-  "Make sure every article gives the reader practical advice first.",
-  "Avoid forcing Fitdog promotions into unrelated topics."
+  "Start with the AI Topic Generator for the best results",
+  "Always review and personalize key sections",
+  "Include local LA relevancy when it adds value",
+  "Use real photos from our media library when possible",
+  "Schedule content consistently for maximum impact"
+] as const;
+
+export const BLOG_HELP_OVERVIEW = {
+  title: "What is the Fitdog Blog Generator?",
+  body:
+    "The Blog Generator is your all-in-one AI-powered content engine that helps you create, manage and publish expert dog-care content for the Fitdog blog. It combines approved Fitdog knowledge, SEO best practices and the Fitdog brand voice to produce detailed articles that inform, engage and attract dog owners to Fitdog services.",
+  why:
+    "Consistent, high-quality content builds trust with dog owners, improves search visibility, and connects readers with Fitdog services when the advice naturally leads there. Every article should provide useful guidance first."
+} as const;
+
+export const BLOG_HELP_FEATURES = [
+  {
+    title: "AI-Powered Content Creation",
+    description: "Generate detailed, helpful articles in minutes.",
+    href: BLOG_HELP_LINKS.generator,
+    tone: "blue" as const,
+    event: "help.feature_generator"
+  },
+  {
+    title: "SEO Optimized",
+    description: "Rank higher in search and reach more dog owners.",
+    href: BLOG_HELP_LINKS.editorial,
+    tone: "blue" as const,
+    event: "help.feature_seo"
+  },
+  {
+    title: "Full Editorial Workflow",
+    description: "From idea to published article in one place.",
+    href: BLOG_HELP_LINKS.dashboard,
+    tone: "purple" as const,
+    event: "help.feature_pipeline"
+  },
+  {
+    title: "Real Performance Insights",
+    description: "See what resonates and keep improving.",
+    href: BLOG_HELP_LINKS.analytics,
+    tone: "green" as const,
+    event: "help.feature_analytics"
+  }
 ] as const;
 
 export const BLOG_HELP_ASSETS = {
+  heroComposite: "/assets/fitdog/blog-help/hero-composite.png",
   heroDog: "/assets/fitdog/social-moments/posters/social-moment-05.jpg",
   dashboardFixture: "/assets/fitdog/blog-help/dashboard-fixture.png",
   topicsFixture: "/assets/fitdog/blog-help/topics-fixture.png",
@@ -73,7 +111,6 @@ export const BLOG_HELP_ASSETS = {
   reviewFixture: "/assets/fitdog/blog-help/review-fixture.png"
 } as const;
 
-/** Tutorial video from env or blog_settings.provider_config.help_tutorial_video_url */
 export function resolveBlogTutorialVideo(providerConfig?: Record<string, unknown> | null) {
   const fromEnv = process.env.NEXT_PUBLIC_BLOG_TUTORIAL_VIDEO_URL?.trim() || process.env.BLOG_TUTORIAL_VIDEO_URL?.trim();
   if (fromEnv) return fromEnv;
