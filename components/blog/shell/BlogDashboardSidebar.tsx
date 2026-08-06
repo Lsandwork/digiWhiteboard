@@ -139,6 +139,14 @@ export function BlogDashboardSidebar({
         </nav>
 
         <div className="blog-dash__sidebar-footer">
+          {!collapsed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src="/assets/fitdog/social-moments/posters/social-moment-08.jpg"
+              alt=""
+              className="mb-1 h-16 w-full rounded-lg object-cover opacity-90"
+            />
+          ) : null}
           <a
             href={publicBlogUrl}
             target="_blank"

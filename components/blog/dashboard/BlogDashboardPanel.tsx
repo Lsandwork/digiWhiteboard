@@ -298,8 +298,8 @@ export function BlogDashboardPanel({ canCreate, canSubmitIdea, onCounts }: Props
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-stretch">
+        <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <KpiCard
             label={data.kpis.articlesPublished.label}
             value={formatNumber(data.kpis.articlesPublished.value)}
@@ -346,7 +346,9 @@ export function BlogDashboardPanel({ canCreate, canSubmitIdea, onCounts }: Props
             comparison={comparison}
           />
         </div>
-        <NewArticleSplitButton canCreate={canCreate} canSubmitIdea={canSubmitIdea} />
+        <div className="flex shrink-0 items-start justify-end xl:pt-1">
+          <NewArticleSplitButton canCreate={canCreate} canSubmitIdea={canSubmitIdea} />
+        </div>
       </div>
 
       <div className="grid gap-3 xl:grid-cols-[1.4fr_1fr_1fr]">
