@@ -17,13 +17,15 @@ export const SAMSARA_BULK_UPLOAD_HEADERS = [
   "Full Address"
 ] as const;
 
-/** Headers that previously caused Samsara "column headers are not supported". */
+/** Headers that previously caused Samsara "column headers are not supported" / row errors. */
 export const SAMSARA_UNSUPPORTED_HEADERS = [
   "Route Notes",
   "Assigned Vehicle",
   "Assigned Driver",
   "Stop Notes",
   "Stop Address",
+  "Stop Arrival Time",
+  "Stop Departure Time",
   "Scheduled Arrival",
   "Scheduled Departure",
   "Route Date",
@@ -113,7 +115,10 @@ export function autoMapSamsaraHeaders(headers: string[]): Record<string, string 
   return mapping;
 }
 
-/** Format a Date for Samsara route CSV upload in org-local wall time. */
+/**
+ * Format a Date for Samsara route CSV upload in org-local wall time.
+ * Samsara bulk upload expects M/D/YYYY H:mm (24h) — keep zero-padded for stable parsing.
+ */
 export function formatSamsaraCsvDateTime(date: Date, timeZone = "America/Los_Angeles"): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -128,6 +133,58 @@ export function formatSamsaraCsvDateTime(date: Date, timeZone = "America/Los_Ang
     parts.find((p) => p.type === type)?.value ?? "";
   const hour = get("hour") === "24" ? "00" : get("hour");
   return `${get("month")}/${get("day")}/${get("year")} ${hour}:${get("minute")}`;
+}
+
+/** Pad Fitdog van labels to match Samsara vehicle names (Van 01 … Van 06). Never Van 04. */
+export function normalizeSamsaraVehicleName(value: string | null | undefined): string {
+  const raw = String(value ?? "").trim();
+  const match = raw.match(/van[\s_-]*0*([1-9]\d*)/i);
+  if (match) {
+    const n = Number(match[1]);
+    if (n === 4) throw new Error("Van 4 must never appear in Samsara exports.");
+    return `Van ${String(n).padStart(2, "0")}`;
+  }
+  return raw;
+}
+
+/** Keep lat/lng numeric and compact so Samsara does not reject the row. */
+export function formatSamsaraCoordinate(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "";
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (!Number.isFinite(n)) return "";
+  return String(Number(n.toFixed(7)));
+}
+
+/**
+ * Flatten multiline driver notes for CSV bulk upload.
+ * Newlines inside quoted cells are valid CSV, but Samsara's importer often marks
+ * those rows as incorrect — use a single-line separator instead.
+ */
+export function sanitizeSamsaraNotes(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(" · ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Parse `MM/DD/YYYY HH:mm` used in our Samsara CSV cells. */
+export function parseSamsaraCsvDateTime(value: string): Date | null {
+  const m = String(value)
+    .trim()
+    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  const year = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
+  return new Date(year, month - 1, day, hour, minute, 0, 0);
 }
 
 /**
@@ -166,8 +223,10 @@ export function synthesizeStopSchedule(params: {
   const localStamp = `${params.operatingDate}T${String(startHour).padStart(2, "0")}:${String(startMinute).padStart(2, "0")}:00`;
   const startMs = civilTimeToUtcMs(localStamp, "America/Los_Angeles");
   const arriveMs = startMs + params.stopIndex * minutesPerStop * 60_000;
-  const departMs =
-    arriveMs + (params.stopIndex === params.stopCount - 1 ? 0 : Math.min(5, minutesPerStop) * 60_000);
+  // Samsara rejects rows when departure is missing or earlier than arrival.
+  // Keep a short dwell even on the final stop.
+  const dwellMinutes = Math.max(1, Math.min(5, minutesPerStop));
+  const departMs = arriveMs + dwellMinutes * 60_000;
   return {
     arrival: formatSamsaraCsvDateTime(new Date(arriveMs)),
     departure: formatSamsaraCsvDateTime(new Date(departMs))
@@ -276,11 +335,35 @@ export function validateExport(params: {
   }
   if (!params.rows.length) errors.push("Export has no stop rows.");
   for (const row of params.rows) {
+    if (!row.stopName?.trim()) {
+      errors.push(`Missing Stop Name on route ${row.routeName}`);
+    }
     if (!row.scheduledArrival?.trim() || !row.scheduledDeparture?.trim()) {
-      errors.push(`Missing scheduled arrival/departure on route ${row.routeName}`);
+      errors.push(`Missing scheduled arrival/departure on route ${row.routeName} stop "${row.stopName}"`);
+    } else {
+      const arrival = parseSamsaraCsvDateTime(row.scheduledArrival);
+      const departure = parseSamsaraCsvDateTime(row.scheduledDeparture);
+      if (!arrival || !departure) {
+        errors.push(
+          `Bad datetime on ${row.routeName} stop "${row.stopName}" (use MM/DD/YYYY HH:mm). Got arrival="${row.scheduledArrival}" departure="${row.scheduledDeparture}"`
+        );
+      } else if (departure.getTime() < arrival.getTime()) {
+        errors.push(
+          `Departure before arrival on ${row.routeName} stop "${row.stopName}" (${row.scheduledArrival} → ${row.scheduledDeparture})`
+        );
+      }
     }
     if (!row.stopAddress?.trim() && (!row.latitude || !row.longitude)) {
       errors.push(`Stop "${row.stopName}" on ${row.routeName} needs Full Address or lat/lng.`);
+    }
+    if (row.latitude && !/^-?\d+(\.\d+)?$/.test(row.latitude.trim())) {
+      errors.push(`Invalid Latitude on ${row.routeName} stop "${row.stopName}": ${row.latitude}`);
+    }
+    if (row.longitude && !/^-?\d+(\.\d+)?$/.test(row.longitude.trim())) {
+      errors.push(`Invalid Longitude on ${row.routeName} stop "${row.stopName}": ${row.longitude}`);
+    }
+    if (/\n|\r/.test(row.stopNotes || "")) {
+      errors.push(`Multiline Notes on ${row.routeName} stop "${row.stopName}" — flatten before upload.`);
     }
   }
 
@@ -292,6 +375,12 @@ export function validateExport(params: {
     if (!row.vehicleName) errors.push(`Missing vehicle name on route ${row.routeName}`);
     if (/van\s*4/i.test(row.vehicleName) || /van_4/i.test(row.routeName)) {
       errors.push("Van 4 must never appear in exports.");
+    }
+    // Prefer exact Samsara roster labels (Van 01…). Soft warning only if non-standard.
+    if (row.vehicleName && !/^Van 0[12356]$/.test(row.vehicleName)) {
+      warnings.push(
+        `Vehicle "${row.vehicleName}" on ${row.routeName} should exactly match a Samsara vehicle name (Van 01, Van 02, Van 03, Van 05, Van 06).`
+      );
     }
   }
 

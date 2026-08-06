@@ -30,7 +30,10 @@ import {
   buildCsv,
   buildRouteName,
   escapeCsvCell,
+  formatSamsaraCoordinate,
   getCanonicalSamsaraTemplate,
+  normalizeSamsaraVehicleName,
+  sanitizeSamsaraNotes,
   SAMSARA_BULK_UPLOAD_HEADERS,
   SAMSARA_UNSUPPORTED_HEADERS,
   dropoffStartTimeForVan,
@@ -574,7 +577,7 @@ const rows = [
     stopNotes: "end",
     stopAddress: "Depot, Santa Monica, CA 90401",
     scheduledArrival: "07/26/2026 07:16",
-    scheduledDeparture: "07/26/2026 07:16",
+    scheduledDeparture: "07/26/2026 07:21",
     routeDate: "2026-07-26",
     stopOrder: 2,
     latitude: "34.01",
@@ -605,6 +608,22 @@ const sched = synthesizeStopSchedule({
   stopCount: 3
 });
 assert.equal(sched.arrival, "07/27/2026 07:00");
+assert.equal(sched.departure, "07/27/2026 07:05");
+assert.equal(
+  synthesizeStopSchedule({
+    operatingDate: "2026-07-27",
+    direction: "pickup",
+    stopIndex: 2,
+    stopCount: 3
+  }).departure,
+  "07/27/2026 07:21",
+  "final stop must still have a dwell so Samsara accepts departure"
+);
+assert.equal(normalizeSamsaraVehicleName("Van 1"), "Van 01");
+assert.equal(normalizeSamsaraVehicleName("van_5"), "Van 05");
+assert.equal(sanitizeSamsaraNotes("Dogs: Indy\nPhone: (310) 555-1212"), "Dogs: Indy · Phone: (310) 555-1212");
+assert.equal(formatSamsaraCoordinate("34.01950000000001"), "34.0195");
+assert.equal(formatSamsaraCoordinate("-118.49120000000002"), "-118.4912");
 
 // Drop-off start: Van 1/2/3 at 10:30; Van 5/6 (club / group class) at 12:00.
 assert.deepEqual(dropoffStartTimeForVan("van_1"), { hour: 10, minute: 30 });

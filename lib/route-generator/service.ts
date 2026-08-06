@@ -22,7 +22,10 @@ import {
   buildCsv,
   buildRouteName,
   formatSamsaraCsvDateTime,
+  formatSamsaraCoordinate,
   getCanonicalSamsaraTemplate,
+  normalizeSamsaraVehicleName,
+  sanitizeSamsaraNotes,
   synthesizeStopSchedule,
   validateExport,
   type ExportStopRow,
@@ -1038,16 +1041,14 @@ export async function exportSamsaraCsv(params: {
 
   const vehicles = await listVehicles();
   const vehicleNameByKey = new Map(
-    vehicles.map((v) => [v.vanKey, v.vanKey.replace("van_", "Van ").replace("_", " ")])
+    vehicles.map((v) => [v.vanKey, normalizeSamsaraVehicleName(v.vanKey.replace("van_", "Van "))])
   );
-  // Prefer configured Samsara names from DB
+  // Prefer configured Samsara names from DB, then normalize to Van 01… style.
   const supabase = getServiceSupabase();
   const { data: vehicleRows } = await supabase.from("route_vehicle_configs").select("van_key, display_name, samsara_vehicle_name");
   for (const row of vehicleRows ?? []) {
-    vehicleNameByKey.set(
-      String(row.van_key),
-      String(row.samsara_vehicle_name || row.display_name || row.van_key)
-    );
+    const configured = String(row.samsara_vehicle_name || row.display_name || row.van_key);
+    vehicleNameByKey.set(String(row.van_key), normalizeSamsaraVehicleName(configured));
   }
 
   // Load stop→reservation links so export can rebuild Fitdog pickup instructions + phones.
@@ -1121,14 +1122,22 @@ export async function exportSamsaraCsv(params: {
         stopCount: routeStops.length,
         vanKey: String(route.van_key ?? "")
       });
-      const scheduledArrival =
+      let scheduledArrival =
         etaArrival && !Number.isNaN(etaArrival.getTime())
           ? formatSamsaraCsvDateTime(etaArrival)
           : synthesized.arrival;
-      const scheduledDeparture =
+      let scheduledDeparture =
         etaDeparture && !Number.isNaN(etaDeparture.getTime())
           ? formatSamsaraCsvDateTime(etaDeparture)
           : synthesized.departure;
+      // Samsara requires both times; departure must not precede arrival.
+      const arrivalMs = etaArrival && !Number.isNaN(etaArrival.getTime()) ? etaArrival.getTime() : null;
+      const departureMs = etaDeparture && !Number.isNaN(etaDeparture.getTime()) ? etaDeparture.getTime() : null;
+      if (arrivalMs != null && (departureMs == null || departureMs < arrivalMs)) {
+        scheduledDeparture = formatSamsaraCsvDateTime(new Date(arrivalMs + 5 * 60_000));
+      }
+      if (!scheduledArrival.trim()) scheduledArrival = synthesized.arrival;
+      if (!scheduledDeparture.trim()) scheduledDeparture = synthesized.departure;
       // Prefer stop notes; include route wave context when present.
       const notesWithRoute =
         stopNotes.trim() ||
@@ -1137,17 +1146,17 @@ export async function exportSamsaraCsv(params: {
         routeName,
         routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
-        vehicleName: vanDisplay,
+        vehicleName: normalizeSamsaraVehicleName(vanDisplay),
         driverName: "",
-        stopName: stop.owner_name || stop.stop_kind,
-        stopNotes: notesWithRoute,
+        stopName: String(stop.owner_name || stop.stop_kind || "Stop").trim(),
+        stopNotes: sanitizeSamsaraNotes(notesWithRoute),
         stopAddress: stop.address || "",
         scheduledArrival,
         scheduledDeparture,
         routeDate: String(bundle.plan.operating_date),
         stopOrder: Number(stop.sequence),
-        latitude: stop.latitude == null ? "" : String(stop.latitude),
-        longitude: stop.longitude == null ? "" : String(stop.longitude)
+        latitude: formatSamsaraCoordinate(stop.latitude == null ? "" : String(stop.latitude)),
+        longitude: formatSamsaraCoordinate(stop.longitude == null ? "" : String(stop.longitude))
       });
     });
   }

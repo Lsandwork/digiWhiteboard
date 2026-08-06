@@ -49,7 +49,7 @@ function phoneFromItem(item: NormalizedReportItem): string | null {
 
 /**
  * Build Samsara Stop Notes for drivers: dogs, owner phone, and pickup/drop-off instructions.
- * Newlines are supported by Samsara Driver App and quoted correctly by our CSV exporter.
+ * Notes may include newlines in-memory; CSV export flattens them with " · " for Samsara upload safety.
  */
 export function buildCustomerStopNotes(params: {
   items: NormalizedReportItem[];
