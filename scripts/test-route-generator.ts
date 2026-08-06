@@ -15,7 +15,12 @@ import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
 import { lockDropoffGroupsToPickupVans, optimizeRoutes } from "../lib/route-generator/optimizer";
 import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
 import { serviceForAssignedVan } from "../lib/route-generator/fitdog-api";
-import { manualTaxiToReportItems } from "../lib/route-generator/gingr-taxi";
+import {
+  mapGingrReservationToTaxiRow,
+  manualTaxiToReportItems,
+  reservationHasTaxi
+} from "../lib/route-generator/gingr-taxi";
+import { normalizeGingrReservationList } from "../lib/integrations/gingr/client";
 import { filterItemsByWave } from "../lib/route-generator/apply-to-plan";
 import {
   autoMapHeaders,
@@ -1058,6 +1063,50 @@ assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
   assert.equal(filterItemsByWave(taxiItems, "pickup").length, 1);
   assert.equal(filterItemsByWave(taxiItems, "dropoff").length, 1);
   assert.equal(filterItemsByWave(taxiItems, "both").length, 2);
+}
+
+{
+  const mapped = normalizeGingrReservationList({
+    error: false,
+    data: {
+      "1001": {
+        id: "1001",
+        reservation_id: "1001",
+        animal: { id: "55", name: "Oscar" },
+        owner: {
+          id: "9",
+          first_name: "Sam",
+          last_name: "Lee",
+          address_1: "400 Main St",
+          city: "Venice",
+          postal: "90291",
+          cell_phone: "3105551212"
+        },
+        reservation_type: { type: "Daycare" },
+        services: [
+          {
+            name: "Taxi Service - Business Only",
+            scheduled_at: "2026-08-10 07:30:00"
+          }
+        ],
+        start_date: "2026-08-10",
+        end_date: "2026-08-10"
+      }
+    }
+  });
+  assert.equal(mapped.length, 1);
+  assert.equal(reservationHasTaxi(mapped[0]!), true);
+  const row = mapGingrReservationToTaxiRow(mapped[0]!, {
+    date: "2026-08-10",
+    serviceRaw: "Taxi Service - Business Only"
+  });
+  assert.equal(row.dogName, "Oscar");
+  assert.equal(row.ownerName, "Sam Lee");
+  assert.equal(row.address, "400 Main St");
+  assert.equal(row.city, "Venice");
+  assert.equal(row.zip, "90291");
+  assert.equal(row.serviceRaw, "Taxi Service - Business Only");
+  assert.equal(reservationHasTaxi({ id: "2", reservation_type: { type: "Boarding" }, services: [] }), false);
 }
 
 console.log("route-generator tests: ok");

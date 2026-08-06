@@ -22,10 +22,35 @@ function resolveConfig(overrides?: GingrClientConfig): Required<GingrClientConfi
   };
 }
 
+/** Unwrap Gingr `{ error, data }` payloads where `data` may be an array or id-keyed object. */
+export function unwrapGingrData<T = unknown>(payload: unknown): T {
+  if (payload && typeof payload === "object" && !Array.isArray(payload) && "data" in payload) {
+    const wrapped = payload as { error?: unknown; data?: unknown };
+    if (wrapped.error && wrapped.error !== false) {
+      throw new GingrIntegrationError(
+        typeof wrapped.error === "string" ? wrapped.error : "Gingr API returned an error.",
+        "gingr_api_error"
+      );
+    }
+    return wrapped.data as T;
+  }
+  return payload as T;
+}
+
+/** Normalize reservation list responses (array or `{ [id]: reservation }`). */
+export function normalizeGingrReservationList(payload: unknown): GingrReservation[] {
+  const data = unwrapGingrData(payload);
+  if (Array.isArray(data)) return data as GingrReservation[];
+  if (data && typeof data === "object") {
+    return Object.values(data as Record<string, GingrReservation>);
+  }
+  return [];
+}
+
 export function createGingrClient(overrides?: GingrClientConfig) {
   const config = resolveConfig(overrides);
 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     if (!config.apiKey) {
       throw new GingrAuthError("GINGR_API_KEY is not configured.");
     }
@@ -34,9 +59,6 @@ export function createGingrClient(overrides?: GingrClientConfig) {
       ...init,
       headers: {
         Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-        "X-Api-Key": config.apiKey,
         ...(init?.headers || {})
       },
       cache: "no-store"
@@ -58,45 +80,68 @@ export function createGingrClient(overrides?: GingrClientConfig) {
     return (await response.json()) as T;
   }
 
+  /** Gingr's documented v1 endpoints expect form-urlencoded POST/GET with `key`. */
+  async function requestForm<T>(
+    path: string,
+    fields: Record<string, string>,
+    method: "GET" | "POST" = "POST"
+  ): Promise<T> {
+    if (!config.apiKey) {
+      throw new GingrAuthError("GINGR_API_KEY is not configured.");
+    }
+    const body = new URLSearchParams({ key: config.apiKey, ...fields });
+    if (method === "GET") {
+      const url = `${config.baseUrl}${path.startsWith("/") ? path : `/${path}`}?${body.toString()}`;
+      return requestJson<T>(url.replace(config.baseUrl, ""), { method: "GET" });
+    }
+    return requestJson<T>(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" },
+      body: body.toString()
+    });
+  }
+
   return {
     config,
     async testConnection() {
-      // Lightweight probe — many Gingr installs expose location/list style endpoints.
-      // Failures surface as typed errors for the Integrations UI.
       try {
-        await request(`/api/locations`);
+        await requestForm(`/api/v1/reservation_types`, {}, "GET");
         return { ok: true as const, message: "Gingr API reachable." };
       } catch (error) {
-        // Fallback probe with query form used by some Gingr API docs
-        try {
-          await request(`/api/owners?limit=1`);
-          return { ok: true as const, message: "Gingr API reachable (owners probe)." };
-        } catch (second) {
-          const message = second instanceof Error ? second.message : "Gingr connection failed.";
-          return { ok: false as const, message };
-        }
+        const message = error instanceof Error ? error.message : "Gingr connection failed.";
+        return { ok: false as const, message };
       }
     },
     getOwner(ownerId: string) {
-      return request<GingrOwner>(`/api/owners/${encodeURIComponent(ownerId)}`);
+      return requestForm<GingrOwner>(`/api/v1/owner`, { id: ownerId }, "GET");
     },
-    listOwners(params?: { modified_since?: string; limit?: number }) {
-      const q = new URLSearchParams();
-      if (params?.modified_since) q.set("modified_since", params.modified_since);
-      if (params?.limit) q.set("limit", String(params.limit));
-      const suffix = q.toString() ? `?${q}` : "";
-      return request<GingrOwner[]>(`/api/owners${suffix}`);
+    listOwners(_params?: { modified_since?: string; limit?: number }) {
+      // Legacy helper — prefer reservations / owner endpoints for Fitdog.
+      return Promise.resolve([] as GingrOwner[]);
     },
     getAnimal(animalId: string) {
-      return request<GingrAnimal>(`/api/animals/${encodeURIComponent(animalId)}`);
+      return requestForm<GingrAnimal>(`/api/v1/animals`, { id: animalId }, "GET");
     },
-    listReservationsByDate(date: string) {
-      return request<GingrReservation[]>(`/api/reservations?date=${encodeURIComponent(date)}`);
+    /**
+     * Official Gingr endpoint:
+     * POST /api/v1/reservations with key + start_date + end_date (or checked_in=true).
+     */
+    async listReservationsByDate(date: string) {
+      const payload = await requestForm<unknown>(`/api/v1/reservations`, {
+        start_date: date,
+        end_date: date,
+        location_id: config.locationId,
+        checked_in: "false"
+      });
+      return normalizeGingrReservationList(payload);
     },
-    listReservationsByOwner(ownerId: string) {
-      return request<GingrReservation[]>(
-        `/api/reservations?owner_id=${encodeURIComponent(ownerId)}`
+    async listReservationsByOwner(ownerId: string) {
+      const payload = await requestForm<unknown>(
+        `/api/v1/reservations_by_owner`,
+        { owner_id: ownerId },
+        "GET"
       );
+      return normalizeGingrReservationList(payload);
     }
   };
 }
