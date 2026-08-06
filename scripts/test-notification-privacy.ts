@@ -18,6 +18,7 @@ function makeState(notifications: StaffNotification[]): StaffOpsState {
     crossover_message_replies: [],
     owner_follow_ups: [],
     active_issues: [],
+    active_issue_replies: [],
     activity_logs: [],
     staff_directory: [
       {
