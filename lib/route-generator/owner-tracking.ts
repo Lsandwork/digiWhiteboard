@@ -7,6 +7,18 @@ import {
   isSamsaraLiveConfigured,
   matchVehicleByName
 } from "@/lib/route-generator/samsara-live";
+import {
+  formatArriveAtLabel,
+  OWNER_ETA_ALERT_MINUTES,
+  OWNER_LIVE_MAP_MINUTES,
+  ownerTrackHeadline,
+  ownerTrackHelper,
+  ownerTrackPhase,
+  ownerTrackProgressStep,
+  shouldSendEtaAlert,
+  shouldShowLiveVehicle,
+  type OwnerTrackPhase
+} from "@/lib/route-generator/owner-track-thresholds";
 import { phoneDigitsE164 } from "@/lib/route-generator/stop-notes";
 
 function publicSiteUrl(): string {
@@ -29,33 +41,22 @@ export type OwnerTrackingPublicView = {
   ownerName: string | null;
   stopAddress: string | null;
   stop: { lat: number; lng: number } | null;
+  /** Only populated when ETA ≤ 10 minutes (privacy until then). */
   vehicle: { lat: number; lng: number; heading: number | null; updatedAt: string | null } | null;
   etaMinutes: number | null;
+  arriveAtLabel: string | null;
   headline: string;
   subline: string;
+  helperText: string;
+  phase: OwnerTrackPhase;
+  progressStep: number;
+  showLiveVehicle: boolean;
   showArrivingBanner: boolean;
   liveConfigured: boolean;
+  vanDisplayName: string;
+  alertMinutes: number;
+  liveMapMinutes: number;
 };
-
-function headlineFor(status: string, etaMinutes: number | null, direction: string): string {
-  if (status === "arrived" || status === "completed") {
-    return direction === "pickup" ? "Your Fitdog driver has arrived" : "Your dog is being dropped off";
-  }
-  if (etaMinutes != null && etaMinutes <= 15) {
-    return `${etaMinutes} min away`;
-  }
-  if (etaMinutes != null) {
-    return `${etaMinutes} min away`;
-  }
-  return direction === "pickup" ? "Driver is on the way" : "Drop-off is on the way";
-}
-
-function sublineFor(status: string, etaMinutes: number | null): string {
-  if (status === "arrived" || status === "completed") return "Thanks for trusting Fitdog.";
-  if (etaMinutes != null && etaMinutes <= 15) return "Your driver is almost there — please be ready.";
-  if (etaMinutes != null && etaMinutes <= 30) return "Your driver is getting close.";
-  return "Live map updates as your Fitdog van moves.";
-}
 
 export async function createOwnerTrackingForPlan(planId: string): Promise<{ created: number; smsQueued: number }> {
   const supabase = getServiceSupabase();
@@ -106,12 +107,13 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
         phoneDigitsE164(stop.owner_phone_display) ||
         phoneDigitsE164(String(stop.driver_notes || "").match(/Phone:\s*([^\n]+)/i)?.[1]);
 
-      const dogNames = String(stop.driver_notes || "")
-        .split("\n")[0]
-        ?.replace(/^\d+\s*dog\(s\):\s*/i, "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean) ?? [];
+      const dogNames =
+        String(stop.driver_notes || "")
+          .split("\n")[0]
+          ?.replace(/^\d+\s*dog\(s\):\s*/i, "")
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean) ?? [];
 
       let token = existing?.token;
       if (!existing) {
@@ -144,7 +146,7 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
         const url = `${publicSiteUrl()}/track/${token}`;
         const dogs = dogNames.slice(0, 3).join(" + ") || "your dog";
         const direction = route.direction === "pickup" ? "pickup" : "drop-off";
-        const body = `Fitdog: track ${dogs}'s ${direction} live — ${url}`;
+        const body = `Fitdog: track ${dogs}'s ${direction}. We'll text you ~${OWNER_ETA_ALERT_MINUTES} min out. Live van map unlocks at ~${OWNER_LIVE_MAP_MINUTES} min: ${url}`;
         const sent = await sms.send({
           to: phone,
           body,
@@ -171,20 +173,7 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
   if (!row) return null;
 
   let etaMinutes = row.last_eta_minutes == null ? null : Number(row.last_eta_minutes);
-  let vehicle: OwnerTrackingPublicView["vehicle"] = null;
-
-  if (
-    row.last_vehicle_latitude != null &&
-    row.last_vehicle_longitude != null &&
-    Number.isFinite(Number(row.last_vehicle_latitude))
-  ) {
-    vehicle = {
-      lat: Number(row.last_vehicle_latitude),
-      lng: Number(row.last_vehicle_longitude),
-      heading: null,
-      updatedAt: row.last_vehicle_at ? String(row.last_vehicle_at) : null
-    };
-  }
+  let liveVehicle: OwnerTrackingPublicView["vehicle"] = null;
 
   // Refresh live location when Samsara is configured (best-effort on each poll).
   if (isSamsaraLiveConfigured() && row.stop_latitude != null && row.stop_longitude != null) {
@@ -197,14 +186,18 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
           { lat: Number(row.stop_latitude), lng: Number(row.stop_longitude) },
           match.speedMilesPerHour && match.speedMilesPerHour > 3 ? match.speedMilesPerHour : 18
         );
-        vehicle = {
+        liveVehicle = {
           lat: match.latitude,
           lng: match.longitude,
           heading: match.heading,
           updatedAt: match.time
         };
         const nextStatus =
-          etaMinutes <= 15 ? "arriving_15" : etaMinutes <= 30 ? "en_route" : row.status === "pending" ? "en_route" : row.status;
+          etaMinutes <= OWNER_ETA_ALERT_MINUTES
+            ? "arriving_15"
+            : row.status === "pending"
+              ? "en_route"
+              : row.status;
         await supabase
           .from("route_owner_tracking")
           .update({
@@ -222,11 +215,30 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
     }
   }
 
+  if (
+    !liveVehicle &&
+    row.last_vehicle_latitude != null &&
+    row.last_vehicle_longitude != null &&
+    Number.isFinite(Number(row.last_vehicle_latitude))
+  ) {
+    liveVehicle = {
+      lat: Number(row.last_vehicle_latitude),
+      lng: Number(row.last_vehicle_longitude),
+      heading: null,
+      updatedAt: row.last_vehicle_at ? String(row.last_vehicle_at) : null
+    };
+  }
+
   const status = String(row.status);
+  const direction = row.direction as "pickup" | "dropoff";
+  const phase = ownerTrackPhase({ status, etaMinutes });
+  const showLive = shouldShowLiveVehicle(etaMinutes, status);
+  const vanDisplayName = String(row.samsara_vehicle_name || row.van_key || "Fitdog van");
+
   return {
     token,
     status,
-    direction: row.direction as "pickup" | "dropoff",
+    direction,
     dogNames: (row.dog_names as string[]) || [],
     ownerName: row.owner_name,
     stopAddress: row.stop_address,
@@ -234,19 +246,32 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
       row.stop_latitude != null && row.stop_longitude != null
         ? { lat: Number(row.stop_latitude), lng: Number(row.stop_longitude) }
         : null,
-    vehicle,
+    vehicle: showLive ? liveVehicle : null,
     etaMinutes,
-    headline: headlineFor(status, etaMinutes, String(row.direction)),
-    subline: sublineFor(status, etaMinutes),
-    showArrivingBanner: Boolean(etaMinutes != null && etaMinutes <= 15) || status === "arriving_15",
-    liveConfigured: isSamsaraLiveConfigured()
+    arriveAtLabel: formatArriveAtLabel(etaMinutes),
+    headline: ownerTrackHeadline({ phase, direction, etaMinutes }),
+    subline:
+      etaMinutes != null && phase !== "arrived"
+        ? `${etaMinutes} min away`
+        : phase === "arrived"
+          ? "Thanks for trusting Fitdog."
+          : "Live updates when your route is moving",
+    helperText: ownerTrackHelper({ phase, direction }),
+    phase,
+    progressStep: ownerTrackProgressStep(phase),
+    showLiveVehicle: showLive,
+    showArrivingBanner: phase === "nearby" || phase === "live",
+    liveConfigured: isSamsaraLiveConfigured(),
+    vanDisplayName,
+    alertMinutes: OWNER_ETA_ALERT_MINUTES,
+    liveMapMinutes: OWNER_LIVE_MAP_MINUTES
   };
 }
 
-/** Cron: refresh ETAs and send 30-min SMS + record 15-min state. */
+/** Cron: refresh ETAs and SMS owners at ~15 minutes out. */
 export async function processOwnerEtaAlerts(): Promise<{
   checked: number;
-  sms30: number;
+  sms15: number;
   arriving15: number;
   errors: string[];
 }> {
@@ -259,7 +284,7 @@ export async function processOwnerEtaAlerts(): Promise<{
     .in("status", ["pending", "en_route", "arriving_15"]);
 
   const errors: string[] = [];
-  let sms30 = 0;
+  let sms15 = 0;
   let arriving15 = 0;
   let vehicles: Awaited<ReturnType<typeof fetchSamsaraVehicleLocations>> = [];
   if (isSamsaraLiveConfigured()) {
@@ -287,45 +312,28 @@ export async function processOwnerEtaAlerts(): Promise<{
       last_vehicle_latitude: match.latitude,
       last_vehicle_longitude: match.longitude,
       last_vehicle_at: match.time || new Date().toISOString(),
-      status: etaMinutes <= 15 ? "arriving_15" : "en_route"
+      status: etaMinutes <= OWNER_ETA_ALERT_MINUTES ? "arriving_15" : "en_route"
     };
 
-    if (etaMinutes <= 30 && !row.notified_30_at && row.owner_phone_e164 && sms.isConfigured()) {
-      const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
-      const url = `${publicSiteUrl()}/track/${row.token}`;
-      const body = `Fitdog: your driver is about ${etaMinutes} minutes away for ${dogs}. Track live: ${url}`;
-      const sent = await sms.send({
-        to: String(row.owner_phone_e164),
-        body,
-        purpose: "transactional",
-        idempotencyKey: `route-eta-30:${row.id}`
-      });
-      if (sent.ok) {
-        patch.notified_30_at = new Date().toISOString();
-        sms30 += 1;
-      } else if (sent.error) {
-        errors.push(`${row.token}: ${sent.error}`);
-      }
-    }
-
-    if (etaMinutes <= 15 && !row.notified_15_at) {
+    if (shouldSendEtaAlert(etaMinutes, Boolean(row.notified_15_at))) {
       patch.notified_15_at = new Date().toISOString();
       arriving15 += 1;
-      // Optional SMS at 15 as well when Twilio is configured.
       if (row.owner_phone_e164 && sms.isConfigured()) {
         const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
         const url = `${publicSiteUrl()}/track/${row.token}`;
-        await sms.send({
+        const sent = await sms.send({
           to: String(row.owner_phone_e164),
-          body: `Fitdog: your driver is ~${etaMinutes} minutes out for ${dogs}. Live map: ${url}`,
+          body: `Fitdog: your driver is about ${etaMinutes} minutes away for ${dogs}. Live van map unlocks at ~${OWNER_LIVE_MAP_MINUTES} min: ${url}`,
           purpose: "transactional",
           idempotencyKey: `route-eta-15:${row.id}`
         });
+        if (sent.ok) sms15 += 1;
+        else if (sent.error) errors.push(`${row.token}: ${sent.error}`);
       }
     }
 
     await supabase.from("route_owner_tracking").update(patch).eq("id", row.id);
   }
 
-  return { checked: rows?.length ?? 0, sms30, arriving15, errors };
+  return { checked: rows?.length ?? 0, sms15, arriving15, errors };
 }

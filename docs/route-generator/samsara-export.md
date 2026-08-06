@@ -23,10 +23,11 @@ On **Approve**:
 Live map + ETA:
 
 - Polls Samsara vehicle GPS when `SAMSARA_API_TOKEN` is set
-- Owners see an Uber Eats–style map with live minutes
-- Cron `/api/cron/route-eta-alerts` (every 2 minutes):
-  - SMS when driver is ~**30 minutes** out
-  - Map banner + SMS when ~**15 minutes** out
+- SMS alert when driver is ~**15 minutes** out
+- Live van appears on the map at ~**10 minutes** out
+- Cron `/api/cron/route-eta-alerts` every 2 minutes
+
+See [owner-live-tracking.md](./owner-live-tracking.md).
 
 ## Van drop-off start times (Pacific)
 

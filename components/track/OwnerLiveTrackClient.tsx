@@ -13,15 +13,26 @@ type TrackView = {
   stop: { lat: number; lng: number } | null;
   vehicle: { lat: number; lng: number; heading: number | null; updatedAt: string | null } | null;
   etaMinutes: number | null;
+  arriveAtLabel: string | null;
   headline: string;
   subline: string;
+  helperText: string;
+  phase: "waiting" | "en_route" | "nearby" | "live" | "arrived";
+  progressStep: number;
+  showLiveVehicle: boolean;
   showArrivingBanner: boolean;
   liveConfigured: boolean;
+  vanDisplayName: string;
+  alertMinutes: number;
+  liveMapMinutes: number;
 };
+
+const PROGRESS_LABELS = ["On the way", "Nearby", "Almost there", "Arrived"];
 
 export function OwnerLiveTrackClient({ token }: { token: string }) {
   const [view, setView] = useState<TrackView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +50,7 @@ export function OwnerLiveTrackClient({ token }: { token: string }) {
       }
     }
     void load();
-    const timer = window.setInterval(() => void load(), 10000);
+    const timer = window.setInterval(() => void load(), 8000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -48,79 +59,144 @@ export function OwnerLiveTrackClient({ token }: { token: string }) {
 
   if (error) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f6f8] px-4">
-        <p className="rounded-2xl bg-white px-5 py-4 text-sm text-neutral-700 shadow">{error}</p>
+      <main className="owner-track owner-track--centered">
+        <p className="owner-track-error">{error}</p>
       </main>
     );
   }
 
   if (!view) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f4f6f8]">
-        <p className="text-sm text-neutral-500">Loading live map…</p>
+      <main className="owner-track owner-track--centered">
+        <p className="owner-track-loading">Loading live map…</p>
       </main>
     );
   }
 
   const dogs = view.dogNames.join(" + ") || "your dog";
+  const mapCallout =
+    view.phase === "arrived" ? "Arrived" : view.phase === "live" ? "En route" : "On the way";
 
   return (
-    <main className="relative min-h-screen bg-[#f4f6f8] text-neutral-900">
-      <div className="absolute inset-0 z-0">
-        <OwnerLiveTrackMap stop={view.stop} vehicle={view.vehicle} />
+    <main className="owner-track">
+      <div className="owner-track__map">
+        <OwnerLiveTrackMap
+          stop={view.stop}
+          vehicle={view.vehicle}
+          showLiveVehicle={view.showLiveVehicle}
+          vanLabel={view.vanDisplayName}
+          callout={mapCallout}
+        />
       </div>
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 px-4 pt-4">
-        <div className="pointer-events-auto mx-auto flex max-w-lg items-center justify-between rounded-full bg-white/95 px-4 py-2 shadow-lg backdrop-blur">
-          <span className="text-sm font-black tracking-tight text-[#f15f2a]">FITDOG</span>
-          <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+      <header className="owner-track__topbar">
+        <div className="owner-track__brand-pill">
+          <span className="owner-track__brand">FITDOG</span>
+          <span className="owner-track__wave">
             {view.direction === "pickup" ? "Pickup" : "Drop-off"}
           </span>
         </div>
       </header>
 
-      {view.showArrivingBanner ? (
-        <div className="pointer-events-none absolute inset-x-0 top-16 z-10 px-4">
-          <div className="pointer-events-auto mx-auto max-w-lg rounded-2xl bg-[#111827] px-4 py-3 text-center text-sm font-semibold text-white shadow-xl">
-            Driver is about 15 minutes out — please be ready for {dogs}.
-          </div>
+      {!view.showLiveVehicle && view.phase !== "arrived" ? (
+        <div className="owner-track__privacy">
+          <p>
+            Live van map unlocks at ~{view.liveMapMinutes} minutes out.
+            {view.phase === "nearby"
+              ? " Your alert text was sent — hang tight."
+              : ` We’ll text you around ${view.alertMinutes} minutes away.`}
+          </p>
         </div>
       ) : null}
 
-      <section className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-3 pb-3">
-        <div className="pointer-events-auto mx-auto max-w-lg overflow-hidden rounded-[28px] bg-white shadow-[0_-8px_40px_rgba(0,0,0,.18)]">
-          <div className="border-b border-neutral-100 px-5 py-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-400">Arriving in</p>
-            <div className="mt-1 flex items-end gap-3">
-              <h1 className="text-5xl font-black tracking-tight text-neutral-900">
-                {view.etaMinutes != null ? view.etaMinutes : "—"}
-              </h1>
-              <p className="mb-1 text-lg font-semibold text-neutral-500">min</p>
+      <section className="owner-track__sheet" aria-label="Live tracking status">
+        <div className="owner-track__sheet-inner">
+          <div className="owner-track__status">
+            <h1 className="owner-track__headline">{view.headline}</h1>
+            {view.arriveAtLabel ? (
+              <p className="owner-track__arrive">
+                Arrives <strong>{view.arriveAtLabel}</strong>
+                {view.etaMinutes != null ? <span> · {view.etaMinutes} min</span> : null}
+              </p>
+            ) : (
+              <p className="owner-track__arrive">{view.subline}</p>
+            )}
+
+            <div
+              className="owner-track__progress"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={4}
+              aria-valuenow={Math.min(4, view.progressStep)}
+              aria-label="Route progress"
+            >
+              {PROGRESS_LABELS.map((label, index) => {
+                const filled = view.progressStep > index;
+                return (
+                  <span
+                    key={label}
+                    className={`owner-track__progress-seg ${filled ? "is-filled" : ""}`}
+                    title={label}
+                  />
+                );
+              })}
             </div>
-            <p className="mt-2 text-base font-semibold text-neutral-900">{view.headline}</p>
-            <p className="mt-1 text-sm text-neutral-500">{view.subline}</p>
+            <p className="owner-track__helper">{view.helperText}</p>
           </div>
 
-          <div className="space-y-3 px-5 py-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Dogs</p>
-              <p className="text-sm font-semibold text-neutral-900">{dogs}</p>
+          <div className="owner-track__van-row">
+            <div className="owner-track__van-thumb" aria-hidden="true">
+              <span className="owner-track__van-glyph" />
             </div>
-            {view.stopAddress ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">Stop</p>
-                <p className="text-sm text-neutral-700">{view.stopAddress}</p>
-              </div>
-            ) : null}
-            {!view.liveConfigured ? (
-              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Live van GPS activates when Samsara API token is configured. Tracking link and map are ready.
+            <div className="owner-track__van-meta">
+              <p className="owner-track__van-name">
+                {view.vanDisplayName}
+                <span> · Fitdog</span>
               </p>
-            ) : null}
-            <p className="text-[11px] text-neutral-400">
-              Updates every 10 seconds · You’ll also get a text when the driver is ~30 minutes away.
-            </p>
+              <p className="owner-track__van-desc">
+                {view.showLiveVehicle
+                  ? `Live GPS for ${dogs}`
+                  : `Tracking ${dogs} · map unlocks at ~${view.liveMapMinutes} min`}
+              </p>
+            </div>
           </div>
+
+          <a className="owner-track__support" href="https://fitdog.com/contact" target="_blank" rel="noreferrer">
+            Contact Fitdog
+          </a>
+
+          <button
+            type="button"
+            className="owner-track__details-toggle"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+          >
+            <div>
+              <p className="owner-track__details-label">
+                {view.direction === "pickup" ? "Pickup details" : "Drop-off details"}
+              </p>
+              {detailsOpen ? (
+                <>
+                  <p className="owner-track__details-note">
+                    {view.direction === "pickup"
+                      ? "Meet your Fitdog driver outside with leash + phone."
+                      : "Be ready outside for drop-off."}
+                  </p>
+                  {view.stopAddress ? <p className="owner-track__details-address">{view.stopAddress}</p> : null}
+                  {view.ownerName ? <p className="owner-track__details-owner">{view.ownerName}</p> : null}
+                </>
+              ) : (
+                <p className="owner-track__details-address">{view.stopAddress || "Address on file"}</p>
+              )}
+            </div>
+            <span className={`owner-track__chevron ${detailsOpen ? "is-open" : ""}`} aria-hidden="true" />
+          </button>
+
+          {!view.liveConfigured ? (
+            <p className="owner-track__warn">
+              Live van GPS activates when Samsara is configured. Your tracking link still works.
+            </p>
+          ) : null}
         </div>
       </section>
     </main>
