@@ -13,7 +13,11 @@ export function isFitdogReportSyncEnabled() {
 }
 
 export function isRouteOptimizationEnabled() {
-  return envFlag("ROUTE_OPTIMIZATION_ENABLED", false);
+  // Default on when a Google Maps key is present so traffic-aware routing is used in prod.
+  const hasMaps =
+    Boolean(process.env.GOOGLE_MAPS_API_KEY?.trim()) ||
+    Boolean(process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim());
+  return envFlag("ROUTE_OPTIMIZATION_ENABLED", hasMaps);
 }
 
 export function isSamsaraCsvExportEnabled() {

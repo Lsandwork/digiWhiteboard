@@ -750,8 +750,41 @@ export async function generatePlanForRun(params: {
       coords[g.householdKey] = { lat: locations.hub.latitude, lng: locations.hub.longitude };
       return;
     }
+    // Temporary placeholder — replaced by Google geocode when Maps is configured.
     coords[g.householdKey] = syntheticCoords(g.householdKey, index);
   });
+
+  const trafficWarnings: string[] = [];
+  try {
+    const { geocodeHouseholdAddresses } = await import("@/lib/route-generator/google-maps");
+    const geocodeResult = await geocodeHouseholdAddresses(
+      supabase,
+      [...pickupGroups, ...dropoffGroups]
+        .filter((g) => !g.householdKey.startsWith("facility:"))
+        .map((g) => ({ householdKey: g.householdKey, address: g.address }))
+    );
+    for (const [householdKey, point] of Object.entries(geocodeResult.coords)) {
+      coords[householdKey] = point;
+    }
+    if (geocodeResult.provider === "google") {
+      trafficWarnings.push(
+        `Geocoded ${geocodeResult.geocoded} addresses (${geocodeResult.cached} cached) for traffic-aware routing.`
+      );
+    } else {
+      trafficWarnings.push(
+        "GOOGLE_MAPS_API_KEY not set — using synthetic coordinates and heuristic drive times. Add a Google Maps key for live traffic optimization."
+      );
+    }
+    if (geocodeResult.failed.length) {
+      trafficWarnings.push(
+        `${geocodeResult.failed.length} address(es) could not be geocoded and used fallback coordinates.`
+      );
+    }
+  } catch (error) {
+    trafficWarnings.push(
+      error instanceof Error ? `Geocoding failed: ${error.message}` : "Geocoding failed."
+    );
+  }
 
   const effectiveDepot: DepotConfig = {
     ...depot,
@@ -762,6 +795,44 @@ export async function generatePlanForRun(params: {
   };
 
   const operatingDate = String(run.operating_date).slice(0, 10);
+
+  const matrixPoints = [
+    ...Object.values(coords),
+    ...(effectiveDepot.latitude != null && effectiveDepot.longitude != null
+      ? [{ lat: effectiveDepot.latitude, lng: effectiveDepot.longitude }]
+      : []),
+    ...(locations.club.latitude != null && locations.club.longitude != null
+      ? [{ lat: locations.club.latitude, lng: locations.club.longitude }]
+      : [])
+  ];
+
+  let pickupMatrix = null as Awaited<
+    ReturnType<typeof import("@/lib/route-generator/google-maps").buildTrafficTravelMatrix>
+  > | null;
+  let dropoffMatrix = null as typeof pickupMatrix;
+  try {
+    const { buildTrafficTravelMatrix, defaultDepartureTimeIso } = await import(
+      "@/lib/route-generator/google-maps"
+    );
+    const [pickup, dropoff] = await Promise.all([
+      buildTrafficTravelMatrix({
+        points: matrixPoints,
+        departureTime: defaultDepartureTimeIso("pickup", operatingDate)
+      }),
+      buildTrafficTravelMatrix({
+        points: matrixPoints,
+        departureTime: defaultDepartureTimeIso("dropoff", operatingDate)
+      })
+    ]);
+    pickupMatrix = pickup;
+    dropoffMatrix = dropoff;
+    trafficWarnings.push(...pickup.warnings, ...dropoff.warnings);
+  } catch (error) {
+    trafficWarnings.push(
+      error instanceof Error ? `Traffic matrix failed: ${error.message}` : "Traffic matrix failed."
+    );
+  }
+
   const pickupOpt = optimizeRoutes({
     direction: "pickup",
     households: pickupGroups,
@@ -772,7 +843,8 @@ export async function generatePlanForRun(params: {
     seed: `pickup:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
     lockedVanByHousehold,
-    operatingDate
+    operatingDate,
+    travelMatrix: pickupMatrix
   });
 
   // Drop-off must use the same van that picked each dog up (Van 3 never drops dogs it did not collect).
@@ -798,10 +870,14 @@ export async function generatePlanForRun(params: {
     seed: `dropoff:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
     lockedVanByHousehold: dropoffLock.lockedVanByHousehold,
-    operatingDate
+    operatingDate,
+    travelMatrix: dropoffMatrix
   });
   if (dropoffLock.warnings.length) {
     dropoffOpt.warnings.push(...dropoffLock.warnings);
+  }
+  if (trafficWarnings.length) {
+    pickupOpt.warnings.push(...trafficWarnings);
   }
   if (activeUnconfigured.length) {
     pickupOpt.warnings.push(
