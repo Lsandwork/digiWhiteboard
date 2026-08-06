@@ -17,11 +17,11 @@ Rebuild path: Generate Routes writes notes on `route_plan_stops.driver_notes`; E
 
 Exact Samsara bulk-upload columns A–K:
 
-`Route Name, Assigned Driver Username, Assigned Vehicle Name, Stop Name, Notes, Scheduled Arrival Time, Scheduled Departure Time, Address Name, Latitude, Longitude, Full Address`
+`Route Name, Assigned Driver Username, Assigned Vehicle Name, Stop Name, Stop Arrival Time, Stop Departure Time, Stop Notes, Address Name, Latitude, Longitude, Full Address`
 
-Every stop row must include **both** scheduled arrival and departure. Vehicle names must match Samsara exactly (`Van 01` … `Van 06`, never Van 04). Leave driver username blank when assigning by vehicle.
+Every stop row must include **both** stop arrival and departure. Vehicle names must match Samsara exactly (`Van 01` … `Van 06`, never Van 04). Leave driver username blank when assigning by vehicle.
 
-If Samsara says **"One or more rows are incorrect"**, see [troubleshooting](./troubleshooting.md).
+If Samsara says **"One or more column headers are not supported"** or **"One or more rows are incorrect"**, see [troubleshooting](./troubleshooting.md).
 
 ## Owner live tracking (Uber-style map)
 

@@ -413,7 +413,7 @@ export function RouteGeneratorPanel() {
       a.download = body.fileName;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("Samsara CSV exported. Confirm header uses Notes / Scheduled Arrival Time before upload.", "success");
+      showToast("Samsara CSV exported. Confirm headers use Stop Arrival Time / Stop Departure Time / Stop Notes before upload.", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Export failed.", "error");
     }

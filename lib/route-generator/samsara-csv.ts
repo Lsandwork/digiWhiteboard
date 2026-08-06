@@ -1,31 +1,32 @@
 /**
  * Canonical Samsara dashboard bulk-upload headers (columns A–K).
- * Any other header names are rejected by cloud.samsara.com CSV upload.
- * Do not invent aliases — keep this list exact.
+ * Source of truth: company sample downloads + Samsara route CSV bulk upload
+ * (e.g. fitdog-samsara-routes.csv from May 2026). Any other names are rejected
+ * with "One or more column headers are not supported."
  */
 export const SAMSARA_BULK_UPLOAD_HEADERS = [
   "Route Name",
   "Assigned Driver Username",
   "Assigned Vehicle Name",
   "Stop Name",
-  "Notes",
-  "Scheduled Arrival Time",
-  "Scheduled Departure Time",
+  "Stop Arrival Time",
+  "Stop Departure Time",
+  "Stop Notes",
   "Address Name",
   "Latitude",
   "Longitude",
   "Full Address"
 ] as const;
 
-/** Headers that previously caused Samsara "column headers are not supported" / row errors. */
+/** Headers that Samsara rejects (wrong aliases / leftover Digi columns). */
 export const SAMSARA_UNSUPPORTED_HEADERS = [
   "Route Notes",
   "Assigned Vehicle",
   "Assigned Driver",
-  "Stop Notes",
+  "Notes",
   "Stop Address",
-  "Stop Arrival Time",
-  "Stop Departure Time",
+  "Scheduled Arrival Time",
+  "Scheduled Departure Time",
   "Scheduled Arrival",
   "Scheduled Departure",
   "Route Date",
