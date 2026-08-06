@@ -9,6 +9,8 @@
   white-space: nowrap;
   border: 0;
 }
+
+.fitdog-blog.why-fitdog-page {
   --fitdog-orange: #ff6f26;
   --fitdog-orange-hover: #e85a12;
   --fitdog-orange-active: #d14e0f;
