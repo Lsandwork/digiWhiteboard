@@ -10,8 +10,8 @@ import {
 import { publicBlogHref } from "../lib/blog/public-path";
 import { absoluteBlogUrl } from "../lib/blog/site-url";
 
-assert.equal(BLOGS_HOSTNAME, "blog.ruffops.com");
-assert.equal(BLOGS_PUBLIC_ORIGIN, "https://blog.ruffops.com");
+assert.equal(BLOGS_HOSTNAME, "blogs.ruffops.com");
+assert.equal(BLOGS_PUBLIC_ORIGIN, "https://blogs.ruffops.com");
 
 assert.equal(rewriteBlogsPublicPath(BLOGS_HOSTNAME, "/"), "/blog");
 assert.equal(rewriteBlogsPublicPath(BLOGS_HOSTNAME, "/articles"), "/blog/articles");

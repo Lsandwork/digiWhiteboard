@@ -1,9 +1,9 @@
 /**
- * Public Fitdog Blog custom-domain routing (blog.ruffops.com).
+ * Public Fitdog Blog custom-domain routing (blogs.ruffops.com).
  * Serves App Router pages under /blog/* while the browser URL stays on the blog subdomain.
  */
 
-export const BLOGS_HOSTNAME = "blog.ruffops.com";
+export const BLOGS_HOSTNAME = "blogs.ruffops.com";
 export const BLOGS_PUBLIC_ORIGIN = `https://${BLOGS_HOSTNAME}`;
 
 const RESERVED_PREFIXES = [
@@ -39,7 +39,7 @@ function isReservedBlogsPath(pathname: string) {
 }
 
 /**
- * Internal rewrite target for blog.ruffops.com → /blog/* routes.
+ * Internal rewrite target for blogs.ruffops.com → /blog/* routes.
  * Returns null when the host/path should not be rewritten.
  */
 export function rewriteBlogsPublicPath(host: string | null | undefined, pathname: string): string | null {
@@ -58,7 +58,7 @@ export function rewriteBlogsPublicPath(host: string | null | undefined, pathname
   return null;
 }
 
-/** Strip /blog prefix for canonical URLs on blog.ruffops.com. */
+/** Strip /blog prefix for canonical URLs on blogs.ruffops.com. */
 export function blogsPublicPathFromInternal(pathname: string) {
   if (pathname === "/blog") return "/";
   if (pathname.startsWith("/blog/")) return pathname.slice("/blog".length) || "/";
@@ -75,7 +75,7 @@ export function blogsCanonicalRedirectPath(host: string | null | undefined, path
 }
 
 /**
- * Redirect legacy /blog/* on other production hosts to blog.ruffops.com.
+ * Redirect legacy /blog/* on other production hosts to blogs.ruffops.com.
  */
 export function legacyBlogRedirectUrl(
   host: string | null | undefined,

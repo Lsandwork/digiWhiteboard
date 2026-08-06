@@ -1,6 +1,6 @@
 import { BLOGS_HOSTNAME, BLOGS_PUBLIC_ORIGIN } from "@/lib/blogs-domain";
 
-/** Whether public blog URLs should omit the /blog prefix (blog.ruffops.com). */
+/** Whether public blog URLs should omit the /blog prefix (blogs.ruffops.com). */
 export function usesBlogsPublicDomain() {
   const configured =
     process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim() ||
@@ -13,7 +13,7 @@ export function usesBlogsPublicDomain() {
 
 /**
  * Public blog path for in-app links.
- * blog.ruffops.com → /articles, /{slug}
+ * blogs.ruffops.com → /articles, /{slug}
  * other hosts → /blog/articles, /blog/{slug}
  */
 export function publicBlogHref(subpath = "") {
