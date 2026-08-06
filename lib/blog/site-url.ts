@@ -1,4 +1,4 @@
-import { BLOGS_PUBLIC_ORIGIN } from "@/lib/blogs-domain";
+import { BLOG_PRIMARY_PUBLIC_ORIGIN, getBlogPrimaryPublicOrigin } from "@/lib/blogs-domain";
 import { publicBlogHref, usesBlogsPublicDomain } from "@/lib/blog/public-path";
 
 /** Public site origin for Fitdog blog SEO (canonical, Open Graph, JSON-LD). */
@@ -11,7 +11,7 @@ export function getPublicBlogSiteOrigin() {
     const withProtocol = configured.startsWith("http") ? configured : `https://${configured}`;
     return withProtocol.replace(/\/$/, "");
   }
-  return BLOGS_PUBLIC_ORIGIN;
+  return getBlogPrimaryPublicOrigin() || BLOG_PRIMARY_PUBLIC_ORIGIN;
 }
 
 export function absoluteBlogUrl(path: string) {

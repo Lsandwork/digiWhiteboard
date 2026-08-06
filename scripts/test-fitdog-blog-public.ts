@@ -5,7 +5,7 @@ import { getSeedArticleBySlug, getSeedArticles, relatedArticles, neighboringArti
 import { findBannedPhrases, startsWithGenericQuestion } from "../lib/blog/editorial/banned-phrases";
 import { markdownToSimpleHtml } from "../lib/blog/utils/markdown";
 import { absoluteBlogUrl } from "../lib/blog/site-url";
-import { BLOGS_PUBLIC_ORIGIN } from "../lib/blogs-domain";
+import { BLOG_PRIMARY_PUBLIC_ORIGIN } from "../lib/blogs-domain";
 
 assert.equal(FITDOG_BLOG_ORANGE, "#ff6f26");
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Blog" && item.href === "/"));
@@ -106,6 +106,6 @@ assert.ok(sampleHtml.includes("<p>First paragraph.</p>"));
 assert.ok(sampleHtml.includes("<p>Second paragraph.</p>"));
 assert.ok(sampleHtml.includes("<ul><li>Item one</li><li>Item two</li></ul>"));
 assert.ok(sampleHtml.includes("<ol><li>Step one</li><li>Step two</li></ol>"));
-assert.equal(absoluteBlogUrl("/blog"), `${BLOGS_PUBLIC_ORIGIN}/`);
+assert.equal(absoluteBlogUrl("/blog"), `${BLOG_PRIMARY_PUBLIC_ORIGIN}/`);
 
 console.log("test-fitdog-blog-public passed");

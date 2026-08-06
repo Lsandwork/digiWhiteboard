@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { buildArticlePreviewHtml, estimateReadingMinutes } from "@/lib/blog/utils/article-preview-html";
-import { BLOGS_HOSTNAME } from "@/lib/blogs-domain";
+import { BLOG_FITDOG_HOSTNAME } from "@/lib/blogs-domain";
 
 export type PreviewDevice = "desktop" | "tablet" | "mobile";
 
@@ -38,7 +38,7 @@ export function ArticleLivePreview({ article, device = "desktop", compact = fals
         <span className="blog-editor-preview__dot" />
         <span className="blog-editor-preview__dot" />
         <span className="blog-editor-preview__url">
-          {BLOGS_HOSTNAME}/{article.slug || "preview"}
+          {BLOG_FITDOG_HOSTNAME}/{article.slug || "preview"}
         </span>
       </div>
       <article className="blog-editor-preview__page">
