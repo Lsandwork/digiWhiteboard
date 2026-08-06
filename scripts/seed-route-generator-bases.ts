@@ -165,11 +165,11 @@ async function main() {
            else samsara_vehicle_name
          end,
          samsara_serial = case
-           when van_key = 'van_1' then 'GXPD-PPW-GEV'
-           when van_key = 'van_2' then 'GW6E-ADZ-ATK'
-           when van_key = 'van_3' then 'GVE5-PCJ-7KK'
-           when van_key = 'van_5' then 'GGR6-JKW-B6F'
-           when van_key = 'van_6' then 'GKEW-DZK-4NX'
+           when van_key = 'van_1' then 'GXPDPPWGEV'
+           when van_key = 'van_2' then 'GW6EADZATK'
+           when van_key = 'van_3' then 'GVE5PCJ7KK'
+           when van_key = 'van_5' then 'GGR6JKWB6F'
+           when van_key = 'van_6' then 'GKEWDZK4NX'
            else samsara_serial
          end,
          eligible_services = case

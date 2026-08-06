@@ -22,7 +22,8 @@ Updated 2026-07-26 after Render worker deploy + Vercel wiring.
 ## Blocked — interactive / company data
 
 - [ ] Interactive Fitdog reconnect (MFA) + real report selectors
-- [ ] Upload current company Samsara bulk-upload sample CSV
+- [ ] Confirm Samsara API token returns Van 01–06 + GPS (`npm run verify:samsara`) and push to Vercel (`./scripts/push-samsara-vercel-env.sh`)
+- [ ] Smoke-upload one exported CSV in company Samsara (headers are hard-locked to official A–K; no DB template upload required)
 - [ ] Real operating-day shadow comparison vs Hub Coordinator routes
 - [ ] Enable production flags on Vercel
 

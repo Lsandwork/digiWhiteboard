@@ -1,5 +1,78 @@
 # Route Generator — Samsara export + owner ETA
 
+## Setup status (2026-07-27)
+
+| Piece | Status |
+|---|---|
+| CSV headers (canonical A–K) | Done in code — export always uses official bulk-upload columns |
+| Van names / gateway serials in DB | Seeded (`Van 01–03, 05–06`) |
+| Fixture CSV smoke | Passed |
+| `SAMSARA_API_TOKEN` on Vercel | **Do this next** (see below) |
+| Token returns vans + GPS | **Verify** — prior token authenticated but returned an empty vehicle list |
+| Production Route Generator flags | Keep **false** until Fitdog MFA + shadow day |
+
+## 1. Create / fix the Samsara API token
+
+In [cloud.samsara.com](https://cloud.samsara.com) → **Settings → API Tokens**:
+
+1. Create (or edit) a token with:
+   - **Read Vehicles**
+   - **Read Vehicle Statistics**
+2. Set **Tag Access = Entire Organization** (critical — a tag-scoped token returns an empty vehicle list even though the UI shows vans).
+3. Confirm vehicle names match (already correct in Fitdog org as of 2026-07-27):
+
+| Staff name | Samsara name | Notes from fleet UI |
+|---|---|---|
+| Van 1 | **Van 01** | 2018 Ford Transit Connect |
+| Van 2 | **Van 02** | 2018 Ford Transit Connect · VIN `NM0LS7E74J1371466` · plate `38516L2` |
+| Van 3 | **Van 03** | 2018 Ford Transit Connect |
+| Van 5 | **Van 05** | 2018 Nissan NV200 · VIN `3N6CM0KN6JK701997` · plate `69357N2` |
+| Van 6 | **Van 06** | 2021 Nissan NV200 · VIN `3N6CM0KN3MK705283` |
+
+Never Van 04. Do **not** rename away from `Van 01`… — our exporter and GPS matcher expect those exact labels.
+
+Gateway serials (DB fallback) live in `route_vehicle_configs` / `lib/route-generator/samsara-vans.ts`.
+
+## 2. Verify the token locally
+
+```bash
+export SAMSARA_API_TOKEN='samsara_api_...'
+npm run verify:samsara
+```
+
+Expect `ok: true`, all five vans in `fleetMatch` + `gpsMatch`.
+
+If `fleetVehicleCount` is `0`: token is tag-restricted or missing Read Vehicles — fix in Samsara, do not push to Vercel yet.
+
+## 3. Push token to Vercel (token only)
+
+```bash
+export VERCEL_TOKEN=...          # https://vercel.com/account/tokens
+export SAMSARA_API_TOKEN='samsara_api_...'
+./scripts/push-samsara-vercel-env.sh
+npx vercel --prod --token "$VERCEL_TOKEN" --scope bridge-tess
+```
+
+Default push sets `SAMSARA_API_TOKEN` only and **does not** enable Route Generator flags.
+
+Only after the [shadow-mode checklist](./shadow-mode-checklist.md) is complete:
+
+```bash
+ENABLE_ROUTE_GENERATOR_FLAGS=true ./scripts/push-samsara-vercel-env.sh
+```
+
+## 4. CSV template / bulk upload
+
+Export no longer depends on a DB-uploaded template. It always emits Samsara’s official columns A–K:
+
+`Route Name, Assigned Driver Username, Assigned Vehicle Name, Stop Name, Notes, Scheduled Arrival Time, Scheduled Departure Time, Address Name, Latitude, Longitude, Full Address`
+
+Ops flow:
+
+1. Approve a plan in Route Generator → **Export Samsara CSV**
+2. Upload that file in Samsara → Routes → bulk upload
+3. Optional smoke: download a fresh sample from the company dashboard and confirm headers still match A–K (if Samsara changes columns, update `SAMSARA_BULK_UPLOAD_HEADERS`)
+
 ## Samsara CSV Stop Notes (drivers)
 
 Every customer stop exported to Samsara includes:

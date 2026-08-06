@@ -7,7 +7,23 @@ import {
   isSamsaraLiveConfigured,
   matchVehicleByName
 } from "@/lib/route-generator/samsara-live";
+import { getFitdogSamsaraVan } from "@/lib/route-generator/samsara-vans";
 import { phoneDigitsE164 } from "@/lib/route-generator/stop-notes";
+
+function matchHintsForTrackingRow(row: {
+  van_key?: string | null;
+  samsara_vehicle_name?: string | null;
+  samsara_serial?: string | null;
+}) {
+  const catalog = getFitdogSamsaraVan(String(row.van_key || ""));
+  return {
+    samsaraVehicleName: row.samsara_vehicle_name || catalog?.samsaraVehicleName || null,
+    samsaraSerial: row.samsara_serial || catalog?.samsaraSerial || null,
+    samsaraVehicleId: catalog?.samsaraVehicleId || null,
+    vin: catalog?.vin || null,
+    licensePlate: catalog?.licensePlate || null
+  };
+}
 
 function publicSiteUrl(): string {
   return (
@@ -190,7 +206,7 @@ export async function getOwnerTrackingPublic(token: string): Promise<OwnerTracki
   if (isSamsaraLiveConfigured() && row.stop_latitude != null && row.stop_longitude != null) {
     try {
       const vehicles = await fetchSamsaraVehicleLocations();
-      const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
+      const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial, matchHintsForTrackingRow(row));
       if (match) {
         etaMinutes = etaMinutesFromCoords(
           { lat: match.latitude, lng: match.longitude },
@@ -273,7 +289,12 @@ export async function processOwnerEtaAlerts(): Promise<{
   const sms = getSmsProvider();
   for (const row of rows ?? []) {
     if (row.stop_latitude == null || row.stop_longitude == null) continue;
-    const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
+    const match = matchVehicleByName(
+      vehicles,
+      row.samsara_vehicle_name,
+      row.samsara_serial,
+      matchHintsForTrackingRow(row)
+    );
     if (!match) continue;
 
     const etaMinutes = etaMinutesFromCoords(
