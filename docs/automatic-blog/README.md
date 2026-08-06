@@ -74,3 +74,10 @@ Code and data:
 1. Set `blog_settings.emergency_off = true` (Settings in admin, or DB update on `id = 'default'`).
 2. Optionally set `BLOG_ENABLED=false` so non–Super Admin staff lose API access.
 3. Confirm no publish attempts continue; see [OPERATIONS.md](./OPERATIONS.md).
+
+## Public Fitdog Blog
+
+- Homepage `/blog`, articles `/blog/articles`, categories `/blog/category/[slug]`, article pages `/blog/[slug]`
+- Brand orange `#ff6f26`; logo `/assets/lobby-whiteboard/light-v2/branding/fitdog-dog-logo-exact.png`
+- Five launch articles in `lib/blog/content/initial-articles.ts`
+- Migrations: `054_automatic_blog.sql`, `055_automatic_blog_public.sql`
