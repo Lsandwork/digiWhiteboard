@@ -50,7 +50,7 @@ function envUrl(key: string, fallback: string) {
  * Default is Fitdog’s live training inquiry page (no Calendly URL exists in-repo).
  */
 export function getTrainingConsultUrl() {
-  return envUrl("NEXT_PUBLIC_FITDOG_TRAINING_CONSULT_URL", "https://www.fitdog.com/training-inquiry/");
+  return envUrl("NEXT_PUBLIC_FITDOG_TRAINING_CONSULT_URL", "https://fitdog.wpenginepowered.com/training-inquiry/");
 }
 
 /** Sports & Enrichment Outing consult uses the same destination as training consult. */

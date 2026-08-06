@@ -22,3 +22,5 @@ create table if not exists blog_why_fitdog_leads (
 
 create index if not exists blog_why_fitdog_leads_created_idx on blog_why_fitdog_leads (created_at desc);
 create index if not exists blog_why_fitdog_leads_email_idx on blog_why_fitdog_leads (email);
+
+alter table blog_why_fitdog_leads enable row level security;
