@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { FITDOG_BLOG_LOGO, FITDOG_BLOG_NAV, FITDOG_PUBLIC_URLS } from "@/lib/blog/brand";
+import { publicBlogHref } from "@/lib/blog/public-path";
 
 export function FitdogBlogHeader({ active = "Blog" }: { active?: string }) {
   const [open, setOpen] = useState(false);
@@ -11,7 +12,7 @@ export function FitdogBlogHeader({ active = "Blog" }: { active?: string }) {
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--fitdog-border)] bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
-        <Link href="/blog" className="flex items-center gap-2.5" aria-label="Fitdog home blog">
+        <Link href={publicBlogHref()} className="flex items-center gap-2.5" aria-label="Fitdog home blog">
           <Image src={FITDOG_BLOG_LOGO.mark} alt="Fitdog logo" width={44} height={44} priority className="h-11 w-11" />
           <span className="text-[1.55rem] font-extrabold lowercase tracking-tight text-[var(--fitdog-dark)]">fitdog</span>
         </Link>

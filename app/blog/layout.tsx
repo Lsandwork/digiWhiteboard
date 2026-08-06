@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { absoluteBlogUrl, getPublicBlogSiteOrigin } from "@/lib/blog/site-url";
+import { publicBlogHref } from "@/lib/blog/public-path";
 import "./blog.css";
 
 export const metadata: Metadata = {
@@ -10,13 +11,13 @@ export const metadata: Metadata = {
   },
   description:
     "Practical Fitdog dog-care guides for LA owners — summer safety, puppy routines, enrichment, beach days, boarding prep, and more.",
-  alternates: { canonical: absoluteBlogUrl("/blog") },
+  alternates: { canonical: absoluteBlogUrl(publicBlogHref()) },
   openGraph: {
     type: "website",
     siteName: "Fitdog Blog",
     title: "Fitdog Blog",
     description: "Practical dog-care tips from Fitdog for Southern California dog owners.",
-    url: absoluteBlogUrl("/blog")
+    url: absoluteBlogUrl(publicBlogHref())
   },
   robots: { index: true, follow: true }
 };

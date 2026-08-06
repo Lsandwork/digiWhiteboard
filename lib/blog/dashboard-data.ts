@@ -1,6 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getBlogSettings } from "@/lib/blog/service";
-import { absoluteBlogUrl } from "@/lib/blog/site-url";
+import { absoluteBlogUrl, publicBlogHref } from "@/lib/blog/site-url";
 
 export type DashboardRange = "7d" | "30d" | "90d" | "year";
 
@@ -258,7 +258,7 @@ export async function getBlogDashboardData(range: DashboardRange = "30d") {
 
   return {
     range,
-    publicBlogUrl: absoluteBlogUrl("/blog"),
+    publicBlogUrl: absoluteBlogUrl(publicBlogHref()),
     settings: {
       enabled: Boolean(settings.enabled),
       autoPublish: Boolean(settings.auto_publish_enabled),
@@ -323,7 +323,7 @@ export async function getBlogDashboardData(range: DashboardRange = "30d") {
       coverAlt: row.cover_alt ? String(row.cover_alt) : String(row.title),
       views: null as number | null,
       href: `/admin/automatic-blog?page=editor&id=${row.id}`,
-      publicHref: row.slug ? absoluteBlogUrl(`/blog/${row.slug}`) : null
+      publicHref: row.slug ? absoluteBlogUrl(publicBlogHref(row.slug)) : null
     })),
     calendar: (upcoming.data || []).map((row) => ({
       id: String(row.id),
@@ -431,7 +431,7 @@ export async function getBlogDashboardData(range: DashboardRange = "30d") {
       image: "/assets/fitdog/social-moments/posters/social-moment-02.jpg",
       imageAlt: "Fitdog dog on a Southern California beach",
       headline: "Fitdog adventures. Every day.",
-      href: absoluteBlogUrl("/blog/category/adventures")
+      href: absoluteBlogUrl(publicBlogHref("/category/adventures"))
     },
     counts: {
       drafts: draftCount,

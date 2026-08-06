@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
+import { absoluteBlogUrl, publicBlogHref } from "@/lib/blog/site-url";
 
 type Overview = {
   settings: Record<string, unknown>;
@@ -108,7 +109,7 @@ export function BlogOverviewPanel() {
         >
           Seed 5 launch articles to DB
         </button>
-        <Link href="/blog" target="_blank" className="blog-dash-toolbar-btn">
+        <Link href={absoluteBlogUrl(publicBlogHref())} target="_blank" className="blog-dash-toolbar-btn">
           Open public blog
         </Link>
       </div>

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { PublicBlogArticle } from "@/lib/blog/content/public";
+import { publicBlogHref } from "@/lib/blog/public-path";
 
 export function FeaturedHero({ articles }: { articles: PublicBlogArticle[] }) {
   const slides = articles.length ? articles : [];
@@ -51,7 +52,7 @@ export function FeaturedHero({ articles }: { articles: PublicBlogArticle[] }) {
           <p className="mt-4 max-w-xl text-base leading-relaxed text-[var(--fitdog-muted)] md:text-lg">{article.excerpt}</p>
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <Link
-              href={`/blog/${article.slug}`}
+              href={publicBlogHref(article.slug)}
               className="inline-flex items-center gap-2 rounded-md bg-[var(--fitdog-orange)] px-5 py-3 text-sm font-bold text-white transition hover:bg-[var(--fitdog-orange-hover)]"
             >
               Read the Full Article <span aria-hidden>→</span>

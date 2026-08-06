@@ -16,6 +16,11 @@ import {
   shouldRedirectFitdogRootToLogin
 } from "@/lib/fitdog-domain";
 import { RUFFLY_REWRITE_TARGET, rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
+import {
+  blogsCanonicalRedirectPath,
+  legacyBlogRedirectUrl,
+  rewriteBlogsPublicPath
+} from "@/lib/blogs-domain";
 
 export async function middleware(request: NextRequest) {
   try {
@@ -28,6 +33,24 @@ export async function middleware(request: NextRequest) {
 
 async function runMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const host = request.headers.get("host");
+
+  const legacyBlogRedirect = legacyBlogRedirectUrl(host, pathname);
+  if (legacyBlogRedirect) {
+    return NextResponse.redirect(legacyBlogRedirect, 308);
+  }
+
+  const blogsCanonical = blogsCanonicalRedirectPath(host, pathname);
+  if (blogsCanonical) {
+    return NextResponse.redirect(new URL(blogsCanonical, request.url), 308);
+  }
+
+  const blogsRewrite = rewriteBlogsPublicPath(host, pathname);
+  if (blogsRewrite) {
+    const url = request.nextUrl.clone();
+    url.pathname = blogsRewrite;
+    return NextResponse.rewrite(url);
+  }
 
   // Staff login shortcut (fitdog.ruffops.com/) → admin login.
   // Does not change staff.ruffops.com landing page behavior.
@@ -229,7 +252,22 @@ async function runMiddleware(request: NextRequest) {
 }
 
 export const config = {
-  // "/" is matched so lobby, CAST-TV, and Ruffly custom-domain rewrites can run at the root.
+  // "/" is matched so lobby, CAST-TV, Ruffly, and Blogs custom-domain rewrites can run at the root.
   // Non-custom hosts fall through to the normal Staff board at "/".
-  matcher: ["/", "/admin", "/admin/:path*", "/gingr", "/ruffly", "/ruffly/:path*"]
+  matcher: [
+    "/",
+    "/blog",
+    "/blog/:path*",
+    "/articles",
+    "/articles/:path*",
+    "/category/:path*",
+    "/rss.xml",
+    "/sitemap.xml",
+    "/:slug",
+    "/admin",
+    "/admin/:path*",
+    "/gingr",
+    "/ruffly",
+    "/ruffly/:path*"
+  ]
 };

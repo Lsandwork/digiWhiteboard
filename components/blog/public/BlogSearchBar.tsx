@@ -2,8 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { publicBlogHref } from "@/lib/blog/public-path";
 
-export function BlogSearchBar({ basePath = "/blog/articles" }: { basePath?: string }) {
+export function BlogSearchBar({ basePath = publicBlogHref("/articles") }: { basePath?: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const [q, setQ] = useState(params.get("q") || "");

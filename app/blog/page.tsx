@@ -9,18 +9,20 @@ import { FitdogBlogHeader } from "@/components/blog/public/FitdogBlogHeader";
 import { BlogSearchBar } from "@/components/blog/public/BlogSearchBar";
 import { getActivePromotion, getFeaturedArticles, getSeedCategories, listPublicArticles } from "@/lib/blog/content/public";
 import { isBlogPublicEnabled } from "@/lib/blog/flags";
+import { publicBlogHref } from "@/lib/blog/public-path";
+import { absoluteBlogUrl } from "@/lib/blog/site-url";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Fitdog Blog | Practical dog care for LA owners",
   description: "Thoughtful, practical articles for dog owners from the Fitdog team in Santa Monica and Los Angeles.",
-  alternates: { canonical: "/blog" },
+  alternates: { canonical: absoluteBlogUrl(publicBlogHref()) },
   openGraph: {
     title: "Fitdog Blog",
     description: "Practical dog care guidance from Fitdog.",
     type: "website",
-    url: "/blog"
+    url: absoluteBlogUrl(publicBlogHref())
   }
 };
 
@@ -51,13 +53,13 @@ export default async function BlogHomePage() {
       <section className="border-b border-[var(--fitdog-border)] bg-[var(--fitdog-surface)]">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
           <div className="flex flex-wrap gap-2" aria-label="Categories">
-            <Link href="/blog/articles" className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--fitdog-dark)] shadow-sm">
+            <Link href={publicBlogHref("/articles")} className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--fitdog-dark)] shadow-sm">
               All
             </Link>
             {categories.map((category) => (
               <Link
                 key={category.slug}
-                href={`/blog/category/${category.slug}`}
+                href={publicBlogHref(`/category/${category.slug}`)}
                 className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--fitdog-dark)] shadow-sm hover:text-[var(--fitdog-orange)]"
               >
                 {category.label}
@@ -76,7 +78,7 @@ export default async function BlogHomePage() {
         <section>
           <div className="mb-5 flex items-end justify-between gap-3">
             <h2 className="text-2xl font-extrabold text-[var(--fitdog-dark)]">Latest from the Fitdog Blog</h2>
-            <Link href="/blog/articles" className="text-sm font-bold text-[var(--fitdog-orange)] hover:underline">
+            <Link href={publicBlogHref("/articles")} className="text-sm font-bold text-[var(--fitdog-orange)] hover:underline">
               View all articles →
             </Link>
           </div>

@@ -16,6 +16,7 @@ import {
 import { isBlogPublicEnabled } from "@/lib/blog/flags";
 import { getBlogSettings } from "@/lib/blog/service";
 import { absoluteBlogUrl } from "@/lib/blog/site-url";
+import { publicBlogHref } from "@/lib/blog/public-path";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const article = await getPublicArticle(slug);
   if (!article) return { title: "Article not found" };
-  const canonical = absoluteBlogUrl(`/blog/${article.slug}`);
+  const canonical = absoluteBlogUrl(publicBlogHref(article.slug));
   const image = absoluteBlogUrl(article.coverImage);
   return {
     title: article.seoTitle,
@@ -91,7 +92,7 @@ export default async function BlogArticlePage({ params }: Props) {
   const neighbors = neighboringArticles(article, all);
   const toc = extractToc(article.bodyMarkdown);
   const bodyHtml = addHeadingIds(article.bodyHtml);
-  const canonical = absoluteBlogUrl(`/blog/${article.slug}`);
+  const canonical = absoluteBlogUrl(publicBlogHref(article.slug));
   const coverAbsolute = absoluteBlogUrl(article.coverImage);
 
   let disclosure: string | null = null;
@@ -132,12 +133,12 @@ export default async function BlogArticlePage({ params }: Props) {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Blog", item: absoluteBlogUrl("/blog") },
+      { "@type": "ListItem", position: 1, name: "Blog", item: absoluteBlogUrl(publicBlogHref()) },
       {
         "@type": "ListItem",
         position: 2,
         name: article.categoryLabel,
-        item: absoluteBlogUrl(`/blog/category/${article.categorySlug}`)
+        item: absoluteBlogUrl(publicBlogHref(`/category/${article.categorySlug}`))
       },
       { "@type": "ListItem", position: 3, name: article.title, item: canonical }
     ]
@@ -155,11 +156,11 @@ export default async function BlogArticlePage({ params }: Props) {
         <meta itemProp="dateModified" content={article.updatedAt || article.publishedAt} />
 
         <nav className="text-sm text-[var(--fitdog-muted)]" aria-label="Breadcrumb">
-          <Link href="/blog" className="hover:text-[var(--fitdog-orange)]">
+          <Link href={publicBlogHref()} className="hover:text-[var(--fitdog-orange)]">
             Blog
           </Link>
           <span aria-hidden> / </span>
-          <Link href={`/blog/category/${article.categorySlug}`} className="hover:text-[var(--fitdog-orange)]">
+          <Link href={publicBlogHref(`/category/${article.categorySlug}`)} className="hover:text-[var(--fitdog-orange)]">
             {article.categoryLabel}
           </Link>
           <span aria-hidden> / </span>
@@ -243,7 +244,7 @@ export default async function BlogArticlePage({ params }: Props) {
 
         <div className="mt-8 grid gap-4 border-t border-[var(--fitdog-border)] pt-6 md:grid-cols-2">
           {neighbors.previous ? (
-            <Link href={`/blog/${neighbors.previous.slug}`} className="rounded-lg border border-[var(--fitdog-border)] p-4 hover:border-[var(--fitdog-orange)]">
+            <Link href={publicBlogHref(neighbors.previous.slug)} className="rounded-lg border border-[var(--fitdog-border)] p-4 hover:border-[var(--fitdog-orange)]">
               <p className="text-xs font-bold uppercase text-[var(--fitdog-muted)]">Previous</p>
               <p className="mt-1 font-semibold">{neighbors.previous.title}</p>
             </Link>
@@ -251,7 +252,7 @@ export default async function BlogArticlePage({ params }: Props) {
             <div />
           )}
           {neighbors.next ? (
-            <Link href={`/blog/${neighbors.next.slug}`} className="rounded-lg border border-[var(--fitdog-border)] p-4 text-right hover:border-[var(--fitdog-orange)]">
+            <Link href={publicBlogHref(neighbors.next.slug)} className="rounded-lg border border-[var(--fitdog-border)] p-4 text-right hover:border-[var(--fitdog-orange)]">
               <p className="text-xs font-bold uppercase text-[var(--fitdog-muted)]">Next</p>
               <p className="mt-1 font-semibold">{neighbors.next.title}</p>
             </Link>
@@ -264,7 +265,7 @@ export default async function BlogArticlePage({ params }: Props) {
             <ul className="mt-4 space-y-3">
               {related.map((item) => (
                 <li key={item.slug}>
-                  <Link href={`/blog/${item.slug}`} className="font-semibold text-[var(--fitdog-orange)] hover:underline">
+                  <Link href={publicBlogHref(item.slug)} className="font-semibold text-[var(--fitdog-orange)] hover:underline">
                     {item.title}
                   </Link>
                   <p className="text-sm text-[var(--fitdog-muted)]">{item.excerpt}</p>
@@ -282,7 +283,7 @@ export default async function BlogArticlePage({ params }: Props) {
         </section>
 
         <p className="mt-8">
-          <Link href="/blog" className="font-bold text-[var(--fitdog-orange)] hover:underline">
+          <Link href={publicBlogHref()} className="font-bold text-[var(--fitdog-orange)] hover:underline">
             ← Back to Fitdog Blog
           </Link>
         </p>

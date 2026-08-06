@@ -1,5 +1,6 @@
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
 import { FITDOG_BLOG_ORANGE, FITDOG_BLOG_LOGO } from "@/lib/blog/brand";
+import { publicBlogHref } from "@/lib/blog/public-path";
 
 export const BLOG_HELP_GUIDE_PATH = "/admin/blog/help/how-to-use-blog-generator";
 
@@ -51,7 +52,7 @@ export const BLOG_HELP_LINKS = {
   setup: `${BLOG_APP_PATH}?page=setup`,
   editorial: `${BLOG_APP_PATH}?page=editorial`,
   help: BLOG_HELP_GUIDE_PATH,
-  publicBlog: "/blog"
+  publicBlog: publicBlogHref()
 } as const;
 
 /** Pro Tips copy aligned to the approved mockup (sidebar panel). */

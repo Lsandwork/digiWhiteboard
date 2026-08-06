@@ -1,5 +1,7 @@
 /** Public Fitdog blog brand tokens and navigation. */
 
+import { publicBlogHref } from "@/lib/blog/public-path";
+
 export const FITDOG_BLOG_ORANGE = "#ff6f26";
 
 export const FITDOG_BLOG_LOGO = {
@@ -38,7 +40,7 @@ export const FITDOG_BLOG_NAV = [
   { label: "Services", href: FITDOG_PUBLIC_URLS.services, external: true },
   { label: "Why Fitdog", href: FITDOG_PUBLIC_URLS.whyFitdog, external: true },
   { label: "Members", href: FITDOG_PUBLIC_URLS.members, external: true },
-  { label: "Blog", href: "/blog", external: false },
+  { label: "Blog", href: publicBlogHref(), external: false },
   { label: "About Us", href: FITDOG_PUBLIC_URLS.about, external: true },
   { label: "Contact", href: FITDOG_PUBLIC_URLS.contact, external: true }
 ] as const;

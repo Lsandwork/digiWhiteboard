@@ -1,3 +1,6 @@
+import { absoluteBlogUrl } from "@/lib/blog/site-url";
+import { publicBlogHref } from "@/lib/blog/public-path";
+
 export type PublishPayload = {
   title: string;
   slug: string;
@@ -18,12 +21,8 @@ export type PublishResult = {
   responseSummary?: Record<string, unknown>;
 };
 
-function siteBase() {
-  return (process.env.NEXT_PUBLIC_SITE_URL || "https://staff.ruffops.com").replace(/\/$/, "");
-}
-
 export async function publishNative(payload: PublishPayload): Promise<PublishResult> {
-  const publishedUrl = `${siteBase()}/blog/${payload.slug}`;
+  const publishedUrl = absoluteBlogUrl(publicBlogHref(payload.slug));
   return {
     ok: true,
     provider: "native",

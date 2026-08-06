@@ -1,6 +1,7 @@
 import { INITIAL_BLOG_ARTICLES } from "@/lib/blog/content/initial-articles";
 import { writeBlogAudit } from "@/lib/blog/service";
 import { markdownToSimpleHtml } from "@/lib/blog/utils/markdown";
+import { publicBlogHref } from "@/lib/blog/public-path";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 /** Upsert the five editorial seed articles as PUBLISHED for native public blog. */
@@ -28,7 +29,7 @@ export async function seedInitialPublishedArticles(actor?: string) {
       featured: article.featured,
       reading_minutes: article.readingMinutes,
       published_at: article.publishedAt,
-      published_url: `/blog/${article.slug}`,
+      published_url: publicBlogHref(article.slug),
       human_editorial_score: 94,
       topic_quality_score: 92,
       natural_voice_score: 93,

@@ -13,7 +13,7 @@ import {
   type UserAccess
 } from "@/lib/admin/permissions";
 import { BLOG_APP_PATH, type BlogPageId } from "@/lib/blog/constants";
-import { absoluteBlogUrl } from "@/lib/blog/site-url";
+import { absoluteBlogUrl, publicBlogHref } from "@/lib/blog/site-url";
 
 type Props = {
   username: string;
@@ -36,7 +36,7 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const publicBlogUrl = absoluteBlogUrl("/blog");
+  const publicBlogUrl = absoluteBlogUrl(publicBlogHref());
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

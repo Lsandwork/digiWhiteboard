@@ -121,7 +121,7 @@ async function runAsyncChecks() {
     html: "<p>hi</p>"
   });
   assert.equal(native.ok, true);
-  assert.ok(native.publishedUrl?.includes("/blog/test-slug"));
+  assert.ok(native.publishedUrl?.includes("blog.ruffops.com/test-slug"));
 
   const oldWebhook = process.env.BLOG_PUBLISH_WEBHOOK_URL;
   process.env.BLOG_PUBLISH_WEBHOOK_URL = "http://localhost/hook";

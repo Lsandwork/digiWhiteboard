@@ -6,6 +6,8 @@ import { FitdogBlogFooter } from "@/components/blog/public/FitdogBlogFooter";
 import { FitdogBlogHeader } from "@/components/blog/public/FitdogBlogHeader";
 import { INITIAL_BLOG_CATEGORIES } from "@/lib/blog/content/initial-articles";
 import { listPublicArticles } from "@/lib/blog/content/public";
+import { publicBlogHref } from "@/lib/blog/public-path";
+import { absoluteBlogUrl } from "@/lib/blog/site-url";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${category.label} | Fitdog Blog`,
     description: `Fitdog articles about ${category.label.toLowerCase()}.`,
-    alternates: { canonical: `/blog/category/${slug}` }
+    alternates: { canonical: absoluteBlogUrl(publicBlogHref(`/category/${slug}`)) }
   };
 }
 
@@ -33,7 +35,7 @@ export default async function CategoryPage({ params }: Props) {
       <FitdogBlogHeader active="Blog" />
       <main className="mx-auto max-w-6xl px-4 py-10 md:px-6">
         <nav className="text-sm text-[var(--fitdog-muted)]">
-          <Link href="/blog" className="hover:text-[var(--fitdog-orange)]">
+          <Link href={publicBlogHref()} className="hover:text-[var(--fitdog-orange)]">
             Blog
           </Link>
           <span aria-hidden> / </span>
@@ -50,7 +52,7 @@ export default async function CategoryPage({ params }: Props) {
         ) : (
           <p className="mt-10 rounded-xl border border-dashed border-[var(--fitdog-border)] p-8 text-[var(--fitdog-muted)]">
             No published articles in this category yet.{" "}
-            <Link href="/blog/articles" className="font-bold text-[var(--fitdog-orange)] hover:underline">
+            <Link href={publicBlogHref("/articles")} className="font-bold text-[var(--fitdog-orange)] hover:underline">
               Browse all articles
             </Link>
           </p>

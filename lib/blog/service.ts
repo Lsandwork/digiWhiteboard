@@ -6,6 +6,7 @@ import { orchestrateArticleGeneration } from "@/lib/blog/pipeline/orchestrate";
 import { publishArticle } from "@/lib/blog/publishing/adapters";
 import { BLOG_SEED_TOPICS } from "@/lib/blog/topics/seed-topics";
 import { slugifyBlogTitle } from "@/lib/blog/utils/slug";
+import { publicBlogHref } from "@/lib/blog/public-path";
 import { randomUUID } from "crypto";
 
 export async function writeBlogAudit(actor: string | null | undefined, action: string, entityType: string, entityId?: string, details?: Record<string, unknown>) {
@@ -417,7 +418,7 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
       seoTitle: article.seo_title,
       metaDescription: article.meta_description,
       publishedAt: new Date().toISOString(),
-      canonicalPath: `/blog/${article.slug}`
+      canonicalPath: publicBlogHref(String(article.slug))
     },
     idempotencyKey
   );
@@ -445,7 +446,7 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
     .update({
       status: "PUBLISHED",
       published_at: new Date().toISOString(),
-      published_url: result.publishedUrl ?? `/blog/${article.slug}`,
+      published_url: result.publishedUrl ?? publicBlogHref(String(article.slug)),
       updated_at: new Date().toISOString()
     })
     .eq("id", articleId);

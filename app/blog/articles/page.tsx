@@ -6,13 +6,15 @@ import { BlogSearchBar } from "@/components/blog/public/BlogSearchBar";
 import { FitdogBlogFooter } from "@/components/blog/public/FitdogBlogFooter";
 import { FitdogBlogHeader } from "@/components/blog/public/FitdogBlogHeader";
 import { getSeedCategories, listPublicArticles } from "@/lib/blog/content/public";
+import { publicBlogHref } from "@/lib/blog/public-path";
+import { absoluteBlogUrl } from "@/lib/blog/site-url";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "All Articles | Fitdog Blog",
   description: "Browse every published Fitdog blog article by category, topic, and search.",
-  alternates: { canonical: "/blog/articles" }
+  alternates: { canonical: absoluteBlogUrl(publicBlogHref("/articles")) }
 };
 
 type Props = { searchParams: Promise<{ q?: string; category?: string; page?: string }> };
@@ -40,14 +42,14 @@ export default async function AllArticlesPage({ searchParams }: Props) {
           </div>
           <div className="w-full md:max-w-md">
             <Suspense fallback={null}>
-              <BlogSearchBar basePath="/blog/articles" />
+              <BlogSearchBar basePath={publicBlogHref("/articles")} />
             </Suspense>
           </div>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-2">
           <Link
-            href="/blog/articles"
+            href={publicBlogHref("/articles")}
             className={`rounded-full px-3 py-1.5 text-xs font-bold ${!category ? "bg-[var(--fitdog-orange)] text-white" : "bg-[var(--fitdog-surface)]"}`}
           >
             All
@@ -55,7 +57,7 @@ export default async function AllArticlesPage({ searchParams }: Props) {
           {categories.map((item) => (
             <Link
               key={item.slug}
-              href={`/blog/articles?category=${item.slug}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              href={`${publicBlogHref("/articles")}?category=${item.slug}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
               className={`rounded-full px-3 py-1.5 text-xs font-bold ${
                 category === item.slug ? "bg-[var(--fitdog-orange)] text-white" : "bg-[var(--fitdog-surface)]"
               }`}
@@ -64,7 +66,7 @@ export default async function AllArticlesPage({ searchParams }: Props) {
             </Link>
           ))}
           {(q || category) && (
-            <Link href="/blog/articles" className="rounded-full px-3 py-1.5 text-xs font-bold text-[var(--fitdog-orange)] underline">
+            <Link href={publicBlogHref("/articles")} className="rounded-full px-3 py-1.5 text-xs font-bold text-[var(--fitdog-orange)] underline">
               Clear filters
             </Link>
           )}
@@ -86,7 +88,7 @@ export default async function AllArticlesPage({ searchParams }: Props) {
           <nav className="mt-8 flex items-center justify-center gap-3" aria-label="Pagination">
             {page > 1 ? (
               <Link
-                href={`/blog/articles?page=${page - 1}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}`}
+                href={`${publicBlogHref("/articles")}?page=${page - 1}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}`}
                 className="rounded border px-3 py-1.5 text-sm font-semibold"
               >
                 Previous
@@ -97,7 +99,7 @@ export default async function AllArticlesPage({ searchParams }: Props) {
             </span>
             {page < totalPages ? (
               <Link
-                href={`/blog/articles?page=${page + 1}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}`}
+                href={`${publicBlogHref("/articles")}?page=${page + 1}${q ? `&q=${encodeURIComponent(q)}` : ""}${category ? `&category=${category}` : ""}`}
                 className="rounded border px-3 py-1.5 text-sm font-semibold"
               >
                 Next

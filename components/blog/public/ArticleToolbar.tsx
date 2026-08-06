@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { publicBlogHref } from "@/lib/blog/public-path";
 
 const BOOKMARK_KEY = "fitdog_blog_bookmarks_v1";
 
 export function ArticleToolbar({ slug, title }: { slug: string; title: string }) {
   const [bookmarked, setBookmarked] = useState(false);
   const [copied, setCopied] = useState(false);
-  const url = typeof window !== "undefined" ? `${window.location.origin}/blog/${slug}` : `/blog/${slug}`;
+  const [url, setUrl] = useState(() => publicBlogHref(slug));
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setUrl(window.location.href);
+    }
+  }, [slug]);
 
   useEffect(() => {
     try {
