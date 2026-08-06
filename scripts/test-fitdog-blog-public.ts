@@ -29,8 +29,8 @@ assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Services" && item.href 
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Why Fitdog" && item.href === "/why-fitdog"));
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Members" && item.href === FITDOG_PUBLIC_URLS.members));
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Contact" && item.href === FITDOG_PUBLIC_URLS.contact));
-assert.ok(!FITDOG_BLOG_NAV.some((item) => item.label === "About Us"));
-assert.ok(!FITDOG_BLOG_NAV.some((item) => item.label === "Why Us"));
+assert.ok(!(FITDOG_BLOG_NAV as ReadonlyArray<{ label: string }>).some((item) => item.label === "About Us"));
+assert.ok(!(FITDOG_BLOG_NAV as ReadonlyArray<{ label: string }>).some((item) => item.label === "Why Us"));
 assert.equal(FITDOG_PUBLIC_URLS.socialHandle, "@fitdogsports");
 assert.equal(
   FITDOG_FOOTER_SERVICES.find((item) => item.label === "Boarding")?.href,
