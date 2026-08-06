@@ -5,11 +5,25 @@ import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/li
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
+import { ingestGingrWebhook } from "@/lib/integrations/gingr/webhooks/process";
+import { isRufflyEnabled } from "@/lib/ruffly/flags";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
 import type { LiveDog } from "@/lib/types";
+
+/** Gingr only supports one webhook URL — fan out to Ruffly without blocking the board. */
+function fanOutToRuffly(payload: GingrWebhookPayload) {
+  if (!isRufflyEnabled() && process.env.RUFFLY_WEBHOOKS_ALWAYS_ACCEPT !== "true") return;
+  after(async () => {
+    try {
+      await ingestGingrWebhook(payload);
+    } catch {
+      // Board path must stay healthy even if Ruffly tables/jobs are unavailable.
+    }
+  });
+}
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +105,9 @@ export async function POST(request: Request) {
   if (!verified) {
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 403 });
   }
+
+  // Keep Digi-board as the single Gingr webhook target; Ruffly receives a copy.
+  fanOutToRuffly(payload);
 
   if (payload.entity_id) {
     const dedupeSince = new Date(Date.now() - 30_000).toISOString();

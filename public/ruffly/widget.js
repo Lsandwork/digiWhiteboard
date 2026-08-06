@@ -7,6 +7,13 @@
   var apiBase =
     (script && script.getAttribute("data-ruffly-api")) ||
     "https://staff.ruffops.com";
+  var VISITOR_KEY = "ruffly_visitor_token";
+  var visitorToken = null;
+  try {
+    visitorToken = window.localStorage.getItem(VISITOR_KEY);
+  } catch (e) {
+    visitorToken = null;
+  }
 
   var root = document.createElement("div");
   root.id = "ruffly-chat-root";
@@ -57,12 +64,25 @@
     fetch(apiBase.replace(/\/$/, "") + "/api/ruffly/public/webchat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ message: text, siteKey: key, origin: location.origin })
+      body: JSON.stringify({
+        message: text,
+        siteKey: key,
+        origin: location.origin,
+        visitorToken: visitorToken || undefined
+      })
     })
       .then(function (res) {
         return res.json();
       })
       .then(function (body) {
+        if (body && body.visitorToken) {
+          visitorToken = body.visitorToken;
+          try {
+            window.localStorage.setItem(VISITOR_KEY, visitorToken);
+          } catch (e) {
+            /* ignore storage failures */
+          }
+        }
         var reply = document.createElement("p");
         reply.textContent = "Fitdog: " + (body.reply || body.error || "Thanks — our team will follow up.");
         messages.appendChild(reply);

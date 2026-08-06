@@ -69,22 +69,59 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
   }
 
+  async function persistTest(result: { ok: boolean; message: string }) {
+    try {
+      const supabase = getServiceSupabase();
+      const now = new Date().toISOString();
+      await supabase.from("ruffly_provider_connections").upsert(
+        {
+          provider,
+          display_name:
+            provider === "gingr"
+              ? "Gingr"
+              : provider === "twilio"
+                ? "Twilio SMS"
+                : provider === "resend"
+                  ? "Resend Email"
+                  : provider === "gemini"
+                    ? "Gemini AI"
+                    : provider,
+          status: result.ok ? "connected" : "error",
+          last_success_at: result.ok ? now : null,
+          last_error_at: result.ok ? null : now,
+          last_error: result.ok ? null : result.message,
+          updated_at: now
+        },
+        { onConflict: "provider" }
+      );
+    } catch {
+      // Table may not exist yet — still return the live test result.
+    }
+  }
+
   if (provider === "gingr") {
     const result = await createGingrClient().testConnection();
+    await persistTest(result);
     return NextResponse.json(result);
   }
   if (provider === "twilio") {
-    return NextResponse.json(await getSmsProvider().testConnection());
+    const result = await getSmsProvider().testConnection();
+    await persistTest(result);
+    return NextResponse.json(result);
   }
   if (provider === "resend") {
-    return NextResponse.json(await getEmailProvider().testConnection());
+    const result = await getEmailProvider().testConnection();
+    await persistTest(result);
+    return NextResponse.json(result);
   }
   if (provider === "gemini") {
     const ok = Boolean(process.env.GEMINI_API_KEY?.trim());
-    return NextResponse.json({
+    const result = {
       ok,
       message: ok ? "GEMINI_API_KEY present." : "Setup Required: set GEMINI_API_KEY."
-    });
+    };
+    await persistTest(result);
+    return NextResponse.json(result);
   }
 
   return NextResponse.json({

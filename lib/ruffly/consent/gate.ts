@@ -1,10 +1,13 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { normalizePhone } from "@/lib/ruffly/consent/normalize";
+import { isWithinQuietHours } from "@/lib/ruffly/consent/quiet-hours";
 
 export async function canSendToContact(input: {
   contactId: string;
   channel: "sms" | "email";
   purpose: "transactional" | "marketing";
+  /** When true, also block automated marketing during configured quiet hours. */
+  respectQuietHours?: boolean;
 }): Promise<{ allowed: boolean; reason?: string }> {
   const supabase = getServiceSupabase();
   const { data: contact } = await supabase
@@ -17,18 +20,35 @@ export async function canSendToContact(input: {
   const phone = contact.phone_normalized;
   const email = contact.email_normalized;
 
-  const { data: suppressions } = await supabase
+  if (input.channel === "sms" && !phone) {
+    return { allowed: false, reason: "Contact has no phone number." };
+  }
+  if (input.channel === "email" && !email) {
+    return { allowed: false, reason: "Contact has no email address." };
+  }
+
+  // Filter by identity so STOP'd contacts are never missed by an unscoped row limit.
+  let suppressionQuery = supabase
     .from("ruffly_suppressions")
-    .select("id, reason, channel, purpose, phone_normalized, email_normalized")
-    .limit(100);
+    .select("id, reason, channel, purpose, phone_normalized, email_normalized, contact_id");
+
+  if (input.channel === "sms" && phone) {
+    suppressionQuery = suppressionQuery.or(`phone_normalized.eq.${phone},contact_id.eq.${input.contactId}`);
+  } else if (input.channel === "email" && email) {
+    suppressionQuery = suppressionQuery.or(`email_normalized.eq.${email},contact_id.eq.${input.contactId}`);
+  } else {
+    suppressionQuery = suppressionQuery.eq("contact_id", input.contactId);
+  }
+
+  const { data: suppressions } = await suppressionQuery.limit(50);
 
   const blocked = (suppressions || []).some((row) => {
     const channelMatch = row.channel === input.channel || row.channel === "all";
     const purposeMatch = row.purpose === input.purpose || row.purpose === "all";
     const identityMatch =
+      row.contact_id === input.contactId ||
       (input.channel === "sms" && phone && row.phone_normalized === phone) ||
-      (input.channel === "email" && email && row.email_normalized === email) ||
-      false;
+      (input.channel === "email" && email && row.email_normalized === email);
     return channelMatch && purposeMatch && identityMatch;
   });
   if (blocked) return { allowed: false, reason: "Contact is suppressed." };
@@ -48,6 +68,20 @@ export async function canSendToContact(input: {
   }
   if (consent?.status === "opted_out") {
     return { allowed: false, reason: "Contact opted out." };
+  }
+
+  const checkQuiet =
+    input.respectQuietHours === true ||
+    (input.respectQuietHours !== false && input.purpose === "marketing");
+  if (checkQuiet) {
+    const { data: settings } = await supabase
+      .from("ruffly_settings")
+      .select("quiet_hours")
+      .eq("id", "default")
+      .maybeSingle();
+    if (isWithinQuietHours(settings?.quiet_hours as { start?: string; end?: string; timezone?: string } | null)) {
+      return { allowed: false, reason: "Quiet hours are active." };
+    }
   }
 
   return { allowed: true };

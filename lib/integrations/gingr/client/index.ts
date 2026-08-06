@@ -8,6 +8,12 @@ export type GingrClientConfig = {
   subdomain?: string;
 };
 
+type GingrWrapped<T> = {
+  success?: boolean;
+  error?: unknown;
+  data?: T;
+};
+
 function resolveConfig(overrides?: GingrClientConfig): Required<GingrClientConfig> {
   const subdomain = overrides?.subdomain || process.env.GINGR_SUBDOMAIN?.trim() || "fitdog";
   const baseUrl =
@@ -22,25 +28,78 @@ function resolveConfig(overrides?: GingrClientConfig): Required<GingrClientConfi
   };
 }
 
+function sanitizeGingrErrorBody(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) return "";
+  if (/<!DOCTYPE|<html[\s>]/i.test(trimmed)) {
+    const title = trimmed.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim();
+    return title || "HTML error page";
+  }
+  return trimmed.slice(0, 200);
+}
+
+function unwrapGingrBody<T>(body: GingrWrapped<T> | T): T {
+  if (body && typeof body === "object" && "data" in (body as GingrWrapped<T>)) {
+    const wrapped = body as GingrWrapped<T>;
+    if (wrapped.error) {
+      const message =
+        typeof wrapped.error === "string" ? wrapped.error : "Gingr API returned an error.";
+      throw new GingrIntegrationError(message, "gingr_api_error");
+    }
+    return wrapped.data as T;
+  }
+  return body as T;
+}
+
+function toFormBody(params: Record<string, string | undefined>) {
+  const body = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") continue;
+    body.set(key, value);
+  }
+  return body;
+}
+
 export function createGingrClient(overrides?: GingrClientConfig) {
   const config = resolveConfig(overrides);
 
-  async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  async function requestJson<T>(
+    path: string,
+    options?: {
+      method?: "GET" | "POST";
+      query?: Record<string, string | undefined>;
+      form?: Record<string, string | undefined>;
+    }
+  ): Promise<T> {
     if (!config.apiKey) {
       throw new GingrAuthError("GINGR_API_KEY is not configured.");
     }
-    const url = `${config.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${config.apiKey}`,
-        "X-Api-Key": config.apiKey,
-        ...(init?.headers || {})
-      },
+
+    const method = options?.method || (options?.form ? "POST" : "GET");
+    const url = new URL(`${config.baseUrl}${path.startsWith("/") ? path : `/${path}`}`);
+    // Gingr public API authenticates with a `key` parameter (query or form), not Bearer headers.
+    url.searchParams.set("key", config.apiKey);
+    for (const [key, value] of Object.entries(options?.query || {})) {
+      if (value == null || value === "") continue;
+      url.searchParams.set(key, value);
+    }
+
+    const init: RequestInit = {
+      method,
+      headers: { Accept: "application/json" },
       cache: "no-store"
-    });
+    };
+
+    if (options?.form) {
+      const form = toFormBody({ key: config.apiKey, ...options.form });
+      init.headers = {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+      };
+      init.body = form;
+    }
+
+    const response = await fetch(url.toString(), init);
     if (response.status === 401 || response.status === 403) {
       throw new GingrAuthError();
     }
@@ -50,27 +109,36 @@ export function createGingrClient(overrides?: GingrClientConfig) {
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new GingrIntegrationError(
-        `Gingr API ${response.status}: ${text.slice(0, 200) || response.statusText}`,
+        `Gingr API ${response.status}: ${sanitizeGingrErrorBody(text) || response.statusText}`,
         "gingr_http",
         response.status
       );
     }
-    return (await response.json()) as T;
+
+    const json = (await response.json()) as GingrWrapped<T> | T;
+    return unwrapGingrBody(json);
   }
 
   return {
     config,
     async testConnection() {
-      // Lightweight probe — many Gingr installs expose location/list style endpoints.
-      // Failures surface as typed errors for the Integrations UI.
       try {
-        await request(`/api/locations`);
-        return { ok: true as const, message: "Gingr API reachable." };
+        const locations = await requestJson<unknown[]>("/api/v1/get_locations");
+        const count = Array.isArray(locations) ? locations.length : 0;
+        return {
+          ok: true as const,
+          message:
+            count > 0
+              ? `Gingr API reachable — ${count} location${count === 1 ? "" : "s"} found.`
+              : "Gingr API reachable."
+        };
       } catch (error) {
-        // Fallback probe with query form used by some Gingr API docs
+        // Proven Digi-board probe used daily by the whiteboard.
         try {
-          await request(`/api/owners?limit=1`);
-          return { ok: true as const, message: "Gingr API reachable (owners probe)." };
+          await requestJson<unknown[]>("/api/v1/reservation_types", {
+            query: { active_only: "true" }
+          });
+          return { ok: true as const, message: "Gingr API reachable (reservation types probe)." };
         } catch (second) {
           const message = second instanceof Error ? second.message : "Gingr connection failed.";
           return { ok: false as const, message };
@@ -78,25 +146,51 @@ export function createGingrClient(overrides?: GingrClientConfig) {
       }
     },
     getOwner(ownerId: string) {
-      return request<GingrOwner>(`/api/owners/${encodeURIComponent(ownerId)}`);
+      return requestJson<GingrOwner>("/api/v1/owner", {
+        query: { id: ownerId }
+      });
     },
     listOwners(params?: { modified_since?: string; limit?: number }) {
-      const q = new URLSearchParams();
-      if (params?.modified_since) q.set("modified_since", params.modified_since);
-      if (params?.limit) q.set("limit", String(params.limit));
-      const suffix = q.toString() ? `?${q}` : "";
-      return request<GingrOwner[]>(`/api/owners${suffix}`);
+      if (params?.modified_since) {
+        const start = params.modified_since.slice(0, 10);
+        const end = new Date().toISOString().slice(0, 10);
+        return requestJson<GingrOwner[]>("/api/v1/new_modified_owners", {
+          method: "POST",
+          form: {
+            start_date: start,
+            end_date: end,
+            location_id: config.locationId
+          }
+        });
+      }
+      return requestJson<GingrOwner[]>("/api/v1/owners", {
+        method: "POST",
+        form: params?.limit ? { "params[limit]": String(params.limit) } : undefined
+      });
     },
     getAnimal(animalId: string) {
-      return request<GingrAnimal>(`/api/animals/${encodeURIComponent(animalId)}`);
+      return requestJson<GingrAnimal>("/api/v1/animals", {
+        method: "POST",
+        form: { "params[id]": animalId }
+      });
     },
     listReservationsByDate(date: string) {
-      return request<GingrReservation[]>(`/api/reservations?date=${encodeURIComponent(date)}`);
+      return requestJson<GingrReservation[]>("/api/v1/reservations", {
+        method: "POST",
+        form: {
+          start_date: date,
+          end_date: date,
+          location_id: config.locationId
+        }
+      });
     },
     listReservationsByOwner(ownerId: string) {
-      return request<GingrReservation[]>(
-        `/api/reservations?owner_id=${encodeURIComponent(ownerId)}`
-      );
+      return requestJson<GingrReservation[]>("/api/v1/reservations_by_owner", {
+        query: { id: ownerId }
+      });
+    },
+    listLocations() {
+      return requestJson<Array<Record<string, unknown>>>("/api/v1/get_locations");
     }
   };
 }

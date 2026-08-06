@@ -17,7 +17,12 @@ export async function GET(request: Request) {
       .select("*, contact:ruffly_contacts(id, first_name, last_name, preferred_name, phone, email, is_vip)")
       .order("last_message_at", { ascending: false, nullsFirst: false })
       .limit(100);
-    if (status) query = query.eq("status", status);
+    // "open" means needs staff attention (includes inbound SMS waiting_staff).
+    if (status === "open") {
+      query = query.in("status", ["open", "waiting_staff"]);
+    } else if (status && status !== "all") {
+      query = query.eq("status", status);
+    }
     const { data, error } = await query;
     if (error) throw error;
     return NextResponse.json({ conversations: data ?? [] });
