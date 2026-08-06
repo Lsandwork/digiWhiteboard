@@ -48,25 +48,51 @@ export const AUTOMATIC_BLOG_NAV_ROUTE: NavRouteLeaf = {
   type: "route",
   id: "automatic-blog",
   href: "/admin/automatic-blog",
-  label: "Automatic Blog"
+  label: "Blog Generator"
 };
 
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
-  options?: { includeRuffly?: boolean; includeBlog?: boolean }
+  options?: { includeRuffly?: boolean }
 ): NavEntry[] {
   const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE];
   if (options?.includeRuffly !== false) {
     globalSection.push(RUFFLY_NAV_ROUTE);
-  }
-  if (options?.includeBlog !== false) {
-    globalSection.push(AUTOMATIC_BLOG_NAV_ROUTE);
   }
   const helpIndex = entries.findIndex((entry) => entry.type === "section" && entry.id === "help");
   if (helpIndex >= 0) {
     return [...entries.slice(0, helpIndex), ...globalSection, ...entries.slice(helpIndex)];
   }
   return [...entries, ...globalSection];
+}
+
+/** Place Blog Generator under the Dashboard section (create the section when missing). */
+export function insertBlogGeneratorIntoDashboard(entries: NavEntry[], includeBlog: boolean): NavEntry[] {
+  if (!includeBlog) return entries;
+  if (entries.some((entry) => entry.type === "route" && entry.id === "automatic-blog")) {
+    return entries;
+  }
+
+  const dashboardIdx = entries.findIndex(
+    (entry) => entry.type === "section" && entry.id === "staff_dashboard"
+  );
+  if (dashboardIdx >= 0) {
+    let insertAt = dashboardIdx + 1;
+    while (insertAt < entries.length && entries[insertAt].type !== "section") {
+      insertAt += 1;
+    }
+    return [...entries.slice(0, insertAt), AUTOMATIC_BLOG_NAV_ROUTE, ...entries.slice(insertAt)];
+  }
+
+  const dashboardBlock: NavEntry[] = [section("staff_dashboard", "Dashboard"), AUTOMATIC_BLOG_NAV_ROUTE];
+  const anchorIdx = entries.findIndex(
+    (entry) =>
+      entry.type === "section" && (entry.id === "global_apps" || entry.id === "help" || entry.id === "marketing_board")
+  );
+  if (anchorIdx >= 0) {
+    return [...entries.slice(0, anchorIdx), ...dashboardBlock, ...entries.slice(anchorIdx)];
+  }
+  return [...dashboardBlock, ...entries];
 }
 
 const TAB_LABELS: Record<AdminTab, string> = {
@@ -587,16 +613,10 @@ function roleCanSeeRufflyNav(role?: string | null) {
   );
 }
 
-function roleCanSeeBlogNav(role?: string | null) {
+/** Blog Generator nav — Super Admin, Admin, and Marketing only. */
+export function roleCanSeeBlogNav(role?: string | null) {
   if (!role) return false;
-  return (
-    role === "owner_admin" ||
-    role === "manager_admin" ||
-    role === "assistant_manager" ||
-    role === "marketing" ||
-    role === "trainer" ||
-    role === "groomer"
-  );
+  return role === "owner_admin" || role === "manager_admin" || role === "marketing";
 }
 
 /** Pick the staff-panel sidebar layout for the signed-in role. */
@@ -610,9 +630,9 @@ export function buildStaffPanelNav(
   else if (role === "team_leader") entries = buildTeamLeadNav(visibleTabs);
   else if (role === "groomer") entries = buildGroomerNav(visibleTabs);
   else entries = buildAdminNav(visibleTabs, board);
+  entries = insertBlogGeneratorIntoDashboard(entries, roleCanSeeBlogNav(role));
   return appendAuthenticatedGlobalRoutes(entries, {
-    includeRuffly: roleCanSeeRufflyNav(role),
-    includeBlog: roleCanSeeBlogNav(role)
+    includeRuffly: roleCanSeeRufflyNav(role)
   });
 }
 

@@ -8,7 +8,7 @@ This is **not** a “set and forget” content spammer. Defaults favor human rev
 
 | Surface | URL |
 |---------|-----|
-| Staff admin | `https://staff.ruffops.com/admin/automatic-blog` (also reachable via `ruffops.com` staff routing) |
+| Staff admin (Blog Generator) | `/admin/automatic-blog` — listed under **Dashboard** for Super Admin, Admin, and Marketing |
 | Public blog | `/blog` (native adapter) |
 | Public article | `/blog/{slug}` |
 

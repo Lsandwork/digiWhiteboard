@@ -25,6 +25,17 @@ import { publishNative, publishWebhook } from "../lib/blog/publishing/adapters";
 import { BLOG_SEED_TOPICS } from "../lib/blog/topics/seed-topics";
 import { slugifyBlogTitle } from "../lib/blog/utils/slug";
 import { BLOG_PERMISSIONS } from "../lib/blog/permissions";
+import {
+  AUTOMATIC_BLOG_NAV_ROUTE,
+  buildStaffPanelNav,
+  roleCanSeeBlogNav
+} from "../lib/admin/nav-groups";
+import {
+  accessFromLegacyRole,
+  canAccessBlogGenerator,
+  hasPermission
+} from "../lib/admin/permissions";
+import type { AdminTab } from "../lib/admin/types";
 
 assert.equal(DEFAULT_HUMAN_SCORE_THRESHOLD, 90);
 assert.equal(DEFAULT_TOPIC_SCORE_THRESHOLD, 85);
@@ -124,6 +135,49 @@ async function runAsyncChecks() {
 
   assert.ok(["gemini", "openai", "anthropic", "perplexity", "cursor"].length === 5);
 }
+
+assert.equal(AUTOMATIC_BLOG_NAV_ROUTE.label, "Blog Generator");
+assert.equal(roleCanSeeBlogNav("owner_admin"), true);
+assert.equal(roleCanSeeBlogNav("manager_admin"), true);
+assert.equal(roleCanSeeBlogNav("marketing"), true);
+assert.equal(roleCanSeeBlogNav("assistant_manager"), false);
+assert.equal(roleCanSeeBlogNav("trainer"), false);
+assert.equal(roleCanSeeBlogNav("groomer"), false);
+assert.equal(canAccessBlogGenerator(null, "owner_admin"), true);
+assert.equal(canAccessBlogGenerator(null, "manager_admin"), true);
+assert.equal(canAccessBlogGenerator(null, "marketing"), true);
+assert.equal(canAccessBlogGenerator(accessFromLegacyRole(null, null, "assistant_manager"), "assistant_manager"), false);
+assert.equal(canAccessBlogGenerator(accessFromLegacyRole(null, null, "trainer"), "trainer"), false);
+assert.equal(hasPermission(accessFromLegacyRole(null, null, "trainer"), "blog.view"), false);
+assert.equal(hasPermission(accessFromLegacyRole(null, null, "marketing"), "blog.view"), true);
+
+const staffTabs = ["overview", "route_generator", "help"] as AdminTab[];
+const adminNav = buildStaffPanelNav(staffTabs, "staff", "manager_admin");
+const dashboardIdx = adminNav.findIndex((entry) => entry.type === "section" && entry.id === "staff_dashboard");
+assert.ok(dashboardIdx >= 0, "staff panel should include Dashboard");
+const blogIdx = adminNav.findIndex((entry) => entry.type === "route" && entry.id === "automatic-blog");
+assert.ok(blogIdx > dashboardIdx, "Blog Generator should sit under Dashboard");
+const nextSectionAfterDashboard = adminNav.findIndex(
+  (entry, index) => index > dashboardIdx && entry.type === "section"
+);
+assert.ok(
+  nextSectionAfterDashboard < 0 || blogIdx < nextSectionAfterDashboard,
+  "Blog Generator must remain inside the Dashboard section"
+);
+const appsIdx = adminNav.findIndex((entry) => entry.type === "section" && entry.id === "global_apps");
+assert.ok(appsIdx < 0 || blogIdx < appsIdx, "Blog Generator should not live under Applications");
+
+const trainerNav = buildStaffPanelNav(staffTabs, "staff", "trainer");
+assert.equal(
+  trainerNav.some((entry) => entry.type === "route" && entry.id === "automatic-blog"),
+  false
+);
+
+const marketingNav = buildStaffPanelNav(["cast_tv", "settings", "help"] as AdminTab[], "marketing", "marketing");
+assert.ok(
+  marketingNav.some((entry) => entry.type === "route" && entry.id === "automatic-blog"),
+  "marketing users should see Blog Generator in the panel"
+);
 
 void runAsyncChecks()
   .then(() => {

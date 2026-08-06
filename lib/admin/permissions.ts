@@ -527,24 +527,7 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "ruffly.feedback.resolve",
   "ruffly.campaigns.view",
   "ruffly.analytics.view",
-  "ruffly.ai.manage",
-  "blog.view",
-  "blog.submit_idea",
-  "blog.create",
-  "blog.edit",
-  "blog.review",
-  "blog.approve",
-  "blog.schedule",
-  "blog.publish",
-  "blog.archive",
-  "blog.manage_sources",
-  "blog.manage_knowledge",
-  "blog.manage_media",
-  "blog.approve_images",
-  "blog.manage_brand",
-  "blog.view_costs",
-  "blog.view_analytics",
-  "blog.view_audit_log"
+  "ruffly.ai.manage"
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -568,11 +551,7 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "ruffly.inbox.view",
   "ruffly.inbox.reply",
   "ruffly.contacts.view",
-  "ruffly.leads.view",
-  "blog.view",
-  "blog.submit_idea",
-  "blog.review",
-  "blog.manage_knowledge"
+  "ruffly.leads.view"
 ];
 
 /** Groomer DigiBoard panel — grooming push, front desk log, video links, notifications, complaints/requests, profile. */
@@ -592,11 +571,7 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "ruffly.view",
   "ruffly.inbox.view",
   "ruffly.inbox.reply",
-  "ruffly.leads.view",
-  "blog.view",
-  "blog.submit_idea",
-  "blog.review",
-  "blog.manage_knowledge"
+  "ruffly.leads.view"
 ];
 
 /** Read-only staff roles (viewer / overnight / maintenance / generic staff). */
@@ -1192,6 +1167,28 @@ export function isTrainerLegacyRole(legacyRole?: string | null) {
 
 export function isMarketingLegacyRole(legacyRole?: string | null) {
   return legacyRole === "marketing";
+}
+
+/**
+ * Blog Generator access — Super Admin, Admin, and Marketing only.
+ * Checks legacy session role and RBAC role keys.
+ */
+export function canAccessBlogGenerator(
+  access?: UserAccess | null,
+  legacyRole?: string | null
+): boolean {
+  if (
+    legacyRole === "owner_admin" ||
+    legacyRole === "manager_admin" ||
+    legacyRole === "marketing" ||
+    isMarketingLegacyRole(legacyRole)
+  ) {
+    return true;
+  }
+  if (isSuperAdminAccess(access) || hasAnyRole(access, ["super_admin", "admin", "marketing"])) {
+    return true;
+  }
+  return false;
 }
 
 /** Dog Handler + Driver/Hiker — same staff Digi-board pages and permissions. */

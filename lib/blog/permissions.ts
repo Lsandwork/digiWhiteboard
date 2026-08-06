@@ -26,6 +26,7 @@ export const BLOG_PERMISSIONS = [
 
 export type BlogPermission = (typeof BLOG_PERMISSIONS)[number];
 
+/** Marketing role blog capabilities (Admin / Super Admin use broader role matrices). */
 export const BLOG_MARKETING_PERMISSIONS: BlogPermission[] = [
   "blog.view",
   "blog.submit_idea",
@@ -41,25 +42,4 @@ export const BLOG_MARKETING_PERMISSIONS: BlogPermission[] = [
   "blog.approve_images",
   "blog.manage_brand",
   "blog.view_analytics"
-];
-
-export const BLOG_MANAGEMENT_PERMISSIONS: BlogPermission[] = [
-  ...BLOG_MARKETING_PERMISSIONS,
-  "blog.manage_knowledge",
-  "blog.view_costs",
-  "blog.view_audit_log"
-];
-
-export const BLOG_TRAINER_PERMISSIONS: BlogPermission[] = [
-  "blog.view",
-  "blog.submit_idea",
-  "blog.review",
-  "blog.manage_knowledge"
-];
-
-export const BLOG_GROOMER_PERMISSIONS: BlogPermission[] = [
-  "blog.view",
-  "blog.submit_idea",
-  "blog.review",
-  "blog.manage_knowledge"
 ];

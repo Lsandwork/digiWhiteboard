@@ -248,9 +248,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   },
   {
     key: "automatic_blog",
-    label: "Automatic Blog",
+    label: "Blog Generator",
     permissions: [
-      p("blog.view", "View Automatic Blog", "Open the Automatic Blog workspace."),
+      p("blog.view", "View Blog Generator", "Open the Blog Generator workspace."),
       p("blog.submit_idea", "Submit Blog Ideas", "Submit topic ideas for review."),
       p("blog.create", "Create Blog Content", "Create topics, briefs, and drafts."),
       p("blog.edit", "Edit Blog Content", "Edit drafts and metadata."),
@@ -270,7 +270,7 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("blog.manage_automation", "Manage Blog Automation", "Configure automation rules."),
       p("blog.view_costs", "View Blog Costs", "View AI usage and costs."),
       p("blog.view_analytics", "View Blog Analytics", "View verified blog analytics."),
-      p("blog.view_audit_log", "View Blog Audit Log", "View Automatic Blog audit history.")
+      p("blog.view_audit_log", "View Blog Audit Log", "View Blog Generator audit history.")
     ]
   }
 ];

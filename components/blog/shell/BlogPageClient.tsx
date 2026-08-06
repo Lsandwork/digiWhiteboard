@@ -115,7 +115,7 @@ function BlogPageInner({ username, role, access }: Props) {
           <div className="flex items-center gap-3">
             <MobileMenuButton onClick={() => setMobileOpen(true)} />
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Automatic Blog</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Blog Generator</p>
               <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Fitdog editorial system</h1>
             </div>
           </div>
@@ -171,7 +171,7 @@ function BlogPageInner({ username, role, access }: Props) {
 
 export function BlogPageClient(props: Props) {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-slate-600">Loading Automatic Blog…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-slate-600">Loading Blog Generator…</div>}>
       <BlogPageInner {...props} />
     </Suspense>
   );
