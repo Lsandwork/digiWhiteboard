@@ -6,7 +6,7 @@ See also: [README](./README.md)
 Production Route Generator for staff.ruffops.com: Fitdog report pull → normalize → optimize (Van 1/2/3/5/6 only) → approve → Samsara CSV.
 
 ## Live pull (not fixtures)
-Pull Report uses the same Fitdog employee OAuth grant as Fitdog Alerts:
+Pull Report uses the same Fitdog employee OAuth grant as Sports App Alerts:
 
 1. `POST /api/oauth/token/` (password grant)
 2. `GET /api/v1/employees/class-occurrences/?date__gte={date}&date__lte={date}`

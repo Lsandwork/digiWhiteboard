@@ -112,7 +112,7 @@ export class FitdogRouteReportProvider {
     // mode === "api"
     if (!canUseFitdogEmployeeApi()) {
       throw new Error(
-        "Live Fitdog pull requires FITDOG_EMPLOYEE_EMAIL and FITDOG_EMPLOYEE_PASSWORD (same credentials as Fitdog Alerts)."
+        "Live Fitdog pull requires FITDOG_EMPLOYEE_EMAIL and FITDOG_EMPLOYEE_PASSWORD (same credentials as Sports App Alerts)."
       );
     }
 

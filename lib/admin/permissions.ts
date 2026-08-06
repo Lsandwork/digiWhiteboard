@@ -447,6 +447,10 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_own_groomer_submissions",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "view_vet_visits",
+  "manage_vet_visits",
+  "view_track_incidents",
+  "manage_track_incidents",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -652,6 +656,10 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
   "receive_walks_board_reminders",
+  "view_vet_visits",
+  "manage_vet_visits",
+  "view_track_incidents",
+  "manage_track_incidents",
   "manage_photo_upload_queue",
   "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
@@ -675,10 +683,12 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
+  "walks_board",
+  "vet_visits",
+  "track_incidents",
   "staff_directory",
   "bulk_photo_upload",
   "yard_links",
-  "walks_board",
   "notifications",
   "management_support",
   "settings",
@@ -694,10 +704,21 @@ export const TEAM_LEADER_TABS = [
   "bulk_photo_upload",
   "yard_links",
   "walks_board",
+  "vet_visits",
+  "track_incidents",
   "notifications",
   "management_support",
   "settings",
   "help"
+] as const;
+
+/** Panels that Management (Assistant Manager) accounts must always retain. */
+export const MANAGEMENT_REQUIRED_PANEL_TABS = [
+  "route_generator",
+  "fitdog_alerts",
+  "walks_board",
+  "vet_visits",
+  "track_incidents"
 ] as const;
 
 export const GROOMER_TABS = [
@@ -776,6 +797,7 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
     case "manager_admin":
       return "admin";
     case "assistant_manager":
+    case "management":
       return "management";
     case "daycare":
     case "dog_handler":
@@ -1049,9 +1071,18 @@ export function isFullAdminLegacyRole(legacyRole?: string | null) {
   return legacyRole === "owner_admin" || legacyRole === "manager_admin";
 }
 
-/** Owner Admin, Manager Admin, or Assistant Manager. */
+/** Owner Admin, Manager Admin, or Assistant Manager / Management. */
 export function isAdminOrManagementLegacyRole(legacyRole?: string | null) {
-  return isFullAdminLegacyRole(legacyRole) || legacyRole === "assistant_manager";
+  return (
+    isFullAdminLegacyRole(legacyRole) ||
+    legacyRole === "assistant_manager" ||
+    legacyRole === "management"
+  );
+}
+
+/** Assistant Manager and RBAC Management role key (legacy string). */
+export function isManagementLegacyRole(legacyRole?: string | null) {
+  return legacyRole === "assistant_manager" || legacyRole === "management";
 }
 
 export function isSuperAdminAccess(access: UserAccess | null | undefined) {
@@ -1279,7 +1310,22 @@ export function canAccessAdminTab(
     if (hasPermission(effective, "route_generator.view")) return true;
     if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
     const roleKey = legacyRoleToRoleKey(legacyRole);
-    return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      isManagementLegacyRole(legacyRole)
+    );
+  }
+
+  // Management required floor panels (Sports App Alerts, Walks Board, Vet Visits, Track Incidents).
+  if (
+    board === "staff" &&
+    (MANAGEMENT_REQUIRED_PANEL_TABS as readonly string[]).includes(tab) &&
+    (isManagementLegacyRole(legacyRole) || hasAnyRole(access, ["management"]))
+  ) {
+    if (tab === "walks_board" && isMarketingLegacyRole(legacyRole)) return false;
+    return true;
   }
 
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
@@ -1329,6 +1375,25 @@ export function canAccessAdminTab(
       roleKey === "admin" ||
       roleKey === "management" ||
       roleKey === "front_desk_coordinator"
+    );
+  }
+
+  // Vet Visits + Track Incidents: front desk coordinators and team leads (plus admins/management).
+  if (tab === "vet_visits" || tab === "track_incidents") {
+    if (board !== "staff") return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    const required = tab === "vet_visits" ? "view_vet_visits" : "view_track_incidents";
+    if (hasPermission(effective, required)) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator", "team_leader"])) {
+      return true;
+    }
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator" ||
+      roleKey === "team_leader"
     );
   }
 
