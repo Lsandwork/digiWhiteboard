@@ -13,6 +13,7 @@ import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain
 import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
 import {
   FITDOG_LOGIN_REDIRECT_PATH,
+  shouldForceFitdogStaffBoard,
   shouldRedirectFitdogRootToLogin
 } from "@/lib/fitdog-domain";
 import { RUFFLY_REWRITE_TARGET, rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
@@ -101,6 +102,21 @@ async function runMiddleware(request: NextRequest) {
     }
 
     const role = session.role ?? "";
+
+    // fitdog.ruffops.com is the staff DigiBoard host — never leave users on lobby/marketing
+    // boards where Route Generator + Operations panels are absent from the sidebar.
+    if (shouldForceFitdogStaffBoard(request.headers.get("host"), pathname, request.nextUrl.searchParams.get("board"))) {
+      const url = request.nextUrl.clone();
+      url.pathname = pathname === "/admin" || pathname.startsWith("/admin/") ? "/admin" : pathname;
+      url.searchParams.set("board", "staff");
+      if (!url.searchParams.get("tab")) {
+        url.searchParams.set(
+          "tab",
+          session.isDemo ? "demo_push" : firstAccessibleAdminTab(null, role, "staff")
+        );
+      }
+      return NextResponse.redirect(url);
+    }
 
     // Bare /admin (or staff board with no tab) → Front Desk Log for every account.
     if (pathname === "/admin") {

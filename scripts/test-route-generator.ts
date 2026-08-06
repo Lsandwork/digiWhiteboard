@@ -54,6 +54,14 @@ assert.equal(
   true
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "route_generator", "front_desk_coordinator", "staff"),
+  true
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "route_generator", "team_leader", "staff"),
+  true
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "route_generator", "daycare", "staff"),
   false,
   "handlers must not see Route Generator"

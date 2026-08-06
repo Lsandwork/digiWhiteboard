@@ -37,14 +37,18 @@ async function requireTrackIncidentsAccess(request: Request) {
     session?.role === "manager_admin" ||
     session?.role === "admin" ||
     session?.role === "management" ||
-    session?.role === "assistant_manager";
+    session?.role === "assistant_manager" ||
+    session?.role === "front_desk_coordinator" ||
+    session?.role === "team_leader";
   const canManage =
     hasPermission(access, "manage_track_incidents") ||
     session?.role === "owner_admin" ||
     session?.role === "manager_admin" ||
     session?.role === "admin" ||
     session?.role === "management" ||
-    session?.role === "assistant_manager";
+    session?.role === "assistant_manager" ||
+    session?.role === "front_desk_coordinator" ||
+    session?.role === "team_leader";
   if (!canView) {
     return { error: NextResponse.json({ error: "Track Incidents access required." }, { status: 403 }) };
   }
