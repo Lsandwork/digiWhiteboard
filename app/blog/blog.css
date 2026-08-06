@@ -22,6 +22,116 @@
   outline-offset: 2px;
 }
 
+/* Article body — Tailwind Preflight resets heading size/margins, so style explicitly. */
+.fitdog-blog-prose {
+  color: var(--fitdog-dark);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+.fitdog-blog-prose > * + * {
+  margin-top: 1.15em;
+}
+
+.fitdog-blog-prose p {
+  margin: 0;
+  max-width: 68ch;
+}
+
+.fitdog-blog-prose h2,
+.fitdog-blog-prose h3 {
+  color: var(--fitdog-dark);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 5.5rem;
+  max-width: 40rem;
+}
+
+.fitdog-blog-prose h2 {
+  margin-top: 2.25em;
+  margin-bottom: 0.65em;
+  padding-top: 0.35em;
+  font-size: clamp(1.35rem, 2.4vw, 1.7rem);
+  border-top: 1px solid var(--fitdog-border);
+}
+
+.fitdog-blog-prose > h2:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.fitdog-blog-prose h3 {
+  margin-top: 1.75em;
+  margin-bottom: 0.5em;
+  font-size: 1.2rem;
+}
+
+.fitdog-blog-prose ul,
+.fitdog-blog-prose ol {
+  margin: 0.85em 0 1.25em;
+  padding-left: 1.35rem;
+  max-width: 68ch;
+}
+
+.fitdog-blog-prose li {
+  margin: 0.45em 0;
+  padding-left: 0.2rem;
+}
+
+.fitdog-blog-prose ul {
+  list-style: disc;
+}
+
+.fitdog-blog-prose ol {
+  list-style: decimal;
+}
+
+.fitdog-blog-prose li::marker {
+  color: var(--fitdog-orange);
+  font-weight: 700;
+}
+
+.fitdog-blog-prose strong {
+  font-weight: 700;
+  color: var(--fitdog-dark);
+}
+
+.fitdog-blog-prose em {
+  font-style: italic;
+}
+
+.fitdog-blog-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+  background: var(--fitdog-surface);
+  border: 1px solid var(--fitdog-border);
+  border-radius: 0.3rem;
+  padding: 0.1em 0.35em;
+}
+
+.fitdog-blog-prose a {
+  color: var(--fitdog-orange);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.fitdog-blog-prose a:hover {
+  color: var(--fitdog-orange-hover);
+}
+
+.fitdog-blog-prose label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.fitdog-blog-prose input[type="checkbox"] {
+  margin-top: 0.35rem;
+  accent-color: var(--fitdog-orange);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fitdog-blog * {
     animation: none !important;

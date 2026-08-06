@@ -15,6 +15,7 @@ import {
 } from "@/lib/blog/content/public";
 import { isBlogPublicEnabled } from "@/lib/blog/flags";
 import { getBlogSettings } from "@/lib/blog/service";
+import { absoluteBlogUrl } from "@/lib/blog/site-url";
 
 export const dynamic = "force-dynamic";
 
@@ -37,14 +38,14 @@ function extractToc(markdown: string) {
 }
 
 function addHeadingIds(html: string) {
-  return html.replace(/<h2>(.*?)<\/h2>/g, (_match, text: string) => {
+  return html.replace(/<h([23])>(.*?)<\/h\1>/g, (_match, level: string, text: string) => {
     const id = String(text)
       .replace(/<[^>]+>/g, "")
       .toLowerCase()
       .replace(/[^\w\s-]/g, "")
       .trim()
       .replace(/\s+/g, "-");
-    return `<h2 id="${id}">${text}</h2>`;
+    return `<h${level} id="${id}">${text}</h${level}>`;
   });
 }
 
@@ -52,16 +53,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const article = await getPublicArticle(slug);
   if (!article) return { title: "Article not found" };
+  const canonical = absoluteBlogUrl(`/blog/${article.slug}`);
+  const image = absoluteBlogUrl(article.coverImage);
   return {
     title: article.seoTitle,
     description: article.metaDescription,
-    alternates: { canonical: `/blog/${article.slug}` },
+    alternates: { canonical },
+    robots: { index: true, follow: true },
     openGraph: {
       title: article.seoTitle,
       description: article.metaDescription,
       type: "article",
-      url: `/blog/${article.slug}`,
-      images: [{ url: article.coverImage, alt: article.coverAlt }]
+      url: canonical,
+      siteName: "Fitdog Blog",
+      publishedTime: article.publishedAt,
+      modifiedTime: article.updatedAt || article.publishedAt,
+      authors: [article.authorProfile],
+      images: [{ url: image, alt: article.coverAlt }]
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.seoTitle,
+      description: article.metaDescription,
+      images: [image]
     }
   };
 }
@@ -77,6 +91,8 @@ export default async function BlogArticlePage({ params }: Props) {
   const neighbors = neighboringArticles(article, all);
   const toc = extractToc(article.bodyMarkdown);
   const bodyHtml = addHeadingIds(article.bodyHtml);
+  const canonical = absoluteBlogUrl(`/blog/${article.slug}`);
+  const coverAbsolute = absoluteBlogUrl(article.coverImage);
 
   let disclosure: string | null = null;
   try {
@@ -88,23 +104,42 @@ export default async function BlogArticlePage({ params }: Props) {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "Article",
+    "@type": "BlogPosting",
     headline: article.title,
-    description: article.excerpt,
-    image: article.coverImage,
+    description: article.metaDescription || article.excerpt,
+    image: [coverAbsolute],
     datePublished: article.publishedAt,
     dateModified: article.updatedAt || article.publishedAt,
-    author: { "@type": "Organization", name: article.authorProfile },
-    publisher: { "@type": "Organization", name: "Fitdog" }
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": canonical
+    },
+    author: { "@type": "Organization", name: article.authorProfile || "Fitdog Team" },
+    publisher: {
+      "@type": "Organization",
+      name: "Fitdog",
+      logo: {
+        "@type": "ImageObject",
+        url: absoluteBlogUrl("/assets/lobby-whiteboard/light-v2/branding/fitdog-dog-logo-exact.png")
+      }
+    },
+    articleSection: article.categoryLabel,
+    wordCount: article.bodyMarkdown.split(/\s+/).filter(Boolean).length,
+    inLanguage: "en-US"
   };
 
   const breadcrumbLd = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Blog", item: "/blog" },
-      { "@type": "ListItem", position: 2, name: article.categoryLabel, item: `/blog/category/${article.categorySlug}` },
-      { "@type": "ListItem", position: 3, name: article.title, item: `/blog/${article.slug}` }
+      { "@type": "ListItem", position: 1, name: "Blog", item: absoluteBlogUrl("/blog") },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: article.categoryLabel,
+        item: absoluteBlogUrl(`/blog/category/${article.categorySlug}`)
+      },
+      { "@type": "ListItem", position: 3, name: article.title, item: canonical }
     ]
   };
 
@@ -114,7 +149,11 @@ export default async function BlogArticlePage({ params }: Props) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
-      <article className="mx-auto max-w-3xl px-4 py-8 md:px-6">
+      <article className="mx-auto max-w-3xl px-4 py-8 md:px-6" itemScope itemType="https://schema.org/BlogPosting">
+        <meta itemProp="headline" content={article.title} />
+        <meta itemProp="datePublished" content={article.publishedAt} />
+        <meta itemProp="dateModified" content={article.updatedAt || article.publishedAt} />
+
         <nav className="text-sm text-[var(--fitdog-muted)]" aria-label="Breadcrumb">
           <Link href="/blog" className="hover:text-[var(--fitdog-orange)]">
             Blog
@@ -128,20 +167,33 @@ export default async function BlogArticlePage({ params }: Props) {
         </nav>
 
         <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-[var(--fitdog-orange)]">{article.categoryLabel}</p>
-        <h1 className="mt-2 text-3xl font-extrabold leading-tight text-[var(--fitdog-dark)] md:text-5xl">{article.title}</h1>
-        <p className="mt-4 text-[var(--fitdog-muted)]">{article.excerpt}</p>
+        <h1 className="mt-2 text-3xl font-extrabold leading-tight text-[var(--fitdog-dark)] md:text-5xl" itemProp="headline">
+          {article.title}
+        </h1>
+        <p className="mt-4 text-lg leading-relaxed text-[var(--fitdog-muted)]" itemProp="description">
+          {article.excerpt}
+        </p>
         <p className="mt-4 text-sm text-[var(--fitdog-muted)]">
-          {article.authorProfile} · {article.readingMinutes} min read ·{" "}
-          {new Date(article.publishedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+          <span itemProp="author">{article.authorProfile}</span> · {article.readingMinutes} min read ·{" "}
+          <time dateTime={article.publishedAt}>
+            {new Date(article.publishedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+          </time>
           {article.updatedAt && article.updatedAt !== article.publishedAt
             ? ` · Updated ${new Date(article.updatedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}`
             : ""}
         </p>
 
         <div className="relative mt-6 aspect-[16/9] overflow-hidden rounded-xl bg-[var(--fitdog-surface)]">
-          <Image src={article.coverImage} alt={article.coverAlt} fill className="object-cover" sizes="(max-width: 768px) 100vw, 768px" priority />
+          <Image
+            src={article.coverImage}
+            alt={article.coverAlt}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 768px"
+            priority
+          />
         </div>
-        <p className="mt-2 text-xs text-[var(--fitdog-muted)]">Image: Fitdog-owned media library asset · {article.coverAlt}</p>
+        <p className="mt-2 text-xs text-[var(--fitdog-muted)]">Photo: Fitdog · {article.coverAlt}</p>
 
         <div className="mt-6">
           <ArticleToolbar slug={article.slug} title={article.title} />
@@ -163,11 +215,12 @@ export default async function BlogArticlePage({ params }: Props) {
         ) : null}
 
         <div
-          className="prose prose-stone mt-8 max-w-none prose-headings:font-extrabold prose-headings:text-[var(--fitdog-dark)] prose-a:text-[var(--fitdog-orange)] prose-li:marker:text-[var(--fitdog-orange)]"
+          className="fitdog-blog-prose mt-8"
+          itemProp="articleBody"
           dangerouslySetInnerHTML={{ __html: bodyHtml }}
         />
 
-        <p className="mt-8 rounded-lg bg-[var(--fitdog-orange-light)] p-4 text-sm text-[var(--fitdog-dark)]">
+        <p className="mt-10 rounded-lg bg-[var(--fitdog-orange-light)] p-4 text-sm leading-relaxed text-[var(--fitdog-dark)]">
           This article is educational and is not a substitute for veterinary, training, or medical advice. If your dog shows concerning symptoms, contact a veterinarian.
         </p>
 

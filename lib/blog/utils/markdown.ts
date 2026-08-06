@@ -6,6 +6,21 @@ function escapeHtml(value: string) {
     .replace(/"/g, "&quot;");
 }
 
+function formatInline(text: string) {
+  return escapeHtml(text)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function isUnorderedListBlock(block: string) {
+  return /^[-*]\s+\[[ xX]\]\s+/m.test(block) || /^[-*]\s+/m.test(block);
+}
+
+function isOrderedListBlock(block: string) {
+  return /^\d+\.\s+/m.test(block);
+}
+
 /** Lightweight markdown → HTML for Fitdog blog articles (headings, paragraphs, lists, checkboxes). */
 export function markdownToSimpleHtml(markdown: string): string {
   const blocks = markdown
@@ -16,10 +31,11 @@ export function markdownToSimpleHtml(markdown: string): string {
 
   return blocks
     .map((block) => {
-      if (/^###\s+/.test(block)) return `<h3>${escapeHtml(block.replace(/^###\s+/, ""))}</h3>`;
-      if (/^##\s+/.test(block)) return `<h2>${escapeHtml(block.replace(/^##\s+/, ""))}</h2>`;
-      if (/^#\s+/.test(block)) return `<h2>${escapeHtml(block.replace(/^#\s+/, ""))}</h2>`;
-      if (/^[-*]\s+\[[ xX]\]\s+/m.test(block) || /^[-*]\s+/m.test(block)) {
+      if (/^###\s+/.test(block)) return `<h3>${formatInline(block.replace(/^###\s+/, ""))}</h3>`;
+      if (/^##\s+/.test(block)) return `<h2>${formatInline(block.replace(/^##\s+/, ""))}</h2>`;
+      if (/^#\s+/.test(block)) return `<h2>${formatInline(block.replace(/^#\s+/, ""))}</h2>`;
+
+      if (isUnorderedListBlock(block)) {
         const items = block
           .split("\n")
           .map((line) => line.trim())
@@ -28,16 +44,24 @@ export function markdownToSimpleHtml(markdown: string): string {
             const checkbox = line.match(/^[-*]\s+\[([ xX])\]\s+(.*)$/);
             if (checkbox) {
               const checked = checkbox[1].toLowerCase() === "x";
-              return `<li><input type="checkbox" disabled ${checked ? "checked" : ""}/> ${escapeHtml(checkbox[2])}</li>`;
+              return `<li><label><input type="checkbox" disabled ${checked ? "checked" : ""}/> <span>${formatInline(checkbox[2])}</span></label></li>`;
             }
-            return `<li>${escapeHtml(line.replace(/^[-*]\s+/, ""))}</li>`;
+            return `<li>${formatInline(line.replace(/^[-*]\s+/, ""))}</li>`;
           });
         return `<ul>${items.join("")}</ul>`;
       }
-      const withInline = escapeHtml(block)
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\n/g, "<br />");
-      return `<p>${withInline}</p>`;
+
+      if (isOrderedListBlock(block)) {
+        const items = block
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => `<li>${formatInline(line.replace(/^\d+\.\s+/, ""))}</li>`);
+        return `<ol>${items.join("")}</ol>`;
+      }
+
+      const withBreaks = formatInline(block).replace(/\n/g, "<br />");
+      return `<p>${withBreaks}</p>`;
     })
     .join("\n");
 }

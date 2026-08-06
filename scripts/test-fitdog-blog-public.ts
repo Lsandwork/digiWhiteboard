@@ -3,6 +3,8 @@ import { FITDOG_BLOG_NAV, FITDOG_BLOG_ORANGE, FITDOG_FOOTER_SERVICES, FITDOG_PUB
 import { INITIAL_BLOG_ARTICLES, INITIAL_BLOG_CATEGORIES } from "../lib/blog/content/initial-articles";
 import { getSeedArticleBySlug, getSeedArticles, relatedArticles, neighboringArticles } from "../lib/blog/content/public";
 import { findBannedPhrases, startsWithGenericQuestion } from "../lib/blog/editorial/banned-phrases";
+import { markdownToSimpleHtml } from "../lib/blog/utils/markdown";
+import { absoluteBlogUrl } from "../lib/blog/site-url";
 
 assert.equal(FITDOG_BLOG_ORANGE, "#ff6f26");
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Blog" && item.href === "/blog"));
@@ -92,5 +94,17 @@ const neighbors = neighboringArticles(current, all);
 assert.ok(neighbors.next || neighbors.previous);
 
 assert.ok(all.every((article) => article.bodyHtml.includes("<p>") || article.bodyHtml.includes("<h2>")));
+assert.ok(all.every((article) => (article.bodyHtml.match(/<h2/g) || []).length >= 3));
+assert.ok(all.every((article) => (article.bodyHtml.match(/<p>/g) || []).length >= 8));
+
+const sampleHtml = markdownToSimpleHtml(
+  "## Heading one\n\nFirst paragraph.\n\nSecond paragraph.\n\n- Item one\n- Item two\n\n1. Step one\n2. Step two"
+);
+assert.ok(sampleHtml.includes("<h2>Heading one</h2>"));
+assert.ok(sampleHtml.includes("<p>First paragraph.</p>"));
+assert.ok(sampleHtml.includes("<p>Second paragraph.</p>"));
+assert.ok(sampleHtml.includes("<ul><li>Item one</li><li>Item two</li></ul>"));
+assert.ok(sampleHtml.includes("<ol><li>Step one</li><li>Step two</li></ol>"));
+assert.ok(absoluteBlogUrl("/blog").includes("/blog"));
 
 console.log("test-fitdog-blog-public passed");
