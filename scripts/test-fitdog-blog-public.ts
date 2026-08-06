@@ -18,7 +18,7 @@ assert.equal(FITDOG_PUBLIC_URLS.transportation, "https://www.fitdog.com/daycare-
 assert.equal(FITDOG_PUBLIC_URLS.services, "https://www.fitdog.com/club-home/");
 assert.equal(FITDOG_PUBLIC_URLS.members, "https://fitdog.portal.gingrapp.com/public/login");
 assert.equal(FITDOG_PUBLIC_URLS.book, "https://www.fitdog.com/daycare-assessment/");
-assert.ok(!FITDOG_BLOG_NAV.some((item) => item.label === "Locations"));
+assert.ok(!(FITDOG_BLOG_NAV as ReadonlyArray<{ label: string }>).some((item) => item.label === "Locations"));
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Services" && item.href === FITDOG_PUBLIC_URLS.services));
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Members" && item.href === FITDOG_PUBLIC_URLS.members));
 assert.equal(
