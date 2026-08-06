@@ -23,6 +23,7 @@ type Overview = {
 export function BlogOverviewPanel() {
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [seedMessage, setSeedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +94,25 @@ export function BlogOverviewPanel() {
         <Link href={`${BLOG_APP_PATH}?page=setup`} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
           Setup wizard
         </Link>
+        <button
+          type="button"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          onClick={() => {
+            void (async () => {
+              setSeedMessage(null);
+              const res = await fetch("/api/blog/seed-published", { method: "POST" });
+              const json = await res.json();
+              setSeedMessage(res.ok ? `Seeded ${json.upserted} published articles.` : json.error || "Seed failed");
+            })();
+          }}
+        >
+          Seed 5 launch articles to DB
+        </button>
+        <Link href="/blog" target="_blank" className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+          Open public blog
+        </Link>
       </div>
+      {seedMessage ? <p className="text-sm text-emerald-800">{seedMessage}</p> : null}
       <div>
         <h3 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Recent articles</h3>
         <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">

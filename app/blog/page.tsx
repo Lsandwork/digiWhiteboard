@@ -1,14 +1,27 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { ArticleCard } from "@/components/blog/public/ArticleCard";
+import { BlogSidebar } from "@/components/blog/public/BlogSidebar";
+import { FeaturedHero } from "@/components/blog/public/FeaturedHero";
+import { FitdogBlogFooter } from "@/components/blog/public/FitdogBlogFooter";
+import { FitdogBlogHeader } from "@/components/blog/public/FitdogBlogHeader";
+import { BlogSearchBar } from "@/components/blog/public/BlogSearchBar";
+import { getActivePromotion, getFeaturedArticles, getSeedCategories, listPublicArticles } from "@/lib/blog/content/public";
 import { isBlogPublicEnabled } from "@/lib/blog/flags";
-import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Fitdog Blog | Practical dog care guidance",
-  description: "Thoughtful, practical articles for dog owners from the Fitdog team.",
-  alternates: { canonical: "/blog" }
+  title: "Fitdog Blog | Practical dog care for LA owners",
+  description: "Thoughtful, practical articles for dog owners from the Fitdog team in Santa Monica and Los Angeles.",
+  alternates: { canonical: "/blog" },
+  openGraph: {
+    title: "Fitdog Blog",
+    description: "Practical dog care guidance from Fitdog.",
+    type: "website",
+    url: "/blog"
+  }
 };
 
 export default async function BlogHomePage() {
@@ -16,59 +29,73 @@ export default async function BlogHomePage() {
     return (
       <main className="mx-auto max-w-3xl px-4 py-16">
         <h1 className="text-3xl font-semibold">Fitdog Blog</h1>
-        <p className="mt-3 text-slate-600">The public blog is temporarily unavailable.</p>
+        <p className="mt-3 text-[var(--fitdog-muted)]">The public blog is temporarily unavailable.</p>
       </main>
     );
   }
 
-  let articles: Array<{
-    id: string;
-    title: string;
-    slug: string;
-    excerpt: string;
-    published_at: string | null;
-    author_profile: string;
-  }> = [];
-
-  try {
-    const supabase = getServiceSupabase();
-    const { data } = await supabase
-      .from("blog_articles")
-      .select("id, title, slug, excerpt, published_at, author_profile")
-      .eq("status", "PUBLISHED")
-      .order("published_at", { ascending: false })
-      .limit(30);
-    articles = data || [];
-  } catch {
-    articles = [];
-  }
+  const [featured, articles, promotion] = await Promise.all([
+    getFeaturedArticles(),
+    listPublicArticles({ limit: 12 }),
+    getActivePromotion()
+  ]);
+  const latest = articles.filter((article) => !featured.some((item) => item.slug === article.slug)).slice(0, 4);
+  const latestCards = latest.length ? latest : articles.slice(0, 4);
+  const categories = getSeedCategories().filter((category) => category.count > 0);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-stone-100 via-white to-emerald-50">
-      <div className="mx-auto max-w-3xl px-4 py-12">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-emerald-800">Fitdog</p>
-        <h1 className="mt-2 font-serif text-4xl text-stone-900 md:text-5xl">Blog</h1>
-        <p className="mt-3 max-w-2xl text-lg text-stone-700">
-          Practical guidance for dog owners — written to be useful, calm, and honest.
-        </p>
-        <ul className="mt-10 space-y-8">
-          {articles.map((article) => (
-            <li key={article.id} className="border-t border-stone-200 pt-6">
-              <Link href={`/blog/${article.slug}`} className="group block">
-                <h2 className="font-serif text-2xl text-stone-900 group-hover:text-emerald-800">{article.title}</h2>
-                <p className="mt-2 text-stone-600">{article.excerpt}</p>
-                <p className="mt-2 text-xs uppercase tracking-wide text-stone-500">
-                  {article.author_profile || "Fitdog Team"}
-                  {article.published_at ? ` · ${new Date(article.published_at).toLocaleDateString()}` : ""}
-                </p>
+    <>
+      <FitdogBlogHeader active="Blog" />
+      <FeaturedHero articles={featured.length ? featured : articles.slice(0, 1)} />
+
+      <section className="border-b border-[var(--fitdog-border)] bg-[var(--fitdog-surface)]">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
+          <div className="flex flex-wrap gap-2" aria-label="Categories">
+            <Link href="/blog/articles" className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--fitdog-dark)] shadow-sm">
+              All
+            </Link>
+            {categories.map((category) => (
+              <Link
+                key={category.slug}
+                href={`/blog/category/${category.slug}`}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-[var(--fitdog-dark)] shadow-sm hover:text-[var(--fitdog-orange)]"
+              >
+                {category.label}
               </Link>
-            </li>
-          ))}
-          {!articles.length ? (
-            <li className="text-stone-600">Published articles will appear here after editorial approval.</li>
-          ) : null}
-        </ul>
-      </div>
-    </main>
+            ))}
+          </div>
+          <div className="w-full md:max-w-sm">
+            <Suspense fallback={<div className="h-10 rounded bg-white" />}>
+              <BlogSearchBar />
+            </Suspense>
+          </div>
+        </div>
+      </section>
+
+      <main className="mx-auto grid max-w-6xl gap-8 px-4 py-10 lg:grid-cols-[1fr_320px] md:px-6">
+        <section>
+          <div className="mb-5 flex items-end justify-between gap-3">
+            <h2 className="text-2xl font-extrabold text-[var(--fitdog-dark)]">Latest from the Fitdog Blog</h2>
+            <Link href="/blog/articles" className="text-sm font-bold text-[var(--fitdog-orange)] hover:underline">
+              View all articles →
+            </Link>
+          </div>
+          {latestCards.length ? (
+            <div className="grid gap-5 sm:grid-cols-2">
+              {latestCards.map((article) => (
+                <ArticleCard key={article.slug} article={article} />
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed border-[var(--fitdog-border)] p-8 text-[var(--fitdog-muted)]">
+              No published articles yet.
+            </p>
+          )}
+        </section>
+        <BlogSidebar promotion={promotion} />
+      </main>
+
+      <FitdogBlogFooter />
+    </>
   );
 }

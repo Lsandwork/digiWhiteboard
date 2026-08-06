@@ -57,7 +57,8 @@
     "db:push:query": "tsx scripts/push-supabase-migration-query.ts",
     "db:push:all": "tsx scripts/push-all-supabase-migrations.ts",
     "compress:social-moments": "tsx scripts/compress-social-moments.ts",
-    "test:blog": "tsx scripts/test-automatic-blog.ts"
+    "test:blog": "tsx scripts/test-automatic-blog.ts && tsx scripts/test-fitdog-blog-public.ts",
+    "test:blog-public": "tsx scripts/test-fitdog-blog-public.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,7 +1,10 @@
 import { generateBlogText } from "@/lib/blog/ai/gateway";
 import { BANNED_FILLER_PHRASES } from "@/lib/blog/constants";
 import { scoreHumanEditorialQuality } from "@/lib/blog/editorial/human-score";
+import { markdownToSimpleHtml } from "@/lib/blog/utils/markdown";
 import { slugifyBlogTitle } from "@/lib/blog/utils/slug";
+
+export { markdownToSimpleHtml };
 
 export type DraftBrief = {
   title: string;
@@ -31,37 +34,6 @@ export type DraftPipelineResult = {
   estimatedCostCents: number;
   agentNotes: string[];
 };
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-export function markdownToSimpleHtml(markdown: string): string {
-  const blocks = markdown
-    .trim()
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  return blocks
-    .map((block) => {
-      if (/^###\s+/.test(block)) return `<h3>${escapeHtml(block.replace(/^###\s+/, ""))}</h3>`;
-      if (/^##\s+/.test(block)) return `<h2>${escapeHtml(block.replace(/^##\s+/, ""))}</h2>`;
-      if (/^#\s+/.test(block)) return `<h2>${escapeHtml(block.replace(/^#\s+/, ""))}</h2>`;
-      if (/^[-*]\s+/m.test(block)) {
-        const items = block
-          .split("\n")
-          .map((line) => line.replace(/^[-*]\s+/, "").trim())
-          .filter(Boolean);
-        return `<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
-      }
-      return `<p>${escapeHtml(block).replace(/\n/g, "<br />")}</p>`;
-    })
-    .join("\n");
-}
 
 function deterministicDraft(brief: DraftBrief): { markdown: string; excerpt: string } {
   const local = brief.localRelevance ? ` For owners around ${brief.localRelevance}, this comes up often.` : "";
