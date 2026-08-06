@@ -9,6 +9,36 @@ assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Blog" && item.href === 
 assert.ok(!FITDOG_BLOG_NAV.some((item) => item.href === "#"));
 assert.ok(FITDOG_FOOTER_SERVICES.every((item) => item.href.startsWith("http")));
 assert.ok(FITDOG_PUBLIC_URLS.instagram.includes("instagram.com"));
+assert.equal(FITDOG_PUBLIC_URLS.boarding, "https://www.fitdog.com/cat/caringdog/boarding");
+assert.equal(FITDOG_PUBLIC_URLS.daycare, "https://www.fitdog.com/club-home/");
+assert.equal(FITDOG_PUBLIC_URLS.training, "https://www.fitdog.com/dog-training/");
+assert.equal(FITDOG_PUBLIC_URLS.hikes, "https://www.fitdog.com/los-angeles-outings/");
+assert.equal(FITDOG_PUBLIC_URLS.grooming, "https://fitdog.wpenginepowered.com/club-home/grooming/");
+assert.equal(FITDOG_PUBLIC_URLS.transportation, "https://www.fitdog.com/daycare-assessment/");
+assert.equal(
+  FITDOG_FOOTER_SERVICES.find((item) => item.label === "Boarding")?.href,
+  FITDOG_PUBLIC_URLS.boarding
+);
+assert.equal(
+  FITDOG_FOOTER_SERVICES.find((item) => item.label === "Daycare")?.href,
+  FITDOG_PUBLIC_URLS.daycare
+);
+assert.equal(
+  FITDOG_FOOTER_SERVICES.find((item) => item.label === "Training")?.href,
+  FITDOG_PUBLIC_URLS.training
+);
+assert.equal(
+  FITDOG_FOOTER_SERVICES.find((item) => item.label === "Hikes & Adventures")?.href,
+  FITDOG_PUBLIC_URLS.hikes
+);
+assert.equal(
+  FITDOG_FOOTER_SERVICES.find((item) => item.label === "Grooming")?.href,
+  FITDOG_PUBLIC_URLS.grooming
+);
+assert.equal(
+  FITDOG_FOOTER_SERVICES.find((item) => item.label === "Transportation")?.href,
+  FITDOG_PUBLIC_URLS.transportation
+);
 
 assert.equal(INITIAL_BLOG_ARTICLES.length, 5);
 assert.ok(INITIAL_BLOG_CATEGORIES.length >= 11);
