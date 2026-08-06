@@ -2,17 +2,21 @@
  * Public Fitdog Blog custom-domain routing.
  * Serves App Router pages under /blog/* while the browser URL stays on the blog host.
  *
- * Primary consumer domain: blog.fitdog.com (leads + members, no account required)
- * Alternate ops domain: blogs.ruffops.com
+ * Production hosts: blog.ruffops.com (Vercel), blog.fitdog.com (consumer), blogs.ruffops.com (legacy)
  */
 
+export const BLOG_RUFFOPS_HOSTNAME = "blog.ruffops.com";
 export const BLOG_FITDOG_HOSTNAME = "blog.fitdog.com";
-/** @deprecated Use BLOG_FITDOG_HOSTNAME or BLOG_PUBLIC_HOSTNAMES */
+/** @deprecated Prefer BLOG_RUFFOPS_HOSTNAME */
 export const BLOGS_HOSTNAME = "blogs.ruffops.com";
 
-export const BLOG_PUBLIC_HOSTNAMES = [BLOG_FITDOG_HOSTNAME, BLOGS_HOSTNAME] as const;
+export const BLOG_PUBLIC_HOSTNAMES = [
+  BLOG_RUFFOPS_HOSTNAME,
+  BLOG_FITDOG_HOSTNAME,
+  BLOGS_HOSTNAME
+] as const;
 
-export const BLOG_PRIMARY_PUBLIC_ORIGIN = `https://${BLOG_FITDOG_HOSTNAME}`;
+export const BLOG_PRIMARY_PUBLIC_ORIGIN = `https://${BLOG_RUFFOPS_HOSTNAME}`;
 /** @deprecated Use BLOG_PRIMARY_PUBLIC_ORIGIN */
 export const BLOGS_PUBLIC_ORIGIN = BLOG_PRIMARY_PUBLIC_ORIGIN;
 
@@ -64,7 +68,7 @@ function isReservedBlogsPath(pathname: string) {
 }
 
 /**
- * Internal rewrite target for blog.fitdog.com / blogs.ruffops.com → /blog/* routes.
+ * Internal rewrite target for public blog hosts → /blog/* routes.
  * Returns null when the host/path should not be rewritten.
  */
 export function rewriteBlogsPublicPath(host: string | null | undefined, pathname: string): string | null {

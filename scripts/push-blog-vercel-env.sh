@@ -31,7 +31,7 @@ set_env() {
 }
 
 echo "Pushing Fitdog blog env to Vercel production..."
-set_env NEXT_PUBLIC_PUBLIC_SITE_URL "https://blog.fitdog.com" production
+set_env NEXT_PUBLIC_PUBLIC_SITE_URL "https://blog.ruffops.com" production
 set_env BLOG_LEGACY_REDIRECT "false" production
 
 echo "Done. Trigger a production redeploy so env vars take effect:"

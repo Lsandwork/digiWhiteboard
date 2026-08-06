@@ -2,6 +2,7 @@ import {
   BLOG_FITDOG_HOSTNAME,
   BLOG_PRIMARY_PUBLIC_ORIGIN,
   BLOG_PUBLIC_HOSTNAMES,
+  BLOG_RUFFOPS_HOSTNAME,
   BLOGS_HOSTNAME
 } from "@/lib/blogs-domain";
 
@@ -9,7 +10,7 @@ function normalizeConfiguredHost(value: string) {
   return value.replace(/^https?:\/\//, "").replace(/\/$/, "").toLowerCase();
 }
 
-/** Whether public blog URLs should omit the /blog prefix (blog.fitdog.com, blogs.ruffops.com). */
+/** Whether public blog URLs should omit the /blog prefix (blog.ruffops.com, blog.fitdog.com, …). */
 export function usesBlogsPublicDomain() {
   const configured =
     process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim() ||
@@ -23,7 +24,7 @@ export function usesBlogsPublicDomain() {
 
 /**
  * Public blog path for in-app links.
- * blog.fitdog.com / blogs.ruffops.com → /articles, /{slug}
+ * blog.ruffops.com / blog.fitdog.com → /articles, /{slug}
  * other hosts → /blog/articles, /blog/{slug}
  */
 export function publicBlogHref(subpath = "") {
@@ -37,4 +38,4 @@ export function publicBlogHref(subpath = "") {
 
 export const BLOG_PUBLIC_HOME_HREF = publicBlogHref();
 
-export { BLOG_FITDOG_HOSTNAME, BLOGS_HOSTNAME };
+export { BLOG_FITDOG_HOSTNAME, BLOG_RUFFOPS_HOSTNAME, BLOGS_HOSTNAME };
