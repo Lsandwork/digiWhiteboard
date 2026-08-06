@@ -10,6 +10,7 @@ export async function GET() {
   const urls = [
     absoluteBlogUrl(publicBlogHref()),
     absoluteBlogUrl(publicBlogHref("/articles")),
+    absoluteBlogUrl(publicBlogHref("/why-fitdog")),
     ...INITIAL_BLOG_CATEGORIES.map((c) => absoluteBlogUrl(publicBlogHref(`/category/${c.slug}`)))
   ];
   const articles = await listPublicArticles({ limit: 500 });

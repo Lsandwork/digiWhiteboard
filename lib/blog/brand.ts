@@ -39,7 +39,7 @@ export const FITDOG_PUBLIC_URLS = {
 
 export const FITDOG_BLOG_NAV = [
   { label: "Services", href: FITDOG_PUBLIC_URLS.services, external: true },
-  { label: "Why Us", href: FITDOG_PUBLIC_URLS.about, external: true },
+  { label: "Why Fitdog", href: publicBlogHref("/why-fitdog"), external: false },
   { label: "Members", href: FITDOG_PUBLIC_URLS.members, external: true },
   { label: "Blog", href: publicBlogHref(), external: false },
   { label: "Contact", href: FITDOG_PUBLIC_URLS.contact, external: true }
