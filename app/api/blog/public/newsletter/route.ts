@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEmailProvider } from "@/lib/integrations/email/provider";
+import { notifySuperAdminOfBlogSubscriber } from "@/lib/blog/newsletter-alerts";
 import { writeBlogAudit } from "@/lib/blog/service";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -43,8 +44,9 @@ export async function POST(request: Request) {
 
   let stored = false;
   let duplicate = false;
+  let supabase: ReturnType<typeof getServiceSupabase> | null = null;
   try {
-    const supabase = getServiceSupabase();
+    supabase = getServiceSupabase();
     const { data: existing } = await supabase.from("blog_subscribers").select("id, status").eq("email", email).maybeSingle();
     if (existing?.id) {
       duplicate = true;
@@ -69,6 +71,7 @@ export async function POST(request: Request) {
   } catch {
     // table may not exist yet — still try email provider / report honest state
     stored = false;
+    supabase = null;
   }
 
   const provider = getEmailProvider();
@@ -84,11 +87,20 @@ export async function POST(request: Request) {
     emailed = result.ok;
   }
 
+  const alert = await notifySuperAdminOfBlogSubscriber({
+    supabase,
+    subscriberEmail: email,
+    duplicate
+  });
+
   await writeBlogAudit(null, "newsletter.subscribe", "subscriber", email, {
     stored,
     duplicate,
     emailed,
-    providerConfigured: provider.isConfigured()
+    providerConfigured: provider.isConfigured(),
+    alertEmail: alert.alertEmail,
+    dashboardNotified: alert.dashboardNotified,
+    adminEmailed: alert.emailed
   });
 
   if (!stored && !provider.isConfigured()) {

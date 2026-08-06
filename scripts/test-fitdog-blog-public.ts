@@ -15,6 +15,12 @@ assert.equal(FITDOG_PUBLIC_URLS.training, "https://www.fitdog.com/dog-training/"
 assert.equal(FITDOG_PUBLIC_URLS.hikes, "https://www.fitdog.com/los-angeles-outings/");
 assert.equal(FITDOG_PUBLIC_URLS.grooming, "https://fitdog.wpenginepowered.com/club-home/grooming/");
 assert.equal(FITDOG_PUBLIC_URLS.transportation, "https://www.fitdog.com/daycare-assessment/");
+assert.equal(FITDOG_PUBLIC_URLS.services, "https://www.fitdog.com/club-home/");
+assert.equal(FITDOG_PUBLIC_URLS.members, "https://fitdog.portal.gingrapp.com/public/login");
+assert.equal(FITDOG_PUBLIC_URLS.book, "https://www.fitdog.com/daycare-assessment/");
+assert.ok(!FITDOG_BLOG_NAV.some((item) => item.label === "Locations"));
+assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Services" && item.href === FITDOG_PUBLIC_URLS.services));
+assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Members" && item.href === FITDOG_PUBLIC_URLS.members));
 assert.equal(
   FITDOG_FOOTER_SERVICES.find((item) => item.label === "Boarding")?.href,
   FITDOG_PUBLIC_URLS.boarding
@@ -40,6 +46,14 @@ assert.equal(
   FITDOG_PUBLIC_URLS.transportation
 );
 
+const expectedCovers: Record<string, string> = {
+  "how-to-keep-your-dog-safe-happy-summer-la": "/assets/fitdog/social-moments/posters/social-moment-06.jpg",
+  "introducing-your-puppy-to-a-new-routine": "/assets/fitdog/social-moments/posters/social-moment-05.jpg",
+  "5-indoor-enrichment-ideas-for-rainy-days": "/assets/fitdog/social-moments/posters/social-moment-01.jpg",
+  "why-beach-days-are-great-for-dogs": "/assets/fitdog/social-moments/posters/social-moment-02.jpg",
+  "what-to-pack-for-your-dogs-boarding-stay": "/assets/fitdog/social-moments/posters/social-moment-08.jpg"
+};
+
 assert.equal(INITIAL_BLOG_ARTICLES.length, 5);
 assert.ok(INITIAL_BLOG_CATEGORIES.length >= 11);
 
@@ -53,6 +67,8 @@ const requiredSlugs = [
 for (const slug of requiredSlugs) {
   const article = getSeedArticleBySlug(slug);
   assert.ok(article, `missing ${slug}`);
+  assert.equal(article!.coverImage, expectedCovers[slug], `${slug} cover mismatch`);
+  assert.ok(article!.coverImage.includes("/social-moments/posters/"), `${slug} should use real Fitdog photo`);
   const words = article!.bodyMarkdown.split(/\s+/).filter(Boolean).length;
   assert.ok(words >= 1100, `${slug} too short: ${words}`);
   assert.ok(article!.bodyHtml.includes("<p>"));

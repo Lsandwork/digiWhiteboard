@@ -11,13 +11,14 @@ export const FITDOG_BLOG_LOGO = {
 
 export const FITDOG_PUBLIC_URLS = {
   home: process.env.NEXT_PUBLIC_FITDOG_SITE_URL?.trim() || "https://www.fitdog.com",
-  services: process.env.NEXT_PUBLIC_FITDOG_SERVICES_URL?.trim() || "https://www.fitdog.com/services",
+  services: process.env.NEXT_PUBLIC_FITDOG_SERVICES_URL?.trim() || "https://www.fitdog.com/club-home/",
   whyFitdog: process.env.NEXT_PUBLIC_FITDOG_WHY_URL?.trim() || "https://www.fitdog.com/why-fitdog",
   locations: process.env.NEXT_PUBLIC_FITDOG_LOCATIONS_URL?.trim() || "https://www.fitdog.com/locations",
-  members: process.env.NEXT_PUBLIC_FITDOG_MEMBERS_URL?.trim() || "https://www.fitdog.com/members",
+  members:
+    process.env.NEXT_PUBLIC_FITDOG_MEMBERS_URL?.trim() || "https://fitdog.portal.gingrapp.com/public/login",
   about: process.env.NEXT_PUBLIC_FITDOG_ABOUT_URL?.trim() || "https://www.fitdog.com/about",
   contact: process.env.NEXT_PUBLIC_FITDOG_CONTACT_URL?.trim() || "https://www.fitdog.com/contact",
-  book: process.env.NEXT_PUBLIC_FITDOG_BOOK_URL?.trim() || "https://www.fitdog.com/book",
+  book: process.env.NEXT_PUBLIC_FITDOG_BOOK_URL?.trim() || "https://www.fitdog.com/daycare-assessment/",
   daycare: process.env.NEXT_PUBLIC_FITDOG_DAYCARE_URL?.trim() || "https://www.fitdog.com/club-home/",
   boarding: process.env.NEXT_PUBLIC_FITDOG_BOARDING_URL?.trim() || "https://www.fitdog.com/cat/caringdog/boarding",
   training: process.env.NEXT_PUBLIC_FITDOG_TRAINING_URL?.trim() || "https://www.fitdog.com/dog-training/",
@@ -36,7 +37,6 @@ export const FITDOG_PUBLIC_URLS = {
 export const FITDOG_BLOG_NAV = [
   { label: "Services", href: FITDOG_PUBLIC_URLS.services, external: true },
   { label: "Why Fitdog", href: FITDOG_PUBLIC_URLS.whyFitdog, external: true },
-  { label: "Locations", href: FITDOG_PUBLIC_URLS.locations, external: true },
   { label: "Members", href: FITDOG_PUBLIC_URLS.members, external: true },
   { label: "Blog", href: "/blog", external: false },
   { label: "About Us", href: FITDOG_PUBLIC_URLS.about, external: true },
