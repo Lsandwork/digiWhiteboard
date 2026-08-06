@@ -135,7 +135,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   admin_trainer_entries: "Trainer Entries",
   package_commissions: "Package & Class Commissions",
   track_incidents: "Track Incidents",
-  fitdog_alerts: "Fitdog Alerts",
+  fitdog_alerts: "Sports App Alerts",
   vet_visits: "Vet Visits",
   demo_push: "Demo Push",
   analytics: "Analytics",
@@ -234,7 +234,9 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
-  "walks_board"
+  "walks_board",
+  "vet_visits",
+  "track_incidents"
 ];
 
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
@@ -243,7 +245,6 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));
@@ -386,7 +387,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["ms_hub", "management_support"], visible),
           group("support_complaints", "Complaints", SUPPORT_COMPLAINT_TABS, visible),
           group("support_requests", "Requests", SUPPORT_REQUEST_TABS, visible),
-          ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)
+          ...singles(["admin_trainer_entries"], visible)
         ]),
         true
       )

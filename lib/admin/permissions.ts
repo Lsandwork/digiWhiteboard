@@ -447,6 +447,10 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_own_groomer_submissions",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "view_vet_visits",
+  "manage_vet_visits",
+  "view_track_incidents",
+  "manage_track_incidents",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -652,6 +656,10 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
   "receive_walks_board_reminders",
+  "view_vet_visits",
+  "manage_vet_visits",
+  "view_track_incidents",
+  "manage_track_incidents",
   "manage_photo_upload_queue",
   "download_photo_uploads",
   ...STAFF_NOTIFICATION_PERMISSIONS,
@@ -675,10 +683,12 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
+  "walks_board",
+  "vet_visits",
+  "track_incidents",
   "staff_directory",
   "bulk_photo_upload",
   "yard_links",
-  "walks_board",
   "notifications",
   "management_support",
   "settings",
@@ -694,6 +704,8 @@ export const TEAM_LEADER_TABS = [
   "bulk_photo_upload",
   "yard_links",
   "walks_board",
+  "vet_visits",
+  "track_incidents",
   "notifications",
   "management_support",
   "settings",
@@ -1329,6 +1341,25 @@ export function canAccessAdminTab(
       roleKey === "admin" ||
       roleKey === "management" ||
       roleKey === "front_desk_coordinator"
+    );
+  }
+
+  // Vet Visits + Track Incidents: front desk coordinators and team leads (plus admins/management).
+  if (tab === "vet_visits" || tab === "track_incidents") {
+    if (board !== "staff") return false;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    const required = tab === "vet_visits" ? "view_vet_visits" : "view_track_incidents";
+    if (hasPermission(effective, required)) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator", "team_leader"])) {
+      return true;
+    }
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator" ||
+      roleKey === "team_leader"
     );
   }
 

@@ -183,9 +183,9 @@ assert.ok(
   "Management section should bucket its tab links for collapsible nav"
 );
 assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "ms_hub"), "staff_management");
-assert.equal(findNavSectionForTab(adminWithSubmitNav, "track_incidents"), "Management");
-assert.equal(findNavSectionForTab(adminWithSubmitNav, "vet_visits"), "Management");
-assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "track_incidents"), "staff_management");
-assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "vet_visits"), "staff_management");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "track_incidents"), "Front Desk & Floor");
+assert.equal(findNavSectionForTab(adminWithSubmitNav, "vet_visits"), "Front Desk & Floor");
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "track_incidents"), "staff_operations");
+assert.equal(findNavSectionIdForTab(adminWithSubmitNav, "vet_visits"), "staff_operations");
 
 console.log("commissions nav tests passed");

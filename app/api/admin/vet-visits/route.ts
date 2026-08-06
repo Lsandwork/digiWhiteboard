@@ -28,9 +28,14 @@ async function requireVetVisitsAccess(request: Request) {
   const canView =
     hasPermission(access, "view_vet_visits") ||
     hasPermission(access, "manage_vet_visits") ||
-    isAdminOrManagementRole(session?.role);
+    isAdminOrManagementRole(session?.role) ||
+    session?.role === "front_desk_coordinator" ||
+    session?.role === "team_leader";
   const canManage =
-    hasPermission(access, "manage_vet_visits") || isAdminOrManagementRole(session?.role);
+    hasPermission(access, "manage_vet_visits") ||
+    isAdminOrManagementRole(session?.role) ||
+    session?.role === "front_desk_coordinator" ||
+    session?.role === "team_leader";
   if (!canView) {
     return { error: NextResponse.json({ error: "Vet Visits access required." }, { status: 403 }) };
   }
