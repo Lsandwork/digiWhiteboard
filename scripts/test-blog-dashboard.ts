@@ -3,6 +3,8 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
 import { BLOG_APP_PATH, BLOG_NAV_PAGES } from "../lib/blog/constants";
 import { FITDOG_BLOG_ORANGE, FITDOG_BLOG_LOGO } from "../lib/blog/brand";
 import { comparePeriodLabel, planPipelineTransition } from "../lib/blog/workflow";
+import { buildArticlePreviewHtml, estimateReadingMinutes } from "../lib/blog/utils/article-preview-html";
+import { chunkSpeechText, pickBestSpeechVoice } from "../lib/blog/utils/natural-speech-voice";
 
 assert.equal(BLOG_APP_PATH, "/admin/automatic-blog");
 assert.equal(FITDOG_BLOG_ORANGE, "#ff6f26");
@@ -107,5 +109,19 @@ const scheduleOk = planPipelineTransition({
 });
 assert.equal(scheduleOk.ok, true);
 if (scheduleOk.ok) assert.equal(scheduleOk.action, "schedule");
+
+const previewHtml = buildArticlePreviewHtml("## Summer safety\n\nKeep dogs hydrated.");
+assert.match(previewHtml, /<h2 id="summer-safety">/);
+assert.match(previewHtml, /<p>Keep dogs hydrated\./);
+assert.equal(estimateReadingMinutes("one two three four"), 1);
+
+const chunks = chunkSpeechText("First sentence. Second sentence. Third sentence.", 20);
+assert.ok(chunks.length >= 2);
+
+const fakeVoices = [
+  { name: "Bad News", lang: "en-US", localService: true },
+  { name: "Samantha", lang: "en-US", localService: true }
+] as Array<{ name: string; lang: string; localService: boolean }>;
+assert.equal(pickBestSpeechVoice(fakeVoices as never)?.name, "Samantha");
 
 console.log("blog-dashboard tests passed");

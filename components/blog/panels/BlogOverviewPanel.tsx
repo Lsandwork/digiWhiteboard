@@ -52,7 +52,7 @@ export function BlogOverviewPanel() {
       </div>
     );
   }
-  if (!overview) return <p className="text-sm text-slate-600">Loading overview…</p>;
+  if (!overview) return <p className="text-sm text-[var(--fitdog-muted,#6b7280)]">Loading overview…</p>;
 
   const cards = [
     { label: "Topics", value: overview.topicCount },
@@ -66,10 +66,10 @@ export function BlogOverviewPanel() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="blog-dash-panel--wide space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Overview</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+        <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Overview</h2>
+        <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
           Human Editorial Score threshold {String(overview.settings.human_score_threshold ?? 90)}. Auto-publish{" "}
           {overview.settings.auto_publish_enabled ? "on" : "off"}. AI images{" "}
           {overview.settings.ai_images_enabled ? "enabled" : "disabled"}. Emergency stop{" "}
@@ -78,25 +78,25 @@ export function BlogOverviewPanel() {
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{card.label}</p>
-            <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">{card.value}</p>
+          <div key={card.label} className="blog-dash-side-card">
+            <p className="text-xs uppercase tracking-wide text-[var(--fitdog-muted,#6b7280)]">{card.label}</p>
+            <p className="mt-1 text-2xl font-semibold text-[var(--fitdog-heading,#121417)]">{card.value}</p>
           </div>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Link href={`${BLOG_APP_PATH}?page=generate`} className="rounded-md bg-emerald-700 px-3 py-2 text-sm text-white">
+        <Link href={`${BLOG_APP_PATH}?page=generate`} className="blog-dash-toolbar-btn blog-dash-toolbar-btn--success">
           Generate article
         </Link>
-        <Link href={`${BLOG_APP_PATH}?page=topics`} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+        <Link href={`${BLOG_APP_PATH}?page=topics`} className="blog-dash-toolbar-btn">
           Topic ideas
         </Link>
-        <Link href={`${BLOG_APP_PATH}?page=setup`} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+        <Link href={`${BLOG_APP_PATH}?page=setup`} className="blog-dash-toolbar-btn">
           Setup wizard
         </Link>
         <button
           type="button"
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="blog-dash-toolbar-btn"
           onClick={() => {
             void (async () => {
               setSeedMessage(null);
@@ -108,34 +108,34 @@ export function BlogOverviewPanel() {
         >
           Seed 5 launch articles to DB
         </button>
-        <Link href="/blog" target="_blank" className="rounded-md border border-slate-300 px-3 py-2 text-sm">
+        <Link href="/blog" target="_blank" className="blog-dash-toolbar-btn">
           Open public blog
         </Link>
       </div>
       {seedMessage ? <p className="text-sm text-emerald-800">{seedMessage}</p> : null}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">Recent articles</h3>
-        <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
+        <h3 className="mb-2 text-sm font-semibold text-[var(--fitdog-heading,#121417)]">Recent articles</h3>
+        <div className="overflow-hidden rounded-[var(--blog-card-radius,14px)] border border-[var(--fitdog-border,#e6e8eb)]">
+          <table className="blog-dash-table min-w-full">
+            <thead>
               <tr>
-                <th className="px-3 py-2">Title</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Human score</th>
-                <th className="px-3 py-2">Topic score</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Human score</th>
+                <th>Topic score</th>
               </tr>
             </thead>
             <tbody>
               {(overview.recent || []).map((row) => (
-                <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
-                  <td className="px-3 py-2">
-                    <Link href={`${BLOG_APP_PATH}?page=editor&id=${row.id}`} className="text-emerald-700 hover:underline">
+                <tr key={row.id}>
+                  <td>
+                    <Link href={`${BLOG_APP_PATH}?page=editor&id=${row.id}`} className="font-medium text-[var(--fitdog-orange,#ff6f26)] hover:underline">
                       {row.title}
                     </Link>
                   </td>
-                  <td className="px-3 py-2">{row.status}</td>
-                  <td className="px-3 py-2">{row.human_editorial_score ?? "—"}</td>
-                  <td className="px-3 py-2">{row.topic_quality_score ?? "—"}</td>
+                  <td>{row.status}</td>
+                  <td>{row.human_editorial_score ?? "—"}</td>
+                  <td>{row.topic_quality_score ?? "—"}</td>
                 </tr>
               ))}
               {!overview.recent?.length ? (

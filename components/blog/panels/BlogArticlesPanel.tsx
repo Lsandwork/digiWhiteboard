@@ -49,41 +49,41 @@ export function BlogArticlesPanel({ title, statuses }: { title: string; statuses
   }, [statuses]);
 
   return (
-    <div className="space-y-4">
+    <div className="blog-dash-panel--wide space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">{title}</h2>
-          <p className="text-sm text-slate-600">Statuses: {statuses}</p>
+          <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">Statuses: {statuses}</p>
         </div>
         {helpStep ? <BlogContextualHelpLink step={helpStep} /> : null}
       </div>
       {error ? <p className="text-sm text-amber-700">{error}</p> : null}
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
+      <div className="overflow-hidden rounded-[var(--blog-card-radius,14px)] border border-[var(--fitdog-border,#e6e8eb)]">
+        <table className="blog-dash-table min-w-full">
+          <thead>
             <tr>
-              <th className="px-3 py-2">Title</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Human</th>
-              <th className="px-3 py-2">Updated</th>
+              <th>Title</th>
+              <th>Status</th>
+              <th>Human</th>
+              <th>Updated</th>
             </tr>
           </thead>
           <tbody>
             {articles.map((article) => (
-              <tr key={article.id} className="border-t border-slate-100 dark:border-slate-800">
-                <td className="px-3 py-2">
-                  <Link href={`${BLOG_APP_PATH}?page=editor&id=${article.id}`} className="text-[var(--fitdog-orange,#ff6f26)] hover:underline">
+              <tr key={article.id}>
+                <td>
+                  <Link href={`${BLOG_APP_PATH}?page=editor&id=${article.id}`} className="font-medium text-[var(--fitdog-orange,#ff6f26)] hover:underline">
                     {article.title}
                   </Link>
                 </td>
-                <td className="px-3 py-2">{article.status}</td>
-                <td className="px-3 py-2">{article.human_editorial_score ?? "—"}</td>
-                <td className="px-3 py-2">{article.updated_at ? new Date(article.updated_at).toLocaleString() : "—"}</td>
+                <td>{article.status}</td>
+                <td>{article.human_editorial_score ?? "—"}</td>
+                <td className="text-[var(--fitdog-muted,#6b7280)]">{article.updated_at ? new Date(article.updated_at).toLocaleString() : "—"}</td>
               </tr>
             ))}
             {!articles.length ? (
               <tr>
-                <td colSpan={4} className="px-3 py-4 text-slate-500">
+                <td colSpan={4} className="py-6 text-[var(--fitdog-muted,#6b7280)]">
                   No articles in this queue.
                 </td>
               </tr>

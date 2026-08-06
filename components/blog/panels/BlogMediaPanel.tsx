@@ -64,18 +64,18 @@ export function BlogMediaPanel({ approvalsOnly }: { approvalsOnly?: boolean }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="blog-dash-panel space-y-5">
       <div>
-        <h2 className="text-xl font-semibold">{approvalsOnly ? "Image Approvals" : "Media Library"}</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">{approvalsOnly ? "Image Approvals" : "Media Library"}</h2>
+        <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
           Prefer Fitdog-owned photography. AI-generated images are off by default and never presented as real Fitdog photos.
         </p>
       </div>
       {!approvalsOnly ? (
-        <form onSubmit={create} className="space-y-2 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-          <input className="w-full rounded border px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950" placeholder="Public URL (approved storage/CDN)" value={publicUrl} onChange={(e) => setPublicUrl(e.target.value)} required />
-          <input className="w-full rounded border px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950" placeholder="Alt text" value={altText} onChange={(e) => setAltText(e.target.value)} />
-          <select className="w-full rounded border px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950" value={sourceClass} onChange={(e) => setSourceClass(e.target.value)}>
+        <form onSubmit={create} className="blog-dash-form-panel">
+          <input className="blog-dash-input" placeholder="Public URL (approved storage/CDN)" value={publicUrl} onChange={(e) => setPublicUrl(e.target.value)} required />
+          <input className="blog-dash-input" placeholder="Alt text" value={altText} onChange={(e) => setAltText(e.target.value)} />
+          <select className="blog-dash-select" value={sourceClass} onChange={(e) => setSourceClass(e.target.value)}>
             <option value="fitdog_owned">Fitdog-owned</option>
             <option value="member_submitted">Member-submitted with consent</option>
             <option value="employee_submitted">Employee-submitted</option>
@@ -83,19 +83,21 @@ export function BlogMediaPanel({ approvalsOnly }: { approvalsOnly?: boolean }) {
             <option value="photographer_licensed">Photographer-licensed</option>
             <option value="partner_provided">Partner-provided</option>
           </select>
-          <textarea className="w-full rounded border px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950" rows={2} placeholder="License / consent notes" value={licenseNotes} onChange={(e) => setLicenseNotes(e.target.value)} />
-          <button type="submit" className="rounded-md bg-emerald-700 px-3 py-2 text-sm text-white">
+          <textarea className="blog-dash-textarea blog-dash-textarea--compact" rows={3} placeholder="License / consent notes" value={licenseNotes} onChange={(e) => setLicenseNotes(e.target.value)} />
+          <button type="submit" className="blog-dash-toolbar-btn blog-dash-toolbar-btn--success w-fit">
             Add media record
           </button>
         </form>
       ) : null}
       {message ? <p className="text-sm text-emerald-800">{message}</p> : null}
-      <ul className="space-y-2">
+      <ul className="space-y-3">
         {media.map((item) => (
-          <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded border border-slate-200 p-3 text-sm dark:border-slate-700">
+          <li key={item.id} className="blog-dash-side-card flex flex-wrap items-center justify-between gap-3 text-sm">
             <div>
-              <p className="font-medium">{item.source_class} · {item.approval_status}</p>
-              <p className="text-slate-600">{item.alt_text || "No alt text"}</p>
+              <p className="font-medium text-[var(--fitdog-heading,#121417)]">
+                {item.source_class} · {item.approval_status}
+              </p>
+              <p className="text-[var(--fitdog-muted,#6b7280)]">{item.alt_text || "No alt text"}</p>
               {item.public_url ? (
                 <a href={item.public_url} className="text-emerald-700 hover:underline" target="_blank" rel="noreferrer">
                   Open image
@@ -104,10 +106,10 @@ export function BlogMediaPanel({ approvalsOnly }: { approvalsOnly?: boolean }) {
             </div>
             {item.approval_status === "pending" ? (
               <div className="flex gap-2">
-                <button type="button" className="rounded bg-emerald-700 px-2 py-1 text-white" onClick={() => void approve(item.id, "approved")}>
+                <button type="button" className="blog-dash-toolbar-btn blog-dash-toolbar-btn--success px-3 py-2" onClick={() => void approve(item.id, "approved")}>
                   Approve
                 </button>
-                <button type="button" className="rounded border px-2 py-1" onClick={() => void approve(item.id, "rejected")}>
+                <button type="button" className="blog-dash-toolbar-btn px-3 py-2" onClick={() => void approve(item.id, "rejected")}>
                   Reject
                 </button>
               </div>

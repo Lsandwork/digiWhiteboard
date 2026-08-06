@@ -35,12 +35,12 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
     }
   }
 
-  if (!settings) return <p className="text-sm text-slate-600">Loading settings…</p>;
+  if (!settings) return <p className="text-sm text-[var(--fitdog-muted,#6b7280)]">Loading settings…</p>;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="blog-dash-panel space-y-5">
       <div>
-        <h2 className="text-xl font-semibold">
+        <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">
           {focus === "brand-voice"
             ? "Brand Voice"
             : focus === "editorial"
@@ -51,60 +51,60 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
                   ? "Automation Rules"
                   : "Settings"}
         </h2>
-        <p className="text-sm text-slate-600">
+        <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
           Defaults protect quality: auto-publish off, AI images off, human score ≥ 90, topic score ≥ 85.
         </p>
       </div>
 
-      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <label className="flex items-center justify-between gap-3 text-sm">
-          <span>Emergency stop (blocks generation & publishing)</span>
+      <div className="blog-dash-form-panel">
+        <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
+          <span className="font-medium">Emergency stop (blocks generation & publishing)</span>
           <input
             type="checkbox"
             checked={Boolean(settings.emergency_off)}
             onChange={(e) => void save({ emergency_off: e.target.checked })}
           />
         </label>
-        <label className="flex items-center justify-between gap-3 text-sm">
-          <span>Automatic publishing</span>
+        <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
+          <span className="font-medium">Automatic publishing</span>
           <input
             type="checkbox"
             checked={Boolean(settings.auto_publish_enabled)}
             onChange={(e) => void save({ auto_publish_enabled: e.target.checked })}
           />
         </label>
-        <label className="flex items-center justify-between gap-3 text-sm">
-          <span>AI-generated images</span>
+        <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
+          <span className="font-medium">AI-generated images</span>
           <input
             type="checkbox"
             checked={Boolean(settings.ai_images_enabled)}
             onChange={(e) => void save({ ai_images_enabled: e.target.checked })}
           />
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block">Human Editorial Score threshold</span>
+        <label className="block">
+          <span className="blog-dash-label">Human Editorial Score threshold</span>
           <input
             type="number"
-            className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
+            className="blog-dash-input"
             value={Number(settings.human_score_threshold || 90)}
             onChange={(e) => setSettings({ ...settings, human_score_threshold: Number(e.target.value) })}
             onBlur={() => void save({ human_score_threshold: Number(settings.human_score_threshold) })}
           />
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block">Topic Quality Score threshold</span>
+        <label className="block">
+          <span className="blog-dash-label">Topic Quality Score threshold</span>
           <input
             type="number"
-            className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
+            className="blog-dash-input"
             value={Number(settings.topic_score_threshold || 85)}
             onChange={(e) => setSettings({ ...settings, topic_score_threshold: Number(e.target.value) })}
             onBlur={() => void save({ topic_score_threshold: Number(settings.topic_score_threshold) })}
           />
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block">Publish provider</span>
+        <label className="block">
+          <span className="blog-dash-label">Publish provider</span>
           <select
-            className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
+            className="blog-dash-select"
             value={String(settings.publish_provider || "native")}
             onChange={(e) => void save({ publish_provider: e.target.value })}
           >
@@ -113,11 +113,11 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
             <option value="webhook">Protected webhook</option>
           </select>
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block">Help overview video URL (optional)</span>
+        <label className="block">
+          <span className="blog-dash-label">Help overview video URL (optional)</span>
           <input
             type="url"
-            className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
+            className="blog-dash-input"
             placeholder="https://…/blog-generator-overview.mp4"
             value={String(
               ((settings.provider_config as Record<string, unknown> | undefined)?.help_tutorial_video_url as string) || ""
@@ -143,27 +143,26 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
               })
             }
           />
-          <span className="mt-1 block text-xs text-slate-500">
-            Powers the “Watch 2-Minute Overview” button on the How to Use guide. Leave blank to show “Tutorial Video Not
-            Configured.” You can also set NEXT_PUBLIC_BLOG_TUTORIAL_VIDEO_URL.
+          <span className="mt-1 block text-xs text-[var(--fitdog-muted,#6b7280)]">
+            Powers the “Watch 2-Minute Overview” button on the How to Use guide. Leave blank to show setup instructions in the modal.
           </span>
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block">Public AI disclosure (optional)</span>
+        <label className="block">
+          <span className="blog-dash-label">Public AI disclosure (optional)</span>
           <textarea
-            className="w-full rounded border px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
-            rows={3}
+            className="blog-dash-textarea blog-dash-textarea--compact"
+            rows={4}
             value={String(settings.public_ai_disclosure || "")}
             onChange={(e) => setSettings({ ...settings, public_ai_disclosure: e.target.value })}
             onBlur={() => void save({ public_ai_disclosure: settings.public_ai_disclosure })}
             placeholder="Shown only when configured by Super Admin"
           />
         </label>
-        <label className="block text-sm">
-          <span className="mb-1 block">Voice sliders (JSON)</span>
+        <label className="block">
+          <span className="blog-dash-label">Voice sliders (JSON)</span>
           <textarea
-            className="w-full rounded border px-3 py-2 font-mono text-xs dark:border-slate-600 dark:bg-slate-950"
-            rows={6}
+            className="blog-dash-textarea blog-dash-textarea--body"
+            rows={8}
             value={JSON.stringify(settings.voice_sliders || {}, null, 2)}
             onChange={(e) => {
               try {
@@ -186,7 +185,7 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
               monthly_cost_limit_cents: settings.monthly_cost_limit_cents
             })
           }
-          className="rounded-md bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-50"
+          className="blog-dash-toolbar-btn blog-dash-toolbar-btn--success w-fit disabled:opacity-50"
         >
           Save cost limits
         </button>

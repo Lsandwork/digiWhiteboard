@@ -78,11 +78,11 @@ export function BlogTopicsPanel() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="blog-dash-panel--wide space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Topic Ideas</h2>
-          <p className="text-sm text-slate-600">Minimum Topic Quality Score: 85. Weak generic topics are rejected.</p>
+          <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Topic Ideas</h2>
+          <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">Minimum Topic Quality Score: 85. Weak generic topics are rejected.</p>
           <div className="mt-2">
             <BlogContextualHelpLink step="topics" label="Learn how to generate topics" />
           </div>
@@ -91,59 +91,59 @@ export function BlogTopicsPanel() {
           type="button"
           disabled={busy}
           onClick={() => void seed()}
-          className="rounded-md bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-50"
+          className="blog-dash-toolbar-btn blog-dash-toolbar-btn--success disabled:opacity-50"
         >
           Seed thoughtful topics
         </button>
       </div>
 
-      <form onSubmit={createTopic} className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
-        <h3 className="text-sm font-semibold">Submit a topic</h3>
+      <form onSubmit={createTopic} className="blog-dash-form-panel">
+        <h3 className="text-base font-semibold text-[var(--fitdog-heading,#121417)]">Submit a topic</h3>
         <input
-          className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+          className="blog-dash-input"
           placeholder="Specific, useful topic title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
         />
         <textarea
-          className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+          className="blog-dash-textarea blog-dash-textarea--compact"
           placeholder="Reader concern"
           value={readerConcern}
           onChange={(e) => setReaderConcern(e.target.value)}
-          rows={2}
+          rows={3}
         />
         <textarea
-          className="w-full rounded border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
+          className="blog-dash-textarea blog-dash-textarea--compact"
           placeholder="Primary takeaway"
           value={primaryTakeaway}
           onChange={(e) => setPrimaryTakeaway(e.target.value)}
-          rows={2}
+          rows={3}
         />
-        <button type="submit" disabled={busy} className="rounded-md bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-50">
+        <button type="submit" disabled={busy} className="blog-dash-toolbar-btn blog-dash-toolbar-btn--primary w-fit disabled:opacity-50">
           Score & save topic
         </button>
       </form>
 
-      {message ? <p className="text-sm text-emerald-800 dark:text-emerald-300">{message}</p> : null}
+      {message ? <p className="text-sm text-emerald-800">{message}</p> : null}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800">
+      <div className="overflow-hidden rounded-[var(--blog-card-radius,14px)] border border-[var(--fitdog-border,#e6e8eb)]">
+        <table className="blog-dash-table min-w-full">
+          <thead>
             <tr>
-              <th className="px-3 py-2">Title</th>
-              <th className="px-3 py-2">Score</th>
-              <th className="px-3 py-2">Status</th>
-              <th className="px-3 py-2">Concern</th>
+              <th>Title</th>
+              <th>Score</th>
+              <th>Status</th>
+              <th>Concern</th>
             </tr>
           </thead>
           <tbody>
             {topics.map((topic) => (
-              <tr key={topic.id} className="border-t border-slate-100 dark:border-slate-800">
-                <td className="px-3 py-2 font-medium">{topic.title}</td>
-                <td className="px-3 py-2">{topic.topic_quality_score ?? "—"}</td>
-                <td className="px-3 py-2">{topic.status}</td>
-                <td className="px-3 py-2 text-slate-600">{topic.reader_concern || topic.rejection_reason || "—"}</td>
+              <tr key={topic.id}>
+                <td className="font-medium text-[var(--fitdog-heading,#121417)]">{topic.title}</td>
+                <td>{topic.topic_quality_score ?? "—"}</td>
+                <td>{topic.status}</td>
+                <td className="text-[var(--fitdog-muted,#6b7280)]">{topic.reader_concern || topic.rejection_reason || "—"}</td>
               </tr>
             ))}
           </tbody>

@@ -12,6 +12,19 @@
   color: var(--fitdog-text);
   font-family: Inter, "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   min-height: 100vh;
+  color-scheme: light;
+}
+
+.blog-help input:not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),
+.blog-help select,
+.blog-help textarea {
+  background: #ffffff !important;
+  color: var(--fitdog-navy) !important;
+  border: 1px solid var(--fitdog-border) !important;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 10px;
 }
 
 .blog-help :focus-visible {

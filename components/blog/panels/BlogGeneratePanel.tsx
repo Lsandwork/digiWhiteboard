@@ -58,11 +58,13 @@ export function BlogGeneratePanel() {
     }
   }
 
+  const selectedTopic = topics.find((t) => t.id === topicId);
+
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="blog-dash-panel space-y-5">
       <div>
         <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Blog Generator</h2>
-        <p className="text-sm text-slate-600">
+        <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
           Runs topic brief → Human-First Writer → empathy, practical, natural-voice, SEO, fact-check, brand, and final human-quality agents.
           Auto-publish stays off.
         </p>
@@ -70,32 +72,36 @@ export function BlogGeneratePanel() {
           <BlogContextualHelpLink step="create" label="Learn how to create articles" />
         </div>
       </div>
-      <label className="block text-sm">
-        <span className="mb-1 block font-medium">Approved / scored topic</span>
-        <select
-          className="w-full rounded border border-slate-300 px-3 py-2 dark:border-slate-600 dark:bg-slate-950"
-          value={topicId}
-          onChange={(e) => setTopicId(e.target.value)}
+
+      <div className="blog-dash-form-panel">
+        <label className="block">
+          <span className="blog-dash-label">Approved / scored topic</span>
+          <select className="blog-dash-select" value={topicId} onChange={(e) => setTopicId(e.target.value)}>
+            {topics.map((topic) => (
+              <option key={topic.id} value={topic.id}>
+                [{topic.topic_quality_score}] {topic.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {selectedTopic?.reader_concern ? (
+          <div className="blog-dash-concern">
+            <strong>Concern:</strong> {selectedTopic.reader_concern}
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          disabled={busy || !topicId}
+          onClick={() => void generate()}
+          className="blog-dash-toolbar-btn blog-dash-toolbar-btn--primary w-fit disabled:opacity-50"
         >
-          {topics.map((topic) => (
-            <option key={topic.id} value={topic.id}>
-              [{topic.topic_quality_score}] {topic.title}
-            </option>
-          ))}
-        </select>
-      </label>
-      {topics.find((t) => t.id === topicId)?.reader_concern ? (
-        <p className="text-sm text-slate-600">Concern: {topics.find((t) => t.id === topicId)?.reader_concern}</p>
-      ) : null}
-      <button
-        type="button"
-        disabled={busy || !topicId}
-        onClick={() => void generate()}
-        className="rounded-md bg-[var(--fitdog-orange,#ff6f26)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-      >
-        {busy ? "Generating…" : "Generate draft"}
-      </button>
-      {message ? <p className="text-sm text-slate-800 dark:text-slate-200">{message}</p> : null}
+          {busy ? "Generating…" : "Generate draft"}
+        </button>
+      </div>
+
+      {message ? <p className="text-sm text-emerald-800">{message}</p> : null}
       {articleId ? (
         <Link href={`${BLOG_APP_PATH}?page=editor&id=${articleId}`} className="inline-block text-sm text-[var(--fitdog-orange,#ff6f26)] hover:underline">
           Open in editor

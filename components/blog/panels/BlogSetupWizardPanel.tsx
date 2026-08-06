@@ -56,10 +56,10 @@ export function BlogSetupWizardPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
+    <div className="blog-dash-panel space-y-5">
       <div>
-        <h2 className="text-xl font-semibold">Setup Wizard</h2>
-        <p className="text-sm text-slate-600">
+        <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Setup Wizard</h2>
+        <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
           Complete these checks before activating draft generation. Do not enable automatic publication until required reviews pass.
         </p>
       </div>
@@ -67,8 +67,10 @@ export function BlogSetupWizardPanel() {
         {STEPS.map((label, index) => (
           <li
             key={label}
-            className={`rounded border px-3 py-2 text-sm ${
-              index === step ? "border-emerald-600 bg-emerald-50 dark:bg-emerald-950/30" : "border-slate-200 dark:border-slate-700"
+            className={`rounded-lg border px-4 py-3 text-sm ${
+              index === step
+                ? "border-emerald-600 bg-emerald-50 text-[var(--fitdog-heading,#121417)]"
+                : "border-[var(--fitdog-border,#e6e8eb)] bg-white text-[var(--fitdog-body,#2f363d)]"
             }`}
           >
             <span className="mr-2 font-semibold">{index + 1}.</span>
@@ -80,7 +82,7 @@ export function BlogSetupWizardPanel() {
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
-          className="rounded-md border px-3 py-2 text-sm"
+          className="blog-dash-toolbar-btn"
           disabled={step <= 0}
           onClick={() => void persist(Math.max(0, step - 1))}
         >
@@ -88,7 +90,7 @@ export function BlogSetupWizardPanel() {
         </button>
         <button
           type="button"
-          className="rounded-md bg-emerald-700 px-3 py-2 text-sm text-white"
+          className="blog-dash-toolbar-btn blog-dash-toolbar-btn--success"
           onClick={() => {
             if (step >= STEPS.length - 1) void persist(step, true);
             else void persist(step + 1);
