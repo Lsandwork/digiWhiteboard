@@ -12,18 +12,25 @@ assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Blog" && item.href === 
 assert.ok(!FITDOG_BLOG_NAV.some((item) => item.href === "#"));
 assert.ok(FITDOG_FOOTER_SERVICES.every((item) => item.href.startsWith("http")));
 assert.ok(FITDOG_PUBLIC_URLS.instagram.includes("instagram.com"));
-assert.equal(FITDOG_PUBLIC_URLS.boarding, "https://www.fitdog.com/cat/caringdog/boarding");
+assert.equal(FITDOG_PUBLIC_URLS.about, "https://www.fitdog.com/about/");
+assert.equal(FITDOG_PUBLIC_URLS.whyFitdog, FITDOG_PUBLIC_URLS.about);
+assert.equal(FITDOG_PUBLIC_URLS.boarding, "https://www.fitdog.com/club-home/boarding/");
 assert.equal(FITDOG_PUBLIC_URLS.daycare, "https://www.fitdog.com/club-home/");
 assert.equal(FITDOG_PUBLIC_URLS.training, "https://www.fitdog.com/dog-training/");
 assert.equal(FITDOG_PUBLIC_URLS.hikes, "https://www.fitdog.com/los-angeles-outings/");
-assert.equal(FITDOG_PUBLIC_URLS.grooming, "https://fitdog.wpenginepowered.com/club-home/grooming/");
-assert.equal(FITDOG_PUBLIC_URLS.transportation, "https://www.fitdog.com/daycare-assessment/");
+assert.equal(FITDOG_PUBLIC_URLS.grooming, "https://www.fitdog.com/club-home/grooming/");
+assert.equal(FITDOG_PUBLIC_URLS.transportation, "https://www.fitdog.com/club-home/");
 assert.equal(FITDOG_PUBLIC_URLS.services, "https://www.fitdog.com/club-home/");
 assert.equal(FITDOG_PUBLIC_URLS.members, "https://fitdog.portal.gingrapp.com/public/login");
 assert.equal(FITDOG_PUBLIC_URLS.book, "https://www.fitdog.com/daycare-assessment/");
+assert.equal(FITDOG_PUBLIC_URLS.contact, "https://www.fitdog.com/contact/");
 assert.ok(!(FITDOG_BLOG_NAV as ReadonlyArray<{ label: string }>).some((item) => item.label === "Locations"));
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Services" && item.href === FITDOG_PUBLIC_URLS.services));
+assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Why Us" && item.href === FITDOG_PUBLIC_URLS.about));
 assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Members" && item.href === FITDOG_PUBLIC_URLS.members));
+assert.ok(FITDOG_BLOG_NAV.some((item) => item.label === "Contact" && item.href === FITDOG_PUBLIC_URLS.contact));
+assert.ok(!FITDOG_BLOG_NAV.some((item) => item.label === "About Us"));
+assert.equal(FITDOG_PUBLIC_URLS.socialHandle, "@fitdogsports");
 assert.equal(
   FITDOG_FOOTER_SERVICES.find((item) => item.label === "Boarding")?.href,
   FITDOG_PUBLIC_URLS.boarding

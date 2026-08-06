@@ -12,10 +12,10 @@ export function FitdogBlogHeader({ active = "Blog" }: { active?: string }) {
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--fitdog-border)] bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
-        <Link href={publicBlogHref()} className="flex items-center gap-2.5" aria-label="Fitdog home blog">
+        <a href={FITDOG_PUBLIC_URLS.home} className="flex items-center gap-2.5" target="_blank" rel="noopener noreferrer" aria-label="Fitdog home">
           <Image src={FITDOG_BLOG_LOGO.mark} alt="Fitdog logo" width={44} height={44} priority className="h-11 w-11" />
           <span className="text-[1.55rem] font-extrabold lowercase tracking-tight text-[var(--fitdog-dark)]">fitdog</span>
-        </Link>
+        </a>
 
         <nav className="hidden items-center gap-6 lg:flex" aria-label="Primary">
           {FITDOG_BLOG_NAV.map((item) => {
