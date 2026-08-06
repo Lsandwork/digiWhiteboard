@@ -50,13 +50,14 @@
     "test:photo-upload-queue": "tsx scripts/test-photo-upload-queue.ts",
     "test:photo-queue-expected-dogs": "tsx scripts/test-photo-queue-expected-dogs.ts",
     "test:board-fast-path": "tsx scripts/test-board-optimistic-transition.ts && tsx scripts/test-board-checkout-merge.ts && tsx scripts/test-basket-cleared-checkout.ts && tsx scripts/test-board-sticky-checkout.ts",
-    "test:all": "npm run test:role-access && npm run test:ruffly && npm run test:commissions-nav && npm run test:write-up-access && npm run test:board-fast-path && npm run test:checkout-prompt && npm run test:checkout-display",
+    "test:all": "npm run test:role-access && npm run test:ruffly && npm run test:commissions-nav && npm run test:write-up-access && npm run test:board-fast-path && npm run test:checkout-prompt && npm run test:checkout-display && npm run test:blog",
     "setup:record": "playwright install chromium",
     "record:role-tour": "tsx scripts/record-role-panel-tour.ts",
     "db:push": "tsx scripts/push-supabase-migration.ts",
     "db:push:query": "tsx scripts/push-supabase-migration-query.ts",
     "db:push:all": "tsx scripts/push-all-supabase-migrations.ts",
-    "compress:social-moments": "tsx scripts/compress-social-moments.ts"
+    "compress:social-moments": "tsx scripts/compress-social-moments.ts",
+    "test:blog": "tsx scripts/test-automatic-blog.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

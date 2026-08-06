@@ -127,7 +127,28 @@ export type PermissionKey =
   | "ruffly.analytics.view"
   | "ruffly.integrations.manage"
   | "ruffly.settings.manage"
-  | "ruffly.audit.view";
+  | "ruffly.audit.view"
+  | "blog.view"
+  | "blog.submit_idea"
+  | "blog.create"
+  | "blog.edit"
+  | "blog.review"
+  | "blog.approve"
+  | "blog.schedule"
+  | "blog.publish"
+  | "blog.archive"
+  | "blog.delete"
+  | "blog.manage_sources"
+  | "blog.manage_knowledge"
+  | "blog.manage_media"
+  | "blog.approve_images"
+  | "blog.manage_brand"
+  | "blog.manage_providers"
+  | "blog.manage_publishing"
+  | "blog.manage_automation"
+  | "blog.view_costs"
+  | "blog.view_analytics"
+  | "blog.view_audit_log";
 
 export type RoleKey =
   | "super_admin"
@@ -322,7 +343,28 @@ const ALL_PERMISSIONS = Object.freeze([
   "ruffly.analytics.view",
   "ruffly.integrations.manage",
   "ruffly.settings.manage",
-  "ruffly.audit.view"
+  "ruffly.audit.view",
+  "blog.view",
+  "blog.submit_idea",
+  "blog.create",
+  "blog.edit",
+  "blog.review",
+  "blog.approve",
+  "blog.schedule",
+  "blog.publish",
+  "blog.archive",
+  "blog.delete",
+  "blog.manage_sources",
+  "blog.manage_knowledge",
+  "blog.manage_media",
+  "blog.approve_images",
+  "blog.manage_brand",
+  "blog.manage_providers",
+  "blog.manage_publishing",
+  "blog.manage_automation",
+  "blog.view_costs",
+  "blog.view_analytics",
+  "blog.view_audit_log"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -335,6 +377,10 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "view_api_access",
   "ruffly.integrations.manage",
   "ruffly.audit.view",
+  "blog.manage_providers",
+  "blog.manage_publishing",
+  "blog.manage_automation",
+  "blog.delete",
   "manage_api_keys",
   "view_gingr_sync_settings",
   "manage_gingr_sync_settings",
@@ -481,7 +527,24 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "ruffly.feedback.resolve",
   "ruffly.campaigns.view",
   "ruffly.analytics.view",
-  "ruffly.ai.manage"
+  "ruffly.ai.manage",
+  "blog.view",
+  "blog.submit_idea",
+  "blog.create",
+  "blog.edit",
+  "blog.review",
+  "blog.approve",
+  "blog.schedule",
+  "blog.publish",
+  "blog.archive",
+  "blog.manage_sources",
+  "blog.manage_knowledge",
+  "blog.manage_media",
+  "blog.approve_images",
+  "blog.manage_brand",
+  "blog.view_costs",
+  "blog.view_analytics",
+  "blog.view_audit_log"
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -505,7 +568,11 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "ruffly.inbox.view",
   "ruffly.inbox.reply",
   "ruffly.contacts.view",
-  "ruffly.leads.view"
+  "ruffly.leads.view",
+  "blog.view",
+  "blog.submit_idea",
+  "blog.review",
+  "blog.manage_knowledge"
 ];
 
 /** Groomer DigiBoard panel — grooming push, front desk log, video links, notifications, complaints/requests, profile. */
@@ -525,7 +592,11 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "ruffly.view",
   "ruffly.inbox.view",
   "ruffly.inbox.reply",
-  "ruffly.leads.view"
+  "ruffly.leads.view",
+  "blog.view",
+  "blog.submit_idea",
+  "blog.review",
+  "blog.manage_knowledge"
 ];
 
 /** Read-only staff roles (viewer / overnight / maintenance / generic staff). */
@@ -558,7 +629,21 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "ruffly.social.manage",
   "ruffly.analytics.view",
   "ruffly.webchat.manage",
-  "ruffly.contacts.view"
+  "ruffly.contacts.view",
+  "blog.view",
+  "blog.submit_idea",
+  "blog.create",
+  "blog.edit",
+  "blog.review",
+  "blog.approve",
+  "blog.schedule",
+  "blog.publish",
+  "blog.archive",
+  "blog.manage_sources",
+  "blog.manage_media",
+  "blog.approve_images",
+  "blog.manage_brand",
+  "blog.view_analytics"
 ];
 
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */

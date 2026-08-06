@@ -9,8 +9,8 @@ export type NavLeaf = {
 
 export type NavRouteLeaf = {
   type: "route";
-  id: "gingr" | "ruffly";
-  href: "/gingr" | "/ruffly";
+  id: "gingr" | "ruffly" | "automatic-blog";
+  href: "/gingr" | "/ruffly" | "/admin/automatic-blog";
   label: string;
 };
 
@@ -44,13 +44,23 @@ export const RUFFLY_NAV_ROUTE: NavRouteLeaf = {
   label: "Ruffly"
 };
 
+export const AUTOMATIC_BLOG_NAV_ROUTE: NavRouteLeaf = {
+  type: "route",
+  id: "automatic-blog",
+  href: "/admin/automatic-blog",
+  label: "Automatic Blog"
+};
+
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
-  options?: { includeRuffly?: boolean }
+  options?: { includeRuffly?: boolean; includeBlog?: boolean }
 ): NavEntry[] {
   const globalSection: NavEntry[] = [section("global_apps", "Applications"), GINGR_NAV_ROUTE];
   if (options?.includeRuffly !== false) {
     globalSection.push(RUFFLY_NAV_ROUTE);
+  }
+  if (options?.includeBlog !== false) {
+    globalSection.push(AUTOMATIC_BLOG_NAV_ROUTE);
   }
   const helpIndex = entries.findIndex((entry) => entry.type === "section" && entry.id === "help");
   if (helpIndex >= 0) {
@@ -577,6 +587,18 @@ function roleCanSeeRufflyNav(role?: string | null) {
   );
 }
 
+function roleCanSeeBlogNav(role?: string | null) {
+  if (!role) return false;
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "marketing" ||
+    role === "trainer" ||
+    role === "groomer"
+  );
+}
+
 /** Pick the staff-panel sidebar layout for the signed-in role. */
 export function buildStaffPanelNav(
   visibleTabs: AdminTab[],
@@ -588,7 +610,10 @@ export function buildStaffPanelNav(
   else if (role === "team_leader") entries = buildTeamLeadNav(visibleTabs);
   else if (role === "groomer") entries = buildGroomerNav(visibleTabs);
   else entries = buildAdminNav(visibleTabs, board);
-  return appendAuthenticatedGlobalRoutes(entries, { includeRuffly: roleCanSeeRufflyNav(role) });
+  return appendAuthenticatedGlobalRoutes(entries, {
+    includeRuffly: roleCanSeeRufflyNav(role),
+    includeBlog: roleCanSeeBlogNav(role)
+  });
 }
 
 export function getTabLabel(tab: AdminTab) {

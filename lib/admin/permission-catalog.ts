@@ -245,6 +245,33 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("ruffly.settings.manage", "Manage Ruffly Settings", "Configure Ruffly setup and channel activation."),
       p("ruffly.audit.view", "View Ruffly Audit Log", "View Ruffly audit history (Super Admin).")
     ]
+  },
+  {
+    key: "automatic_blog",
+    label: "Automatic Blog",
+    permissions: [
+      p("blog.view", "View Automatic Blog", "Open the Automatic Blog workspace."),
+      p("blog.submit_idea", "Submit Blog Ideas", "Submit topic ideas for review."),
+      p("blog.create", "Create Blog Content", "Create topics, briefs, and drafts."),
+      p("blog.edit", "Edit Blog Content", "Edit drafts and metadata."),
+      p("blog.review", "Review Blog Content", "Run and review editorial checks."),
+      p("blog.approve", "Approve Blog Articles", "Approve articles for scheduling."),
+      p("blog.schedule", "Schedule Blog Articles", "Schedule approved articles."),
+      p("blog.publish", "Publish Blog Articles", "Publish approved articles."),
+      p("blog.archive", "Archive Blog Articles", "Archive blog content."),
+      p("blog.delete", "Delete Blog Content", "Delete blog records (protected)."),
+      p("blog.manage_sources", "Manage Blog Sources", "Manage research sources."),
+      p("blog.manage_knowledge", "Manage Blog Knowledge", "Manage Fitdog knowledge entries."),
+      p("blog.manage_media", "Manage Blog Media", "Upload and organize media."),
+      p("blog.approve_images", "Approve Blog Images", "Approve images for publication."),
+      p("blog.manage_brand", "Manage Blog Brand Voice", "Edit Fitdog brand voice settings."),
+      p("blog.manage_providers", "Manage Blog AI Providers", "Configure AI providers (Super Admin)."),
+      p("blog.manage_publishing", "Manage Blog Publishing", "Configure publishing destinations."),
+      p("blog.manage_automation", "Manage Blog Automation", "Configure automation rules."),
+      p("blog.view_costs", "View Blog Costs", "View AI usage and costs."),
+      p("blog.view_analytics", "View Blog Analytics", "View verified blog analytics."),
+      p("blog.view_audit_log", "View Blog Audit Log", "View Automatic Blog audit history.")
+    ]
   }
 ];
 

@@ -223,6 +223,7 @@ function SidebarNavRouteItem({
 }) {
   const isGingr = href === "/gingr";
   const isRuffly = href === "/ruffly";
+  const isBlog = href === "/admin/automatic-blog";
   const icon = isRuffly ? RUFFLY_NAV_ICON : GINGR_NAV_ICON;
   return (
     <Link
@@ -234,7 +235,16 @@ function SidebarNavRouteItem({
         onNavigate();
       }}
     >
-      <Image src={icon} alt="" width={18} height={18} className="admin-nav-item__icon shrink-0 rounded-sm" />
+      {isBlog ? (
+        <span
+          className="admin-nav-item__icon inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-sm bg-emerald-700 text-[10px] font-semibold text-white"
+          aria-hidden
+        >
+          B
+        </span>
+      ) : (
+        <Image src={icon} alt="" width={18} height={18} className="admin-nav-item__icon shrink-0 rounded-sm" />
+      )}
       <span>{label}</span>
     </Link>
   );
