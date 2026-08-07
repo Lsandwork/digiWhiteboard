@@ -509,7 +509,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
       "team_lead_operations",
       "Front Desk & Floor",
       compactEntries([
-        group("front_desk", "Operations", ["crossover_communication"], visible),
+        group("front_desk", "Operations", ["crossover_communication", "owner_follow_up", "active_issues"], visible),
         ...singles(["bulk_photo_upload"], visible)
       ])
     )

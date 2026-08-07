@@ -78,7 +78,13 @@ export function canManagePushNotices(role?: string | null) {
 }
 
 export function canManageStaffOperations(role?: string | null) {
-  return role === "owner_admin" || role === "manager_admin" || hasCoordinatorAccess(role);
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "management" ||
+    hasCoordinatorAccess(role)
+  );
 }
 
 export function canManageWhiteboardAdmin(role?: string | null) {

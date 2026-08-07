@@ -45,6 +45,8 @@ const teamLeadTabs: AdminTab[] = [
   "yard_push_notices",
   "grooming_push",
   "crossover_communication",
+  "owner_follow_up",
+  "active_issues",
   "bulk_photo_upload",
   "management_support",
   "notifications",
@@ -59,6 +61,12 @@ assert.equal(
   "Front Desk & Floor",
   "team leads must see Bulk Photo Upload in nav"
 );
+assert.equal(
+  findNavSectionForTab(teamLeadNav, "owner_follow_up"),
+  "Front Desk & Floor",
+  "team leads must see Owner Follow Up in Front Desk & Floor"
+);
+assert.equal(findNavGroupForTab(teamLeadNav, "owner_follow_up"), "front_desk");
 
 const coordinatorTabs: AdminTab[] = [
   "push_notices",

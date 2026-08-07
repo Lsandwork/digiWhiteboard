@@ -475,6 +475,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "assign_front_desk_log",
   "resolve_front_desk_log",
   "view_owner_follow_up",
+  "create_owner_follow_up",
+  "edit_owner_follow_up",
   "assign_owner_follow_up",
   "resolve_owner_follow_up",
   "view_active_issues",
@@ -648,6 +650,16 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_front_desk_log",
   "create_front_desk_log",
   "edit_front_desk_log",
+  "view_owner_follow_up",
+  "create_owner_follow_up",
+  "edit_owner_follow_up",
+  "assign_owner_follow_up",
+  "resolve_owner_follow_up",
+  "view_active_issues",
+  "create_active_issue",
+  "edit_active_issue",
+  "assign_active_issue",
+  "resolve_active_issue",
   "submit_write_up",
   "submit_groomer_complaint",
   "view_own_groomer_submissions",
@@ -697,6 +709,8 @@ export const TEAM_LEADER_TABS = [
   "push_notices",
   "yard_push_notices",
   "grooming_push",
+  "owner_follow_up",
+  "active_issues",
   "whiteboard_preview",
   "bulk_photo_upload",
   "yard_links",
@@ -784,6 +798,7 @@ export function legacyRoleToRoleKey(role?: string | null): RoleKey {
     case "manager_admin":
       return "admin";
     case "assistant_manager":
+    case "management":
       return "management";
     case "daycare":
     case "dog_handler":
@@ -1291,6 +1306,36 @@ export function canAccessAdminTab(
     return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
   }
 
+  // Same staff-board gate as Route Generator for walks / checklist / Fitdog alerts.
+  if (tab === "walks_board") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isMarketingLegacyRole(legacyRole)) return false;
+    return true;
+  }
+
+  if (tab === "checklist") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isAdminOrManagementLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole)) return true;
+    return isDogHandlerLegacyRole(legacyRole);
+  }
+
+  if (tab === "fitdog_alerts") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "view_fitdog_alerts")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator"
+    );
+  }
+
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
     return true;
   }
@@ -1309,36 +1354,6 @@ export function canAccessAdminTab(
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     if (!canAccessAdminBoard("marketing", effective, legacyRole)) return false;
     return (MARKETING_BOARD_TABS as readonly string[]).includes(tab);
-  }
-
-  // Walks Board is available to floor staff on the staff board (not marketing accounts).
-  if (tab === "walks_board") {
-    if (board !== "staff") return false;
-    if (isMarketingLegacyRole(legacyRole)) return false;
-    return true;
-  }
-
-  // Operations checklist is for floor handlers (+ leads/management/admins via early return).
-  if (tab === "checklist") {
-    if (board !== "staff") return false;
-    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
-    if (isAdminOrManagementLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole)) return true;
-    return isDogHandlerLegacyRole(legacyRole);
-  }
-
-  // Fitdog payment alerts: allowlisted roles or explicit permission.
-  if (tab === "fitdog_alerts") {
-    if (board !== "staff") return false;
-    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-    if (hasPermission(effective, "view_fitdog_alerts")) return true;
-    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
-    const roleKey = legacyRoleToRoleKey(legacyRole);
-    return (
-      roleKey === "super_admin" ||
-      roleKey === "admin" ||
-      roleKey === "management" ||
-      roleKey === "front_desk_coordinator"
-    );
   }
 
   const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
