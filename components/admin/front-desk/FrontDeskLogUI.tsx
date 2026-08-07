@@ -586,6 +586,11 @@ export function ActiveShiftLogCard({
                   <td className="crossover-table__subject">
                     <p className="crossover-table__subject-title">{item.subject}</p>
                     <p className="crossover-table__subject-preview">{htmlToPlainText(shiftLogDetails(item))}</p>
+                    {item.resolution_notes?.trim() ? (
+                      <p className="crossover-table__subject-preview mt-1 text-emerald-300">
+                        Resolution: {htmlToPlainText(item.resolution_notes)}
+                      </p>
+                    ) : null}
                     <ShiftLogTypeBadge logType={type} />
                   </td>
                   <td>
@@ -659,6 +664,11 @@ export function ActiveShiftLogCard({
             </div>
             <p className="crossover-mobile-card__meta">{shiftLogSubmittedByLabel(item, directory)} • {formatDateTime(item.created_at)} • Assigned {shiftLogAssignedTo(item)}</p>
             <p className="crossover-mobile-card__preview">{htmlToPlainText(shiftLogDetails(item))}</p>
+            {item.resolution_notes?.trim() ? (
+              <p className="crossover-mobile-card__preview text-emerald-300">
+                Resolution: {htmlToPlainText(item.resolution_notes)}
+              </p>
+            ) : null}
             <div className="crossover-mobile-card__footer">
               <ShiftLogStatusBadge status={item.status} />
               {renderRowMenu(item)}

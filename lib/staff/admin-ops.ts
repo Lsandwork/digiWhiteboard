@@ -86,6 +86,8 @@ export type CrossoverMessage = {
   updated_at: string;
   resolved_at: string | null;
   archived_at?: string | null;
+  /** Visible to every staff role that can open Front Desk / Archived Log. */
+  resolution_notes?: string | null;
 };
 
 export type CrossoverReply = {
@@ -109,6 +111,8 @@ export type OwnerFollowUp = {
   due_date: string | null;
   status: StaffOpsStatus;
   follow_up_notes: string | null;
+  /** Visible to every staff role that can open Owner Follow Up. */
+  resolution_notes?: string | null;
   source: string;
   source_id: string | null;
   urgent: boolean;
@@ -784,7 +788,8 @@ export async function createCrossoverMessage(
     created_at: now,
     updated_at: now,
     resolved_at: null,
-    archived_at: null
+    archived_at: null,
+    resolution_notes: null
   };
   let state = await loadState(supabase);
   state = createActivityLog({ ...state, crossover_messages: sortNewest([record, ...state.crossover_messages]) }, {
@@ -881,6 +886,7 @@ function appendOwnerFollowUpFromLogState(state: StaffOpsState, record: Crossover
     due_date: record.due_at ?? null,
     status: "Open",
     follow_up_notes: shiftLogDetails(record),
+    resolution_notes: null,
     source: "Front Desk Log",
     source_id: record.id,
     urgent: record.urgent,
@@ -1000,7 +1006,9 @@ function applyCrossoverMessagePatch(
             : status === "Archived"
               ? item.resolved_at
               : null,
-        archived_at: status === "Archived" ? item.archived_at ?? now : item.archived_at ?? null
+        archived_at: status === "Archived" ? item.archived_at ?? now : item.archived_at ?? null,
+        resolution_notes:
+          patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes ?? null
       };
       return updated;
     })
@@ -1220,6 +1228,7 @@ export async function createOwnerFollowUp(supabase: SupabaseClient, input: Recor
     due_date: normalizeDate(input.due_date),
     status: "Open",
     follow_up_notes: optionalString(input.follow_up_notes),
+    resolution_notes: optionalString(input.resolution_notes),
     source: cleanString(input.source, "Manual") || "Manual",
     source_id: optionalString(input.source_id),
     urgent: Boolean(input.urgent),
@@ -1274,6 +1283,8 @@ export async function updateOwnerFollowUp(supabase: SupabaseClient, id: string, 
         due_date: patch.due_date !== undefined ? normalizeDate(patch.due_date) : item.due_date,
         status,
         follow_up_notes: patch.follow_up_notes !== undefined ? optionalString(patch.follow_up_notes) : item.follow_up_notes,
+        resolution_notes:
+          patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes ?? null,
         source: patch.source !== undefined ? cleanString(patch.source, "Manual") : item.source,
         urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
         updated_at: now,

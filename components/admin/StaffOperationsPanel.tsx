@@ -990,6 +990,11 @@ function DesktopFollowUpTable({ rows, busy, onMutate, onDetail, sortKey, sortDir
               <td className="crossover-table__subject">
                 <p className="crossover-table__subject-title">{item.subject}</p>
                 <p className="crossover-table__muted">{item.owner_name}</p>
+                {item.resolution_notes?.trim() ? (
+                  <p className="crossover-table__subject-preview mt-1 text-emerald-300">
+                    Resolution: {htmlToPlainText(item.resolution_notes)}
+                  </p>
+                ) : null}
               </td>
               <td>{item.dog_name ?? "N/A"}</td>
               <td className="crossover-table__meta">{item.logged_by ?? "Front Desk"}</td>
@@ -1025,6 +1030,9 @@ function FollowUpCard({ item, busy, onMutate, onDetail }: { item: OwnerFollowUp;
       <p className="crossover-table__subject-title">{item.subject}</p>
       <p className="mt-1 text-sm text-admin-muted">Owner: {item.owner_name} • Dog: {item.dog_name ?? "N/A"}</p>
       <p className="mt-1 text-sm text-white">Assigned To: {item.assigned_to}</p>
+      {item.resolution_notes?.trim() ? (
+        <p className="mt-2 text-sm text-emerald-300">Resolution: {htmlToPlainText(item.resolution_notes)}</p>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2"><Badge type="priority" value={item.priority} urgent={item.urgent} /><Badge type="status" value={item.status} /></div>
       <OpsRowActions
         className="mt-4"
@@ -1120,6 +1128,11 @@ function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, 
               <td className="crossover-table__subject">
                 <p className="crossover-table__subject-title">{item.title}</p>
                 <p className="crossover-table__subject-preview">{htmlToPlainText(item.notes ?? "")}</p>
+                {item.resolution_notes?.trim() ? (
+                  <p className="crossover-table__subject-preview mt-1 text-emerald-300">
+                    Resolution: {htmlToPlainText(item.resolution_notes)}
+                  </p>
+                ) : null}
               </td>
               <td>{item.category}</td>
               <td>{item.source}</td>
@@ -1156,6 +1169,9 @@ function IssueCard({ item, busy, onMutate, onDetail }: { item: ActiveIssue; busy
       <p className="crossover-table__subject-title">{item.title}</p>
       <p className="mt-1 text-sm text-admin-muted">{item.category} • {item.source}</p>
       <p className="mt-1 text-sm text-white">Assigned To: {item.assigned_to ?? "Unassigned"}</p>
+      {item.resolution_notes?.trim() ? (
+        <p className="mt-2 text-sm text-emerald-300">Resolution: {htmlToPlainText(item.resolution_notes)}</p>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2"><Badge type="priority" value={item.priority} /><Badge type="status" value={item.status} /></div>
       <OpsRowActions
         className="mt-4"
@@ -1284,10 +1300,13 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setReply("");
-      setResolution("");
+      const current = detail ? resolveDetailItem(data, detail) ?? detail.item : null;
+      const existing =
+        current && "resolution_notes" in current ? String(current.resolution_notes ?? "").trim() : "";
+      setResolution(existing);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [detail?.item.id]);
+  }, [data, detail]);
   if (!detail) return null;
   const item = resolveDetailItem(data, detail) ?? detail.item;
   const title = "subject" in item ? item.subject : item.title;
@@ -1297,6 +1316,8 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
       : "follow_up_notes" in item
         ? item.follow_up_notes
         : item.notes;
+  const existingResolutionNotes =
+    "resolution_notes" in item ? String(item.resolution_notes ?? "").trim() : "";
   const replies = detail.type === "crossover" ? (data?.crossover_message_replies ?? []).filter((entry) => entry.crossover_message_id === item.id) : [];
   const resolveStatus =
     detail.type === "crossover" ? resolveStatusForShiftLog(item as CrossoverMessage) : ("Resolved" as const);
@@ -1344,7 +1365,12 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             onClick={() =>
               void saveAndClose(
                 resolveStatus === "Check Out" ? "Unable to check out." : "Unable to resolve.",
-                { action: updateAction, id: item.id, status: resolveStatus, resolution_notes: resolution },
+                {
+                  action: updateAction,
+                  id: item.id,
+                  status: resolveStatus,
+                  resolution_notes: resolution.trim() || existingResolutionNotes || null
+                },
                 resolveStatus === "Check Out" ? "Assessment marked Check Out." : "Record resolved."
               )
             }
@@ -1378,6 +1404,14 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             <RichText value={description} empty="No notes provided." />
           </div>
         </div>
+        {existingResolutionNotes ? (
+          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-300">Resolution notes</h4>
+            <div className="text-sm text-white">
+              <RichText value={existingResolutionNotes} empty="No resolution notes." />
+            </div>
+          </div>
+        ) : null}
         {"assigned_to" in item ? (
           <SelectField
             label="Assign / Reassign"
@@ -1428,11 +1462,29 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             </button>
           </div>
         ) : null}
-        {detail.type === "issues" ? (
-          <Field label="Resolution notes">
-            <textarea className="admin-input min-h-[80px]" value={resolution} onChange={(event) => setResolution(event.target.value)} />
-          </Field>
-        ) : null}
+        <Field label="Resolution notes">
+          <textarea
+            className="admin-input min-h-[80px]"
+            placeholder="Visible to everyone with Front Desk Log / Follow Up / Active Issues access."
+            value={resolution}
+            onChange={(event) => setResolution(event.target.value)}
+          />
+          <p className="text-xs text-admin-muted">Saved when you Resolve. Shown to all staff who can open this log.</p>
+        </Field>
+        <button
+          className="admin-btn-secondary justify-self-start"
+          type="button"
+          disabled={busy || resolution.trim() === existingResolutionNotes}
+          onClick={() =>
+            void saveAndClose(
+              "Unable to save resolution notes.",
+              { action: updateAction, id: item.id, resolution_notes: resolution.trim() || null },
+              "Resolution notes saved."
+            )
+          }
+        >
+          Save resolution notes
+        </button>
       </div>
     </Modal>
   );
