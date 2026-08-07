@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       dogBodyLanguage: [],
       staffHandlingNotes: [],
       recommendedNextSteps: ["Notify a team lead or manager if dogs or staff may be at risk.", "Document what the clip shows."],
-      documentationSuggestion: "Write a short Front Desk Log note with time, dogs, and what is visible.",
+      documentationSuggestion: "Write a short Team Log note with time, dogs, and what is visible.",
       suggestedLogText: "",
       actionIntent: toneHint === "safety" ? "front_desk_log" : "file_complaint",
       secondaryActionIntent: "complaints_filed",

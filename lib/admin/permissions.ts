@@ -556,7 +556,7 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "ruffly.leads.view"
 ];
 
-/** Groomer DigiBoard panel — grooming push, front desk log, video links, notifications, complaints/requests, profile. */
+/** Groomer DigiBoard panel — grooming push, team log, video links, notifications, complaints/requests, profile. */
 const GROOMER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
@@ -585,7 +585,7 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_VIDEO_AI_PERMISSIONS
 ];
 
-/** Lobby marketing panel — lobby content plus Front Desk Log landing access. */
+/** Lobby marketing panel — lobby content plus Team Log landing access. */
 const MARKETING_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "manage_lobby_board",
@@ -638,7 +638,7 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_NOTIFICATION_PERMISSIONS
 ];
 
-/** Team Lead DigiBoard panel — push, grooming, front desk log, video links, notifications, write-ups, profile. */
+/** Team Lead DigiBoard panel — push, grooming, team log, video links, notifications, write-ups, profile. */
 const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
@@ -1001,7 +1001,7 @@ export function effectiveAccessLabel(access: UserAccess | null | undefined, lega
 export const PERMISSION_PREVIEW_LABELS: Partial<Record<PermissionKey, string>> = {
   manage_push_notices: "Push Notices",
   manage_cast_videos: "Cast Videos",
-  view_front_desk_log: "Front Desk Log",
+  view_front_desk_log: "Team Log",
   view_owner_follow_up: "Owner Follow Up",
   view_active_issues: "Active Issues",
   push_grooming_request: "Grooming Requests",
@@ -1502,13 +1502,13 @@ export function canAccessFrontDeskLogForRole(role?: string | null) {
   return hasPermission(access, "view_front_desk_log");
 }
 
-/** Submit new Front Desk log entries when the role has create access. */
+/** Submit new Team Log entries when the role has create access. */
 export function canCreateFrontDeskLogForRole(role?: string | null) {
   const access = accessFromLegacyRole(null, null, role);
   return hasPermission(access, "create_front_desk_log");
 }
 
-/** Edit / reply / move Front Desk log entries when the role has edit access. */
+/** Edit / reply / move Team Log entries when the role has edit access. */
 export function canEditFrontDeskLogForRole(role?: string | null) {
   const access = accessFromLegacyRole(null, null, role);
   return hasPermission(access, "edit_front_desk_log");
@@ -1535,7 +1535,7 @@ export function firstAccessibleAdminTab(
       ? "lobby"
       : board;
 
-  // Every staff-board session lands on Front Desk Log whenever the role can open it.
+  // Every staff-board session lands on Team Log whenever the role can open it.
   if (
     resolvedBoard === "staff" &&
     canAccessAdminTab(access, "crossover_communication", legacyRole, "staff", options)

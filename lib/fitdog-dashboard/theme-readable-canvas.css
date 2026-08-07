@@ -411,7 +411,7 @@ html[data-theme="clear"] {
 }
 
 /*
- * Front Desk Log / crossover mobile cards & chips.
+ * Team Log / crossover mobile cards & chips.
  * Dark-theme badge colors (pale yellow/white) are unreadable on light cards.
  */
 html[data-theme="light"] .admin-theme .crossover-dashboard,

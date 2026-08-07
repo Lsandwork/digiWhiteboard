@@ -37,7 +37,7 @@ type ActionConfig = {
 
 export const FITDOG_ACTION_LINKS: Record<Exclude<FitdogActionIntent, "none">, ActionConfig> = {
   front_desk_log: {
-    label: "Open Front Desk Log",
+    label: "Open Team Log",
     href: `${STAFF}&tab=crossover_communication`,
     permissions: ["view_front_desk_log", "create_front_desk_log"]
   },

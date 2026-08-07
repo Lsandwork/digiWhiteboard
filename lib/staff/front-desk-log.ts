@@ -257,7 +257,7 @@ export function isLoggedToday(value: string | null | undefined) {
   return isDueToday(value);
 }
 
-/** Super Admin / Admin (and RBAC equivalents) see past + current-day Front Desk Log history. */
+/** Super Admin / Admin (and RBAC equivalents) see past + current-day Team Log history. */
 export function canViewFullFrontDeskLogHistory(role?: string | null) {
   return (
     role === "owner_admin" ||
@@ -272,7 +272,7 @@ function normalizeActorKey(value?: string | null) {
   return value?.trim().toLowerCase() ?? "";
 }
 
-/** Super Admin, Admin, and Management may delete any Front Desk Log entry. */
+/** Super Admin, Admin, and Management may delete any Team Log entry. */
 export function canDeleteAnyFrontDeskLog(role?: string | null) {
   return (
     role === "owner_admin" ||

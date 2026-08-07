@@ -40,7 +40,7 @@ type NotificationResponseModalProps = {
 function sourceTabLabel(tab: string | null | undefined): string {
   switch (tab) {
     case "crossover_communication":
-      return "Front Desk Log";
+      return "Team Log";
     case "owner_follow_up":
       return "Owner Follow-Up";
     case "active_issues":

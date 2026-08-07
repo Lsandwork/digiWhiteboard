@@ -18,7 +18,7 @@ const QUICK_PROMPTS = [
   { label: "Scan Video", mode: "video" as const },
   { label: "Push team notice", message: "I need to push a notice to the team on the whiteboard." },
   { label: "Help me document this", message: "Help me document this clearly for Fitdog." },
-  { label: "Where should this go?", message: "Where should this go in Fitdog — Front Desk Log, complaint, or request?" },
+  { label: "Where should this go?", message: "Where should this go in Fitdog — Team Log, complaint, or request?" },
   { label: "I'm frustrated", message: "I'm frustrated and need help figuring out the right next step." },
   { label: "Grooming push", message: "I need a dog put in catch for grooming." }
 ];

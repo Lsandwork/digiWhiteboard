@@ -110,7 +110,7 @@ export function canAccessFrontDeskLog(role?: string | null) {
   return canAccessFrontDeskLogForRole(role);
 }
 
-/** Submit new Front Desk log entries — roles with create_front_desk_log. */
+/** Submit new Team Log entries — roles with create_front_desk_log. */
 export function canCreateFrontDeskLog(role?: string | null) {
   return canCreateFrontDeskLogForRole(role);
 }

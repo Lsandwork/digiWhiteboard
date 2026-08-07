@@ -27,7 +27,7 @@ type QuickLinkItem = {
 const QUICK_LINKS: QuickLinkItem[] = [
   { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer", "marketing"] },
   { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer", "handler"] },
-  { href: "/admin?board=staff&tab=crossover_communication", label: "Front Desk Log / Crossover Log", roles: ["admin", "staff_ops", "handler"] },
+  { href: "/admin?board=staff&tab=crossover_communication", label: "Team Log / Crossover Log", roles: ["admin", "staff_ops", "handler"] },
   { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=walks_board", label: "Walks Board", roles: ["admin", "staff_ops", "handler"] },
   { href: "/admin?board=staff&tab=staff_directory", label: "Staff Directory", roles: ["admin", "staff_ops"] },

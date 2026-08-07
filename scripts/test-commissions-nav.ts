@@ -145,7 +145,7 @@ assert.equal(
       (entry.type === "group" && entry.children.some((child) => child.tab === "trainer_entry"))
   ),
   false,
-  "trainer nav should not include Trainer's Entry; use Front Desk Log"
+  "trainer nav should not include Trainer's Entry; use Team Log"
 );
 assert.equal(findNavSectionForTab(trainerNav, "package_commissions"), "Commissions");
 assert.equal(findNavGroupForTab(trainerNav, "package_commissions"), "commissions");

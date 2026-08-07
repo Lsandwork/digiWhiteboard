@@ -126,7 +126,7 @@ async function resolveReliableParsed(params: {
   return normalizeChatJson(
     {
       reply:
-        "I couldn't finish that answer cleanly. Ask me again in a second, or open the Fitdog page you need — Front Desk Log for shift notes, Package & Class Commissions for earnings, or Management Support for complaints.",
+        "I couldn't finish that answer cleanly. Ask me again in a second, or open the Fitdog page you need — Team Log for shift notes, Package & Class Commissions for earnings, or Management Support for complaints.",
       actionIntent: "front_desk_log",
       secondaryActionIntent: "package_commissions",
       tone: "normal",
@@ -253,7 +253,7 @@ export async function POST(request: Request) {
       {
         error: fitdogAiUserFacingError(error),
         reply:
-          "I hit a snag answering that. Try one more time — or open Front Desk Log / Package & Class Commissions / Management Support while it's fresh.",
+          "I hit a snag answering that. Try one more time — or open Team Log / Package & Class Commissions / Management Support while it's fresh.",
         actionLinks: context ? fallbackActionLinks(context.access, "normal") : [],
         tone: "normal"
       },

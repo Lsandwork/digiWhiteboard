@@ -389,10 +389,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: "front-desk-log",
-    title: "How does the Front Desk Log (Crossover Log) work?",
+    title: "How does the Team Log (Crossover Log) work?",
     summary: "Track today’s handoffs in Crossover Log, keep closed history in Archived Log, and check out assessment dogs correctly.",
     category: "Staff Board",
     keywords: [
+      "team log",
       "front desk log",
       "crossover log",
       "archived log",
@@ -403,7 +404,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "delete"
     ],
     steps: [
-      "Open Staff Digital Whiteboard → Front Desk Log.",
+      "Open Staff Digital Whiteboard → Team Log.",
       "Crossover Log shows current-day activity so every role can hand off the shift.",
       "Open Log shows unresolved items that still need follow-up.",
       "Archived Log shows prior-day resolved, completed, Check Out, and archived entries (including past imported notes).",
@@ -412,7 +413,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Delete is only available for entries you created. Super Admin, Admin, and Management can delete any entry."
     ],
     tips: [
-      "Front Desk Log is an internal Digi-Board tool. It does not change Lobby or Staff whiteboard Gingr sync.",
+      "Team Log is an internal Digi-Board tool. It does not change Lobby or Staff whiteboard Gingr sync.",
       "Use filters (log type, status, assigned to, urgent) to find items quickly during crossover."
     ],
     adminTab: "crossover_communication",
@@ -421,14 +422,14 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "staff-ops-pages",
     title: "How do Owner Follow Up and Active Issues work?",
-    summary: "Track client follow-ups and urgent operational issues alongside the Front Desk Log.",
+    summary: "Track client follow-ups and urgent operational issues alongside the Team Log.",
     category: "Staff Board",
-    keywords: ["owner follow up", "active issues", "urgent", "staff admin", "handoff", "front desk log"],
+    keywords: ["owner follow up", "active issues", "urgent", "staff admin", "handoff", "team log"],
     steps: [
-      "Use Front Desk Log (Crossover Log) for daily shift notes and assessment Check Outs — see the Front Desk Log help article.",
+      "Use Team Log (Crossover Log) for daily shift notes and assessment Check Outs — see the Team Log help article.",
       "Open Owner Follow Up to assign client follow-up tasks with due dates and statuses.",
-      "Open Active Issues to manage urgent or critical items linked from Front Desk Log and Owner Follow Up.",
-      "High, Critical, or urgent Front Desk Log and Owner Follow Up records can create an Active Issue.",
+      "Open Active Issues to manage urgent or critical items linked from Team Log and Owner Follow Up.",
+      "High, Critical, or urgent Team Log and Owner Follow Up records can create an Active Issue.",
       "Use Push to Staff Whiteboard only when an internal item should become a temporary Push Notice."
     ],
     tips: [
@@ -457,16 +458,16 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "front-desk-coordinator",
     title: "What can a Front Desk Coordinator or Team Lead do?",
-    summary: "Front Desk Coordinator and Team Lead accounts use Staff Digi-Board tools: Push Notices, Front Desk Log, follow-ups, and view-only Staff Directory.",
+    summary: "Front Desk Coordinator and Team Lead accounts use Staff Digi-Board tools: Push Notices, Team Log, follow-ups, and view-only Staff Directory.",
     category: "Users & Login",
     keywords: ["front desk coordinator", "team leader", "role", "permissions", "push notices", "staff directory", "crossover log"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
       "After login, you are routed to Staff Digital Whiteboard → Push Notices.",
-      "Use Front Desk Log → Crossover Log for today’s handoffs, Open Log for unresolved items, and Archived Log for prior closed entries.",
+      "Use Team Log → Crossover Log for today’s handoffs, Open Log for unresolved items, and Archived Log for prior closed entries.",
       "You can also use Owner Follow Up, Active Issues, Push Notices, Notifications, Walks Board, and Help Center.",
       "Staff Directory is view-only — search and review staff records, but you cannot add, edit, or delete entries.",
-      "You can delete only Front Desk Log entries you created (unless you are Super Admin, Admin, or Management).",
+      "You can delete only Team Log entries you created (unless you are Super Admin, Admin, or Management).",
       "You cannot access Lobby content, global settings, logs, integrations, or the full Admin Users area."
     ],
     adminTab: "crossover_communication",
@@ -476,15 +477,15 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "groomer-trainer-crossover",
     title: "What can a Groomer or Trainer do?",
-    summary: "Groomers and Trainers use Digi-Board staff tools, Front Desk Log handoffs, push panels, and (for trainers) package & class commissions.",
+    summary: "Groomers and Trainers use Digi-Board staff tools, Team Log handoffs, push panels, and (for trainers) package & class commissions.",
     category: "Users & Login",
     keywords: ["groomer", "trainer", "crossover", "grooming", "training", "handoff", "commissions", "package", "class", "check out"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Groomers land on Staff Digital Whiteboard → Grooming Push and can use Front Desk Log for handoffs.",
+      "Groomers land on Staff Digital Whiteboard → Grooming Push and can use Team Log for handoffs.",
       "Trainers land on Staff Digital Whiteboard → Trainer Push.",
-      "On Front Desk Log, use Crossover Log for today’s notes. Assessment dogs use Mark Check Out so they stay on today’s log until the next day.",
-      "You can delete only Front Desk Log entries you created.",
+      "On Team Log, use Crossover Log for today’s notes. Assessment dogs use Mark Check Out so they stay on today’s log until the next day.",
+      "You can delete only Team Log entries you created.",
       "Trainers: open Commissions → Package & Class Commissions to review earnings, comment, or dispute a row.",
       "Both roles also have Notifications, Video Links, Walks Board, and Help Center."
     ],
@@ -495,15 +496,15 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "dog-handler-basics",
     title: "What can a Dog Handler do?",
-    summary: "Dog Handler accounts use Staff Digi-Board tools for yard work, walks, reminders, and Front Desk Log notes.",
+    summary: "Dog Handler accounts use Staff Digi-Board tools for yard work, walks, reminders, and Team Log notes.",
     category: "Users & Login",
-    keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "front desk log"],
+    keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "team log"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
       "Open Check List first — today’s dog-handler daily recurring push notices appear there so you can mark each one completed.",
       "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders.",
       "Open Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
-      "Use Front Desk Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
+      "Use Team Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
       "Open Notifications for alerts assigned to you, and Help Center anytime you need a guide.",
       "Dog Handler accounts do not manage Lobby content, admin users, integrations, or global settings."
     ],
@@ -517,14 +518,14 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "management-role",
     title: "What can an Assistant Manager (Management) do?",
-    summary: "Management can run staff Digi-Board operations, review Front Desk Log history, and delete any Front Desk Log entry when needed.",
+    summary: "Management can run staff Digi-Board operations, review Team Log history, and delete any Team Log entry when needed.",
     category: "Users & Login",
-    keywords: ["assistant manager", "management", "role", "permissions", "front desk log", "delete"],
+    keywords: ["assistant manager", "management", "role", "permissions", "team log", "delete"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned Management credentials.",
-      "Use Staff Digital Whiteboard tools: Push Notices, Front Desk Log, Owner Follow Up, Active Issues, Staff Directory, and related staff tabs.",
-      "On Front Desk Log, review Crossover Log (today), Open Log, and Archived Log (prior closed items).",
-      "Management can delete any Front Desk Log entry — not only their own.",
+      "Use Staff Digital Whiteboard tools: Push Notices, Team Log, Owner Follow Up, Active Issues, Staff Directory, and related staff tabs.",
+      "On Team Log, review Crossover Log (today), Open Log, and Archived Log (prior closed items).",
+      "Management can delete any Team Log entry — not only their own.",
       "Help with commissions, write-ups, and management support tabs when those tools are enabled for your account.",
       "Full Super Admin-only areas (integrations secrets, permission matrix, some global settings) may still be restricted."
     ],
@@ -542,7 +543,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Sign in at Fitdog Digi-Board with your assigned Marketing credentials.",
       "Use Lobby Whiteboard tools for promotions, content, and schedule updates your role can access.",
       "If CAST-TV or lobby slideshow tools are enabled for your account, upload and order media there.",
-      "Marketing accounts do not manage staff operations, Front Desk Log, Gingr integrations, or admin user security.",
+      "Marketing accounts do not manage staff operations, Team Log, Gingr integrations, or admin user security.",
       "Use Help Center for lobby board guides, and email Lonnie@fitdog.com if login access looks wrong."
     ],
     adminTab: "promotions",

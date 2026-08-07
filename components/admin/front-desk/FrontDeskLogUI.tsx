@@ -403,7 +403,7 @@ export function ActiveShiftLogCard({
   };
 
   const deleteEntry = (item: CrossoverMessage) => {
-    if (!window.confirm(`Delete this Front Desk Log entry?\n\n"${item.subject}"\n\nThis cannot be undone.`)) return;
+    if (!window.confirm(`Delete this Team Log entry?\n\n"${item.subject}"\n\nThis cannot be undone.`)) return;
     void onMutate("Unable to delete log entry.", { action: "delete_crossover", id: item.id }, "Log entry deleted.");
   };
 
@@ -699,7 +699,7 @@ export function ActiveShiftLogCard({
       <Modal
         open={moveOpen}
         title={`Move ${selectedCount} entr${selectedCount === 1 ? "y" : "ies"}`}
-        description="Choose which Front Desk log should receive the selected rows."
+        description="Choose which log (Crossover, Open, or Archived) should receive the selected rows."
         onClose={() => {
           setMoveOpen(false);
           setMoveTarget("");

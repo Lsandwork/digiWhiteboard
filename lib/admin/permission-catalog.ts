@@ -109,11 +109,11 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
   },
   {
     key: "front_desk",
-    label: "Front Desk Log",
+    label: "Team Log",
     permissions: [
-      p("view_front_desk_log", "View Front Desk Log", "View crossover / front desk log entries."),
-      p("create_front_desk_log", "Create Log Entry", "Create new front desk log entries."),
-      p("edit_front_desk_log", "Edit Log Entries", "Edit front desk log entries."),
+      p("view_front_desk_log", "View Team Log", "View crossover / team log entries."),
+      p("create_front_desk_log", "Create Log Entry", "Create new team log entries."),
+      p("edit_front_desk_log", "Edit Log Entries", "Edit team log entries."),
       p("assign_front_desk_log", "Assign Log Entries", "Assign logs to staff members."),
       p("resolve_front_desk_log", "Resolve Log Entries", "Mark log items resolved."),
       p("view_owner_follow_up", "View Owner Follow-Up", "View owner follow-up items."),

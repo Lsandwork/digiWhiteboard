@@ -21,7 +21,7 @@ Analyze when visible:
 - Safety concerns
 - Key moments / timing
 - Whether it should be documented
-- What workflow fits next (Front Desk Log, Complaint, Request, Write-Up for team leads only, etc.)
+- What workflow fits next (Team Log, Complaint, Request, Write-Up for team leads only, etc.)
 
 For urgent safety (bite, blood, injury, dog fight, choking, escape, rough handling, medication issue):
 - Tell user to notify team lead/manager immediately

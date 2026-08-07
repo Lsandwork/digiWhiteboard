@@ -651,7 +651,7 @@ export function AdminDashboard() {
           <section className="admin-card p-5">
             <h2 className="admin-page-title">Templates</h2>
             <p className="admin-page-subtitle">Quick Log Templates for the Front Desk Tracking Log are available when adding a shift log entry.</p>
-            <button type="button" className="admin-btn-primary mt-4" onClick={() => setActiveTab("crossover_communication")}>Open Front Desk Log</button>
+            <button type="button" className="admin-btn-primary mt-4" onClick={() => setActiveTab("crossover_communication")}>Open Team Log</button>
           </section>
         ) : null}
 

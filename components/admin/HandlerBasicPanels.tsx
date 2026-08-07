@@ -376,7 +376,7 @@ export function HandlerShiftEntryPanel() {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entry.");
-      showToast("Handler shift entry saved to Front Desk Log.", "success");
+      showToast("Handler shift entry saved to Team Log.", "success");
       setForm(emptyShiftForm);
       await load();
     } catch (error) {
@@ -391,7 +391,7 @@ export function HandlerShiftEntryPanel() {
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Handler Shift Entry Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Submit shift log entries for daycare operations. Entries are reported to Front Desk Log.
+          Submit shift log entries for daycare operations. Entries are reported to Team Log.
         </p>
         {loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>

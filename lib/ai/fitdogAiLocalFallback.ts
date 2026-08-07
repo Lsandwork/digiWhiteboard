@@ -12,7 +12,7 @@ const GROOMING_INTENT_PATTERN =
   /\b(grooming push|put .+ in catch|catch for grooming|needs grooming|send .+ to grooming)\b/i;
 
 const DOCUMENT_INTENT_PATTERN =
-  /\b(document|write up|write-up|log this|front desk log|handoff)\b/i;
+  /\b(document|write up|write-up|log this|team log|front desk log|handoff)\b/i;
 
 const WHERE_TO_GO_PATTERN = /\bwhere should (this|it) go\b/i;
 
@@ -100,7 +100,7 @@ export function buildLocalChatFallback(params: {
     if (!canPush) {
       return {
         reply:
-          "Pushing to the staff whiteboard needs a team lead or admin with push access. Tell me what you want the team to know and I can help you word it — or log it in the Front Desk Log for handoff.",
+          "Pushing to the staff whiteboard needs a team lead or admin with push access. Tell me what you want the team to know and I can help you word it — or log it in the Team Log for handoff.",
         actionIntent: "front_desk_log",
         secondaryActionIntent: "management_support",
         tone: "normal",
@@ -153,7 +153,7 @@ export function buildLocalChatFallback(params: {
   if (WHERE_TO_GO_PATTERN.test(trimmed) || DOCUMENT_INTENT_PATTERN.test(trimmed)) {
     return {
       reply:
-        "Quick guide: shift notes and handoffs go in Front Desk Log. Employee concerns go through Management Support (complaint or request). Urgent team-wide messages go to Push Notices on the staff whiteboard. What happened?",
+        "Quick guide: shift notes and handoffs go in Team Log. Employee concerns go through Management Support (complaint or request). Urgent team-wide messages go to Push Notices on the staff whiteboard. What happened?",
       actionIntent: "front_desk_log",
       secondaryActionIntent: "management_support",
       tone: "normal",

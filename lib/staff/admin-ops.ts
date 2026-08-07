@@ -54,7 +54,7 @@ export type IssueCategory =
   | "Grooming"
   | "Daycare"
   | "General";
-export type IssueSource = "Front Desk" | "Front Desk Log" | "Crossover Communication" | "Owner Follow Up" | "Push Notice" | "Manual" | "Other";
+export type IssueSource = "Front Desk" | "Team Log" | "Crossover Communication" | "Owner Follow Up" | "Push Notice" | "Manual" | "Other";
 
 export type CrossoverMessage = {
   id: string;
@@ -317,7 +317,7 @@ export const ISSUE_CATEGORIES: IssueCategory[] = [
   "General"
 ];
 
-export const ISSUE_SOURCES: IssueSource[] = ["Front Desk", "Front Desk Log", "Crossover Communication", "Owner Follow Up", "Push Notice", "Manual", "Other"];
+export const ISSUE_SOURCES: IssueSource[] = ["Front Desk", "Team Log", "Crossover Communication", "Owner Follow Up", "Push Notice", "Manual", "Other"];
 export const STAFF_PRIORITIES: StaffOpsPriority[] = ["Low", "Normal", "Medium", "High", "Urgent", "Critical"];
 export const STAFF_STATUSES: StaffOpsStatus[] = [
   "Open",
@@ -393,6 +393,8 @@ function normalizeCategory(value: unknown): IssueCategory {
 }
 
 function normalizeSource(value: unknown): IssueSource {
+  // Legacy Active Issues used "Front Desk Log" before the Team Log rename.
+  if (value === "Front Desk Log") return "Team Log";
   return ISSUE_SOURCES.includes(value as IssueSource) ? (value as IssueSource) : "Manual";
 }
 
@@ -613,7 +615,7 @@ function maybeCreateActiveIssueFromCrossover(state: StaffOpsState, message: Cros
     id: newId(),
     title: message.subject,
     category: message.log_type === "Medical / Health Note" ? "Medical / Health" : message.related_dog_name ? "Dog Issue" : "General",
-    source: "Front Desk Log",
+    source: "Team Log",
     source_id: message.id,
     source_table: "crossover_messages",
     reported_by: actor,
@@ -903,7 +905,7 @@ function appendOwnerFollowUpFromLogState(state: StaffOpsState, record: Crossover
     status: "Open",
     follow_up_notes: shiftLogDetails(record),
     resolution_notes: null,
-    source: "Front Desk Log",
+    source: "Team Log",
     source_id: record.id,
     urgent: record.urgent,
     created_at: now,
@@ -1233,7 +1235,7 @@ export async function deleteCrossoverMessage(
   const existing = state.crossover_messages.find((item) => item.id === id);
   if (!existing) throw new Error("Shift log entry not found.");
   if (!canDeleteFrontDeskLogEntry(existing, options)) {
-    throw new Error("You can only delete Front Desk Log entries that you created.");
+    throw new Error("You can only delete Team Log entries that you created.");
   }
 
   let next: StaffOpsState = {

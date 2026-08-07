@@ -850,7 +850,7 @@ function CrossoverPage(props: {
           </>
         ) : (
           <div className="crossover-dashboard__workspace-form">
-            <p className="text-sm text-slate-300">View only — your role can read the Front Desk Log but cannot create entries.</p>
+            <p className="text-sm text-slate-300">View only — your role can read the Team Log but cannot create entries.</p>
           </div>
         )}
         <div className="crossover-dashboard__workspace-archived">
@@ -1465,7 +1465,7 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
         <Field label="Resolution notes">
           <textarea
             className="admin-input min-h-[80px]"
-            placeholder="Visible to everyone with Front Desk Log / Follow Up / Active Issues access."
+            placeholder="Visible to everyone with Team Log / Follow Up / Active Issues access."
             value={resolution}
             onChange={(event) => setResolution(event.target.value)}
           />

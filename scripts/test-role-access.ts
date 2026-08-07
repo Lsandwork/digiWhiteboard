@@ -58,12 +58,12 @@ for (const role of roles) {
   assert.equal(
     canAccessAdminTab(access, "crossover_communication", role, "staff"),
     true,
-    `${role} can open Front Desk Log`
+    `${role} can open Team Log`
   );
   assert.equal(
     firstAccessibleAdminTab(access, role, "staff"),
     "crossover_communication",
-    `${role} staff landing tab is Front Desk Log`
+    `${role} staff landing tab is Team Log`
   );
 }
 
@@ -84,12 +84,12 @@ assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "gro
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "handler_shift_entry", "daycare", "staff"),
   false,
-  "handlers use Front Desk Log instead of Handler Shift Entry Log"
+  "handlers use Team Log instead of Handler Shift Entry Log"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "trainer_entry", "trainer", "staff"),
   false,
-  "trainers use Front Desk Log instead of Trainer's Entry"
+  "trainers use Team Log instead of Trainer's Entry"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "handler_shift_entry", "assistant_manager", "staff"),
@@ -127,12 +127,12 @@ assert.equal(isFullAdminLegacyRole("owner_admin"), true, "owner_admin is full ad
 assert.equal(isFullAdminRole(null), false, "null role is not full admin (users)");
 assert.equal(isFullAdminRole(""), false, "empty role is not full admin (users)");
 
-assert.equal(canCreateFrontDeskLogForRole("viewer"), false, "viewer cannot create front desk log");
-assert.equal(canEditFrontDeskLogForRole("viewer"), false, "viewer cannot edit front desk log");
-assert.equal(canCreateFrontDeskLogForRole("overnight"), false, "overnight cannot create front desk log");
-assert.equal(canEditFrontDeskLogForRole("maintenance"), false, "maintenance cannot edit front desk log");
-assert.equal(canCreateFrontDeskLogForRole("daycare"), true, "handlers can create front desk log");
-assert.equal(canEditFrontDeskLogForRole("daycare"), true, "handlers can edit front desk log");
+assert.equal(canCreateFrontDeskLogForRole("viewer"), false, "viewer cannot create team log");
+assert.equal(canEditFrontDeskLogForRole("viewer"), false, "viewer cannot edit team log");
+assert.equal(canCreateFrontDeskLogForRole("overnight"), false, "overnight cannot create team log");
+assert.equal(canEditFrontDeskLogForRole("maintenance"), false, "maintenance cannot edit team log");
+assert.equal(canCreateFrontDeskLogForRole("daycare"), true, "handlers can create team log");
+assert.equal(canEditFrontDeskLogForRole("daycare"), true, "handlers can edit team log");
 
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "viewer"), "checklist", "viewer", "staff"),

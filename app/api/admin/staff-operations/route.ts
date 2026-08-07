@@ -314,7 +314,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, result });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to save Staff Admin record.";
-    if (message.includes("only delete Front Desk Log entries")) {
+    if (message.includes("only delete Team Log entries")) {
       return NextResponse.json({ error: message }, { status: 403 });
     }
     return NextResponse.json({ error: message }, { status: 500 });

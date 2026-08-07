@@ -145,7 +145,7 @@ async function runMiddleware(request: NextRequest) {
 
     const role = session.role ?? "";
 
-    // Bare /admin (or staff board with no tab) → Front Desk Log for every account.
+    // Bare /admin (or staff board with no tab) → Team Log for every account.
     if (pathname === "/admin") {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
@@ -179,7 +179,7 @@ async function runMiddleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
       const tab = url.searchParams.get("tab");
-      // Marketing accounts may use Front Desk Log and Bulk Photo Upload on the staff board.
+      // Marketing accounts may use Team Log and Bulk Photo Upload on the staff board.
       if (
         board === "staff" &&
         (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "help" || !tab)

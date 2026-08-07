@@ -72,7 +72,7 @@ assert.equal(
 assert.equal(
   articleVisibleToRole(HELP_ARTICLES.find((a) => a.id === "front-desk-log")!, "assistant_manager"),
   true,
-  "assistant manager must see front desk log help"
+  "assistant manager must see team log help"
 );
 
 console.log(

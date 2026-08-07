@@ -1,5 +1,5 @@
 /**
- * Import Front Desk / Team Lead shift notes into Front Desk Log.
+ * Import Front Desk / Team Lead shift notes into Team Log.
  *
  * Usage:
  *   npx tsx scripts/import-front-desk-shift-notes.ts --dry-run
@@ -409,7 +409,7 @@ function buildSubject(note: ParsedNote) {
 
 function buildDetails(note: ParsedNote) {
   const footer = note.isToday
-    ? "Imported from shift spreadsheet into today's Front Desk Log. Unassigned."
+    ? "Imported from shift spreadsheet into today's Team Log. Unassigned."
     : "Imported historical shift note. Closed / resolved (not open). Unassigned.";
   const lines = [
     note.note,
@@ -616,7 +616,7 @@ async function main() {
       {
         id: randomUUID(),
         activity_type: "shift_log.imported",
-        title: `Imported ${toInsert.length} Front Desk logs (${todayCount} today open, ${pastCount} past resolved)`,
+        title: `Imported ${toInsert.length} Team Logs (${todayCount} today open, ${pastCount} past resolved)`,
         description: `${IMPORT_MARKER} • submitted by ${ACTOR} • unassigned`,
         source_table: "crossover_messages",
         source_id: null,
@@ -629,7 +629,7 @@ async function main() {
 
   await saveState(supabase, nextState);
   console.log(
-    `Imported ${toInsert.length} Front Desk logs (${todayCount} open for today, ${pastCount} resolved past).`
+    `Imported ${toInsert.length} Team Logs (${todayCount} open for today, ${pastCount} resolved past).`
   );
 }
 

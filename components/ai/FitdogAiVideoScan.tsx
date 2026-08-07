@@ -101,7 +101,7 @@ export function FitdogAiVideoScan({ currentPage, onComplete }: FitdogAiVideoScan
           rows={3}
           value={userNote}
           onChange={(event) => setUserNote(event.target.value)}
-          placeholder="Example: Was this safe handling? Help me write a Front Desk Log note. Should this be documented?"
+          placeholder="Example: Was this safe handling? Help me write a Team Log note. Should this be documented?"
         />
       </label>
 
