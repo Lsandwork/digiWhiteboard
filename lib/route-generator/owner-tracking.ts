@@ -66,6 +66,44 @@ function sublineFor(status: string, etaMinutes: number | null): string {
   return "Live map updates as your Fitdog van moves.";
 }
 
+/** Tokens used in SMS samples / Twilio verification — not real owner links. */
+const DEMO_TRACK_TOKENS = new Set(["example", "demo"]);
+
+export function isOwnerTrackingDemoToken(token: string): boolean {
+  return DEMO_TRACK_TOKENS.has(token.trim().toLowerCase());
+}
+
+/** Preview payload so `/track/example` opens a real map instead of "Invalid tracking link." */
+export function getOwnerTrackingDemo(token: string): OwnerTrackingPublicView {
+  const normalized = token.trim().toLowerCase();
+  // Venice / Culver City–ish area so the map isn't empty.
+  const stop = { lat: 33.9915, lng: -118.4662 };
+  const vehicle = {
+    lat: 34.0108,
+    lng: -118.4452,
+    heading: 210,
+    updatedAt: new Date().toISOString()
+  };
+  const etaMinutes = 12;
+  const direction = "pickup" as const;
+  const status = "en_route";
+  return {
+    token: normalized,
+    status,
+    direction,
+    dogNames: ["Indy"],
+    ownerName: "Demo Owner",
+    stopAddress: "Venice, Los Angeles, CA",
+    stop,
+    vehicle,
+    etaMinutes,
+    headline: headlineFor(status, etaMinutes, direction),
+    subline: sublineFor(status, etaMinutes),
+    showArrivingBanner: false,
+    liveConfigured: true
+  };
+}
+
 export async function createOwnerTrackingForPlan(planId: string): Promise<{
   created: number;
   smsQueued: number;
@@ -195,6 +233,10 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
 }
 
 export async function getOwnerTrackingPublic(token: string): Promise<OwnerTrackingPublicView | null> {
+  if (isOwnerTrackingDemoToken(token)) {
+    return getOwnerTrackingDemo(token);
+  }
+
   const supabase = getServiceSupabase();
   const { data: row } = await supabase.from("route_owner_tracking").select("*").eq("token", token).maybeSingle();
   if (!row) return null;

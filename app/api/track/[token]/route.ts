@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
-import { getOwnerTrackingPublic } from "@/lib/route-generator/owner-tracking";
+import {
+  getOwnerTrackingPublic,
+  isOwnerTrackingDemoToken
+} from "@/lib/route-generator/owner-tracking";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request, context: { params: Promise<{ token: string }> }) {
   const { token } = await context.params;
-  if (!token || token.length < 8) {
+  // Real tokens are long base64url strings; demo tokens (`example`, `demo`) are short on purpose.
+  if (!token || (!isOwnerTrackingDemoToken(token) && token.length < 8)) {
     return NextResponse.json({ error: "Invalid tracking link." }, { status: 404 });
   }
   try {
