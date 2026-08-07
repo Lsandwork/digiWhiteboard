@@ -1,4 +1,5 @@
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
+import { normalizeSmsToE164 } from "@/lib/integrations/sms/provider";
 
 /** Format a phone for Samsara driver notes (full number, not masked). */
 export function formatPhoneForDriver(phone: string | null | undefined): string | null {
@@ -15,11 +16,7 @@ export function formatPhoneForDriver(phone: string | null | undefined): string |
 }
 
 export function phoneDigitsE164(phone: string | null | undefined): string | null {
-  const digits = String(phone ?? "").replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  if (digits.length >= 10) return `+${digits}`;
-  return null;
+  return normalizeSmsToE164(phone);
 }
 
 function uniqueNonEmpty(values: Array<string | null | undefined>): string[] {

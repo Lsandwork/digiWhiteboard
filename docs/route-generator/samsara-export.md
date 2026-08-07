@@ -13,6 +13,18 @@ Notes are flattened to a single line (` · ` separators) in the CSV so Samsara b
 
 Rebuild path: Generate Routes writes notes on `route_plan_stops.driver_notes`; Export rebuilds from Fitdog report items + stop item links as a safety net.
 
+## Owner SMS (Twilio)
+
+On **Approve**, Digi creates `/track/[token]` links and sends SMS when Twilio is configured:
+
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_MESSAGING_SERVICE_SID` (preferred — Fitdog Ruffly Messaging Service / A2P)
+- `TWILIO_FROM_NUMBER` (fallback if Messaging Service is unset)
+- `NEXT_PUBLIC_SITE_URL` (tracking link host, e.g. `https://staff.ruffops.com`)
+
+Approve toast reports how many SMS were sent, or the first Twilio/phone error if send failed.
+
 ## Required CSV headers
 
 Exact Samsara bulk-upload columns A–K:
@@ -49,7 +61,7 @@ Pickup synthesis still starts at **07:00 AM**. These times feed the Samsara CSV 
 
 ## Feature flags / secrets
 
-`ROUTE_GENERATOR_ENABLED`, `SAMSARA_CSV_EXPORT_ENABLED`, `SAMSARA_API_TOKEN`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `CRON_SECRET`, `NEXT_PUBLIC_SITE_URL`
+`ROUTE_GENERATOR_ENABLED`, `SAMSARA_CSV_EXPORT_ENABLED`, `SAMSARA_API_TOKEN`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`, `TWILIO_FROM_NUMBER`, `CRON_SECRET`, `NEXT_PUBLIC_SITE_URL`
 
 ## Van 4
 

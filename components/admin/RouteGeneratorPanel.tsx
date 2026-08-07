@@ -390,9 +390,20 @@ export function RouteGeneratorPanel() {
       return;
     }
     try {
-      await postAction("approve_plan", { planId: bundle.plan.id });
+      const body = await postAction("approve_plan", { planId: bundle.plan.id });
       await hydratePlan(bundle.plan.id);
-      showToast("Plan approved.", "success");
+      const tracking = body.tracking as
+        | { smsQueued?: number; smsConfigured?: boolean; smsErrors?: string[] }
+        | undefined;
+      if (tracking?.smsQueued) {
+        showToast(`Plan approved. Sent ${tracking.smsQueued} owner tracking SMS.`, "success");
+      } else if (tracking?.smsConfigured === false) {
+        showToast("Plan approved, but Twilio is not configured — tracking links created without SMS.", "error");
+      } else if (tracking?.smsErrors?.length) {
+        showToast(`Plan approved. Tracking SMS issue: ${tracking.smsErrors[0]}`, "error");
+      } else {
+        showToast("Plan approved.", "success");
+      }
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Approve failed.", "error");
     }

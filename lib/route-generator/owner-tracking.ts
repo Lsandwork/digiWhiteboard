@@ -1,13 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { getSmsProvider } from "@/lib/integrations/sms/provider";
+import { getSmsProvider, normalizeSmsToE164 } from "@/lib/integrations/sms/provider";
 import {
   etaMinutesFromCoords,
   fetchSamsaraVehicleLocations,
   isSamsaraLiveConfigured,
   matchVehicleByName
 } from "@/lib/route-generator/samsara-live";
-import { phoneDigitsE164 } from "@/lib/route-generator/stop-notes";
 
 function publicSiteUrl(): string {
   return (
@@ -19,6 +18,18 @@ function publicSiteUrl(): string {
 
 function newToken(): string {
   return randomBytes(18).toString("base64url");
+}
+
+/** Pull a usable owner phone from stop display fields / flattened driver notes. */
+export function extractOwnerPhoneE164(...sources: Array<string | null | undefined>): string | null {
+  for (const source of sources) {
+    if (!source) continue;
+    const text = String(source);
+    const labeled = text.match(/Phone:\s*([^·\n|]+)/i)?.[1];
+    const candidate = normalizeSmsToE164(labeled) || normalizeSmsToE164(text);
+    if (candidate) return candidate;
+  }
+  return null;
 }
 
 export type OwnerTrackingPublicView = {
@@ -57,7 +68,12 @@ function sublineFor(status: string, etaMinutes: number | null): string {
   return "Live map updates as your Fitdog van moves.";
 }
 
-export async function createOwnerTrackingForPlan(planId: string): Promise<{ created: number; smsQueued: number }> {
+export async function createOwnerTrackingForPlan(planId: string): Promise<{
+  created: number;
+  smsQueued: number;
+  smsConfigured: boolean;
+  smsErrors: string[];
+}> {
   const supabase = getServiceSupabase();
   const { data: plan } = await supabase.from("route_plans").select("*").eq("id", planId).single();
   if (!plan) throw new Error("Plan not found.");
@@ -85,7 +101,13 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
 
   let created = 0;
   let smsQueued = 0;
+  const smsErrors: string[] = [];
   const sms = getSmsProvider();
+  if (!sms.isConfigured()) {
+    smsErrors.push(
+      "Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER)."
+    );
+  }
 
   for (const route of routes ?? []) {
     const { data: stops } = await supabase
@@ -102,12 +124,14 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
         .eq("stop_id", stop.id)
         .maybeSingle();
 
-      const phone =
-        phoneDigitsE164(stop.owner_phone_display) ||
-        phoneDigitsE164(String(stop.driver_notes || "").match(/Phone:\s*([^\n]+)/i)?.[1]);
+      const phone = extractOwnerPhoneE164(
+        stop.owner_phone_display,
+        stop.driver_notes,
+        String(stop.driver_notes || "").match(/Phone:\s*([^·\n|]+)/i)?.[1]
+      );
 
       const dogNames = String(stop.driver_notes || "")
-        .split("\n")[0]
+        .split(/\n|·/)[0]
         ?.replace(/^\d+\s*dog\(s\):\s*/i, "")
         .split(",")
         .map((s) => s.trim())
@@ -140,7 +164,12 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
         await supabase.from("route_owner_tracking").update({ owner_phone_e164: phone }).eq("id", existing.id);
       }
 
-      if (phone && sms.isConfigured() && !existing?.link_sent_at && token) {
+      if (!phone) {
+        smsErrors.push(`Stop ${stop.owner_name || stop.id}: missing owner phone`);
+        continue;
+      }
+
+      if (sms.isConfigured() && !existing?.link_sent_at && token) {
         const url = `${publicSiteUrl()}/track/${token}`;
         const dogs = dogNames.slice(0, 3).join(" + ") || "your dog";
         const direction = route.direction === "pickup" ? "pickup" : "drop-off";
@@ -157,12 +186,14 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{ crea
             .update({ link_sent_at: new Date().toISOString(), status: "en_route" })
             .eq("token", token);
           smsQueued += 1;
+        } else {
+          smsErrors.push(`${phone}: ${sent.error || "Twilio send failed"}`);
         }
       }
     }
   }
 
-  return { created, smsQueued };
+  return { created, smsQueued, smsConfigured: sms.isConfigured(), smsErrors: smsErrors.slice(0, 25) };
 }
 
 export async function getOwnerTrackingPublic(token: string): Promise<OwnerTrackingPublicView | null> {

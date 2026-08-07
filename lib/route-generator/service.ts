@@ -1001,8 +1001,14 @@ export async function approvePlan(params: {
   });
 
   // Create owner tracking links (+ SMS when Twilio is configured).
+  let tracking: {
+    created: number;
+    smsQueued: number;
+    smsConfigured: boolean;
+    smsErrors: string[];
+  } = { created: 0, smsQueued: 0, smsConfigured: false, smsErrors: [] };
   try {
-    const tracking = await createOwnerTrackingForPlan(params.planId);
+    tracking = await createOwnerTrackingForPlan(params.planId);
     await writeRouteAuditEvent({
       action: "route_generator.owner_tracking_created",
       entityType: "route_plan",
@@ -1014,9 +1020,12 @@ export async function approvePlan(params: {
     });
   } catch (trackingError) {
     console.error("owner tracking create failed", trackingError);
+    tracking.smsErrors = [
+      trackingError instanceof Error ? trackingError.message : "Owner tracking failed"
+    ];
   }
 
-  return plan;
+  return { plan, tracking };
 }
 
 export async function exportSamsaraCsv(params: {

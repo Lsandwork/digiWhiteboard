@@ -45,7 +45,9 @@ import {
   synthesizeStopSchedule,
   validateExport
 } from "../lib/route-generator/samsara-csv";
-import { buildCustomerStopNotes, formatPhoneForDriver } from "../lib/route-generator/stop-notes";
+import { buildCustomerStopNotes, formatPhoneForDriver, phoneDigitsE164 } from "../lib/route-generator/stop-notes";
+import { normalizeSmsToE164 } from "../lib/integrations/sms/provider";
+import { extractOwnerPhoneE164 } from "../lib/route-generator/owner-tracking";
 
 // Permissions
 assert.equal(
@@ -917,6 +919,17 @@ assert.equal(serviceForAssignedVan("van_3"), "Beach Excursion");
 }
 
 assert.equal(formatPhoneForDriver("4132187041"), "(413) 218-7041");
+assert.equal(normalizeSmsToE164("(310) 562-5520"), "+13105625520");
+assert.equal(
+  normalizeSmsToE164("Phone: (310) 562-5520 · Pickup instructions: front door code is 3647"),
+  "+13105625520",
+  "must not swallow gate-code digits into the phone number"
+);
+assert.equal(phoneDigitsE164("•••-•••-1001"), null);
+assert.equal(
+  extractOwnerPhoneE164(null, "1 dog(s): Annie · Phone: (310) 562-5520 · Pickup instructions: code 3647"),
+  "+13105625520"
+);
 {
   const indyNotes = buildCustomerStopNotes({
     direction: "pickup",
