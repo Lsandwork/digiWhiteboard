@@ -49,13 +49,15 @@ export function OwnerLiveTrackMap({ stop, vehicle }: Props) {
       L.marker([stop.lat, stop.lng], { icon: destIcon }).addTo(map);
 
       if (vehicle) {
-        const vanIcon = L.divIcon({
-          className: "",
-          html: `<div style="transform:rotate(${vehicle.heading ?? 0}deg);width:34px;height:34px;border-radius:999px;background:#f15f2a;border:3px solid #fff;box-shadow:0 4px 16px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:800">➔</div>`,
-          iconSize: [34, 34],
-          iconAnchor: [17, 17]
+        // Fitdog van + map-pin marker (transparent PNG). Keep upright — pin tip anchors to GPS.
+        const vanIcon = L.icon({
+          iconUrl: "/assets/fitdog-track-van-marker.png",
+          iconRetinaUrl: "/assets/fitdog-track-van-marker.png",
+          iconSize: [64, 64],
+          iconAnchor: [32, 60],
+          className: "fitdog-track-van-marker"
         });
-        L.marker([vehicle.lat, vehicle.lng], { icon: vanIcon }).addTo(map);
+        L.marker([vehicle.lat, vehicle.lng], { icon: vanIcon, zIndexOffset: 400 }).addTo(map);
         L.polyline(
           [
             [vehicle.lat, vehicle.lng],
