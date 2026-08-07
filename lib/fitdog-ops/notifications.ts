@@ -3,6 +3,7 @@ import { dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
 import { isDeclinedPaymentAlert, isPaymentErrorAlert } from "@/lib/fitdog-ops/display";
 import type { OperationsAlert } from "@/lib/fitdog-ops/types";
 import { formatUsd } from "@/lib/fitdog-ops/money";
+import { sendSuperAdminSmsAlertFireAndForget } from "@/lib/staff/super-admin-sms";
 
 function priorityForAlert(alert: OperationsAlert) {
   if (isDeclinedPaymentAlert(alert) || isPaymentErrorAlert(alert) || alert.severity === "critical") {
@@ -60,6 +61,20 @@ export async function notifyFitdogPaymentAlert(
       notifyFrontDeskCoordinators: fanOutFrontDesk,
       actor: "Fitdog Sync"
     });
+
+    // SMS Lonnie for declined payments and other critical Fitdog payment alerts.
+    if (kind === "created" && (declined || paymentError || alert.severity === "critical")) {
+      sendSuperAdminSmsAlertFireAndForget(
+        {
+          kind: "fitdog_alert",
+          title,
+          detail: body,
+          idempotencyKey: `sa-sms:fitdog:${alert.id}:created`,
+          adminPath: "/admin?board=staff&tab=fitdog_alerts"
+        },
+        supabase
+      );
+    }
   } catch {
     // Notification store must never block payment alert persistence.
   }

@@ -22,6 +22,10 @@ import {
   type StaffNotification,
   type StaffOpsNotificationEvent
 } from "@/lib/staff/notifications";
+import {
+  isCriticalOrUrgentStaffNote,
+  sendSuperAdminSmsAlertFireAndForget
+} from "@/lib/staff/super-admin-sms";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -850,6 +854,18 @@ export async function createCrossoverMessage(
     const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
     triggerShellyAlertFireAndForget("urgent_front_desk", `front-desk:${record.id}`);
   }
+  if (isCriticalOrUrgentStaffNote(record)) {
+    sendSuperAdminSmsAlertFireAndForget(
+      {
+        kind: "front_desk_note",
+        title: `${record.priority}${record.urgent ? "/URGENT" : ""} note: ${record.subject}`,
+        detail: buildShiftLogAlertBody(record),
+        idempotencyKey: `sa-sms:front-desk:${record.id}:created`,
+        adminPath: "/admin?board=staff&tab=crossover_communication"
+      },
+      supabase
+    );
+  }
   return record;
 }
 
@@ -938,6 +954,18 @@ export async function replyToCrossoverMessage(
     created_by: authorLabel
   });
   await saveState(supabase, next);
+  if (isCriticalOrUrgentStaffNote(parent)) {
+    sendSuperAdminSmsAlertFireAndForget(
+      {
+        kind: "front_desk_comment",
+        title: `Comment on ${parent.priority} note: ${parent.subject}`,
+        detail: `${authorLabel ?? "Staff"}: ${text}`,
+        idempotencyKey: `sa-sms:front-desk-reply:${reply.id}`,
+        adminPath: "/admin?board=staff&tab=crossover_communication"
+      },
+      supabase
+    );
+  }
   return reply;
 }
 
@@ -1081,8 +1109,23 @@ function applyCrossoverMessagePatch(
 
 export async function updateCrossoverMessage(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
   const state = await loadState(supabase);
+  const previous = state.crossover_messages.find((item) => item.id === id);
   const { state: next, updated } = applyCrossoverMessagePatch(state, id, patch, actor);
   await saveState(supabase, next);
+  const wasCritical = previous ? isCriticalOrUrgentStaffNote(previous) : false;
+  const nowCritical = isCriticalOrUrgentStaffNote(updated);
+  if (nowCritical && !wasCritical) {
+    sendSuperAdminSmsAlertFireAndForget(
+      {
+        kind: "front_desk_note",
+        title: `${updated.priority}${updated.urgent ? "/URGENT" : ""} note escalated: ${updated.subject}`,
+        detail: buildShiftLogAlertBody(updated),
+        idempotencyKey: `sa-sms:front-desk:${updated.id}:escalated`,
+        adminPath: "/admin?board=staff&tab=crossover_communication"
+      },
+      supabase
+    );
+  }
   return updated;
 }
 
