@@ -7,13 +7,11 @@ import {
   isSamsaraLiveConfigured,
   matchVehicleByName
 } from "@/lib/route-generator/samsara-live";
+import { getPublicSiteUrl } from "@/lib/site-url";
 
 function publicSiteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.RUFFLY_PUBLIC_URL?.trim() ||
-    "https://staff.ruffops.com"
-  ).replace(/\/$/, "");
+  // Owner tracking always lives on the Digi-Board host — never Ruffly's public URL.
+  return getPublicSiteUrl().replace(/\/$/, "");
 }
 
 function newToken(): string {

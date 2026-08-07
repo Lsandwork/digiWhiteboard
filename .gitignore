@@ -10,6 +10,7 @@ coverage
 tsconfig.tsbuildinfo
 .vercel
 .env*
+.twilio-tfv.json
 videos/raw/
 public/assets/fitdog/social-moments/clips-original/
 ruffops-seo-package/

@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
 import { getBlogSettings, publishBlogArticle, seedBlogTopics, writeBlogAudit } from "@/lib/blog/service";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-function authorized(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = request.headers.get("authorization")?.trim();
-    if (auth === `Bearer ${cronSecret}`) return true;
-  }
-  return request.headers.get("x-vercel-cron") === "1";
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!isAuthorizedCron(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   const settings = await getBlogSettings();
   if (settings.emergency_off) {

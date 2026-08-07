@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
 import { isPacificFiveAm, syncIncidentsFromWebhookInbox } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-function isAuthorizedCron(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = request.headers.get("authorization")?.trim();
-    if (auth === `Bearer ${cronSecret}`) return true;
-  }
-  return request.headers.get("x-vercel-cron") === "1";
-}
 
 /**
  * Scheduled at 12:05 and 13:05 UTC; only runs when America/Los_Angeles hour is 5.

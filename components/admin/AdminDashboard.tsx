@@ -120,7 +120,9 @@ export function AdminDashboard() {
     if (typeof window === "undefined") return;
     const stored = window.localStorage.getItem("fitdog_admin_board");
     if (!searchParams.get("board") && (stored === "staff" || stored === "marketing")) {
-      router.replace(`/admin?board=${stored}`);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("board", stored);
+      router.replace(`/admin?${params.toString()}`);
     }
   }, [router, searchParams]);
 

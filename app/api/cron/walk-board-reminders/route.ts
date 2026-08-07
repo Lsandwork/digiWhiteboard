@@ -1,17 +1,9 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { processWalkBoardReminders } from "@/lib/walks-board/reminders";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
-
-function isAuthorizedCron(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = request.headers.get("authorization")?.trim();
-    if (auth === `Bearer ${cronSecret}`) return true;
-  }
-  return request.headers.get("x-vercel-cron") === "1";
-}
 
 export async function GET(request: Request) {
   if (!isAuthorizedCron(request)) {

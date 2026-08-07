@@ -164,7 +164,8 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
   const permissions = readFileSync(join(process.cwd(), "lib/admin/permissions.ts"), "utf8");
   assert.match(permissions, /walks_board/);
   assert.match(permissions, /receive_walks_board_reminders/);
-  assert.match(permissions, /if \(tab === "walks_board"\) return board === "staff"/);
+  assert.match(permissions, /if \(tab === "walks_board"\) \{\s*if \(board !== "staff"\) return false;/);
+
 
   const nav = readFileSync(join(process.cwd(), "lib/admin/nav-groups.ts"), "utf8");
   assert.match(nav, /FRONT_DESK_TABS:[\s\S]*"walks_board"/);
@@ -200,7 +201,7 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
     );
   }
 
-  const limitedRoles = ["groomer", "trainer", "daycare", "viewer"] as const;
+  const limitedRoles = ["groomer", "trainer", "daycare", "viewer", "owner_admin"] as const;
   for (const role of limitedRoles) {
     const access = accessFromLegacyRole(`walk-${role}`, `${role}@fitdog.test`, role);
     assert.equal(
@@ -212,7 +213,7 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
 }
 
 // Reminder message content
-assert.match(buildWalkDueNotificationMessage("Ralphie", "no_plays", false), /Ralphie is due for a walk — No Plays\./);
+assert.match(buildWalkDueNotificationMessage("Ralphie", "no_plays", false), /Ralphie needs to be walked now \(No Plays\)/);
 assert.match(buildWalkDueNotificationMessage("Ralphie", "no_plays", true), /Snooze already used/);
 
 console.log("test-walks-board: all assertions passed");

@@ -1,18 +1,10 @@
 import { NextResponse } from "next/server";
 import { runSystemHealthAudit } from "@/lib/admin/system-health-audit";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-function isAuthorizedCron(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = request.headers.get("authorization")?.trim();
-    if (auth === `Bearer ${cronSecret}`) return true;
-  }
-  return request.headers.get("x-vercel-cron") === "1";
-}
 
 /**
  * Twice-daily system health audit for whiteboard push / Gingr checkout lag.

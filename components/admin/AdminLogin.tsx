@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { isSafeRelativePath } from "@/lib/safe-url";
 import "@/app/login-screen.css";
 
 const REMEMBER_USERNAME_KEY = "fitdog.login.rememberUsername";
@@ -13,6 +14,11 @@ const HELP_EMAIL = "Lonnie@fitdog.com";
 function defaultAdminRoute(_role?: string, isDemo?: boolean) {
   if (isDemo) return "/admin?board=staff&tab=demo_push";
   return "/admin?board=staff&tab=crossover_communication";
+}
+
+function resolvePostLoginRoute(requested: string | null, role?: string, isDemo?: boolean) {
+  if (requested && isSafeRelativePath(requested)) return requested;
+  return defaultAdminRoute(role, isDemo);
 }
 
 const FEATURES = [
@@ -122,7 +128,7 @@ export function AdminLogin() {
         return;
       }
 
-      const next = searchParams.get("next") || defaultAdminRoute(body.role, body.isDemo);
+      const next = resolvePostLoginRoute(searchParams.get("next"), body.role, body.isDemo);
       router.replace(next);
       router.refresh();
     } catch (loginError) {
@@ -159,7 +165,7 @@ export function AdminLogin() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to update password.");
 
-      const next = searchParams.get("next") || defaultAdminRoute(body.role);
+      const next = resolvePostLoginRoute(searchParams.get("next"), body.role);
       router.replace(next);
       router.refresh();
     } catch (changeError) {

@@ -1,20 +1,12 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
-function authorize(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  const auth = request.headers.get("authorization");
-  const vercelCron = request.headers.get("x-vercel-cron");
-  if (vercelCron === "1") return true;
-  if (cronSecret && auth === `Bearer ${cronSecret}`) return true;
-  return false;
-}
-
 /** Drain queued route worker jobs / retries (no-op when queue empty). */
 export async function GET(request: Request) {
-  if (!authorize(request)) {
+  if (!isAuthorizedCron(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

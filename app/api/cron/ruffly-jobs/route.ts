@@ -1,21 +1,13 @@
 import { NextResponse } from "next/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 import { processRufflyJobs } from "@/lib/ruffly/jobs/processor";
 import { isRufflyEnabled } from "@/lib/ruffly/flags";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-function authorized(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = request.headers.get("authorization")?.trim();
-    if (auth === `Bearer ${cronSecret}`) return true;
-  }
-  return request.headers.get("x-vercel-cron") === "1";
-}
-
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  if (!isAuthorizedCron(request)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   if (!isRufflyEnabled()) return NextResponse.json({ ok: true, skipped: true, reason: "RUFFLY_ENABLED=false" });
 
   try {

@@ -24,10 +24,7 @@ function Frame({ children, label }: { children: ReactNode; label: string }) {
 }
 
 export function CastChromeIllustration({ variant = "lobby", className }: IllustrationProps) {
-  const url =
-    variant === "staff"
-      ? "fitdog-gingr-status-board.vercel.app/"
-      : "fitdog-gingr-status-board.vercel.app/lobby/checkouts";
+  const url = variant === "staff" ? "staff.ruffops.com/" : "lobby.ruffops.com/";
   const title = variant === "staff" ? "Staff Digital Whiteboard" : "Fitdog Lobby Whiteboard";
 
   return (

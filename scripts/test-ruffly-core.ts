@@ -11,6 +11,7 @@ import {
 } from "../lib/integrations/gingr/webhooks/verify";
 import { rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "../lib/ruffly-domain";
 import { isRufflyGingrBookingEnabled } from "../lib/ruffly/flags";
+import { rufflyFeedbackPath, rufflyReviewPath } from "../lib/ruffly/public-url";
 import { hashToken, signRufflyToken, verifyRufflyToken } from "../lib/ruffly/tokens/signed-token";
 
 assert.equal(shouldRewriteRufflyRoot("ruffly.ruffops.com", "/"), true);
@@ -18,6 +19,16 @@ assert.equal(shouldRewriteRufflyRoot("ruffly.ruffops.com", "/widget.js"), false)
 assert.equal(shouldRewriteRufflyRoot("staff.ruffops.com", "/"), false);
 assert.equal(rewriteRufflyPublicPath("ruffly.ruffops.com", "/review/tok"), "/ruffly/review/tok");
 assert.equal(isRufflyGingrBookingEnabled(), false);
+
+const previousRufflyPublic = process.env.RUFFLY_PUBLIC_URL;
+delete process.env.RUFFLY_PUBLIC_URL;
+assert.equal(rufflyReviewPath("abc"), "https://staff.ruffops.com/ruffly/review/abc");
+assert.equal(rufflyFeedbackPath("abc"), "https://staff.ruffops.com/ruffly/feedback/abc");
+process.env.RUFFLY_PUBLIC_URL = "https://ruffly.ruffops.com";
+assert.equal(rufflyReviewPath("abc"), "https://ruffly.ruffops.com/review/abc");
+assert.equal(rufflyFeedbackPath("abc"), "https://ruffly.ruffops.com/feedback/abc");
+if (previousRufflyPublic === undefined) delete process.env.RUFFLY_PUBLIC_URL;
+else process.env.RUFFLY_PUBLIC_URL = previousRufflyPublic;
 
 assert.equal(isSmsOptOutRequest("STOP"), true);
 assert.equal(isSmsOptOutRequest("please stop texting me"), true);

@@ -1,15 +1,25 @@
-import { BLOG_PRIMARY_PUBLIC_ORIGIN, getBlogPrimaryPublicOrigin } from "@/lib/blogs-domain";
+import {
+  BLOG_PRIMARY_PUBLIC_ORIGIN,
+  getBlogPrimaryPublicOrigin,
+  isBlogPublicHostname
+} from "@/lib/blogs-domain";
 import { publicBlogHref, usesBlogsPublicDomain } from "@/lib/blog/public-path";
 
 /** Public site origin for Fitdog blog SEO (canonical, Open Graph, JSON-LD). */
 export function getPublicBlogSiteOrigin() {
-  const configured =
-    process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim() ||
-    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
-    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
+  // Prefer an explicitly configured public blog host. Never fall back to Digi-Board
+  // NEXT_PUBLIC_SITE_URL (staff.ruffops.com) — that pollutes canonicals/sitemaps.
+  const configured = process.env.NEXT_PUBLIC_PUBLIC_SITE_URL?.trim();
   if (configured) {
     const withProtocol = configured.startsWith("http") ? configured : `https://${configured}`;
-    return withProtocol.replace(/\/$/, "");
+    try {
+      const hostname = new URL(withProtocol).hostname;
+      if (isBlogPublicHostname(hostname)) {
+        return new URL(withProtocol).origin.replace(/\/$/, "");
+      }
+    } catch {
+      // ignore invalid configured values
+    }
   }
   return getBlogPrimaryPublicOrigin() || BLOG_PRIMARY_PUBLIC_ORIGIN;
 }
@@ -20,12 +30,19 @@ export function absoluteBlogUrl(path: string) {
 
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
-  if (usesBlogsPublicDomain() && (path === "/blog" || path.startsWith("/blog/"))) {
-    const clean = path === "/blog" ? "/" : path.slice("/blog".length) || "/";
-    return `${origin}${clean.startsWith("/") ? clean : `/${clean}`}`;
+  let normalized = path.startsWith("/") ? path : `/${path}`;
+
+  // Public blog hosts serve clean URLs; strip the internal /blog prefix.
+  try {
+    if (isBlogPublicHostname(new URL(origin).hostname)) {
+      if (normalized === "/blog") normalized = "/";
+      else if (normalized.startsWith("/blog/")) normalized = normalized.slice("/blog".length) || "/";
+    }
+  } catch {
+    // keep normalized path
   }
 
-  return `${origin}${path.startsWith("/") ? path : `/${path}`}`;
+  return `${origin}${normalized}`;
 }
 
 export { publicBlogHref, usesBlogsPublicDomain };

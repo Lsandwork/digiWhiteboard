@@ -2,19 +2,11 @@ import { NextResponse } from "next/server";
 import { runFitdogSync } from "@/lib/fitdog-ops/sync";
 import { getFitdogIntegrationSettings } from "@/lib/fitdog-ops/store";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 export const runtime = "nodejs";
-
-function isAuthorizedCron(request: Request) {
-  const cronSecret = process.env.CRON_SECRET?.trim();
-  if (cronSecret) {
-    const auth = request.headers.get("authorization")?.trim();
-    if (auth === `Bearer ${cronSecret}`) return true;
-  }
-  return request.headers.get("x-vercel-cron") === "1";
-}
 
 export async function GET(request: Request) {
   if (!isAuthorizedCron(request)) {

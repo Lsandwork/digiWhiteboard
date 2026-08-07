@@ -26,7 +26,27 @@ export async function middleware(request: NextRequest) {
   try {
     return await runMiddleware(request);
   } catch {
-    // Never let a session/decode error 500 the whole app — fall through to the page.
+    // Never 500 the whole app on session/decode errors. For staff-only surfaces,
+    // fail closed to login instead of silently serving protected pages.
+    const { pathname } = request.nextUrl;
+    const isPublicRuffly =
+      pathname.startsWith("/ruffly/public") ||
+      pathname.startsWith("/ruffly/review") ||
+      pathname.startsWith("/ruffly/feedback") ||
+      pathname.startsWith("/ruffly/consent") ||
+      pathname.startsWith("/ruffly/campaign") ||
+      pathname === "/ruffly/widget.js";
+    if (
+      (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) ||
+      pathname.startsWith("/gingr") ||
+      (pathname.startsWith("/ruffly") && !isPublicRuffly)
+    ) {
+      const login = request.nextUrl.clone();
+      login.pathname = "/admin/login";
+      login.search = "";
+      login.searchParams.set("next", pathname);
+      return NextResponse.redirect(login);
+    }
     return NextResponse.next();
   }
 }
@@ -206,10 +226,6 @@ async function runMiddleware(request: NextRequest) {
       if (!canAccessReviewRoutes && !canAccessWriteUpSubmitRoute) {
         return NextResponse.redirect(new URL("/admin?board=staff", request.url));
       }
-    }
-
-    if (pathname.startsWith("/admin/settings/user-groups-permissions") && role !== "owner_admin") {
-      return NextResponse.redirect(new URL("/admin?tab=settings", request.url));
     }
   }
 
