@@ -25,9 +25,13 @@ export function OwnerLiveTrackClient({ token }: { token: string }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Forward `?t=` so demo SMS links start ~12 min away and advance on each poll.
+    const demoStart = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("t") : null;
+    const query = demoStart && /^\d{10,16}$/.test(demoStart) ? `?t=${demoStart}` : "";
+
     async function load() {
       try {
-        const response = await fetch(`/api/track/${encodeURIComponent(token)}`, { cache: "no-store" });
+        const response = await fetch(`/api/track/${encodeURIComponent(token)}${query}`, { cache: "no-store" });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Unable to load tracking.");
         if (!cancelled) {

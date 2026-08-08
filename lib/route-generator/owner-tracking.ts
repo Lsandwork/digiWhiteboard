@@ -69,24 +69,167 @@ function sublineFor(status: string, etaMinutes: number | null): string {
 /** Tokens used in SMS samples / Twilio verification — not real owner links. */
 const DEMO_TRACK_TOKENS = new Set(["example", "demo"]);
 
+/** Simulated trip length shown to the owner (minutes). */
+const DEMO_SIM_ETA_MINUTES = 12;
+/**
+ * Demo-only speed-up. Real Samsara owner links are unaffected.
+ * 12 sim-minutes at 3× ≈ 4 real minutes to arrival.
+ */
+const DEMO_SPEED_FACTOR = 3;
+
+/** Venice stop — demo destination. */
+const DEMO_STOP = { lat: 33.9915, lng: -118.4662 };
+
+/**
+ * Short approach into Venice (closer than Culver) so the van looks almost there.
+ * Progress is time-warped with traffic / light pauses — not a straight lerp.
+ */
+const DEMO_ROUTE: Array<{ lat: number; lng: number }> = [
+  { lat: 33.9990, lng: -118.4538 }, // start — closer to Venice
+  { lat: 33.9974, lng: -118.4572 },
+  { lat: 33.9960, lng: -118.4596 }, // light / slow
+  { lat: 33.9946, lng: -118.4618 },
+  { lat: 33.9934, lng: -118.4636 }, // light / slow
+  { lat: 33.9924, lng: -118.4650 },
+  DEMO_STOP
+];
+
+/**
+ * Time-share segments: each row is { timeFrac of trip, progressFrac along route }.
+ * Lights / traffic burn time with little movement.
+ */
+const DEMO_DRIVE_SEGMENTS: Array<{ timeFrac: number; progressFrac: number }> = [
+  { timeFrac: 0.16, progressFrac: 0.2 },
+  { timeFrac: 0.08, progressFrac: 0.015 }, // red light
+  { timeFrac: 0.18, progressFrac: 0.22 },
+  { timeFrac: 0.1, progressFrac: 0.04 }, // traffic crawl
+  { timeFrac: 0.07, progressFrac: 0.012 }, // light
+  { timeFrac: 0.17, progressFrac: 0.24 },
+  { timeFrac: 0.08, progressFrac: 0.03 }, // light
+  { timeFrac: 0.16, progressFrac: 0.243 }
+];
+
 export function isOwnerTrackingDemoToken(token: string): boolean {
   return DEMO_TRACK_TOKENS.has(token.trim().toLowerCase());
 }
 
-/** Preview payload so `/track/example` opens a real map instead of "Invalid tracking link." */
-export function getOwnerTrackingDemo(token: string): OwnerTrackingPublicView {
-  const normalized = token.trim().toLowerCase();
-  // Venice / Culver City–ish area so the map isn't empty.
-  const stop = { lat: 33.9915, lng: -118.4662 };
-  const vehicle = {
-    lat: 34.0108,
-    lng: -118.4452,
-    heading: 210,
-    updatedAt: new Date().toISOString()
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function lerp(a: number, b: number, t: number) {
+  return a + (b - a) * t;
+}
+
+function headingDegrees(from: { lat: number; lng: number }, to: { lat: number; lng: number }) {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLng = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180) / Math.PI;
+}
+
+/** Map sim-time fraction → route progress with traffic/light pauses. */
+function demoRouteProgressFromTime(timeFrac: number): number {
+  const t = clamp01(timeFrac);
+  let timeAcc = 0;
+  let progressAcc = 0;
+  for (const segment of DEMO_DRIVE_SEGMENTS) {
+    const nextTime = timeAcc + segment.timeFrac;
+    if (t <= nextTime + 1e-9) {
+      const local = segment.timeFrac <= 0 ? 1 : (t - timeAcc) / segment.timeFrac;
+      return clamp01(progressAcc + segment.progressFrac * clamp01(local));
+    }
+    timeAcc = nextTime;
+    progressAcc += segment.progressFrac;
+  }
+  return 1;
+}
+
+function demoPointAlongRoute(progress: number): {
+  lat: number;
+  lng: number;
+  heading: number;
+} {
+  const p = clamp01(progress);
+  if (p <= 0) {
+    const a = DEMO_ROUTE[0]!;
+    const b = DEMO_ROUTE[1] || a;
+    return { lat: a.lat, lng: a.lng, heading: headingDegrees(a, b) };
+  }
+  if (p >= 1) {
+    const last = DEMO_ROUTE[DEMO_ROUTE.length - 1]!;
+    const prev = DEMO_ROUTE[DEMO_ROUTE.length - 2] || last;
+    return { lat: last.lat, lng: last.lng, heading: headingDegrees(prev, last) };
+  }
+
+  const segments = DEMO_ROUTE.length - 1;
+  const scaled = p * segments;
+  const idx = Math.min(segments - 1, Math.floor(scaled));
+  const local = scaled - idx;
+  const a = DEMO_ROUTE[idx]!;
+  const b = DEMO_ROUTE[idx + 1]!;
+  return {
+    lat: lerp(a.lat, b.lat, local),
+    lng: lerp(a.lng, b.lng, local),
+    heading: headingDegrees(a, b)
   };
-  const etaMinutes = 12;
+}
+
+/**
+ * Demo-only clock: advances at DEMO_SPEED_FACTOR.
+ * Pass `startedAtMs` (from SMS link `?t=`) so the trip starts ~12 min away.
+ * Without a start time, the demo loops on a wall-clock cycle so `/track/example` always moves.
+ */
+export function getDemoDriveState(nowMs = Date.now(), startedAtMs?: number | null) {
+  const simTripMs = DEMO_SIM_ETA_MINUTES * 60 * 1000;
+  const realTripMs = Math.round(simTripMs / DEMO_SPEED_FACTOR);
+  const holdAtArrivalMs = 45_000;
+  const cycleMs = realTripMs + holdAtArrivalMs;
+
+  let elapsedRealMs: number;
+  if (startedAtMs != null && Number.isFinite(startedAtMs) && startedAtMs > 0) {
+    elapsedRealMs = Math.max(0, nowMs - startedAtMs);
+  } else {
+    elapsedRealMs = nowMs % cycleMs;
+  }
+
+  const simElapsedMs = Math.min(simTripMs, elapsedRealMs * DEMO_SPEED_FACTOR);
+  const timeFrac = clamp01(simElapsedMs / simTripMs);
+  const routeProgress = demoRouteProgressFromTime(timeFrac);
+  const point = demoPointAlongRoute(routeProgress);
+  const remainingSimMs = Math.max(0, simTripMs - simElapsedMs);
+  const etaMinutes =
+    remainingSimMs <= 0 ? 0 : Math.max(1, Math.ceil(remainingSimMs / 60_000));
+  const arrived = remainingSimMs <= 0 || routeProgress >= 0.995;
+
+  return {
+    stop: DEMO_STOP,
+    vehicle: {
+      lat: point.lat,
+      lng: point.lng,
+      heading: Math.round(((point.heading % 360) + 360) % 360),
+      updatedAt: new Date(nowMs).toISOString()
+    },
+    etaMinutes: arrived ? 0 : etaMinutes,
+    arrived,
+    routeProgress,
+    speedFactor: DEMO_SPEED_FACTOR
+  };
+}
+
+/** Preview payload so `/track/example` opens a live-feeling demo map (not Samsara). */
+export function getOwnerTrackingDemo(
+  token: string,
+  options?: { startedAtMs?: number | null; nowMs?: number }
+): OwnerTrackingPublicView {
+  const normalized = token.trim().toLowerCase();
+  const drive = getDemoDriveState(options?.nowMs ?? Date.now(), options?.startedAtMs);
   const direction = "pickup" as const;
-  const status = "en_route";
+  const status = drive.arrived ? "arrived" : drive.etaMinutes <= 15 ? "arriving_15" : "en_route";
+  const etaMinutes = drive.arrived ? 0 : drive.etaMinutes;
   return {
     token: normalized,
     status,
@@ -94,12 +237,12 @@ export function getOwnerTrackingDemo(token: string): OwnerTrackingPublicView {
     dogNames: ["Indy"],
     ownerName: "Demo Owner",
     stopAddress: "Venice, Los Angeles, CA",
-    stop,
-    vehicle,
+    stop: drive.stop,
+    vehicle: drive.vehicle,
     etaMinutes,
     headline: headlineFor(status, etaMinutes, direction),
     subline: sublineFor(status, etaMinutes),
-    showArrivingBanner: false,
+    showArrivingBanner: Boolean(etaMinutes != null && etaMinutes <= 15) || status === "arriving_15" || drive.arrived,
     liveConfigured: true
   };
 }
@@ -232,9 +375,12 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
   return { created, smsQueued, smsConfigured: sms.isConfigured(), smsErrors: smsErrors.slice(0, 25) };
 }
 
-export async function getOwnerTrackingPublic(token: string): Promise<OwnerTrackingPublicView | null> {
+export async function getOwnerTrackingPublic(
+  token: string,
+  options?: { startedAtMs?: number | null }
+): Promise<OwnerTrackingPublicView | null> {
   if (isOwnerTrackingDemoToken(token)) {
-    return getOwnerTrackingDemo(token);
+    return getOwnerTrackingDemo(token, { startedAtMs: options?.startedAtMs });
   }
 
   const supabase = getServiceSupabase();
