@@ -722,6 +722,31 @@ export async function createEmployeeWriteUpReport(
     team_lead_signature: trimField(input.manager_signature, 120) || actor
   };
 
+  const summary = `${employee_name} (${employee_department}) — ${statement_of_violation.slice(0, 180)}`;
+  const now = new Date().toISOString();
+  const report: ManagementReport = {
+    id: newId(),
+    report_type: "employee_write_up",
+    title: `Employee Write-Up — ${employee_name}`,
+    dog_handler_name: null,
+    complaint_category: null,
+    employee_name,
+    summary: summary.slice(0, MAX_SUMMARY_LENGTH),
+    write_up_details,
+    groomer_submission_details: null,
+    source: "team_lead_form",
+    status: "Needs Review",
+    visibility: "admin_management",
+    push_notice_id: null,
+    related_notes: null,
+    reviewed_by: null,
+    reviewed_at: null,
+    created_by: actor,
+    submitted_by_name: trimField(submittedByName, 120) || null,
+    created_at: now,
+    updated_at: now
+  };
+
   const state = await loadState(supabase);
   await saveState(supabase, { reports: sortNewest([report, ...state.reports]) });
 

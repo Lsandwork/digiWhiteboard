@@ -34,7 +34,7 @@ import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckinListsForDisplay, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
   expireStickyCheckoutDogs,
@@ -454,8 +454,9 @@ export function BoardClient({
       setBoard((previous) => {
         // The fast endpoint includes webhook-sourced check-ins as well as
         // prompted checkouts, so both columns can update without waiting for
-        // the heavier Gingr-backed full-board request.
-        const nextCheckins = preserveDogPhotos(previous.checking_in, data.checking_in ?? []);
+        // the heavier Gingr-backed full-board request. Preserve recent webhook
+        // check-ins across multi-instance cache lag so dogs do not flicker off.
+        const nextCheckins = mergeCheckinListsForDisplay(data.checking_in ?? [], previous.checking_in);
         const nextRaw = data.basket_filtered
           ? data.checking_out
           : mergeCheckoutDogs(previous.checking_out, data.checking_out);

@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
-import { includePromptedCheckoutInBoard } from "../lib/board-checkout-merge";
+import {
+  BOARD_CHECKOUT_POLL_MS,
+  includePromptedCheckoutInBoard,
+  mergeBoardResponse,
+  mergeCheckinListsForDisplay
+} from "../lib/board-checkout-merge";
 import { applyOptimisticLiveBoardTransition } from "../lib/board-optimistic-transition";
 import type { LiveBoardResponse, LiveDog } from "../lib/types";
+
+assert.equal(BOARD_CHECKOUT_POLL_MS, 1000);
 
 function dog(overrides: Partial<LiveDog>): LiveDog {
   return {
@@ -87,5 +94,39 @@ const optimisticRemove = applyOptimisticLiveBoardTransition(
 );
 assert.ok(optimisticRemove);
 assert.equal(optimisticRemove?.checking_in.length, 0);
+
+const recentCheckin = dog({
+  status_started_at: new Date(recentMs).toISOString(),
+  updated_at: new Date(recentMs).toISOString(),
+  display_until: new Date(recentMs + 4 * 60_000).toISOString()
+});
+const preserved = mergeCheckinListsForDisplay([], [recentCheckin], recentMs);
+assert.equal(preserved.length, 1);
+assert.equal(preserved[0]?.animal_name, "Atlas");
+
+const staleCheckin = dog({
+  status_started_at: new Date(recentMs - 5_000).toISOString(),
+  updated_at: new Date(recentMs - 5_000).toISOString(),
+  display_until: new Date(recentMs + 3 * 60_000).toISOString()
+});
+assert.equal(mergeCheckinListsForDisplay([], [staleCheckin], recentMs).length, 0);
+
+const completedCheckin = dog({
+  status_started_at: new Date(recentMs).toISOString(),
+  updated_at: new Date(recentMs).toISOString(),
+  completed_at: new Date(recentMs).toISOString(),
+  display_until: new Date(recentMs + 4 * 60_000).toISOString()
+});
+assert.equal(mergeCheckinListsForDisplay([], [completedCheckin], recentMs).length, 0);
+
+const mergedBoard = mergeBoardResponse(
+  {
+    ...emptyBoard,
+    checking_in: [recentCheckin],
+    counts: { checking_in: 1, checking_out: 0, total: 1 }
+  },
+  { ...emptyBoard, last_updated: new Date(recentMs).toISOString() }
+);
+assert.equal(mergedBoard.checking_in.length, 1);
 
 console.log("board optimistic transition tests passed");

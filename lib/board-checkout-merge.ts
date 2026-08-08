@@ -1,14 +1,22 @@
+import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
-export const BOARD_CHECKOUT_POLL_MIN_MS = 1500;
+export const BOARD_CHECKOUT_POLL_MIN_MS = 1000;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
-export const BOARD_CHECKOUT_POLL_MS = 1500;
+/** Staff board fast poll — keep ≤1s so check-ins appear quickly when Realtime is down. */
+export const BOARD_CHECKOUT_POLL_MS = 1000;
 export const BOARD_FULL_SYNC_POLL_MS = 20_000;
 /** Full board sync interval when Supabase Realtime is connected. */
 export const BOARD_FULL_SYNC_POLL_LIVE_MS = 60_000;
 export const BOARD_REALTIME_DEBOUNCE_MS = 0;
+/**
+ * Bridge multi-instance TTL lag after a webhook write so an optimistic
+ * check-in is not wiped by a stale empty poll from another serverless node.
+ * Keep short so a completed check-in is not stuck on the board.
+ */
+export const WEBHOOK_CHECKIN_CACHE_GRACE_MS = 4_000;
 
 export function clampCheckoutPollMs(intervalMs: number) {
   return Math.min(BOARD_CHECKOUT_POLL_MAX_MS, Math.max(BOARD_CHECKOUT_POLL_MIN_MS, intervalMs));
@@ -43,8 +51,29 @@ export function preserveDogPhotos(previousDogs: LiveDog[], nextDogs: LiveDog[]) 
   });
 }
 
+/** Keep a just-webhooks check-in visible while other Vercel instances still serve a stale empty cache. */
+export function isWebhookCheckinWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
+  if (dog.hidden || dog.completed_at) return false;
+  if (dog.display_status !== "checking_in" || dog.current_status !== "checking_in") return false;
+  if (dog.raw_payload?.source === "gingr_back_of_house") return false;
+  if (shouldExpireCheckinDog(dog, new Date(nowMs))) return false;
+  const started = dog.status_started_at ?? dog.updated_at;
+  if (!started) return false;
+  const startedMs = new Date(started).getTime();
+  return Number.isFinite(startedMs) && nowMs - startedMs <= WEBHOOK_CHECKIN_CACHE_GRACE_MS;
+}
+
+export function mergeCheckinListsForDisplay(
+  serverCheckins: LiveDog[],
+  previousCheckins: LiveDog[],
+  nowMs = Date.now()
+) {
+  const graceRows = previousCheckins.filter((dog) => isWebhookCheckinWithinCacheGrace(dog, nowMs));
+  return preserveDogPhotos(previousCheckins, mergeCheckoutDogs(serverCheckins, graceRows));
+}
+
 export function mergeBoardResponse(previous: LiveBoardResponse, next: LiveBoardResponse): LiveBoardResponse {
-  const checkingIn = preserveDogPhotos(previous.checking_in, next.checking_in);
+  const checkingIn = mergeCheckinListsForDisplay(next.checking_in, previous.checking_in);
   const checkingOut = preserveDogPhotos(previous.checking_out, next.checking_out);
 
   if (
@@ -58,7 +87,12 @@ export function mergeBoardResponse(previous: LiveBoardResponse, next: LiveBoardR
   return {
     ...next,
     checking_in: checkingIn,
-    checking_out: checkingOut
+    checking_out: checkingOut,
+    counts: {
+      checking_in: checkingIn.length,
+      checking_out: checkingOut.length,
+      total: checkingIn.length + checkingOut.length
+    }
   };
 }
 

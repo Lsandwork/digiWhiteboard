@@ -5,9 +5,7 @@ import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/li
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
-import { invalidateGingrCustomAnimalIconsCache } from "@/lib/gingr-custom-animal-icons";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
-import { evaluateFighterRotationAlertForCheckIn } from "@/lib/staff/fighter-rotation-alerts";
 import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
@@ -174,37 +172,43 @@ export async function POST(request: Request) {
       const { data: savedDog, error } = await mutation;
       if (error) throw error;
 
-      await supabase.from("board_activity_log").insert({
-        gingr_reservation_id: dog.gingr_reservation_id,
-        animal_name: dog.animal_name,
-        action: webhookType,
-        previous_status: existing?.current_status ?? null,
-        new_status: webhookType,
-        source: "webhook",
-        details: { dog_id: savedDog.id }
-      });
-
-      if (!continuing) {
-        after(async () => {
-          if (webhookType === "checking_in") {
-            await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
-            try {
-              await evaluateFighterRotationAlertForCheckIn(supabase, savedDog);
-            } catch (error) {
-              console.error("fighter-rotation: check-in alert failed", error);
-            }
-          } else if (webhookType === "checking_out") {
-            await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
-          }
-        });
-      }
-
+      // Ack Gingr as soon as the dog is on the board path. Activity log, Shelly,
+      // and Fighter/Rotations alerts must not delay the webhook response.
       invalidateBoardTransitionCaches();
+
+      after(async () => {
+        await supabase.from("board_activity_log").insert({
+          gingr_reservation_id: dog.gingr_reservation_id,
+          animal_name: dog.animal_name,
+          action: webhookType,
+          previous_status: existing?.current_status ?? null,
+          new_status: webhookType,
+          source: "webhook",
+          details: { dog_id: savedDog.id }
+        });
+
+        if (continuing) return;
+
+        if (webhookType === "checking_in") {
+          await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
+          try {
+            const { evaluateFighterRotationAlertForCheckIn } = await import(
+              "@/lib/staff/fighter-rotation-alerts"
+            );
+            await evaluateFighterRotationAlertForCheckIn(supabase, savedDog);
+          } catch (error) {
+            console.error("fighter-rotation: check-in alert failed", error);
+          }
+        } else if (webhookType === "checking_out") {
+          await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
+        }
+      });
     }
 
     if (acceptedPassiveTypes.has(webhookType)) {
       const dog = normalizeDog(payload);
       if (dog.gingr_animal_id && (webhookType === "animal_edited" || webhookType === "animal_created")) {
+        const { invalidateGingrCustomAnimalIconsCache } = await import("@/lib/gingr-custom-animal-icons");
         invalidateGingrCustomAnimalIconsCache(dog.gingr_animal_id);
       }
       if (dog.gingr_animal_id || dog.gingr_reservation_id) {

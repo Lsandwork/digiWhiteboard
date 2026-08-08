@@ -188,7 +188,14 @@ export type CheckedInGingrDog = {
 };
 
 /** Currently checked-in dogs from Gingr reservations (facility presence). */
+const CHECKED_IN_CACHE_TTL_MS = 45_000;
+let checkedInCache: { dogs: CheckedInGingrDog[]; cachedAt: number } | null = null;
+
 export async function fetchCurrentlyCheckedInDogs(): Promise<CheckedInGingrDog[]> {
+  if (checkedInCache && Date.now() - checkedInCache.cachedAt < CHECKED_IN_CACHE_TTL_MS) {
+    return checkedInCache.dogs;
+  }
+
   const { subdomain, apiKey } = getGingrConfig();
   if (!apiKey) return [];
 
@@ -247,5 +254,6 @@ export async function fetchCurrentlyCheckedInDogs(): Promise<CheckedInGingrDog[]
       reservationId: readString(record.reservation_id) ?? readString(record.id)
     });
   }
+  checkedInCache = { dogs, cachedAt: Date.now() };
   return dogs;
 }

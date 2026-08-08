@@ -1340,6 +1340,13 @@ export async function createOwnerFollowUp(supabase: SupabaseClient, input: Recor
   }
   return record;
 }
+
+export async function updateOwnerFollowUp(
+  supabase: SupabaseClient,
+  id: string,
+  patch: Record<string, unknown>,
+  actor: string | null
+) {
   const now = nowIso();
   const state = await loadState(supabase);
   let updated: OwnerFollowUp | null = null;
