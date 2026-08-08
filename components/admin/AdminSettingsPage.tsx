@@ -237,14 +237,15 @@ export function AdminSettingsPage({
         </div>
       </Section>
 
-      <Section title="Notification & Health" helper="Alerts when sync data looks stale or unhealthy.">
+      <Section title="Notification & Health" helper="Critical/Urgent alerts email Super Admin. Also configure sync health warnings.">
         <div className="grid gap-4 md:grid-cols-2">
           <Toggle label="Show sync health warnings" checked={draft.show_sync_health_warnings} onChange={(checked) => setDraft({ ...draft, show_sync_health_warnings: checked })} />
           <Field label="Stale data warning after (minutes)">
             <input className="admin-input" type="number" min={1} max={60} value={draft.stale_data_warning_minutes} onChange={(e) => setDraft({ ...draft, stale_data_warning_minutes: Number(e.target.value) })} />
           </Field>
           <Field label="Admin alert email">
-            <input className="admin-input" type="email" value={draft.admin_alert_email} onChange={(e) => setDraft({ ...draft, admin_alert_email: e.target.value })} placeholder="ops@fitdog.com" />
+            <input className="admin-input" type="email" value={draft.admin_alert_email} onChange={(e) => setDraft({ ...draft, admin_alert_email: e.target.value })} placeholder="lonnie@fitdog.com" />
+            <p className="mt-1 text-xs text-admin-muted">Critical/Urgent alerts always email Super Admin lonnie@fitdog.com; this address is notified too when set.</p>
           </Field>
           <Toggle label="Enable publish reminders" checked={draft.enable_publish_reminders} onChange={(checked) => setDraft({ ...draft, enable_publish_reminders: checked })} />
         </div>

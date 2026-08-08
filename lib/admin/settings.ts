@@ -52,7 +52,7 @@ export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
   animation_intensity: "subtle",
   show_sync_health_warnings: true,
   stale_data_warning_minutes: 5,
-  admin_alert_email: "",
+  admin_alert_email: "lonnie@fitdog.com",
   enable_publish_reminders: true,
   public_display_disabled: false,
   display_content_revision: 0,

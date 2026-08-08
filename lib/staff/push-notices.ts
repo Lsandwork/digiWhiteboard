@@ -671,6 +671,21 @@ export async function pushStaffNoticeById(
   });
   const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
   await triggerShellyAlertForPushNotice(updated);
+  void import("@/lib/admin/alert-email")
+    .then(({ sendCriticalAlertEmailToSuperAdmin }) =>
+      sendCriticalAlertEmailToSuperAdmin(supabase, {
+        title: updated.title || "Urgent push notice",
+        body: updated.message,
+        priority: updated.priority,
+        displayMode: updated.display_mode,
+        urgent: updated.priority === "urgent" || updated.display_mode === "urgent",
+        sourceTable: "staff_push_notices",
+        sourceId: updated.id,
+        sourceTab: "push_notices",
+        idempotencyKey: `push-notice-email:${updated.id}:push`
+      })
+    )
+    .catch(() => undefined);
   return updated;
 }
 
@@ -700,6 +715,21 @@ export async function createAndPushStaffNotice(
   await saveNoticeState(supabase, { notices: sortNotices([notice, ...state.notices]) });
   const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
   await triggerShellyAlertForPushNotice(notice);
+  void import("@/lib/admin/alert-email")
+    .then(({ sendCriticalAlertEmailToSuperAdmin }) =>
+      sendCriticalAlertEmailToSuperAdmin(supabase, {
+        title: notice.title || "Urgent push notice",
+        body: notice.message,
+        priority: notice.priority,
+        displayMode: notice.display_mode,
+        urgent: notice.priority === "urgent" || notice.display_mode === "urgent",
+        sourceTable: "staff_push_notices",
+        sourceId: notice.id,
+        sourceTab: "push_notices",
+        idempotencyKey: `push-notice-email:${notice.id}:create`
+      })
+    )
+    .catch(() => undefined);
   return notice;
 }
 
