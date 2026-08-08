@@ -6,7 +6,12 @@ import { getPublicSiteUrl } from "@/lib/site-url";
 /** Lonnie Sandoval — seeded in staff directory / used for demo SMS delivery. */
 const LONNIE_FALLBACK_PHONE = "213-913-1391";
 
-export type SuperAdminSmsKind = "fitdog_alert" | "front_desk_note" | "front_desk_comment";
+export type SuperAdminSmsKind =
+  | "fitdog_alert"
+  | "front_desk_note"
+  | "front_desk_comment"
+  | "keyword_alert"
+  | "write_up";
 
 export type SuperAdminSmsPayload = {
   kind: SuperAdminSmsKind;
@@ -15,6 +20,18 @@ export type SuperAdminSmsPayload = {
   idempotencyKey: string;
   adminPath?: string;
 };
+
+/** Phrases that must SMS Lonnie regardless of priority. */
+const SUPER_ADMIN_SMS_KEYWORD_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
+  { label: "puncture", pattern: /\bpunctur(?:e|ed|ing|es)\b/i },
+  { label: "dog fight", pattern: /\bdog[\s-]*fights?\b/i },
+  { label: "fight", pattern: /\bfights?\b/i },
+  { label: "angry owner", pattern: /\bangry\s+owners?\b/i },
+  { label: "sick dog", pattern: /\bsick\s+dogs?\b/i },
+  { label: "not eating", pattern: /\bnot\s+eating\b/i },
+  { label: "missing meds", pattern: /\bmissing\s+med(?:s|ication|ications)?\b/i },
+  { label: "write up", pattern: /\bwrite[\s-]*ups?\b|\bwritten\s+up\b/i }
+];
 
 function staffAlertSmsEnabled() {
   const flag = process.env.STAFF_ALERT_SMS_ENABLED?.trim().toLowerCase();
@@ -34,6 +51,36 @@ export function isCriticalOrUrgentStaffNote(input: {
   const priority = String(input.priority || "").trim();
   if (input.urgent) return true;
   return priority === "Critical" || priority === "Urgent";
+}
+
+/** First matched sensitive keyword label, or null. */
+export function findSuperAdminSmsKeyword(...parts: Array<string | null | undefined>): string | null {
+  const text = parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join("\n");
+  if (!text) return null;
+  for (const row of SUPER_ADMIN_SMS_KEYWORD_PATTERNS) {
+    if (row.pattern.test(text)) return row.label;
+  }
+  return null;
+}
+
+export function textTriggersSuperAdminSms(...parts: Array<string | null | undefined>) {
+  return findSuperAdminSmsKeyword(...parts) != null;
+}
+
+/** Critical/Urgent note OR sensitive keyword mention. */
+export function staffContentNeedsSuperAdminSms(input: {
+  priority?: string | null;
+  urgent?: boolean | null;
+  subject?: string | null;
+  details?: string | null;
+  message?: string | null;
+  body?: string | null;
+}) {
+  if (isCriticalOrUrgentStaffNote(input)) return true;
+  return textTriggersSuperAdminSms(input.subject, input.details, input.message, input.body);
 }
 
 async function resolveSuperAdminPhone(supabase?: SupabaseClient | null): Promise<string | null> {

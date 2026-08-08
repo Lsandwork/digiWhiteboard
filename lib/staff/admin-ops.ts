@@ -24,6 +24,8 @@ import {
 } from "@/lib/staff/notifications";
 import {
   isCriticalOrUrgentStaffNote,
+  findSuperAdminSmsKeyword,
+  staffContentNeedsSuperAdminSms,
   sendSuperAdminSmsAlertFireAndForget
 } from "@/lib/staff/super-admin-sms";
 
@@ -856,11 +858,14 @@ export async function createCrossoverMessage(
     const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
     triggerShellyAlertFireAndForget("urgent_front_desk", `front-desk:${record.id}`);
   }
-  if (isCriticalOrUrgentStaffNote(record)) {
+  if (staffContentNeedsSuperAdminSms(record)) {
+    const keyword = findSuperAdminSmsKeyword(record.subject, record.details, record.message);
     sendSuperAdminSmsAlertFireAndForget(
       {
-        kind: "front_desk_note",
-        title: `${record.priority}${record.urgent ? "/URGENT" : ""} note: ${record.subject}`,
+        kind: keyword ? "keyword_alert" : "front_desk_note",
+        title: keyword
+          ? `Keyword alert (${keyword}): ${record.subject}`
+          : `${record.priority}${record.urgent ? "/URGENT" : ""} note: ${record.subject}`,
         detail: buildShiftLogAlertBody(record),
         idempotencyKey: `sa-sms:front-desk:${record.id}:created`,
         adminPath: "/admin?board=staff&tab=crossover_communication"
@@ -956,11 +961,14 @@ export async function replyToCrossoverMessage(
     created_by: authorLabel
   });
   await saveState(supabase, next);
-  if (isCriticalOrUrgentStaffNote(parent)) {
+  const commentKeyword = findSuperAdminSmsKeyword(text);
+  if (isCriticalOrUrgentStaffNote(parent) || commentKeyword) {
     sendSuperAdminSmsAlertFireAndForget(
       {
-        kind: "front_desk_comment",
-        title: `Comment on ${parent.priority} note: ${parent.subject}`,
+        kind: commentKeyword ? "keyword_alert" : "front_desk_comment",
+        title: commentKeyword
+          ? `Keyword alert (${commentKeyword}) on note: ${parent.subject}`
+          : `Comment on ${parent.priority} note: ${parent.subject}`,
         detail: `${authorLabel ?? "Staff"}: ${text}`,
         idempotencyKey: `sa-sms:front-desk-reply:${reply.id}`,
         adminPath: "/admin?board=staff&tab=crossover_communication"
@@ -1114,13 +1122,16 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
   const previous = state.crossover_messages.find((item) => item.id === id);
   const { state: next, updated } = applyCrossoverMessagePatch(state, id, patch, actor);
   await saveState(supabase, next);
-  const wasCritical = previous ? isCriticalOrUrgentStaffNote(previous) : false;
-  const nowCritical = isCriticalOrUrgentStaffNote(updated);
-  if (nowCritical && !wasCritical) {
+  const wasAlert = previous ? staffContentNeedsSuperAdminSms(previous) : false;
+  const nowAlert = staffContentNeedsSuperAdminSms(updated);
+  if (nowAlert && !wasAlert) {
+    const keyword = findSuperAdminSmsKeyword(updated.subject, updated.details, updated.message);
     sendSuperAdminSmsAlertFireAndForget(
       {
-        kind: "front_desk_note",
-        title: `${updated.priority}${updated.urgent ? "/URGENT" : ""} note escalated: ${updated.subject}`,
+        kind: keyword ? "keyword_alert" : "front_desk_note",
+        title: keyword
+          ? `Keyword alert (${keyword}): ${updated.subject}`
+          : `${updated.priority}${updated.urgent ? "/URGENT" : ""} note escalated: ${updated.subject}`,
         detail: buildShiftLogAlertBody(updated),
         idempotencyKey: `sa-sms:front-desk:${updated.id}:escalated`,
         adminPath: "/admin?board=staff&tab=crossover_communication"
@@ -1305,10 +1316,30 @@ export async function createOwnerFollowUp(supabase: SupabaseClient, input: Recor
     actor
   });
   await saveState(supabase, state);
+  if (
+    staffContentNeedsSuperAdminSms({
+      priority: record.priority,
+      urgent: record.urgent,
+      subject: record.subject,
+      details: record.follow_up_notes
+    })
+  ) {
+    const keyword = findSuperAdminSmsKeyword(record.subject, record.follow_up_notes);
+    sendSuperAdminSmsAlertFireAndForget(
+      {
+        kind: keyword ? "keyword_alert" : "front_desk_note",
+        title: keyword
+          ? `Keyword alert (${keyword}): ${record.subject}`
+          : `Follow-up ${record.priority}: ${record.subject}`,
+        detail: [record.owner_name, record.dog_name, record.follow_up_notes].filter(Boolean).join(" · "),
+        idempotencyKey: `sa-sms:follow-up:${record.id}:created`,
+        adminPath: "/admin?board=staff&tab=owner_follow_up"
+      },
+      supabase
+    );
+  }
   return record;
 }
-
-export async function updateOwnerFollowUp(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
   const now = nowIso();
   const state = await loadState(supabase);
   let updated: OwnerFollowUp | null = null;
@@ -1419,6 +1450,27 @@ export async function createActiveIssue(supabase: SupabaseClient, input: Record<
   if (record.priority === "Urgent" || record.priority === "High" || record.priority === "Critical") {
     const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
     triggerShellyAlertFireAndForget("urgent_front_desk", `active-issue:${record.id}`);
+  }
+  if (
+    staffContentNeedsSuperAdminSms({
+      priority: record.priority,
+      subject: record.title,
+      details: record.notes
+    })
+  ) {
+    const keyword = findSuperAdminSmsKeyword(record.title, record.notes, record.related_dog_name, record.related_owner_name);
+    sendSuperAdminSmsAlertFireAndForget(
+      {
+        kind: keyword ? "keyword_alert" : "front_desk_note",
+        title: keyword
+          ? `Keyword alert (${keyword}): ${record.title}`
+          : `Active issue ${record.priority}: ${record.title}`,
+        detail: [record.category, record.related_dog_name, record.notes].filter(Boolean).join(" · "),
+        idempotencyKey: `sa-sms:active-issue:${record.id}:created`,
+        adminPath: "/admin?board=staff&tab=active_issues"
+      },
+      supabase
+    );
   }
   return record;
 }
