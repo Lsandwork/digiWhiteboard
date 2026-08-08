@@ -5,7 +5,9 @@ import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/li
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
+import { invalidateGingrCustomAnimalIconsCache } from "@/lib/gingr-custom-animal-icons";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
+import { evaluateFighterRotationAlertForCheckIn } from "@/lib/staff/fighter-rotation-alerts";
 import { upsertIncidentFromGingrWebhook } from "@/lib/staff/track-incidents";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isContinuingSameTransition, shouldHideCompletedDog } from "@/lib/transition-cleanup";
@@ -186,6 +188,11 @@ export async function POST(request: Request) {
         after(async () => {
           if (webhookType === "checking_in") {
             await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
+            try {
+              await evaluateFighterRotationAlertForCheckIn(supabase, savedDog);
+            } catch (error) {
+              console.error("fighter-rotation: check-in alert failed", error);
+            }
           } else if (webhookType === "checking_out") {
             await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
           }
@@ -197,6 +204,9 @@ export async function POST(request: Request) {
 
     if (acceptedPassiveTypes.has(webhookType)) {
       const dog = normalizeDog(payload);
+      if (dog.gingr_animal_id && (webhookType === "animal_edited" || webhookType === "animal_created")) {
+        invalidateGingrCustomAnimalIconsCache(dog.gingr_animal_id);
+      }
       if (dog.gingr_animal_id || dog.gingr_reservation_id) {
         const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
         const now = new Date().toISOString();
