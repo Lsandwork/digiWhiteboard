@@ -29,6 +29,11 @@ export type VipAutoBookClient = {
   endsOn: string | null;
   status: VipClientStatus;
   notes: string;
+  platform: string;
+  needToRebook: boolean;
+  pickupLocation: string | null;
+  dropoffLocation: string | null;
+  daysBookedLabel: string | null;
   lastVerifiedAt: string | null;
   lastBookedFor: string | null;
   lastBookStatus: string | null;

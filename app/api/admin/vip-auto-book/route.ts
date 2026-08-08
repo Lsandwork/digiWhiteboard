@@ -148,7 +148,17 @@ export async function POST(request: Request) {
         startsOn: body.startsOn !== undefined ? String(body.startsOn) : undefined,
         endsOn: body.endsOn !== undefined ? (body.endsOn ? String(body.endsOn) : null) : undefined,
         status: body.status as VipClientStatus | undefined,
-        notes: body.notes !== undefined ? String(body.notes) : undefined
+        notes: body.notes !== undefined ? String(body.notes) : undefined,
+        platform: body.platform !== undefined ? String(body.platform) : undefined,
+        needToRebook: body.needToRebook !== undefined ? Boolean(body.needToRebook) : undefined,
+        pickupLocation:
+          body.pickupLocation !== undefined ? (body.pickupLocation ? String(body.pickupLocation) : null) : undefined,
+        dropoffLocation:
+          body.dropoffLocation !== undefined ? (body.dropoffLocation ? String(body.dropoffLocation) : null) : undefined,
+        daysBookedLabel:
+          body.daysBookedLabel !== undefined ? (body.daysBookedLabel ? String(body.daysBookedLabel) : null) : undefined,
+        lastBookedFor:
+          body.lastBookedFor !== undefined ? (body.lastBookedFor ? String(body.lastBookedFor) : null) : undefined
       });
       return NextResponse.json({ ok: true, record });
     }

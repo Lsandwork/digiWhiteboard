@@ -71,6 +71,11 @@ function mapRow(row: Record<string, unknown>): VipAutoBookClient {
     endsOn: row.ends_on != null ? String(row.ends_on).slice(0, 10) : null,
     status: asStatus(row.status),
     notes: String(row.notes ?? ""),
+    platform: String(row.platform ?? "APP"),
+    needToRebook: Boolean(row.need_to_rebook),
+    pickupLocation: row.pickup_location != null ? String(row.pickup_location) : null,
+    dropoffLocation: row.dropoff_location != null ? String(row.dropoff_location) : null,
+    daysBookedLabel: row.days_booked_label != null ? String(row.days_booked_label) : null,
     lastVerifiedAt: row.last_verified_at != null ? String(row.last_verified_at) : null,
     lastBookedFor: row.last_booked_for != null ? String(row.last_booked_for).slice(0, 10) : null,
     lastBookStatus: row.last_book_status != null ? String(row.last_book_status) : null,
@@ -151,6 +156,12 @@ export async function createVipAutoBookClient(
     startsOn?: string | null;
     endsOn?: string | null;
     notes?: string;
+    platform?: string | null;
+    needToRebook?: boolean;
+    pickupLocation?: string | null;
+    dropoffLocation?: string | null;
+    daysBookedLabel?: string | null;
+    lastBookedFor?: string | null;
     createdByUserId?: string | null;
     createdByName?: string | null;
   }
@@ -184,6 +195,12 @@ export async function createVipAutoBookClient(
       ends_on: input.endsOn?.trim() || null,
       status: "active",
       notes: String(input.notes ?? "").trim(),
+      platform: String(input.platform ?? "APP").trim() || "APP",
+      need_to_rebook: Boolean(input.needToRebook),
+      pickup_location: input.pickupLocation?.trim() || null,
+      dropoff_location: input.dropoffLocation?.trim() || null,
+      days_booked_label: input.daysBookedLabel?.trim() || null,
+      last_booked_for: input.lastBookedFor?.trim() || null,
       created_by_user_id: input.createdByUserId ?? null,
       created_by_name: input.createdByName ?? null
     })
@@ -213,6 +230,11 @@ export async function updateVipAutoBookClient(
     endsOn: string | null;
     status: VipClientStatus;
     notes: string;
+    platform: string;
+    needToRebook: boolean;
+    pickupLocation: string | null;
+    dropoffLocation: string | null;
+    daysBookedLabel: string | null;
     lastVerifiedAt: string | null;
     lastBookedFor: string | null;
     lastBookStatus: string | null;
@@ -239,6 +261,11 @@ export async function updateVipAutoBookClient(
   if (patch.endsOn !== undefined) update.ends_on = patch.endsOn;
   if (patch.status !== undefined) update.status = asStatus(patch.status);
   if (patch.notes !== undefined) update.notes = String(patch.notes).trim();
+  if (patch.platform !== undefined) update.platform = String(patch.platform).trim() || "APP";
+  if (patch.needToRebook !== undefined) update.need_to_rebook = Boolean(patch.needToRebook);
+  if (patch.pickupLocation !== undefined) update.pickup_location = patch.pickupLocation?.trim() || null;
+  if (patch.dropoffLocation !== undefined) update.dropoff_location = patch.dropoffLocation?.trim() || null;
+  if (patch.daysBookedLabel !== undefined) update.days_booked_label = patch.daysBookedLabel?.trim() || null;
   if (patch.lastVerifiedAt !== undefined) update.last_verified_at = patch.lastVerifiedAt;
   if (patch.lastBookedFor !== undefined) update.last_booked_for = patch.lastBookedFor;
   if (patch.lastBookStatus !== undefined) update.last_book_status = patch.lastBookStatus;

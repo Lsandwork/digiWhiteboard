@@ -321,46 +321,62 @@ export function VipAutoBookPanel() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="crossover-table w-full min-w-[900px]">
+          <table className="crossover-table w-full min-w-[1100px]">
             <thead>
               <tr>
                 <th>Dog</th>
                 <th>Owner</th>
-                <th>Service</th>
-                <th>Cadence</th>
-                <th>Days / Week</th>
-                <th>Status</th>
+                <th>Repeat Classes / Service</th>
+                <th>Days Booked</th>
+                <th>Platform</th>
+                <th>Last Day Booked?</th>
+                <th>Need to Re-Book?</th>
+                <th>PU</th>
+                <th>DO</th>
               </tr>
             </thead>
             <tbody>
               {(data?.rows ?? []).map((row) => (
                 <tr key={row.id} className="cursor-pointer" onClick={() => setDrawer(row)}>
                   <td className="font-semibold">{row.dogName}</td>
+                  <td>{row.ownerName}</td>
+                  <td>{row.serviceName || serviceKindLabel(row.serviceKind)}</td>
                   <td>
-                    <div>{row.ownerName}</div>
-                    <div className="text-xs text-admin-muted">{row.ownerPhone || row.ownerEmail || "—"}</div>
+                    {row.daysBookedLabel ||
+                      (row.cadence === "monthly"
+                        ? row.monthlyWeek
+                          ? `Week ${row.monthlyWeek}`
+                          : "Monthly"
+                        : formatDaysOfWeek(row.daysOfWeek))}
+                  </td>
+                  <td>{row.platform || "APP"}</td>
+                  <td>
+                    {row.lastBookedFor
+                      ? new Date(`${row.lastBookedFor}T12:00:00`).toLocaleDateString("en-US", {
+                          month: "2-digit",
+                          day: "2-digit"
+                        })
+                      : "—"}
                   </td>
                   <td>
-                    <div>{serviceKindLabel(row.serviceKind)}</div>
-                    <div className="text-xs text-admin-muted">{row.serviceName || "—"}</div>
+                    <button
+                      type="button"
+                      className="crossover-btn crossover-btn--secondary px-3 py-1 text-xs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void patchClient(row.id, { needToRebook: !row.needToRebook });
+                      }}
+                    >
+                      {row.needToRebook ? "Yes" : "No"} ▾
+                    </button>
                   </td>
-                  <td>{cadenceLabel(row.cadence)}</td>
-                  <td>
-                    {row.cadence === "monthly"
-                      ? row.monthlyWeek
-                        ? `Week ${row.monthlyWeek}`
-                        : "Monthly"
-                      : formatDaysOfWeek(row.daysOfWeek)}
-                    {row.preferredTime ? <div className="text-xs text-admin-muted">{row.preferredTime}</div> : null}
-                  </td>
-                  <td>
-                    <span className="crossover-badge">{row.status}</span>
-                  </td>
+                  <td>{row.pickupLocation || "—"}</td>
+                  <td>{row.dropoffLocation || "—"}</td>
                 </tr>
               ))}
               {!loading && !(data?.rows ?? []).length ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-sm text-admin-muted">
+                  <td colSpan={9} className="py-8 text-center text-sm text-admin-muted">
                     No VIP Auto Book clients yet. Add one and choose weekly/monthly class, hike, or excursion.
                   </td>
                 </tr>
@@ -574,11 +590,21 @@ export function VipAutoBookPanel() {
               <span className="font-semibold text-white">Service:</span> {drawer.serviceName || serviceKindLabel(drawer.serviceKind)}
             </p>
             <p>
-              <span className="font-semibold text-white">Schedule:</span>{" "}
-              {drawer.cadence === "monthly"
-                ? `Monthly${drawer.monthlyWeek ? ` · week ${drawer.monthlyWeek}` : ""}`
-                : formatDaysOfWeek(drawer.daysOfWeek)}
+              <span className="font-semibold text-white">Days booked:</span>{" "}
+              {drawer.daysBookedLabel ||
+                (drawer.cadence === "monthly"
+                  ? `Monthly${drawer.monthlyWeek ? ` · week ${drawer.monthlyWeek}` : ""}`
+                  : formatDaysOfWeek(drawer.daysOfWeek))}
               {drawer.preferredTime ? ` · ${drawer.preferredTime}` : ""}
+            </p>
+            <p>
+              <span className="font-semibold text-white">Platform:</span> {drawer.platform || "APP"} ·{" "}
+              <span className="font-semibold text-white">Last booked:</span> {drawer.lastBookedFor || "—"} ·{" "}
+              <span className="font-semibold text-white">Re-book:</span> {drawer.needToRebook ? "Yes" : "No"}
+            </p>
+            <p>
+              <span className="font-semibold text-white">PU / DO:</span> {drawer.pickupLocation || "—"} /{" "}
+              {drawer.dropoffLocation || "—"}
             </p>
             <p>
               <span className="font-semibold text-white">Contact:</span> {drawer.ownerPhone || "—"} · {drawer.ownerEmail || "—"}
