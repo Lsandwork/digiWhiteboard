@@ -768,66 +768,108 @@ export function FitdogAlertsPanel() {
             </div>
           ) : null}
 
-          <div className="admin-card grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-4">
-            <input
-              className="admin-input min-h-11 sm:col-span-2 xl:col-span-1"
-              placeholder="Search owner, dog, reason…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            <select
-              className="admin-select min-h-11"
-              value={alertType}
-              onChange={(e) => {
-                setSummaryFocus(null);
-                setAlertType(e.target.value as FitdogAlertType | "all");
-              }}
-            >
-              <option value="all">All alert types</option>
-              {FITDOG_ALERT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-            <select
-              className="admin-select min-h-11"
-              value={effectiveStatus}
-              onChange={(e) => {
-                setSummaryFocus(null);
-                setStatus(e.target.value as OperationsAlertStatus | "all");
-              }}
-            >
-              <option value="all">{panelView === "resolved" ? "All resolved" : "All statuses"}</option>
-              {(panelView === "resolved"
-                ? OPERATIONS_ALERT_STATUSES.filter((value) => isClosedAlertStatus(value))
-                : OPERATIONS_ALERT_STATUSES
-              ).map((value) => (
-                <option key={value} value={value}>
-                  {formatOperationsAlertStatus(value)}
-                  {isClosedAlertStatus(value) && value !== "resolved" ? ` (${value})` : ""}
-                </option>
-              ))}
-            </select>
-            <select className="admin-select min-h-11" value={assignedUserId} onChange={(e) => setAssignedUserId(e.target.value)}>
-              <option value="all">All assignees</option>
-              <option value="unassigned">Unassigned</option>
-              {(data?.assignableUsers || []).map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-            <input className="admin-input min-h-11" placeholder="Owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
-            <input className="admin-input min-h-11" placeholder="Dog" value={dog} onChange={(e) => setDog(e.target.value)} />
-            <input className="admin-input min-h-11" placeholder="Service" value={service} onChange={(e) => setService(e.target.value)} />
-            <input className="admin-input min-h-11" placeholder="Min amount" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
-            <input className="admin-input min-h-11" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            <input className="admin-input min-h-11" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            <label className="flex min-h-11 items-center gap-2 text-sm text-admin-muted">
-              <input type="checkbox" checked={unassignedOnly} onChange={(e) => setUnassignedOnly(e.target.checked)} />
-              Unassigned only
-            </label>
+          <div className="admin-card fitdog-alert-filters space-y-3 p-3 sm:p-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <input
+                className="admin-input min-h-11 sm:col-span-2 xl:col-span-1"
+                placeholder="Search owner, dog, reason…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              <select
+                className="admin-select min-h-11"
+                value={alertType}
+                onChange={(e) => {
+                  setSummaryFocus(null);
+                  setAlertType(e.target.value as FitdogAlertType | "all");
+                }}
+              >
+                <option value="all">All alert types</option>
+                {FITDOG_ALERT_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="admin-select min-h-11"
+                value={effectiveStatus}
+                onChange={(e) => {
+                  setSummaryFocus(null);
+                  setStatus(e.target.value as OperationsAlertStatus | "all");
+                }}
+              >
+                <option value="all">{panelView === "resolved" ? "All resolved" : "All statuses"}</option>
+                {(panelView === "resolved"
+                  ? OPERATIONS_ALERT_STATUSES.filter((value) => isClosedAlertStatus(value))
+                  : OPERATIONS_ALERT_STATUSES
+                ).map((value) => (
+                  <option key={value} value={value}>
+                    {formatOperationsAlertStatus(value)}
+                    {isClosedAlertStatus(value) && value !== "resolved" ? ` (${value})` : ""}
+                  </option>
+                ))}
+              </select>
+              <select className="admin-select min-h-11" value={assignedUserId} onChange={(e) => setAssignedUserId(e.target.value)}>
+                <option value="all">All assignees</option>
+                <option value="unassigned">Unassigned</option>
+                {(data?.assignableUsers || []).map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="admin-input hidden min-h-11 md:block"
+                placeholder="Owner"
+                value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+              />
+              <input className="admin-input hidden min-h-11 md:block" placeholder="Dog" value={dog} onChange={(e) => setDog(e.target.value)} />
+              <input
+                className="admin-input hidden min-h-11 md:block"
+                placeholder="Service"
+                value={service}
+                onChange={(e) => setService(e.target.value)}
+              />
+              <input
+                className="admin-input hidden min-h-11 md:block"
+                placeholder="Min amount"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+              />
+              <input
+                className="admin-input hidden min-h-11 md:block"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+              <input
+                className="admin-input hidden min-h-11 md:block"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+              <label className="hidden min-h-11 items-center gap-2 text-sm text-admin-muted md:flex">
+                <input type="checkbox" checked={unassignedOnly} onChange={(e) => setUnassignedOnly(e.target.checked)} />
+                Unassigned only
+              </label>
+            </div>
+            <details className="fitdog-alert-filters__more md:hidden">
+              <summary className="fitdog-alert-filters__summary">More filters</summary>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input className="admin-input min-h-11" placeholder="Owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
+                <input className="admin-input min-h-11" placeholder="Dog" value={dog} onChange={(e) => setDog(e.target.value)} />
+                <input className="admin-input min-h-11" placeholder="Service" value={service} onChange={(e) => setService(e.target.value)} />
+                <input className="admin-input min-h-11" placeholder="Min amount" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
+                <input className="admin-input min-h-11" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <input className="admin-input min-h-11" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                <label className="flex min-h-11 items-center gap-2 text-sm text-admin-muted">
+                  <input type="checkbox" checked={unassignedOnly} onChange={(e) => setUnassignedOnly(e.target.checked)} />
+                  Unassigned only
+                </label>
+              </div>
+            </details>
           </div>
 
           <div ref={resultsRef} className="space-y-5">
@@ -929,57 +971,81 @@ export function FitdogAlertsPanel() {
       ) : null}
 
       {panelView === "sync" ? (
-        <div className="admin-card overflow-x-auto p-4">
+        <div className="admin-card p-4">
           <div className="mb-4 flex flex-wrap gap-2">
-            <button type="button" className="admin-btn-primary" disabled={syncing} onClick={() => void runSync("incremental")}>
+            <button type="button" className="admin-btn-primary min-h-11 flex-1 sm:flex-none" disabled={syncing} onClick={() => void runSync("incremental")}>
               Sync Now
             </button>
-            <button type="button" className="admin-btn-secondary" disabled={syncing} onClick={() => void runSync("reconciliation")}>
+            <button type="button" className="admin-btn-secondary min-h-11 flex-1 sm:flex-none" disabled={syncing} onClick={() => void runSync("reconciliation")}>
               Run Reconciliation
             </button>
-            <button type="button" className="admin-btn-secondary" disabled={syncing} onClick={() => void runSync("backfill")}>
+            <button type="button" className="admin-btn-secondary min-h-11 flex-1 sm:flex-none" disabled={syncing} onClick={() => void runSync("backfill")}>
               Run Backfill
             </button>
           </div>
-          <table className="min-w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-admin-border text-admin-muted">
-                <th className="px-3 py-2">Started</th>
-                <th className="px-3 py-2">Trigger</th>
-                <th className="px-3 py-2">Mode</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Scanned</th>
-                <th className="px-3 py-2">Created</th>
-                <th className="px-3 py-2">Updated</th>
-                <th className="px-3 py-2">Resolved</th>
-                <th className="px-3 py-2">Duration</th>
-                <th className="px-3 py-2">Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((run) => (
-                <tr key={run.id} className="border-b border-admin-border/50">
-                  <td className="px-3 py-2 text-admin-muted">{formatWhen(run.started_at)}</td>
-                  <td className="px-3 py-2 text-white">{run.trigger}</td>
-                  <td className="px-3 py-2 text-white">{run.mode}</td>
-                  <td className="px-3 py-2 text-white">{run.status}</td>
-                  <td className="px-3 py-2 text-admin-muted">{run.records_scanned}</td>
-                  <td className="px-3 py-2 text-admin-muted">{run.alerts_created}</td>
-                  <td className="px-3 py-2 text-admin-muted">{run.alerts_updated}</td>
-                  <td className="px-3 py-2 text-admin-muted">{run.alerts_resolved}</td>
-                  <td className="px-3 py-2 text-admin-muted">{run.duration_ms != null ? `${Math.round(run.duration_ms / 1000)}s` : "—"}</td>
-                  <td className="px-3 py-2 text-admin-muted">{run.error_details || run.message || "—"}</td>
+          <div className="space-y-2 md:hidden">
+            {history.map((run) => (
+              <article key={run.id} className="rounded-xl border border-admin-border bg-black/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-white">{run.status}</p>
+                  <p className="text-xs text-admin-muted">{formatWhen(run.started_at)}</p>
+                </div>
+                <p className="mt-1 text-xs text-admin-muted">
+                  {run.trigger} · {run.mode}
+                  {run.duration_ms != null ? ` · ${Math.round(run.duration_ms / 1000)}s` : ""}
+                </p>
+                <p className="mt-2 text-xs text-admin-muted">
+                  Scanned {run.records_scanned} · Created {run.alerts_created} · Updated {run.alerts_updated} · Resolved{" "}
+                  {run.alerts_resolved}
+                </p>
+                {run.error_details || run.message ? (
+                  <p className="mt-2 text-xs text-admin-muted">{run.error_details || run.message}</p>
+                ) : null}
+              </article>
+            ))}
+            {!history.length ? <p className="py-6 text-center text-sm text-admin-muted">No sync runs yet.</p> : null}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-admin-border text-admin-muted">
+                  <th className="px-3 py-2">Started</th>
+                  <th className="px-3 py-2">Trigger</th>
+                  <th className="px-3 py-2">Mode</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Scanned</th>
+                  <th className="px-3 py-2">Created</th>
+                  <th className="px-3 py-2">Updated</th>
+                  <th className="px-3 py-2">Resolved</th>
+                  <th className="px-3 py-2">Duration</th>
+                  <th className="px-3 py-2">Message</th>
                 </tr>
-              ))}
-              {!history.length ? (
-                <tr>
-                  <td colSpan={10} className="px-3 py-8 text-center text-admin-muted">
-                    No sync runs yet.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {history.map((run) => (
+                  <tr key={run.id} className="border-b border-admin-border/50">
+                    <td className="px-3 py-2 text-admin-muted">{formatWhen(run.started_at)}</td>
+                    <td className="px-3 py-2 text-white">{run.trigger}</td>
+                    <td className="px-3 py-2 text-white">{run.mode}</td>
+                    <td className="px-3 py-2 text-white">{run.status}</td>
+                    <td className="px-3 py-2 text-admin-muted">{run.records_scanned}</td>
+                    <td className="px-3 py-2 text-admin-muted">{run.alerts_created}</td>
+                    <td className="px-3 py-2 text-admin-muted">{run.alerts_updated}</td>
+                    <td className="px-3 py-2 text-admin-muted">{run.alerts_resolved}</td>
+                    <td className="px-3 py-2 text-admin-muted">{run.duration_ms != null ? `${Math.round(run.duration_ms / 1000)}s` : "—"}</td>
+                    <td className="px-3 py-2 text-admin-muted">{run.error_details || run.message || "—"}</td>
+                  </tr>
+                ))}
+                {!history.length ? (
+                  <tr>
+                    <td colSpan={10} className="px-3 py-8 text-center text-admin-muted">
+                      No sync runs yet.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : null}
 

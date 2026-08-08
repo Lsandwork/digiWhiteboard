@@ -243,44 +243,73 @@ function SupportTable({
 }) {
   const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, SUPPORT_SORT_ACCESSORS, "date", "desc");
   return (
-    <div className="overflow-x-auto">
-      <table className="crossover-table w-full min-w-[1100px]">
-        <thead>
-          <tr>
-            <SortableTh label="Date" column="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            {showSource ? <SortableTh label="Source" column="source" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /> : null}
-            <SortableTh label={nameColumn} column="submitted_by" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="Details" column="details" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="Assigned" column="assigned" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <SortableTh label="Updated" column="updated" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sortedRows.map((row) => (
-            <tr key={row.id}>
-              <td>{formatDateTime(row.date_submitted)}</td>
-              {showSource ? <td>{sourceLabel(row.report_type)}</td> : null}
-              <td>{row.submitted_by}</td>
-              <td>{row.subject}</td>
-              <td className="max-w-xs truncate">{htmlToPlainText(row.details_preview ?? "")}</td>
-              <td className="crossover-table__badge-cell"><span className={priorityBadgeClass(row.priority)}>{row.priority}</span></td>
-              <td className="crossover-table__badge-cell crossover-table__status-cell"><span className={statusBadgeClass(row.status)}>{row.status}</span></td>
-              <td>{row.assigned_to ?? "—"}</td>
-              <td>{formatDateTime(row.last_updated)}</td>
-              <td>
-                <button type="button" className="crossover-link-btn inline-flex items-center gap-1" onClick={() => onView(row)}>
-                  <Eye className="h-4 w-4" /> View
-                </button>
-              </td>
+    <div>
+      <div className="space-y-2 md:hidden">
+        {sortedRows.map((row) => (
+          <article key={row.id} className="rounded-xl border border-admin-border bg-black/20 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className={priorityBadgeClass(row.priority)}>{row.priority}</span>
+              <span className={statusBadgeClass(row.status)}>{row.status}</span>
+            </div>
+            <p className="mt-2 text-sm font-semibold text-white">{row.subject}</p>
+            <p className="mt-1 text-xs text-admin-muted">
+              {row.submitted_by}
+              {showSource ? ` · ${sourceLabel(row.report_type)}` : ""} · {formatDateTime(row.date_submitted)}
+            </p>
+            <p className="mt-2 line-clamp-3 text-sm text-admin-muted">{htmlToPlainText(row.details_preview ?? "")}</p>
+            <p className="mt-2 text-xs text-admin-muted">
+              Assigned: {row.assigned_to ?? "—"} · Updated {formatDateTime(row.last_updated)}
+            </p>
+            <button
+              type="button"
+              className="crossover-link-btn mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1"
+              onClick={() => onView(row)}
+            >
+              <Eye className="h-4 w-4" /> View
+            </button>
+          </article>
+        ))}
+        {!rows.length ? <p className="py-4 text-sm text-admin-muted">No items match the current filters.</p> : null}
+      </div>
+      <div className="hidden overflow-x-auto md:block">
+        <table className="crossover-table w-full min-w-[1100px]">
+          <thead>
+            <tr>
+              <SortableTh label="Date" column="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              {showSource ? <SortableTh label="Source" column="source" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} /> : null}
+              <SortableTh label={nameColumn} column="submitted_by" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <SortableTh label="Details" column="details" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <SortableTh label="Priority" column="priority" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <SortableTh label="Assigned" column="assigned" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <SortableTh label="Updated" column="updated" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {!rows.length ? <p className="mt-4 text-sm text-admin-muted">No items match the current filters.</p> : null}
+          </thead>
+          <tbody>
+            {sortedRows.map((row) => (
+              <tr key={row.id}>
+                <td>{formatDateTime(row.date_submitted)}</td>
+                {showSource ? <td>{sourceLabel(row.report_type)}</td> : null}
+                <td>{row.submitted_by}</td>
+                <td>{row.subject}</td>
+                <td className="max-w-xs truncate">{htmlToPlainText(row.details_preview ?? "")}</td>
+                <td className="crossover-table__badge-cell"><span className={priorityBadgeClass(row.priority)}>{row.priority}</span></td>
+                <td className="crossover-table__badge-cell crossover-table__status-cell"><span className={statusBadgeClass(row.status)}>{row.status}</span></td>
+                <td>{row.assigned_to ?? "—"}</td>
+                <td>{formatDateTime(row.last_updated)}</td>
+                <td>
+                  <button type="button" className="crossover-link-btn inline-flex items-center gap-1" onClick={() => onView(row)}>
+                    <Eye className="h-4 w-4" /> View
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!rows.length ? <p className="mt-4 text-sm text-admin-muted">No items match the current filters.</p> : null}
+      </div>
     </div>
   );
 }
