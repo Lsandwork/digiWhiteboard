@@ -6,6 +6,16 @@ type CacheEntry<T> = {
 
 const memoryCache = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
+/** Bumped on invalidate so in-flight loaders cannot repopulate stale values. */
+const cacheGeneration = new Map<string, number>();
+
+function matchesKey(key: string, prefixOrKey: string) {
+  return key === prefixOrKey || key.startsWith(prefixOrKey);
+}
+
+function bumpGeneration(key: string) {
+  cacheGeneration.set(key, (cacheGeneration.get(key) ?? 0) + 1);
+}
 
 export function getTtlCache<T>(key: string): T | null {
   const entry = memoryCache.get(key);
@@ -29,10 +39,21 @@ export function setTtlCache<T>(key: string, value: T, ttlMs: number) {
 
 export function invalidateTtlCache(prefixOrKey: string) {
   for (const key of memoryCache.keys()) {
-    if (key === prefixOrKey || key.startsWith(prefixOrKey)) {
+    if (matchesKey(key, prefixOrKey)) {
       memoryCache.delete(key);
+      bumpGeneration(key);
     }
   }
+  for (const key of inFlight.keys()) {
+    if (matchesKey(key, prefixOrKey)) {
+      // Drop shared in-flight work so the next reader starts a fresh load.
+      inFlight.delete(key);
+      bumpGeneration(key);
+    }
+  }
+  // Also bump exact prefix key so future writes for never-seen keys stay coherent
+  // when invalidate is called with a concrete key before first load.
+  bumpGeneration(prefixOrKey);
 }
 
 /** Deduped loader with short TTL. Concurrent callers share one in-flight promise. */
@@ -43,13 +64,20 @@ export async function getOrLoadTtlCache<T>(key: string, ttlMs: number, loader: (
   const existing = inFlight.get(key) as Promise<T> | undefined;
   if (existing) return existing;
 
+  const generationAtStart = cacheGeneration.get(key) ?? 0;
+
   const promise = loader()
     .then((value) => {
-      setTtlCache(key, value, ttlMs);
+      // If this key was invalidated while loading, do not write stale data back.
+      if ((cacheGeneration.get(key) ?? 0) === generationAtStart) {
+        setTtlCache(key, value, ttlMs);
+      }
       return value;
     })
     .finally(() => {
-      inFlight.delete(key);
+      if (inFlight.get(key) === promise) {
+        inFlight.delete(key);
+      }
     });
 
   inFlight.set(key, promise);

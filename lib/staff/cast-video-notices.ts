@@ -577,12 +577,40 @@ export async function updateCastVideoNotice(
   return normalizeNoticeRow(data as Record<string, unknown>);
 }
 
-export async function clearAllActiveCastVideos(supabase: SupabaseClient, actor?: string | null) {
-  const notices = await listCastVideoNotices(supabase, 100);
-  for (const notice of notices) {
-    if (notice.status !== "active") continue;
-    await clearCastVideoNotice(supabase, notice.id, actor);
+async function notifyBoardOverlaysChanged() {
+  try {
+    const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardOverlayCaches();
+  } catch {
+    // Best-effort — push path must stay fast even if cache helpers fail.
   }
+}
+
+export async function clearAllActiveCastVideos(supabase: SupabaseClient, actor?: string | null) {
+  const nowIso = new Date().toISOString();
+  const payload = {
+    status: "cleared" as const,
+    cleared_at: nowIso,
+    cleared_by: actor ?? null,
+    updated_at: nowIso
+  };
+
+  // Single batch update — the previous N+1 clear loop blocked every staff/grooming/trainer push.
+  const { error } = await supabase.from("cast_video_notices").update(payload).eq("status", "active");
+  if (error && isMissingRelation(error)) {
+    const state = await loadFallbackState(supabase);
+    let changed = false;
+    const next = state.notices.map((notice) => {
+      if (notice.status !== "active") return notice;
+      changed = true;
+      return { ...notice, ...payload };
+    });
+    if (changed) await saveFallbackState(supabase, { notices: next });
+    await notifyBoardOverlaysChanged();
+    return;
+  }
+  if (error) throw error;
+  await notifyBoardOverlaysChanged();
 }
 
 /** Clears other active cast videos (including yard push) so a new cast can take over. */
@@ -591,14 +619,54 @@ export async function clearCompetingCastVideosBeforePush(
   pushedNotice: Pick<CastVideoNotice, "id" | "priority">,
   actor?: string | null
 ) {
-  const notices = await listCastVideoNotices(supabase, 100);
+  const nowIso = new Date().toISOString();
+  const payload = {
+    status: "cleared" as const,
+    cleared_at: nowIso,
+    cleared_by: actor ?? null,
+    updated_at: nowIso
+  };
   const pushingEmergency = isEmergencyCastVideo(pushedNotice);
-  for (const notice of notices) {
-    if (notice.status !== "active") continue;
-    if (notice.id === pushedNotice.id) continue;
-    if (!pushingEmergency && isEmergencyCastVideo(notice)) continue;
-    await clearCastVideoNotice(supabase, notice.id, actor);
+
+  const { data, error } = await supabase
+    .from("cast_video_notices")
+    .select("id, priority, status")
+    .eq("status", "active");
+
+  if (error && isMissingRelation(error)) {
+    const state = await loadFallbackState(supabase);
+    let changed = false;
+    const next = state.notices.map((notice) => {
+      if (notice.status !== "active") return notice;
+      if (notice.id === pushedNotice.id) return notice;
+      if (!pushingEmergency && isEmergencyCastVideo(notice)) return notice;
+      changed = true;
+      return { ...notice, ...payload };
+    });
+    if (changed) await saveFallbackState(supabase, { notices: next });
+    await notifyBoardOverlaysChanged();
+    return;
   }
+  if (error) throw error;
+
+  const idsToClear = (data ?? [])
+    .filter((row) => {
+      const id = String(row.id);
+      if (id === pushedNotice.id) return false;
+      if (!pushingEmergency && isEmergencyCastVideo({ priority: row.priority as CastVideoPriority })) return false;
+      return true;
+    })
+    .map((row) => String(row.id));
+
+  if (idsToClear.length) {
+    const { error: clearError } = await supabase
+      .from("cast_video_notices")
+      .update(payload)
+      .in("id", idsToClear)
+      .eq("status", "active");
+    if (clearError) throw clearError;
+  }
+  await notifyBoardOverlaysChanged();
 }
 
 export async function pushCastVideoNotice(
@@ -640,14 +708,18 @@ export async function pushCastVideoNotice(
     });
     await saveFallbackState(supabase, { notices: next });
     if (!pushed) throw new Error("Cast video notice not found.");
-    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
-    await triggerShellyAlert("cast_video_push", `cast-video:${id}`);
+    await notifyBoardOverlaysChanged();
+    void import("@/lib/shelly-alert")
+      .then(({ triggerShellyAlert }) => triggerShellyAlert("cast_video_push", `cast-video:${id}`))
+      .catch(() => undefined);
     return pushed;
   }
   if (error) throw error;
   const pushed = normalizeNoticeRow(data as Record<string, unknown>);
-  const { triggerShellyAlert } = await import("@/lib/shelly-alert");
-  await triggerShellyAlert("cast_video_push", `cast-video:${pushed.id}`);
+  await notifyBoardOverlaysChanged();
+  void import("@/lib/shelly-alert")
+    .then(({ triggerShellyAlert }) => triggerShellyAlert("cast_video_push", `cast-video:${pushed.id}`))
+    .catch(() => undefined);
   return pushed;
 }
 
@@ -671,10 +743,12 @@ export async function clearCastVideoNotice(supabase: SupabaseClient, id: string,
     });
     await saveFallbackState(supabase, { notices: next });
     if (!cleared) throw new Error("Cast video notice not found.");
+    await notifyBoardOverlaysChanged();
     return cleared;
   }
   if (error) throw error;
   if (!data) throw new Error("Cast video notice not found.");
+  await notifyBoardOverlaysChanged();
   return normalizeNoticeRow(data as Record<string, unknown>);
 }
 

@@ -101,14 +101,18 @@ export function StaffAlertCard({
       role="alert"
       aria-live="assertive"
     >
-      <PushNoticeFlashLayers tone={isDailyReminder ? "reminder" : "alert"} />
+      {lowMotion ? null : <PushNoticeFlashLayers tone={isDailyReminder ? "reminder" : "alert"} />}
 
-      <div className="staff-push-notice__paw staff-push-notice__paw--one" aria-hidden="true">
-        <PawPrint />
-      </div>
-      <div className="staff-push-notice__paw staff-push-notice__paw--two" aria-hidden="true">
-        <PawPrint />
-      </div>
+      {lowMotion ? null : (
+        <>
+          <div className="staff-push-notice__paw staff-push-notice__paw--one" aria-hidden="true">
+            <PawPrint />
+          </div>
+          <div className="staff-push-notice__paw staff-push-notice__paw--two" aria-hidden="true">
+            <PawPrint />
+          </div>
+        </>
+      )}
 
       <div className="staff-push-notice__icon" aria-hidden="true">
         {notice ? <NoticeIconFromNotice notice={notice} /> : alert ? <NoticeIconFromAlert alert={alert} /> : <AlertTriangle />}

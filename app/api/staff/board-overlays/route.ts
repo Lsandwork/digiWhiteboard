@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(overlays, {
       headers: {
-        "cache-control": "private, max-age=2, stale-while-revalidate=8"
+        // Push notices must not linger in browser HTTP caches on TV receivers.
+        "cache-control": "private, no-store"
       }
     });
   } catch (error) {

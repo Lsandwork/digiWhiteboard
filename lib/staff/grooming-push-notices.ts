@@ -412,14 +412,28 @@ export async function createGroomingPushNotice(
       updated_at: requested_at
     };
     await saveFallbackState(supabase, { notices: [notice, ...state.notices] });
-    const { triggerShellyAlert } = await import("@/lib/shelly-alert");
-    await triggerShellyAlert("grooming_push", `grooming:${notice.id}`);
+    try {
+      const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+      invalidateBoardOverlayCaches();
+    } catch {
+      // best-effort
+    }
+    void import("@/lib/shelly-alert")
+      .then(({ triggerShellyAlert }) => triggerShellyAlert("grooming_push", `grooming:${notice.id}`))
+      .catch(() => undefined);
     return notice;
   }
   if (error) throw error;
   const notice = normalizeNoticeRow(data as Record<string, unknown>);
-  const { triggerShellyAlert } = await import("@/lib/shelly-alert");
-  await triggerShellyAlert("grooming_push", `grooming:${notice.id}`);
+  try {
+    const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardOverlayCaches();
+  } catch {
+    // best-effort
+  }
+  void import("@/lib/shelly-alert")
+    .then(({ triggerShellyAlert }) => triggerShellyAlert("grooming_push", `grooming:${notice.id}`))
+    .catch(() => undefined);
   return notice;
 }
 
@@ -447,9 +461,21 @@ export async function clearGroomingPushNotice(
     });
     await saveFallbackState(supabase, { notices: next });
     if (!cleared) throw new Error("Grooming push notice not found.");
+    try {
+      const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+      invalidateBoardOverlayCaches();
+    } catch {
+      // best-effort
+    }
     return cleared;
   }
   if (error) throw error;
   if (!data) throw new Error("Grooming push notice not found.");
+  try {
+    const { invalidateBoardOverlayCaches } = await import("@/lib/board-settings-cache");
+    invalidateBoardOverlayCaches();
+  } catch {
+    // best-effort
+  }
   return normalizeNoticeRow(data as Record<string, unknown>);
 }
