@@ -447,6 +447,27 @@ export const HELP_ARTICLES: HelpArticle[] = [
     adminBoard: "staff"
   },
   {
+    id: "vip-auto-book-help",
+    title: "How does VIP Auto Book work?",
+    summary: "Track owners who always want their dogs booked on app.fitdog.com for classes, hikes, or excursions on a weekly or monthly schedule.",
+    category: "Staff Board",
+    keywords: ["vip", "auto book", "fitdog sports", "app.fitdog.com", "hike", "class", "excursion", "weekly", "monthly"],
+    steps: [
+      "Open Digi-Board → Staff → VIP Auto Book (Admin, Management, and Front Desk).",
+      "Click Sync Fitdog Directory (or wait for the daily pull) so owner and dog names from app.fitdog.com are available.",
+      "Add VIP Client — type a dog or owner name and pick a match from the popup list.",
+      "Choose service type (Group Class, Adventure Hike, Beach Excursion, Trainer-Led Hike, etc.), cadence (weekly/monthly), and days or week of month.",
+      "Use the VIP list during booking windows so those dogs are never missed on Fitdog Sports."
+    ],
+    tips: [
+      "VIP Auto Book is a Digi-Board tracker — it does not auto-create bookings inside app.fitdog.com yet.",
+      "fitdog.ruffops.com is the Digi-Board login shortcut; owner/dog data still comes from the Fitdog Sports employee API."
+    ],
+    adminTab: "vip_auto_book",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
+  },
+  {
     id: "fitdog-alerts-help",
     title: "How do Fitdog Alerts work?",
     summary: "Operations alerts for declined payments, card issues, and Fitdog sync problems — for Admin and Management.",
@@ -807,6 +828,7 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "front-desk-log": STAFF_OPS_AND_ADMIN,
   "staff-ops-pages": STAFF_OPS_AND_ADMIN,
   "fitdog-alerts-help": STAFF_OPS_AND_ADMIN,
+  "vip-auto-book-help": STAFF_OPS_AND_ADMIN,
   "add-admin-user": ADMIN_ONLY,
   "front-desk-coordinator": STAFF_OPS_AND_ADMIN,
   "groomer-trainer-crossover": STAFF_OPS_AND_ADMIN,
@@ -839,6 +861,7 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "front-desk-log",
   "staff-ops-pages",
   "fitdog-alerts-help",
+  "vip-auto-book-help",
   "push-notices",
   "schedule-push-notices",
   "staff-display",

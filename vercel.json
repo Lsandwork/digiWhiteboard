@@ -32,6 +32,10 @@
       "schedule": "*/8 * * * *"
     },
     {
+      "path": "/api/cron/vip-auto-book-directory",
+      "schedule": "15 13 * * *"
+    },
+    {
       "path": "/api/cron/ruffly-reconcile",
       "schedule": "15 */6 * * *"
     },

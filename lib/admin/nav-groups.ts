@@ -133,6 +133,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   track_incidents: "Track Incidents",
   fitdog_alerts: "Fitdog Alerts",
   vet_visits: "Vet Visits",
+  vip_auto_book: "VIP Auto Book",
   demo_push: "Demo Push",
   analytics: "Analytics",
   templates: "Message Templates",
@@ -179,6 +180,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
   fitdog_alerts: "Failed payments, missed payments, card issues, and Fitdog sync health under Operations.",
   vet_visits: "Log vet visits, alert admin/management, and track required owner follow-up until resolved.",
+  vip_auto_book: "Track clients who always want dogs booked on app.fitdog.com for classes, hikes, and excursions.",
   crossover_communication: "Team handoff log between shifts.",
   owner_follow_up: "Track owner follow-ups and callbacks.",
   active_issues: "Monitor open floor issues and escalations.",
@@ -230,6 +232,7 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
+  "vip_auto_book",
   "walks_board"
 ];
 
@@ -239,7 +242,7 @@ const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
 const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
-const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits"];
+const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits", "vip_auto_book"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {
   return items.filter((item): item is NavEntry => Boolean(item));

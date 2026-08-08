@@ -127,7 +127,9 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("assign_active_issue", "Assign Active Issue", "Assign active issues."),
       p("resolve_active_issue", "Resolve Active Issue", "Resolve active issues."),
       p("view_fitdog_alerts", "View Fitdog Alerts", "View Fitdog payment and operations alerts under Operations."),
-      p("manage_fitdog_alerts", "Manage Fitdog Alerts", "Assign, resolve, and sync Fitdog payment alerts.")
+      p("manage_fitdog_alerts", "Manage Fitdog Alerts", "Assign, resolve, and sync Fitdog payment alerts."),
+      p("view_vip_auto_book", "View VIP Auto Book", "View VIP clients who always want Fitdog Sports bookings."),
+      p("manage_vip_auto_book", "Manage VIP Auto Book", "Add, edit, and sync VIP Auto Book clients from app.fitdog.com.")
     ]
   },
   {

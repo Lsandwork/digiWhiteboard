@@ -69,6 +69,8 @@ export type PermissionKey =
   | "manage_fitdog_alerts"
   | "view_vet_visits"
   | "manage_vet_visits"
+  | "view_vip_auto_book"
+  | "manage_vip_auto_book"
   | "route_generator.view"
   | "route_generator.pull_report"
   | "route_generator.generate"
@@ -285,6 +287,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
+  "view_vip_auto_book",
+  "manage_vip_auto_book",
   "route_generator.view",
   "route_generator.pull_report",
   "route_generator.generate",
@@ -447,6 +451,8 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_own_groomer_submissions",
   "view_fitdog_alerts",
   "manage_fitdog_alerts",
+  "view_vip_auto_book",
+  "manage_vip_auto_book",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -496,6 +502,8 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "manage_fitdog_alerts",
   "view_vet_visits",
   "manage_vet_visits",
+  "view_vip_auto_book",
+  "manage_vip_auto_book",
   "route_generator.view",
   "route_generator.pull_report",
   "route_generator.generate",
@@ -694,6 +702,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "owner_follow_up",
   "active_issues",
   "fitdog_alerts",
+  "vip_auto_book",
   "staff_directory",
   "bulk_photo_upload",
   "yard_links",
@@ -961,6 +970,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   track_incidents: "view_track_incidents",
   fitdog_alerts: "view_fitdog_alerts",
   vet_visits: "view_vet_visits",
+  vip_auto_book: "view_vip_auto_book",
   route_generator: "route_generator.view",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
@@ -1326,6 +1336,23 @@ export function canAccessAdminTab(
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
     if (hasPermission(effective, "view_fitdog_alerts")) return true;
+    if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
+    const roleKey = legacyRoleToRoleKey(legacyRole);
+    return (
+      roleKey === "super_admin" ||
+      roleKey === "admin" ||
+      roleKey === "management" ||
+      roleKey === "front_desk_coordinator"
+    );
+  }
+
+  if (tab === "vip_auto_book") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    if (hasPermission(effective, "view_vip_auto_book") || hasPermission(effective, "manage_vip_auto_book")) {
+      return true;
+    }
     if (hasAnyRole(effective, ["super_admin", "admin", "management", "front_desk_coordinator"])) return true;
     const roleKey = legacyRoleToRoleKey(legacyRole);
     return (
