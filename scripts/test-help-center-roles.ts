@@ -21,21 +21,21 @@ const ALL_ROLES: AdminUserRole[] = [
   "viewer"
 ];
 
-const REQUIRED_FOR_EVERYONE = ["first-login", "change-password", "troubleshoot-login"] as const;
+const REQUIRED_FOR_EVERYONE = ["first-login", "change-password", "troubleshoot-login", "what-is-this"] as const;
 
 const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
-  owner_admin: ["env-vars", "front-desk-log", "add-admin-user"],
-  manager_admin: ["env-vars", "front-desk-log", "add-admin-user"],
-  assistant_manager: ["front-desk-log", "management-role", "staff-ops-pages"],
-  front_desk_coordinator: ["front-desk-log", "front-desk-coordinator", "staff-ops-pages"],
-  team_leader: ["front-desk-log", "front-desk-coordinator", "staff-ops-pages"],
+  owner_admin: ["env-vars", "front-desk-log", "fitdog-alerts-help", "add-admin-user", "viewer-basics"],
+  manager_admin: ["env-vars", "front-desk-log", "fitdog-alerts-help", "add-admin-user", "viewer-basics"],
+  assistant_manager: ["front-desk-log", "management-role", "staff-ops-pages", "fitdog-alerts-help"],
+  front_desk_coordinator: ["front-desk-log", "front-desk-coordinator", "staff-ops-pages", "fitdog-alerts-help"],
+  team_leader: ["front-desk-log", "front-desk-coordinator", "staff-ops-pages", "fitdog-alerts-help"],
   groomer: ["front-desk-log", "groomer-trainer-crossover"],
   trainer: ["front-desk-log", "groomer-trainer-crossover"],
   daycare: ["front-desk-log", "dog-handler-basics"],
   driver: ["front-desk-log", "dog-handler-basics"],
   hiker: ["front-desk-log", "dog-handler-basics"],
-  marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast"],
-  viewer: ["lobby-messages", "lobby-tv-cast"]
+  marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast", "what-is-this"],
+  viewer: ["lobby-messages", "lobby-tv-cast", "viewer-basics", "what-is-this"]
 };
 
 for (const role of ALL_ROLES) {
