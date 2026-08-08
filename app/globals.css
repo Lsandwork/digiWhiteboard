@@ -6650,6 +6650,109 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   box-shadow: inset 3px 0 0 #f59e0b;
 }
 
+.vip-auto-book-mobile {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.vip-auto-book-mobile__card {
+  border: 1px solid rgba(255, 166, 0, 0.18);
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.22);
+  padding: 1rem 1.05rem;
+  cursor: pointer;
+}
+
+.vip-auto-book-mobile__card--alert {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: inset 3px 0 0 #f59e0b;
+}
+
+.vip-auto-book-mobile__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.vip-auto-book-mobile__dog {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--crossover-text, #fff7ed);
+  overflow-wrap: anywhere;
+}
+
+.vip-auto-book-mobile__card--alert .vip-auto-book-mobile__dog {
+  color: #fde68a;
+}
+
+.vip-auto-book-mobile__owner {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  color: var(--crossover-muted, #c4b5a5);
+  overflow-wrap: anywhere;
+}
+
+.vip-auto-book-mobile__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 0.85rem;
+  margin: 0.95rem 0 0;
+}
+
+.vip-auto-book-mobile__grid dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--crossover-muted, #c4b5a5);
+}
+
+.vip-auto-book-mobile__grid dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--crossover-text, #fff7ed);
+  overflow-wrap: anywhere;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__card {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(180, 83, 9, 0.22);
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__card--alert {
+  background: rgba(254, 243, 199, 0.95);
+  border-color: rgba(217, 119, 6, 0.45);
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__dog,
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__grid dd {
+  color: #1c1917;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__card--alert .vip-auto-book-mobile__dog {
+  color: #9a3412;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__owner,
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-mobile__grid dt {
+  color: #78716c;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-table__dog--alert {
+  color: #9a3412;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .vip-auto-book-table__row--alert {
+  background: rgba(254, 243, 199, 0.85);
+}
+
 .crossover-table__badge-cell,
 .crossover-table__status-cell,
 .crossover-table td:has(> .crossover-badge),

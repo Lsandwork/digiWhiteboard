@@ -50,6 +50,25 @@ function gingrBookStatusLabel(status: string | null | undefined) {
   return null;
 }
 
+function vipDaysLabel(row: VipAutoBookClient) {
+  return (
+    row.daysBookedLabel ||
+    (row.cadence === "monthly"
+      ? row.monthlyWeek
+        ? `Week ${row.monthlyWeek}`
+        : "Monthly"
+      : formatDaysOfWeek(row.daysOfWeek))
+  );
+}
+
+function vipLastBookedLabel(value: string | null | undefined) {
+  if (!value) return "—";
+  return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric"
+  });
+}
+
 const emptyForm = {
   ownerName: "",
   dogName: "",
@@ -374,7 +393,80 @@ export function VipAutoBookPanel() {
           </select>
         </div>
 
-        <div className="vip-auto-book-table-wrap">
+        {/* Mobile: stacked cards — never crush table columns on small screens */}
+        <div className="vip-auto-book-mobile md:hidden">
+          {(data?.rows ?? []).map((row) => {
+            const gingrLabel = gingrBookStatusLabel(row.lastBookStatus);
+            return (
+              <article
+                key={row.id}
+                className={`vip-auto-book-mobile__card ${row.needToRebook ? "vip-auto-book-mobile__card--alert" : ""}`}
+                onClick={() => setDrawer(row)}
+              >
+                <div className="vip-auto-book-mobile__head">
+                  <div className="min-w-0">
+                    <h3 className="vip-auto-book-mobile__dog">{row.dogName}</h3>
+                    <p className="vip-auto-book-mobile__owner">{row.ownerName}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={`crossover-btn vip-auto-book-table__rebook-btn shrink-0 ${
+                      row.needToRebook
+                        ? "crossover-btn--primary border-amber-400 bg-amber-500 text-black hover:bg-amber-400"
+                        : "crossover-btn--secondary"
+                    }`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void patchClient(row.id, { needToRebook: !row.needToRebook });
+                    }}
+                  >
+                    {row.needToRebook ? "Re-book: Yes" : "Re-book: No"}
+                  </button>
+                </div>
+
+                <dl className="vip-auto-book-mobile__grid">
+                  <div>
+                    <dt>Service</dt>
+                    <dd>{row.serviceName || serviceKindLabel(row.serviceKind)}</dd>
+                  </div>
+                  <div>
+                    <dt>Platform</dt>
+                    <dd>{row.platform || "APP"}</dd>
+                  </div>
+                  <div>
+                    <dt>Schedule</dt>
+                    <dd>
+                      {vipDaysLabel(row)} · {cadenceLabel(row.cadence)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Last booked</dt>
+                    <dd>
+                      {vipLastBookedLabel(row.lastBookedFor)}
+                      {gingrLabel ? ` · ${gingrLabel}` : ""}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Pickup</dt>
+                    <dd>{row.pickupLocation || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Drop-off</dt>
+                    <dd>{row.dropoffLocation || "—"}</dd>
+                  </div>
+                </dl>
+              </article>
+            );
+          })}
+          {!loading && !(data?.rows ?? []).length ? (
+            <p className="py-8 text-center text-sm text-admin-muted">
+              No VIP Auto Book clients yet. Add one and choose weekly/monthly class, hike, or excursion.
+            </p>
+          ) : null}
+        </div>
+
+        {/* Desktop / tablet: full table */}
+        <div className="vip-auto-book-table-wrap hidden md:block">
           <table className="crossover-table vip-auto-book-table">
             <thead>
               <tr>
@@ -388,13 +480,6 @@ export function VipAutoBookPanel() {
             </thead>
             <tbody>
               {(data?.rows ?? []).map((row) => {
-                const daysLabel =
-                  row.daysBookedLabel ||
-                  (row.cadence === "monthly"
-                    ? row.monthlyWeek
-                      ? `Week ${row.monthlyWeek}`
-                      : "Monthly"
-                    : formatDaysOfWeek(row.daysOfWeek));
                 const gingrLabel = gingrBookStatusLabel(row.lastBookStatus);
                 return (
                   <tr
@@ -419,18 +504,11 @@ export function VipAutoBookPanel() {
                       <p className="vip-auto-book-table__meta">{row.platform || "APP"}</p>
                     </td>
                     <td>
-                      <p className="vip-auto-book-table__primary">{daysLabel}</p>
+                      <p className="vip-auto-book-table__primary">{vipDaysLabel(row)}</p>
                       <p className="vip-auto-book-table__meta">{cadenceLabel(row.cadence)}</p>
                     </td>
                     <td>
-                      <p className="vip-auto-book-table__primary">
-                        {row.lastBookedFor
-                          ? new Date(`${row.lastBookedFor}T12:00:00`).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric"
-                            })
-                          : "—"}
-                      </p>
+                      <p className="vip-auto-book-table__primary">{vipLastBookedLabel(row.lastBookedFor)}</p>
                       {gingrLabel ? (
                         <p
                           className={`vip-auto-book-table__status ${
