@@ -36,6 +36,10 @@
       "schedule": "15 13 * * *"
     },
     {
+      "path": "/api/cron/vip-rebook-alerts",
+      "schedule": "30 13 * * *"
+    },
+    {
       "path": "/api/cron/ruffly-reconcile",
       "schedule": "15 */6 * * *"
     },

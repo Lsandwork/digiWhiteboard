@@ -47,6 +47,8 @@ function sourceTabLabel(tab: string | null | undefined): string {
       return "Active Issues";
     case "push_notices":
       return "Push Notices / Management Support";
+    case "vip_auto_book":
+      return "VIP Auto Book";
     default:
       return "Notifications";
   }
@@ -57,6 +59,7 @@ function sourceTabForReport(report: ManagementReport | null, sourceTab: string):
   if (sourceTab === "owner_follow_up") return "owner_follow_up";
   if (sourceTab === "active_issues") return "active_issues";
   if (sourceTab === "push_notices") return "push_notices";
+  if (sourceTab === "vip_auto_book") return "vip_auto_book";
   if (report?.report_type === "employee_write_up") return "management_support";
   return null;
 }

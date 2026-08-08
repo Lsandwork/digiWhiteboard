@@ -73,6 +73,8 @@ function mapRow(row: Record<string, unknown>): VipAutoBookClient {
     notes: String(row.notes ?? ""),
     platform: String(row.platform ?? "APP"),
     needToRebook: Boolean(row.need_to_rebook),
+    needToRebookSetAt: row.need_to_rebook_set_at != null ? String(row.need_to_rebook_set_at) : null,
+    rebookAlertSentAt: row.rebook_alert_sent_at != null ? String(row.rebook_alert_sent_at) : null,
     pickupLocation: row.pickup_location != null ? String(row.pickup_location) : null,
     dropoffLocation: row.dropoff_location != null ? String(row.dropoff_location) : null,
     daysBookedLabel: row.days_booked_label != null ? String(row.days_booked_label) : null,
@@ -197,6 +199,8 @@ export async function createVipAutoBookClient(
       notes: String(input.notes ?? "").trim(),
       platform: String(input.platform ?? "APP").trim() || "APP",
       need_to_rebook: Boolean(input.needToRebook),
+      need_to_rebook_set_at: input.needToRebook ? new Date().toISOString() : null,
+      rebook_alert_sent_at: null,
       pickup_location: input.pickupLocation?.trim() || null,
       dropoff_location: input.dropoffLocation?.trim() || null,
       days_booked_label: input.daysBookedLabel?.trim() || null,
@@ -262,7 +266,17 @@ export async function updateVipAutoBookClient(
   if (patch.status !== undefined) update.status = asStatus(patch.status);
   if (patch.notes !== undefined) update.notes = String(patch.notes).trim();
   if (patch.platform !== undefined) update.platform = String(patch.platform).trim() || "APP";
-  if (patch.needToRebook !== undefined) update.need_to_rebook = Boolean(patch.needToRebook);
+  if (patch.needToRebook !== undefined) {
+    const next = Boolean(patch.needToRebook);
+    update.need_to_rebook = next;
+    if (next) {
+      update.need_to_rebook_set_at = new Date().toISOString();
+      update.rebook_alert_sent_at = null;
+    } else {
+      update.need_to_rebook_set_at = null;
+      update.rebook_alert_sent_at = null;
+    }
+  }
   if (patch.pickupLocation !== undefined) update.pickup_location = patch.pickupLocation?.trim() || null;
   if (patch.dropoffLocation !== undefined) update.dropoff_location = patch.dropoffLocation?.trim() || null;
   if (patch.daysBookedLabel !== undefined) update.days_booked_label = patch.daysBookedLabel?.trim() || null;

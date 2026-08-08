@@ -31,6 +31,8 @@ export type VipAutoBookClient = {
   notes: string;
   platform: string;
   needToRebook: boolean;
+  needToRebookSetAt: string | null;
+  rebookAlertSentAt: string | null;
   pickupLocation: string | null;
   dropoffLocation: string | null;
   daysBookedLabel: string | null;

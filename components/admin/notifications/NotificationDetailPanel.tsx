@@ -40,6 +40,7 @@ function sourceTabForNotification(notification: EnrichedNotification): AdminTab 
   if (notification.source_tab === "owner_follow_up") return "owner_follow_up";
   if (notification.source_tab === "active_issues") return "active_issues";
   if (notification.source_tab === "push_notices") return "push_notices";
+  if (notification.source_tab === "vip_auto_book") return "vip_auto_book";
   if (notification.linkedReport?.report_type === "employee_write_up") return "management_support";
   return null;
 }

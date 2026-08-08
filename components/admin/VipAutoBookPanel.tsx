@@ -337,8 +337,18 @@ export function VipAutoBookPanel() {
             </thead>
             <tbody>
               {(data?.rows ?? []).map((row) => (
-                <tr key={row.id} className="cursor-pointer" onClick={() => setDrawer(row)}>
-                  <td className="font-semibold">{row.dogName}</td>
+                <tr
+                  key={row.id}
+                  className={`cursor-pointer ${
+                    row.needToRebook
+                      ? "bg-amber-500/20 ring-1 ring-inset ring-amber-400/50 [&_td]:bg-amber-500/10"
+                      : ""
+                  }`}
+                  onClick={() => setDrawer(row)}
+                >
+                  <td className={row.needToRebook ? "text-base font-bold text-amber-100 sm:text-lg" : "font-semibold"}>
+                    {row.dogName}
+                  </td>
                   <td>{row.ownerName}</td>
                   <td>{row.serviceName || serviceKindLabel(row.serviceKind)}</td>
                   <td>
@@ -361,7 +371,11 @@ export function VipAutoBookPanel() {
                   <td>
                     <button
                       type="button"
-                      className="crossover-btn crossover-btn--secondary px-3 py-1 text-xs"
+                      className={`crossover-btn px-3 py-1 text-xs ${
+                        row.needToRebook
+                          ? "crossover-btn--primary border-amber-400 bg-amber-500 text-black hover:bg-amber-400"
+                          : "crossover-btn--secondary"
+                      }`}
                       onClick={(event) => {
                         event.stopPropagation();
                         void patchClient(row.id, { needToRebook: !row.needToRebook });
