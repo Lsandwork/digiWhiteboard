@@ -13,6 +13,8 @@ export type VipAutoBookClient = {
   id: string;
   fitdogOwnerId: string | null;
   fitdogDogId: string | null;
+  gingrAnimalId: string | null;
+  gingrOwnerId: string | null;
   ownerName: string;
   ownerEmail: string | null;
   ownerPhone: string | null;

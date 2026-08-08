@@ -7,10 +7,12 @@ import { getUserAccess } from "@/lib/admin/user-access";
 import {
   createVipAutoBookClient,
   getLatestVipDirectorySync,
+  getLatestVipGingrSync,
   getVipAutoBookSummary,
   listVipAutoBookClients,
   searchVipDirectory,
   syncVipFitdogDirectory,
+  syncVipGingrLastBooked,
   updateVipAutoBookClient,
   type VipAutoBookListFilters,
   type VipCadence,
@@ -58,8 +60,11 @@ export async function GET(request: Request) {
     }
 
     if (action === "sync-status") {
-      const latest = await getLatestVipDirectorySync(gate.supabase!);
-      return NextResponse.json({ latest });
+      const [latest, latestGingrSync] = await Promise.all([
+        getLatestVipDirectorySync(gate.supabase!),
+        getLatestVipGingrSync(gate.supabase!)
+      ]);
+      return NextResponse.json({ latest, latestGingrSync });
     }
 
     const filters: VipAutoBookListFilters = {
@@ -73,12 +78,13 @@ export async function GET(request: Request) {
       sortDir: url.searchParams.get("sortDir") === "asc" ? "asc" : "desc"
     };
 
-    const [list, summary, latestSync] = await Promise.all([
+    const [list, summary, latestSync, latestGingrSync] = await Promise.all([
       listVipAutoBookClients(gate.supabase!, filters),
       getVipAutoBookSummary(gate.supabase!),
-      getLatestVipDirectorySync(gate.supabase!)
+      getLatestVipDirectorySync(gate.supabase!),
+      getLatestVipGingrSync(gate.supabase!)
     ]);
-    return NextResponse.json({ ...list, summary, latestSync, canManage: gate.canManage });
+    return NextResponse.json({ ...list, summary, latestSync, latestGingrSync, canManage: gate.canManage });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load VIP Auto Book.";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -99,6 +105,11 @@ export async function POST(request: Request) {
   try {
     if (action === "sync_directory") {
       const result = await syncVipFitdogDirectory(gate.supabase!);
+      return NextResponse.json(result, { status: result.ok ? 200 : 500 });
+    }
+
+    if (action === "sync_gingr") {
+      const result = await syncVipGingrLastBooked(gate.supabase!);
       return NextResponse.json(result, { status: result.ok ? 200 : 500 });
     }
 

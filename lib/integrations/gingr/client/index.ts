@@ -126,6 +126,15 @@ export function createGingrClient(overrides?: GingrClientConfig) {
      * Official Gingr endpoint:
      * POST /api/v1/reservations with key + start_date + end_date (or checked_in=true).
      */
+    async listReservationsByDateRange(startDate: string, endDate: string) {
+      const payload = await requestForm<unknown>(`/api/v1/reservations`, {
+        start_date: startDate,
+        end_date: endDate,
+        location_id: config.locationId,
+        checked_in: "false"
+      });
+      return normalizeGingrReservationList(payload);
+    },
     async listReservationsByDate(date: string) {
       const payload = await requestForm<unknown>(`/api/v1/reservations`, {
         start_date: date,

@@ -32,7 +32,23 @@ type ListPayload = {
     owners_upserted?: number;
     dogs_upserted?: number;
   } | null;
+  latestGingrSync?: {
+    started_at?: string;
+    finished_at?: string | null;
+    status?: string;
+    message?: string | null;
+    clients_confirmed?: number;
+    clients_corrected?: number;
+    clients_unmatched?: number;
+  } | null;
 };
+
+function gingrBookStatusLabel(status: string | null | undefined) {
+  if (status === "gingr_confirmed") return "Confirmed";
+  if (status === "gingr_corrected") return "Corrected";
+  if (status === "gingr_no_reservations") return "No Gingr match";
+  return null;
+}
 
 const emptyForm = {
   ownerName: "",
@@ -69,6 +85,7 @@ export function VipAutoBookPanel() {
   const [data, setData] = useState<ListPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [gingrSyncing, setGingrSyncing] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [drawer, setDrawer] = useState<VipAutoBookClient | null>(null);
   const [q, setQ] = useState("");
@@ -229,6 +246,25 @@ export function VipAutoBookPanel() {
     }
   }
 
+  async function runGingrSync() {
+    setGingrSyncing(true);
+    try {
+      const res = await fetch("/api/admin/vip-auto-book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync_gingr" })
+      });
+      const json = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      if (!res.ok || !json.ok) throw new Error(json.error || json.message || "Gingr sync failed.");
+      showToast(json.message || "Gingr last-day booked synced.", "success");
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Gingr sync failed.", "error");
+    } finally {
+      setGingrSyncing(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -250,11 +286,20 @@ export function VipAutoBookPanel() {
           <button
             type="button"
             className="crossover-btn crossover-btn--secondary"
-            disabled={syncing || !data?.canManage}
+            disabled={syncing || gingrSyncing || !data?.canManage}
             onClick={() => void runDirectorySync()}
           >
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
             Sync Fitdog Directory
+          </button>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--secondary"
+            disabled={syncing || gingrSyncing || !data?.canManage}
+            onClick={() => void runGingrSync()}
+          >
+            <RefreshCw className={`h-4 w-4 ${gingrSyncing ? "animate-spin" : ""}`} />
+            Sync Gingr Bookings
           </button>
           <button
             type="button"
@@ -288,9 +333,18 @@ export function VipAutoBookPanel() {
         ))}
       </div>
 
-      <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-50">
-        Directory last sync: {formatWhen(data?.latestSync?.finished_at || data?.latestSync?.started_at)} ·{" "}
-        {data?.latestSync?.message || "Run Sync Fitdog Directory (or wait for the daily cron) so owner/dog names pop up while typing."}
+      <div className="space-y-2">
+        <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-50">
+          Directory last sync: {formatWhen(data?.latestSync?.finished_at || data?.latestSync?.started_at)} ·{" "}
+          {data?.latestSync?.message ||
+            "Run Sync Fitdog Directory (or wait for the daily cron) so owner/dog names pop up while typing."}
+        </div>
+        <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
+          Gingr last-day sync:{" "}
+          {formatWhen(data?.latestGingrSync?.finished_at || data?.latestGingrSync?.started_at)} ·{" "}
+          {data?.latestGingrSync?.message ||
+            "Run Sync Gingr Bookings to confirm or correct Last Day Booked from Gingr reservations."}
+        </div>
       </div>
 
       <div className="crossover-card p-4">
@@ -361,12 +415,29 @@ export function VipAutoBookPanel() {
                   </td>
                   <td>{row.platform || "APP"}</td>
                   <td>
-                    {row.lastBookedFor
-                      ? new Date(`${row.lastBookedFor}T12:00:00`).toLocaleDateString("en-US", {
-                          month: "2-digit",
-                          day: "2-digit"
-                        })
-                      : "—"}
+                    <div className="flex flex-col gap-0.5">
+                      <span>
+                        {row.lastBookedFor
+                          ? new Date(`${row.lastBookedFor}T12:00:00`).toLocaleDateString("en-US", {
+                              month: "2-digit",
+                              day: "2-digit"
+                            })
+                          : "—"}
+                      </span>
+                      {gingrBookStatusLabel(row.lastBookStatus) ? (
+                        <span
+                          className={`text-[10px] font-semibold uppercase tracking-wide ${
+                            row.lastBookStatus === "gingr_confirmed"
+                              ? "text-emerald-300"
+                              : row.lastBookStatus === "gingr_corrected"
+                                ? "text-amber-300"
+                                : "text-admin-muted"
+                          }`}
+                        >
+                          {gingrBookStatusLabel(row.lastBookStatus)}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td>
                     <button
@@ -613,8 +684,15 @@ export function VipAutoBookPanel() {
             </p>
             <p>
               <span className="font-semibold text-white">Platform:</span> {drawer.platform || "APP"} ·{" "}
-              <span className="font-semibold text-white">Last booked:</span> {drawer.lastBookedFor || "—"} ·{" "}
-              <span className="font-semibold text-white">Re-book:</span> {drawer.needToRebook ? "Yes" : "No"}
+              <span className="font-semibold text-white">Last booked:</span> {drawer.lastBookedFor || "—"}
+              {gingrBookStatusLabel(drawer.lastBookStatus)
+                ? ` (${gingrBookStatusLabel(drawer.lastBookStatus)})`
+                : ""}{" "}
+              · <span className="font-semibold text-white">Re-book:</span> {drawer.needToRebook ? "Yes" : "No"}
+            </p>
+            <p>
+              <span className="font-semibold text-white">Gingr verified:</span> {formatWhen(drawer.lastVerifiedAt)}
+              {drawer.lastBookError ? ` · ${drawer.lastBookError}` : ""}
             </p>
             <p>
               <span className="font-semibold text-white">PU / DO:</span> {drawer.pickupLocation || "—"} /{" "}

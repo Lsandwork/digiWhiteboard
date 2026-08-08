@@ -40,6 +40,10 @@
       "schedule": "30 13 * * *"
     },
     {
+      "path": "/api/cron/vip-gingr-last-booked",
+      "schedule": "45 13 * * *"
+    },
+    {
       "path": "/api/cron/ruffly-reconcile",
       "schedule": "15 */6 * * *"
     },

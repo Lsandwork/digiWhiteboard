@@ -55,6 +55,8 @@ function mapRow(row: Record<string, unknown>): VipAutoBookClient {
     id: String(row.id),
     fitdogOwnerId: row.fitdog_owner_id != null ? String(row.fitdog_owner_id) : null,
     fitdogDogId: row.fitdog_dog_id != null ? String(row.fitdog_dog_id) : null,
+    gingrAnimalId: row.gingr_animal_id != null ? String(row.gingr_animal_id) : null,
+    gingrOwnerId: row.gingr_owner_id != null ? String(row.gingr_owner_id) : null,
     ownerName: String(row.owner_name ?? ""),
     ownerEmail: row.owner_email != null ? String(row.owner_email) : null,
     ownerPhone: row.owner_phone != null ? String(row.owner_phone) : null,
@@ -243,6 +245,8 @@ export async function updateVipAutoBookClient(
     lastBookedFor: string | null;
     lastBookStatus: string | null;
     lastBookError: string | null;
+    gingrAnimalId: string | null;
+    gingrOwnerId: string | null;
   }>
 ) {
   const update: Record<string, unknown> = {};
@@ -284,6 +288,8 @@ export async function updateVipAutoBookClient(
   if (patch.lastBookedFor !== undefined) update.last_booked_for = patch.lastBookedFor;
   if (patch.lastBookStatus !== undefined) update.last_book_status = patch.lastBookStatus;
   if (patch.lastBookError !== undefined) update.last_book_error = patch.lastBookError;
+  if (patch.gingrAnimalId !== undefined) update.gingr_animal_id = patch.gingrAnimalId?.trim() || null;
+  if (patch.gingrOwnerId !== undefined) update.gingr_owner_id = patch.gingrOwnerId?.trim() || null;
 
   const { data, error } = await supabase
     .from("vip_auto_book_clients")
