@@ -46,9 +46,23 @@ export type OwnerTrackingPublicView = {
   liveConfigured: boolean;
 };
 
-function headlineFor(status: string, etaMinutes: number | null, direction: string): string {
+function headlineFor(
+  status: string,
+  etaMinutes: number | null,
+  direction: string,
+  routeProgress?: number | null
+): string {
   if (status === "arrived" || status === "completed") {
     return direction === "pickup" ? "Your Fitdog driver has arrived" : "Your dog is being dropped off";
+  }
+  if (
+    (etaMinutes != null && etaMinutes <= 2) ||
+    (routeProgress != null && routeProgress >= 0.92)
+  ) {
+    return "Driver is pulling up now";
+  }
+  if (etaMinutes != null && etaMinutes <= 5) {
+    return `${etaMinutes} min away — almost there`;
   }
   if (etaMinutes != null && etaMinutes <= 15) {
     return `${etaMinutes} min away`;
@@ -59,40 +73,26 @@ function headlineFor(status: string, etaMinutes: number | null, direction: strin
   return direction === "pickup" ? "Driver is on the way" : "Drop-off is on the way";
 }
 
-function sublineFor(status: string, etaMinutes: number | null): string {
+function sublineFor(status: string, etaMinutes: number | null, routeProgress?: number | null): string {
   if (status === "arrived" || status === "completed") return "Thanks for trusting Fitdog.";
+  if ((etaMinutes != null && etaMinutes <= 2) || (routeProgress != null && routeProgress >= 0.92)) {
+    return "Your Fitdog van is pulling up to the stop — please be ready.";
+  }
   if (etaMinutes != null && etaMinutes <= 15) return "Your driver is almost there — please be ready.";
   if (etaMinutes != null && etaMinutes <= 30) return "Your driver is getting close.";
   return "Live map updates as your Fitdog van moves.";
 }
 
-/** Tokens used in SMS samples / Twilio verification — not real owner links. */
-const DEMO_TRACK_TOKENS = new Set(["example", "demo"]);
-
-/** Simulated trip length shown to the owner (minutes). */
-const DEMO_SIM_ETA_MINUTES = 12;
-/**
- * Demo-only speed-up. Real Samsara owner links are unaffected.
- * 12 sim-minutes at 3× ≈ 4 real minutes to arrival.
- */
-const DEMO_SPEED_FACTOR = 3;
-
-/** Venice stop — demo destination. */
-const DEMO_STOP = { lat: 33.9915, lng: -118.4662 };
-
-/**
- * Short approach into Venice (closer than Culver) so the van looks almost there.
- * Progress is time-warped with traffic / light pauses — not a straight lerp.
- */
-const DEMO_ROUTE: Array<{ lat: number; lng: number }> = [
-  { lat: 33.9990, lng: -118.4538 }, // start — closer to Venice
-  { lat: 33.9974, lng: -118.4572 },
-  { lat: 33.9960, lng: -118.4596 }, // light / slow
-  { lat: 33.9946, lng: -118.4618 },
-  { lat: 33.9934, lng: -118.4636 }, // light / slow
-  { lat: 33.9924, lng: -118.4650 },
-  DEMO_STOP
-];
+type DemoScenario = {
+  token: string;
+  dogNames: string[];
+  ownerName: string;
+  stopAddress: string;
+  stop: { lat: number; lng: number };
+  route: Array<{ lat: number; lng: number }>;
+  simEtaMinutes: number;
+  speedFactor: number;
+};
 
 /**
  * Time-share segments: each row is { timeFrac of trip, progressFrac along route }.
@@ -109,8 +109,77 @@ const DEMO_DRIVE_SEGMENTS: Array<{ timeFrac: number; progressFrac: number }> = [
   { timeFrac: 0.16, progressFrac: 0.243 }
 ];
 
+/** Venice stop — legacy Indy demo. */
+const DEMO_STOP_VENICE = { lat: 33.9915, lng: -118.4662 };
+
+/** Jasper pickup — 7742 Redlands St, Playa Del Rey, CA 90293 */
+const DEMO_STOP_JASPER = { lat: 33.95315, lng: -118.43955 };
+
+/**
+ * Lincoln Blvd & Manchester Ave → Redlands St (Playa Del Rey).
+ * Short approach with light/traffic pauses so the map feels real-time.
+ */
+const DEMO_ROUTE_JASPER: Array<{ lat: number; lng: number }> = [
+  { lat: 33.96005, lng: -118.41815 }, // Lincoln & Manchester — driver start
+  { lat: 33.95955, lng: -118.4224 },
+  { lat: 33.9587, lng: -118.4268 }, // light / slow
+  { lat: 33.9574, lng: -118.4312 },
+  { lat: 33.9559, lng: -118.4349 }, // traffic crawl
+  { lat: 33.9546, lng: -118.4376 },
+  { lat: 33.9537, lng: -118.4389 }, // final approach / pulling up
+  DEMO_STOP_JASPER
+];
+
+const DEMO_ROUTE_VENICE: Array<{ lat: number; lng: number }> = [
+  { lat: 33.9990, lng: -118.4538 },
+  { lat: 33.9974, lng: -118.4572 },
+  { lat: 33.9960, lng: -118.4596 },
+  { lat: 33.9946, lng: -118.4618 },
+  { lat: 33.9934, lng: -118.4636 },
+  { lat: 33.9924, lng: -118.4650 },
+  DEMO_STOP_VENICE
+];
+
+const DEMO_SCENARIOS: Record<string, DemoScenario> = {
+  example: {
+    token: "example",
+    dogNames: ["Indy"],
+    ownerName: "Demo Owner",
+    stopAddress: "Venice, Los Angeles, CA",
+    stop: DEMO_STOP_VENICE,
+    route: DEMO_ROUTE_VENICE,
+    simEtaMinutes: 12,
+    speedFactor: 3
+  },
+  demo: {
+    token: "demo",
+    dogNames: ["Indy"],
+    ownerName: "Demo Owner",
+    stopAddress: "Venice, Los Angeles, CA",
+    stop: DEMO_STOP_VENICE,
+    route: DEMO_ROUTE_VENICE,
+    simEtaMinutes: 12,
+    speedFactor: 3
+  },
+  jasper: {
+    token: "jasper",
+    dogNames: ["Jasper"],
+    ownerName: "Demo Owner",
+    stopAddress: "7742 Redlands St, Playa Del Rey, CA 90293",
+    stop: DEMO_STOP_JASPER,
+    route: DEMO_ROUTE_JASPER,
+    // ~10 sim minutes at 3× ≈ 3.3 real minutes — tight demo for “pulling up” SMS.
+    simEtaMinutes: 10,
+    speedFactor: 3
+  }
+};
+
 export function isOwnerTrackingDemoToken(token: string): boolean {
-  return DEMO_TRACK_TOKENS.has(token.trim().toLowerCase());
+  return Boolean(DEMO_SCENARIOS[token.trim().toLowerCase()]);
+}
+
+export function getDemoScenario(token: string): DemoScenario | null {
+  return DEMO_SCENARIOS[token.trim().toLowerCase()] ?? null;
 }
 
 function clamp01(value: number) {
@@ -148,29 +217,32 @@ function demoRouteProgressFromTime(timeFrac: number): number {
   return 1;
 }
 
-function demoPointAlongRoute(progress: number): {
+function demoPointAlongRoute(
+  progress: number,
+  route: Array<{ lat: number; lng: number }>
+): {
   lat: number;
   lng: number;
   heading: number;
 } {
   const p = clamp01(progress);
   if (p <= 0) {
-    const a = DEMO_ROUTE[0]!;
-    const b = DEMO_ROUTE[1] || a;
+    const a = route[0]!;
+    const b = route[1] || a;
     return { lat: a.lat, lng: a.lng, heading: headingDegrees(a, b) };
   }
   if (p >= 1) {
-    const last = DEMO_ROUTE[DEMO_ROUTE.length - 1]!;
-    const prev = DEMO_ROUTE[DEMO_ROUTE.length - 2] || last;
+    const last = route[route.length - 1]!;
+    const prev = route[route.length - 2] || last;
     return { lat: last.lat, lng: last.lng, heading: headingDegrees(prev, last) };
   }
 
-  const segments = DEMO_ROUTE.length - 1;
+  const segments = route.length - 1;
   const scaled = p * segments;
   const idx = Math.min(segments - 1, Math.floor(scaled));
   const local = scaled - idx;
-  const a = DEMO_ROUTE[idx]!;
-  const b = DEMO_ROUTE[idx + 1]!;
+  const a = route[idx]!;
+  const b = route[idx + 1]!;
   return {
     lat: lerp(a.lat, b.lat, local),
     lng: lerp(a.lng, b.lng, local),
@@ -179,13 +251,21 @@ function demoPointAlongRoute(progress: number): {
 }
 
 /**
- * Demo-only clock: advances at DEMO_SPEED_FACTOR.
- * Pass `startedAtMs` (from SMS link `?t=`) so the trip starts ~12 min away.
+ * Demo-only clock: advances at scenario speedFactor.
+ * Pass `startedAtMs` (from SMS link `?t=`) so the trip starts at full ETA.
  * Without a start time, the demo loops on a wall-clock cycle so `/track/example` always moves.
  */
-export function getDemoDriveState(nowMs = Date.now(), startedAtMs?: number | null) {
-  const simTripMs = DEMO_SIM_ETA_MINUTES * 60 * 1000;
-  const realTripMs = Math.round(simTripMs / DEMO_SPEED_FACTOR);
+export function getDemoDriveState(
+  nowMs = Date.now(),
+  startedAtMs?: number | null,
+  tokenOrScenario: string | DemoScenario = "example"
+) {
+  const scenario =
+    typeof tokenOrScenario === "string"
+      ? getDemoScenario(tokenOrScenario) || DEMO_SCENARIOS.example!
+      : tokenOrScenario;
+  const simTripMs = scenario.simEtaMinutes * 60 * 1000;
+  const realTripMs = Math.round(simTripMs / scenario.speedFactor);
   const holdAtArrivalMs = 45_000;
   const cycleMs = realTripMs + holdAtArrivalMs;
 
@@ -196,17 +276,17 @@ export function getDemoDriveState(nowMs = Date.now(), startedAtMs?: number | nul
     elapsedRealMs = nowMs % cycleMs;
   }
 
-  const simElapsedMs = Math.min(simTripMs, elapsedRealMs * DEMO_SPEED_FACTOR);
+  const simElapsedMs = Math.min(simTripMs, elapsedRealMs * scenario.speedFactor);
   const timeFrac = clamp01(simElapsedMs / simTripMs);
   const routeProgress = demoRouteProgressFromTime(timeFrac);
-  const point = demoPointAlongRoute(routeProgress);
+  const point = demoPointAlongRoute(routeProgress, scenario.route);
   const remainingSimMs = Math.max(0, simTripMs - simElapsedMs);
   const etaMinutes =
     remainingSimMs <= 0 ? 0 : Math.max(1, Math.ceil(remainingSimMs / 60_000));
   const arrived = remainingSimMs <= 0 || routeProgress >= 0.995;
 
   return {
-    stop: DEMO_STOP,
+    stop: scenario.stop,
     vehicle: {
       lat: point.lat,
       lng: point.lng,
@@ -216,33 +296,45 @@ export function getDemoDriveState(nowMs = Date.now(), startedAtMs?: number | nul
     etaMinutes: arrived ? 0 : etaMinutes,
     arrived,
     routeProgress,
-    speedFactor: DEMO_SPEED_FACTOR
+    speedFactor: scenario.speedFactor,
+    scenario
   };
 }
 
-/** Preview payload so `/track/example` opens a live-feeling demo map (not Samsara). */
+/** Preview payload so `/track/jasper` (or `/track/example`) opens a live-feeling demo map. */
 export function getOwnerTrackingDemo(
   token: string,
   options?: { startedAtMs?: number | null; nowMs?: number }
 ): OwnerTrackingPublicView {
   const normalized = token.trim().toLowerCase();
-  const drive = getDemoDriveState(options?.nowMs ?? Date.now(), options?.startedAtMs);
+  const scenario = getDemoScenario(normalized) || DEMO_SCENARIOS.example!;
+  const drive = getDemoDriveState(options?.nowMs ?? Date.now(), options?.startedAtMs, scenario);
   const direction = "pickup" as const;
-  const status = drive.arrived ? "arrived" : drive.etaMinutes <= 15 ? "arriving_15" : "en_route";
+  const status = drive.arrived
+    ? "arrived"
+    : drive.etaMinutes <= 2 || drive.routeProgress >= 0.92
+      ? "pulling_up"
+      : drive.etaMinutes <= 15
+        ? "arriving_15"
+        : "en_route";
   const etaMinutes = drive.arrived ? 0 : drive.etaMinutes;
   return {
     token: normalized,
     status,
     direction,
-    dogNames: ["Indy"],
-    ownerName: "Demo Owner",
-    stopAddress: "Venice, Los Angeles, CA",
+    dogNames: scenario.dogNames,
+    ownerName: scenario.ownerName,
+    stopAddress: scenario.stopAddress,
     stop: drive.stop,
     vehicle: drive.vehicle,
     etaMinutes,
-    headline: headlineFor(status, etaMinutes, direction),
-    subline: sublineFor(status, etaMinutes),
-    showArrivingBanner: Boolean(etaMinutes != null && etaMinutes <= 15) || status === "arriving_15" || drive.arrived,
+    headline: headlineFor(status, etaMinutes, direction, drive.routeProgress),
+    subline: sublineFor(status, etaMinutes, drive.routeProgress),
+    showArrivingBanner:
+      Boolean(etaMinutes != null && etaMinutes <= 15) ||
+      status === "arriving_15" ||
+      status === "pulling_up" ||
+      drive.arrived,
     liveConfigured: true
   };
 }
@@ -439,7 +531,12 @@ export async function getOwnerTrackingPublic(
     }
   }
 
-  const status = String(row.status);
+  const status =
+    String(row.status) === "arrived" || String(row.status) === "completed"
+      ? String(row.status)
+      : etaMinutes != null && etaMinutes <= 2
+        ? "pulling_up"
+        : String(row.status);
   return {
     token,
     status,
