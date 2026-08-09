@@ -14,6 +14,8 @@ import { BlogMediaPanel } from "@/components/blog/panels/BlogMediaPanel";
 import { BlogSetupWizardPanel } from "@/components/blog/panels/BlogSetupWizardPanel";
 import { BlogGenericPanel } from "@/components/blog/panels/BlogGenericPanel";
 import { BlogUnavailablePanel } from "@/components/blog/panels/BlogUnavailablePanel";
+import { BlogPostingAnalyticsPanel } from "@/components/blog/panels/BlogPostingAnalyticsPanel";
+import { BlogSocialGeneratorPanel } from "@/components/blog/panels/BlogSocialGeneratorPanel";
 import { BlogHelpRedirect } from "@/components/blog/help/BlogHelpRedirect";
 
 type Props = {
@@ -50,6 +52,10 @@ export function BlogWorkspace({
       return <BlogTopicsPanel />;
     case "generate":
       return <BlogGeneratePanel />;
+    case "social-generator":
+      return <BlogSocialGeneratorPanel />;
+    case "posting-analytics":
+      return <BlogPostingAnalyticsPanel />;
     case "articles":
       return (
         <BlogArticlesPanel

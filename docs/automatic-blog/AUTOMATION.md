@@ -1,6 +1,30 @@
 # Automation
 
-Automation is deliberately conservative. Generation and publishing are gated; auto-publish is **off** by default.
+Full-auto SEO posting (**mode C**) is supported: generate → score gates → human-like schedule → publish. Kill switch and score gates always apply.
+
+## Settings (blog_settings)
+
+| Flag | Role |
+|------|------|
+| `full_auto_enabled` | Cron picks highest SEO topic, generates, schedules jittered LA slots |
+| `auto_publish_enabled` | Cron publishes due `SCHEDULED` articles |
+| `wordpress_mirror_enabled` | After native publish, mirror to WordPress REST |
+| `posts_per_week` | Human-like weekly cadence (default 3) |
+| `min_hours_between_posts` | Spacing between posts (default 20h) |
+| `schedule_jitter_*` | ± minutes so slots are not robotic |
+| `quiet_hours_*` | Avoid late-night PT publishes |
+| `emergency_off` | Blocks generate + publish immediately |
+
+Migration `061_blog_posting_social.sql` enables `full_auto_enabled` + `auto_publish_enabled` for the default row. Super Admin can turn them off anytime.
+
+## Human-like SEO scheduler
+
+Module: `lib/blog/scheduler/human-like-seo.ts` + `lib/blog/scheduler/auto-run.ts`
+
+- Prefers Tue–Thu LA morning/afternoon windows
+- Jittered minutes; refuses same-hour dumps
+- Skips recently used primary keywords
+- Holds articles below human editorial threshold (default ≥ 90)
 
 ## Job queue
 
@@ -8,15 +32,11 @@ Table: `blog_generation_jobs`
 
 | Column | Notes |
 |--------|-------|
-| `job_type` | Worker-specific type string |
+| `job_type` | `seed_topics`, `auto_generate_and_schedule`, … |
 | `payload` | JSON input |
 | `status` | `queued` → `running` → `succeeded` / `failed` / `cancelled` |
 | `attempts` / `max_attempts` | Default max 3 |
 | `run_after` | Delay / schedule |
-| `locked_at` | Worker lock |
-| `last_error` / `result` | Diagnostics |
-
-Index: `(status, run_after)` for dequeue.
 
 ## Cron endpoint
 
@@ -24,63 +44,51 @@ Index: `(status, run_after)` for dequeue.
 /api/cron/blog-jobs
 ```
 
-Auth (same pattern as other RuffOps crons):
+Every ~15 minutes (`vercel.json`). Flow:
 
-1. `Authorization: Bearer ${CRON_SECRET}` if `CRON_SECRET` is set, or
-2. Vercel cron header `x-vercel-cron: 1`
+1. Seed topics (idempotent)
+2. Full-auto SEO cycle (if enabled)
+3. Publish due `SCHEDULED` articles
+4. Retry failed WordPress mirrors
+5. Process social post queue
+6. Drain lightweight generation jobs
 
-Unauthorized → 401.
+Auth: `Authorization: Bearer ${CRON_SECRET}` or `x-vercel-cron: 1`.
 
-Configure schedule in `vercel.json` (or host cron) once the route is deployed. Suggested starting cadence: every 5–10 minutes, similar to other job workers.
-
-## What automation may do
-
-When enabled by settings + permissions:
-
-- Process queued generation / review / publish jobs
-- Advance articles that already passed score gates
-- Retry failed jobs up to `max_attempts`
-- Respect `run_after` for scheduled work
-
-## What automation must not do (defaults)
+## Score gates (never bypassed)
 
 | Guard | Default |
 |-------|---------|
-| Auto-publish | **OFF** (`auto_publish_enabled = false`) |
-| AI images | **OFF** |
-| First 25 articles | Require human **APPROVED** (or SCHEDULED) before publish |
+| Topic score | ≥ 85 to generate |
+| Human editorial score | ≥ 90 to schedule/publish |
+| Fact-check medical/legal | May hold in `FACT_CHECK` |
 | Emergency off | Blocks generate + publish |
-| Topic score &lt; 85 | No generation |
-| Human score &lt; 90 | Stays in `NEEDS_CHANGES` / blocked at publish |
+| AI images | OFF unless explicitly enabled |
 
-## Manual approval warm-up
+## WordPress mirror
 
-`manual_approval_first_n` default **25**. While `published_count < 25`, publish requires `APPROVED` or `SCHEDULED`. This exists so early content is human-vetted before any looser automation.
+- Native Fitdog `/blog` always publishes first
+- Mirror via `lib/blog/publishing/wordpress-mirror.ts` when enabled
+- SEO meta (Yoast / Rank Math keys) + canonical back to Fitdog
+- Failures logged in `blog_publish_attempts` without failing native
+- Test: Publishing Connections → **Test WordPress connection**
 
-## Automation rules UI
+Env: `WORDPRESS_URL`, `WORDPRESS_USERNAME`, `WORDPRESS_APPLICATION_PASSWORD`
 
-Admin nav page: **Automation Rules** (`blog.manage_automation`). Keep rules narrow:
+## Posting Analytics
 
-- Max articles per week (`max_articles_per_week`, default 7)
-- Cost caps (daily / weekly / monthly)
-- Quiet editorial windows if you add them later
-- Never bypass fact-check flags on medical/legal content
+Tab: **Posting Analytics** (`?page=posting-analytics`) — timeline, channel health, next slots, advice, resources.  
+API: `GET /api/blog/posting-analytics`
 
-## Enabling auto-publish later
+## Social
 
-Only after ops review:
-
-1. Confirm `published_count >= 25` with clean quality history.
-2. Confirm Gemini (or approved writer) stable and costs within caps.
-3. Confirm destinations tested.
-4. Set `auto_publish_enabled = true` with Super Admin oversight.
-5. Watch Failed queue + `blog_audit_logs` daily for the first week.
+See [SOCIAL.md](./SOCIAL.md).
 
 ## Disabling automation quickly
 
-1. `emergency_off = true` (stops generate/publish).
-2. `auto_publish_enabled = false`.
-3. Optionally `BLOG_ENABLED=false` for staff APIs.
-4. Cancel queued jobs: set `blog_generation_jobs.status = 'cancelled'` where `status in ('queued','running')`.
+1. `emergency_off = true`
+2. `full_auto_enabled = false` and/or `auto_publish_enabled = false`
+3. Optionally `BLOG_ENABLED=false` for staff APIs
+4. Cancel queued jobs in `blog_generation_jobs`
 
 Details: [OPERATIONS.md](./OPERATIONS.md) and [TROUBLESHOOTING.md](./TROUBLESHOOTING.md).

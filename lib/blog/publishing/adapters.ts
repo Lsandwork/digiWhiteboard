@@ -42,6 +42,13 @@ export async function publishWordPress(payload: PublishPayload): Promise<Publish
   const auth = Buffer.from(`${username}:${appPassword}`).toString("base64");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20_000);
+  const canonicalUrl =
+    payload.canonicalPath != null
+      ? payload.canonicalPath.startsWith("http")
+        ? payload.canonicalPath
+        : absoluteBlogUrl(payload.canonicalPath)
+      : undefined;
+
   try {
     const response = await fetch(`${base}/wp-json/wp/v2/posts`, {
       method: "POST",
@@ -50,16 +57,59 @@ export async function publishWordPress(payload: PublishPayload): Promise<Publish
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        title: payload.title,
+        title: payload.seoTitle || payload.title,
         slug: payload.slug,
         excerpt: payload.excerpt,
         content: payload.html,
-        status: "publish"
+        status: "publish",
+        meta: {
+          // Yoast / Rank Math friendly keys when those plugins expose REST meta.
+          _yoast_wpseo_title: payload.seoTitle || payload.title,
+          _yoast_wpseo_metadesc: payload.metaDescription || payload.excerpt,
+          _yoast_wpseo_canonical: canonicalUrl,
+          rank_math_title: payload.seoTitle || payload.title,
+          rank_math_description: payload.metaDescription || payload.excerpt,
+          rank_math_canonical_url: canonicalUrl
+        }
       }),
       signal: controller.signal
     });
     const json = (await response.json().catch(() => ({}))) as Record<string, unknown>;
     if (!response.ok) {
+      // Retry without meta if plugin meta registration rejects the payload.
+      if (response.status === 400 || response.status === 403) {
+        const retry = await fetch(`${base}/wp-json/wp/v2/posts`, {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${auth}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            title: payload.seoTitle || payload.title,
+            slug: payload.slug,
+            excerpt: payload.metaDescription || payload.excerpt,
+            content: payload.html,
+            status: "publish"
+          }),
+          signal: controller.signal
+        });
+        const retryJson = (await retry.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!retry.ok) {
+          return {
+            ok: false,
+            provider: "wordpress",
+            error: `WordPress publish failed (${retry.status})`,
+            responseSummary: retryJson
+          };
+        }
+        return {
+          ok: true,
+          provider: "wordpress",
+          publishedUrl: typeof retryJson.link === "string" ? retryJson.link : undefined,
+          externalId: retryJson.id != null ? String(retryJson.id) : undefined,
+          responseSummary: { id: retryJson.id, link: retryJson.link, metaSkipped: true }
+        };
+      }
       return {
         ok: false,
         provider: "wordpress",
@@ -72,7 +122,7 @@ export async function publishWordPress(payload: PublishPayload): Promise<Publish
       provider: "wordpress",
       publishedUrl: typeof json.link === "string" ? json.link : undefined,
       externalId: json.id != null ? String(json.id) : undefined,
-      responseSummary: { id: json.id, link: json.link }
+      responseSummary: { id: json.id, link: json.link, canonicalUrl }
     };
   } catch (error) {
     return {

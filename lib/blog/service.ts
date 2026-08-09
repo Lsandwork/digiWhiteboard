@@ -32,12 +32,16 @@ export async function getBlogSettings() {
     data ?? {
       id: "default",
       enabled: false,
-      auto_publish_enabled: false,
+      auto_publish_enabled: true,
+      full_auto_enabled: true,
+      wordpress_mirror_enabled: false,
       emergency_off: false,
       human_score_threshold: DEFAULT_HUMAN_SCORE_THRESHOLD,
       topic_score_threshold: DEFAULT_TOPIC_SCORE_THRESHOLD,
       manual_approval_first_n: 25,
       published_count: 0,
+      posts_per_week: 3,
+      min_hours_between_posts: 20,
       ai_images_enabled: false,
       setup_completed: false,
       setup_step: 0
@@ -386,8 +390,21 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
 
   const publishedCount = Number(settings.published_count || 0);
   const firstN = Number(settings.manual_approval_first_n || 25);
-  if (publishedCount < firstN && article.status !== "APPROVED" && article.status !== "SCHEDULED") {
+  const fullAuto = Boolean((settings as Record<string, unknown>).full_auto_enabled);
+  // Mode C: full auto may publish SCHEDULED articles past score gates without human APPROVED.
+  if (
+    !fullAuto &&
+    publishedCount < firstN &&
+    article.status !== "APPROVED" &&
+    article.status !== "SCHEDULED"
+  ) {
     throw new Error(`First ${firstN} articles require APPROVED status before publishing.`);
+  }
+  if (fullAuto && !["APPROVED", "SCHEDULED", "PUBLISHING"].includes(String(article.status))) {
+    // Still allow republish path from FAILED after fix.
+    if (article.status !== "FAILED") {
+      throw new Error("Full-auto publish expects APPROVED or SCHEDULED articles.");
+    }
   }
   if (Number(article.human_editorial_score || 0) < Number(settings.human_score_threshold || DEFAULT_HUMAN_SCORE_THRESHOLD)) {
     throw new Error("Human Editorial Score is below threshold.");
@@ -407,7 +424,8 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
 
   await transitionArticleStatus(articleId, "PUBLISHING", actor, "Publishing started");
   const idempotencyKey = `blog-publish-${articleId}-${article.version || 1}`;
-  const destination = String(article.publish_destination || settings.publish_provider || "native");
+  // Always publish to native Fitdog blog first; WordPress is a mirror.
+  const destination = "native";
   const result = await publishArticle(
     destination,
     {
@@ -428,7 +446,7 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
       article_id: articleId,
       idempotency_key: idempotencyKey,
       status: result.ok ? "succeeded" : "failed",
-      request_summary: { destination },
+      request_summary: { destination, provider: "native" },
       response_summary: result.responseSummary || {},
       published_url: result.publishedUrl ?? null,
       error: result.error ?? null
@@ -455,7 +473,23 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
     .update({ published_count: publishedCount + 1, updated_at: new Date().toISOString() })
     .eq("id", "default");
   await writeBlogAudit(actor, "article.published", "article", articleId, { url: result.publishedUrl, provider: result.provider });
-  return { ...article, status: "PUBLISHED", published_url: result.publishedUrl };
+
+  // WordPress mirror — never fail the native publish if WP errors.
+  let wordpress: { ok: boolean; url?: string; error?: string } | null = null;
+  const wantWordpress =
+    Boolean((settings as Record<string, unknown>).wordpress_mirror_enabled) ||
+    String(article.publish_destination || settings.publish_provider || "") === "wordpress";
+  if (wantWordpress) {
+    try {
+      const { mirrorArticleToWordPress } = await import("@/lib/blog/publishing/wordpress-mirror");
+      const wp = await mirrorArticleToWordPress(articleId, actor);
+      wordpress = { ok: wp.ok, url: wp.publishedUrl, error: wp.error };
+    } catch (error) {
+      wordpress = { ok: false, error: error instanceof Error ? error.message : "WordPress mirror failed" };
+    }
+  }
+
+  return { ...article, status: "PUBLISHED", published_url: result.publishedUrl, wordpress };
 }
 
 export async function getBlogOverview() {

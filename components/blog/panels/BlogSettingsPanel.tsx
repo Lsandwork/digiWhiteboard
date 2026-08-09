@@ -2,6 +2,48 @@
 
 import { useEffect, useState } from "react";
 
+function WordPressTestBlock({
+  message,
+  setMessage
+}: {
+  message: string | null;
+  setMessage: (value: string | null) => void;
+}) {
+  const [testing, setTesting] = useState(false);
+  return (
+    <div className="rounded-xl border border-[var(--fitdog-border,#e6e8eb)] bg-[#fafbfc] p-4">
+      <p className="text-sm font-medium text-[var(--fitdog-heading,#121417)]">WordPress connection</p>
+      <p className="mt-1 text-xs text-[var(--fitdog-muted,#6b7280)]">
+        Uses WORDPRESS_URL, WORDPRESS_USERNAME, and WORDPRESS_APPLICATION_PASSWORD. Canonical URL points back to the Fitdog blog.
+      </p>
+      <button
+        type="button"
+        disabled={testing}
+        className="blog-dash-toolbar-btn mt-3 w-fit disabled:opacity-50"
+        onClick={() => {
+          void (async () => {
+            setTesting(true);
+            setMessage(null);
+            try {
+              const res = await fetch("/api/blog/publishing/wordpress-test", { method: "POST" });
+              const json = await res.json();
+              if (!res.ok) throw new Error(json.error || json.message || "Test failed");
+              setMessage(json.message || "WordPress OK");
+            } catch (error) {
+              setMessage(error instanceof Error ? error.message : "WordPress test failed");
+            } finally {
+              setTesting(false);
+            }
+          })();
+        }}
+      >
+        {testing ? "Testing…" : "Test WordPress connection"}
+      </button>
+      {message ? <p className="mt-2 text-sm text-emerald-800">{message}</p> : null}
+    </div>
+  );
+}
+
 export function BlogSettingsPanel({ focus }: { focus?: string }) {
   const [settings, setSettings] = useState<Record<string, unknown> | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -52,7 +94,7 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
                   : "Settings"}
         </h2>
         <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
-          Defaults protect quality: auto-publish off, AI images off, human score ≥ 90, topic score ≥ 85.
+          Full-auto SEO posting uses score gates (topic ≥ 85, human ≥ 90). Emergency stop still blocks everything.
         </p>
       </div>
 
@@ -66,13 +108,60 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
           />
         </label>
         <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
-          <span className="font-medium">Automatic publishing</span>
+          <span className="font-medium">Full-auto SEO scheduler (generate → schedule → post)</span>
+          <input
+            type="checkbox"
+            checked={Boolean(settings.full_auto_enabled)}
+            onChange={(e) => void save({ full_auto_enabled: e.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
+          <span className="font-medium">Automatic publishing (cron publishes due slots)</span>
           <input
             type="checkbox"
             checked={Boolean(settings.auto_publish_enabled)}
             onChange={(e) => void save({ auto_publish_enabled: e.target.checked })}
           />
         </label>
+        <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
+          <span className="font-medium">Mirror publishes to WordPress</span>
+          <input
+            type="checkbox"
+            checked={Boolean(settings.wordpress_mirror_enabled)}
+            onChange={(e) => void save({ wordpress_mirror_enabled: e.target.checked })}
+          />
+        </label>
+        {(focus === "automation" || focus === "publishing" || !focus || focus === "settings") && (
+          <>
+            <label className="block">
+              <span className="blog-dash-label">Posts per week (human-like cadence)</span>
+              <input
+                type="number"
+                min={1}
+                max={14}
+                className="blog-dash-input"
+                value={Number(settings.posts_per_week || 3)}
+                onChange={(e) => setSettings({ ...settings, posts_per_week: Number(e.target.value) })}
+                onBlur={() => void save({ posts_per_week: Number(settings.posts_per_week || 3) })}
+              />
+            </label>
+            <label className="block">
+              <span className="blog-dash-label">Minimum hours between posts</span>
+              <input
+                type="number"
+                min={6}
+                max={72}
+                className="blog-dash-input"
+                value={Number(settings.min_hours_between_posts || 20)}
+                onChange={(e) => setSettings({ ...settings, min_hours_between_posts: Number(e.target.value) })}
+                onBlur={() => void save({ min_hours_between_posts: Number(settings.min_hours_between_posts || 20) })}
+              />
+            </label>
+          </>
+        )}
+        {(focus === "publishing" || focus === "settings") && (
+          <WordPressTestBlock message={message} setMessage={setMessage} />
+        )}
         <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
           <span className="font-medium">AI-generated images</span>
           <input

@@ -21,6 +21,8 @@ export async function PATCH(request: Request) {
   for (const key of [
     "enabled",
     "auto_publish_enabled",
+    "full_auto_enabled",
+    "wordpress_mirror_enabled",
     "emergency_off",
     "human_score_threshold",
     "topic_score_threshold",
@@ -31,6 +33,14 @@ export async function PATCH(request: Request) {
     "weekly_cost_limit_cents",
     "monthly_cost_limit_cents",
     "max_articles_per_week",
+    "posts_per_week",
+    "min_hours_between_posts",
+    "schedule_jitter_min_minutes",
+    "schedule_jitter_max_minutes",
+    "quiet_hours_start",
+    "quiet_hours_end",
+    "scheduler_timezone",
+    "automation_config",
     "primary_provider",
     "evaluator_provider",
     "publish_provider",
@@ -44,9 +54,9 @@ export async function PATCH(request: Request) {
   ]) {
     if (key in body) allowed[key] = body[key];
   }
-  // Safety: never silently enable auto-publish without explicit true.
-  if ("auto_publish_enabled" in allowed && allowed.auto_publish_enabled !== true) {
-    allowed.auto_publish_enabled = false;
+  // Booleans must be explicit true to enable.
+  for (const flag of ["auto_publish_enabled", "full_auto_enabled", "wordpress_mirror_enabled"] as const) {
+    if (flag in allowed && allowed[flag] !== true) allowed[flag] = false;
   }
   const { data, error } = await supabase.from("blog_settings").update(allowed).eq("id", "default").select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

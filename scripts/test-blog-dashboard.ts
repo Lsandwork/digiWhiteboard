@@ -16,6 +16,8 @@ assert.ok(navIds.includes("calendar"));
 assert.ok(navIds.includes("articles"));
 assert.ok(navIds.includes("newsletter"));
 assert.ok(navIds.includes("generate"));
+assert.ok(navIds.includes("social-generator"));
+assert.ok(navIds.includes("posting-analytics"));
 assert.ok(navIds.includes("search-console"));
 assert.ok(!(navIds as string[]).includes("comments"), "Comments must stay hidden until a real comments system exists");
 

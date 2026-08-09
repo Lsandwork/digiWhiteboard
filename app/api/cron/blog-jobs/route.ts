@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBlogSettings, publishBlogArticle, seedBlogTopics, writeBlogAudit } from "@/lib/blog/service";
+import { runFullAutoSeoCycle, retryFailedWordPressMirrors } from "@/lib/blog/scheduler/auto-run";
+import { processSocialPostQueue } from "@/lib/blog/social/service";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -17,15 +19,19 @@ export async function GET(request: Request) {
   const supabase = getServiceSupabase();
   const results: Record<string, unknown> = {};
 
-  // Ensure seed topics exist (idempotent).
   try {
     results.seed = await seedBlogTopics("cron");
   } catch (error) {
     results.seedError = error instanceof Error ? error.message : "seed failed";
   }
 
-  // Publish due scheduled articles only when auto_publish is enabled OR they were manually scheduled after approval.
-  // Default: auto_publish_enabled is false — only publish SCHEDULED articles that are already APPROVED-path.
+  // Full-auto human-like SEO: generate + schedule when enabled.
+  try {
+    results.fullAuto = await runFullAutoSeoCycle("cron");
+  } catch (error) {
+    results.fullAutoError = error instanceof Error ? error.message : "full auto failed";
+  }
+
   const nowIso = new Date().toISOString();
   const { data: due } = await supabase
     .from("blog_articles")
@@ -36,9 +42,9 @@ export async function GET(request: Request) {
 
   const published: string[] = [];
   const failed: Array<{ id: string; error: string }> = [];
+  const fullAuto = Boolean((settings as Record<string, unknown>).full_auto_enabled);
   for (const row of due || []) {
-    if (!settings.auto_publish_enabled && !row.approved_by) {
-      // Require an approver on record when auto-publish is off.
+    if (!settings.auto_publish_enabled && !fullAuto && !row.approved_by) {
       continue;
     }
     try {
@@ -51,7 +57,18 @@ export async function GET(request: Request) {
   results.published = published;
   results.failed = failed;
 
-  // Process queued generation jobs lightly (topic suggestion placeholder job types).
+  try {
+    results.wordpressRetries = await retryFailedWordPressMirrors(3);
+  } catch (error) {
+    results.wordpressRetryError = error instanceof Error ? error.message : "wp retry failed";
+  }
+
+  try {
+    results.socialQueue = await processSocialPostQueue(5);
+  } catch (error) {
+    results.socialQueueError = error instanceof Error ? error.message : "social queue failed";
+  }
+
   const { data: jobs } = await supabase
     .from("blog_generation_jobs")
     .select("*")
@@ -69,6 +86,8 @@ export async function GET(request: Request) {
     try {
       if (job.job_type === "seed_topics") {
         await seedBlogTopics("cron");
+      } else if (job.job_type === "auto_generate_and_schedule") {
+        await runFullAutoSeoCycle("cron");
       }
       await supabase
         .from("blog_generation_jobs")

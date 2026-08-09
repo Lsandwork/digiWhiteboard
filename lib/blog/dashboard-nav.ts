@@ -50,6 +50,7 @@ export const BLOG_DASHBOARD_NAV: BlogDashboardNavSection[] = [
     label: "AUTOMATION & AI",
     items: [
       { id: "generate", label: "Blog Generator", permission: "blog.create" },
+      { id: "social-generator", label: "Social Media Generator", permission: "blog.create" },
       { id: "agents", label: "AI Agents", permission: "blog.manage_providers" },
       { id: "automation", label: "Automation Rules", permission: "blog.manage_automation" }
     ]
@@ -59,6 +60,7 @@ export const BLOG_DASHBOARD_NAV: BlogDashboardNavSection[] = [
     label: "ANALYTICS",
     items: [
       { id: "analytics", label: "Performance", permission: "blog.view_analytics" },
+      { id: "posting-analytics", label: "Posting Analytics", permission: "blog.view_analytics" },
       { id: "search-console", label: "Search Console", permission: "blog.view_analytics" }
     ]
   },
