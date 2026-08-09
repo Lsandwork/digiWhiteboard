@@ -6,10 +6,13 @@ import {
   downloadSocialPackTxt,
   getSocialPack,
   listSocialConnections,
+  listSocialImageAlternatives,
   listSocialPacks,
+  replaceSocialPackImage,
   testSocialConnection,
   upsertSocialConnection
 } from "@/lib/blog/social/service";
+import type { BlogImageCandidate } from "@/lib/blog/media/types";
 import { SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/blog/social/types";
 
 export const dynamic = "force-dynamic";
@@ -98,6 +101,48 @@ export async function POST(request: Request) {
     }
     const result = await testSocialConnection(platform, blogActor(pub.session, pub.role));
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+  }
+
+  if (action === "list_image_options") {
+    try {
+      const excludeIds = Array.isArray(body.excludeIds) ? body.excludeIds.map(String) : [];
+      const result = await listSocialImageAlternatives({
+        topic: body.topic != null ? String(body.topic) : "dog daycare",
+        excludeIds,
+        limit: body.limit != null ? Number(body.limit) : 12
+      });
+      return NextResponse.json({ ok: true, photos: result.photos, notes: result.notes });
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to load replacement photos." },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (action === "replace_image") {
+    const replacement = body.replacement as BlogImageCandidate | undefined;
+    if (!replacement?.id || !replacement?.url) {
+      return NextResponse.json({ error: "Replacement photo is required." }, { status: 400 });
+    }
+    if (replacement.sourceKind === ("ai_generated" as never)) {
+      return NextResponse.json({ error: "AI-generated images are not allowed." }, { status: 400 });
+    }
+    try {
+      const result = await replaceSocialPackImage({
+        packId: body.packId != null ? String(body.packId) : null,
+        oldImageId: String(body.oldImageId || ""),
+        oldImageUrl: body.oldImageUrl != null ? String(body.oldImageUrl) : null,
+        replacement,
+        actor: blogActor(auth.session, auth.role)
+      });
+      return NextResponse.json(result);
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Unable to replace photo." },
+        { status: 500 }
+      );
+    }
   }
 
   try {

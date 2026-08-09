@@ -1,6 +1,10 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { decryptBlogSecret, encryptBlogSecret, hasEncryptedSecret } from "@/lib/blog/crypto";
-import { selectImagesForPosting } from "@/lib/blog/media/select-for-posting";
+import {
+  listReplacementImageOptions,
+  selectImagesForPosting
+} from "@/lib/blog/media/select-for-posting";
+import type { BlogImageCandidate } from "@/lib/blog/media/types";
 import {
   generateSocialPackDeterministic,
   packItemToDownloadRow,
@@ -182,11 +186,12 @@ export async function createSocialPack(input: {
   queueAutoPost?: boolean;
 }) {
   const topic = String(input.topic || input.articleTitle || "Fitdog daycare Santa Monica");
+  const topicForPhotos = [topic, input.angle].filter(Boolean).join(" ").trim();
   const selected = await selectImagesForPosting({
-    topic,
+    topic: topicForPhotos,
     total: 4,
-    bulkCount: 3,
-    webCount: 3,
+    bulkCount: 4,
+    webCount: 2,
     actor: input.createdBy ?? null,
     promoteCover: false
   });
@@ -310,6 +315,92 @@ export async function getSocialPack(packId: string) {
     .eq("pack_id", packId)
     .order("sort_order", { ascending: true });
   return { pack, items: items || [] };
+}
+
+export async function listSocialImageAlternatives(input: {
+  topic: string;
+  excludeIds?: string[];
+  limit?: number;
+}) {
+  return listReplacementImageOptions({
+    topic: String(input.topic || "dog daycare").slice(0, 160),
+    excludeIds: input.excludeIds,
+    limit: input.limit
+  });
+}
+
+/** Swap one selected photo for another topic-matched real photo; updates pack items that used the old URL. */
+export async function replaceSocialPackImage(input: {
+  packId?: string | null;
+  oldImageId: string;
+  oldImageUrl?: string | null;
+  replacement: BlogImageCandidate;
+  actor?: string | null;
+}) {
+  const credit = [input.replacement.photographer, input.replacement.license].filter(Boolean).join(" · ");
+  const patch = {
+    imageUrl: input.replacement.url,
+    imageAlt: input.replacement.alt,
+    imageCredit: credit,
+    imageSourceKind: input.replacement.sourceKind
+  };
+
+  let updatedItems: unknown[] = [];
+  const packId = input.packId && !String(input.packId).startsWith("local-") ? String(input.packId) : null;
+
+  if (packId) {
+    try {
+      const supabase = getServiceSupabase();
+      const { data: items, error } = await supabase
+        .from("blog_social_pack_items")
+        .select("id, content, visual_direction")
+        .eq("pack_id", packId);
+      if (error) throw error;
+
+      for (const item of items || []) {
+        const content =
+          item.content && typeof item.content === "object"
+            ? ({ ...(item.content as Record<string, unknown>) } as Record<string, unknown>)
+            : {};
+        const currentUrl = String(content.imageUrl || "");
+        const matches =
+          (input.oldImageUrl && currentUrl === input.oldImageUrl) ||
+          (input.oldImageUrl && currentUrl.split("?")[0] === input.oldImageUrl.split("?")[0]);
+        if (!matches) continue;
+
+        const nextContent = { ...content, ...patch };
+        const dogBit = input.replacement.dogNames?.length
+          ? ` Featuring ${input.replacement.dogNames.slice(0, 3).join(", ")}.`
+          : "";
+        const { data: updated, error: updateError } = await supabase
+          .from("blog_social_pack_items")
+          .update({
+            content: nextContent,
+            visual_direction: `USE THIS REAL PHOTO (${input.replacement.sourceKind}): ${input.replacement.sceneDescription}.${dogBit} No AI-generated images.`
+          })
+          .eq("id", item.id)
+          .select("*")
+          .single();
+        if (updateError) throw updateError;
+        if (updated) updatedItems.push(updated);
+      }
+
+      await writeBlogAudit(input.actor, "social.image_replaced", "social_pack", packId, {
+        oldImageId: input.oldImageId,
+        newImageId: input.replacement.id,
+        sourceKind: input.replacement.sourceKind
+      });
+    } catch {
+      // Ephemeral / migration missing — client still applies the swap locally.
+      updatedItems = [];
+    }
+  }
+
+  return {
+    ok: true as const,
+    image: input.replacement,
+    updatedItems
+  };
 }
 
 function itemsToDownloadRows(

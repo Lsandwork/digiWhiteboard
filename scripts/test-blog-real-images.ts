@@ -4,6 +4,11 @@ import {
   isBlockedBlogSourceClass,
   textLooksAiGenerated
 } from "../lib/blog/media/ai-image-guard";
+import {
+  isOffTopicImageText,
+  MIN_WEB_RELEVANCE_SCORE,
+  scoreImageRelevance
+} from "../lib/blog/media/image-relevance";
 import { formatPhotoContextForPrompt, photoAwareWritingRules } from "../lib/blog/media/select-for-posting";
 import { searchWebDogPhotos } from "../lib/blog/media/web-image-search";
 import type { BlogImageCandidate } from "../lib/blog/media/types";
@@ -16,6 +21,28 @@ async function main() {
   assert.equal(textLooksAiGenerated("created with Stable Diffusion"), true);
   assert.throws(() => assertRealPhotography("ai_generated_approved", "cover"), /AI-generated/);
   assert.throws(() => assertRealPhotography("licensed_stock", "DALL-E puppy portrait"), /AI-generated|Rejected/);
+
+  assert.equal(isOffTopicImageText("Dia de los Muertos dog skeleton statue marigolds"), true);
+  assert.equal(isOffTopicImageText("Day of the Dead calavera dog sculpture"), true);
+  assert.equal(isOffTopicImageText("Dogs playing indoors at daycare"), false);
+
+  const topic = "Daycare regulars living their life Summer heat no problem we got ac";
+  const diaScore = scoreImageRelevance(topic, {
+    title: "Dia de los Muertos dog statues with marigolds",
+    tags: ["skeleton", "holiday"],
+    sourceKind: "web_licensed"
+  });
+  assert.ok(diaScore < MIN_WEB_RELEVANCE_SCORE, `expected Dia de los Muertos rejected, got ${diaScore}`);
+
+  const daycareScore = scoreImageRelevance(topic, {
+    title: "Happy dogs playing indoors at daycare group",
+    tags: ["dog", "play", "indoor"],
+    sourceKind: "web_licensed"
+  });
+  assert.ok(
+    daycareScore >= MIN_WEB_RELEVANCE_SCORE,
+    `expected daycare photo accepted, got ${daycareScore}`
+  );
 
   const images: BlogImageCandidate[] = [
     {
@@ -39,6 +66,15 @@ async function main() {
       assert.equal(photo.sourceKind, "web_licensed");
       assert.ok(photo.url.startsWith("http"));
       assert.equal(textLooksAiGenerated(photo.alt, photo.caption, photo.license), false);
+      assert.equal(isOffTopicImageText(photo.alt, photo.caption, ...(photo.tags || [])), false);
+      assert.ok(
+        scoreImageRelevance("dog daycare play", {
+          title: photo.alt,
+          caption: photo.caption,
+          tags: photo.tags,
+          sourceKind: "web_licensed"
+        }) >= MIN_WEB_RELEVANCE_SCORE
+      );
     }
     console.log("web search samples:", photos.length);
   } catch (error) {

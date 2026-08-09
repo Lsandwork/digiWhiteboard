@@ -65,8 +65,33 @@ export function BlogSocialGeneratorPanel() {
   const [credDrafts, setCredDrafts] = useState<Record<string, { username: string; secret: string }>>({});
   const [imageNotes, setImageNotes] = useState<string[]>([]);
   const [selectedImages, setSelectedImages] = useState<
-    Array<{ id: string; url: string; alt: string; sourceKind: string; sceneDescription?: string }>
+    Array<{
+      id: string;
+      url: string;
+      alt: string;
+      sourceKind: string;
+      sceneDescription?: string;
+      photographer?: string | null;
+      license?: string | null;
+      dogNames?: string[];
+      thumbUrl?: string | null;
+    }>
   >([]);
+  const [replacingImageId, setReplacingImageId] = useState<string | null>(null);
+  const [replacementOptions, setReplacementOptions] = useState<
+    Array<{
+      id: string;
+      url: string;
+      alt: string;
+      sourceKind: string;
+      sceneDescription?: string;
+      photographer?: string | null;
+      license?: string | null;
+      dogNames?: string[];
+      thumbUrl?: string | null;
+    }>
+  >([]);
+  const [replacementBusy, setReplacementBusy] = useState(false);
 
   const reload = useCallback(async () => {
     const res = await fetch("/api/blog/social");
@@ -121,6 +146,8 @@ export function BlogSocialGeneratorPanel() {
   async function generate() {
     setBusy(true);
     setMessage(null);
+    setReplacingImageId(null);
+    setReplacementOptions([]);
     try {
       const res = await fetch("/api/blog/social", {
         method: "POST",
@@ -144,6 +171,91 @@ export function BlogSocialGeneratorPanel() {
       setMessage(error instanceof Error ? error.message : "Generate failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function openReplacePicker(imageId: string) {
+    setReplacingImageId(imageId);
+    setReplacementBusy(true);
+    setMessage(null);
+    try {
+      const excludeIds = selectedImages.map((img) => img.id);
+      const res = await fetch("/api/blog/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "list_image_options",
+          topic: [topic, angle].filter(Boolean).join(" ").trim() || "dog daycare",
+          excludeIds,
+          limit: 12
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Could not load replacements");
+      setReplacementOptions(json.photos || []);
+      if (!(json.photos || []).length) {
+        setMessage("No other topic-matched photos found. Upload more bulk photos or refine the topic.");
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not load replacements");
+      setReplacingImageId(null);
+    } finally {
+      setReplacementBusy(false);
+    }
+  }
+
+  async function applyReplacement(replacement: (typeof selectedImages)[number]) {
+    if (!replacingImageId) return;
+    const old = selectedImages.find((img) => img.id === replacingImageId);
+    if (!old) return;
+    setReplacementBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/blog/social", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "replace_image",
+          packId: activePackId,
+          oldImageId: old.id,
+          oldImageUrl: old.url,
+          replacement
+        })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Replace failed");
+
+      setSelectedImages((prev) => prev.map((img) => (img.id === old.id ? { ...replacement } : img)));
+      setItems((prev) =>
+        prev.map((item) => {
+          const url = item.content?.imageUrl || "";
+          if (url !== old.url && url.split("?")[0] !== old.url.split("?")[0]) return item;
+          const credit = [replacement.photographer, replacement.license].filter(Boolean).join(" · ");
+          return {
+            ...item,
+            visual_direction: `USE THIS REAL PHOTO (${replacement.sourceKind}): ${
+              replacement.sceneDescription || replacement.alt
+            }. No AI-generated images.`,
+            content: {
+              ...(item.content || {}),
+              imageUrl: replacement.url,
+              imageAlt: replacement.alt,
+              imageCredit: credit,
+              imageSourceKind: replacement.sourceKind
+            }
+          };
+        })
+      );
+      if (Array.isArray(json.updatedItems) && json.updatedItems.length && activePackId) {
+        await loadPack(activePackId);
+      }
+      setMessage("Photo replaced with a topic-matched real image.");
+      setReplacingImageId(null);
+      setReplacementOptions([]);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Replace failed");
+    } finally {
+      setReplacementBusy(false);
     }
   }
 
@@ -309,16 +421,67 @@ export function BlogSocialGeneratorPanel() {
                 <figure key={img.id} className="w-28 space-y-1">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={img.url}
+                    src={img.thumbUrl || img.url}
                     alt={img.alt}
                     className="h-24 w-28 rounded-md object-cover border border-[var(--fitdog-border,#e6e8eb)]"
                   />
                   <figcaption className="text-[10px] leading-tight text-[var(--fitdog-muted,#6b7280)]">
                     {img.sourceKind.replace(/_/g, " ")}
                   </figcaption>
+                  <button
+                    type="button"
+                    disabled={busy || replacementBusy}
+                    className="blog-dash-toolbar-btn w-full px-1 py-1 text-[11px] disabled:opacity-50"
+                    onClick={() => void openReplacePicker(img.id)}
+                  >
+                    {replacingImageId === img.id && replacementBusy ? "…" : "Replace"}
+                  </button>
                 </figure>
               ))}
             </div>
+            {replacingImageId ? (
+              <div className="rounded-xl border border-[var(--fitdog-border,#e6e8eb)] bg-[var(--fitdog-surface,#f8f9fa)] p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold text-[var(--fitdog-heading,#121417)]">
+                    Pick a better topic-matched photo
+                  </p>
+                  <button
+                    type="button"
+                    className="text-xs text-[var(--fitdog-muted,#6b7280)] underline"
+                    onClick={() => {
+                      setReplacingImageId(null);
+                      setReplacementOptions([]);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {replacementBusy && !replacementOptions.length ? (
+                  <p className="text-xs text-[var(--fitdog-muted,#6b7280)]">Finding matching photos…</p>
+                ) : null}
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {replacementOptions.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      disabled={replacementBusy}
+                      onClick={() => void applyReplacement(opt)}
+                      className="shrink-0 w-24 space-y-1 text-left disabled:opacity-50"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={opt.thumbUrl || opt.url}
+                        alt={opt.alt}
+                        className="h-20 w-24 rounded-md object-cover border border-[var(--fitdog-border,#e6e8eb)]"
+                      />
+                      <span className="block text-[10px] leading-tight text-[var(--fitdog-muted,#6b7280)]">
+                        {opt.sourceKind.replace(/_/g, " ")}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

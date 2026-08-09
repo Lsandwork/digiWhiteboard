@@ -1,6 +1,11 @@
 import { listBulkPhotoCandidates } from "@/lib/blog/media/bulk-photos";
 import { searchWebDogPhotos } from "@/lib/blog/media/web-image-search";
 import { assertRealPhotography, isBlockedBlogSourceClass } from "@/lib/blog/media/ai-image-guard";
+import {
+  MIN_BULK_RELEVANCE_SCORE,
+  MIN_WEB_RELEVANCE_SCORE,
+  scoreImageRelevance
+} from "@/lib/blog/media/image-relevance";
 import type { BlogImageCandidate, SelectedPostingImages } from "@/lib/blog/media/types";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -60,7 +65,8 @@ async function promoteToMediaLibrary(candidate: BlogImageCandidate, actor?: stri
           ...(candidate.tags || []),
           candidate.sourceKind,
           "auto_selected",
-          "real_photography"
+          "real_photography",
+          "topic_relevant"
         ].filter(Boolean),
         activity: candidate.category || null,
         synthetic_flags: []
@@ -74,9 +80,40 @@ async function promoteToMediaLibrary(candidate: BlogImageCandidate, actor?: stri
   }
 }
 
+function diversifyBulk(candidates: BlogImageCandidate[], limit: number): BlogImageCandidate[] {
+  const picked: BlogImageCandidate[] = [];
+  const seenDogs = new Set<string>();
+  const seenFiles = new Set<string>();
+
+  for (const img of candidates) {
+    if (picked.length >= limit) break;
+    const fileKey = (img.url || img.id).split("?")[0] || img.id;
+    if (seenFiles.has(fileKey)) continue;
+    const dogKey = (img.dogNames || []).slice().sort().join("|") || img.sceneDescription.slice(0, 40);
+    // Prefer variety: allow at most 2 frames of the same dog set.
+    const dogCount = [...picked].filter(
+      (p) => ((p.dogNames || []).slice().sort().join("|") || p.sceneDescription.slice(0, 40)) === dogKey
+    ).length;
+    if (dogCount >= 2 && seenDogs.has(dogKey)) continue;
+    seenDogs.add(dogKey);
+    seenFiles.add(fileKey);
+    picked.push(img);
+  }
+
+  // If still short, fill remaining unique files.
+  if (picked.length < limit) {
+    for (const img of candidates) {
+      if (picked.length >= limit) break;
+      if (picked.some((p) => p.id === img.id)) continue;
+      picked.push(img);
+    }
+  }
+  return picked;
+}
+
 /**
- * Prefer Digi Board bulk photos; fill with licensed web photography.
- * Explicitly excludes AI-generated imagery.
+ * Prefer Digi Board bulk photos; fill only with topic-relevant licensed web photos.
+ * Never attaches off-topic art (statues, holidays, skeletons, etc.).
  */
 export async function selectImagesForPosting(options: {
   topic: string;
@@ -85,20 +122,47 @@ export async function selectImagesForPosting(options: {
   total?: number;
   actor?: string | null;
   promoteCover?: boolean;
+  excludeIds?: string[];
 }): Promise<SelectedPostingImages & { coverMediaId?: string | null }> {
   const total = Math.min(8, Math.max(1, options.total ?? 4));
-  const bulkCount = Math.min(total, Math.max(0, options.bulkCount ?? Math.ceil(total * 0.7)));
-  const webCount = Math.min(total, Math.max(0, options.webCount ?? total));
+  const bulkCount = Math.min(total, Math.max(0, options.bulkCount ?? total));
+  const webCount = Math.min(total, Math.max(0, options.webCount ?? 2));
+  const exclude = new Set(options.excludeIds || []);
   const notes: string[] = [];
 
-  const [bulk, web] = await Promise.all([
-    listBulkPhotoCandidates({ topic: options.topic, limit: Math.max(bulkCount, 6) }),
-    searchWebDogPhotos({ topic: options.topic, limit: Math.max(webCount, 6) })
+  const [bulkRaw, webRaw] = await Promise.all([
+    listBulkPhotoCandidates({ topic: options.topic, limit: Math.max(bulkCount * 3, 12) }),
+    searchWebDogPhotos({
+      topic: options.topic,
+      limit: Math.max(webCount * 4, 10),
+      excludeIds: options.excludeIds
+    })
   ]);
 
+  const bulkScored = bulkRaw
+    .filter((img) => !exclude.has(img.id))
+    .map((img) => ({
+      img,
+      score: scoreImageRelevance(options.topic, {
+        title: img.alt,
+        alt: img.alt,
+        caption: img.caption,
+        sceneDescription: img.sceneDescription,
+        category: img.category,
+        yard: img.yard,
+        tags: img.tags,
+        sourceKind: "bulk_photo"
+      })
+    }))
+    .filter((row) => row.score >= MIN_BULK_RELEVANCE_SCORE)
+    .sort((a, b) => b.score - a.score)
+    .map((row) => row.img);
+
+  const bulk = diversifyBulk(bulkScored, bulkCount);
   const picked: BlogImageCandidate[] = [];
+
   for (const img of bulk) {
-    if (picked.length >= bulkCount) break;
+    if (picked.length >= total) break;
     try {
       assertRealPhotography("fitdog_owned", img.alt, img.caption, img.sceneDescription);
       picked.push(img);
@@ -108,21 +172,37 @@ export async function selectImagesForPosting(options: {
   }
   if (picked.length) {
     notes.push(`Selected ${picked.length} real photo(s) from Digi Board Bulk Photo library.`);
-  } else {
-    notes.push("No matching bulk photos available — using licensed web photography only.");
   }
 
-  for (const img of web) {
+  // Only add web photos when they clear a strict relevance bar — never pad with junk.
+  let webAdded = 0;
+  for (const img of webRaw) {
     if (picked.length >= total) break;
+    if (exclude.has(img.id) || picked.some((p) => p.id === img.id || p.url === img.url)) continue;
+    const score = scoreImageRelevance(options.topic, {
+      title: img.alt,
+      alt: img.alt,
+      caption: img.caption,
+      sceneDescription: img.sceneDescription,
+      tags: img.tags,
+      sourceKind: "web_licensed"
+    });
+    if (score < MIN_WEB_RELEVANCE_SCORE) {
+      notes.push(`Rejected off-topic web photo: ${img.alt.slice(0, 60)}`);
+      continue;
+    }
     try {
       assertRealPhotography("licensed_stock", img.alt, img.caption, img.sceneDescription, img.license);
       picked.push(img);
+      webAdded += 1;
     } catch {
       notes.push(`Skipped web image that looked AI-generated: ${img.id}`);
     }
   }
-  if (picked.some((p) => p.sourceKind === "web_licensed")) {
-    notes.push("Added licensed web photographs (Openverse/Unsplash/Pexels). AI-generated images are blocked.");
+  if (webAdded) {
+    notes.push(`Added ${webAdded} topic-matched licensed web photo(s). Off-topic results were blocked.`);
+  } else if (picked.length < total) {
+    notes.push("No topic-matched web photos found — kept Fitdog bulk photos only (better than unrelated stock).");
   }
 
   const cover = picked[0] || null;
@@ -140,4 +220,22 @@ export async function selectImagesForPosting(options: {
     notes,
     coverMediaId
   };
+}
+
+/** Alternatives for replacing one selected image (bulk first, then relevant web). */
+export async function listReplacementImageOptions(options: {
+  topic: string;
+  excludeIds?: string[];
+  limit?: number;
+}): Promise<{ photos: BlogImageCandidate[]; notes: string[] }> {
+  const limit = Math.min(18, Math.max(4, options.limit ?? 12));
+  const selected = await selectImagesForPosting({
+    topic: options.topic,
+    total: limit,
+    bulkCount: limit,
+    webCount: Math.min(6, limit),
+    promoteCover: false,
+    excludeIds: options.excludeIds
+  });
+  return { photos: selected.all, notes: selected.notes };
 }

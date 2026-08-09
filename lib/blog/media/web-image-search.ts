@@ -1,4 +1,9 @@
 import { textLooksAiGenerated } from "@/lib/blog/media/ai-image-guard";
+import {
+  isOffTopicImageText,
+  MIN_WEB_RELEVANCE_SCORE,
+  scoreImageRelevance
+} from "@/lib/blog/media/image-relevance";
 import type { BlogImageCandidate } from "@/lib/blog/media/types";
 
 type RawWebHit = {
@@ -18,33 +23,46 @@ type RawWebHit = {
 
 function buildQueries(topic: string): string[] {
   const base = topic.replace(/[^\w\s-]/g, " ").trim() || "dog daycare";
-  return [
-    `${base} dog`,
-    `dog daycare play`,
-    `happy dog outdoor santa monica`,
-    `dog training leash walk`,
-    `dogs playing together park`
-  ].map((q) => q.slice(0, 120));
+  const lower = base.toLowerCase();
+  const queries = [`${base} real dog photo`, `dog daycare play indoors`];
+
+  if (/heat|summer|ac|cool|hot/i.test(lower)) {
+    queries.push("dog resting indoors cool air", "happy dog indoors shade water");
+  }
+  if (/day.?care|play|regular|yard/i.test(lower)) {
+    queries.push("dogs playing daycare group", "puppy playgroup indoor facility");
+  }
+  if (/train|leash|obedience/i.test(lower)) {
+    queries.push("dog training leash walk real photo");
+  }
+  if (/hike|trail|walk/i.test(lower)) {
+    queries.push("dog walking on leash trail");
+  }
+
+  // Never search bare holiday / art terms — keep queries grounded in live dogs.
+  return Array.from(new Set(queries.map((q) => q.slice(0, 120))));
 }
 
-function acceptHit(hit: RawWebHit): boolean {
-  if (!hit.url || !/^https?:\/\//i.test(hit.url)) return false;
+function acceptHit(hit: RawWebHit, topic: string): { ok: boolean; score: number } {
+  if (!hit.url || !/^https?:\/\//i.test(hit.url)) return { ok: false, score: 0 };
   if (
-    textLooksAiGenerated(
-      hit.title,
-      hit.creator,
-      hit.license,
-      ...(hit.tags || []),
-      hit.sourcePageUrl
-    )
+    textLooksAiGenerated(hit.title, hit.creator, hit.license, ...(hit.tags || []), hit.sourcePageUrl)
   ) {
-    return false;
+    return { ok: false, score: 0 };
   }
-  // Prefer real photography hosts; skip obvious AI marketplaces when detectable in URL
   if (/midjourney|openai\.com\/dall|generated\.photos|thispersondoesnotexist/i.test(hit.url)) {
-    return false;
+    return { ok: false, score: 0 };
   }
-  return true;
+  if (isOffTopicImageText(hit.title, hit.sourcePageUrl, ...(hit.tags || []))) {
+    return { ok: false, score: 0 };
+  }
+
+  const score = scoreImageRelevance(topic, {
+    title: hit.title,
+    tags: hit.tags,
+    sourceKind: "web_licensed"
+  });
+  return { ok: score >= MIN_WEB_RELEVANCE_SCORE, score };
 }
 
 async function searchOpenverse(query: string, limit: number): Promise<RawWebHit[]> {
@@ -72,8 +90,6 @@ async function searchOpenverse(query: string, limit: number): Promise<RawWebHit[
       tags?: Array<{ name?: string } | string>;
       width?: number;
       height?: number;
-      filetype?: string;
-      category?: string;
     }>;
   };
 
@@ -178,11 +194,11 @@ async function searchPexels(query: string, limit: number): Promise<RawWebHit[]> 
 
 function toCandidate(hit: RawWebHit, topic: string): BlogImageCandidate {
   const scene = [
-    "Licensed web photograph · camera photo",
+    "Licensed web photograph · live dog",
     hit.title,
     hit.creator ? `by ${hit.creator}` : null,
     hit.license ? `license: ${hit.license}` : null,
-    `selected for topic: ${topic.slice(0, 80)}`
+    `matched to: ${topic.slice(0, 80)}`
   ]
     .filter(Boolean)
     .join(" · ");
@@ -206,39 +222,44 @@ function toCandidate(hit: RawWebHit, topic: string): BlogImageCandidate {
 }
 
 /**
- * Search the public web for real (non-AI) dog photography.
- * Openverse works without keys; Unsplash/Pexels used when env keys exist.
+ * Search the public web for real (non-AI) dog photography that matches the post topic.
+ * Off-topic art (statues, Day of the Dead, skeletons, etc.) is rejected.
  */
 export async function searchWebDogPhotos(options?: {
   topic?: string;
   limit?: number;
+  excludeIds?: string[];
 }): Promise<BlogImageCandidate[]> {
   const limit = Math.min(24, Math.max(1, options?.limit ?? 10));
   const topic = String(options?.topic || "dog daycare").slice(0, 160);
+  const exclude = new Set(options?.excludeIds || []);
   const queries = buildQueries(topic);
   const hits: RawWebHit[] = [];
 
   for (const query of queries.slice(0, 3)) {
-    if (hits.length >= limit * 2) break;
+    if (hits.length >= limit * 3) break;
     const batches = await Promise.allSettled([
-      searchOpenverse(query, limit),
-      searchUnsplash(query, Math.min(8, limit)),
-      searchPexels(query, Math.min(8, limit))
+      searchOpenverse(query, Math.max(12, limit)),
+      searchUnsplash(query, Math.min(10, limit)),
+      searchPexels(query, Math.min(10, limit))
     ]);
     for (const batch of batches) {
       if (batch.status === "fulfilled") hits.push(...batch.value);
     }
   }
 
+  const scored: Array<{ candidate: BlogImageCandidate; score: number }> = [];
   const seen = new Set<string>();
-  const out: BlogImageCandidate[] = [];
   for (const hit of hits) {
-    if (!acceptHit(hit)) continue;
+    if (exclude.has(hit.id)) continue;
     const key = hit.url.split("?")[0] || hit.id;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(toCandidate(hit, topic));
-    if (out.length >= limit) break;
+    const { ok, score } = acceptHit(hit, topic);
+    if (!ok) continue;
+    scored.push({ candidate: toCandidate(hit, topic), score });
   }
-  return out;
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((row) => row.candidate);
 }
