@@ -19,6 +19,7 @@ import { TextScaleControls } from "@/components/admin/TextScaleControls";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { NotificationBell } from "@/components/admin/NotificationBell";
+import { AdminMobileTabBar } from "@/components/admin/mobile/AdminMobileTabBar";
 import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
 type AdminShellProps = {
@@ -127,8 +128,13 @@ export function AdminShell({
     setMobileOpen(false);
   }
 
+  function handleTabChange(next: AdminTab) {
+    onTabChange(next);
+    setMobileOpen(false);
+  }
+
   return (
-    <div className="admin-theme">
+    <div className="admin-theme admin-theme--app">
       <ImpersonationBanner />
       <div className={`admin-layout ${sidebarCollapsed ? "admin-layout--collapsed" : ""}`}>
         <Sidebar
@@ -141,7 +147,7 @@ export function AdminShell({
           visibleTabs={visibleTabs}
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
-          onTabChange={onTabChange}
+          onTabChange={handleTabChange}
           onLogout={onLogout}
           onOpenHelp={onOpenHelp}
           collapsed={sidebarCollapsed}
@@ -150,7 +156,33 @@ export function AdminShell({
 
         <div className="admin-main">
           <header className="admin-header">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            {/* Phone app chrome — compact sticky bar */}
+            <div className="admin-appbar">
+              <div className="admin-appbar__leading">
+                <MobileMenuButton onClick={() => setMobileOpen(true)} />
+                <div className="admin-appbar__titles min-w-0">
+                  <p className="admin-appbar__brand">Fitdog</p>
+                  <h1 className="admin-appbar__title">{pageLabel}</h1>
+                </div>
+              </div>
+              <div className="admin-appbar__actions">
+                <NotificationBell onOpenTab={handleTabChange} />
+                <button
+                  type="button"
+                  className="admin-appbar__board-btn"
+                  onClick={onOpenBoard}
+                  aria-label={
+                    board === "staff" ? "Open Staff Whiteboard" : board === "marketing" ? "Open CAST-TV" : "Open Lobby Whiteboard"
+                  }
+                >
+                  <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
+                  <span>Board</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Desktop / tablet header keeps full context */}
+            <div className="admin-header__desktop flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="mb-3 flex flex-wrap items-center gap-3">
                   <MobileMenuButton onClick={() => setMobileOpen(true)} />
@@ -165,60 +197,84 @@ export function AdminShell({
                 <p className="admin-page-subtitle mt-1 max-w-2xl">{pageDescription}</p>
               </div>
 
-              <div className="flex w-full flex-col items-start gap-2 lg:w-auto lg:items-end">
-                <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:gap-3">
-                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+              <div className="admin-header__actions flex w-full flex-col items-start gap-2 lg:w-auto lg:items-end">
+                <div className="admin-header__toolbar flex w-full flex-wrap items-center justify-end gap-2 sm:gap-3">
+                  <div className="admin-header__utils flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                     {canSeeAdminUtilities ? (
-                      <button type="button" className="admin-btn-secondary flex-1 sm:flex-none" onClick={onPreviewLive}>
-                        Preview Live
+                      <button
+                        type="button"
+                        className="admin-btn-secondary admin-header__util-btn flex-1 sm:flex-none"
+                        onClick={onPreviewLive}
+                      >
+                        <span className="admin-header__label-full">Preview Live</span>
+                        <span className="admin-header__label-short">Preview</span>
                       </button>
                     ) : null}
                     <button
                       type="button"
-                      className="admin-btn-secondary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none"
+                      className="admin-btn-secondary admin-header__util-btn inline-flex flex-1 items-center justify-center gap-2 sm:flex-none"
                       onClick={onRefresh}
                       disabled={refreshing}
                     >
                       <FitdogDashboardIcon src={FITDOG_UI.refresh} size={18} alt="" />
-                      {refreshing ? "Refreshing…" : "Refresh"}
+                      <span className="admin-header__label-full">{refreshing ? "Refreshing…" : "Refresh"}</span>
+                      <span className="admin-header__label-short">{refreshing ? "…" : "Refresh"}</span>
                     </button>
                     {canSeeAdminUtilities ? (
                       <button
                         type="button"
-                        className="admin-btn-secondary flex-1 sm:flex-none"
+                        className="admin-btn-secondary admin-header__util-btn flex-1 sm:flex-none"
                         onClick={onCastRefresh}
                         disabled={castRefreshing || !onCastRefresh}
                         title="Force a hard reload on every active Chromecast and TV display"
                       >
-                        {castRefreshing ? "Refreshing TVs…" : "Hard Refresh Cast TVs"}
+                        <span className="admin-header__label-full">
+                          {castRefreshing ? "Refreshing TVs…" : "Hard Refresh Cast TVs"}
+                        </span>
+                        <span className="admin-header__label-short">
+                          {castRefreshing ? "TVs…" : "Refresh TVs"}
+                        </span>
                       </button>
                     ) : null}
                     <button
                       type="button"
-                      className="admin-btn-primary inline-flex flex-1 items-center justify-center gap-2 sm:flex-none"
+                      className="admin-btn-primary admin-header__primary-btn inline-flex flex-1 items-center justify-center gap-2 sm:flex-none"
                       onClick={onOpenBoard}
                     >
                       <FitdogDashboardIcon src={FITDOG_UI.openWhiteboard} size={18} alt="" />
-                      {isDemo
-                        ? "Open Demo Whiteboard"
-                        : board === "marketing"
-                          ? "Open CAST-TV"
-                          : board === "staff"
-                            ? "Open Staff Whiteboard"
-                            : "Open Lobby Whiteboard"}
+                      <span className="admin-header__label-full">
+                        {isDemo
+                          ? "Open Demo Whiteboard"
+                          : board === "marketing"
+                            ? "Open CAST-TV"
+                            : board === "staff"
+                              ? "Open Staff Whiteboard"
+                              : "Open Lobby Whiteboard"}
+                      </span>
+                      <span className="admin-header__label-short">
+                        {isDemo
+                          ? "Open Board"
+                          : board === "marketing"
+                            ? "Open CAST-TV"
+                            : board === "staff"
+                              ? "Open Staff"
+                              : "Open Lobby"}
+                      </span>
                     </button>
                   </div>
-                  <NotificationBell onOpenTab={onTabChange} />
-                  <ThemeToggle />
-                  <div className="admin-header-brand">
-                    <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
-                    <div>
-                      <p className="admin-header-brand__label">FITDOG</p>
-                      <p className="text-xs font-bold text-white">Fitdog Digi-board</p>
+                  <div className="admin-header__meta flex items-center gap-2">
+                    <NotificationBell onOpenTab={handleTabChange} />
+                    <ThemeToggle />
+                    <div className="admin-header-brand">
+                      <Image src={FITDOG_BRAND.logoBadge64} alt="Fitdog" width={36} height={36} className="rounded-full" />
+                      <div>
+                        <p className="admin-header-brand__label">FITDOG</p>
+                        <p className="text-xs font-bold text-white">Fitdog Digi-board</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <p className="text-xs text-admin-muted">{savedLabel}</p>
+                <p className="admin-header__saved text-xs text-admin-muted">{savedLabel}</p>
               </div>
             </div>
           </header>
@@ -234,11 +290,18 @@ export function AdminShell({
         <DemoRoleSwitcher
           currentRole={getEffectiveDemoRole({ email: username, role: role ?? undefined, isDemo: true, demoRole: demoRole ?? undefined })}
           onSwitched={() => {
-        onDemoRoleSwitched?.();
-        window.location.reload();
-      }}
+            onDemoRoleSwitched?.();
+            window.location.reload();
+          }}
         />
       ) : null}
+
+      <AdminMobileTabBar
+        activeTab={tab}
+        visibleTabs={visibleTabs}
+        onTabChange={handleTabChange}
+        onOpenMore={() => setMobileOpen(true)}
+      />
 
       <div className="admin-floating-dock">
         <TextScaleControls />

@@ -8,6 +8,8 @@ export type BlogDashboardNavItem = {
   badgeKey?: "drafts" | "needsReview" | "approved" | "scheduled" | "published" | "subscribers" | "topics";
   /** When true, item is omitted from nav (feature unavailable). */
   unavailable?: boolean;
+  /** Hide from phone “More” drawer — reachable via All Articles / bottom tabs instead. */
+  mobileHidden?: boolean;
 };
 
 export type BlogDashboardNavSection = {
@@ -26,14 +28,20 @@ export const BLOG_DASHBOARD_NAV: BlogDashboardNavSection[] = [
       { id: "calendar", label: "Content Calendar", permission: "blog.view" },
       { id: "articles", label: "All Articles", permission: "blog.view" },
       { id: "topics", label: "Topics", permission: "blog.view", badgeKey: "topics" },
-      { id: "drafts", label: "Drafts", permission: "blog.edit", badgeKey: "drafts" },
-      { id: "human-review", label: "Needs Review", permission: "blog.review", badgeKey: "needsReview" },
-      { id: "approved", label: "Approved", permission: "blog.approve", badgeKey: "approved" },
-      { id: "scheduled", label: "Scheduled", permission: "blog.schedule", badgeKey: "scheduled" },
-      { id: "published", label: "Published", permission: "blog.view", badgeKey: "published" },
-      { id: "categories", label: "Categories", permission: "blog.view" },
-      { id: "tags", label: "Tags", permission: "blog.view" },
-      { id: "authors", label: "Authors", permission: "blog.view" },
+      { id: "drafts", label: "Drafts", permission: "blog.edit", badgeKey: "drafts", mobileHidden: true },
+      {
+        id: "human-review",
+        label: "Needs Review",
+        permission: "blog.review",
+        badgeKey: "needsReview",
+        mobileHidden: true
+      },
+      { id: "approved", label: "Approved", permission: "blog.approve", badgeKey: "approved", mobileHidden: true },
+      { id: "scheduled", label: "Scheduled", permission: "blog.schedule", badgeKey: "scheduled", mobileHidden: true },
+      { id: "published", label: "Published", permission: "blog.view", badgeKey: "published", mobileHidden: true },
+      { id: "categories", label: "Categories", permission: "blog.view", mobileHidden: true },
+      { id: "tags", label: "Tags", permission: "blog.view", mobileHidden: true },
+      { id: "authors", label: "Authors", permission: "blog.view", mobileHidden: true },
       { id: "media", label: "Media Library", permission: "blog.manage_media" }
     ]
   },
@@ -51,7 +59,7 @@ export const BLOG_DASHBOARD_NAV: BlogDashboardNavSection[] = [
     items: [
       { id: "generate", label: "Blog Generator", permission: "blog.create" },
       { id: "social-generator", label: "Social Media Generator", permission: "blog.create" },
-      { id: "agents", label: "AI Agents", permission: "blog.manage_providers" },
+      { id: "agents", label: "AI Agents", permission: "blog.manage_providers", mobileHidden: true },
       { id: "automation", label: "Automation Rules", permission: "blog.manage_automation" }
     ]
   },
@@ -61,7 +69,7 @@ export const BLOG_DASHBOARD_NAV: BlogDashboardNavSection[] = [
     items: [
       { id: "analytics", label: "Performance", permission: "blog.view_analytics" },
       { id: "posting-analytics", label: "Posting Analytics", permission: "blog.view_analytics" },
-      { id: "search-console", label: "Search Console", permission: "blog.view_analytics" }
+      { id: "search-console", label: "Search Console", permission: "blog.view_analytics", mobileHidden: true }
     ]
   },
   {

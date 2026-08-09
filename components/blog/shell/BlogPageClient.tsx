@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import "@/app/admin/automatic-blog/blog-dashboard.css";
 import { BlogDashboardSidebar } from "@/components/blog/shell/BlogDashboardSidebar";
 import { BlogDashboardTopbar } from "@/components/blog/shell/BlogDashboardTopbar";
+import { BlogMobileTabBar } from "@/components/blog/shell/BlogMobileTabBar";
 import { BlogWorkspace } from "@/components/blog/shell/BlogWorkspace";
 import {
   accessFromLegacyRole,
@@ -88,7 +89,7 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
   }
 
   return (
-    <div className="blog-dash">
+    <div className="blog-dash blog-dash--app">
       <div
         className="blog-dash__shell"
         style={
@@ -121,6 +122,7 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
             displayName={resolvedName}
             roleLabel={roleLabel}
             avatarUrl={avatarUrl}
+            page={page}
             onToggleMobile={() => setMobileOpen(true)}
             onLogout={() => void logout()}
             notificationCount={counts.needsReview || 0}
@@ -138,6 +140,7 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
           </div>
         </div>
       </div>
+      <BlogMobileTabBar page={page} canAccess={canAccess} onOpenMore={() => setMobileOpen(true)} />
       {/* Keep path stable for deep links */}
       <span className="sr-only">{BLOG_APP_PATH}</span>
     </div>

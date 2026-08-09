@@ -444,9 +444,28 @@
   display: none;
 }
 
+.blog-mobile-tabbar {
+  display: none;
+}
+
+.blog-dash__app-brand,
+.blog-dash__title-mobile {
+  display: none;
+}
+
+.blog-dash__title-desktop {
+  display: inline;
+}
+
+.blog-dash__nav-link--mobile-hidden {
+  display: flex;
+}
+
 @media (max-width: 1024px) {
   .blog-dash__sidebar {
     transform: translateX(-100%);
+    z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   .blog-dash__sidebar--open {
     transform: translateX(0);
@@ -459,7 +478,7 @@
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.45);
-    z-index: 35;
+    z-index: 45;
   }
   .blog-dash__search {
     max-width: none;
@@ -471,12 +490,158 @@
   }
 }
 
+@media (max-width: 767px) {
+  .blog-dash--app {
+    --blog-topbar-height: 58px;
+    --blog-mobile-tabbar-h: calc(3.65rem + env(safe-area-inset-bottom, 0px));
+    min-height: 100dvh;
+  }
+
+  .blog-dash__topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: auto;
+    min-height: calc(var(--blog-topbar-height) + env(safe-area-inset-top, 0px));
+    padding: max(0.45rem, env(safe-area-inset-top, 0px)) 12px 0.55rem;
+    gap: 0.55rem;
+    background: rgba(244, 245, 247, 0.94);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--fitdog-border);
+  }
+
+  .blog-dash__app-brand {
+    display: block;
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fitdog-orange);
+    line-height: 1.1;
+  }
+
+  .blog-dash__title {
+    font-size: 1.15rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--fitdog-heading);
+  }
+
+  .blog-dash__title-mobile {
+    display: inline;
+  }
+
+  .blog-dash__title-desktop {
+    display: none;
+  }
+
+  .blog-dash__search {
+    display: none;
+  }
+
+  .blog-dash__content {
+    padding: 12px 12px calc(var(--blog-mobile-tabbar-h) + 1rem);
+  }
+
+  .blog-dash__nav-link--mobile-hidden {
+    display: none !important;
+  }
+
+  .blog-mobile-tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    min-height: var(--blog-mobile-tabbar-h);
+    padding: 0.35rem 0.2rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(255, 255, 255, 0.96);
+    border-top: 1px solid var(--fitdog-border);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 -8px 24px rgba(16, 24, 40, 0.08);
+  }
+
+  .blog-mobile-tabbar__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    min-height: 2.85rem;
+    border: 0;
+    background: transparent;
+    color: var(--fitdog-muted);
+    font-size: 0.65rem;
+    font-weight: 750;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .blog-mobile-tabbar__item.is-active {
+    color: var(--fitdog-orange);
+  }
+
+  /* App-like density: less wall of text, larger controls */
+  .blog-dash--app .blog-dash-panel > p,
+  .blog-dash--app .blog-dash-panel > .mt-1 {
+    font-size: 0.9rem;
+    line-height: 1.4;
+    color: var(--fitdog-muted);
+  }
+
+  .blog-dash--app h2 {
+    font-size: 1.2rem;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .blog-dash--app .blog-dash-form-panel {
+    padding: 14px 14px;
+    gap: 12px;
+    border-radius: 16px;
+  }
+
+  .blog-dash--app .blog-dash-input,
+  .blog-dash--app .blog-dash-select,
+  .blog-dash--app .blog-dash-textarea {
+    min-height: 48px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  .blog-dash--app .blog-dash-toolbar-btn {
+    min-height: 44px;
+    border-radius: 12px;
+    font-weight: 700;
+  }
+
+  .blog-dash--app table {
+    font-size: 0.86rem;
+  }
+
+  .blog-dash--app .blog-dash__sidebar-footer img {
+    display: none;
+  }
+
+  .blog-dash--app .blog-dash__nav-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+  }
+
+  .blog-dash--app .blog-dash__nav-link {
+    min-height: 44px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+  }
+}
+
 @media (max-width: 640px) {
   .blog-dash__content {
-    padding: 12px;
-  }
-  .blog-dash__title {
-    font-size: 16px;
+    padding-left: 12px;
+    padding-right: 12px;
   }
 }
 

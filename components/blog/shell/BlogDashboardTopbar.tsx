@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Bell, ChevronDown, HelpCircle, Menu, Search, X } from "lucide-react";
-import { BLOG_APP_PATH } from "@/lib/blog/constants";
+import { BLOG_APP_PATH, BLOG_NAV_PAGES, type BlogPageId } from "@/lib/blog/constants";
 
 type SearchResults = {
   articles: Array<{ id: string; title: string; slug?: string; status?: string }>;
@@ -18,10 +18,30 @@ type Props = {
   displayName: string;
   roleLabel: string;
   avatarUrl?: string | null;
+  page?: BlogPageId;
   onToggleMobile: () => void;
   onLogout: () => void;
   notificationCount?: number;
 };
+
+const SHORT_TITLES: Partial<Record<BlogPageId, string>> = {
+  overview: "Home",
+  generate: "Write",
+  "social-generator": "Social",
+  media: "Media",
+  articles: "Articles",
+  "posting-analytics": "Posting",
+  "human-review": "Review",
+  calendar: "Calendar",
+  automation: "Automation",
+  settings: "Settings"
+};
+
+function pageTitle(page?: BlogPageId) {
+  if (!page) return "Blog";
+  if (SHORT_TITLES[page]) return SHORT_TITLES[page]!;
+  return BLOG_NAV_PAGES.find((item) => item.id === page)?.label || "Blog";
+}
 
 type FlatResult = { key: string; label: string; href: string; meta: string };
 
@@ -30,10 +50,12 @@ export function BlogDashboardTopbar({
   displayName,
   roleLabel,
   avatarUrl,
+  page,
   onToggleMobile,
   onLogout,
   notificationCount = 0
 }: Props) {
+  const mobileTitle = pageTitle(page);
   const inputId = useId();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -185,12 +207,16 @@ export function BlogDashboardTopbar({
   return (
     <header className="blog-dash__topbar">
       <div className="blog-dash__topbar-left">
-        <button type="button" className="blog-dash__icon-btn lg:hidden" onClick={onToggleMobile} aria-label="Open sidebar">
-          <Menu className="h-4 w-4" />
+        <button type="button" className="blog-dash__icon-btn lg:hidden" onClick={onToggleMobile} aria-label="Open menu">
+          <Menu className="h-5 w-5" />
         </button>
-        <div>
-          <h1 className="blog-dash__title">Blog Dashboard</h1>
-          <p className="blog-dash__welcome">Welcome back, {firstName}!</p>
+        <div className="min-w-0">
+          <p className="blog-dash__app-brand">Fitdog Blog</p>
+          <h1 className="blog-dash__title">
+            <span className="blog-dash__title-mobile">{mobileTitle}</span>
+            <span className="blog-dash__title-desktop">Blog Dashboard</span>
+          </h1>
+          <p className="blog-dash__welcome">Welcome back, {firstName}</p>
         </div>
       </div>
 

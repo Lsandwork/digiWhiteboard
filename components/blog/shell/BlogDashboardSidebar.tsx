@@ -25,6 +25,7 @@ import {
   Tags,
   Users,
   Wand2,
+  Share2,
   ExternalLink
 } from "lucide-react";
 import { BLOG_APP_PATH } from "@/lib/blog/constants";
@@ -49,6 +50,8 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   media: ImageIcon,
   newsletter: Mail,
   generate: Wand2,
+  "social-generator": Share2,
+  "posting-analytics": BarChart3,
   agents: Bot,
   automation: Settings,
   analytics: BarChart3,
@@ -126,7 +129,9 @@ export function BlogDashboardSidebar({
                     <Link
                       key={item.id}
                       href={href}
-                      className={`blog-dash__nav-link${active ? " blog-dash__nav-link--active" : ""}`}
+                      className={`blog-dash__nav-link${active ? " blog-dash__nav-link--active" : ""}${
+                        item.mobileHidden ? " blog-dash__nav-link--mobile-hidden" : ""
+                      }`}
                       title={collapsed ? item.label : undefined}
                       onClick={onCloseMobile}
                     >

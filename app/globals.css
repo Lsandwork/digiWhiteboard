@@ -6038,18 +6038,230 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   }
 }
 
+/* Short/full header labels: desktop shows full text */
+.admin-header__label-short {
+  display: none;
+}
+
+.admin-header__label-full {
+  display: inline;
+}
+
+/* Phone app chrome — hidden on desktop */
+.admin-appbar,
+.admin-mobile-tabbar {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  .admin-theme--app {
+    --admin-app-tabbar-h: calc(3.65rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .admin-main {
-    padding: 1rem 0.85rem 1.5rem;
+    padding: 0.7rem 0.7rem calc(var(--admin-app-tabbar-h, 4.5rem) + 1.25rem);
   }
 
   .admin-header {
-    margin-bottom: 1rem;
+    margin-bottom: 0.65rem;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    margin-left: -0.7rem;
+    margin-right: -0.7rem;
+    padding: 0.55rem 0.7rem 0.65rem;
+    padding-top: max(0.55rem, env(safe-area-inset-top, 0px));
+    background: color-mix(in srgb, var(--admin-bg, #0b1220) 92%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  }
+
+  .admin-header__desktop {
+    display: none !important;
+  }
+
+  .admin-appbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+  }
+
+  .admin-appbar__leading {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .admin-appbar__brand {
+    margin: 0;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #ff6f26;
+    line-height: 1.1;
+  }
+
+  .admin-appbar__title {
+    margin: 0.1rem 0 0;
+    font-size: 1.15rem;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: min(58vw, 14rem);
+  }
+
+  .admin-appbar__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  .admin-appbar__board-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.35rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    border: 0;
+    background: #ff6f26;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 750;
+  }
+
+  .admin-mobile-tabbar {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    min-height: var(--admin-app-tabbar-h);
+    padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
+    background: rgba(10, 14, 22, 0.94);
+    border-top: 1px solid rgba(148, 163, 184, 0.16);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .admin-mobile-tabbar__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    min-height: 2.85rem;
+    border: 0;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .admin-mobile-tabbar__item.is-active {
+    color: #ff6f26;
   }
 
   .admin-content-grid {
-    gap: 0.85rem;
+    gap: 0.75rem;
   }
+
+  .admin-content-main.space-y-5 > * + * {
+    margin-top: 0.85rem;
+  }
+
+  .admin-page-title {
+    font-size: clamp(1.3rem, 5.4vw, 1.7rem);
+    line-height: 1.15;
+  }
+
+  .admin-page-subtitle {
+    display: none;
+  }
+
+  .admin-header__label-full {
+    display: none;
+  }
+
+  .admin-header__label-short {
+    display: inline;
+  }
+
+  .admin-floating-dock {
+    bottom: calc(var(--admin-app-tabbar-h, 4.5rem) + 0.55rem);
+    right: max(0.65rem, env(safe-area-inset-right, 0px));
+  }
+
+  .admin-sidebar {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+    z-index: 80;
+  }
+
+  .admin-mobile-backdrop {
+    z-index: 75;
+  }
+
+  /* Denser, more readable panel copy on phones */
+  .admin-theme--app .crossover-dashboard,
+  .admin-theme--app .admin-content-main {
+    font-size: 0.95rem;
+    line-height: 1.45;
+  }
+
+  .admin-theme--app h2,
+  .admin-theme--app h3 {
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .admin-theme--app p,
+  .admin-theme--app li {
+    max-width: 42rem;
+  }
+
+  .admin-theme--app button,
+  .admin-theme--app .admin-btn-primary,
+  .admin-theme--app .admin-btn-secondary {
+    min-height: 2.6rem;
+  }
+
+  .admin-preview-column {
+    display: none;
+  }
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-mobile-tabbar {
+  background: rgba(255, 255, 255, 0.96);
+  border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-mobile-tabbar__item {
+  color: #64748b;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-mobile-tabbar__item.is-active {
+  color: #ff6f26;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-appbar__title {
+  color: #121417;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .admin-header {
+  background: rgba(247, 249, 252, 0.94);
+  border-bottom-color: rgba(15, 23, 42, 0.08);
 }
 
 /* ── Crossover Messaging Dashboard ── */
