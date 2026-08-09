@@ -58,6 +58,17 @@ export async function PATCH(request: Request) {
   for (const flag of ["auto_publish_enabled", "full_auto_enabled", "wordpress_mirror_enabled"] as const) {
     if (flag in allowed && allowed[flag] !== true) allowed[flag] = false;
   }
+  // Real photography only — AI-generated images look fake and are never enabled.
+  if ("ai_images_enabled" in allowed && allowed.ai_images_enabled === true) {
+    return NextResponse.json(
+      {
+        error:
+          "AI-generated images are disabled for Fitdog blog and social. Use Digi Board Bulk Photo Upload photos or licensed web photography."
+      },
+      { status: 400 }
+    );
+  }
+  allowed.ai_images_enabled = false;
   const { data, error } = await supabase.from("blog_settings").update(allowed).eq("id", "default").select("*").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await writeBlogAudit(blogActor(auth.session, auth.role), "settings.updated", "settings", "default", allowed);

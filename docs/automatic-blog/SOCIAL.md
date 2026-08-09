@@ -6,6 +6,13 @@ Admin tab: **Social Media Generator** (`/admin/automatic-blog?page=social-genera
 
 Generate platform-ready Fitdog marketing content that sounds human — smart, funny, not corny — for a professional Santa Monica dog-care business (16 years). Content is downloadable per platform and format. Auto-post queues when platform credentials are connected.
 
+## Photos
+
+- Pulls real photos from **Bulk Photo Upload** first, then licensed web search.
+- Captions / scripts are written to match the selected scenes.
+- **No AI-generated images** (blocked in policy + selectors).
+- CSV/TXT downloads include `imageUrl`, `imageAlt`, `imageCredit`, `imageSourceKind`.
+
 ## Platforms & download tables
 
 | Platform | Tables |

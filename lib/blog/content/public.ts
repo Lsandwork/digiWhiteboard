@@ -46,7 +46,7 @@ export async function listPublicArticles(options?: {
     let query = supabase
       .from("blog_articles")
       .select(
-        "title, slug, excerpt, body_markdown, body_html, seo_title, meta_description, author_profile, published_at, updated_at, cover_alt, primary_keyword, content_pillar, quality_reports"
+        "title, slug, excerpt, body_markdown, body_html, seo_title, meta_description, author_profile, published_at, updated_at, cover_alt, cover_image_path, cover_media_id, primary_keyword, content_pillar, quality_reports"
       )
       .eq("status", "PUBLISHED")
       .order("published_at", { ascending: false })
@@ -58,6 +58,13 @@ export async function listPublicArticles(options?: {
     if (!error && data && data.length > 0) {
       let rows = data.map((row) => {
         const seed = INITIAL_BLOG_ARTICLES.find((article) => article.slug === row.slug);
+        const reports = (row.quality_reports && typeof row.quality_reports === "object"
+          ? row.quality_reports
+          : {}) as { images?: { cover?: { url?: string; alt?: string } } };
+        const coverFromDb =
+          (row.cover_image_path && String(row.cover_image_path)) ||
+          reports.images?.cover?.url ||
+          "";
         return withHtml(
           {
             slug: String(row.slug),
@@ -68,8 +75,11 @@ export async function listPublicArticles(options?: {
             seoTitle: String(row.seo_title || row.title),
             metaDescription: String(row.meta_description || row.excerpt || ""),
             authorProfile: String(row.author_profile || "Fitdog Team"),
-            coverImage: seed?.coverImage || "/assets/fitdog/social-moments/posters/social-moment-01.jpg",
-            coverAlt: String(row.cover_alt || seed?.coverAlt || row.title),
+            coverImage:
+              coverFromDb ||
+              seed?.coverImage ||
+              "/assets/fitdog/social-moments/posters/social-moment-01.jpg",
+            coverAlt: String(row.cover_alt || reports.images?.cover?.alt || seed?.coverAlt || row.title),
             readingMinutes: seed?.readingMinutes || Math.max(4, Math.round(String(row.body_markdown || "").split(/\s+/).length / 220)),
             featured: Boolean(seed?.featured),
             publishedAt: String(row.published_at || seed?.publishedAt || new Date().toISOString()),

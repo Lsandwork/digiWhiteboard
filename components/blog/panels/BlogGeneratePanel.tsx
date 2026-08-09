@@ -65,8 +65,8 @@ export function BlogGeneratePanel() {
       <div>
         <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Blog Generator</h2>
         <p className="mt-1 text-sm text-[var(--fitdog-muted,#6b7280)]">
-          Runs topic brief → Human-First Writer → empathy, practical, natural-voice, SEO, fact-check, brand, and final human-quality agents.
-          Auto-publish stays off.
+          Selects real Digi Board Bulk Photo Upload shots (+ licensed web photos), then runs topic brief → Human-First
+          Writer with photo-aware copy → editorial agents. AI-generated images are blocked.
         </p>
         <div className="mt-2">
           <BlogContextualHelpLink step="create" label="Learn how to create articles" />

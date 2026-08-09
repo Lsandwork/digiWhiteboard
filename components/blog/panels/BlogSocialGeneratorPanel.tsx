@@ -25,6 +25,12 @@ type PackItem = {
   tone_tags: string[] | unknown;
   script_spoken?: string;
   on_screen_text?: string;
+  content?: {
+    imageUrl?: string;
+    imageAlt?: string;
+    imageCredit?: string;
+    imageSourceKind?: string;
+  } | null;
 };
 
 type Pack = {
@@ -57,6 +63,10 @@ export function BlogSocialGeneratorPanel() {
   const [items, setItems] = useState<PackItem[]>([]);
   const [queueAutoPost, setQueueAutoPost] = useState(false);
   const [credDrafts, setCredDrafts] = useState<Record<string, { username: string; secret: string }>>({});
+  const [imageNotes, setImageNotes] = useState<string[]>([]);
+  const [selectedImages, setSelectedImages] = useState<
+    Array<{ id: string; url: string; alt: string; sourceKind: string; sceneDescription?: string }>
+  >([]);
 
   const reload = useCallback(async () => {
     const res = await fetch("/api/blog/social");
@@ -87,6 +97,8 @@ export function BlogSocialGeneratorPanel() {
     pack?: Pack & { ephemeral?: boolean };
     items?: PackItem[];
     persisted?: boolean;
+    images?: Array<{ id: string; url: string; alt: string; sourceKind: string; sceneDescription?: string }>;
+    imageNotes?: string[];
   }) {
     if (json.pack?.id) {
       setActivePackId(String(json.pack.id));
@@ -96,10 +108,13 @@ export function BlogSocialGeneratorPanel() {
       });
     }
     if (json.items?.length) setItems(json.items);
+    setSelectedImages(json.images || []);
+    setImageNotes(json.imageNotes || []);
+    const photoCount = json.images?.length || 0;
     setMessage(
       json.persisted === false
-        ? "Social pack ready (download now). Apply migration 061 to save packs & connections in the database."
-        : "Social pack ready — download by platform below."
+        ? `Social pack ready with ${photoCount} real photo(s) (download now). Apply migration 061 to save packs in the database.`
+        : `Social pack ready — ${photoCount} real photo(s) from bulk library + web search (no AI images). Download by platform below.`
     );
   }
 
@@ -149,7 +164,11 @@ export function BlogSocialGeneratorPanel() {
         visualDirection: item.visual_direction,
         toneTags: asStringArray(item.tone_tags),
         scriptSpoken: item.script_spoken,
-        onScreenText: item.on_screen_text
+        onScreenText: item.on_screen_text,
+        imageUrl: item.content?.imageUrl,
+        imageAlt: item.content?.imageAlt,
+        imageCredit: item.content?.imageCredit,
+        imageSourceKind: item.content?.imageSourceKind as "bulk_photo" | "web_licensed" | "fitdog_owned" | undefined
       })
     );
     const body = kind === "txt" ? toTxt(rows) : toCsv(rows);
@@ -226,8 +245,9 @@ export function BlogSocialGeneratorPanel() {
         <h2 className="text-xl font-semibold text-[var(--fitdog-heading,#121417)]">Social Media Generator</h2>
         <p className="mt-1 max-w-3xl text-sm text-[var(--fitdog-muted,#6b7280)]">
           Professional Fitdog content for Instagram, Facebook, TikTok, and Snapchat — smart, funny, never corny.
-          Sounds like a human marketer who&apos;s been caring for Santa Monica dogs for 16 years. Download by
-          platform and format; connect accounts below when you&apos;re ready to auto-post.
+          Captions are written to match real Digi Board Bulk Photo Upload shots first, then licensed web photos.
+          AI-generated images are blocked. Download by platform and format; connect accounts below when you&apos;re
+          ready to auto-post.
         </p>
       </div>
 
@@ -272,6 +292,35 @@ export function BlogSocialGeneratorPanel() {
           {busy ? "Generating…" : "Generate social pack"}
         </button>
         {message ? <p className="text-sm text-emerald-800">{message}</p> : null}
+        {imageNotes.length ? (
+          <ul className="list-disc pl-5 text-xs text-[var(--fitdog-muted,#6b7280)]">
+            {imageNotes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        ) : null}
+        {selectedImages.length ? (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--fitdog-muted,#6b7280)]">
+              Selected real photos
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {selectedImages.map((img) => (
+                <figure key={img.id} className="w-28 space-y-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={img.url}
+                    alt={img.alt}
+                    className="h-24 w-28 rounded-md object-cover border border-[var(--fitdog-border,#e6e8eb)]"
+                  />
+                  <figcaption className="text-[10px] leading-tight text-[var(--fitdog-muted,#6b7280)]">
+                    {img.sourceKind.replace(/_/g, " ")}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <section className="space-y-3">
@@ -460,6 +509,7 @@ function PlatformBlock({
                     <th className="px-3 py-2">Body</th>
                     <th className="px-3 py-2">CTA</th>
                     <th className="px-3 py-2">On-screen / script</th>
+                    <th className="px-3 py-2">Photo</th>
                     <th className="px-3 py-2">Visual</th>
                     <th className="px-3 py-2">Copy</th>
                   </tr>
@@ -480,13 +530,37 @@ function PlatformBlock({
                             </p>
                           ) : null}
                         </td>
+                        <td className="px-3 py-2">
+                          {row.content?.imageUrl ? (
+                            <a href={row.content.imageUrl} target="_blank" rel="noreferrer" className="block w-20">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={row.content.imageUrl}
+                                alt={row.content.imageAlt || row.hook}
+                                className="h-16 w-20 rounded object-cover border border-[var(--fitdog-border,#e6e8eb)]"
+                              />
+                              <span className="mt-1 block text-[10px] text-[var(--fitdog-muted,#6b7280)]">
+                                {(row.content.imageSourceKind || "photo").replace(/_/g, " ")}
+                              </span>
+                            </a>
+                          ) : (
+                            <span className="text-xs text-[var(--fitdog-muted,#6b7280)]">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 text-xs text-[var(--fitdog-muted,#6b7280)]">{row.visual_direction}</td>
                         <td className="px-3 py-2">
                           <button
                             type="button"
                             className="blog-dash-toolbar-btn"
                             onClick={() => {
-                              const text = [row.hook, row.body, row.cta, row.script_spoken, row.on_screen_text]
+                              const text = [
+                                row.hook,
+                                row.body,
+                                row.cta,
+                                row.script_spoken,
+                                row.on_screen_text,
+                                row.content?.imageUrl ? `IMAGE: ${row.content.imageUrl}` : ""
+                              ]
                                 .filter(Boolean)
                                 .join("\n\n");
                               void navigator.clipboard.writeText(text);
@@ -499,7 +573,7 @@ function PlatformBlock({
                     ))
                   ) : (
                     <tr>
-                      <td className="px-3 py-4 text-[var(--fitdog-muted,#6b7280)]" colSpan={6}>
+                      <td className="px-3 py-4 text-[var(--fitdog-muted,#6b7280)]" colSpan={7}>
                         Generate a pack to fill this table.
                       </td>
                     </tr>

@@ -21,6 +21,11 @@ export type SocialPackItemInput = {
   toneTags: string[];
   scriptSpoken?: string;
   onScreenText?: string;
+  /** Real photo URL (bulk library or licensed web) — never AI-generated */
+  imageUrl?: string;
+  imageAlt?: string;
+  imageCredit?: string;
+  imageSourceKind?: "bulk_photo" | "web_licensed" | "fitdog_owned";
 };
 
 export type SocialPackResult = {

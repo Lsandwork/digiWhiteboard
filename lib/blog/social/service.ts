@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { decryptBlogSecret, encryptBlogSecret, hasEncryptedSecret } from "@/lib/blog/crypto";
+import { selectImagesForPosting } from "@/lib/blog/media/select-for-posting";
 import {
   generateSocialPackDeterministic,
   packItemToDownloadRow,
@@ -162,7 +163,13 @@ function ephemeralPackPayload(pack: ReturnType<typeof generateSocialPackDetermin
     content: packItemToDownloadRow(item),
     sort_order: index
   }));
-  return { pack: packRow, items, generated: pack, persisted: false as const };
+  return {
+    pack: packRow,
+    items,
+    generated: pack,
+    persisted: false as const,
+    images: [] as unknown[]
+  };
 }
 
 export async function createSocialPack(input: {
@@ -174,11 +181,22 @@ export async function createSocialPack(input: {
   createdBy?: string | null;
   queueAutoPost?: boolean;
 }) {
+  const topic = String(input.topic || input.articleTitle || "Fitdog daycare Santa Monica");
+  const selected = await selectImagesForPosting({
+    topic,
+    total: 4,
+    bulkCount: 3,
+    webCount: 3,
+    actor: input.createdBy ?? null,
+    promoteCover: false
+  });
+
   const pack = generateSocialPackDeterministic({
     topic: input.topic,
     angle: input.angle,
     blogUrl: input.blogUrl,
-    articleTitle: input.articleTitle
+    articleTitle: input.articleTitle,
+    images: selected.all
   });
 
   try {
@@ -209,7 +227,13 @@ export async function createSocialPack(input: {
       tone_tags: item.toneTags,
       script_spoken: item.scriptSpoken || "",
       on_screen_text: item.onScreenText || "",
-      content: packItemToDownloadRow(item),
+      content: {
+        ...packItemToDownloadRow(item),
+        imageUrl: item.imageUrl || "",
+        imageAlt: item.imageAlt || "",
+        imageCredit: item.imageCredit || "",
+        imageSourceKind: item.imageSourceKind || ""
+      },
       sort_order: index
     }));
 
@@ -241,13 +265,23 @@ export async function createSocialPack(input: {
     }
 
     await writeBlogAudit(input.createdBy, "social.pack_created", "social_pack", String(packRow.id), {
-      items: items?.length || 0
+      items: items?.length || 0,
+      images: selected.all.length,
+      bulkPhotos: selected.all.filter((i) => i.sourceKind === "bulk_photo").length,
+      webPhotos: selected.all.filter((i) => i.sourceKind === "web_licensed").length
     });
 
-    return { pack: packRow, items: items || [], generated: pack, persisted: true as const };
+    return {
+      pack: packRow,
+      items: items || [],
+      generated: pack,
+      persisted: true as const,
+      images: selected.all,
+      imageNotes: selected.notes
+    };
   } catch {
     // Migration not applied yet — still return downloadable content.
-    return ephemeralPackPayload(pack, input);
+    return { ...ephemeralPackPayload(pack, input), images: selected.all, imageNotes: selected.notes };
   }
 }
 
@@ -288,8 +322,12 @@ function itemsToDownloadRows(
     if (format && item.format !== format) return false;
     return true;
   });
-  return filtered.map((item) =>
-    packItemToDownloadRow({
+  return filtered.map((item) => {
+    const content = (item.content && typeof item.content === "object" ? item.content : {}) as Record<
+      string,
+      unknown
+    >;
+    return packItemToDownloadRow({
       platform: item.platform as SocialPlatform,
       format: item.format as never,
       hook: String(item.hook || ""),
@@ -299,9 +337,17 @@ function itemsToDownloadRows(
       visualDirection: String(item.visual_direction || ""),
       toneTags: Array.isArray(item.tone_tags) ? item.tone_tags.map(String) : [],
       scriptSpoken: String(item.script_spoken || ""),
-      onScreenText: String(item.on_screen_text || "")
-    })
-  );
+      onScreenText: String(item.on_screen_text || ""),
+      imageUrl: String(content.imageUrl || item.imageUrl || ""),
+      imageAlt: String(content.imageAlt || item.imageAlt || ""),
+      imageCredit: String(content.imageCredit || item.imageCredit || ""),
+      imageSourceKind: (content.imageSourceKind || item.imageSourceKind || undefined) as
+        | "bulk_photo"
+        | "web_licensed"
+        | "fitdog_owned"
+        | undefined
+    });
+  });
 }
 
 export async function downloadSocialPackCsv(packId: string, platform?: SocialPlatform, format?: string) {

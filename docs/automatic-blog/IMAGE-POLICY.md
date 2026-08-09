@@ -1,16 +1,17 @@
 # Image Policy
 
-## Default: AI images OFF
+## Hard rule: real photography only
 
-`blog_settings.ai_images_enabled` defaults to **false**.
+AI-generated images are **blocked** for blog and social. They look fake and undermine Fitdog’s brand.
 
-Reasons:
+Blog Generator and Social Media Generator automatically:
 
-- Fitdog’s brand is real dogs, real staff, real places.
-- Synthetic imagery risks misleading owners about the facility or services.
-- Consent and authenticity are clearer with owned / licensed photography.
+1. Prefer photos from **Digi Board Bulk Photo Upload** (`photo_upload_items`)
+2. Fill remaining slots with **licensed web photography** (Openverse; optional Unsplash / Pexels keys)
+3. Write captions/articles so the copy **matches those scenes**
+4. Reject titles/tags/URLs that look AI-generated (Midjourney, DALL·E, etc.)
 
-Keep AI images off unless Super Admin explicitly enables them after a documented decision.
+`blog_settings.ai_images_enabled` is forced **false** in the settings API.
 
 ## What is allowed by default
 

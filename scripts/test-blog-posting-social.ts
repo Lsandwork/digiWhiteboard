@@ -44,9 +44,34 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
 {
   const pack = generateSocialPackDeterministic({
     topic: "first daycare drop-off",
-    blogUrl: "https://blog.fitdog.com/first-daycare"
+    blogUrl: "https://blog.fitdog.com/first-daycare",
+    images: [
+      {
+        id: "bulk:test-1",
+        sourceKind: "bulk_photo",
+        url: "https://example.com/bulk-jasper.jpg",
+        alt: "Jasper in the big yard",
+        caption: "Real Fitdog facility photo",
+        sceneDescription: "Real Fitdog facility photo · activity: play · area: big yard · dogs in frame: Jasper",
+        dogNames: ["Jasper"],
+        yard: "big",
+        category: "play",
+        license: "Fitdog-owned"
+      },
+      {
+        id: "openverse:abc",
+        sourceKind: "web_licensed",
+        url: "https://example.com/licensed-dog.jpg",
+        alt: "Dog at park",
+        caption: "Licensed web photograph",
+        sceneDescription: "Licensed web photograph (not AI-generated)",
+        license: "cc0",
+        photographer: "Jane Doe"
+      }
+    ]
   });
   assert.ok(pack.items.length >= 8);
+  assert.ok(pack.voiceNotes.some((n) => /REAL PHOTOS ONLY/i.test(n)));
   const byPlatform = itemsByPlatform(pack.items);
   for (const platform of SOCIAL_PLATFORMS) {
     assert.ok(byPlatform[platform].length > 0, `${platform} must have content`);
@@ -61,6 +86,9 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
   const igFeed = byPlatform.instagram.filter((i) => i.format === "feed");
   assert.ok(igStory.length >= 1, "Instagram stories table");
   assert.ok(igFeed.length >= 1, "Instagram feed table");
+  assert.ok(igFeed[0]?.imageUrl?.includes("bulk-jasper"), "feed uses bulk photo URL");
+  assert.ok(/jasper/i.test(igFeed[0]?.hook || igFeed[0]?.body || ""), "copy mentions pictured dog");
+  assert.ok(/real/i.test(igFeed[0]?.visualDirection || ""), "visual direction marks real photo");
 
   const joined = pack.items.map((i) => `${i.hook} ${i.body}`).join(" ");
   for (const phrase of ["furry friend", "paw-some", "In today's fast-paced world"]) {
@@ -70,9 +98,12 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
 
   const csv = toCsv(pack.items.map(packItemToDownloadRow));
   assert.ok(csv.includes("platform,format,hook"));
+  assert.ok(csv.includes("imageUrl"));
+  assert.ok(csv.includes("https://example.com/bulk-jasper.jpg"));
   assert.ok(csv.split("\n").length > 5);
   const txt = toTxt(pack.items.map(packItemToDownloadRow));
   assert.ok(txt.includes("HOOK:"));
+  assert.ok(txt.includes("IMAGE_URL:"));
   assert.ok(txt.includes("INSTAGRAM"));
 }
 

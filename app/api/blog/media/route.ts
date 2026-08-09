@@ -25,7 +25,10 @@ export async function POST(request: Request) {
   const sourceClass = String(body.sourceClass || "fitdog_owned");
   if (sourceClass === "ai_generated_approved") {
     return NextResponse.json(
-      { error: "AI-generated images require Super Admin enablement and manual approval workflow." },
+      {
+        error:
+          "AI-generated images are not allowed for Fitdog blog or social — they look fake. Use Digi Board Bulk Photo Upload or licensed real photography."
+      },
       { status: 400 }
     );
   }

@@ -2,6 +2,11 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { DEFAULT_HUMAN_SCORE_THRESHOLD, DEFAULT_TOPIC_SCORE_THRESHOLD } from "@/lib/blog/constants";
 import { scoreHumanEditorialQuality } from "@/lib/blog/editorial/human-score";
 import { scoreTopicQuality } from "@/lib/blog/editorial/topic-score";
+import {
+  formatPhotoContextForPrompt,
+  photoAwareWritingRules,
+  selectImagesForPosting
+} from "@/lib/blog/media/select-for-posting";
 import { orchestrateArticleGeneration } from "@/lib/blog/pipeline/orchestrate";
 import { publishArticle } from "@/lib/blog/publishing/adapters";
 import { BLOG_SEED_TOPICS } from "@/lib/blog/topics/seed-topics";
@@ -162,6 +167,17 @@ export async function generateArticleFromTopic(topicId: string, actor?: string) 
     throw new Error(`Topic Quality Score ${topicScore} is below threshold ${topicThreshold}.`);
   }
 
+  const imageSelection = await selectImagesForPosting({
+    topic: String(topic.title || topic.working_title || ""),
+    total: 4,
+    bulkCount: 3,
+    webCount: 3,
+    actor: actor ?? null,
+    promoteCover: true
+  });
+  const photoContext = formatPhotoContextForPrompt(imageSelection.all);
+  const photoRules = photoAwareWritingRules();
+
   const briefPayload = {
     topic: topic.title,
     workingTitle: topic.working_title || topic.title,
@@ -172,7 +188,17 @@ export async function generateArticleFromTopic(topicId: string, actor?: string) 
     tonePreset: topic.tone_preset,
     localRelevance: topic.local_relevance,
     primaryKeyword: topic.primary_keyword,
-    fitdogConnection: "daycare evaluations, boarding preparation, training, or enrichment support"
+    fitdogConnection: "daycare evaluations, boarding preparation, training, or enrichment support",
+    photoContext,
+    photoRules,
+    imagePolicy: "real_photography_only_no_ai",
+    selectedImages: imageSelection.all.map((img) => ({
+      id: img.id,
+      sourceKind: img.sourceKind,
+      alt: img.alt,
+      sceneDescription: img.sceneDescription,
+      url: img.url
+    }))
   };
 
   const { data: brief, error: briefError } = await supabase
@@ -205,7 +231,9 @@ export async function generateArticleFromTopic(topicId: string, actor?: string) 
       tonePreset: String(topic.tone_preset || "service_explanation"),
       primaryKeyword: String(topic.primary_keyword || ""),
       localRelevance: String(topic.local_relevance || ""),
-      fitdogConnection: "daycare, boarding, training, or enrichment"
+      fitdogConnection: "daycare, boarding, training, or enrichment",
+      photoContext,
+      photoRules
     },
     threshold,
     previousOpenings
@@ -223,6 +251,10 @@ export async function generateArticleFromTopic(topicId: string, actor?: string) 
   let slug = draft.slug;
   const { data: slugHit } = await supabase.from("blog_articles").select("id").eq("slug", slug).maybeSingle();
   if (slugHit?.id) slug = `${slug}-${Date.now().toString(36)}`;
+
+  const cover = imageSelection.cover;
+  const coverAlt = draft.coverAlt || cover?.alt || "";
+  const imageReviewStatus = cover ? "approved_fitdog_owned" : "pending";
 
   const { data: article, error: articleError } = await supabase
     .from("blog_articles")
@@ -249,7 +281,8 @@ export async function generateArticleFromTopic(topicId: string, actor?: string) 
         empathy_review: true,
         natural_voice_review: true,
         fact_check: true,
-        social_media: true
+        social_media: true,
+        images: "real_photography_only"
       },
       primary_keyword: topic.primary_keyword,
       seo_title: draft.seoTitle,
@@ -259,14 +292,35 @@ export async function generateArticleFromTopic(topicId: string, actor?: string) 
       natural_voice_score: draft.humanScore.naturalVoiceScore,
       empathy_score: draft.humanScore.empathyScore,
       fact_check_status: requiresManualFact ? "needs_manual" : factReview?.ok ? "passed_rules" : "failed",
-      image_review_status: "pending",
+      image_review_status: imageReviewStatus,
+      cover_media_id: imageSelection.coverMediaId || null,
+      cover_image_path: cover?.url || null,
+      cover_alt: coverAlt,
       estimated_cost_cents: draft.estimatedCostCents,
       provider_usage: { provider: draft.provider, model: draft.model },
       quality_reports: {
         human: draft.humanScore,
-        agentNotes: draft.agentNotes,
+        agentNotes: [...draft.agentNotes, ...imageSelection.notes],
         reviews: orchestration.reviews,
-        blockReasons: orchestration.blockReasons
+        blockReasons: orchestration.blockReasons,
+        images: {
+          policy: "real_photography_only_no_ai",
+          cover: cover
+            ? {
+                id: cover.id,
+                sourceKind: cover.sourceKind,
+                url: cover.url,
+                alt: coverAlt,
+                license: cover.license
+              }
+            : null,
+          supporting: imageSelection.supporting.map((img) => ({
+            id: img.id,
+            sourceKind: img.sourceKind,
+            url: img.url,
+            alt: img.alt
+          }))
+        }
       },
       social_package: orchestration.socialPackage,
       claims: (factReview?.output?.claims as unknown[]) || [],
@@ -409,16 +463,14 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
   if (Number(article.human_editorial_score || 0) < Number(settings.human_score_threshold || DEFAULT_HUMAN_SCORE_THRESHOLD)) {
     throw new Error("Human Editorial Score is below threshold.");
   }
-  if (!settings.ai_images_enabled && article.cover_media_id) {
-    // cover optional; if present must be approved — checked below when media exists
-  }
   if (article.cover_media_id) {
     const { data: media } = await supabase.from("blog_media_assets").select("*").eq("id", article.cover_media_id).maybeSingle();
     if (media && media.approval_status !== "approved") {
       throw new Error("Cover image is not approved.");
     }
-    if (media && media.source_class === "ai_generated_approved" && !settings.ai_images_enabled) {
-      throw new Error("AI-generated images are disabled.");
+    // Hard ban: AI-generated covers are never allowed for Fitdog posts (looks fake).
+    if (media && media.source_class === "ai_generated_approved") {
+      throw new Error("AI-generated images are not allowed. Use Digi Board bulk photos or licensed real photography.");
     }
   }
 

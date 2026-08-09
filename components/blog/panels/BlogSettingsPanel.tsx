@@ -162,14 +162,13 @@ export function BlogSettingsPanel({ focus }: { focus?: string }) {
         {(focus === "publishing" || focus === "settings") && (
           <WordPressTestBlock message={message} setMessage={setMessage} />
         )}
-        <label className="flex items-center justify-between gap-3 text-sm text-[var(--fitdog-heading,#121417)]">
-          <span className="font-medium">AI-generated images</span>
-          <input
-            type="checkbox"
-            checked={Boolean(settings.ai_images_enabled)}
-            onChange={(e) => void save({ ai_images_enabled: e.target.checked })}
-          />
-        </label>
+        <div className="rounded-lg border border-[var(--fitdog-border,#e5e7eb)] bg-[var(--fitdog-soft,#f8fafc)] px-3 py-2 text-sm text-[var(--fitdog-heading,#121417)]">
+          <p className="font-medium">Images: real photography only</p>
+          <p className="mt-1 text-[var(--fitdog-muted,#6b7280)]">
+            AI-generated images are blocked — they look fake. Generators pull from Digi Board Bulk Photo Upload
+            first, then licensed web photos (Openverse / Unsplash / Pexels).
+          </p>
+        </div>
         <label className="block">
           <span className="blog-dash-label">Human Editorial Score threshold</span>
           <input

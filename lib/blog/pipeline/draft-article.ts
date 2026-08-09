@@ -17,6 +17,9 @@ export type DraftBrief = {
   localRelevance?: string;
   fitdogConnection?: string;
   questionsToAnswer?: string[];
+  /** Real photo scenes the draft must make sense with (never AI art). */
+  photoContext?: string;
+  photoRules?: string[];
 };
 
 export type DraftPipelineResult = {
@@ -27,6 +30,7 @@ export type DraftPipelineResult = {
   bodyHtml: string;
   seoTitle: string;
   metaDescription: string;
+  coverAlt?: string;
   humanScore: ReturnType<typeof scoreHumanEditorialQuality>;
   usedAi: boolean;
   provider?: string;
@@ -41,6 +45,11 @@ function deterministicDraft(brief: DraftBrief): { markdown: string; excerpt: str
     brief.fitdogConnection && brief.fitdogConnection.trim()
       ? `\n\nIf you want hands-on support with this, Fitdog can help through ${brief.fitdogConnection.trim()} — only when it fits your dog’s needs.`
       : "";
+  const photoBridge = brief.photoContext?.includes("Real Fitdog")
+    ? `\n\n## What a real day can look like\n\nThe photos with this post are real Fitdog moments from our Digi Board library — not staged AI art. Use them as a reminder that progress usually looks ordinary: supervised play, clear routines, and dogs learning at their own pace.`
+    : brief.photoContext
+      ? `\n\n## Keep the picture honest\n\nThe images paired with this article are real photographs (licensed), not AI-generated. Match your expectations to what you can actually see in a normal dog day — not a perfect stock fantasy.`
+      : "";
 
   const markdown = [
     `${brief.readerConcern.trim() || "Many dog owners run into this at some point."}${local}`,
@@ -54,6 +63,7 @@ function deterministicDraft(brief: DraftBrief): { markdown: string; excerpt: str
     `Start with what you can observe at home. ${brief.angle.trim() || "Keep the plan simple and adjustable."} Not every dog needs the same pace, tools, or amount of social time.`,
     ``,
     `Try one small change for a few days before stacking more. If your dog seems stressed, stop and give them an easier version of the same skill.`,
+    photoBridge,
     ``,
     `## When to get extra support`,
     ``,
@@ -90,10 +100,18 @@ export async function runHumanFirstDraft(brief: DraftBrief): Promise<DraftPipeli
         "Do not start with Have you ever wondered / Are you looking for / Did you know / Imagine this.",
         "Acknowledge that every dog is different.",
         "Mention Fitdog only if it naturally helps, and keep promotion light.",
-        "Return JSON: {\"title\":\"\",\"excerpt\":\"\",\"bodyMarkdown\":\"\",\"seoTitle\":\"\",\"metaDescription\":\"\"}",
+        "REAL PHOTOS ONLY: Cover and supporting images are real photography (Fitdog bulk library and/or licensed web photos). Never describe AI art, illustrations, or synthetic dogs.",
+        ...(brief.photoRules || []),
+        "If photoContext is provided, make the article coherent with those scenes — do not contradict what the photos show, and do not invent extra photo details.",
+        "Return JSON: {\"title\":\"\",\"excerpt\":\"\",\"bodyMarkdown\":\"\",\"seoTitle\":\"\",\"metaDescription\":\"\",\"coverAlt\":\"\"}",
+        "coverAlt should describe the real cover photo scene accessibly when photoContext exists.",
         "bodyMarkdown should use at most 2-4 headings and feel natural when read aloud."
       ].join("\n"),
-      userMessage: JSON.stringify(brief)
+      userMessage: JSON.stringify({
+        ...brief,
+        photoContext: brief.photoContext || "none",
+        imagePolicy: "real_photography_only_no_ai"
+      })
     });
     usedAi = true;
     provider = ai.provider;
@@ -105,6 +123,7 @@ export async function runHumanFirstDraft(brief: DraftBrief): Promise<DraftPipeli
       bodyMarkdown?: string;
       seoTitle?: string;
       metaDescription?: string;
+      coverAlt?: string;
     };
     markdown = String(parsed.bodyMarkdown || "").trim();
     excerpt = String(parsed.excerpt || "").trim();
@@ -113,6 +132,7 @@ export async function runHumanFirstDraft(brief: DraftBrief): Promise<DraftPipeli
     agentNotes.push("Human-First Writer produced an AI-assisted draft.");
     const seoTitle = String(parsed.seoTitle || brief.title);
     const metaDescription = String(parsed.metaDescription || excerpt).slice(0, 160);
+    const coverAlt = String(parsed.coverAlt || "").trim() || undefined;
     const humanScore = scoreHumanEditorialQuality({
       title: brief.title,
       body: markdown,
@@ -126,6 +146,7 @@ export async function runHumanFirstDraft(brief: DraftBrief): Promise<DraftPipeli
       bodyHtml: markdownToSimpleHtml(markdown),
       seoTitle,
       metaDescription,
+      coverAlt,
       humanScore,
       usedAi,
       provider,
@@ -156,6 +177,9 @@ export async function runHumanFirstDraft(brief: DraftBrief): Promise<DraftPipeli
     bodyHtml: markdownToSimpleHtml(markdown),
     seoTitle: brief.title,
     metaDescription: excerpt.slice(0, 160),
+    coverAlt: brief.photoContext?.includes("Real Fitdog")
+      ? "Real Fitdog daycare photo from the Digi Board library"
+      : undefined,
     humanScore,
     usedAi,
     provider,
