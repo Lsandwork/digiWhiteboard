@@ -247,6 +247,8 @@ export async function updateVipAutoBookClient(
     lastBookError: string | null;
     gingrAnimalId: string | null;
     gingrOwnerId: string | null;
+    fitdogDogId: string | null;
+    fitdogOwnerId: string | null;
   }>
 ) {
   const update: Record<string, unknown> = {};
@@ -290,6 +292,8 @@ export async function updateVipAutoBookClient(
   if (patch.lastBookError !== undefined) update.last_book_error = patch.lastBookError;
   if (patch.gingrAnimalId !== undefined) update.gingr_animal_id = patch.gingrAnimalId?.trim() || null;
   if (patch.gingrOwnerId !== undefined) update.gingr_owner_id = patch.gingrOwnerId?.trim() || null;
+  if (patch.fitdogDogId !== undefined) update.fitdog_dog_id = patch.fitdogDogId?.trim() || null;
+  if (patch.fitdogOwnerId !== undefined) update.fitdog_owner_id = patch.fitdogOwnerId?.trim() || null;
 
   const { data, error } = await supabase
     .from("vip_auto_book_clients")

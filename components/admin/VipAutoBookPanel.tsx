@@ -43,10 +43,11 @@ type ListPayload = {
   } | null;
 };
 
-function gingrBookStatusLabel(status: string | null | undefined) {
-  if (status === "gingr_confirmed") return "Confirmed";
-  if (status === "gingr_corrected") return "Corrected";
+function vipBookStatusLabel(status: string | null | undefined) {
+  if (status === "gingr_confirmed" || status === "fitdog_confirmed") return "Confirmed";
+  if (status === "gingr_corrected" || status === "fitdog_corrected") return "Corrected";
   if (status === "gingr_no_reservations") return "No Gingr match";
+  if (status === "fitdog_no_bookings") return "No Fitdog match";
   return null;
 }
 
@@ -354,9 +355,10 @@ export function VipAutoBookPanel() {
 
       <div className="space-y-2">
         <div className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-50">
-          Directory last sync: {formatWhen(data?.latestSync?.finished_at || data?.latestSync?.started_at)} ·{" "}
+          Fitdog directory / last-day sync:{" "}
+          {formatWhen(data?.latestSync?.finished_at || data?.latestSync?.started_at)} ·{" "}
           {data?.latestSync?.message ||
-            "Run Sync Fitdog Directory (or wait for the daily cron) so owner/dog names pop up while typing."}
+            "Run Sync Fitdog Directory to pull app.fitdog.com names and confirm Last Day Booked (clears Re-book Needed when booked ahead)."}
         </div>
         <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
           Gingr last-day sync:{" "}
@@ -396,7 +398,7 @@ export function VipAutoBookPanel() {
         {/* Mobile: stacked cards — never crush table columns on small screens */}
         <div className="vip-auto-book-mobile md:hidden">
           {(data?.rows ?? []).map((row) => {
-            const gingrLabel = gingrBookStatusLabel(row.lastBookStatus);
+            const gingrLabel = vipBookStatusLabel(row.lastBookStatus);
             return (
               <article
                 key={row.id}
@@ -480,7 +482,7 @@ export function VipAutoBookPanel() {
             </thead>
             <tbody>
               {(data?.rows ?? []).map((row) => {
-                const gingrLabel = gingrBookStatusLabel(row.lastBookStatus);
+                const gingrLabel = vipBookStatusLabel(row.lastBookStatus);
                 return (
                   <tr
                     key={row.id}
@@ -512,9 +514,11 @@ export function VipAutoBookPanel() {
                       {gingrLabel ? (
                         <p
                           className={`vip-auto-book-table__status ${
-                            row.lastBookStatus === "gingr_confirmed"
+                            row.lastBookStatus === "gingr_confirmed" ||
+                            row.lastBookStatus === "fitdog_confirmed"
                               ? "vip-auto-book-table__status--ok"
-                              : row.lastBookStatus === "gingr_corrected"
+                              : row.lastBookStatus === "gingr_corrected" ||
+                                  row.lastBookStatus === "fitdog_corrected"
                                 ? "vip-auto-book-table__status--warn"
                                 : "vip-auto-book-table__status--muted"
                           }`}
@@ -772,8 +776,8 @@ export function VipAutoBookPanel() {
             <p>
               <span className="font-semibold text-white">Platform:</span> {drawer.platform || "APP"} ·{" "}
               <span className="font-semibold text-white">Last booked:</span> {drawer.lastBookedFor || "—"}
-              {gingrBookStatusLabel(drawer.lastBookStatus)
-                ? ` (${gingrBookStatusLabel(drawer.lastBookStatus)})`
+              {vipBookStatusLabel(drawer.lastBookStatus)
+                ? ` (${vipBookStatusLabel(drawer.lastBookStatus)})`
                 : ""}{" "}
               · <span className="font-semibold text-white">Re-book:</span> {drawer.needToRebook ? "Yes" : "No"}
             </p>

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
-    const result = await syncVipFitdogDirectory(supabase, { lookbackDays: 3, lookaheadDays: 10 });
+    const result = await syncVipFitdogDirectory(supabase, { lookbackDays: 14, lookaheadDays: 60 });
     return NextResponse.json(result, { status: result.ok ? 200 : 500 });
   } catch (error) {
     return NextResponse.json(

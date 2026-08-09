@@ -1,65 +1,16 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 import { createGingrClient } from "@/lib/integrations/gingr/client";
 import { mapGingrReservationToTaxiRow } from "@/lib/route-generator/gingr-taxi";
+import {
+  dateOnly,
+  dogNamesMatch,
+  maxDate,
+  ownerNamesMatch,
+  pacificDateOffset,
+  shouldClearNeedToRebook
+} from "@/lib/staff/vip-auto-book/match-utils";
 import { listVipAutoBookClients, updateVipAutoBookClient } from "@/lib/staff/vip-auto-book/store";
 import type { VipAutoBookClient } from "@/lib/staff/vip-auto-book/types";
-
-function pacificDateOffset(daysFromToday: number): string {
-  const now = new Date();
-  const pacific = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
-  pacific.setDate(pacific.getDate() + daysFromToday);
-  const y = pacific.getFullYear();
-  const m = String(pacific.getMonth() + 1).padStart(2, "0");
-  const d = String(pacific.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function normalizeName(value: string | null | undefined) {
-  return String(value ?? "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function ownerNamesMatch(a: string | null | undefined, b: string | null | undefined) {
-  const left = normalizeName(a);
-  const right = normalizeName(b);
-  if (!left || !right) return false;
-  if (left === right) return true;
-  if (left.includes(right) || right.includes(left)) return true;
-  const leftParts = left.split(" ");
-  const rightParts = right.split(" ");
-  const leftLast = leftParts[leftParts.length - 1];
-  const rightLast = rightParts[rightParts.length - 1];
-  if (leftLast && rightLast && leftLast === rightLast && leftLast.length >= 3) {
-    // Require a shared first-token when only last names match (Nina vs N.).
-    const leftFirst = leftParts[0];
-    const rightFirst = rightParts[0];
-    if (leftFirst && rightFirst && (leftFirst[0] === rightFirst[0] || leftFirst === rightFirst)) return true;
-  }
-  return false;
-}
-
-function dogNamesMatch(a: string | null | undefined, b: string | null | undefined) {
-  const left = normalizeName(a);
-  const right = normalizeName(b);
-  if (!left || !right) return false;
-  return left === right;
-}
-
-function dateOnly(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const text = String(value).trim();
-  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
-  return match?.[1] ?? null;
-}
-
-function maxDate(a: string | null, b: string | null): string | null {
-  if (!a) return b;
-  if (!b) return a;
-  return a >= b ? a : b;
-}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -228,13 +179,15 @@ export async function syncVipGingrLastBooked(
       if (same) confirmed += 1;
       else corrected += 1;
 
+      const clearRebook = shouldClearNeedToRebook(next) && vip.needToRebook;
       await updateVipAutoBookClient(supabase, vip.id, {
         lastBookedFor: next,
         lastVerifiedAt: nowIso,
         lastBookStatus: status,
         lastBookError: null,
         ...(hit.animalId ? { gingrAnimalId: hit.animalId } : {}),
-        ...(hit.ownerId ? { gingrOwnerId: hit.ownerId } : {})
+        ...(hit.ownerId ? { gingrOwnerId: hit.ownerId } : {}),
+        ...(clearRebook ? { needToRebook: false } : {})
       });
       updates.push({
         id: vip.id,

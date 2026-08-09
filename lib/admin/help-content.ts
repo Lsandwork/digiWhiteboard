@@ -454,7 +454,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["vip", "auto book", "fitdog sports", "app.fitdog.com", "hike", "class", "excursion", "weekly", "monthly"],
     steps: [
       "Open Digi-Board → Staff → VIP Auto Book (Admin, Management, and Front Desk).",
-      "Click Sync Fitdog Directory (or wait for the daily pull) so owner and dog names from app.fitdog.com are available.",
+      "Click Sync Fitdog Directory (or wait for the daily pull) to load owner/dog names from app.fitdog.com and confirm Last Day Booked (clears Re-book Needed when a future class is already booked).",
       "Add VIP Client — type a dog or owner name and pick a match from the popup list.",
       "Choose service type (Group Class, Adventure Hike, Beach Excursion, Trainer-Led Hike, etc.), cadence (weekly/monthly), and days or week of month.",
       "Use the VIP list during booking windows so those dogs are never missed on Fitdog Sports."

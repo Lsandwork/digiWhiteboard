@@ -22,6 +22,7 @@ import {
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 async function requireVipAutoBookAccess(request: Request) {
   if (!(await isAdminRequest(request))) return { error: unauthorizedAdminResponse() };
@@ -104,7 +105,11 @@ export async function POST(request: Request) {
 
   try {
     if (action === "sync_directory") {
-      const result = await syncVipFitdogDirectory(gate.supabase!);
+      // Wide lookahead so monthly VIP bookings (e.g. 09/07) confirm Last Day Booked.
+      const result = await syncVipFitdogDirectory(gate.supabase!, {
+        lookbackDays: 14,
+        lookaheadDays: 60
+      });
       return NextResponse.json(result, { status: result.ok ? 200 : 500 });
     }
 
