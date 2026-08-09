@@ -62,21 +62,28 @@ function transitionStartedMs(dog: LiveDog) {
 
 /** Keep a just-shown check-in visible while other Vercel instances still serve a stale empty cache. */
 export function isWebhookCheckinWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
-  if (dog.hidden) return false;
+  if (dog.hidden || dog.completed_at) return false;
   if (dog.display_status !== "checking_in") return false;
   if (dog.raw_payload?.source === "gingr_back_of_house") return false;
-  if (!shouldExpireCheckinDog(dog, new Date(nowMs))) return true;
+  if (shouldExpireCheckinDog(dog, new Date(nowMs))) return false;
   const startedMs = transitionStartedMs(dog);
   return startedMs != null && nowMs - startedMs <= WEBHOOK_CHECKIN_CACHE_GRACE_MS;
 }
 
-/** Keep a just-shown checkout visible while basket cache / poll lag catches up. */
+/**
+ * Keep a just-shown checkout visible while basket cache / poll lag catches up.
+ *
+ * This is only a short bridge over a stale instance — the server holds the dog
+ * for its full display window. Holding here for the whole window too would
+ * resurrect dogs the server deliberately dropped (manual hide, column change).
+ * `completed_at` is intentionally ignored: Gingr marks checkout complete while
+ * the card still has time left on screen.
+ */
 export function isWebhookCheckoutWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
   if (dog.hidden) return false;
   if (dog.display_status !== "checking_out") return false;
   if (dog.raw_payload?.source === "gingr_back_of_house") return false;
-  // Honor the full checkout display window even after Gingr marks checkout complete.
-  if (!shouldExpireCheckoutDog(dog, new Date(nowMs))) return true;
+  if (shouldExpireCheckoutDog(dog, new Date(nowMs))) return false;
   const startedMs = transitionStartedMs(dog);
   return startedMs != null && nowMs - startedMs <= WEBHOOK_CHECKOUT_CACHE_GRACE_MS;
 }

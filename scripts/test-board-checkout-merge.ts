@@ -49,7 +49,7 @@ assert.equal(isDogInGingrCheckoutBasket(webhookDog, keys), false);
 const completedCheckout = {
   ...webhookDog,
   current_status: "checked_out",
-  completed_at: "2026-07-01T16:00:30.000Z",
+  completed_at: "2026-07-01T16:00:05.000Z",
   display_until: "2026-07-01T16:05:00.000Z"
 };
 const nowMs = new Date("2026-07-01T16:01:00.000Z").getTime();
@@ -58,10 +58,21 @@ assert.equal(
   true,
   "completed checkout stays visible until display_until even when missing from basket"
 );
+
+// Gingr marks checkout complete seconds after the prompt — the client bridge must
+// still cover that dog while a stale instance catches up.
+const justCompletedMs = new Date("2026-07-01T16:00:08.000Z").getTime();
+assert.equal(
+  isWebhookCheckoutWithinCacheGrace(completedCheckout, justCompletedMs),
+  true,
+  "completion does not cancel the client cache bridge"
+);
+
+// Past the bridge the server is authoritative, so the client must stop re-adding.
 assert.equal(
   isWebhookCheckoutWithinCacheGrace(completedCheckout, nowMs),
-  true,
-  "cache grace honors display_until after checkout completion"
+  false,
+  "client bridge is short-lived; the server owns the full display window"
 );
 
 console.log("board checkout merge tests passed");

@@ -2,7 +2,7 @@ import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { getCachedGingrBasketCheckoutKeys } from "@/lib/basket-cleared-checkout";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import {
-  buildGingrCheckoutKeySet,
+  isDogInGingrCheckoutBasket,
   mergeCheckoutDogs,
   reconcileGingrSourcedCheckouts,
   shouldShowCheckoutAgainstBasket,
@@ -55,10 +55,12 @@ function loadCachedGingrCheckoutDogs(now: Date) {
   );
 }
 
-function resolveGingrCheckoutBasketKeys(now: Date, gingrCheckouts: LiveDog[]) {
-  if (gingrCheckouts.length) {
-    return buildGingrCheckoutKeySet(gingrCheckouts);
-  }
+/**
+ * Basket membership comes from the raw cached Gingr payload rather than the
+ * expiry-filtered dog list, so a dog waiting in the basket is never mistaken
+ * for one the front desk already cleared.
+ */
+export function resolveGingrCheckoutBasketKeys(now: Date) {
   return (
     getCachedGingrBasketCheckoutKeys(now.getTime(), false) ??
     getCachedGingrBasketCheckoutKeys(now.getTime(), true)
@@ -67,14 +69,13 @@ function resolveGingrCheckoutBasketKeys(now: Date, gingrCheckouts: LiveDog[]) {
 
 function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[]) {
   const gingrCheckouts = loadCachedGingrCheckoutDogs(now);
-  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now, gingrCheckouts);
+  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now);
   let visibleCheckouts = mergeCheckoutDogs(gingrCheckouts, promptedCheckouts);
   let basketFiltered = false;
 
   if (gingrCheckoutKeys) {
     basketFiltered = true;
-    // Keep webhook rows visible while Gingr basket cache catches up on add;
-    // drop them immediately once the basket no longer includes the dog.
+    // Drop Gingr-sourced rows the basket no longer lists; webhook rows keep their window.
     visibleCheckouts = reconcileGingrSourcedCheckouts(visibleCheckouts, gingrCheckouts);
     const nowMs = now.getTime();
     visibleCheckouts = visibleCheckouts.filter(
@@ -111,7 +112,8 @@ export async function loadFastPromptedCheckouts(
         )
         .eq("hidden", false)
         .eq("display_status", "checking_out")
-        .order("status_started_at", { ascending: true })
+        // Newest first: a row limit must never hide the dog that just checked out.
+        .order("status_started_at", { ascending: false })
         .limit(40)
     ),
     FAST_CHECKOUT_QUERY_TIMEOUT_MS,
@@ -172,7 +174,8 @@ export async function loadFastBoardTransitions(
         )
         .eq("hidden", false)
         .in("display_status", ["checking_in", "checking_out"])
-        .order("status_started_at", { ascending: true })
+        // Newest first: a row limit must never hide the dog that just transitioned.
+        .order("status_started_at", { ascending: false })
         .limit(80)
     ),
     FAST_CHECKOUT_QUERY_TIMEOUT_MS,
@@ -236,9 +239,68 @@ export async function reconcileCachedBasketClears(
     return { hidden_count: 0, skipped: true as const };
   }
   lastBasketReconcileAt = Date.now();
-  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now, loadCachedGingrCheckoutDogs(now));
+  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now);
   if (!gingrCheckoutKeys?.size) {
     return { hidden_count: 0, skipped: true as const };
   }
   return hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, now);
+}
+
+/**
+ * Retire transition rows whose display window already closed.
+ *
+ * Checkout completion intentionally leaves rows visible until `display_until`,
+ * so without this sweep the active-row set grows all day and the newest dog can
+ * fall outside the fast query's row limit. Runs unconditionally (a basket
+ * snapshot is not required) and only ever touches already-expired rows.
+ */
+const EXPIRED_SWEEP_DEBOUNCE_MS = 15_000;
+const EXPIRED_SWEEP_SCAN_LIMIT = 200;
+let lastExpiredSweepAt = 0;
+
+export async function sweepExpiredTransitionRows(supabase: SupabaseClient, now = new Date()) {
+  if (Date.now() - lastExpiredSweepAt < EXPIRED_SWEEP_DEBOUNCE_MS) {
+    return { hidden_count: 0, skipped: true as const };
+  }
+  lastExpiredSweepAt = Date.now();
+
+  const { data, error } = await supabase
+    .from("live_transition_dogs")
+    .select("id, gingr_reservation_id, gingr_animal_id, display_status, status_started_at, display_until, updated_at")
+    .eq("hidden", false)
+    .in("display_status", ["checking_in", "checking_out"])
+    .order("status_started_at", { ascending: true })
+    .limit(EXPIRED_SWEEP_SCAN_LIMIT);
+
+  if (error) throw error;
+
+  const rows = (data ?? []) as LiveDog[];
+  const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now);
+  const expiredIds = rows
+    .filter((row) => {
+      if (row.display_status === "checking_in") return shouldExpireCheckinDog(row, now);
+      // A dog still sitting in the Gingr basket is never swept.
+      if (gingrCheckoutKeys?.size && isDogInGingrCheckoutBasket(row, gingrCheckoutKeys)) return false;
+      return shouldExpireCheckoutDog(row, now);
+    })
+    .map((row) => row.id);
+
+  if (!expiredIds.length) {
+    return { hidden_count: 0 };
+  }
+
+  const nowIso = now.toISOString();
+  const { error: updateError } = await supabase
+    .from("live_transition_dogs")
+    .update({
+      hidden: true,
+      display_status: "removed",
+      completed_at: nowIso,
+      updated_at: nowIso
+    })
+    .in("id", expiredIds);
+
+  if (updateError) throw updateError;
+
+  return { hidden_count: expiredIds.length };
 }
