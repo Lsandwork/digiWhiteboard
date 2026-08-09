@@ -23,7 +23,6 @@ import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-/** Keep dogs visible while Gingr still lists them in the live checkout basket. */
 export function isVisibleLobbyCheckoutDog(
   dog: LiveDog,
   now: Date,
@@ -31,9 +30,11 @@ export function isVisibleLobbyCheckoutDog(
   options: { requireGingrBasket?: boolean } = {}
 ) {
   if (dog.display_status !== "checking_out") return false;
+  // Lobby guests must see checkout cards for the full display window.
+  if (!shouldExpireLobbyCheckoutDog(dog, now)) return true;
   if (isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)) return true;
   if (options.requireGingrBasket) return false;
-  return !shouldExpireLobbyCheckoutDog(dog, now);
+  return false;
 }
 
 function enrichDogPhotos(dogs: LiveDog[]) {

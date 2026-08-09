@@ -59,7 +59,10 @@ function resolveGingrCheckoutBasketKeys(now: Date, gingrCheckouts: LiveDog[]) {
   if (gingrCheckouts.length) {
     return buildGingrCheckoutKeySet(gingrCheckouts);
   }
-  return getCachedGingrBasketCheckoutKeys(now.getTime(), true);
+  return (
+    getCachedGingrBasketCheckoutKeys(now.getTime(), false) ??
+    getCachedGingrBasketCheckoutKeys(now.getTime(), true)
+  );
 }
 
 function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[]) {
@@ -179,9 +182,7 @@ export async function loadFastBoardTransitions(
   if (error) throw error;
 
   const rows = enrichDogs((data ?? []) as LiveDog[]);
-  const checkinRows = rows.filter(
-    (dog) => dog.display_status === "checking_in" && dog.raw_payload?.source !== "gingr_back_of_house"
-  );
+  const checkinRows = rows.filter((dog) => dog.display_status === "checking_in");
   const visibleCheckins = checkinRows.filter((dog) => !shouldExpireCheckinDog(dog, now));
 
   const checkoutRows = rows.filter((dog) => dog.display_status === "checking_out");
@@ -236,6 +237,8 @@ export async function reconcileCachedBasketClears(
   }
   lastBasketReconcileAt = Date.now();
   const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now, loadCachedGingrCheckoutDogs(now));
-  if (!gingrCheckoutKeys) return { hidden_count: 0 };
+  if (!gingrCheckoutKeys?.size) {
+    return { hidden_count: 0, skipped: true as const };
+  }
   return hideBasketClearedCheckoutRows(supabase, gingrCheckoutKeys, now);
 }

@@ -32,8 +32,9 @@ function debugLog(enabled: boolean, message: string, details?: Record<string, un
 }
 
 function nextBackoffMs(failures: number) {
-  const capped = Math.min(failures, 5);
-  return Math.min(30_000, 1000 * 2 ** Math.max(0, capped - 1));
+  const capped = Math.min(failures, 4);
+  // TV boards must recover quickly — never back off longer than 3 seconds.
+  return Math.min(3000, 500 * 2 ** Math.max(0, capped - 1));
 }
 
 export async function fetchBoardJson<T>(options: BoardFetchOptions): Promise<BoardFetchResult<T>> {

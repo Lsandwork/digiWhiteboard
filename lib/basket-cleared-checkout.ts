@@ -1,6 +1,5 @@
-import {
-  isDogInGingrCheckoutBasket
-} from "@/lib/board-checkout-merge";
+import { isDogInGingrCheckoutBasket } from "@/lib/board-checkout-merge";
+import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import type { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import type { LiveDog } from "@/lib/types";
@@ -38,17 +37,29 @@ export async function hideBasketClearedCheckoutRows(
   gingrCheckoutKeys: Set<string>,
   now = new Date()
 ) {
+  // Never reconcile against an empty/stale basket snapshot — that hides every active checkout.
+  if (!gingrCheckoutKeys.size) {
+    return { hidden_count: 0, skipped_empty_basket: true as const };
+  }
+
   const { data, error } = await supabase
     .from("live_transition_dogs")
-    .select("id, gingr_reservation_id, gingr_animal_id")
+    .select(
+      "id, gingr_reservation_id, gingr_animal_id, display_status, display_until, status_started_at, completed_at, hidden, raw_payload"
+    )
     .eq("hidden", false)
     .eq("display_status", "checking_out");
 
   if (error) throw error;
 
-  const rows = (data ?? []) as Pick<LiveDog, "id" | "gingr_reservation_id" | "gingr_animal_id">[];
+  const rows = (data ?? []) as LiveDog[];
   const clearedIds = rows
-    .filter((row) => !isDogInGingrCheckoutBasket(row as LiveDog, gingrCheckoutKeys))
+    .filter((row) => {
+      if (isDogInGingrCheckoutBasket(row, gingrCheckoutKeys)) return false;
+      // Keep checkout cards visible for the full configured display window.
+      if (!shouldExpireCheckoutDog(row, now)) return false;
+      return true;
+    })
     .map((row) => row.id);
 
   if (!clearedIds.length) {

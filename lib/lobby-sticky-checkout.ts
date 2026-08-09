@@ -1,4 +1,5 @@
 import { isLobbyCheckoutDogExpired } from "@/lib/lobby/checkout-display";
+import { WEBHOOK_CHECKOUT_CACHE_GRACE_MS } from "@/lib/board-checkout-merge";
 import { getLobbyCheckoutMergeKey, mergeLobbyDogFields } from "@/lib/lobby-display-stable";
 import type { LobbyCheckoutDog, LobbyCheckoutsResponse } from "@/lib/lobby/types";
 
@@ -19,6 +20,11 @@ export type StickyLobbyCheckoutMergeOptions = {
 };
 
 export { getLobbyCheckoutMergeKey } from "@/lib/lobby-display-stable";
+
+function isLobbyCheckoutWithinStickyGrace(entry: StickyLobbyCheckoutEntry, nowMs: number) {
+  if (!isLobbyCheckoutDogExpired(entry.dog, nowMs)) return true;
+  return nowMs - entry.firstSeenAt <= WEBHOOK_CHECKOUT_CACHE_GRACE_MS;
+}
 
 function lobbyCheckoutsToDogs(response: LobbyCheckoutsResponse) {
   const dogs = [...(response.queue ?? [])];
@@ -97,13 +103,17 @@ export function mergeStickyLobbyCheckouts(
 
   if (incomingDogs.length > 0 && basketAuthoritative && pruneMissingFromBasket) {
     const incomingKeys = new Set(incomingDogs.map((dog) => getLobbyCheckoutMergeKey(dog)));
-    for (const key of next.keys()) {
-      if (!incomingKeys.has(key)) {
+    for (const [key, entry] of next.entries()) {
+      if (!incomingKeys.has(key) && !isLobbyCheckoutWithinStickyGrace(entry, nowMs)) {
         next.delete(key);
       }
     }
   } else if (incomingDogs.length === 0 && basketAuthoritative && basketConfirmedEmpty) {
-    return new Map();
+    for (const [key, entry] of next.entries()) {
+      if (!isLobbyCheckoutWithinStickyGrace(entry, nowMs)) {
+        next.delete(key);
+      }
+    }
   } else if (!incomingDogs.length) {
     return next;
   }

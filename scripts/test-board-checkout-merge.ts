@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import {
   buildGingrCheckoutKeySet,
   isDogInGingrCheckoutBasket,
+  isWebhookCheckoutWithinCacheGrace,
   mergeCheckoutDogs,
-  reconcileGingrSourcedCheckouts
+  reconcileGingrSourcedCheckouts,
+  shouldShowCheckoutAgainstBasket
 } from "../lib/board-checkout-merge";
 import type { LiveDog } from "../lib/types";
 
@@ -43,5 +45,23 @@ assert.equal(reconciled[0]?.id, "2");
 const keys = buildGingrCheckoutKeySet([gingrDog]);
 assert.equal(isDogInGingrCheckoutBasket(gingrDog, keys), true);
 assert.equal(isDogInGingrCheckoutBasket(webhookDog, keys), false);
+
+const completedCheckout = {
+  ...webhookDog,
+  current_status: "checked_out",
+  completed_at: "2026-07-01T16:00:30.000Z",
+  display_until: "2026-07-01T16:05:00.000Z"
+};
+const nowMs = new Date("2026-07-01T16:01:00.000Z").getTime();
+assert.equal(
+  shouldShowCheckoutAgainstBasket(completedCheckout, new Set(), nowMs),
+  true,
+  "completed checkout stays visible until display_until even when missing from basket"
+);
+assert.equal(
+  isWebhookCheckoutWithinCacheGrace(completedCheckout, nowMs),
+  true,
+  "cache grace honors display_until after checkout completion"
+);
 
 console.log("board checkout merge tests passed");

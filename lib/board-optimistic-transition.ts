@@ -32,7 +32,7 @@ export function applyOptimisticLiveBoardTransition(
     };
   }
 
-  if (next.display_status === "checking_in" && next.raw_payload?.source !== "gingr_back_of_house") {
+  if (next.display_status === "checking_in") {
     const checkingIn = preserveDogPhotos(previous.checking_in, mergeCheckoutDogs(previous.checking_in, [next]));
     const checkingOut = withoutDog(previous.checking_out, next.id);
     return {

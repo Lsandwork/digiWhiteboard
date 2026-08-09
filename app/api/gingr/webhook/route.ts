@@ -254,16 +254,26 @@ export async function POST(request: Request) {
           current_status: newStatus,
           completed_at: now
         };
-        const hideNow = isCheckoutCompletion(webhookType) || shouldHideCompletedDog(pendingHide, nowDate);
+        const checkoutCompletion = isCheckoutCompletion(webhookType);
+        // Checkout completion must stay on the board until display_until — never hide immediately.
+        const hideNow = checkoutCompletion ? false : shouldHideCompletedDog(pendingHide, nowDate);
+        const displayUntil = checkoutCompletion
+          ? resolveActiveCheckoutDisplayUntil(
+              String(existing.status_started_at ?? now),
+              existing.display_until,
+              nowDate
+            )
+          : existing.display_until;
         const { error } = await supabase
           .from("live_transition_dogs")
           .update({
             current_status: newStatus,
-            display_status: hideNow ? "removed" : existing.display_status,
+            display_status: hideNow ? "removed" : checkoutCompletion ? "checking_out" : existing.display_status,
             hidden: hideNow,
             completed_at: now,
+            display_until: displayUntil,
             last_seen_from_gingr_at: now,
-            raw_payload: payload,
+            raw_payload: { ...payload, source: "gingr_webhook" },
             updated_at: now
           })
           .eq("id", existing.id);

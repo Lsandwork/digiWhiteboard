@@ -1,4 +1,5 @@
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
+import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
@@ -61,22 +62,21 @@ function transitionStartedMs(dog: LiveDog) {
 
 /** Keep a just-shown check-in visible while other Vercel instances still serve a stale empty cache. */
 export function isWebhookCheckinWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
-  if (dog.hidden || dog.completed_at) return false;
+  if (dog.hidden) return false;
   if (dog.display_status !== "checking_in") return false;
-  if (dog.current_status && dog.current_status !== "checking_in") return false;
   if (dog.raw_payload?.source === "gingr_back_of_house") return false;
-  if (shouldExpireCheckinDog(dog, new Date(nowMs))) return false;
+  if (!shouldExpireCheckinDog(dog, new Date(nowMs))) return true;
   const startedMs = transitionStartedMs(dog);
   return startedMs != null && nowMs - startedMs <= WEBHOOK_CHECKIN_CACHE_GRACE_MS;
 }
 
 /** Keep a just-shown checkout visible while basket cache / poll lag catches up. */
 export function isWebhookCheckoutWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
-  if (dog.hidden || dog.completed_at) return false;
+  if (dog.hidden) return false;
   if (dog.display_status !== "checking_out") return false;
-  if (dog.current_status && dog.current_status !== "checking_out") return false;
-  // Gingr basket rows are authoritative — do not hold them after the basket drops them.
   if (dog.raw_payload?.source === "gingr_back_of_house") return false;
+  // Honor the full checkout display window even after Gingr marks checkout complete.
+  if (!shouldExpireCheckoutDog(dog, new Date(nowMs))) return true;
   const startedMs = transitionStartedMs(dog);
   return startedMs != null && nowMs - startedMs <= WEBHOOK_CHECKOUT_CACHE_GRACE_MS;
 }
@@ -215,9 +215,10 @@ export function isWebhookCheckoutWithinAddGrace(dog: LiveDog, nowMs = Date.now()
   return Number.isFinite(startedMs) && nowMs - startedMs <= WEBHOOK_BASKET_ADD_GRACE_MS;
 }
 
-/** Show when in basket, or briefly after webhook prompt while basket cache catches up. */
+/** Show when in basket, or for the full checkout display window while basket cache catches up. */
 export function shouldShowCheckoutAgainstBasket(dog: LiveDog, gingrCheckoutKeys: Set<string>, nowMs = Date.now()) {
   if (isDogInGingrCheckoutBasket(dog, gingrCheckoutKeys)) return true;
+  if (!shouldExpireCheckoutDog(dog, new Date(nowMs))) return true;
   return isWebhookCheckoutWithinAddGrace(dog, nowMs);
 }
 
