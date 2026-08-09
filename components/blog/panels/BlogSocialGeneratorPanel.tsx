@@ -681,15 +681,17 @@ function PlatformBlock({
                   {rows.length ? (
                     rows.map((row) => (
                       <tr key={row.id} className="border-t border-[var(--fitdog-border,#e6e8eb)] align-top">
-                        <td className="px-3 py-2 font-medium">{row.hook}</td>
-                        <td className="px-3 py-2 max-w-xs">{row.body}</td>
-                        <td className="px-3 py-2">{row.cta}</td>
+                        <td className="px-3 py-2 font-medium whitespace-pre-wrap text-sm">{row.hook}</td>
+                        <td className="px-3 py-2 max-w-sm whitespace-pre-wrap text-sm">{row.body}</td>
+                        <td className="px-3 py-2 text-sm">{row.cta}</td>
                         <td className="px-3 py-2 text-xs">
                           {row.on_screen_text ? <p>On-screen: {row.on_screen_text}</p> : null}
                           {row.script_spoken ? <p className="mt-1">Spoken: {row.script_spoken}</p> : null}
                           {asStringArray(row.hashtags).length ? (
-                            <p className="mt-1 text-[var(--fitdog-muted,#6b7280)]">
-                              #{asStringArray(row.hashtags).join(" #")}
+                            <p className="mt-1 whitespace-pre-wrap text-[var(--fitdog-muted,#6b7280)]">
+                              {asStringArray(row.hashtags)
+                                .map((h) => (h.startsWith("#") ? h : `#${h}`))
+                                .join(" ")}
                             </p>
                           ) : null}
                         </td>
@@ -716,16 +718,12 @@ function PlatformBlock({
                             type="button"
                             className="blog-dash-toolbar-btn"
                             onClick={() => {
-                              const text = [
-                                row.hook,
-                                row.body,
-                                row.cta,
-                                row.script_spoken,
-                                row.on_screen_text,
-                                row.content?.imageUrl ? `IMAGE: ${row.content.imageUrl}` : ""
-                              ]
-                                .filter(Boolean)
-                                .join("\n\n");
+                              const tags = asStringArray(row.hashtags)
+                                .map((h) => (h.startsWith("#") ? h : `#${h}`))
+                                .join(" ");
+                              const text = [row.hook, "", row.body, "", tags, row.content?.imageUrl ? `\nIMAGE: ${row.content.imageUrl}` : ""]
+                                .join("\n")
+                                .trim();
                               void navigator.clipboard.writeText(text);
                             }}
                           >

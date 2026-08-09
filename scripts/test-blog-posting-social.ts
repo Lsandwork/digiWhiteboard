@@ -87,14 +87,30 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
   assert.ok(igStory.length >= 1, "Instagram stories table");
   assert.ok(igFeed.length >= 1, "Instagram feed table");
   assert.ok(igFeed[0]?.imageUrl?.includes("bulk-jasper"), "feed uses bulk photo URL");
-  assert.ok(/jasper/i.test(igFeed[0]?.hook || igFeed[0]?.body || ""), "copy mentions pictured dog");
+  assert.ok(/jasper/i.test(`${igFeed[0]?.hook || ""}\n${igFeed[0]?.body || ""}`), "copy mentions pictured dog");
   assert.ok(/real/i.test(igFeed[0]?.visualDirection || ""), "visual direction marks real photo");
 
-  const joined = pack.items.map((i) => `${i.hook} ${i.body}`).join(" ");
+  const joined = pack.items.map((i) => `${i.hook}\n${i.body}`).join("\n");
   for (const phrase of ["furry friend", "paw-some", "In today's fast-paced world"]) {
     assert.equal(joined.toLowerCase().includes(phrase.toLowerCase()), false, `banned: ${phrase}`);
   }
-  assert.ok(/tell your dog we said hi/i.test(joined), "signature line present");
+  // Smart Fitdog recipe markers
+  assert.ok(/after 16 years/i.test(joined), "years lesson present");
+  assert.ok(/our (dogs|regulars|guests)|the (dogs|group chat|committee|new kid)/i.test(joined), "dog dialogue present");
+  assert.ok(/\?/.test(joined), "engagement question present");
+  assert.ok(igFeed[0]?.hashtags.includes("Fitdog"), "Fitdog hashtag");
+  assert.ok(igFeed[0]?.hashtags.includes("DogsofLA"), "DogsofLA hashtag");
+  assert.ok(/\n\n/.test(igFeed[0]?.body || ""), "feed body keeps paragraph breaks");
+
+  const summer = generateSocialPackDeterministic({
+    topic: "Daycare regulars living their life",
+    angle: "Summer heat no problem we got ac"
+  });
+  const summerFeed = summer.items.find((i) => i.platform === "instagram" && i.format === "feed");
+  assert.ok(/summer in santa monica/i.test(summerFeed?.hook || ""), "summer opener");
+  assert.ok(/turn the ac up/i.test(summerFeed?.hook || ""), "dog dialogue from gold standard");
+  assert.ok(/play hard\. cool off\. repeat/i.test(summerFeed?.body || ""), "three-beat line");
+  assert.ok(/sunbather|ac addict/i.test(summerFeed?.body || ""), "binary question");
 
   const csv = toCsv(pack.items.map(packItemToDownloadRow));
   assert.ok(csv.includes("platform,format,hook"));
@@ -102,9 +118,9 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
   assert.ok(csv.includes("https://example.com/bulk-jasper.jpg"));
   assert.ok(csv.split("\n").length > 5);
   const txt = toTxt(pack.items.map(packItemToDownloadRow));
-  assert.ok(txt.includes("HOOK:"));
   assert.ok(txt.includes("IMAGE_URL:"));
   assert.ok(txt.includes("INSTAGRAM"));
+  assert.ok(/#Fitdog/.test(txt), "download includes hashtag marks");
 }
 
 {
