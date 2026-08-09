@@ -249,3 +249,25 @@ export function toCsv(rows: ReturnType<typeof packItemToDownloadRow>[]): string 
     "\n"
   );
 }
+
+export function toTxt(rows: ReturnType<typeof packItemToDownloadRow>[]): string {
+  return rows
+    .map((row, index) =>
+      [
+        `--- ${row.platform.toUpperCase()} / ${row.format} #${index + 1} ---`,
+        `HOOK: ${row.hook}`,
+        "",
+        row.body,
+        "",
+        row.onScreenText ? `ON-SCREEN: ${row.onScreenText}` : "",
+        row.scriptSpoken ? `SPOKEN: ${row.scriptSpoken}` : "",
+        `CTA: ${row.cta}`,
+        row.hashtags ? `HASHTAGS: ${row.hashtags}` : "",
+        `VISUAL: ${row.visualDirection}`,
+        row.toneTags ? `TONE: ${row.toneTags}` : ""
+      ]
+        .filter((line) => line !== "")
+        .join("\n")
+    )
+    .join("\n\n");
+}

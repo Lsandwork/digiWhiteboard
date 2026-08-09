@@ -9,7 +9,8 @@ import {
   generateSocialPackDeterministic,
   itemsByPlatform,
   packItemToDownloadRow,
-  toCsv
+  toCsv,
+  toTxt
 } from "../lib/blog/social/generate";
 import { SOCIAL_BANNED_PHRASES, scrubSocialAiSlop } from "../lib/blog/social/voice";
 import { PLATFORM_FORMATS, SOCIAL_PLATFORMS } from "../lib/blog/social/types";
@@ -70,6 +71,9 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
   const csv = toCsv(pack.items.map(packItemToDownloadRow));
   assert.ok(csv.includes("platform,format,hook"));
   assert.ok(csv.split("\n").length > 5);
+  const txt = toTxt(pack.items.map(packItemToDownloadRow));
+  assert.ok(txt.includes("HOOK:"));
+  assert.ok(txt.includes("INSTAGRAM"));
 }
 
 {

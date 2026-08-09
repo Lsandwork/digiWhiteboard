@@ -34,15 +34,26 @@ export async function getPostingAnalytics() {
     .order("published_at", { ascending: false })
     .limit(30);
 
-  const { data: socialPosts } = await supabase
-    .from("blog_social_posts")
-    .select("id, platform, format, status, scheduled_for, posted_at, external_url, error, created_at")
-    .order("created_at", { ascending: false })
-    .limit(40);
-
-  const { data: connections } = await supabase
-    .from("blog_social_connections")
-    .select("platform, username, status, last_tested_at, last_error");
+  let socialPosts: Array<Record<string, unknown>> = [];
+  let connections: Array<Record<string, unknown>> = [];
+  try {
+    const socialRes = await supabase
+      .from("blog_social_posts")
+      .select("id, platform, format, status, scheduled_for, posted_at, external_url, error, created_at")
+      .order("created_at", { ascending: false })
+      .limit(40);
+    socialPosts = (socialRes.data || []) as Array<Record<string, unknown>>;
+  } catch {
+    socialPosts = [];
+  }
+  try {
+    const connRes = await supabase
+      .from("blog_social_connections")
+      .select("platform, username, status, last_tested_at, last_error");
+    connections = (connRes.data || []) as Array<Record<string, unknown>>;
+  } catch {
+    connections = [];
+  }
 
   const weekStart = startOfLaWeek().toISOString();
   const { count: weekPublished } = await supabase

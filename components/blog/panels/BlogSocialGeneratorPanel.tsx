@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { packItemToDownloadRow, toCsv, toTxt } from "@/lib/blog/social/generate";
 import { PLATFORM_FORMATS, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/blog/social/types";
 
 type Connection = {
@@ -82,6 +83,26 @@ export function BlogSocialGeneratorPanel() {
     setItems(json.items || []);
   }
 
+  function applyPackPayload(json: {
+    pack?: Pack & { ephemeral?: boolean };
+    items?: PackItem[];
+    persisted?: boolean;
+  }) {
+    if (json.pack?.id) {
+      setActivePackId(String(json.pack.id));
+      setPacks((prev) => {
+        const next = [json.pack as Pack, ...prev.filter((p) => p.id !== json.pack!.id)];
+        return next.slice(0, 30);
+      });
+    }
+    if (json.items?.length) setItems(json.items);
+    setMessage(
+      json.persisted === false
+        ? "Social pack ready (download now). Apply migration 061 to save packs & connections in the database."
+        : "Social pack ready — download by platform below."
+    );
+  }
+
   async function generate() {
     setBusy(true);
     setMessage(null);
@@ -99,14 +120,46 @@ export function BlogSocialGeneratorPanel() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Generate failed");
-      setMessage("Social pack ready — download by platform below.");
-      await reload();
-      if (json.pack?.id) await loadPack(String(json.pack.id));
+      applyPackPayload(json);
+      if (json.persisted !== false && json.pack?.id) {
+        await reload();
+        await loadPack(String(json.pack.id));
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Generate failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  function downloadLocal(kind: "csv" | "txt", platform?: SocialPlatform, format?: string) {
+    const filtered = items.filter((item) => {
+      if (platform && item.platform !== platform) return false;
+      if (format && item.format !== format) return false;
+      return true;
+    });
+    const rows = filtered.map((item) =>
+      packItemToDownloadRow({
+        platform: item.platform,
+        format: item.format as never,
+        hook: item.hook,
+        body: item.body,
+        cta: item.cta,
+        hashtags: asStringArray(item.hashtags),
+        visualDirection: item.visual_direction,
+        toneTags: asStringArray(item.tone_tags),
+        scriptSpoken: item.script_spoken,
+        onScreenText: item.on_screen_text
+      })
+    );
+    const body = kind === "txt" ? toTxt(rows) : toCsv(rows);
+    const blob = new Blob([body], { type: kind === "txt" ? "text/plain;charset=utf-8" : "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `fitdog-social-${platform || "all"}${format ? `-${format}` : ""}.${kind}`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function saveConnection(platform: SocialPlatform) {
@@ -318,13 +371,23 @@ export function BlogSocialGeneratorPanel() {
               </button>
             ))}
           </div>
-          {activePackId ? (
-            <a
-              className="inline-block text-sm text-[var(--fitdog-orange,#ff6f26)] underline"
-              href={`/api/blog/social?packId=${encodeURIComponent(activePackId)}&download=csv`}
-            >
-              Download all platforms (CSV)
-            </a>
+          {items.length ? (
+            <div className="flex flex-wrap gap-3 text-sm">
+              <button type="button" className="text-[var(--fitdog-orange,#ff6f26)] underline" onClick={() => downloadLocal("csv")}>
+                Download all (CSV)
+              </button>
+              <button type="button" className="text-[var(--fitdog-orange,#ff6f26)] underline" onClick={() => downloadLocal("txt")}>
+                Download all (TXT)
+              </button>
+              {activePackId && !String(activePackId).startsWith("local-") ? (
+                <a
+                  className="text-[var(--fitdog-orange,#ff6f26)] underline"
+                  href={`/api/blog/social?packId=${encodeURIComponent(activePackId)}&download=csv`}
+                >
+                  Server CSV
+                </a>
+              ) : null}
+            </div>
           ) : null}
         </section>
       ) : null}
@@ -335,6 +398,7 @@ export function BlogSocialGeneratorPanel() {
           platform={platform}
           items={byPlatform[platform]}
           packId={activePackId}
+          onDownload={(kind, format) => downloadLocal(kind, platform, format)}
         />
       ))}
     </div>
@@ -344,11 +408,13 @@ export function BlogSocialGeneratorPanel() {
 function PlatformBlock({
   platform,
   items,
-  packId
+  packId,
+  onDownload
 }: {
   platform: SocialPlatform;
   items: PackItem[];
   packId: string | null;
+  onDownload: (kind: "csv" | "txt", format?: string) => void;
 }) {
   const formats = PLATFORM_FORMATS[platform];
   return (
@@ -358,13 +424,15 @@ function PlatformBlock({
           <h3 className="text-lg font-semibold text-[var(--fitdog-heading,#121417)]">{PLATFORM_LABELS[platform]}</h3>
           <p className="text-xs text-[var(--fitdog-muted,#6b7280)]">Labeled formats with separate download tables</p>
         </div>
-        {packId ? (
-          <a
-            className="text-sm text-[var(--fitdog-orange,#ff6f26)] underline"
-            href={`/api/blog/social?packId=${encodeURIComponent(packId)}&download=csv&platform=${platform}`}
-          >
-            Download {PLATFORM_LABELS[platform]} CSV
-          </a>
+        {items.length ? (
+          <div className="flex flex-wrap gap-3 text-sm">
+            <button type="button" className="text-[var(--fitdog-orange,#ff6f26)] underline" onClick={() => onDownload("csv")}>
+              Download {PLATFORM_LABELS[platform]} CSV
+            </button>
+            <button type="button" className="text-[var(--fitdog-orange,#ff6f26)] underline" onClick={() => onDownload("txt")}>
+              Download TXT
+            </button>
+          </div>
         ) : null}
       </div>
       {formats.map((fmt) => {
@@ -373,13 +441,15 @@ function PlatformBlock({
           <div key={fmt.tableKey} className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <h4 className="text-sm font-semibold text-[var(--fitdog-heading,#121417)]">{fmt.label}</h4>
-              {packId ? (
-                <a
-                  className="text-xs text-[var(--fitdog-orange,#ff6f26)] underline"
-                  href={`/api/blog/social?packId=${encodeURIComponent(packId)}&download=csv&platform=${platform}&format=${fmt.format}`}
-                >
-                  Download table
-                </a>
+              {rows.length ? (
+                <div className="flex gap-3 text-xs">
+                  <button type="button" className="text-[var(--fitdog-orange,#ff6f26)] underline" onClick={() => onDownload("csv", fmt.format)}>
+                    CSV
+                  </button>
+                  <button type="button" className="text-[var(--fitdog-orange,#ff6f26)] underline" onClick={() => onDownload("txt", fmt.format)}>
+                    TXT
+                  </button>
+                </div>
               ) : null}
             </div>
             <div className="overflow-x-auto rounded-lg border border-[var(--fitdog-border,#e6e8eb)]">

@@ -3,6 +3,7 @@ import { blogActor, requireBlogPermission } from "@/lib/blog/api-auth";
 import {
   createSocialPack,
   downloadSocialPackCsv,
+  downloadSocialPackTxt,
   getSocialPack,
   listSocialConnections,
   listSocialPacks,
@@ -22,13 +23,17 @@ export async function GET(request: Request) {
   const platform = url.searchParams.get("platform") as SocialPlatform | null;
   const format = url.searchParams.get("format");
 
-  if (packId && download === "csv") {
+  if (packId && (download === "csv" || download === "txt")) {
     try {
-      const csv = await downloadSocialPackCsv(packId, platform || undefined, format || undefined);
-      return new NextResponse(csv, {
+      const body =
+        download === "txt"
+          ? await downloadSocialPackTxt(packId, platform || undefined, format || undefined)
+          : await downloadSocialPackCsv(packId, platform || undefined, format || undefined);
+      const ext = download === "txt" ? "txt" : "csv";
+      return new NextResponse(body, {
         headers: {
-          "Content-Type": "text/csv; charset=utf-8",
-          "Content-Disposition": `attachment; filename="fitdog-social-${packId.slice(0, 8)}.csv"`
+          "Content-Type": download === "txt" ? "text/plain; charset=utf-8" : "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="fitdog-social-${packId.slice(0, 8)}.${ext}"`
         }
       });
     } catch (error) {

@@ -3,29 +3,44 @@ import { decryptBlogSecret, encryptBlogSecret, hasEncryptedSecret } from "@/lib/
 import {
   generateSocialPackDeterministic,
   packItemToDownloadRow,
-  toCsv
+  toCsv,
+  toTxt
 } from "@/lib/blog/social/generate";
 import { SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/blog/social/types";
 import { writeBlogAudit } from "@/lib/blog/service";
 
 export async function listSocialConnections() {
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase
-    .from("blog_social_connections")
-    .select("id, platform, username, status, last_tested_at, last_error, metadata, updated_at, secret_encrypted")
-    .order("platform");
-  if (error) throw error;
-  return (data || []).map((row) => ({
-    id: row.id,
-    platform: row.platform as SocialPlatform,
-    username: row.username || "",
-    status: row.status,
-    lastTestedAt: row.last_tested_at,
-    lastError: row.last_error,
-    metadata: row.metadata || {},
-    hasSecret: hasEncryptedSecret(row.secret_encrypted as Record<string, unknown>),
-    updatedAt: row.updated_at
-  }));
+  try {
+    const supabase = getServiceSupabase();
+    const { data, error } = await supabase
+      .from("blog_social_connections")
+      .select("id, platform, username, status, last_tested_at, last_error, metadata, updated_at, secret_encrypted")
+      .order("platform");
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: row.id,
+      platform: row.platform as SocialPlatform,
+      username: row.username || "",
+      status: row.status,
+      lastTestedAt: row.last_tested_at,
+      lastError: row.last_error,
+      metadata: row.metadata || {},
+      hasSecret: hasEncryptedSecret(row.secret_encrypted as Record<string, unknown>),
+      updatedAt: row.updated_at
+    }));
+  } catch {
+    return SOCIAL_PLATFORMS.map((platform) => ({
+      id: platform,
+      platform,
+      username: "",
+      status: "disconnected",
+      lastTestedAt: null,
+      lastError: null,
+      metadata: {},
+      hasSecret: false,
+      updatedAt: null
+    }));
+  }
 }
 
 export async function upsertSocialConnection(input: {
@@ -115,39 +130,25 @@ export async function testSocialConnection(platform: SocialPlatform, actor?: str
   return { ok: true, status: "connected", message };
 }
 
-export async function createSocialPack(input: {
+function ephemeralPackPayload(pack: ReturnType<typeof generateSocialPackDeterministic>, input: {
   topic?: string | null;
-  angle?: string | null;
-  blogUrl?: string | null;
-  articleId?: string | null;
   articleTitle?: string | null;
   createdBy?: string | null;
-  queueAutoPost?: boolean;
 }) {
-  const supabase = getServiceSupabase();
-  const pack = generateSocialPackDeterministic({
-    topic: input.topic,
-    angle: input.angle,
-    blogUrl: input.blogUrl,
-    articleTitle: input.articleTitle
-  });
-
-  const { data: packRow, error: packError } = await supabase
-    .from("blog_social_packs")
-    .insert({
-      title: pack.title,
-      prompt: input.topic || input.articleTitle || "",
-      article_id: input.articleId || null,
-      status: "ready",
-      voice_notes: pack.voiceNotes,
-      created_by: input.createdBy || null
-    })
-    .select("*")
-    .single();
-  if (packError) throw packError;
-
-  const itemRows = pack.items.map((item, index) => ({
-    pack_id: packRow.id,
+  const packId = `local-${Date.now().toString(36)}`;
+  const packRow = {
+    id: packId,
+    title: pack.title,
+    prompt: input.topic || input.articleTitle || "",
+    status: "ready",
+    voice_notes: pack.voiceNotes,
+    created_by: input.createdBy || null,
+    created_at: new Date().toISOString(),
+    ephemeral: true
+  };
+  const items = pack.items.map((item, index) => ({
+    id: `${packId}-${index}`,
+    pack_id: packId,
     platform: item.platform,
     format: item.format,
     hook: item.hook,
@@ -161,50 +162,108 @@ export async function createSocialPack(input: {
     content: packItemToDownloadRow(item),
     sort_order: index
   }));
+  return { pack: packRow, items, generated: pack, persisted: false as const };
+}
 
-  const { data: items, error: itemsError } = await supabase
-    .from("blog_social_pack_items")
-    .insert(itemRows)
-    .select("*");
-  if (itemsError) throw itemsError;
-
-  if (input.queueAutoPost) {
-    const { data: connections } = await supabase
-      .from("blog_social_connections")
-      .select("platform, status")
-      .eq("status", "connected");
-    const connected = new Set((connections || []).map((c) => c.platform));
-    const posts = (items || [])
-      .filter((item) => connected.has(item.platform))
-      .map((item) => ({
-        pack_item_id: item.id,
-        pack_id: packRow.id,
-        platform: item.platform,
-        format: item.format,
-        status: "queued",
-        created_by: input.createdBy || null
-      }));
-    if (posts.length) {
-      await supabase.from("blog_social_posts").insert(posts);
-    }
-  }
-
-  await writeBlogAudit(input.createdBy, "social.pack_created", "social_pack", String(packRow.id), {
-    items: items?.length || 0
+export async function createSocialPack(input: {
+  topic?: string | null;
+  angle?: string | null;
+  blogUrl?: string | null;
+  articleId?: string | null;
+  articleTitle?: string | null;
+  createdBy?: string | null;
+  queueAutoPost?: boolean;
+}) {
+  const pack = generateSocialPackDeterministic({
+    topic: input.topic,
+    angle: input.angle,
+    blogUrl: input.blogUrl,
+    articleTitle: input.articleTitle
   });
 
-  return { pack: packRow, items: items || [], generated: pack };
+  try {
+    const supabase = getServiceSupabase();
+    const { data: packRow, error: packError } = await supabase
+      .from("blog_social_packs")
+      .insert({
+        title: pack.title,
+        prompt: input.topic || input.articleTitle || "",
+        article_id: input.articleId || null,
+        status: "ready",
+        voice_notes: pack.voiceNotes,
+        created_by: input.createdBy || null
+      })
+      .select("*")
+      .single();
+    if (packError) throw packError;
+
+    const itemRows = pack.items.map((item, index) => ({
+      pack_id: packRow.id,
+      platform: item.platform,
+      format: item.format,
+      hook: item.hook,
+      body: item.body,
+      cta: item.cta,
+      hashtags: item.hashtags,
+      visual_direction: item.visualDirection,
+      tone_tags: item.toneTags,
+      script_spoken: item.scriptSpoken || "",
+      on_screen_text: item.onScreenText || "",
+      content: packItemToDownloadRow(item),
+      sort_order: index
+    }));
+
+    const { data: items, error: itemsError } = await supabase
+      .from("blog_social_pack_items")
+      .insert(itemRows)
+      .select("*");
+    if (itemsError) throw itemsError;
+
+    if (input.queueAutoPost) {
+      const { data: connections } = await supabase
+        .from("blog_social_connections")
+        .select("platform, status")
+        .eq("status", "connected");
+      const connected = new Set((connections || []).map((c) => c.platform));
+      const posts = (items || [])
+        .filter((item) => connected.has(item.platform))
+        .map((item) => ({
+          pack_item_id: item.id,
+          pack_id: packRow.id,
+          platform: item.platform,
+          format: item.format,
+          status: "queued",
+          created_by: input.createdBy || null
+        }));
+      if (posts.length) {
+        await supabase.from("blog_social_posts").insert(posts);
+      }
+    }
+
+    await writeBlogAudit(input.createdBy, "social.pack_created", "social_pack", String(packRow.id), {
+      items: items?.length || 0
+    });
+
+    return { pack: packRow, items: items || [], generated: pack, persisted: true as const };
+  } catch {
+    // Migration not applied yet — still return downloadable content.
+    return ephemeralPackPayload(pack, input);
+  }
 }
 
 export async function listSocialPacks(limit = 20) {
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase
-    .from("blog_social_packs")
-    .select("id, title, prompt, status, voice_notes, created_by, created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return data || [];
+  try {
+    const supabase = getServiceSupabase();
+    const { data, error } = await supabase
+      .from("blog_social_packs")
+      .select("id, title, prompt, status, voice_notes, created_by, created_at")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getSocialPack(packId: string) {
@@ -219,28 +278,40 @@ export async function getSocialPack(packId: string) {
   return { pack, items: items || [] };
 }
 
-export async function downloadSocialPackCsv(packId: string, platform?: SocialPlatform, format?: string) {
-  const { items } = await getSocialPack(packId);
+function itemsToDownloadRows(
+  items: Array<Record<string, unknown>>,
+  platform?: SocialPlatform,
+  format?: string
+) {
   const filtered = items.filter((item) => {
     if (platform && item.platform !== platform) return false;
     if (format && item.format !== format) return false;
     return true;
   });
-  const rows = filtered.map((item) =>
+  return filtered.map((item) =>
     packItemToDownloadRow({
-      platform: item.platform,
-      format: item.format,
-      hook: item.hook,
-      body: item.body,
-      cta: item.cta,
+      platform: item.platform as SocialPlatform,
+      format: item.format as never,
+      hook: String(item.hook || ""),
+      body: String(item.body || ""),
+      cta: String(item.cta || ""),
       hashtags: Array.isArray(item.hashtags) ? item.hashtags.map(String) : [],
-      visualDirection: item.visual_direction,
+      visualDirection: String(item.visual_direction || ""),
       toneTags: Array.isArray(item.tone_tags) ? item.tone_tags.map(String) : [],
-      scriptSpoken: item.script_spoken,
-      onScreenText: item.on_screen_text
+      scriptSpoken: String(item.script_spoken || ""),
+      onScreenText: String(item.on_screen_text || "")
     })
   );
-  return toCsv(rows);
+}
+
+export async function downloadSocialPackCsv(packId: string, platform?: SocialPlatform, format?: string) {
+  const { items } = await getSocialPack(packId);
+  return toCsv(itemsToDownloadRows(items as Array<Record<string, unknown>>, platform, format));
+}
+
+export async function downloadSocialPackTxt(packId: string, platform?: SocialPlatform, format?: string) {
+  const { items } = await getSocialPack(packId);
+  return toTxt(itemsToDownloadRows(items as Array<Record<string, unknown>>, platform, format));
 }
 
 /** Process queued social posts — stub adapter until OAuth APIs are fully wired. */
