@@ -642,12 +642,35 @@ export async function pushCastVideoNotice(
     if (!pushed) throw new Error("Cast video notice not found.");
     const { triggerShellyAlert } = await import("@/lib/shelly-alert");
     await triggerShellyAlert("cast_video_push", `cast-video:${id}`);
+    const fallbackPushed = pushed as CastVideoNotice;
+    const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
+    sendUrgentAlertSmsFireAndForget(
+      {
+        id: fallbackPushed.id,
+        title: fallbackPushed.title || "Cast video alert",
+        message: fallbackPushed.description,
+        priority: fallbackPushed.priority,
+        source: "cast_video"
+      },
+      supabase
+    );
     return pushed;
   }
   if (error) throw error;
   const pushed = normalizeNoticeRow(data as Record<string, unknown>);
   const { triggerShellyAlert } = await import("@/lib/shelly-alert");
   await triggerShellyAlert("cast_video_push", `cast-video:${pushed.id}`);
+  const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
+  sendUrgentAlertSmsFireAndForget(
+    {
+      id: pushed.id,
+      title: pushed.title || "Cast video alert",
+      message: pushed.description,
+      priority: pushed.priority,
+      source: "cast_video"
+    },
+    supabase
+  );
   return pushed;
 }
 

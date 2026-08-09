@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   findSuperAdminSmsKeyword,
   isCriticalOrUrgentStaffNote,
+  isUrgentPushAlert,
   staffContentNeedsSuperAdminSms,
   textTriggersSuperAdminSms
 } from "../lib/staff/super-admin-sms";
@@ -35,5 +36,10 @@ assert.equal(
   false
 );
 assert.equal(staffContentNeedsSuperAdminSms({ priority: "Critical", subject: "Anything" }), true);
+
+assert.equal(isUrgentPushAlert({ priority: "urgent", display_mode: "normal" }), true);
+assert.equal(isUrgentPushAlert({ priority: "normal", display_mode: "urgent" }), true);
+assert.equal(isUrgentPushAlert({ priority: "emergency" }), true);
+assert.equal(isUrgentPushAlert({ priority: "important", display_mode: "normal" }), false);
 
 console.log("super-admin-sms: ok");

@@ -671,6 +671,8 @@ export async function pushStaffNoticeById(
   });
   const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
   await triggerShellyAlertForPushNotice(updated);
+  const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
+  sendUrgentAlertSmsFireAndForget(updated, supabase);
   return updated;
 }
 
@@ -700,6 +702,8 @@ export async function createAndPushStaffNotice(
   await saveNoticeState(supabase, { notices: sortNotices([notice, ...state.notices]) });
   const { triggerShellyAlertForPushNotice } = await import("@/lib/shelly-push-alerts");
   await triggerShellyAlertForPushNotice(notice);
+  const { sendUrgentAlertSmsFireAndForget } = await import("@/lib/staff/super-admin-sms");
+  sendUrgentAlertSmsFireAndForget(notice, supabase);
   return notice;
 }
 

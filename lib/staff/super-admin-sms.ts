@@ -11,7 +11,8 @@ export type SuperAdminSmsKind =
   | "front_desk_note"
   | "front_desk_comment"
   | "keyword_alert"
-  | "write_up";
+  | "write_up"
+  | "urgent_alert";
 
 export type SuperAdminSmsPayload = {
   kind: SuperAdminSmsKind;
@@ -81,6 +82,45 @@ export function staffContentNeedsSuperAdminSms(input: {
 }) {
   if (isCriticalOrUrgentStaffNote(input)) return true;
   return textTriggersSuperAdminSms(input.subject, input.details, input.message, input.body);
+}
+
+/** Staff whiteboard / emergency push marked Urgent. */
+export function isUrgentPushAlert(input: {
+  priority?: string | null;
+  display_mode?: string | null;
+}) {
+  const priority = String(input.priority || "")
+    .trim()
+    .toLowerCase();
+  const mode = String(input.display_mode || "")
+    .trim()
+    .toLowerCase();
+  return priority === "urgent" || priority === "emergency" || mode === "urgent" || mode === "emergency";
+}
+
+/** SMS Lonnie whenever an urgent/emergency alert is pushed live. */
+export function sendUrgentAlertSmsFireAndForget(
+  input: {
+    id: string;
+    title: string;
+    message?: string | null;
+    priority?: string | null;
+    display_mode?: string | null;
+    source?: string | null;
+  },
+  supabase?: SupabaseClient | null
+) {
+  if (!isUrgentPushAlert(input)) return;
+  sendSuperAdminSmsAlertFireAndForget(
+    {
+      kind: "urgent_alert",
+      title: `URGENT: ${input.title}`,
+      detail: input.message,
+      idempotencyKey: `sa-sms:urgent:${input.source || "push"}:${input.id}:${Date.now()}`.slice(0, 64),
+      adminPath: "/admin?board=admin&tab=emergency_alerts"
+    },
+    supabase
+  );
 }
 
 async function resolveSuperAdminPhone(supabase?: SupabaseClient | null): Promise<string | null> {
