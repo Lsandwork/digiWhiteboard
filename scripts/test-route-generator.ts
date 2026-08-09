@@ -48,6 +48,16 @@ import {
 import { buildCustomerStopNotes, formatPhoneForDriver, phoneDigitsE164 } from "../lib/route-generator/stop-notes";
 import { normalizeSmsToE164 } from "../lib/integrations/sms/provider";
 import { extractOwnerPhoneE164 } from "../lib/route-generator/owner-tracking";
+import {
+  detectSharedDogTimingConflicts,
+  extractHhMmFromStored,
+  hhMmOnOperatingDateToIso,
+  orderStopsForTimeliness,
+  sharedDogTimingClashPenalty,
+  splitItemsByServiceAndWindow,
+  windowBandKey,
+  windowsOverlap
+} from "../lib/route-generator/timing";
 
 // Permissions
 assert.equal(
@@ -399,7 +409,9 @@ assert.equal(
       raw: {}
     }
   ]);
-  const clubGroup = facilityGroups.find((g) => g.householdKey === "facility:club:adventure-hike");
+  const clubGroup = facilityGroups.find((g) =>
+    String(g.householdKey).startsWith("facility:club:adventure-hike")
+  );
   const homeGroup = facilityGroups.find((g) => g.dogCount === 1 && g.items[0]?.dogName === "Teddy");
   assert.ok(clubGroup, "club facility group expected");
   assert.equal(clubGroup?.ownerName, "Fitdog Club");
@@ -466,8 +478,12 @@ assert.equal(
       raw: { location_name: "Fitdog HQ" }
     }
   ]);
-  const beachClub = mixedFacility.find((g) => g.householdKey === "facility:club:beach-excursion");
-  const adventureClub = mixedFacility.find((g) => g.householdKey === "facility:club:adventure-hike");
+  const beachClub = mixedFacility.find((g) =>
+    String(g.householdKey).startsWith("facility:club:beach-excursion")
+  );
+  const adventureClub = mixedFacility.find((g) =>
+    String(g.householdKey).startsWith("facility:club:adventure-hike")
+  );
   assert.ok(beachClub, "beach club group expected");
   assert.ok(adventureClub, "adventure club group expected");
   assert.deepEqual(
@@ -1139,6 +1155,194 @@ assert.equal(
   assert.equal(row.zip, "90291");
   assert.equal(row.serviceRaw, "Taxi Service - Business Only");
   assert.equal(reservationHasTaxi({ id: "2", reservation_type: { type: "Boarding" }, services: [] }), false);
+}
+
+{
+  assert.equal(windowBandKey("07:00", "09:00"), "07:00-09:00");
+  assert.equal(windowBandKey("07:15", "09:00"), "07:00-09:00");
+  assert.equal(windowBandKey("10:30", "12:00"), "10:30-12:00");
+  assert.equal(windowsOverlap("07:00", "09:00", "08:30", "10:00"), true);
+  assert.equal(windowsOverlap("07:00", "09:00", "10:30", "12:00"), false);
+
+  const homeBase = "123 ocean|santa monica|ca|90401";
+  const mixed = splitItemsByServiceAndWindow([
+    {
+      direction: "pickup",
+      reservationId: "r1",
+      customerId: "c1",
+      ownerFirstName: "Tony",
+      ownerLastName: "Kalili",
+      ownerFullName: "Tony Kalili",
+      dogId: "d1",
+      dogName: "Percy",
+      serviceRaw: "Adventure Hikes",
+      serviceCanonical: "Adventure Hike",
+      addressRaw: "123 Ocean",
+      addressStreet: "123 Ocean",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90401",
+      ownerPhoneMasked: null,
+      timeWindowStart: "07:00",
+      timeWindowEnd: "09:00",
+      dogSize: "Medium",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: homeBase,
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: {}
+    },
+    {
+      direction: "pickup",
+      reservationId: "r2",
+      customerId: "c1",
+      ownerFirstName: "Tony",
+      ownerLastName: "Kalili",
+      ownerFullName: "Tony Kalili",
+      dogId: "d1",
+      dogName: "Percy",
+      serviceRaw: "Group Class",
+      serviceCanonical: "Group Class",
+      addressRaw: "123 Ocean",
+      addressStreet: "123 Ocean",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90401",
+      ownerPhoneMasked: null,
+      timeWindowStart: "10:30",
+      timeWindowEnd: "12:00",
+      dogSize: "Medium",
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: homeBase,
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: {}
+    }
+  ]);
+  assert.notEqual(mixed[0]?.householdKey, mixed[1]?.householdKey, "same home + different class windows must split");
+  const groups = groupHouseholds(mixed);
+  assert.equal(groups.length, 2, "two class windows → two stops");
+
+  const conflicts = detectSharedDogTimingConflicts([
+    {
+      ...mixed[0]!,
+      timeWindowStart: "11:00",
+      timeWindowEnd: "12:00",
+      direction: "pickup",
+      reservationId: "class-b"
+    },
+    {
+      ...mixed[0]!,
+      dogId: "d1",
+      direction: "dropoff",
+      reservationId: "class-a",
+      serviceCanonical: "Adventure Hike",
+      timeWindowStart: "10:30",
+      timeWindowEnd: "12:00"
+    }
+  ]);
+  assert.ok(conflicts.length >= 1, "overlapping cross-class pickup/dropoff must warn");
+
+  const late = {
+    householdKey: "late",
+    direction: "pickup" as const,
+    address: "Late St",
+    ownerName: "Late",
+    dogCount: 1,
+    items: [
+      {
+        ...mixed[0]!,
+        householdKey: "late",
+        timeWindowStart: "08:30",
+        timeWindowEnd: "09:00",
+        dogName: "LateDog"
+      }
+    ],
+    coord: { lat: 34.02, lng: -118.5 }
+  };
+  const early = {
+    householdKey: "early",
+    direction: "pickup" as const,
+    address: "Early St",
+    ownerName: "Early",
+    dogCount: 1,
+    items: [
+      {
+        ...mixed[0]!,
+        householdKey: "early",
+        timeWindowStart: "07:00",
+        timeWindowEnd: "07:30",
+        dogName: "EarlyDog"
+      }
+    ],
+    coord: { lat: 34.03, lng: -118.51 }
+  };
+  const ordered = orderStopsForTimeliness([late, early], { lat: 34.04, lng: -118.43 }, "pickup", () => 0.1);
+  assert.equal(ordered[0]?.householdKey, "early", "earlier pickup deadline must come first");
+
+  const iso = hhMmOnOperatingDateToIso("2026-08-08", "07:00");
+  assert.ok(iso && iso.includes("T"), "window persists as timestamptz ISO");
+  assert.equal(extractHhMmFromStored(iso), "07:00");
+  assert.equal(extractHhMmFromStored("10:30"), "10:30");
+
+  const clashStop = {
+    householdKey: "b",
+    direction: "pickup" as const,
+    address: "B",
+    ownerName: "B",
+    dogCount: 1,
+    items: [
+      {
+        ...mixed[0]!,
+        dogId: "d1",
+        timeWindowStart: "08:00",
+        timeWindowEnd: "09:30"
+      }
+    ]
+  };
+  const existingStop = {
+    householdKey: "a",
+    direction: "pickup" as const,
+    address: "A",
+    ownerName: "A",
+    dogCount: 1,
+    items: [
+      {
+        ...mixed[0]!,
+        dogId: "d1",
+        timeWindowStart: "07:00",
+        timeWindowEnd: "09:00"
+      }
+    ]
+  };
+  assert.ok(
+    sharedDogTimingClashPenalty([existingStop], clashStop) >= 500,
+    "overlapping same-dog windows must clash on one van"
+  );
+  assert.equal(
+    sharedDogTimingClashPenalty(
+      [existingStop],
+      {
+        ...clashStop,
+        items: [
+          {
+            ...mixed[1]!,
+            dogId: "d1",
+            timeWindowStart: "10:30",
+            timeWindowEnd: "12:00"
+          }
+        ]
+      }
+    ),
+    0,
+    "non-overlapping class windows for same dog may share a van"
+  );
 }
 
 console.log("route-generator tests: ok");

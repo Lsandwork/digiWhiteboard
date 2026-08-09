@@ -23,6 +23,14 @@ import {
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
 import { buildCustomerStopNotes, formatPhoneForDriver } from "@/lib/route-generator/stop-notes";
+import {
+  estimateCustomerStopEtas,
+  groupTimelinessSortKey,
+  orderStopsForTimeliness,
+  sharedDogAffinityBonus,
+  sharedDogTimingClashPenalty,
+  windowCompatibilityPenalty
+} from "@/lib/route-generator/timing";
 
 export type DepotConfig = {
   name: string;
@@ -51,6 +59,11 @@ export type OptimizedStop = {
   notes: string;
   /** Full owner phone for drivers (Samsara notes + tracking SMS). */
   ownerPhoneDisplay?: string | null;
+  requestedWindowStart?: string | null;
+  requestedWindowEnd?: string | null;
+  etaArrival?: string | null;
+  etaDeparture?: string | null;
+  dogIds?: string[];
 };
 
 export type OptimizedRoute = {
@@ -257,8 +270,13 @@ export function optimizeRoutes(params: {
   }
 
   const unlocked = enriched.filter((s) => !params.lockedVanByHousehold?.[s.householdKey]);
-  // Sort by load descending for bin packing, then nearest-neighbor within van
-  unlocked.sort((a, b) => b.load - a.load || a.address.localeCompare(b.address));
+  // Assign earliest deadlines first so late-window proximity packing cannot starve early classes.
+  unlocked.sort((a, b) => {
+    const aKey = groupTimelinessSortKey(a, params.direction);
+    const bKey = groupTimelinessSortKey(b, params.direction);
+    if (aKey !== bKey) return aKey - bKey;
+    return b.load - a.load || a.address.localeCompare(b.address);
+  });
 
   for (const stop of unlocked) {
     const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical;
@@ -290,10 +308,15 @@ export function optimizeRoutes(params: {
         const last = bucket.stops[bucket.stops.length - 1];
         const from = last?.coord ?? depotCoord;
         const dist = from && stop.coord ? haversineMiles(from, stop.coord) : 25;
-        return { bucket, check, dist };
+        const timingPenalty = windowCompatibilityPenalty(bucket.stops, stop, params.direction);
+        const clash = sharedDogTimingClashPenalty(bucket.stops, stop);
+        const affinity = sharedDogAffinityBonus(bucket.stops, stop);
+        // Lower is better: proximity + window mismatch + shared-dog clash − sequential affinity.
+        const score = dist + timingPenalty + clash - affinity;
+        return { bucket, check, dist, score, clash };
       })
-      .filter((c) => c.check.ok)
-      .sort((a, b) => a.dist - b.dist || a.bucket.dogs - b.bucket.dogs);
+      .filter((c) => c.check.ok && c.clash < 500)
+      .sort((a, b) => a.score - b.score || a.dist - b.dist || a.bucket.dogs - b.bucket.dogs);
 
     if (candidates[0]) {
       const { bucket } = candidates[0];
@@ -306,8 +329,20 @@ export function optimizeRoutes(params: {
 
     if (!placed) {
       unassigned.push(stop);
-      if (service) warnings.push(`${stop.address}: no eligible van has capacity for ${service}.`);
-      else warnings.push(`${stop.address}: could not assign household.`);
+      const clashBlocked = [...buckets.values()].some(
+        (bucket) =>
+          (!service || isServiceEligibleForVan(service, bucket.vehicle)) &&
+          sharedDogTimingClashPenalty(bucket.stops, stop) >= 500
+      );
+      if (clashBlocked) {
+        warnings.push(
+          `${stop.address}: shared dog has overlapping class windows with another stop — left unassigned for review.`
+        );
+      } else if (service) {
+        warnings.push(`${stop.address}: no eligible van has capacity for ${service}.`);
+      } else {
+        warnings.push(`${stop.address}: could not assign household.`);
+      }
     }
   }
 
@@ -342,15 +377,20 @@ export function optimizeRoutes(params: {
         ? { lat: endBase.latitude, lng: endBase.longitude }
         : startCoord;
 
-    // Prefer visiting Fitdog Club mid-route when facility dogs are on this van,
-    // otherwise keep nearest-neighbor from the start base.
+    // Facility stops stay first (pickup) / last (dropoff). Home stops are ordered by
+    // class-window deadline + proximity so shared-class timing stays feasible.
     const facilityStops = bucket.stops.filter((s) => isFacilityHouseholdKey(s.householdKey));
     const homeStops = bucket.stops.filter((s) => !isFacilityHouseholdKey(s.householdKey));
-    const orderedHome = nearestNeighborOrder(homeStops, startCoord, rng);
+    const orderedHome = orderStopsForTimeliness(homeStops, startCoord, params.direction, rng);
+    // Keep proximity fallback available for routes with no windows at all.
+    const orderedHomeFinal =
+      orderedHome.some((stop) => stop.items.some((item) => item.timeWindowStart || item.timeWindowEnd))
+        ? orderedHome
+        : nearestNeighborOrder(homeStops, startCoord, rng);
     const ordered =
       params.direction === "pickup"
-        ? [...facilityStops, ...orderedHome]
-        : [...orderedHome, ...facilityStops];
+        ? [...facilityStops, ...orderedHomeFinal]
+        : [...orderedHomeFinal, ...facilityStops];
 
     let distance = 0;
     let prev = startCoord;
@@ -359,6 +399,19 @@ export function optimizeRoutes(params: {
       prev = stop.coord ?? prev;
     }
     if (prev && endCoord) distance += haversineMiles(prev, endCoord);
+
+    const etaByIndex = estimateCustomerStopEtas({
+      ordered,
+      direction: params.direction,
+      operatingDate: params.operatingDate || new Date().toISOString().slice(0, 10),
+      vanKey,
+      coordsByHousehold: Object.fromEntries(
+        ordered
+          .filter((stop) => stop.coord)
+          .map((stop) => [stop.householdKey, stop.coord as { lat: number; lng: number }])
+      ),
+      startCoord
+    });
 
     const stops: OptimizedStop[] = [
       {
@@ -400,6 +453,11 @@ export function optimizeRoutes(params: {
             .filter((value): value is string => Boolean(value))
         )
       ];
+      const eta = etaByIndex[index];
+      const windowNote =
+        eta?.requestedWindowStart || eta?.requestedWindowEnd
+          ? `Window ${eta.requestedWindowStart || "?"}–${eta.requestedWindowEnd || "?"}`
+          : null;
       stops.push({
         sequence: index + 1,
         stopKind: "customer",
@@ -413,15 +471,25 @@ export function optimizeRoutes(params: {
         largeDogs: stop.large,
         serviceTypes: services,
         dogNames: stop.items.map((i) => i.dogName || "Dog"),
+        dogIds: stop.items.map((i) => i.dogId || "").filter(Boolean),
         reservationIds: stop.items.map((i) => i.reservationId || "").filter(Boolean),
         locked: Boolean(params.lockedVanByHousehold?.[stop.householdKey]),
         ownerPhoneDisplay: phones[0] ?? null,
-        notes: buildCustomerStopNotes({
-          items: stop.items,
-          direction: params.direction,
-          isFacility,
-          facilityLabel: isFacility ? stop.address : null
-        })
+        requestedWindowStart: eta?.requestedWindowStart ?? null,
+        requestedWindowEnd: eta?.requestedWindowEnd ?? null,
+        etaArrival: eta?.arrivalIso ?? null,
+        etaDeparture: eta?.departureIso ?? null,
+        notes: [
+          buildCustomerStopNotes({
+            items: stop.items,
+            direction: params.direction,
+            isFacility,
+            facilityLabel: isFacility ? stop.address : null
+          }),
+          windowNote
+        ]
+          .filter(Boolean)
+          .join(" · ")
       });
     });
 

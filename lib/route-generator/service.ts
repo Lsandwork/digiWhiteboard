@@ -19,6 +19,11 @@ import {
 } from "@/lib/route-generator/optimizer";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import {
+  detectSharedDogTimingConflicts,
+  extractHhMmFromStored,
+  hhMmOnOperatingDateToIso
+} from "@/lib/route-generator/timing";
+import {
   buildCsv,
   buildRouteName,
   formatSamsaraCsvDateTime,
@@ -216,7 +221,12 @@ export async function getRouteGeneratorBootstrap() {
   };
 }
 
-function reportItemsFromNormalized(runId: string, items: NormalizedReportItem[]) {
+function reportItemsFromNormalized(
+  runId: string,
+  items: NormalizedReportItem[],
+  operatingDate?: string | null
+) {
+  const date = String(operatingDate || "").slice(0, 10) || null;
   return items.map((item) => ({
     report_run_id: runId,
     direction: item.direction,
@@ -236,14 +246,30 @@ function reportItemsFromNormalized(runId: string, items: NormalizedReportItem[])
     address_state: item.addressState,
     address_zip: item.addressZip,
     owner_phone_masked: item.ownerPhoneMasked,
+    // Columns are timestamptz — store civil class windows on the operating date (LA).
+    time_window_start: date ? hhMmOnOperatingDateToIso(date, item.timeWindowStart) : null,
+    time_window_end: date ? hhMmOnOperatingDateToIso(date, item.timeWindowEnd) : null,
     dog_size: item.dogSize,
     special_notes: item.specialNotes,
     driver_notes: item.driverNotes,
     reservation_notes: item.reservationNotes,
     validation_status: item.validationStatus,
     validation_reasons: item.validationReasons,
-    raw: item.raw
+    raw: {
+      ...item.raw,
+      time_window_start: item.timeWindowStart,
+      time_window_end: item.timeWindowEnd
+    }
   }));
+}
+
+function timeWindowFromRow(row: Record<string, unknown>, which: "start" | "end"): string | null {
+  const column = which === "start" ? row.time_window_start : row.time_window_end;
+  const fromColumn = extractHhMmFromStored(column);
+  if (fromColumn) return fromColumn;
+  const raw = (row.raw ?? {}) as Record<string, unknown>;
+  const fromRaw = which === "start" ? raw.time_window_start : raw.time_window_end;
+  return extractHhMmFromStored(fromRaw);
 }
 
 export async function pullReportForDate(params: {
@@ -302,7 +328,11 @@ export async function pullReportForDate(params: {
     }
   }
 
-  const itemRows = reportItemsFromNormalized(run.id, [...pull.pickupItems, ...pull.dropoffItems]);
+  const itemRows = reportItemsFromNormalized(
+    run.id,
+    [...pull.pickupItems, ...pull.dropoffItems],
+    params.date
+  );
 
   if (itemRows.length) {
     const { error: itemError } = await supabase.from("route_report_items").insert(itemRows);
@@ -435,7 +465,9 @@ export async function assignSkippedOccurrence(params: {
 
   const { error: itemError } = await supabase
     .from("route_report_items")
-    .insert(reportItemsFromNormalized(params.reportRunId, promoted.items));
+    .insert(
+      reportItemsFromNormalized(params.reportRunId, promoted.items, String(run.operating_date))
+    );
   if (itemError) throw new Error(itemError.message);
 
   const nextSkipped = skipped.map((row) =>
@@ -564,7 +596,7 @@ export async function addTaxiToReportRun(params: {
 
   const { error: itemError } = await supabase
     .from("route_report_items")
-    .insert(reportItemsFromNormalized(params.reportRunId, items));
+    .insert(reportItemsFromNormalized(params.reportRunId, items, String(run.operating_date)));
   if (itemError) throw new Error(itemError.message);
 
   const nextMetadata: ReportRunMetadata = {
@@ -699,8 +731,8 @@ export async function generatePlanForRun(params: {
     addressState: row.address_state,
     addressZip: row.address_zip,
     ownerPhoneMasked: row.owner_phone_masked,
-    timeWindowStart: null,
-    timeWindowEnd: null,
+    timeWindowStart: timeWindowFromRow(row as Record<string, unknown>, "start"),
+    timeWindowEnd: timeWindowFromRow(row as Record<string, unknown>, "end"),
     dogSize: row.dog_size,
     specialNotes: row.special_notes,
     driverNotes: row.driver_notes,
@@ -714,12 +746,15 @@ export async function generatePlanForRun(params: {
     raw: row.raw ?? {}
   }));
 
+  const validNormalized = normalized.filter((i) => i.validationStatus !== "error");
+  const sharedDogConflicts = detectSharedDogTimingConflicts(validNormalized);
+
   const pickupGroups = groupHouseholdsWithFacilities(
-    normalized.filter((i) => i.direction === "pickup" && i.validationStatus !== "error"),
+    validNormalized.filter((i) => i.direction === "pickup"),
     locations
   );
   const dropoffGroups = groupHouseholdsWithFacilities(
-    normalized.filter((i) => i.direction === "dropoff" && i.validationStatus !== "error"),
+    validNormalized.filter((i) => i.direction === "dropoff"),
     locations
   );
   const needsReview = normalized.filter((i) => i.validationStatus !== "ok");
@@ -806,6 +841,16 @@ export async function generatePlanForRun(params: {
   if (dropoffLock.warnings.length) {
     dropoffOpt.warnings.push(...dropoffLock.warnings);
   }
+  if (sharedDogConflicts.length) {
+    pickupOpt.warnings.push(
+      ...sharedDogConflicts.slice(0, 20).map((conflict) => `Shared-dog timing: ${conflict.message}`)
+    );
+    if (sharedDogConflicts.length > 20) {
+      pickupOpt.warnings.push(
+        `Shared-dog timing: ${sharedDogConflicts.length - 20} additional conflict(s) omitted.`
+      );
+    }
+  }
   if (activeUnconfigured.length) {
     pickupOpt.warnings.push(
       "Active van capacities are not fully configured — shadow placeholders were used. Confirm capacities before production."
@@ -815,7 +860,8 @@ export async function generatePlanForRun(params: {
   const status =
     needsReview.some((i) => i.validationStatus === "error") ||
     pickupOpt.unassigned.length ||
-    dropoffOpt.unassigned.length
+    dropoffOpt.unassigned.length ||
+    sharedDogConflicts.length > 0
       ? "needs_review"
       : "ready_for_approval";
 
@@ -834,6 +880,7 @@ export async function generatePlanForRun(params: {
         vansUsed: new Set([...pickupOpt.routes, ...dropoffOpt.routes].map((r) => r.vanKey)).size,
         unassigned: pickupOpt.unassigned.length + dropoffOpt.unassigned.length,
         needsReview: needsReview.length,
+        sharedDogConflicts: sharedDogConflicts.length,
         pickupLabel: pickupOpt.label,
         dropoffLabel: dropoffOpt.label
       },
@@ -899,6 +946,16 @@ export async function generatePlanForRun(params: {
             ? `•••-•••-${String(stop.ownerPhoneDisplay).replace(/\D/g, "").slice(-4)}`
             : null,
           owner_phone_display: stop.ownerPhoneDisplay ?? null,
+          requested_window_start: hhMmOnOperatingDateToIso(
+            operatingDate,
+            stop.requestedWindowStart ?? null
+          ),
+          requested_window_end: hhMmOnOperatingDateToIso(
+            operatingDate,
+            stop.requestedWindowEnd ?? null
+          ),
+          eta_arrival: stop.etaArrival ?? null,
+          eta_departure: stop.etaDeparture ?? null,
           validation_status: "ok",
           locked: stop.locked,
           household_key: stop.householdKey

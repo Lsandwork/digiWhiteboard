@@ -10,6 +10,7 @@ import { parseAddress } from "@/lib/route-generator/address";
 import type { HouseholdStopGroup } from "@/lib/route-generator/households";
 import { formatStopDisplayName, groupHouseholds } from "@/lib/route-generator/households";
 import type { CanonicalService } from "@/lib/route-generator/flags";
+import { splitItemsByServiceAndWindow, timingHouseholdSuffix } from "@/lib/route-generator/timing";
 
 export type FacilityAwareItem = NormalizedReportItem & {
   facilityKey?: FitdogBaseKey | null;
@@ -97,7 +98,8 @@ export function groupHouseholdsWithFacilities(
   items: NormalizedReportItem[],
   locations: FitdogLocationsConfig = DEFAULT_FITDOG_LOCATIONS
 ): HouseholdStopGroup[] {
-  const annotated = annotateFacilityItems(items, locations);
+  // Facility first, then split home addresses by service + class window band.
+  const annotated = splitItemsByServiceAndWindow(annotateFacilityItems(items, locations));
   const groups = groupHouseholds(annotated);
   const out: HouseholdStopGroup[] = [];
 
@@ -115,17 +117,22 @@ export function groupHouseholdsWithFacilities(
     }
 
     const facility = resolveBaseLocation(locations, facilityKey);
-    const byService = new Map<string, NormalizedReportItem[]>();
+    // Split by service AND class window so Adventure 7–9am ≠ Adventure noon at Club.
+    const byServiceWindow = new Map<string, NormalizedReportItem[]>();
     for (const item of group.items) {
       const service = String(item.serviceCanonical || item.serviceRaw || "unknown");
-      const list = byService.get(service) || [];
+      const band = timingHouseholdSuffix(item);
+      const key = `${service}::${band}`;
+      const list = byServiceWindow.get(key) || [];
       list.push(item);
-      byService.set(service, list);
+      byServiceWindow.set(key, list);
     }
 
-    for (const [service, serviceItems] of byService) {
+    for (const [, serviceItems] of byServiceWindow) {
+      const service = serviceItems[0]?.serviceCanonical || serviceItems[0]?.serviceRaw || "unknown";
+      const band = timingHouseholdSuffix(serviceItems[0]!);
       out.push({
-        householdKey: facilityHouseholdKey(facilityKey, service),
+        householdKey: `${facilityHouseholdKey(facilityKey, service)}|${band}`,
         direction: group.direction,
         address: facility.address,
         ownerName: facility.name,
