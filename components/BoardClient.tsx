@@ -34,7 +34,7 @@ import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckinListsForDisplay, mergeCheckoutDogs, mergeBoardResponse, preserveDogPhotos } from "@/lib/board-checkout-merge";
+import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckinListsForDisplay, mergeCheckoutListsForDisplay, mergeBoardResponse } from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
   expireStickyCheckoutDogs,
@@ -452,15 +452,21 @@ export function BoardClient({
       checkoutBasketEmptyRef.current = emptyBasketStreakRef.current >= EMPTY_BASKET_CONFIRM_POLLS;
 
       setBoard((previous) => {
-        // The fast endpoint includes webhook-sourced check-ins as well as
-        // prompted checkouts, so both columns can update without waiting for
-        // the heavier Gingr-backed full-board request. Preserve recent webhook
-        // check-ins across multi-instance cache lag so dogs do not flicker off.
+        // Soft/stale or last-good cache payloads must not wipe dogs realtime just painted.
+        if (
+          (Boolean(data.stale) || result.fromCache) &&
+          !(data.checking_in?.length || data.checking_out?.length) &&
+          (previous.checking_in.length > 0 || previous.checking_out.length > 0)
+        ) {
+          return previous;
+        }
+
+        // Fast endpoint covers both columns. Always merge with a short grace hold so
+        // basket_filtered / multi-instance TTL lag cannot flicker dogs off.
         const nextCheckins = mergeCheckinListsForDisplay(data.checking_in ?? [], previous.checking_in);
-        const nextRaw = data.basket_filtered
-          ? data.checking_out
-          : mergeCheckoutDogs(previous.checking_out, data.checking_out);
-        const nextCheckouts = preserveDogPhotos(previous.checking_out, nextRaw);
+        const nextCheckouts = mergeCheckoutListsForDisplay(data.checking_out, previous.checking_out, {
+          basketConfirmedEmpty: checkoutBasketEmptyRef.current
+        });
         if (
           areCheckoutListsEquivalent(previous.checking_in, nextCheckins) &&
           areCheckoutListsEquivalent(previous.checking_out, nextCheckouts)
@@ -627,6 +633,8 @@ export function BoardClient({
     effectiveTrainerNotice
   ]);
 
+  // Mount-only board clocks + fast poll. Do NOT restart when Realtime flips
+  // connection → "live" (that was re-fetching and flickering dogs off).
   useEffect(() => {
     const initialLoad = window.setTimeout(() => {
       void loadBoard("connecting");
@@ -637,19 +645,10 @@ export function BoardClient({
     const clockIntervalMs = castKeeperMode ? 60_000 : 1000;
     const nowIntervalMs = castKeeperMode ? 5_000 : 1000;
     const fastPollIntervalMs = BOARD_CHECKOUT_POLL_MS;
-    const fullPollIntervalMs = castKeeperMode
-      ? 25_000
-      : connection === "live"
-        ? BOARD_FULL_SYNC_POLL_LIVE_MS
-        : BOARD_FULL_SYNC_POLL_MS;
 
     const clockTimer = window.setInterval(() => setClock(new Date()), clockIntervalMs);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), nowIntervalMs);
     const fastPollTimer = window.setInterval(() => void loadFastCheckouts(), fastPollIntervalMs);
-    const fullPollTimer = window.setInterval(
-      () => void loadBoard("polling", { silent: true }),
-      fullPollIntervalMs
-    );
 
     return () => {
       window.clearTimeout(initialLoad);
@@ -657,9 +656,22 @@ export function BoardClient({
       window.clearInterval(clockTimer);
       window.clearInterval(nowTimer);
       window.clearInterval(fastPollTimer);
-      window.clearInterval(fullPollTimer);
     };
-  }, [castKeeperMode, connection, loadBoard, loadFastCheckouts]);
+  }, [castKeeperMode, loadBoard, loadFastCheckouts]);
+
+  // Full sync interval only — safe to retune when connection mode changes.
+  useEffect(() => {
+    const fullPollIntervalMs = castKeeperMode
+      ? 25_000
+      : connection === "live"
+        ? BOARD_FULL_SYNC_POLL_LIVE_MS
+        : BOARD_FULL_SYNC_POLL_MS;
+    const fullPollTimer = window.setInterval(
+      () => void loadBoard("polling", { silent: true }),
+      fullPollIntervalMs
+    );
+    return () => window.clearInterval(fullPollTimer);
+  }, [castKeeperMode, connection, loadBoard]);
 
   useEffect(() => {
     const supabase = getBrowserSupabase();
@@ -670,6 +682,7 @@ export function BoardClient({
 
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let reconnectTimer: number | null = null;
+    let realtimeConfirmTimer: number | null = null;
     let reconnectDelayMs = 5_000;
     let cancelled = false;
 
@@ -693,11 +706,12 @@ export function BoardClient({
               const optimistic = applyOptimisticLiveBoardTransition(previous, next);
               return optimistic ?? previous;
             });
-            // Realtime events must bypass the short server caches; otherwise an
-            // immediate request can receive the pre-event snapshot and wait for
-            // the next poll. The fast endpoint covers both check-ins and
-            // prompted checkouts without waiting on the heavier Gingr request.
-            void loadFastCheckoutsRef.current({ fresh: true });
+            // Delay the confirm poll so we do not race the optimistic paint with a
+            // stale empty response from another serverless instance / CDN TTL.
+            if (realtimeConfirmTimer) window.clearTimeout(realtimeConfirmTimer);
+            realtimeConfirmTimer = window.setTimeout(() => {
+              void loadFastCheckoutsRef.current({ fresh: true });
+            }, 750);
           }
         )
         .subscribe((status) => {
@@ -724,6 +738,7 @@ export function BoardClient({
     return () => {
       cancelled = true;
       if (reconnectTimer) window.clearTimeout(reconnectTimer);
+      if (realtimeConfirmTimer) window.clearTimeout(realtimeConfirmTimer);
       if (channel) void supabase.removeChannel(channel);
     };
   }, [castKeeperMode, castMode]);

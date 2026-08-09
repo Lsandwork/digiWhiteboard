@@ -12,11 +12,12 @@ export const BOARD_FULL_SYNC_POLL_MS = 20_000;
 export const BOARD_FULL_SYNC_POLL_LIVE_MS = 60_000;
 export const BOARD_REALTIME_DEBOUNCE_MS = 0;
 /**
- * Bridge multi-instance TTL lag after a webhook write so an optimistic
- * check-in is not wiped by a stale empty poll from another serverless node.
- * Keep short so a completed check-in is not stuck on the board.
+ * Bridge multi-instance TTL lag after a webhook/realtime paint so a stale
+ * poll cannot wipe the dog (appear → disappear → reappear flicker).
  */
-export const WEBHOOK_CHECKIN_CACHE_GRACE_MS = 4_000;
+export const WEBHOOK_CHECKIN_CACHE_GRACE_MS = 10_000;
+/** Same hold for checkout rows while basket cache / other instances catch up. */
+export const WEBHOOK_CHECKOUT_CACHE_GRACE_MS = 12_000;
 
 export function clampCheckoutPollMs(intervalMs: number) {
   return Math.min(BOARD_CHECKOUT_POLL_MAX_MS, Math.max(BOARD_CHECKOUT_POLL_MIN_MS, intervalMs));
@@ -51,16 +52,33 @@ export function preserveDogPhotos(previousDogs: LiveDog[], nextDogs: LiveDog[]) 
   });
 }
 
-/** Keep a just-webhooks check-in visible while other Vercel instances still serve a stale empty cache. */
+function transitionStartedMs(dog: LiveDog) {
+  const started = dog.status_started_at ?? dog.updated_at;
+  if (!started) return null;
+  const startedMs = new Date(started).getTime();
+  return Number.isFinite(startedMs) ? startedMs : null;
+}
+
+/** Keep a just-shown check-in visible while other Vercel instances still serve a stale empty cache. */
 export function isWebhookCheckinWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
   if (dog.hidden || dog.completed_at) return false;
-  if (dog.display_status !== "checking_in" || dog.current_status !== "checking_in") return false;
+  if (dog.display_status !== "checking_in") return false;
+  if (dog.current_status && dog.current_status !== "checking_in") return false;
   if (dog.raw_payload?.source === "gingr_back_of_house") return false;
   if (shouldExpireCheckinDog(dog, new Date(nowMs))) return false;
-  const started = dog.status_started_at ?? dog.updated_at;
-  if (!started) return false;
-  const startedMs = new Date(started).getTime();
-  return Number.isFinite(startedMs) && nowMs - startedMs <= WEBHOOK_CHECKIN_CACHE_GRACE_MS;
+  const startedMs = transitionStartedMs(dog);
+  return startedMs != null && nowMs - startedMs <= WEBHOOK_CHECKIN_CACHE_GRACE_MS;
+}
+
+/** Keep a just-shown checkout visible while basket cache / poll lag catches up. */
+export function isWebhookCheckoutWithinCacheGrace(dog: LiveDog, nowMs = Date.now()) {
+  if (dog.hidden || dog.completed_at) return false;
+  if (dog.display_status !== "checking_out") return false;
+  if (dog.current_status && dog.current_status !== "checking_out") return false;
+  // Gingr basket rows are authoritative — do not hold them after the basket drops them.
+  if (dog.raw_payload?.source === "gingr_back_of_house") return false;
+  const startedMs = transitionStartedMs(dog);
+  return startedMs != null && nowMs - startedMs <= WEBHOOK_CHECKOUT_CACHE_GRACE_MS;
 }
 
 export function mergeCheckinListsForDisplay(
@@ -72,9 +90,38 @@ export function mergeCheckinListsForDisplay(
   return preserveDogPhotos(previousCheckins, mergeCheckoutDogs(serverCheckins, graceRows));
 }
 
+export function mergeCheckoutListsForDisplay(
+  serverCheckouts: LiveDog[],
+  previousCheckouts: LiveDog[],
+  options: { basketConfirmedEmpty?: boolean; nowMs?: number } = {}
+) {
+  const nowMs = options.nowMs ?? Date.now();
+  const graceRows = previousCheckouts.filter((dog) => isWebhookCheckoutWithinCacheGrace(dog, nowMs));
+
+  // Confirmed-empty basket: drop everyone except brand-new webhook prompts still in add-grace.
+  if (options.basketConfirmedEmpty) {
+    const hold = previousCheckouts.filter((dog) => isWebhookCheckoutWithinAddGrace(dog, nowMs));
+    return preserveDogPhotos(previousCheckouts, mergeCheckoutDogs(serverCheckouts, hold));
+  }
+
+  return preserveDogPhotos(previousCheckouts, mergeCheckoutDogs(serverCheckouts, graceRows));
+}
+
 export function mergeBoardResponse(previous: LiveBoardResponse, next: LiveBoardResponse): LiveBoardResponse {
+  // Soft/stale empty payloads must not wipe dogs that realtime just painted.
+  if (
+    next.stale &&
+    !next.checking_in.length &&
+    !next.checking_out.length &&
+    (previous.checking_in.length > 0 || previous.checking_out.length > 0)
+  ) {
+    return previous;
+  }
+
   const checkingIn = mergeCheckinListsForDisplay(next.checking_in, previous.checking_in);
-  const checkingOut = preserveDogPhotos(previous.checking_out, next.checking_out);
+  const checkingOut = mergeCheckoutListsForDisplay(next.checking_out, previous.checking_out, {
+    basketConfirmedEmpty: Boolean(next.basket_filtered && !next.checking_out.length)
+  });
 
   if (
     areCheckoutListsEquivalent(previous.checking_in, checkingIn) &&

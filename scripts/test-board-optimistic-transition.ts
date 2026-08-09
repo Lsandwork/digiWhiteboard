@@ -3,7 +3,8 @@ import {
   BOARD_CHECKOUT_POLL_MS,
   includePromptedCheckoutInBoard,
   mergeBoardResponse,
-  mergeCheckinListsForDisplay
+  mergeCheckinListsForDisplay,
+  mergeCheckoutListsForDisplay
 } from "../lib/board-checkout-merge";
 import { applyOptimisticLiveBoardTransition } from "../lib/board-optimistic-transition";
 import type { LiveBoardResponse, LiveDog } from "../lib/types";
@@ -105,8 +106,8 @@ assert.equal(preserved.length, 1);
 assert.equal(preserved[0]?.animal_name, "Atlas");
 
 const staleCheckin = dog({
-  status_started_at: new Date(recentMs - 5_000).toISOString(),
-  updated_at: new Date(recentMs - 5_000).toISOString(),
+  status_started_at: new Date(recentMs - 11_000).toISOString(),
+  updated_at: new Date(recentMs - 11_000).toISOString(),
   display_until: new Date(recentMs + 3 * 60_000).toISOString()
 });
 assert.equal(mergeCheckinListsForDisplay([], [staleCheckin], recentMs).length, 0);
@@ -128,5 +129,29 @@ const mergedBoard = mergeBoardResponse(
   { ...emptyBoard, last_updated: new Date(recentMs).toISOString() }
 );
 assert.equal(mergedBoard.checking_in.length, 1);
+
+// Basket-filtered empty poll must not wipe a just-prompted webhook checkout (flicker).
+const heldCheckout = mergeCheckoutListsForDisplay([], [webhookCheckout], {
+  basketConfirmedEmpty: false,
+  nowMs: recentMs
+});
+assert.equal(heldCheckout.length, 1);
+assert.equal(heldCheckout[0]?.animal_name, "Atlas");
+
+const staleEmptyBoard = mergeBoardResponse(
+  {
+    ...emptyBoard,
+    checking_in: [recentCheckin],
+    checking_out: [webhookCheckout],
+    counts: { checking_in: 1, checking_out: 1, total: 2 }
+  },
+  {
+    ...emptyBoard,
+    stale: true,
+    last_updated: new Date(recentMs).toISOString()
+  }
+);
+assert.equal(staleEmptyBoard.checking_in.length, 1);
+assert.equal(staleEmptyBoard.checking_out.length, 1);
 
 console.log("board optimistic transition tests passed");

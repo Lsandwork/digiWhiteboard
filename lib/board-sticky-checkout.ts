@@ -1,4 +1,4 @@
-import { sortCheckoutDogs } from "@/lib/board-checkout-merge";
+import { isWebhookCheckoutWithinCacheGrace, sortCheckoutDogs } from "@/lib/board-checkout-merge";
 import { getCheckoutDisplayMs, getCheckoutDisplayUntilAt, shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import type { LiveDog } from "@/lib/types";
 
@@ -89,15 +89,20 @@ export function mergeStickyCheckoutDogs(
     }
   }
 
+  const nowMs = now.getTime();
   if (incoming.length > 0 && basketAuthoritative && pruneMissingFromBasket) {
     const incomingKeys = new Set(incoming.map((dog) => getCheckoutMergeKey(dog)));
-    for (const key of next.keys()) {
-      if (!incomingKeys.has(key)) {
-        next.delete(key);
-      }
+    for (const [key, entry] of next) {
+      if (incomingKeys.has(key)) continue;
+      // Keep freshly prompted webhook dogs while the Gingr basket cache catches up.
+      if (isWebhookCheckoutWithinCacheGrace(entry.dog, nowMs)) continue;
+      next.delete(key);
     }
   } else if (incoming.length === 0 && basketAuthoritative && basketConfirmedEmpty) {
-    next.clear();
+    for (const [key, entry] of next) {
+      if (isWebhookCheckoutWithinCacheGrace(entry.dog, nowMs)) continue;
+      next.delete(key);
+    }
   }
 
   for (const dog of incoming) {
