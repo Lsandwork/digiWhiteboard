@@ -19,6 +19,7 @@ import { TextScaleControls } from "@/components/admin/TextScaleControls";
 import { FitdogDashboardIcon } from "@/components/admin/ui/FitdogDashboardIcon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { NotificationBell } from "@/components/admin/NotificationBell";
+import { AdminBoardSubnav } from "@/components/admin/mobile/AdminBoardSubnav";
 import { AdminMobileTabBar } from "@/components/admin/mobile/AdminMobileTabBar";
 import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
@@ -278,6 +279,8 @@ export function AdminShell({
               </div>
             </div>
           </header>
+
+          <AdminBoardSubnav activeTab={tab} visibleTabs={visibleTabs} onTabChange={handleTabChange} />
 
           <div className={`admin-content-grid ${showPreview ? "" : "admin-content-grid--single"}`}>
             <div className="admin-content-main crossover-dashboard min-w-0 space-y-5">{children}</div>

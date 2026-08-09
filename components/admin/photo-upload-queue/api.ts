@@ -143,11 +143,15 @@ export async function updatePhotoBatch(
 export async function uploadPhotoFiles(
   batchId: string,
   files: File[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: { fastLibrary?: boolean }
 ): Promise<PhotoUploadFileResult[]> {
   const form = new FormData();
   for (const file of files) {
     form.append("files", file);
+  }
+  if (options?.fastLibrary !== false) {
+    form.append("fast_library", "1");
   }
   const response = await fetch(`/api/admin/photo-upload-queue/${batchId}/upload`, {
     method: "POST",

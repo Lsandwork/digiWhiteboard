@@ -37,6 +37,9 @@ export function BulkPhotoLibrary() {
   const pendingRef = useRef<PendingUpload[]>([]);
   const uploadQueueRunning = useRef(false);
   const batchIdRef = useRef<string | null>(null);
+  /** Parallel upload workers — phones stay responsive while 50–100 photos stream. */
+  const UPLOAD_CONCURRENCY = 4;
+  const UPLOAD_BATCH_SIZE = 6;
 
   const items = batch?.items ?? [];
   const selectedItems = useMemo(
@@ -86,59 +89,124 @@ export function BulkPhotoLibrary() {
   const processUploadQueue = useCallback(async () => {
     if (uploadQueueRunning.current) return;
     uploadQueueRunning.current = true;
+    let uploadedSinceRefresh = 0;
     try {
-      while (true) {
-        const next = pendingRef.current.find((item) => item.status === "queued");
-        if (!next || !batchIdRef.current) break;
-
+      const claimQueuedBatch = () => {
+        const claimed: PendingUpload[] = [];
         const abort = new AbortController();
-        setPendingUploads((prev) =>
-          prev.map((item) =>
-            item.id === next.id ? { ...item, status: "uploading", progress: 20, abort } : item
-          )
-        );
-
-        try {
-          const results = await uploadPhotoFiles(batchIdRef.current, [next.file], abort.signal);
-          const fileResult = results[0];
-          if (!fileResult?.ok) throw new Error(fileResult?.error || "Upload failed.");
-
+        pendingRef.current = pendingRef.current.map((item) => {
+          if (item.status !== "queued" || claimed.length >= UPLOAD_BATCH_SIZE) return item;
+          const next = { ...item, status: "uploading" as const, progress: 35, abort };
+          claimed.push(next);
+          return next;
+        });
+        if (claimed.length) {
+          const ids = new Set(claimed.map((item) => item.id));
           setPendingUploads((prev) =>
-            prev.map((item) =>
-              item.id === next.id ? { ...item, status: "done", progress: 100, error: undefined, abort: undefined } : item
-            )
+            prev.map((item) => (ids.has(item.id) ? { ...item, status: "uploading", progress: 35, abort } : item))
           );
-          const detail = await getPhotoBatch(batchIdRef.current);
-          setBatch(detail.batch);
-        } catch (error) {
-          if (abort.signal.aborted) {
-            setPendingUploads((prev) =>
-              prev.map((item) =>
-                item.id === next.id ? { ...item, status: "cancelled", error: "Cancelled", progress: 0, abort: undefined } : item
-              )
+        }
+        return { claimed, abort };
+      };
+
+      const runWorker = async () => {
+        while (batchIdRef.current) {
+          const { claimed: batchItems, abort } = claimQueuedBatch();
+          if (!batchItems.length) return;
+
+          const ids = new Set(batchItems.map((item) => item.id));
+
+          try {
+            const results = await uploadPhotoFiles(
+              batchIdRef.current,
+              batchItems.map((item) => item.file),
+              abort.signal,
+              { fastLibrary: true }
             );
-          } else {
+            const byName = new Map(results.map((row) => [row.fileName, row]));
+            const newItems: PhotoUploadItem[] = [];
+            setPendingUploads((prev) =>
+              prev.map((item) => {
+                if (!ids.has(item.id)) return item;
+                const result =
+                  byName.get(item.file.name) ||
+                  results.find((row) => row.fileName === item.file.name);
+                if (result?.ok && result.item) {
+                  newItems.push(result.item as PhotoUploadItem);
+                  return { ...item, status: "done" as const, progress: 100, error: undefined, abort: undefined };
+                }
+                return {
+                  ...item,
+                  status: "error" as const,
+                  error: result?.error || "Upload failed.",
+                  progress: 0,
+                  abort: undefined
+                };
+              })
+            );
+            if (newItems.length) {
+              setBatch((prev) => {
+                if (!prev) return prev;
+                const existing = new Set((prev.items || []).map((row) => row.id));
+                const merged = [...newItems.filter((row) => !existing.has(row.id)), ...(prev.items || [])];
+                return { ...prev, items: merged };
+              });
+              uploadedSinceRefresh += newItems.length;
+            }
+            // Full refresh only periodically — not after every photo.
+            if (uploadedSinceRefresh >= 24 && batchIdRef.current) {
+              uploadedSinceRefresh = 0;
+              const detail = await getPhotoBatch(batchIdRef.current);
+              setBatch(detail.batch);
+            }
+          } catch (error) {
             const message = error instanceof Error ? error.message : "Upload failed.";
             setPendingUploads((prev) =>
-              prev.map((item) =>
-                item.id === next.id ? { ...item, status: "error", error: message, progress: 0, abort: undefined } : item
-              )
+              prev.map((item) => {
+                if (!ids.has(item.id)) return item;
+                if (abort.signal.aborted) {
+                  return { ...item, status: "cancelled", error: "Cancelled", progress: 0, abort: undefined };
+                }
+                return { ...item, status: "error", error: message, progress: 0, abort: undefined };
+              })
             );
           }
         }
+      };
+
+      await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, () => runWorker()));
+
+      if (batchIdRef.current) {
+        const detail = await getPhotoBatch(batchIdRef.current);
+        setBatch(detail.batch);
       }
+      // Drop finished pending previews to free mobile memory.
+      setPendingUploads((prev) => {
+        for (const item of prev) {
+          if ((item.status === "done" || item.status === "cancelled") && item.previewUrl) {
+            URL.revokeObjectURL(item.previewUrl);
+          }
+        }
+        return prev.filter((item) => item.status === "queued" || item.status === "uploading" || item.status === "error");
+      });
     } finally {
       uploadQueueRunning.current = false;
+      // If more files were queued while workers finished, drain again.
+      if (pendingRef.current.some((item) => item.status === "queued")) {
+        window.setTimeout(() => void processUploadQueue(), 0);
+      }
     }
   }, []);
 
   function queueFiles(files: File[]) {
     if (!files.length) return;
-    const next: PendingUpload[] = files.map((file) => ({
+    // Limit live object-URL previews on big mobile batches to avoid memory thrash.
+    const previewBudget = files.length > 24 ? 0 : 12;
+    const next: PendingUpload[] = files.map((file, index) => ({
       id: makePendingId(),
       file,
-      previewUrl: URL.createObjectURL(file),
-      status: "queued",
+      previewUrl: index < previewBudget ? URL.createObjectURL(file) : "",
+      status: "queued" as const,
       progress: 0
     }));
     setPendingUploads((prev) => [...next, ...prev]);
@@ -219,10 +287,10 @@ export function BulkPhotoLibrary() {
         <div>
           <h2 className="admin-page-title">Bulk Photo Upload</h2>
           <p className="admin-page-subtitle mt-1 max-w-2xl">
-            Upload photos in bulk and store them securely in Digi-Board.{" "}
+            Fast bulk upload (50–100+ photos). Original quality is preserved — we only compress thumbnails.{" "}
             {canDownload
-              ? "You can view and download photos one by one or as a ZIP."
-              : "You can upload and view photos. Downloads are limited to Team Leads, Front Desk Coordinators, Admins, Management, and Super Admins."}
+              ? "Download one-by-one or ZIP when ready."
+              : "Uploads & viewing for all staff; downloads require Team Lead / Admin access."}
           </p>
         </div>
         <button type="button" className="admin-btn-secondary min-h-11" onClick={() => void refresh()} disabled={loading}>

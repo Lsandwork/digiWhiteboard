@@ -9,11 +9,27 @@ import {
 import { PHOTO_UPLOAD_MAX_BYTES } from "@/lib/photo-upload-queue/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 type RouteContext = { params: Promise<{ batchId: string }> };
 
-const MAX_FILES = 40;
+const MAX_FILES = 100;
+const SERVER_CONCURRENCY = 4;
+
+async function mapPool<T, R>(items: T[], concurrency: number, worker: (item: T, index: number) => Promise<R>) {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function run() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await worker(items[index]!, index);
+    }
+  }
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, () => run());
+  await Promise.all(runners);
+  return results;
+}
 
 export async function POST(request: Request, context: RouteContext) {
   const blocked = demoWriteGuard(request);
@@ -44,16 +60,10 @@ export async function POST(request: Request, context: RouteContext) {
     const category = form.get("category") != null ? String(form.get("category")) : null;
     const photographer =
       form.get("photographer_name") != null ? String(form.get("photographer_name")) : null;
+    // Library uploads skip gingr-ready for speed; export path can generate later if null.
+    const fastLibrary = form.get("fast_library") == null || String(form.get("fast_library")) !== "0";
 
-    const results: Array<{
-      fileName: string;
-      ok: boolean;
-      item?: unknown;
-      duplicate?: unknown;
-      error?: string;
-    }> = [];
-
-    for (const file of files) {
+    const results = await mapPool(files, SERVER_CONCURRENCY, async (file) => {
       try {
         if (file.size > PHOTO_UPLOAD_MAX_BYTES) {
           throw new Error("Each photo must be 25MB or smaller.");
@@ -63,7 +73,8 @@ export async function POST(request: Request, context: RouteContext) {
           supabase: auth.supabase,
           batchId,
           fileName: file.name,
-          processed
+          processed,
+          skipGingrReady: fastLibrary
         });
         const { item, duplicate } = await addPhotoItem(
           auth.supabase,
@@ -77,15 +88,15 @@ export async function POST(request: Request, context: RouteContext) {
           },
           auth.actor
         );
-        results.push({ fileName: file.name, ok: true, item, duplicate });
+        return { fileName: file.name, ok: true as const, item, duplicate };
       } catch (error) {
-        results.push({
+        return {
           fileName: file.name,
-          ok: false,
+          ok: false as const,
           error: error instanceof Error ? error.message : "Upload failed."
-        });
+        };
       }
-    }
+    });
 
     const okCount = results.filter((r) => r.ok).length;
     return NextResponse.json({

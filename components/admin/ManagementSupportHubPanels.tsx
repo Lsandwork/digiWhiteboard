@@ -243,8 +243,32 @@ function SupportTable({
 }) {
   const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, SUPPORT_SORT_ACCESSORS, "date", "desc");
   return (
-    <div className="overflow-x-auto">
-      <table className="crossover-table w-full min-w-[1100px]">
+    <>
+      <div className="admin-mobile-card-list md:hidden">
+        {sortedRows.map((row) => (
+          <article key={row.id} className="crossover-mobile-card">
+            <div className="crossover-mobile-card__head">
+              <p className="crossover-mobile-card__title">{row.subject}</p>
+              <span className={priorityBadgeClass(row.priority)}>{row.priority}</span>
+            </div>
+            <p className="crossover-mobile-card__meta">
+              {row.submitted_by}
+              {showSource ? ` · ${sourceLabel(row.report_type)}` : ""} · {formatDateTime(row.date_submitted)}
+            </p>
+            <p className="crossover-mobile-card__preview">{htmlToPlainText(row.details_preview ?? "")}</p>
+            <p className="crossover-mobile-card__meta">
+              <span className={statusBadgeClass(row.status)}>{row.status}</span> · {row.assigned_to ?? "Unassigned"}
+            </p>
+            <div className="crossover-mobile-card__footer">
+              <button type="button" className="admin-btn-primary min-h-11 w-full" onClick={() => onView(row)}>
+                <Eye className="h-4 w-4" /> View
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="overflow-x-auto hidden md:block">
+      <table className="crossover-table w-full">
         <thead>
           <tr>
             <SortableTh label="Date" column="date" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
@@ -282,6 +306,7 @@ function SupportTable({
       </table>
       {!rows.length ? <p className="mt-4 text-sm text-admin-muted">No items match the current filters.</p> : null}
     </div>
+    </>
   );
 }
 

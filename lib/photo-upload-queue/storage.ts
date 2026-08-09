@@ -50,7 +50,8 @@ export async function uploadPhotoBuffer(
   supabase: SupabaseClient,
   path: string,
   buffer: Buffer,
-  contentType: string
+  contentType: string,
+  options?: { skipIntegrityCheck?: boolean }
 ) {
   // Use Blob + a fresh Uint8Array so Vercel/undici never UTF-8–stringifies Node Buffers
   // (that corruption turns JPEG SOI FF D8 FF into EF BF BD and breaks Preview/Safari).
@@ -62,21 +63,25 @@ export async function uploadPhotoBuffer(
   });
   if (error) throw new Error(error.message || "Unable to upload photo to storage.");
 
-  const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-  const fileName = path.includes("/") ? path.slice(path.lastIndexOf("/") + 1) : path;
-  const { data: listed, error: listError } = await supabase.storage
-    .from(PHOTO_UPLOAD_BUCKET)
-    .list(folder || undefined, { search: fileName, limit: 5 });
-  if (!listError) {
-    const match = (listed ?? []).find((row) => row.name === fileName);
-    const storedSize = Number(
-      (match?.metadata as { size?: number } | null | undefined)?.size ?? 0
-    );
-    if (storedSize > 0 && storedSize !== bytes.byteLength) {
-      await supabase.storage.from(PHOTO_UPLOAD_BUCKET).remove([path]);
-      throw new Error(
-        "Photo storage integrity check failed (file was corrupted during upload). Please try again."
+  // Integrity list round-trip is expensive on mobile bulk uploads (50–100 photos).
+  // Skip by default for speed; callers can opt in for critical paths.
+  if (!options?.skipIntegrityCheck) {
+    const folder = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+    const fileName = path.includes("/") ? path.slice(path.lastIndexOf("/") + 1) : path;
+    const { data: listed, error: listError } = await supabase.storage
+      .from(PHOTO_UPLOAD_BUCKET)
+      .list(folder || undefined, { search: fileName, limit: 5 });
+    if (!listError) {
+      const match = (listed ?? []).find((row) => row.name === fileName);
+      const storedSize = Number(
+        (match?.metadata as { size?: number } | null | undefined)?.size ?? 0
       );
+      if (storedSize > 0 && storedSize !== bytes.byteLength) {
+        await supabase.storage.from(PHOTO_UPLOAD_BUCKET).remove([path]);
+        throw new Error(
+          "Photo storage integrity check failed (file was corrupted during upload). Please try again."
+        );
+      }
     }
   }
 

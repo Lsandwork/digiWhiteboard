@@ -675,8 +675,8 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </div>
           ) : null}
 
-          <div className="admin-ledger-table-wrap">
-            <table className={`min-w-[1800px] w-full border-collapse text-left ${isTrainer ? "admin-ledger-table--compact" : ""}`}>
+          <div className="admin-ledger-table-wrap overflow-x-auto">
+            <table className={`w-full border-collapse text-left md:min-w-[1100px] ${isTrainer ? "admin-ledger-table--compact" : ""}`}>
               <thead className="admin-ledger-table-head">
                 <tr className={`border-b border-[var(--border)] uppercase tracking-wide text-admin-muted ${ledgerHeadText}`}>
                   {canManage ? (
@@ -1779,7 +1779,7 @@ function ReportsTab({
 
           <div className="overflow-auto rounded-xl border border-[var(--border)]">
             <h4 className="border-b border-[var(--border)] px-4 py-3 text-sm font-bold admin-text-emphasis">Detail lines</h4>
-            <table className="min-w-[1200px] w-full text-sm">
+            <table className="w-full text-sm md:min-w-[900px]">
               <thead>
                 <tr className="border-b border-[var(--border)] text-left text-admin-muted">
                   <th className="px-3 py-2">Trainer</th>

@@ -19,6 +19,8 @@ export type ProcessedPhotoUpload = {
   height: number | null;
   sha256: string;
   convertedFromHeic: boolean;
+  /** True when original bytes were stored without lossy re-encode */
+  preservedOriginal: boolean;
 };
 
 function isHeic(mime: string, fileName: string) {
@@ -27,6 +29,22 @@ function isHeic(mime: string, fileName: string) {
   return lower.includes("heic") || lower.includes("heif") || ext === "heic" || ext === "heif";
 }
 
+function extensionForFormat(format: string | undefined, fileName: string): { mime: string; ext: string } {
+  const fileExt = (fileName.split(".").pop() || "").toLowerCase();
+  if (format === "jpeg" || format === "jpg" || fileExt === "jpg" || fileExt === "jpeg") {
+    return { mime: "image/jpeg", ext: "jpg" };
+  }
+  if (format === "png" || fileExt === "png") return { mime: "image/png", ext: "png" };
+  if (format === "webp" || fileExt === "webp") return { mime: "image/webp", ext: "webp" };
+  return { mime: "image/jpeg", ext: "jpg" };
+}
+
+/**
+ * Process an uploaded photo:
+ * - Preserve original bytes for JPEG/PNG/WEBP (no quality loss)
+ * - Convert HEIC/HEIF → high-quality JPEG only when required
+ * - Thumbnails + gingr-ready are derived copies (compressed for speed/size)
+ */
 export async function processUploadedPhoto(file: {
   name: string;
   type: string;
@@ -36,56 +54,80 @@ export async function processUploadedPhoto(file: {
   validatePhotoUploadFile(file);
   const input = Buffer.from(await file.arrayBuffer());
   const heic = isHeic(file.type, file.name);
-  let convertedFromHeic = false;
-  let pipeline = sharp(input, { failOn: "none" }).rotate();
 
+  let meta: { format?: string; width?: number; height?: number } = {};
   try {
-    const meta = await pipeline.metadata();
-    if (heic || meta.format === "heif") {
-      convertedFromHeic = true;
-    }
+    meta = await sharp(input, { failOn: "none" }).rotate().metadata();
   } catch {
-    // continue; sharp may still convert
+    meta = {};
   }
 
-  let working: Buffer;
-  let mimeType = "image/jpeg";
-  let extension = "jpg";
+  const needsHeicConvert = heic || meta.format === "heif";
+  let originalBuffer: Buffer;
+  let mimeType: string;
+  let extension: string;
+  let convertedFromHeic = false;
+  let preservedOriginal = false;
 
-  try {
-    working = await sharp(input, { failOn: "none" }).rotate().jpeg({ quality: 92, mozjpeg: true }).toBuffer();
-    if (heic) convertedFromHeic = true;
-  } catch (error) {
-    if (heic) {
+  if (needsHeicConvert) {
+    try {
+      // Highest practical JPEG quality for HEIC sources — phones require conversion.
+      originalBuffer = await sharp(input, { failOn: "none" })
+        .rotate()
+        .jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: "4:4:4" })
+        .toBuffer();
+      convertedFromHeic = true;
+      mimeType = "image/jpeg";
+      extension = "jpg";
+    } catch {
       throw new Error(
-        "HEIC conversion failed on the server. Please export the photo as JPG from your phone/computer and try again."
+        "HEIC conversion failed on the server. Please export the photo as JPG from your phone and try again."
       );
     }
-    throw error instanceof Error ? error : new Error("Unable to process image.");
+  } else if (meta.format === "jpeg" || meta.format === "png" || meta.format === "webp") {
+    // Keep original bytes — do not re-encode (prevents quality distortion).
+    originalBuffer = input;
+    const mapped = extensionForFormat(meta.format, file.name);
+    mimeType = mapped.mime;
+    extension = mapped.ext;
+    preservedOriginal = true;
+  } else {
+    // Unknown / exotic formats → high-quality JPEG once.
+    originalBuffer = await sharp(input, { failOn: "none" })
+      .rotate()
+      .jpeg({ quality: 95, mozjpeg: true, chromaSubsampling: "4:4:4" })
+      .toBuffer();
+    mimeType = "image/jpeg";
+    extension = "jpg";
   }
 
-  const image = sharp(working, { failOn: "none" });
-  const metadata = await image.metadata();
-  const thumbnailBuffer = await sharp(working)
-    .resize(480, 480, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 80 })
-    .toBuffer();
-
-  const gingrReadyBuffer = await sharp(working)
-    .resize(2400, 2400, { fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 90, mozjpeg: true })
-    .toBuffer();
+  // Derive previews from a normalized oriented pipeline without mutating stored original when preserved.
+  const oriented = sharp(input, { failOn: "none" }).rotate();
+  const [thumbnailBuffer, gingrReadyBuffer, orientedMeta] = await Promise.all([
+    oriented
+      .clone()
+      .resize(480, 480, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 78 })
+      .toBuffer(),
+    oriented
+      .clone()
+      .resize(2400, 2400, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 90, mozjpeg: true })
+      .toBuffer(),
+    oriented.metadata()
+  ]);
 
   return {
-    originalBuffer: working,
+    originalBuffer,
     thumbnailBuffer,
     gingrReadyBuffer,
     mimeType,
     extension,
-    width: metadata.width ?? null,
-    height: metadata.height ?? null,
-    sha256: sha256Hex(working),
-    convertedFromHeic
+    width: orientedMeta.width ?? meta.width ?? null,
+    height: orientedMeta.height ?? meta.height ?? null,
+    sha256: sha256Hex(originalBuffer),
+    convertedFromHeic,
+    preservedOriginal
   };
 }
 
@@ -94,6 +136,8 @@ export async function storeProcessedPhoto(options: {
   batchId: string;
   fileName: string;
   processed: ProcessedPhotoUpload;
+  /** Skip gingr-ready storage for faster library uploads (generated on export if missing). */
+  skipGingrReady?: boolean;
 }) {
   const originalPath = buildPhotoStoragePath({
     batchId: options.batchId,
@@ -107,16 +151,35 @@ export async function storeProcessedPhoto(options: {
     fileName: options.fileName,
     ext: "jpg"
   });
-  const gingrPath = buildPhotoStoragePath({
-    batchId: options.batchId,
-    kind: "gingr-ready",
-    fileName: options.fileName,
-    ext: "jpg"
-  });
+  const gingrPath = options.skipGingrReady
+    ? null
+    : buildPhotoStoragePath({
+        batchId: options.batchId,
+        kind: "gingr-ready",
+        fileName: options.fileName,
+        ext: "jpg"
+      });
 
-  await uploadPhotoBuffer(options.supabase, originalPath, options.processed.originalBuffer, options.processed.mimeType);
-  await uploadPhotoBuffer(options.supabase, thumbPath, options.processed.thumbnailBuffer, "image/jpeg");
-  await uploadPhotoBuffer(options.supabase, gingrPath, options.processed.gingrReadyBuffer, "image/jpeg");
+  const uploads = [
+    uploadPhotoBuffer(
+      options.supabase,
+      originalPath,
+      options.processed.originalBuffer,
+      options.processed.mimeType,
+      { skipIntegrityCheck: true }
+    ),
+    uploadPhotoBuffer(options.supabase, thumbPath, options.processed.thumbnailBuffer, "image/jpeg", {
+      skipIntegrityCheck: true
+    })
+  ];
+  if (gingrPath) {
+    uploads.push(
+      uploadPhotoBuffer(options.supabase, gingrPath, options.processed.gingrReadyBuffer, "image/jpeg", {
+        skipIntegrityCheck: true
+      })
+    );
+  }
+  await Promise.all(uploads);
 
   return {
     original_storage_path: originalPath,

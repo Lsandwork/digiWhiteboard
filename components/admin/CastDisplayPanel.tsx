@@ -196,45 +196,69 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
             {loading ? "Loading display devices…" : "No cast displays have checked in yet. Open the cast display URL on a TV or casting computer."}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="text-xs uppercase tracking-wide text-admin-muted">
-                <tr>
-                  <th className="px-3 py-2">Device</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Last seen</th>
-                  <th className="px-3 py-2">Last data</th>
-                  <th className="px-3 py-2">Wake lock</th>
-                </tr>
-              </thead>
-              <tbody>
-                {devices.map((device) => {
-                  const online = isDisplayDeviceOnline(device.last_seen_at);
-                  return (
-                    <tr key={device.id} className="border-t border-admin-border/70">
-                      <td className="px-3 py-3">
-                        <div className="flex items-center gap-2">
-                          <MonitorPlay className="h-4 w-4 text-fitdog-orange" />
-                          <div>
-                            <p className="font-semibold admin-text-emphasis">{device.name ?? "Cast display"}</p>
-                            <p className="text-xs text-admin-muted">{device.current_route ?? "—"}</p>
+          <>
+            <div className="admin-mobile-card-list md:hidden">
+              {devices.map((device) => {
+                const online = isDisplayDeviceOnline(device.last_seen_at);
+                return (
+                  <article key={device.id} className="crossover-mobile-card">
+                    <div className="crossover-mobile-card__head">
+                      <p className="crossover-mobile-card__title flex items-center gap-2">
+                        <MonitorPlay className="h-4 w-4 text-fitdog-orange" />
+                        {device.name ?? "Cast display"}
+                      </p>
+                      <span className={`admin-badge ${online ? "admin-badge--green" : "admin-badge--amber"}`}>
+                        {online ? "Online" : "Offline"}
+                      </span>
+                    </div>
+                    <p className="crossover-mobile-card__meta">{device.current_route ?? "—"}</p>
+                    <p className="crossover-mobile-card__meta">Seen {formatSeen(device.last_seen_at)}</p>
+                    <p className="crossover-mobile-card__meta">Data {formatSeen(device.last_data_at)}</p>
+                    <p className="crossover-mobile-card__meta">Wake lock {device.wake_lock_status ?? "—"}</p>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="overflow-x-auto hidden md:block">
+              <table className="min-w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-admin-muted">
+                  <tr>
+                    <th className="px-3 py-2">Device</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Last seen</th>
+                    <th className="px-3 py-2">Last data</th>
+                    <th className="px-3 py-2">Wake lock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.map((device) => {
+                    const online = isDisplayDeviceOnline(device.last_seen_at);
+                    return (
+                      <tr key={device.id} className="border-t border-admin-border/70">
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <MonitorPlay className="h-4 w-4 text-fitdog-orange" />
+                            <div>
+                              <p className="font-semibold admin-text-emphasis">{device.name ?? "Cast display"}</p>
+                              <p className="text-xs text-admin-muted">{device.current_route ?? "—"}</p>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className={`admin-badge ${online ? "admin-badge--green" : "admin-badge--amber"}`}>
-                          {online ? "Online" : "Offline"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-admin-muted">{formatSeen(device.last_seen_at)}</td>
-                      <td className="px-3 py-3 text-admin-muted">{formatSeen(device.last_data_at)}</td>
-                      <td className="px-3 py-3 text-admin-muted">{device.wake_lock_status ?? "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <span className={`admin-badge ${online ? "admin-badge--green" : "admin-badge--amber"}`}>
+                            {online ? "Online" : "Offline"}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-admin-muted">{formatSeen(device.last_seen_at)}</td>
+                        <td className="px-3 py-3 text-admin-muted">{formatSeen(device.last_data_at)}</td>
+                        <td className="px-3 py-3 text-admin-muted">{device.wake_lock_status ?? "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </div>

@@ -599,7 +599,60 @@ export function PushNoticesPanel() {
             <p className="crossover-card__subtitle">Push previous notices again, or edit and delete custom notices.</p>
           </div>
         </div>
-        <div className="crossover-table-wrap">
+        {/* Phone: stacked cards — no sideways scroll */}
+        <div className="admin-mobile-card-list md:hidden">
+          {history.length ? (
+            history.map((notice) => (
+              <article key={notice.id} className="crossover-mobile-card">
+                <div className="crossover-mobile-card__head">
+                  <p className="crossover-mobile-card__title">{noticeHistoryTitle(notice)}</p>
+                  <PriorityBadge priority={notice.priority} />
+                </div>
+                <p className="crossover-mobile-card__meta">
+                  {noticeStatus(notice)} · {notice.created_by ?? "admin"}
+                </p>
+                <p className="crossover-mobile-card__meta">{formatDateTime(notice.created_at)}</p>
+                <p className="crossover-mobile-card__preview">{scheduleLabel(notice)}</p>
+                <div className="crossover-mobile-card__footer">
+                  <button
+                    type="button"
+                    className="admin-btn-secondary min-h-11 flex-1"
+                    disabled={busy || !canManage}
+                    onClick={() => void pushAgain(notice)}
+                  >
+                    <RotateCcw className="h-4 w-4" /> Push again
+                  </button>
+                  {!notice.is_default ? (
+                    <>
+                      <button
+                        type="button"
+                        className="admin-btn-secondary min-h-11"
+                        disabled={busy || !canManage}
+                        aria-label={`Edit ${notice.title}`}
+                        onClick={() => setEditingNotice(notice)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn-secondary min-h-11"
+                        disabled={busy || !canManage}
+                        aria-label={`Delete ${notice.title}`}
+                        onClick={() => setDeleteNotice(notice)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="text-sm text-admin-muted">No Push Notices have been created yet.</p>
+          )}
+        </div>
+
+        <div className="crossover-table-wrap hidden md:block">
           <table className="crossover-table">
             <thead>
               <tr>

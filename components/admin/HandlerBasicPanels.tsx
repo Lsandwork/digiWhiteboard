@@ -274,33 +274,49 @@ function HandlerEntriesTable({ entries }: { entries: CrossoverMessage[] }) {
         <span className="crossover-link-btn">{sortedRows.length} total</span>
       </div>
       {sortedRows.length ? (
-        <div className="overflow-x-auto">
-          <table className="crossover-table w-full min-w-[720px]">
-            <thead>
-              <tr>
-                <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="Type" column="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-                <SortableTh label="Logged" column="created_at" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((entry) => (
-                <tr key={entry.id}>
-                  <td>
-                    <p className="crossover-table__subject-title">{entry.subject}</p>
-                    <p className="crossover-table__subject-preview">{entry.details ?? entry.message}</p>
-                  </td>
-                  <td>{entry.log_type ?? "Daycare Note"}</td>
-                  <td>{entry.related_dog_name ?? "—"}</td>
-                  <td><span className="crossover-badge">{entry.status}</span></td>
-                  <td>{formatDateTime(entry.created_at)}</td>
+        <>
+          <div className="admin-mobile-card-list md:hidden">
+            {sortedRows.map((entry) => (
+              <article key={entry.id} className="crossover-mobile-card">
+                <div className="crossover-mobile-card__head">
+                  <p className="crossover-mobile-card__title">{entry.subject}</p>
+                  <span className="crossover-badge">{entry.status}</span>
+                </div>
+                <p className="crossover-mobile-card__preview">{entry.details ?? entry.message}</p>
+                <p className="crossover-mobile-card__meta">
+                  {entry.log_type ?? "Daycare Note"} · {entry.related_dog_name ?? "No dog"} · {formatDateTime(entry.created_at)}
+                </p>
+              </article>
+            ))}
+          </div>
+          <div className="overflow-x-auto hidden md:block">
+            <table className="crossover-table w-full">
+              <thead>
+                <tr>
+                  <SortableTh label="Subject" column="subject" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="Type" column="type" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="Dog" column="dog" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="Status" column="status" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
+                  <SortableTh label="Logged" column="created_at" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {sortedRows.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>
+                      <p className="crossover-table__subject-title">{entry.subject}</p>
+                      <p className="crossover-table__subject-preview">{entry.details ?? entry.message}</p>
+                    </td>
+                    <td>{entry.log_type ?? "Daycare Note"}</td>
+                    <td>{entry.related_dog_name ?? "—"}</td>
+                    <td><span className="crossover-badge">{entry.status}</span></td>
+                    <td>{formatDateTime(entry.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : (
         <p className="text-sm text-admin-muted">No entries yet. Use the form above to add your first handler shift entry.</p>
       )}

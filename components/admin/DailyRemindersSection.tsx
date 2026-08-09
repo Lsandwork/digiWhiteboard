@@ -227,8 +227,73 @@ export function DailyRemindersSection({ canView }: { canView: boolean }) {
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="crossover-table w-full min-w-[1100px]">
+      {/* Phone cards — no min-width sideways scroll */}
+      <div className="admin-mobile-card-list md:hidden">
+        {sortedReminders.length ? (
+          sortedReminders.map((reminder) => (
+            <article key={reminder.id} className="crossover-mobile-card">
+              <div className="crossover-mobile-card__head">
+                <p className="crossover-mobile-card__title">
+                  {formatDailyReminderTime(reminder.scheduled_time)} · {reminder.title}
+                </p>
+                <span className="crossover-badge">{statusLabels[reminder.today_status]}</span>
+              </div>
+              <p className="crossover-mobile-card__preview">{reminder.message}</p>
+              <p className="crossover-mobile-card__meta">
+                {formatDailyReminderAudience(reminder.audience)} · {formatDailyReminderShiftGroup(reminder.shift_group)} ·{" "}
+                {reminder.priority}
+              </p>
+              <p className="crossover-mobile-card__meta">
+                Next {formatDateTime(reminder.next_scheduled_send)} · Last {formatDateTime(reminder.last_sent_at)}
+              </p>
+              <div className="crossover-mobile-card__footer flex-wrap">
+                <button
+                  type="button"
+                  className={`admin-btn-secondary min-h-11 ${reminder.is_active ? "text-emerald-300" : ""}`}
+                  disabled={busy || !permissions.canEdit}
+                  onClick={() => void toggleActive(reminder)}
+                >
+                  {reminder.is_active ? <Power className="h-4 w-4" /> : <PowerOff className="h-4 w-4" />}
+                  {reminder.is_active ? "On" : "Off"}
+                </button>
+                {permissions.canEdit ? (
+                  <button
+                    type="button"
+                    className="admin-btn-secondary min-h-11"
+                    disabled={busy}
+                    onClick={() => {
+                      setEditing(reminder);
+                      setForm(reminderToForm(reminder));
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" /> Edit
+                  </button>
+                ) : null}
+                {permissions.canSendEarly ? (
+                  <button
+                    type="button"
+                    className="admin-btn-primary min-h-11 flex-1"
+                    disabled={busy || !reminder.can_send_early}
+                    onClick={() => setSendEarlyTarget(reminder)}
+                  >
+                    <Send className="h-4 w-4" />
+                    {reminder.today_status === "sent_early_today" || reminder.today_status === "sent_automatic_today"
+                      ? "Sent"
+                      : "Send early"}
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className="text-sm text-admin-muted">
+            {loading ? "Loading Daily Reminders…" : "No Daily Reminders configured yet."}
+          </p>
+        )}
+      </div>
+
+      <div className="overflow-x-auto hidden md:block">
+        <table className="crossover-table w-full">
           <thead>
             <tr>
               <th>Active</th>
