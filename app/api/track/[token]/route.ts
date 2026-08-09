@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import {
   getOwnerTrackingPublic,
   isOwnerTrackingDemoToken
@@ -17,6 +18,19 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     const startedAtMs = startedRaw && /^\d{10,16}$/.test(startedRaw) ? Number(startedRaw) : null;
     const view = await getOwnerTrackingPublic(token, { startedAtMs });
     if (!view) return NextResponse.json({ error: "Tracking link not found." }, { status: 404 });
+
+    // Jasper demo: advance Twilio SMS (start → approaching → pulling up → arrived) while the map is open.
+    if (token.trim().toLowerCase() === "jasper") {
+      after(async () => {
+        try {
+          const { maybeAdvanceJasperDemoSms } = await import("@/lib/route-generator/jasper-demo-run");
+          await maybeAdvanceJasperDemoSms();
+        } catch (error) {
+          console.error("jasper demo sms advance failed", error);
+        }
+      });
+    }
+
     return NextResponse.json(view);
   } catch (error) {
     return NextResponse.json(
