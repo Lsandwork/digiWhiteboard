@@ -638,6 +638,19 @@ export async function processOwnerEtaAlerts(): Promise<{
       }
     }
 
+    if (etaMinutes <= 2 && row.owner_phone_e164 && sms.isConfigured()) {
+      patch.status = "pulling_up";
+      const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
+      const url = `${publicSiteUrl()}/track/${row.token}`;
+      const stop = row.stop_address ? ` at ${row.stop_address}` : "";
+      await sms.send({
+        to: String(row.owner_phone_e164),
+        body: `Fitdog: driver is pulling up for ${dogs}${stop} right now. ${url}`,
+        purpose: "transactional",
+        idempotencyKey: `route-eta-pullup:${row.id}`
+      });
+    }
+
     await supabase.from("route_owner_tracking").update(patch).eq("id", row.id);
   }
 
