@@ -506,6 +506,8 @@ export async function addPhotoItem(
     category?: string | null;
     photographer_name?: string | null;
     internal_note?: string | null;
+    media_kind?: "photo" | "video";
+    duration_seconds?: number | null;
   },
   actor: PhotoQueueActor
 ) {
@@ -523,6 +525,14 @@ export async function addPhotoItem(
   const duplicate = await findDuplicateByHash(supabase, input.sha256_hash);
   // Library mode: photos are stored and viewable immediately. No Gingr/dog assignment required.
   const status: PhotoItemStatus = "ready_for_gingr";
+
+  const mime = (input.mime_type || "").toLowerCase();
+  const mediaKind =
+    input.media_kind === "video" || input.media_kind === "photo"
+      ? input.media_kind
+      : mime.startsWith("video/")
+        ? "video"
+        : "photo";
 
   const row = {
     batch_id: input.batchId,
@@ -542,7 +552,11 @@ export async function addPhotoItem(
     internal_note: input.internal_note ?? null,
     status,
     duplicate_of_item_id: duplicate?.id ?? null,
-    duplicate_override: false
+    duplicate_override: false,
+    media_kind: mediaKind,
+    duration_seconds: input.duration_seconds ?? null,
+    uploaded_by: actorId(actor),
+    uploaded_by_name: actorName(actor)
   };
 
   const { data, error } = await supabase.from("photo_upload_items").insert(row).select("*").single();

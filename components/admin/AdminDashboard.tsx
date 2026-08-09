@@ -81,6 +81,7 @@ import { isGroomerRole, isTeamLeaderRole, isTrainerRole, isMarketingRole, isFull
 import { DemoPushPanel } from "@/components/demo/DemoPushPanel";
 import { getEffectiveDemoRole } from "@/lib/demo/session";
 import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, HandlerWriteUpsPanel } from "@/components/admin/HandlerBasicPanels";
+import { MediaLibraryPanel } from "@/components/admin/media-library/MediaLibrary";
 import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 import { WalksBoardPanel } from "@/components/admin/WalksBoardPanel";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
@@ -177,7 +178,7 @@ export function AdminDashboard() {
     }
 
     if (marketingAccount && board === "staff") {
-      if (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "help") return;
+      if (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
       const fallbackBoard = accessibleAdminBoards(access, effectiveRole).includes("marketing") ? "marketing" : "lobby";
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
@@ -367,7 +368,7 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -620,7 +621,8 @@ export function AdminDashboard() {
 
         {tab === "hr_consult" ? (canAccessHrPanels ? <HrConsultPanel initialRecordId={hrConsultRecordId} /> : null) : null}
         {tab === "remote_cast" ? <RemoteCastPanel /> : null}
-        {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel /> : null}
+        {tab === "bulk_photo_upload" ? <BulkPhotoUploadPanel onOpenMediaLibrary={() => setActiveTab("media_library")} /> : null}
+        {tab === "media_library" ? <MediaLibraryPanel /> : null}
         {tab === "write_ups" ? (
           isHandlerPanel ? (
             <HandlerWriteUpsPanel />

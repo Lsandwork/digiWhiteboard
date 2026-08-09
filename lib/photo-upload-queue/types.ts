@@ -1,6 +1,8 @@
 export const PHOTO_UPLOAD_BUCKET = "photo-uploads";
 export const PHOTO_UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
 export const PHOTO_UPLOAD_SIGNED_URL_SECONDS = 60 * 60 * 4;
+/** Videos use direct-to-cloud uploads; keep generous but bounded for staff phones. */
+export const MEDIA_VIDEO_MAX_BYTES = 250 * 1024 * 1024;
 
 export const PHOTO_UPLOAD_ALLOWED_MIME = new Set([
   "image/jpeg",
@@ -9,6 +11,12 @@ export const PHOTO_UPLOAD_ALLOWED_MIME = new Set([
   "image/heic",
   "image/heif",
   "image/webp"
+]);
+
+export const MEDIA_VIDEO_ALLOWED_MIME = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime"
 ]);
 
 export type PhotoBatchStatus =
@@ -57,6 +65,8 @@ export type PhotoUploadDogAssignment = {
   created_at: string;
 };
 
+export type MediaKind = "photo" | "video";
+
 export type PhotoUploadItem = {
   id: string;
   batch_id: string;
@@ -83,6 +93,10 @@ export type PhotoUploadItem = {
   updated_at: string;
   uploaded_to_gingr_at: string | null;
   uploaded_to_gingr_by: string | null;
+  media_kind?: MediaKind;
+  duration_seconds?: number | null;
+  uploaded_by?: string | null;
+  uploaded_by_name?: string | null;
   thumbnail_url?: string | null;
   original_url?: string | null;
   dogs?: PhotoUploadDogAssignment[];

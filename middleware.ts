@@ -182,7 +182,7 @@ async function runMiddleware(request: NextRequest) {
       // Marketing accounts may use Team Log and Bulk Photo Upload on the staff board.
       if (
         board === "staff" &&
-        (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "help" || !tab)
+        (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help" || !tab)
       ) {
         if (!tab) {
           url.pathname = "/admin";

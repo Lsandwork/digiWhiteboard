@@ -261,8 +261,8 @@ export function HandlerChecklistPanel() {
   );
 }
 
-export function BulkPhotoUploadPanel() {
-  return <GingrPhotoUploadQueue />;
+export function BulkPhotoUploadPanel({ onOpenMediaLibrary }: { onOpenMediaLibrary?: () => void }) {
+  return <GingrPhotoUploadQueue onOpenMediaLibrary={onOpenMediaLibrary} />;
 }
 
 function HandlerEntriesTable({ entries }: { entries: CrossoverMessage[] }) {

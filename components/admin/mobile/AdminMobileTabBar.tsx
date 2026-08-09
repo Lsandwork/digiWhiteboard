@@ -28,7 +28,7 @@ const PRIMARY: TabDef[] = [
     id: "photos",
     label: "Photos",
     icon: Camera,
-    tabs: ["bulk_photo_upload"]
+    tabs: ["bulk_photo_upload", "media_library"]
   },
   {
     id: "board",

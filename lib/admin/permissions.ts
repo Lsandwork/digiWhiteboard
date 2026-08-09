@@ -705,6 +705,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "vip_auto_book",
   "staff_directory",
   "bulk_photo_upload",
+  "media_library",
   "yard_links",
   "walks_board",
   "notifications",
@@ -722,6 +723,7 @@ export const TEAM_LEADER_TABS = [
   "active_issues",
   "whiteboard_preview",
   "bulk_photo_upload",
+  "media_library",
   "yard_links",
   "walks_board",
   "notifications",
@@ -762,6 +764,7 @@ export const DOG_HANDLER_TABS = [
   "notifications",
   "management_support",
   "bulk_photo_upload",
+  "media_library",
   "write_ups",
   "settings",
   "help"
@@ -773,6 +776,7 @@ export const MARKETING_TABS = [
   "schedule",
   "lobby_slideshow",
   "bulk_photo_upload",
+  "media_library",
   "whiteboard_preview",
   "settings",
   "help"
@@ -981,6 +985,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   hr_hub: "view_hr_hub",
   hr_consult: "use_hr_consult",
   bulk_photo_upload: "manage_photo_upload_queue",
+  media_library: "manage_photo_upload_queue",
   write_ups: "submit_write_up",
   write_up_review: "review_write_ups",
   complaint_review: "review_management_support",
@@ -1444,6 +1449,7 @@ export function canAccessAdminTab(
       return (
         tab === "crossover_communication" ||
         tab === "bulk_photo_upload" ||
+        tab === "media_library" ||
         tab === "help"
       );
     }

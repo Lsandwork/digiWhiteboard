@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Download, ImagePlus, RefreshCw } from "lucide-react";
+import { Download, ImagePlus, Library, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { UploadZone, type PendingUpload } from "@/components/admin/photo-upload-queue/UploadZone";
 import {
@@ -9,6 +9,7 @@ import {
   preparePhotoExport,
   uploadPhotoFiles
 } from "@/components/admin/photo-upload-queue/api";
+import { isVideoFile, uploadMediaVideoDirect } from "@/lib/media-library/upload-client";
 import type { PhotoUploadBatch, PhotoUploadItem } from "@/lib/photo-upload-queue/types";
 
 function makePendingId() {
@@ -26,7 +27,7 @@ function triggerBrowserDownload(url: string, fileName?: string) {
   anchor.remove();
 }
 
-export function BulkPhotoLibrary() {
+export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: () => void }) {
   const { showToast } = useToast();
   const [batch, setBatch] = useState<PhotoUploadBatch | null>(null);
   const [loading, setLoading] = useState(true);
@@ -117,12 +118,46 @@ export function BulkPhotoLibrary() {
           const ids = new Set(batchItems.map((item) => item.id));
 
           try {
-            const results = await uploadPhotoFiles(
-              batchIdRef.current,
-              batchItems.map((item) => item.file),
-              abort.signal,
-              { fastLibrary: true }
-            );
+            const photoFiles = batchItems.filter((item) => !isVideoFile(item.file));
+            const videoFiles = batchItems.filter((item) => isVideoFile(item.file));
+            const results: Array<{ fileName: string; ok: boolean; item?: PhotoUploadItem; error?: string }> = [];
+
+            if (photoFiles.length) {
+              const photoResults = await uploadPhotoFiles(
+                batchIdRef.current,
+                photoFiles.map((item) => item.file),
+                abort.signal,
+                { fastLibrary: true }
+              );
+              results.push(...photoResults);
+            }
+
+            for (const pending of videoFiles) {
+              if (abort.signal.aborted) {
+                results.push({ fileName: pending.file.name, ok: false, error: "Cancelled" });
+                continue;
+              }
+              try {
+                setPendingUploads((prev) =>
+                  prev.map((item) =>
+                    item.id === pending.id ? { ...item, status: "uploading", progress: 65 } : item
+                  )
+                );
+                const uploaded = await uploadMediaVideoDirect(pending.file, batchIdRef.current);
+                results.push({
+                  fileName: pending.file.name,
+                  ok: true,
+                  item: uploaded.item as PhotoUploadItem
+                });
+              } catch (error) {
+                results.push({
+                  fileName: pending.file.name,
+                  ok: false,
+                  error: error instanceof Error ? error.message : "Video upload failed."
+                });
+              }
+            }
+
             const byName = new Map(results.map((row) => [row.fileName, row]));
             const newItems: PhotoUploadItem[] = [];
             setPendingUploads((prev) =>
@@ -287,16 +322,24 @@ export function BulkPhotoLibrary() {
         <div>
           <h2 className="admin-page-title">Bulk Photo Upload</h2>
           <p className="admin-page-subtitle mt-1 max-w-2xl">
-            Fast bulk upload (50–100+ photos). Original quality is preserved — we only compress thumbnails.{" "}
+            Fast bulk upload for photos and videos. Original quality is preserved — we only compress thumbnails.{" "}
             {canDownload
               ? "Download one-by-one or ZIP when ready."
               : "Uploads & viewing for all staff; downloads require Team Lead / Admin access."}
           </p>
         </div>
-        <button type="button" className="admin-btn-secondary min-h-11" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {onOpenMediaLibrary ? (
+            <button type="button" className="admin-btn-primary min-h-11" onClick={onOpenMediaLibrary}>
+              <Library className="h-4 w-4" />
+              Media Library
+            </button>
+          ) : null}
+          <button type="button" className="admin-btn-secondary min-h-11" onClick={() => void refresh()} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       <UploadZone
@@ -437,6 +480,6 @@ export function BulkPhotoLibrary() {
 }
 
 /** Kept for AdminDashboard / HandlerBasicPanels wiring. */
-export function GingrPhotoUploadQueue() {
-  return <BulkPhotoLibrary />;
+export function GingrPhotoUploadQueue({ onOpenMediaLibrary }: { onOpenMediaLibrary?: () => void }) {
+  return <BulkPhotoLibrary onOpenMediaLibrary={onOpenMediaLibrary} />;
 }

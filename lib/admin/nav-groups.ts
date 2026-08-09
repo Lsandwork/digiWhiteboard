@@ -148,6 +148,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   hr_hub: "HR Records",
   hr_consult: "HR Consult",
   bulk_photo_upload: "Bulk Photo Upload",
+  media_library: "Media Library",
   write_ups: "Write Ups",
   write_up_review: "Write Up Review",
   complaint_review: "Complaint Review",
@@ -202,6 +203,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   analytics: "Operational metrics and board activity summary.",
   demo_push: "Try push notices in demo mode.",
   bulk_photo_upload: "Upload, store, view, and download photos in Digi-Board.",
+  media_library: "Browse all uploaded photos and videos in the RuffOps cloud archive.",
   write_ups: "Submit and review your own write-up forms.",
   write_up_review: "Review all submitted employee write-ups.",
   complaint_review: "Review groomer, trainer, and staff complaints.",
@@ -215,6 +217,7 @@ const LOBBY_BOARD_TABS: AdminTab[] = [
   "schedule",
   "lobby_slideshow",
   "bulk_photo_upload",
+  "media_library",
   "display",
   "whiteboard_preview"
 ];
@@ -370,7 +373,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         compactEntries([
           group("front_desk", "Operations", FRONT_DESK_TABS, visible),
           ...singles(MEDIA_TABS, visible),
-          ...singles(["bulk_photo_upload"], visible)
+          ...singles(["bulk_photo_upload", "media_library"], visible)
         ])
       )
     );
@@ -513,7 +516,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
       "Front Desk & Floor",
       compactEntries([
         group("front_desk", "Operations", ["crossover_communication", "owner_follow_up", "active_issues"], visible),
-        ...singles(["bulk_photo_upload"], visible)
+        ...singles(["bulk_photo_upload", "media_library"], visible)
       ])
     )
   );

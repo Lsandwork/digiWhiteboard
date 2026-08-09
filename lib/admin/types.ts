@@ -88,6 +88,7 @@ export type AdminTab =
   | "hr_hub"
   | "hr_consult"
   | "bulk_photo_upload"
+  | "media_library"
   | "write_ups"
   | "write_up_review"
   | "complaint_review"
@@ -144,6 +145,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "hr_hub",
   "hr_consult",
   "bulk_photo_upload",
+  "media_library",
   "write_ups",
   "write_up_review",
   "complaint_review",

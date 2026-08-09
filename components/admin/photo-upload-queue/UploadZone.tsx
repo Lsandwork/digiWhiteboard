@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Loader2, RefreshCw, UploadCloud, X } from "lucide-react";
+import { ImagePlus, Loader2, RefreshCw, UploadCloud, Video, X } from "lucide-react";
 import { PHOTO_UPLOAD_MAX_BYTES } from "@/lib/photo-upload-queue/types";
+import { MEDIA_VIDEO_MAX_BYTES } from "@/lib/media-library/types";
 
 export type PendingUpload = {
   id: string;
@@ -23,7 +24,14 @@ type UploadZoneProps = {
   onRemove: (id: string) => void;
 };
 
-const ACCEPT = "image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,.heic,.heif";
+const ACCEPT =
+  "image/jpeg,image/jpg,image/png,image/heic,image/heif,image/webp,video/mp4,video/webm,video/quicktime,.heic,.heif,.mp4,.webm,.mov";
+
+function isVideoFile(file: File) {
+  const mime = (file.type || "").toLowerCase();
+  const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return mime.startsWith("video/") || ["mp4", "webm", "mov"].includes(ext);
+}
 
 function formatBytes(size: number) {
   if (size < 1024) return `${size} B`;
@@ -47,10 +55,11 @@ export function UploadZone({
     const files = Array.from(list).filter((file) => {
       const mime = (file.type || "").toLowerCase();
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
-      const allowed =
-        mime.startsWith("image/") ||
-        ["jpg", "jpeg", "png", "heic", "heif", "webp"].includes(ext);
-      return allowed && file.size > 0 && file.size <= PHOTO_UPLOAD_MAX_BYTES;
+      const isPhoto =
+        mime.startsWith("image/") || ["jpg", "jpeg", "png", "heic", "heif", "webp"].includes(ext);
+      const isVideo = isVideoFile(file);
+      const maxBytes = isVideo ? MEDIA_VIDEO_MAX_BYTES : PHOTO_UPLOAD_MAX_BYTES;
+      return (isPhoto || isVideo) && file.size > 0 && file.size <= maxBytes;
     });
     if (files.length) onFilesSelected(files);
   }
@@ -92,10 +101,10 @@ export function UploadZone({
         <div className="lobby-slideshow-upload-drop__icon" aria-hidden>
           <UploadCloud className="h-10 w-10" />
         </div>
-        <p className="lobby-slideshow-upload-drop__title">Drag photos here</p>
+        <p className="lobby-slideshow-upload-drop__title">Drag photos or videos here</p>
         <p className="lobby-slideshow-upload-drop__hint">
-          JPG, PNG, HEIC, or WEBP · up to {Math.round(PHOTO_UPLOAD_MAX_BYTES / (1024 * 1024))}MB each · multiple files
-          supported
+          Photos: JPG, PNG, HEIC, WEBP up to {Math.round(PHOTO_UPLOAD_MAX_BYTES / (1024 * 1024))}MB · Videos: MP4,
+          WebM, MOV up to {Math.round(MEDIA_VIDEO_MAX_BYTES / (1024 * 1024))}MB · multiple files supported
         </p>
         <button
           type="button"
@@ -104,7 +113,7 @@ export function UploadZone({
           onClick={() => inputRef.current?.click()}
         >
           <ImagePlus className="h-4 w-4" />
-          Choose Photos
+          Choose Files
         </button>
       </label>
 
@@ -115,8 +124,18 @@ export function UploadZone({
               key={item.id}
               className="flex flex-col gap-3 rounded-xl border border-admin-border bg-black/15 p-3 sm:flex-row sm:items-center"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.previewUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />
+              {item.previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={item.previewUrl} alt="" className="h-16 w-16 rounded-lg object-cover" />
+              ) : isVideoFile(item.file) ? (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-black/30 text-admin-muted">
+                  <Video className="h-6 w-6" />
+                </div>
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-black/30 text-admin-muted">
+                  <ImagePlus className="h-6 w-6" />
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold text-white">{item.file.name}</p>
                 <p className="text-xs text-admin-muted">{formatBytes(item.file.size)}</p>

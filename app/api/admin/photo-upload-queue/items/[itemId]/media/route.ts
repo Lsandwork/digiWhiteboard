@@ -24,17 +24,20 @@ export async function GET(request: Request, context: RouteContext) {
     const { itemId } = await context.params;
     const { searchParams } = new URL(request.url);
     const variant = searchParams.get("variant") === "original" ? "original" : "thumbnail";
+    const wantsDownload = searchParams.get("download") === "1";
 
-    if (variant === "original" && !canDownloadPhotoUploads(auth.access, auth.session?.role)) {
+    if (wantsDownload && !canDownloadPhotoUploads(auth.access, auth.session?.role)) {
       return NextResponse.json(
-        { error: "You can view photos, but downloads require elevated access." },
+        { error: "You can view media, but downloads require elevated access." },
         { status: 403 }
       );
     }
 
     const { data: item, error } = await auth.supabase
       .from("photo_upload_items")
-      .select("id, original_filename, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, mime_type")
+      .select(
+        "id, original_filename, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, mime_type, media_kind"
+      )
       .eq("id", itemId)
       .maybeSingle();
     if (error) throw new Error(error.message || "Unable to load photo.");
@@ -52,15 +55,19 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const buffer = await downloadPhotoBuffer(auth.supabase, path);
+    const isVideo =
+      item.media_kind === "video" || String(item.mime_type || "").toLowerCase().startsWith("video/");
     const contentType =
       variant === "thumbnail"
         ? "image/jpeg"
-        : item.mime_type || "image/jpeg";
-    const fileName = String(item.original_filename || "photo.jpg").replace(/[^\w.\-()+ ]+/g, "_");
-    const disposition =
-      searchParams.get("download") === "1"
-        ? `attachment; filename="${fileName}"`
-        : `inline; filename="${fileName}"`;
+        : item.mime_type || (isVideo ? "video/mp4" : "image/jpeg");
+    const fileName = String(item.original_filename || (isVideo ? "video.mp4" : "photo.jpg")).replace(
+      /[^\w.\-()+ ]+/g,
+      "_"
+    );
+    const disposition = wantsDownload
+      ? `attachment; filename="${fileName}"`
+      : `inline; filename="${fileName}"`;
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
@@ -69,6 +76,7 @@ export async function GET(request: Request, context: RouteContext) {
         "Content-Length": String(buffer.length),
         "Content-Disposition": disposition,
         "Cache-Control": "private, max-age=300",
+        "Accept-Ranges": "bytes",
         "X-Content-Type-Options": "nosniff",
         "X-Photo-Bucket": PHOTO_UPLOAD_BUCKET
       }
