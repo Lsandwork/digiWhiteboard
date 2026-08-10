@@ -26,6 +26,7 @@
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
     "test:route-generator": "tsx scripts/test-route-generator.ts",
     "test:route-owner-sms": "tsx scripts/test-route-owner-sms-policy.ts",
+    "test:ops-command-center": "tsx scripts/test-ops-command-center-foundation.ts",
     "setup:route-generator-shadow": "tsx scripts/setup-route-generator-shadow.ts",
     "setup:route-generator-bases": "tsx scripts/seed-route-generator-bases.ts",
     "smoke:route-generator-shadow": "tsx scripts/run-route-generator-shadow-smoke.ts",

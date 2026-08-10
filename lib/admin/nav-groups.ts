@@ -156,12 +156,16 @@ const TAB_LABELS: Record<AdminTab, string> = {
   hr_pip: "Track PIP",
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board",
-  route_generator: "Route Generator"
+  route_generator: "Route Generator",
+  my_shift: "My Shift",
+  ops_command_center: "Ops Command Center"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   checklist: "Personal handler checklist for daily shift tasks.",
   overview: "Live snapshot of alerts, HR, PIP, tasks, staffing, and board health.",
+  my_shift: "Role-aware homepage with needs-attention, tasks, dogs, and alerts.",
+  ops_command_center: "Live Fitdog operating state for management — dogs, tasks, alerts, Gingr health.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
   promotions: "Manage lobby promotion cards shown during idle time.",
@@ -344,6 +348,8 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
         // Route Generator lives under Applications (with Gingr / Ruffly).
         singles(
           [
+            "my_shift",
+            "ops_command_center",
             "demo_push",
             "overview",
             "whiteboard_preview",
@@ -439,6 +445,14 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
 
   entries.push(
     ...sectionEntries(
+      "trainer_home",
+      "My Shift",
+      compactEntries([...singles(["my_shift"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
       "trainer_push",
       "Push to Whiteboard",
       compactEntries([group("trainer_live_alerts", "Live Alerts", ["trainer_push"], visible)])
@@ -501,6 +515,14 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
 
   entries.push(
     ...sectionEntries(
+      "team_lead_home",
+      "My Shift",
+      compactEntries([...singles(["my_shift", "ops_command_center"], visible)])
+    )
+  );
+
+  entries.push(
+    ...sectionEntries(
       "team_lead_push",
       "Push to Whiteboard",
       compactEntries([
@@ -557,6 +579,14 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
 export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
   const visible = new Set(visibleTabs);
   const entries: NavEntry[] = [];
+
+  entries.push(
+    ...sectionEntries(
+      "groomer_home",
+      "My Shift",
+      compactEntries([...singles(["my_shift"], visible)])
+    )
+  );
 
   entries.push(
     ...sectionEntries(
