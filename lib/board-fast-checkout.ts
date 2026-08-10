@@ -2,7 +2,6 @@ import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { getCachedGingrBasketCheckoutKeys } from "@/lib/basket-cleared-checkout";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import {
-  getTransitionMatchKeys,
   isDogInGingrCheckoutBasket,
   mergeCheckoutDogs,
   reconcileGingrSourcedCheckouts,
@@ -10,6 +9,13 @@ import {
   sortCheckoutDogs
 } from "@/lib/board-checkout-merge";
 import { hideBasketClearedCheckoutRows } from "@/lib/basket-cleared-checkout";
+import {
+  buildRetiredTransitionKeys,
+  getCachedRetiredTransitionKeys,
+  isRetiredGingrDog,
+  markDogsRetired,
+  setCachedRetiredTransitionKeys
+} from "@/lib/board-retired-keys";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
@@ -18,6 +24,9 @@ import { mapGingrBoardToLiveDogs } from "@/lib/gingr-board-sync";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 import type { LiveDog } from "@/lib/types";
+
+export { markDogsRetired } from "@/lib/board-retired-keys";
+export type { RetiredTransitionKeys } from "@/lib/board-retired-keys";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -71,37 +80,18 @@ function loadCachedGingrCheckinDogs(now: Date, gingrBoardDogs = loadCachedGingrB
 }
 
 /**
- * Reservations the board already retired, mapped to when they were retired.
- *
- * Gingr keeps reporting a dog for the length of its display window, so without
- * this a manually hidden or already-expired dog would pop back onto the board.
- */
-export type RetiredTransitionKeys = Map<string, number>;
-
-function buildRetiredTransitionKeys(rows: LiveDog[]): RetiredTransitionKeys {
-  const retired: RetiredTransitionKeys = new Map();
-  for (const row of rows) {
-    const retiredAtMs = row.updated_at ? new Date(row.updated_at).getTime() : 0;
-    if (!Number.isFinite(retiredAtMs)) continue;
-    for (const key of getTransitionMatchKeys(row)) {
-      retired.set(key, Math.max(retired.get(key) ?? 0, retiredAtMs));
-    }
-  }
-  return retired;
-}
-
-/**
  * Refreshed in the background, never on the hot path: suppression only needs to be
  * seconds-accurate, and the board must not pay a query to learn what it retired.
  */
 const RETIRED_LOOKBACK_MS = 15 * 60 * 1000;
-const RETIRED_REFRESH_MS = 10_000;
+/** Keep multi-instance hide lag short so Gingr BOH cannot re-inject a retired dog for long. */
+const RETIRED_REFRESH_MS = 2_000;
 const RETIRED_SCAN_LIMIT = 200;
 
-let cachedRetiredKeys: RetiredTransitionKeys = new Map();
 let lastRetiredRefreshAt = 0;
 
 export async function refreshRetiredTransitionKeys(supabase: SupabaseClient, now = new Date()) {
+  const cachedRetiredKeys = getCachedRetiredTransitionKeys();
   if (Date.now() - lastRetiredRefreshAt < RETIRED_REFRESH_MS) {
     return { skipped: true as const, size: cachedRetiredKeys.size };
   }
@@ -117,19 +107,13 @@ export async function refreshRetiredTransitionKeys(supabase: SupabaseClient, now
 
   if (error) throw error;
 
-  cachedRetiredKeys = buildRetiredTransitionKeys((data ?? []) as LiveDog[]);
-  return { skipped: false as const, size: cachedRetiredKeys.size };
-}
-
-/** A Gingr row is stale only when we retired it *after* the event Gingr reports. */
-function isRetiredGingrDog(dog: LiveDog, retired: RetiredTransitionKeys) {
-  if (!retired.size) return false;
-  const anchor = dog.status_started_at ?? dog.updated_at;
-  const anchorMs = anchor ? new Date(anchor).getTime() : 0;
-  return getTransitionMatchKeys(dog).some((key) => {
-    const retiredAtMs = retired.get(key);
-    return retiredAtMs != null && retiredAtMs >= anchorMs;
-  });
+  // Merge DB scan with any inline marks so a hide cannot race a stale refresh wipe.
+  const fromDb = buildRetiredTransitionKeys((data ?? []) as LiveDog[]);
+  for (const [key, retiredAtMs] of cachedRetiredKeys) {
+    fromDb.set(key, Math.max(fromDb.get(key) ?? 0, retiredAtMs));
+  }
+  setCachedRetiredTransitionKeys(fromDb);
+  return { skipped: false as const, size: fromDb.size };
 }
 
 /**
@@ -263,9 +247,7 @@ export async function loadFastBoardTransitions(
   if (error) throw error;
 
   const rows = enrichDogs((data ?? []) as LiveDog[]);
-  const gingrBoardDogs = loadCachedGingrBoardDogs(now).filter(
-    (dog) => !isRetiredGingrDog(dog, cachedRetiredKeys)
-  );
+  const gingrBoardDogs = loadCachedGingrBoardDogs(now).filter((dog) => !isRetiredGingrDog(dog));
 
   const checkinRows = rows.filter((dog) => dog.display_status === "checking_in");
   const visibleCheckins = mergeCheckoutDogs(
@@ -376,6 +358,9 @@ export async function sweepExpiredTransitionRows(supabase: SupabaseClient, now =
   }
 
   const nowIso = now.toISOString();
+  const expiredRows = rows.filter((row) => expiredIds.includes(row.id));
+  markDogsRetired(expiredRows, now.getTime());
+
   const { error: updateError } = await supabase
     .from("live_transition_dogs")
     .update({

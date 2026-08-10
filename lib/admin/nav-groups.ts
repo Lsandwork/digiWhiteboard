@@ -302,6 +302,21 @@ function flattenSingleChildGroups(entries: NavEntry[]): NavEntry[] {
   });
 }
 
+/** Sole navigable tab under a section (ignoring nested groups with multiple children). */
+export function findSoleLeafTab(entries: Array<Exclude<NavEntry, { type: "section" }>>): AdminTab | null {
+  const leafTabs: AdminTab[] = [];
+  for (const entry of entries) {
+    if (entry.type === "item") leafTabs.push(entry.tab);
+    else if (entry.type === "group") {
+      if (entry.children.length !== 1) return null;
+      leafTabs.push(entry.children[0]!.tab);
+    } else {
+      return null;
+    }
+  }
+  return leafTabs.length === 1 ? leafTabs[0]! : null;
+}
+
 /** Build sidebar nav for the CAST-TV / Marketing admin board. */
 export function buildMarketingAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
   const visible = new Set(visibleTabs);
@@ -419,12 +434,13 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
       )
     );
 
+    // Flat leaf under the section so one click on Commissions opens the tab
+    // (no nested group that only toggles expand/collapse).
     entries.push(
       ...sectionEntries(
         "staff_commissions",
         "Commissions",
-        compactEntries([group("commissions", "Commissions", COMMISSIONS_TABS, visible)]),
-        true
+        COMMISSIONS_TABS.filter((tab) => visible.has(tab)).map((tab) => leaf(tab, "Commissions"))
       )
     );
 
@@ -492,8 +508,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_commissions",
       "Commissions",
-      compactEntries([group("commissions", "Commissions", COMMISSIONS_TABS, visible)]),
-      true
+      COMMISSIONS_TABS.filter((tab) => visible.has(tab)).map((tab) => leaf(tab, "Commissions"))
     )
   );
 

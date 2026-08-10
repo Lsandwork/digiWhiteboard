@@ -148,19 +148,31 @@ assert.equal(
   "trainer nav should not include Trainer's Entry; use Team Log"
 );
 assert.equal(findNavSectionForTab(trainerNav, "package_commissions"), "Commissions");
-assert.equal(findNavGroupForTab(trainerNav, "package_commissions"), "commissions");
+assert.equal(
+  findNavGroupForTab(trainerNav, "package_commissions"),
+  null,
+  "Commissions must be a flat leaf so one click opens the tab"
+);
 assert.equal(findNavSectionForTab(adminNav, "package_commissions"), "Commissions");
-assert.equal(findNavGroupForTab(adminNav, "package_commissions"), "commissions");
+assert.equal(
+  findNavGroupForTab(adminNav, "package_commissions"),
+  null,
+  "Commissions must be a flat leaf so one click opens the tab"
+);
 
 const trainerCommissionsSection = trainerNav.find((entry) => entry.type === "section" && entry.label === "Commissions");
 assert.ok(trainerCommissionsSection);
 
-const trainerCommissionsGroup = trainerNav.find(
-  (entry) => entry.type === "group" && entry.id === "commissions"
+const trainerCommissionsLeaf = trainerNav.find(
+  (entry) => entry.type === "item" && entry.tab === "package_commissions"
 );
-assert.ok(trainerCommissionsGroup && trainerCommissionsGroup.type === "group");
-assert.equal(trainerCommissionsGroup.children.length, 1);
-assert.equal(trainerCommissionsGroup.children[0]?.label, "Package & Class Commissions");
+assert.ok(trainerCommissionsLeaf && trainerCommissionsLeaf.type === "item");
+assert.equal(trainerCommissionsLeaf.label, "Commissions");
+assert.equal(
+  trainerNav.some((entry) => entry.type === "group" && entry.id === "commissions"),
+  false,
+  "nested Commissions group must be removed"
+);
 
 const supportComplaints = adminNav.find((entry) => entry.type === "group" && entry.id === "support_complaints");
 const supportRequests = adminNav.find((entry) => entry.type === "group" && entry.id === "support_requests");

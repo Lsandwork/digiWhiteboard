@@ -34,7 +34,19 @@ import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
-import { BOARD_CHECKOUT_POLL_MS, BOARD_FAST_FETCH_TIMEOUT_MS, BOARD_FETCH_TIMEOUT_MS, BOARD_FULL_SYNC_POLL_LIVE_MS, BOARD_FULL_SYNC_POLL_MS, EMPTY_BASKET_CONFIRM_POLLS, areCheckoutListsEquivalent, mergeCheckinListsForDisplay, mergeCheckoutListsForDisplay, mergeBoardResponse } from "@/lib/board-checkout-merge";
+import {
+  BOARD_CHECKOUT_POLL_MS,
+  BOARD_FAST_FETCH_TIMEOUT_MS,
+  BOARD_FETCH_TIMEOUT_MS,
+  BOARD_FULL_SYNC_POLL_LIVE_MS,
+  BOARD_FULL_SYNC_POLL_MS,
+  EMPTY_BASKET_CONFIRM_POLLS,
+  areCheckoutListsEquivalent,
+  getTransitionMatchKeys,
+  mergeCheckinListsForDisplay,
+  mergeCheckoutListsForDisplay,
+  mergeBoardResponse
+} from "@/lib/board-checkout-merge";
 import {
   areStickyCheckoutStatesEqual,
   expireStickyCheckoutDogs,
@@ -181,6 +193,8 @@ export function BoardClient({
   const checkoutBasketEmptyRef = useRef(false);
   const checkoutPollSourceRef = useRef<"fast" | "full">("full");
   const emptyBasketStreakRef = useRef(0);
+  /** Keys for dogs explicitly hidden/removed — sticky merge must not resurrect them. */
+  const suppressedTransitionKeysRef = useRef(new Set<string>());
   const [stickyCheckoutState, setStickyCheckoutState] = useState<StickyCheckoutState>(() => new Map());
   const { status: localWakeLockStatus, requestWakeLock } = useScreenWakeLock({
     enabled: !castKeeperMode && tvMode,
@@ -463,9 +477,12 @@ export function BoardClient({
 
         // Fast endpoint covers both columns. Always merge with a short grace hold so
         // basket_filtered / multi-instance TTL lag cannot flicker dogs off.
-        const nextCheckins = mergeCheckinListsForDisplay(data.checking_in ?? [], previous.checking_in);
+        const nextCheckins = mergeCheckinListsForDisplay(data.checking_in ?? [], previous.checking_in, Date.now(), {
+          suppressedKeys: suppressedTransitionKeysRef.current
+        });
         const nextCheckouts = mergeCheckoutListsForDisplay(data.checking_out, previous.checking_out, {
-          basketConfirmedEmpty: checkoutBasketEmptyRef.current
+          basketConfirmedEmpty: checkoutBasketEmptyRef.current,
+          suppressedKeys: suppressedTransitionKeysRef.current
         });
         if (
           areCheckoutListsEquivalent(previous.checking_in, nextCheckins) &&
@@ -571,7 +588,7 @@ export function BoardClient({
       }
 
       setUseDevDemo(false);
-      setBoard((previous) => mergeBoardResponse(previous, data));
+      setBoard((previous) => mergeBoardResponse(previous, data, { suppressedKeys: suppressedTransitionKeysRef.current }));
       setFetchError(null);
       setFetchStatus("ok");
       setLastSuccessAt(data.last_updated);
@@ -702,6 +719,15 @@ export function BoardClient({
             if (dogName && next?.display_status === "checking_out" && !next.hidden) setToast(`${dogName} is checking out.`);
             if (dogName && next?.current_status === "checked_in") setToast(`${dogName} completed check-in.`);
             if (dogName && next?.current_status === "checked_out") setToast(`${dogName} completed check-out.`);
+            if (next && (next.hidden || next.display_status === "removed" || next.current_status === "basket_cleared")) {
+              for (const key of getTransitionMatchKeys(next)) {
+                suppressedTransitionKeysRef.current.add(key);
+              }
+            } else if (next && !next.hidden) {
+              for (const key of getTransitionMatchKeys(next)) {
+                suppressedTransitionKeysRef.current.delete(key);
+              }
+            }
             setBoard((previous) => {
               const optimistic = applyOptimisticLiveBoardTransition(previous, next);
               return optimistic ?? previous;

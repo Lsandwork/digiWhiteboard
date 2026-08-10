@@ -1,4 +1,5 @@
 import { isDogInGingrCheckoutBasket } from "@/lib/board-checkout-merge";
+import { markDogsRetired } from "@/lib/board-retired-keys";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import type { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
@@ -67,6 +68,10 @@ export async function hideBasketClearedCheckoutRows(
   }
 
   const nowIso = now.toISOString();
+  markDogsRetired(
+    rows.filter((row) => clearedIds.includes(row.id)),
+    now.getTime()
+  );
   const { error: updateError } = await supabase
     .from("live_transition_dogs")
     .update({

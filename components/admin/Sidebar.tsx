@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronsLeft, ChevronsRight, HelpCircle, Menu, X } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
@@ -19,6 +19,7 @@ import {
   findNavGroupForTab,
   findNavSectionIdForPath,
   findNavSectionIdForTab,
+  findSoleLeafTab,
   getTabLabel,
   type NavEntry
 } from "@/lib/admin/nav-groups";
@@ -371,7 +372,9 @@ function NavEntryList({
         }
 
         const activeChild = sectionContainsActive(bucket.children, activeTab, activePath);
+        // Icon-rail mode must show every tab icon; accordion collapse only applies when expanded.
         const expanded = forceExpandSections || expandedSections.has(bucket.section.id);
+        const soleLeaf = findSoleLeafTab(bucket.children);
 
         return (
           <SidebarNavSection
@@ -380,7 +383,16 @@ function NavEntryList({
             label={bucket.section.label}
             expanded={expanded}
             activeChild={activeChild}
-            onToggle={() => onToggleSection(bucket.section!.id)}
+            onToggle={() => {
+              // Single-destination sections (e.g. Commissions): open the tab on click.
+              // If already on that tab, allow collapse/expand as usual.
+              if (soleLeaf && activeTab !== soleLeaf) {
+                if (!expandedSections.has(bucket.section!.id)) onToggleSection(bucket.section!.id);
+                onSelect(soleLeaf);
+                return;
+              }
+              onToggleSection(bucket.section!.id);
+            }}
           >
             {children}
           </SidebarNavSection>
@@ -437,6 +449,10 @@ export function Sidebar({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     () => new Set(activeSectionId ? [activeSectionId] : [])
   );
+  const userCollapsedGroupsRef = useRef(new Set<string>());
+  const userCollapsedSectionsRef = useRef(new Set<string>());
+  const prevActiveGroupIdRef = useRef<string | null>(null);
+  const prevActiveSectionIdRef = useRef<string | null>(null);
   const [badgeCounts, setBadgeCounts] = useState<Partial<Record<AdminTab, number>>>({});
 
   useEffect(() => {
@@ -462,9 +478,13 @@ export function Sidebar({
 
   useEffect(() => {
     if (!activeGroupId) return;
+    const changed = prevActiveGroupIdRef.current !== activeGroupId;
+    prevActiveGroupIdRef.current = activeGroupId;
+    if (changed) userCollapsedGroupsRef.current.delete(activeGroupId);
+    if (userCollapsedGroupsRef.current.has(activeGroupId)) return;
     const timer = window.setTimeout(() => {
       setExpandedGroups((current) => {
-        if (current.has(activeGroupId)) return current;
+        if (current.has(activeGroupId) || userCollapsedGroupsRef.current.has(activeGroupId)) return current;
         const next = new Set(current);
         next.add(activeGroupId);
         return next;
@@ -475,9 +495,15 @@ export function Sidebar({
 
   useEffect(() => {
     if (!activeSectionId) return;
+    const changed = prevActiveSectionIdRef.current !== activeSectionId;
+    prevActiveSectionIdRef.current = activeSectionId;
+    if (changed) userCollapsedSectionsRef.current.delete(activeSectionId);
+    if (userCollapsedSectionsRef.current.has(activeSectionId)) return;
     const timer = window.setTimeout(() => {
       setExpandedSections((current) => {
-        if (current.has(activeSectionId)) return current;
+        if (current.has(activeSectionId) || userCollapsedSectionsRef.current.has(activeSectionId)) {
+          return current;
+        }
         const next = new Set(current);
         next.add(activeSectionId);
         return next;
@@ -485,24 +511,6 @@ export function Sidebar({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [activeSectionId]);
-
-  useEffect(() => {
-    // Blog Generator lives under Dashboard — keep that section open for entitled roles
-    // so the tab is visible without hunting through collapsed sections.
-    const hasBlogGenerator = navEntries.some(
-      (entry) => entry.type === "route" && entry.id === "automatic-blog"
-    );
-    if (!hasBlogGenerator) return;
-    const timer = window.setTimeout(() => {
-      setExpandedSections((current) => {
-        if (current.has("staff_dashboard")) return current;
-        const next = new Set(current);
-        next.add("staff_dashboard");
-        return next;
-      });
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [navEntries]);
 
   useEffect(() => {
     // Keep the active tab visible in long / collapsed icon rails.
@@ -525,8 +533,13 @@ export function Sidebar({
   function toggleGroup(id: string) {
     setExpandedGroups((current) => {
       const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        userCollapsedGroupsRef.current.add(id);
+      } else {
+        next.add(id);
+        userCollapsedGroupsRef.current.delete(id);
+      }
       return next;
     });
   }
@@ -534,8 +547,13 @@ export function Sidebar({
   function toggleSection(id: string) {
     setExpandedSections((current) => {
       const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        userCollapsedSectionsRef.current.add(id);
+      } else {
+        next.add(id);
+        userCollapsedSectionsRef.current.delete(id);
+      }
       return next;
     });
   }

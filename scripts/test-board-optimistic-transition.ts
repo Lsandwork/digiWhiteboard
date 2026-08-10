@@ -105,12 +105,17 @@ const preserved = mergeCheckinListsForDisplay([], [recentCheckin], recentMs);
 assert.equal(preserved.length, 1);
 assert.equal(preserved[0]?.animal_name, "Atlas");
 
+// Recognized dogs stay for the full display window even after the short cache grace.
 const staleCheckin = dog({
   status_started_at: new Date(recentMs - 11_000).toISOString(),
   updated_at: new Date(recentMs - 11_000).toISOString(),
   display_until: new Date(recentMs + 3 * 60_000).toISOString()
 });
-assert.equal(mergeCheckinListsForDisplay([], [staleCheckin], recentMs).length, 0);
+assert.equal(
+  mergeCheckinListsForDisplay([], [staleCheckin], recentMs).length,
+  1,
+  "recognized check-in must not flicker off after grace while display_until is open"
+);
 
 const completedCheckin = dog({
   status_started_at: new Date(recentMs).toISOString(),
@@ -118,7 +123,39 @@ const completedCheckin = dog({
   completed_at: new Date(recentMs).toISOString(),
   display_until: new Date(recentMs + 4 * 60_000).toISOString()
 });
-assert.equal(mergeCheckinListsForDisplay([], [completedCheckin], recentMs).length, 0);
+assert.equal(
+  mergeCheckinListsForDisplay([], [completedCheckin], recentMs).length,
+  1,
+  "completed check-in still stays on the board until display_until"
+);
+
+const expiredCheckin = dog({
+  status_started_at: new Date(recentMs - 10 * 60_000).toISOString(),
+  updated_at: new Date(recentMs - 10 * 60_000).toISOString(),
+  display_until: new Date(recentMs - 60_000).toISOString()
+});
+assert.equal(mergeCheckinListsForDisplay([], [expiredCheckin], recentMs).length, 0);
+
+const suppressed = mergeCheckinListsForDisplay([], [staleCheckin], recentMs, {
+  suppressedKeys: new Set(["res:res-1", "animal:animal-1"])
+});
+assert.equal(suppressed.length, 0, "explicit hide keys must drop sticky rows");
+
+// Optimistic hide must remove Gingr twin rows that share animal/reservation identity.
+const gingrTwin = dog({
+  id: "gingr-twin",
+  raw_payload: { source: "gingr_back_of_house" }
+});
+const twinRemoved = applyOptimisticLiveBoardTransition(
+  {
+    ...emptyBoard,
+    checking_in: [dog({}), gingrTwin],
+    counts: { checking_in: 2, checking_out: 0, total: 2 }
+  },
+  dog({ id: "dog-1", hidden: true, display_status: "removed" })
+);
+assert.ok(twinRemoved);
+assert.equal(twinRemoved?.checking_in.length, 0, "identity match removes UUID + Gingr twin");
 
 const mergedBoard = mergeBoardResponse(
   {

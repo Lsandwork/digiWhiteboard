@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { cachedLoadLobbySettings, WHITEBOARD_STATE_CACHE_TTL_MS } from "@/lib/board-settings-cache";
-import { loadFastBoardTransitions } from "@/lib/board-fast-checkout";
+import { loadFastBoardTransitions, type FastBoardTransitionLoadResult } from "@/lib/board-fast-checkout";
 import { loadDisplaySyncState } from "@/lib/display-sync-server";
 import { loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import type { LobbyCheckoutDog, LobbySettings } from "@/lib/lobby/types";
@@ -15,6 +15,9 @@ import type { LiveDog } from "@/lib/types";
 import type { CastBoardType } from "@/lib/whiteboard/cast-options";
 
 const FEATURE_TIMEOUT_MS = 2500;
+
+/** Last healthy staff transition paint — used when a load times out so TVs do not flash empty. */
+let lastGoodStaffTransitions: FastBoardTransitionLoadResult | null = null;
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -239,14 +242,21 @@ export async function buildStaffWhiteboardState(
     expired_checkout_rows: 0,
     basket_filtered: false,
     basket_cleared_rows: 0,
-    data_source: "supabase_live_transition_dogs" as const
+    data_source: "supabase_live_transition_dogs" as const,
+    timed_out: false as boolean
   };
+  const timedOutFastTransitions = { ...emptyFastTransitions, timed_out: true };
 
   const [boardDogs, activePushNotice, groomingState, castVideoState, sync] = await Promise.all([
     withTimeoutFallback(
-      loadFastBoardTransitions(supabase, now).catch(() => emptyFastTransitions),
+      loadFastBoardTransitions(supabase, now)
+        .then((result) => {
+          lastGoodStaffTransitions = result;
+          return { ...result, timed_out: false as boolean };
+        })
+        .catch(() => (lastGoodStaffTransitions ? { ...lastGoodStaffTransitions, timed_out: false } : emptyFastTransitions)),
       2500,
-      emptyFastTransitions
+      lastGoodStaffTransitions ? { ...lastGoodStaffTransitions, timed_out: true } : timedOutFastTransitions
     ),
     withTimeoutFallback(
       loadActiveStaffPushNotice(supabase, { mutate: false }).catch(() => null),

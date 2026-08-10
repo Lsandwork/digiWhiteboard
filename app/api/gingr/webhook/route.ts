@@ -89,7 +89,12 @@ async function hasRecentDuplicateEvent(
   return Boolean(data?.length);
 }
 
-async function findExistingDog(supabase: ReturnType<typeof getServiceSupabase>, reservationId: string | null, animalId: string | null) {
+async function findExistingDog(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  reservationId: string | null,
+  animalId: string | null,
+  options: { preferVisible?: boolean } = {}
+) {
   if (reservationId) {
     const { data } = await supabase
       .from("live_transition_dogs")
@@ -100,6 +105,19 @@ async function findExistingDog(supabase: ReturnType<typeof getServiceSupabase>, 
   }
 
   if (animalId) {
+    // Prefer a still-visible row so a retired twin for the same animal cannot steal the write.
+    if (options.preferVisible !== false) {
+      const { data: visible } = await supabase
+        .from("live_transition_dogs")
+        .select("*")
+        .eq("gingr_animal_id", animalId)
+        .eq("hidden", false)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (visible) return visible;
+    }
+
     const { data } = await supabase
       .from("live_transition_dogs")
       .select("*")
@@ -131,23 +149,32 @@ export async function POST(request: Request) {
       const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
       const nowDate = new Date();
       const now = nowDate.toISOString();
-      const windowExpired =
+      // Never revive a manually hidden / swept row via animal-id fallback — insert a fresh transition instead.
+      const reusableExisting =
         existing &&
         !existing.hidden &&
+        existing.display_status !== "removed" &&
+        (existing.gingr_reservation_id == null ||
+          !dog.gingr_reservation_id ||
+          existing.gingr_reservation_id === dog.gingr_reservation_id)
+          ? existing
+          : null;
+      const windowExpired =
+        reusableExisting &&
         (webhookType === "checking_out"
-          ? shouldExpireCheckoutDog(existing as LiveDog, nowDate)
-          : shouldExpireCheckinDog(existing as LiveDog, nowDate));
+          ? shouldExpireCheckoutDog(reusableExisting as LiveDog, nowDate)
+          : shouldExpireCheckinDog(reusableExisting as LiveDog, nowDate));
       const continuing =
-        !windowExpired && isContinuingSameTransition(existing, webhookType as "checking_in" | "checking_out");
-      const statusStartedAt = continuing && existing?.status_started_at ? existing.status_started_at : now;
-      const existingUntil = continuing ? existing?.display_until : null;
+        !windowExpired && isContinuingSameTransition(reusableExisting, webhookType as "checking_in" | "checking_out");
+      const statusStartedAt = continuing && reusableExisting?.status_started_at ? reusableExisting.status_started_at : now;
+      const existingUntil = continuing ? reusableExisting?.display_until : null;
       const row = {
         ...dog,
         current_status: webhookType,
         display_status: webhookType,
         hidden: false,
         status_started_at: statusStartedAt,
-        completed_at: continuing ? existing?.completed_at ?? null : null,
+        completed_at: continuing ? reusableExisting?.completed_at ?? null : null,
         display_until:
           webhookType === "checking_out"
             ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil, nowDate)
@@ -157,8 +184,8 @@ export async function POST(request: Request) {
         updated_at: now
       };
 
-      const mutation = existing
-        ? supabase.from("live_transition_dogs").update(row).eq("id", existing.id).select("*").single()
+      const mutation = reusableExisting
+        ? supabase.from("live_transition_dogs").update(row).eq("id", reusableExisting.id).select("*").single()
         : supabase.from("live_transition_dogs").insert(row).select("*").single();
       const { data: savedDog, error } = await mutation;
       if (error) throw error;

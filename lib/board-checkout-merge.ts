@@ -20,6 +20,23 @@ export const WEBHOOK_CHECKIN_CACHE_GRACE_MS = 10_000;
 /** Same hold for checkout rows while basket cache / other instances catch up. */
 export const WEBHOOK_CHECKOUT_CACHE_GRACE_MS = 12_000;
 
+/**
+ * Once the whiteboard has recognized a dog, keep it visible for its full
+ * display window even if a sibling Vercel instance briefly returns an empty list.
+ * Explicit hide / expiry still removes the card.
+ */
+export function isRecognizedBoardDogSticky(dog: LiveDog, nowMs = Date.now()) {
+  if (dog.hidden) return false;
+  if (dog.display_status === "removed") return false;
+  if (dog.display_status === "checking_in") {
+    return !shouldExpireCheckinDog(dog, new Date(nowMs));
+  }
+  if (dog.display_status === "checking_out") {
+    return !shouldExpireCheckoutDog(dog, new Date(nowMs));
+  }
+  return false;
+}
+
 export function clampCheckoutPollMs(intervalMs: number) {
   return Math.min(BOARD_CHECKOUT_POLL_MAX_MS, Math.max(BOARD_CHECKOUT_POLL_MIN_MS, intervalMs));
 }
@@ -91,19 +108,35 @@ export function isWebhookCheckoutWithinCacheGrace(dog: LiveDog, nowMs = Date.now
 export function mergeCheckinListsForDisplay(
   serverCheckins: LiveDog[],
   previousCheckins: LiveDog[],
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  options: { suppressedKeys?: Set<string>; allowSticky?: boolean } = {}
 ) {
-  const graceRows = previousCheckins.filter((dog) => isWebhookCheckinWithinCacheGrace(dog, nowMs));
-  return preserveDogPhotos(previousCheckins, mergeCheckoutDogs(serverCheckins, graceRows));
+  const serverKeys = new Set(serverCheckins.flatMap((dog) => getTransitionMatchKeys(dog)));
+  const stickyRows = previousCheckins.filter((dog) => {
+    if (options.allowSticky === false) return isWebhookCheckinWithinCacheGrace(dog, nowMs);
+    if (!isRecognizedBoardDogSticky(dog, nowMs) && !isWebhookCheckinWithinCacheGrace(dog, nowMs)) {
+      return false;
+    }
+    const keys = getTransitionMatchKeys(dog);
+    if (keys.some((key) => options.suppressedKeys?.has(key))) return false;
+    // Keep recognized dogs missing from this poll so empty/stale instances cannot flicker them off.
+    return keys.length ? !keys.some((key) => serverKeys.has(key)) : true;
+  });
+  return preserveDogPhotos(previousCheckins, mergeCheckoutDogs(serverCheckins, stickyRows));
 }
 
 export function mergeCheckoutListsForDisplay(
   serverCheckouts: LiveDog[],
   previousCheckouts: LiveDog[],
-  options: { basketConfirmedEmpty?: boolean; nowMs?: number } = {}
+  options: {
+    basketConfirmedEmpty?: boolean;
+    nowMs?: number;
+    suppressedKeys?: Set<string>;
+    allowSticky?: boolean;
+  } = {}
 ) {
   const nowMs = options.nowMs ?? Date.now();
-  const graceRows = previousCheckouts.filter((dog) => isWebhookCheckoutWithinCacheGrace(dog, nowMs));
+  const serverKeys = new Set(serverCheckouts.flatMap((dog) => getTransitionMatchKeys(dog)));
 
   // Confirmed-empty basket: drop everyone except brand-new webhook prompts still in add-grace.
   if (options.basketConfirmedEmpty) {
@@ -111,23 +144,40 @@ export function mergeCheckoutListsForDisplay(
     return preserveDogPhotos(previousCheckouts, mergeCheckoutDogs(serverCheckouts, hold));
   }
 
-  return preserveDogPhotos(previousCheckouts, mergeCheckoutDogs(serverCheckouts, graceRows));
+  const stickyRows = previousCheckouts.filter((dog) => {
+    if (options.allowSticky === false) return isWebhookCheckoutWithinCacheGrace(dog, nowMs);
+    if (!isRecognizedBoardDogSticky(dog, nowMs) && !isWebhookCheckoutWithinCacheGrace(dog, nowMs)) {
+      return false;
+    }
+    const keys = getTransitionMatchKeys(dog);
+    if (keys.some((key) => options.suppressedKeys?.has(key))) return false;
+    return keys.length ? !keys.some((key) => serverKeys.has(key)) : true;
+  });
+
+  return preserveDogPhotos(previousCheckouts, mergeCheckoutDogs(serverCheckouts, stickyRows));
 }
 
-export function mergeBoardResponse(previous: LiveBoardResponse, next: LiveBoardResponse): LiveBoardResponse {
-  // Soft/stale empty payloads must not wipe dogs that realtime just painted.
-  if (
-    next.stale &&
+export function mergeBoardResponse(
+  previous: LiveBoardResponse,
+  next: LiveBoardResponse,
+  options: { suppressedKeys?: Set<string> } = {}
+): LiveBoardResponse {
+  // Soft/stale/empty payloads must not wipe dogs that realtime just painted.
+  const suspiciousEmpty =
     !next.checking_in.length &&
     !next.checking_out.length &&
-    (previous.checking_in.length > 0 || previous.checking_out.length > 0)
-  ) {
-    return previous;
+    (previous.checking_in.length > 0 || previous.checking_out.length > 0);
+  if ((next.stale || suspiciousEmpty) && suspiciousEmpty) {
+    // Keep previous paint; a later healthy poll will reconcile expiry/hides.
+    if (next.stale || next.error) return previous;
   }
 
-  const checkingIn = mergeCheckinListsForDisplay(next.checking_in, previous.checking_in);
+  const checkingIn = mergeCheckinListsForDisplay(next.checking_in, previous.checking_in, Date.now(), {
+    suppressedKeys: options.suppressedKeys
+  });
   const checkingOut = mergeCheckoutListsForDisplay(next.checking_out, previous.checking_out, {
-    basketConfirmedEmpty: Boolean(next.basket_filtered && !next.checking_out.length)
+    basketConfirmedEmpty: Boolean(next.basket_filtered && !next.checking_out.length),
+    suppressedKeys: options.suppressedKeys
   });
 
   if (

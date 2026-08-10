@@ -210,10 +210,10 @@ export function AdminDashboard() {
       return;
     }
 
-    // Keep Route Generator on staff board instead of bouncing to an unrelated tab.
-    if (tab === "route_generator" && board !== "staff") {
+    // Keep staff-only tabs on staff board instead of bouncing to an unrelated tab.
+    if ((tab === "route_generator" || tab === "package_commissions") && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
-      router.replace("/admin?board=staff&tab=route_generator");
+      router.replace(`/admin?board=staff&tab=${tab}`);
       return;
     }
 
@@ -260,10 +260,11 @@ export function AdminDashboard() {
       router.replace("/admin?tab=users");
       return;
     }
-    // Route Generator only exists on the staff board — force board so the click
+    // These tabs only exist on the staff board — force board so the click
     // never lands on lobby/marketing where the tab is inaccessible / empty.
-    const nextBoard = nextTab === "route_generator" ? "staff" : board;
-    if (nextTab === "route_generator" && typeof window !== "undefined") {
+    const forceStaffBoard = nextTab === "route_generator" || nextTab === "package_commissions";
+    const nextBoard = forceStaffBoard ? "staff" : board;
+    if (forceStaffBoard && typeof window !== "undefined") {
       window.localStorage.setItem("fitdog_admin_board", "staff");
     }
     const params = new URLSearchParams({ board: nextBoard, tab: nextTab });

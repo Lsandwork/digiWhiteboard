@@ -7,7 +7,8 @@ import {
   isAdminOrManagementLegacyRole,
   isFullAdminLegacyRole,
   isLobbyDigiBoardOnlyLegacyRole,
-  isStaffDigiBoardOnlyLegacyRole
+  isStaffDigiBoardOnlyLegacyRole,
+  isTrainerLegacyRole
 } from "@/lib/admin/permissions";
 import { LOBBY_REWRITE_TARGET, shouldRewriteLobbyRoot } from "@/lib/lobby-domain";
 import { CAST_TV_REWRITE_TARGET, shouldRewriteCastTvRoot } from "@/lib/cast-tv-domain";
@@ -223,7 +224,11 @@ async function runMiddleware(request: NextRequest) {
         isFullAdminLegacyRole(role) || isAdminOrManagementLegacyRole(role);
       const canAccessWriteUpSubmitRoute =
         role === "team_leader" && pathname === "/admin/management-support";
-      if (!canAccessReviewRoutes && !canAccessWriteUpSubmitRoute) {
+      // Trainers open Package & Class Commissions via this redirect path.
+      const canAccessPackageCommissionsRoute =
+        isTrainerLegacyRole(role) &&
+        (pathname === "/admin/package-commissions" || pathname.startsWith("/admin/package-commissions/"));
+      if (!canAccessReviewRoutes && !canAccessWriteUpSubmitRoute && !canAccessPackageCommissionsRoute) {
         return NextResponse.redirect(new URL("/admin?board=staff", request.url));
       }
     }

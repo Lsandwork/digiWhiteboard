@@ -103,6 +103,7 @@ export function useWhiteboardCastState({
   const reconnectCountRef = useRef(0);
   const backoffUntilRef = useRef(0);
   const failureCountRef = useRef(0);
+  const emptyDogStreakRef = useRef(0);
   const lastGoodRef = useRef<WhiteboardStateResponse | null>(null);
   const debugRef = useRef(debug);
 
@@ -111,6 +112,33 @@ export function useWhiteboardCastState({
   }, [debug]);
 
   const applyState = useCallback((next: WhiteboardStateResponse) => {
+    const previous = lastGoodRef.current;
+    // Require two consecutive empty dog paints before wiping a recognized board —
+    // a single timeout/stale empty must not make dogs disappear then reappear.
+    if (previous?.payload && next.payload && "checkingInDogs" in previous.payload && "checkingInDogs" in next.payload) {
+      const prevDogs =
+        (previous.payload.checkingInDogs?.length ?? 0) + (previous.payload.checkingOutDogs?.length ?? 0);
+      const nextDogs = (next.payload.checkingInDogs?.length ?? 0) + (next.payload.checkingOutDogs?.length ?? 0);
+      if (nextDogs === 0 && prevDogs > 0) {
+        emptyDogStreakRef.current += 1;
+        if (emptyDogStreakRef.current < 2) {
+          debugLog(debugRef.current, "cast state held empty dog wipe pending confirm", {
+            previousVersion: previous.version,
+            nextVersion: next.version,
+            streak: emptyDogStreakRef.current
+          });
+          setHealth((current) => ({
+            ...current,
+            lastSuccessAt: new Date().toISOString(),
+            lastError: null
+          }));
+          return;
+        }
+      } else {
+        emptyDogStreakRef.current = 0;
+      }
+    }
+
     lastGoodRef.current = next;
     setState((current) => {
       if (current?.version === next.version) return current;

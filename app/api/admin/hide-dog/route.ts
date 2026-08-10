@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/admin/api-auth";
+import { markDogsRetired } from "@/lib/board-retired-keys";
+import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +35,9 @@ export async function POST(request: Request) {
     .eq("id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  markDogsRetired([{ ...dog, updated_at: now }], Date.now());
+  invalidateBoardTransitionCaches();
 
   await supabase.from("board_activity_log").insert({
     gingr_reservation_id: dog.gingr_reservation_id,

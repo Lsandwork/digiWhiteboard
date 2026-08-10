@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AdminTab, AdminBoardType } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
 import {
@@ -99,11 +99,15 @@ export function AdminShell({
         : "Lobby Whiteboard Admin";
   const effectiveRole = isDemo ? (demoRole ?? role) : role;
 
-  const visibleTabs = ADMIN_TABS.filter((item) =>
-    canAccessAdminTab(access, item, effectiveRole, board, { isDemo })
+  const visibleTabs = useMemo(
+    () => ADMIN_TABS.filter((item) => canAccessAdminTab(access, item, effectiveRole, board, { isDemo })),
+    [access, effectiveRole, board, isDemo]
   );
   const pageLabel = getTabLabel(tab);
-  const navEntries = buildStaffPanelNav(visibleTabs, board, effectiveRole);
+  const navEntries = useMemo(
+    () => buildStaffPanelNav(visibleTabs, board, effectiveRole),
+    [visibleTabs, board, effectiveRole]
+  );
   const sectionLabel = findNavSectionForTab(navEntries, tab);
   const pageDescription = getTabDescription(tab, board);
 
