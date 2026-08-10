@@ -210,6 +210,16 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
     ]
   },
   {
+    key: "ops_command_center",
+    label: "Operations Command Center",
+    permissions: [
+      p("view_my_shift", "My Shift", "Open the role-aware My Shift homepage."),
+      p("view_ops_command_center", "Ops Command Center", "Open the live management Operations Command Center."),
+      p("view_ops_dog_profile", "View Ops Dog Profile", "Open the RuffOps operational dog profile and timeline."),
+      p("manage_ops_tasks", "Manage Ops Tasks", "Create and update shared Command Center tasks.")
+    ]
+  },
+  {
     key: "system_data",
     label: "System & Data",
     permissions: [

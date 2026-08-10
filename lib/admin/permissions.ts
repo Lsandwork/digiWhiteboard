@@ -93,6 +93,10 @@ export type PermissionKey =
   | "view_analytics"
   | "export_reports"
   | "view_admin_logs"
+  | "view_my_shift"
+  | "view_ops_command_center"
+  | "view_ops_dog_profile"
+  | "manage_ops_tasks"
   | "receive_walks_board_reminders"
   | "manage_lobby_board"
   | "manage_cast_tv"
@@ -311,6 +315,10 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_analytics",
   "export_reports",
   "view_admin_logs",
+  "view_my_shift",
+  "view_ops_command_center",
+  "view_ops_dog_profile",
+  "manage_ops_tasks",
   "receive_walks_board_reminders",
   "manage_lobby_board",
   "manage_cast_tv",
@@ -463,7 +471,10 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "ruffly.contacts.edit",
   "ruffly.leads.view",
   "ruffly.leads.edit",
-  "ruffly.reviews.view"
+  "ruffly.reviews.view",
+  "view_my_shift",
+  "view_ops_dog_profile",
+  "manage_ops_tasks",
 ];
 
 const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
@@ -537,7 +548,11 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "ruffly.feedback.resolve",
   "ruffly.campaigns.view",
   "ruffly.analytics.view",
-  "ruffly.ai.manage"
+  "ruffly.ai.manage",
+  "view_my_shift",
+  "view_ops_command_center",
+  "view_ops_dog_profile",
+  "manage_ops_tasks",
 ];
 
 /** Trainer DigiBoard panel — trainer push, shift log entry, video links, notifications, complaints/requests/commissions, profile. */
@@ -561,7 +576,9 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "ruffly.inbox.view",
   "ruffly.inbox.reply",
   "ruffly.contacts.view",
-  "ruffly.leads.view"
+  "ruffly.leads.view",
+  "view_my_shift",
+  "view_ops_dog_profile",
 ];
 
 /** Groomer DigiBoard panel — grooming push, team log, video links, notifications, complaints/requests, profile. */
@@ -581,7 +598,9 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "ruffly.view",
   "ruffly.inbox.view",
   "ruffly.inbox.reply",
-  "ruffly.leads.view"
+  "ruffly.leads.view",
+  "view_my_shift",
+  "view_ops_dog_profile",
 ];
 
 /** Read-only staff roles (viewer / overnight / maintenance / generic staff). */
@@ -590,7 +609,8 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   "view_staff_whiteboard",
   "view_front_desk_log",
   ...STAFF_NOTIFICATION_PERMISSIONS,
-  ...STAFF_VIDEO_AI_PERMISSIONS
+  ...STAFF_VIDEO_AI_PERMISSIONS,
+  "view_my_shift",
 ];
 
 /** Lobby marketing panel — lobby content plus Team Log landing access. */
@@ -628,7 +648,8 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "blog.manage_media",
   "blog.approve_images",
   "blog.manage_brand",
-  "blog.view_analytics"
+  "blog.view_analytics",
+  "view_my_shift",
 ];
 
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
@@ -643,7 +664,9 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_own_write_ups",
   "create_trainer_entry",
   "manage_photo_upload_queue",
-  ...STAFF_NOTIFICATION_PERMISSIONS
+  ...STAFF_NOTIFICATION_PERMISSIONS,
+  "view_my_shift",
+  "view_ops_dog_profile",
 ];
 
 /** Team Lead DigiBoard panel — push, grooming, team log, video links, notifications, write-ups, profile. */
@@ -691,10 +714,17 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "ruffly.contacts.view",
   "ruffly.leads.view",
   "ruffly.leads.edit",
-  "ruffly.feedback.view"
+  "ruffly.feedback.view",
+  "view_my_shift",
+  "view_ops_dog_profile",
+  "manage_ops_tasks",
+  "view_ops_command_center",
 ];
 
 export const FRONT_DESK_COORDINATOR_TABS = [
+  "my_shift",
+  "front_desk_command",
+  "shift_handoff",
   "crossover_communication",
   "push_notices",
   "yard_push_notices",
@@ -715,6 +745,10 @@ export const FRONT_DESK_COORDINATOR_TABS = [
 ] as const;
 
 export const TEAM_LEADER_TABS = [
+  "my_shift",
+  "yard_command",
+  "ops_command_center",
+  "shift_handoff",
   "crossover_communication",
   "push_notices",
   "yard_push_notices",
@@ -734,6 +768,7 @@ export const TEAM_LEADER_TABS = [
 ] as const;
 
 export const GROOMER_TABS = [
+  "my_shift",
   "crossover_communication",
   "grooming_push",
   "whiteboard_preview",
@@ -746,6 +781,8 @@ export const GROOMER_TABS = [
 ] as const;
 
 export const TRAINER_TABS = [
+  "my_shift",
+  "trainer_ops",
   "crossover_communication",
   "trainer_push",
   "package_commissions",
@@ -758,6 +795,8 @@ export const TRAINER_TABS = [
 ] as const;
 
 export const DOG_HANDLER_TABS = [
+  "my_shift",
+  "driver_mode",
   "crossover_communication",
   "checklist",
   "walks_board",
@@ -976,6 +1015,15 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   vet_visits: "view_vet_visits",
   vip_auto_book: "view_vip_auto_book",
   route_generator: "route_generator.view",
+  my_shift: "view_my_shift",
+  ops_command_center: "view_ops_command_center",
+  front_desk_command: "view_my_shift",
+  yard_command: "view_my_shift",
+  driver_mode: "view_my_shift",
+  overnight_command: "view_my_shift",
+  trainer_ops: "view_my_shift",
+  ops_system_health: "view_ops_command_center",
+  shift_handoff: "view_my_shift",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
   ms_groomer_requests: "review_management_support",
@@ -1568,7 +1616,12 @@ export function firstAccessibleAdminTab(
       ? "lobby"
       : board;
 
-  // Every staff-board session lands on Team Log whenever the role can open it.
+  // Prefer My Shift homepage when the role can open it.
+  if (resolvedBoard === "staff" && canAccessAdminTab(access, "my_shift", legacyRole, "staff", options)) {
+    return "my_shift";
+  }
+
+  // Fall back to Team Log whenever the role can open it.
   if (
     resolvedBoard === "staff" &&
     canAccessAdminTab(access, "crossover_communication", legacyRole, "staff", options)

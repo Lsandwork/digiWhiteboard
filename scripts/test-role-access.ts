@@ -41,7 +41,7 @@ for (const role of roles) {
         : requestedBoard;
     const firstTab = firstAccessibleAdminTab(access, role, requestedBoard);
     const accessBoard =
-      firstTab === "crossover_communication" ? "staff" : resolvedBoard;
+      firstTab === "my_shift" || firstTab === "crossover_communication" ? "staff" : resolvedBoard;
 
     assert.equal(
       (ADMIN_TABS as readonly string[]).includes(firstTab),
@@ -60,11 +60,24 @@ for (const role of roles) {
     true,
     `${role} can open Team Log`
   );
-  assert.equal(
-    firstAccessibleAdminTab(access, role, "staff"),
-    "crossover_communication",
-    `${role} staff landing tab is Team Log`
-  );
+  if (role !== "marketing") {
+    assert.equal(
+      canAccessAdminTab(access, "my_shift", role, "staff"),
+      true,
+      `${role} can open My Shift`
+    );
+    assert.equal(
+      firstAccessibleAdminTab(access, role, "staff"),
+      "my_shift",
+      `${role} staff landing tab is My Shift`
+    );
+  } else {
+    assert.equal(
+      firstAccessibleAdminTab(access, role, "staff"),
+      "crossover_communication",
+      "marketing staff landing tab remains Team Log"
+    );
+  }
 }
 
 assert.equal(

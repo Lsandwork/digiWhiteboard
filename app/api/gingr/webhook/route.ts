@@ -178,6 +178,26 @@ export async function POST(request: Request) {
           details: { dog_id: savedDog.id }
         });
 
+        try {
+          const { syncBoardDogToOpsCommandCenter } = await import(
+            "@/lib/ops-command-center/adapters/board"
+          );
+          await syncBoardDogToOpsCommandCenter({
+            gingrAnimalId: dog.gingr_animal_id,
+            gingrReservationId: dog.gingr_reservation_id,
+            animalName: dog.animal_name,
+            ownerName: dog.owner_name,
+            photoUrl: dog.photo_url,
+            room: dog.room,
+            displayStatus: webhookType,
+            currentStatus: webhookType,
+            boardDogId: savedDog.id,
+            occurredAt: now
+          });
+        } catch {
+          // Ops Command Center sync must never block Gingr board ingestion.
+        }
+
         if (continuing) return;
         if (await hasRecentDuplicateEvent(supabase, webhookType, entityId, eventId)) return;
 
@@ -357,6 +377,26 @@ export async function POST(request: Request) {
           new_status: newStatus,
           source: "webhook"
         });
+
+        try {
+          const { syncBoardDogToOpsCommandCenter } = await import(
+            "@/lib/ops-command-center/adapters/board"
+          );
+          await syncBoardDogToOpsCommandCenter({
+            gingrAnimalId: existing.gingr_animal_id,
+            gingrReservationId: existing.gingr_reservation_id,
+            animalName: existing.animal_name,
+            ownerName: existing.owner_name,
+            photoUrl: existing.photo_url,
+            room: existing.room,
+            displayStatus: hideNow ? "removed" : checkoutCompletion ? "checking_out" : existing.display_status,
+            currentStatus: newStatus,
+            boardDogId: existing.id,
+            occurredAt: now
+          });
+        } catch {
+          // Ops Command Center sync must never block Gingr board ingestion.
+        }
       }
     }
 

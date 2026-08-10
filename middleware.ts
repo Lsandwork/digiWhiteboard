@@ -152,11 +152,11 @@ async function runMiddleware(request: NextRequest) {
       const tab = url.searchParams.get("tab");
       if (!tab && board !== "marketing" && board !== "lobby") {
         url.searchParams.set("board", "staff");
-        url.searchParams.set("tab", "crossover_communication");
+        url.searchParams.set("tab", firstAccessibleAdminTab(null, role, "staff"));
         return NextResponse.redirect(url);
       }
       if (!tab && board === "staff") {
-        url.searchParams.set("tab", "crossover_communication");
+        url.searchParams.set("tab", firstAccessibleAdminTab(null, role, "staff"));
         return NextResponse.redirect(url);
       }
     }
