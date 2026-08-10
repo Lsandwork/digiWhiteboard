@@ -7,4 +7,8 @@ export * from "@/lib/ops-command-center/notifications";
 export * from "@/lib/ops-command-center/audit";
 export * from "@/lib/ops-command-center/profile";
 export * from "@/lib/ops-command-center/snapshot";
+export * from "@/lib/ops-command-center/system-health";
+export * from "@/lib/ops-command-center/overnight-handoff";
+export * from "@/lib/ops-command-center/offline-queue";
+export * from "@/lib/ops-command-center/autosave";
 export { syncBoardDogToOpsCommandCenter } from "@/lib/ops-command-center/adapters/board";

@@ -723,6 +723,8 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 
 export const FRONT_DESK_COORDINATOR_TABS = [
   "my_shift",
+  "front_desk_command",
+  "shift_handoff",
   "crossover_communication",
   "push_notices",
   "yard_push_notices",
@@ -744,6 +746,9 @@ export const FRONT_DESK_COORDINATOR_TABS = [
 
 export const TEAM_LEADER_TABS = [
   "my_shift",
+  "yard_command",
+  "ops_command_center",
+  "shift_handoff",
   "crossover_communication",
   "push_notices",
   "yard_push_notices",
@@ -777,6 +782,7 @@ export const GROOMER_TABS = [
 
 export const TRAINER_TABS = [
   "my_shift",
+  "trainer_ops",
   "crossover_communication",
   "trainer_push",
   "package_commissions",
@@ -790,6 +796,7 @@ export const TRAINER_TABS = [
 
 export const DOG_HANDLER_TABS = [
   "my_shift",
+  "driver_mode",
   "crossover_communication",
   "checklist",
   "walks_board",
@@ -1010,6 +1017,13 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   route_generator: "route_generator.view",
   my_shift: "view_my_shift",
   ops_command_center: "view_ops_command_center",
+  front_desk_command: "view_my_shift",
+  yard_command: "view_my_shift",
+  driver_mode: "view_my_shift",
+  overnight_command: "view_my_shift",
+  trainer_ops: "view_my_shift",
+  ops_system_health: "view_ops_command_center",
+  shift_handoff: "view_my_shift",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
   ms_groomer_requests: "review_management_support",

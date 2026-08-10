@@ -21,6 +21,12 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { NotificationBell } from "@/components/admin/NotificationBell";
 import { AdminBoardSubnav } from "@/components/admin/mobile/AdminBoardSubnav";
 import { AdminMobileTabBar } from "@/components/admin/mobile/AdminMobileTabBar";
+import { OpsGlobalSearch } from "@/components/admin/ops-command-center/GlobalSearch";
+import {
+  LockRuffOpsButton,
+  RuffOpsLockScreen,
+  useRuffOpsLock
+} from "@/components/admin/ops-command-center/LockRuffOps";
 import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
 type AdminShellProps = {
@@ -84,6 +90,7 @@ export function AdminShell({
 }: AdminShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { locked, lock, unlock } = useRuffOpsLock();
   const title =
     board === "staff"
       ? "Staff Digital Whiteboard Admin"
@@ -264,6 +271,14 @@ export function AdminShell({
                     </button>
                   </div>
                   <div className="admin-header__meta flex items-center gap-2">
+                    <OpsGlobalSearch
+                      onNavigate={(nextTab) => {
+                        if ((ADMIN_TABS as readonly string[]).includes(nextTab)) {
+                          handleTabChange(nextTab as AdminTab);
+                        }
+                      }}
+                    />
+                    <LockRuffOpsButton onLock={lock} />
                     <NotificationBell onOpenTab={handleTabChange} />
                     <ThemeToggle />
                     <div className="admin-header-brand">
@@ -310,6 +325,26 @@ export function AdminShell({
         <TextScaleControls />
         <FitdogAiBubble board={board} tab={tab} />
       </div>
+
+      {locked ? (
+        <RuffOpsLockScreen
+          username={displayName || username}
+          onUnlockRequest={async (password) => {
+            try {
+              const response = await fetch("/api/admin/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username, password, unlockOnly: true })
+              });
+              if (!response.ok) return false;
+              unlock();
+              return true;
+            } catch {
+              return false;
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }

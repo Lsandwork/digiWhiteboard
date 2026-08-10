@@ -16,7 +16,18 @@ const PRIMARY: TabDef[] = [
     id: "home",
     label: "Home",
     icon: Home,
-    tabs: ["my_shift", "ops_command_center", "overview", "checklist", "handler_shift_entry", "notifications"]
+    tabs: [
+      "my_shift",
+      "ops_command_center",
+      "front_desk_command",
+      "yard_command",
+      "driver_mode",
+      "overnight_command",
+      "overview",
+      "checklist",
+      "handler_shift_entry",
+      "notifications"
+    ]
   },
   {
     id: "floor",

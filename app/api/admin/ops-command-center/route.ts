@@ -16,6 +16,16 @@ import {
   acknowledgeOpsNotification,
   resolveOpsNotification
 } from "@/lib/ops-command-center/notifications";
+import { recordOpsEvent } from "@/lib/ops-command-center/events";
+import { buildOpsSystemHealth } from "@/lib/ops-command-center/system-health";
+import {
+  acknowledgeShiftHandoff,
+  completeOvernightRound,
+  createShiftHandoff,
+  ensureOvernightRoundsForDate,
+  escalateMissedOvernightRounds,
+  listRecentShiftHandoffs
+} from "@/lib/ops-command-center/overnight-handoff";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +58,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ dogs });
   }
 
+  const view = url.searchParams.get("view");
+  if (view === "system_health") {
+    const health = await buildOpsSystemHealth();
+    return NextResponse.json(health);
+  }
+  if (view === "overnight") {
+    await escalateMissedOvernightRounds().catch(() => 0);
+    const rounds = await ensureOvernightRoundsForDate();
+    return NextResponse.json({ rounds });
+  }
+  if (view === "handoffs") {
+    const handoffs = await listRecentShiftHandoffs(20);
+    return NextResponse.json({ handoffs });
+  }
+
   const roleKey = legacyRoleToRoleKey(gate.session.role);
   const snapshot = await buildOpsCommandCenterSnapshot({
     adminUserId: gate.session.adminUserId,
@@ -68,6 +93,7 @@ export async function POST(request: Request) {
   const actor = {
     adminId: gate.session.adminUserId,
     email: gate.session.email,
+    name: gate.session.email,
     role: gate.session.role
   };
 
@@ -130,6 +156,70 @@ export async function POST(request: Request) {
       resolutionNotes: body.resolutionNotes ? String(body.resolutionNotes) : null
     });
     return NextResponse.json({ notification });
+  }
+
+  if (action === "complete_overnight_round") {
+    const round = await completeOvernightRound({
+      roundId: String(body.roundId || ""),
+      notes: body.notes ? String(body.notes) : null,
+      actor
+    });
+    return NextResponse.json({ round });
+  }
+
+  if (action === "create_shift_handoff") {
+    const handoff = await createShiftHandoff({
+      fromShift: String(body.fromShift || "Afternoon"),
+      toShift: String(body.toShift || "Overnight"),
+      summary: String(body.summary || "").trim() || "Shift handoff submitted",
+      fields: {},
+      actor
+    });
+    return NextResponse.json({ handoff });
+  }
+
+  if (action === "ack_shift_handoff") {
+    const handoff = await acknowledgeShiftHandoff({
+      handoffId: String(body.handoffId || ""),
+      actor
+    });
+    return NextResponse.json({ handoff });
+  }
+
+  if (action === "driver_event") {
+    const event = await recordOpsEvent({
+      eventType: `driver.${String(body.eventType || "update")}`,
+      category: "transportation",
+      title: `Driver: ${String(body.eventType || "update").replace(/_/g, " ")}`,
+      summary: body.notes ? String(body.notes) : null,
+      actor,
+      sourceModule: "driver_mode",
+      sourceRecordType: "driver_action",
+      sourceRecordId: `${gate.session.adminUserId || "driver"}:${Date.now()}`
+    });
+    return NextResponse.json({ event, synced: true });
+  }
+
+  if (action === "trainer_session_complete") {
+    const event = await recordOpsEvent({
+      eventType: "training.session_completed",
+      category: "training",
+      title: "Training session completed",
+      summary: body.notes ? String(body.notes) : null,
+      actor,
+      sourceModule: "trainer_ops",
+      sourceRecordType: "trainer_session",
+      sourceRecordId: `${gate.session.adminUserId || "trainer"}:${Date.now()}`
+    });
+    await createOpsTask({
+      title: "Owner follow-up: training session recap",
+      assignedRole: "trainer",
+      priority: "attention",
+      createdFrom: "trainer_ops",
+      notes: body.notes ? String(body.notes) : null,
+      actor
+    });
+    return NextResponse.json({ event });
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });

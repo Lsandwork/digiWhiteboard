@@ -158,7 +158,14 @@ const TAB_LABELS: Record<AdminTab, string> = {
   walks_board: "Walks Board",
   route_generator: "Route Generator",
   my_shift: "My Shift",
-  ops_command_center: "Ops Command Center"
+  ops_command_center: "Ops Command Center",
+  front_desk_command: "Front Desk Command",
+  yard_command: "Yard Command",
+  driver_mode: "Driver / Hiker Mode",
+  overnight_command: "Overnight Command",
+  trainer_ops: "Trainer Ops",
+  ops_system_health: "System Health",
+  shift_handoff: "Shift Handoff"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -166,6 +173,13 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   overview: "Live snapshot of alerts, HR, PIP, tasks, staffing, and board health.",
   my_shift: "Role-aware homepage with needs-attention, tasks, dogs, and alerts.",
   ops_command_center: "Live Fitdog operating state for management — dogs, tasks, alerts, Gingr health.",
+  front_desk_command: "Arriving, ready for pickup, checkout, and owner contact speed lane.",
+  yard_command: "Yard occupancy and next actions for Team Leads.",
+  driver_mode: "Mobile next-stop workflow with offline-safe completion.",
+  overnight_command: "Overnight rounds, meds, and escalation.",
+  trainer_ops: "Training session ops around Gingr bookings.",
+  ops_system_health: "Gingr/Samsara/Twilio/storage health without secrets.",
+  shift_handoff: "Structured shift handoff with acknowledgement.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
   promotions: "Manage lobby promotion cards shown during idle time.",
@@ -350,6 +364,13 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           [
             "my_shift",
             "ops_command_center",
+            "front_desk_command",
+            "yard_command",
+            "driver_mode",
+            "overnight_command",
+            "trainer_ops",
+            "ops_system_health",
+            "shift_handoff",
             "demo_push",
             "overview",
             "whiteboard_preview",
@@ -447,7 +468,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_home",
       "My Shift",
-      compactEntries([...singles(["my_shift"], visible)])
+      compactEntries([...singles(["my_shift", "trainer_ops"], visible)])
     )
   );
 
@@ -517,7 +538,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_home",
       "My Shift",
-      compactEntries([...singles(["my_shift", "ops_command_center"], visible)])
+      compactEntries([...singles(["my_shift", "ops_command_center", "yard_command", "shift_handoff"], visible)])
     )
   );
 
