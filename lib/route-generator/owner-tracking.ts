@@ -8,6 +8,12 @@ import {
   matchVehicleByName
 } from "@/lib/route-generator/samsara-live";
 import { getPublicSiteUrl } from "@/lib/site-url";
+import {
+  evaluateOwnerEtaSmsGate,
+  isWithinRouteOwnerSmsServiceHours,
+  routeOwnerSmsQuietHoursMessage,
+  ROUTE_OWNER_SMS_MIN_SPEED_MPH
+} from "@/lib/route-generator/sms-policy";
 
 function publicSiteUrl(): string {
   // Owner tracking always lives on the Digi-Board host — never Ruffly's public URL.
@@ -339,12 +345,25 @@ export function getOwnerTrackingDemo(
   };
 }
 
-export async function createOwnerTrackingForPlan(planId: string): Promise<{
+export type CreateOwnerTrackingOptions = {
+  /** Explicit staff opt-in. Default false — generating/approving routes must never text owners. */
+  sendSms?: boolean;
+  now?: Date;
+};
+
+export async function createOwnerTrackingForPlan(
+  planId: string,
+  options: CreateOwnerTrackingOptions = {}
+): Promise<{
   created: number;
   smsQueued: number;
   smsConfigured: boolean;
+  smsEnabled: boolean;
+  smsDeferredQuietHours: boolean;
   smsErrors: string[];
 }> {
+  const sendSmsRequested = Boolean(options.sendSms);
+  const now = options.now ?? new Date();
   const supabase = getServiceSupabase();
   const { data: plan } = await supabase.from("route_plans").select("*").eq("id", planId).single();
   if (!plan) throw new Error("Plan not found.");
@@ -374,10 +393,15 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
   let smsQueued = 0;
   const smsErrors: string[] = [];
   const sms = getSmsProvider();
-  if (!sms.isConfigured()) {
+  const quietHoursMessage = routeOwnerSmsQuietHoursMessage(now);
+  const canSendLinkNow = sendSmsRequested && !quietHoursMessage;
+  if (sendSmsRequested && !sms.isConfigured()) {
     smsErrors.push(
       "Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER)."
     );
+  }
+  if (sendSmsRequested && quietHoursMessage) {
+    smsErrors.push(quietHoursMessage);
   }
 
   for (const route of routes ?? []) {
@@ -391,7 +415,7 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
     for (const stop of stops ?? []) {
       const { data: existing } = await supabase
         .from("route_owner_tracking")
-        .select("id, token, link_sent_at, owner_phone_e164")
+        .select("id, token, link_sent_at, owner_phone_e164, sms_alerts_enabled")
         .eq("stop_id", stop.id)
         .maybeSingle();
 
@@ -407,6 +431,10 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean) ?? [];
+
+      const plannedArrivalAt = stop.eta_arrival ? String(stop.eta_arrival) : null;
+      const plannedWindowStart = stop.requested_window_start ? String(stop.requested_window_start) : null;
+      const plannedWindowEnd = stop.requested_window_end ? String(stop.requested_window_end) : null;
 
       let token = existing?.token;
       if (!existing) {
@@ -427,20 +455,34 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
           stop_address: stop.address,
           stop_latitude: stop.latitude,
           stop_longitude: stop.longitude,
+          planned_arrival_at: plannedArrivalAt,
+          planned_window_start: plannedWindowStart,
+          planned_window_end: plannedWindowEnd,
+          // Only staff checkbox enables owner SMS. Approve alone never texts.
+          sms_alerts_enabled: sendSmsRequested,
           status: "pending"
         });
         if (error) throw new Error(error.message);
         created += 1;
-      } else if (phone && !existing.owner_phone_e164) {
-        await supabase.from("route_owner_tracking").update({ owner_phone_e164: phone }).eq("id", existing.id);
+      } else {
+        const patch: Record<string, unknown> = {
+          planned_arrival_at: plannedArrivalAt,
+          planned_window_start: plannedWindowStart,
+          planned_window_end: plannedWindowEnd,
+          samsara_vehicle_name: vehicleNameByKey.get(String(route.van_key)) || null,
+          samsara_serial: vehicleSerialByKey.get(String(route.van_key)) || null
+        };
+        if (phone && !existing.owner_phone_e164) patch.owner_phone_e164 = phone;
+        if (sendSmsRequested) patch.sms_alerts_enabled = true;
+        await supabase.from("route_owner_tracking").update(patch).eq("id", existing.id);
       }
 
       if (!phone) {
-        smsErrors.push(`Stop ${stop.owner_name || stop.id}: missing owner phone`);
+        if (sendSmsRequested) smsErrors.push(`Stop ${stop.owner_name || stop.id}: missing owner phone`);
         continue;
       }
 
-      if (sms.isConfigured() && !existing?.link_sent_at && token) {
+      if (canSendLinkNow && sms.isConfigured() && !existing?.link_sent_at && token) {
         const url = `${publicSiteUrl()}/track/${token}`;
         const dogs = dogNames.slice(0, 3).join(" + ") || "your dog";
         const direction = route.direction === "pickup" ? "pickup" : "drop-off";
@@ -454,7 +496,12 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
         if (sent.ok) {
           await supabase
             .from("route_owner_tracking")
-            .update({ link_sent_at: new Date().toISOString(), status: "en_route" })
+            .update({
+              link_sent_at: now.toISOString(),
+              sms_alerts_enabled: true,
+              // Stay pending until Samsara shows the van actually moving toward the stop.
+              status: "pending"
+            })
             .eq("token", token);
           smsQueued += 1;
         } else {
@@ -464,7 +511,14 @@ export async function createOwnerTrackingForPlan(planId: string): Promise<{
     }
   }
 
-  return { created, smsQueued, smsConfigured: sms.isConfigured(), smsErrors: smsErrors.slice(0, 25) };
+  return {
+    created,
+    smsQueued,
+    smsConfigured: sms.isConfigured(),
+    smsEnabled: sendSmsRequested,
+    smsDeferredQuietHours: Boolean(sendSmsRequested && quietHoursMessage),
+    smsErrors: smsErrors.slice(0, 25)
+  };
 }
 
 export async function getOwnerTrackingPublic(
@@ -557,23 +611,46 @@ export async function getOwnerTrackingPublic(
   };
 }
 
-/** Cron: refresh ETAs and send 30-min SMS + record 15-min state. */
+/** Cron: refresh ETAs from Samsara and send gated owner SMS. */
 export async function processOwnerEtaAlerts(): Promise<{
   checked: number;
   sms30: number;
+  sms15: number;
+  smsPullup: number;
+  skippedQuietHours: number;
   arriving15: number;
   errors: string[];
 }> {
   const supabase = getServiceSupabase();
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date());
-  const { data: rows } = await supabase
+  const now = new Date();
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
+  const inServiceHours = isWithinRouteOwnerSmsServiceHours(now);
+
+  // Opt-in only: rows without sms_alerts_enabled never get owner SMS.
+  const { data: rows, error: rowsError } = await supabase
     .from("route_owner_tracking")
     .select("*")
     .eq("operating_date", today)
-    .in("status", ["pending", "en_route", "arriving_15"]);
+    .eq("sms_alerts_enabled", true)
+    .in("status", ["pending", "en_route", "arriving_15", "pulling_up"]);
+
+  if (rowsError) {
+    return {
+      checked: 0,
+      sms30: 0,
+      sms15: 0,
+      smsPullup: 0,
+      skippedQuietHours: 0,
+      arriving15: 0,
+      errors: [rowsError.message]
+    };
+  }
 
   const errors: string[] = [];
   let sms30 = 0;
+  let sms15 = 0;
+  let smsPullup = 0;
+  let skippedQuietHours = 0;
   let arriving15 = 0;
   let vehicles: Awaited<ReturnType<typeof fetchSamsaraVehicleLocations>> = [];
   if (isSamsaraLiveConfigured()) {
@@ -587,24 +664,51 @@ export async function processOwnerEtaAlerts(): Promise<{
   const sms = getSmsProvider();
   for (const row of rows ?? []) {
     if (row.stop_latitude == null || row.stop_longitude == null) continue;
+
     const match = matchVehicleByName(vehicles, row.samsara_vehicle_name, row.samsara_serial);
     if (!match) continue;
 
+    const vehicleSpeed =
+      typeof match.speedMilesPerHour === "number" && Number.isFinite(match.speedMilesPerHour)
+        ? match.speedMilesPerHour
+        : null;
+    const vehicleTime = match.time || null;
     const etaMinutes = etaMinutesFromCoords(
       { lat: match.latitude, lng: match.longitude },
       { lat: Number(row.stop_latitude), lng: Number(row.stop_longitude) },
-      match.speedMilesPerHour && match.speedMilesPerHour > 3 ? match.speedMilesPerHour : 18
+      vehicleSpeed && vehicleSpeed >= ROUTE_OWNER_SMS_MIN_SPEED_MPH ? vehicleSpeed : 18
     );
+
+    const nextStatus =
+      etaMinutes <= 2 ? "pulling_up" : etaMinutes <= 15 ? "arriving_15" : "en_route";
 
     const patch: Record<string, unknown> = {
       last_eta_minutes: etaMinutes,
       last_vehicle_latitude: match.latitude,
       last_vehicle_longitude: match.longitude,
-      last_vehicle_at: match.time || new Date().toISOString(),
-      status: etaMinutes <= 15 ? "arriving_15" : "en_route"
+      last_vehicle_at: vehicleTime || new Date().toISOString(),
+      status: nextStatus
     };
 
-    if (etaMinutes <= 30 && !row.notified_30_at && row.owner_phone_e164 && sms.isConfigured()) {
+    // Always refresh ETA/location in DB; SMS only when every gate passes.
+    const gate = evaluateOwnerEtaSmsGate({
+      now,
+      smsAlertsEnabled: true,
+      ownerPhone: row.owner_phone_e164 ? String(row.owner_phone_e164) : null,
+      speedMilesPerHour: vehicleSpeed,
+      gpsTime: vehicleTime,
+      plannedArrivalAt: row.planned_arrival_at ? String(row.planned_arrival_at) : null,
+      windowStart: row.planned_window_start ? String(row.planned_window_start) : null,
+      windowEnd: row.planned_window_end ? String(row.planned_window_end) : null
+    });
+
+    const canSendSms = sms.isConfigured() && gate.allowed;
+
+    if (!inServiceHours && row.owner_phone_e164) {
+      skippedQuietHours += 1;
+    }
+
+    if (canSendSms && etaMinutes <= 30 && !row.notified_30_at) {
       const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
       const url = `${publicSiteUrl()}/track/${row.token}`;
       const body = `Fitdog: your driver is about ${etaMinutes} minutes away for ${dogs}. Track live: ${url}`;
@@ -622,37 +726,57 @@ export async function processOwnerEtaAlerts(): Promise<{
       }
     }
 
-    if (etaMinutes <= 15 && !row.notified_15_at) {
-      patch.notified_15_at = new Date().toISOString();
+    if (etaMinutes <= 15) {
       arriving15 += 1;
-      // Optional SMS at 15 as well when Twilio is configured.
-      if (row.owner_phone_e164 && sms.isConfigured()) {
+      // Only stamp notified_15_at after a successful SMS so a parked/quiet-hours
+      // skip can still notify later when the van is actually moving.
+      if (canSendSms && !row.notified_15_at) {
         const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
         const url = `${publicSiteUrl()}/track/${row.token}`;
-        await sms.send({
+        const sent = await sms.send({
           to: String(row.owner_phone_e164),
           body: `Fitdog: your driver is ~${etaMinutes} minutes out for ${dogs}. Live map: ${url}`,
           purpose: "transactional",
           idempotencyKey: `route-eta-15:${row.id}`
         });
+        if (sent.ok) {
+          patch.notified_15_at = new Date().toISOString();
+          sms15 += 1;
+        } else if (sent.error) {
+          errors.push(`${row.token}: ${sent.error}`);
+        }
       }
     }
 
-    if (etaMinutes <= 2 && row.owner_phone_e164 && sms.isConfigured()) {
-      patch.status = "pulling_up";
+    if (canSendSms && etaMinutes <= 2 && !row.notified_pullup_at) {
       const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
       const url = `${publicSiteUrl()}/track/${row.token}`;
       const stop = row.stop_address ? ` at ${row.stop_address}` : "";
-      await sms.send({
+      const sent = await sms.send({
         to: String(row.owner_phone_e164),
         body: `Fitdog: driver is pulling up for ${dogs}${stop} right now. ${url}`,
         purpose: "transactional",
         idempotencyKey: `route-eta-pullup:${row.id}`
       });
+      if (sent.ok) {
+        patch.notified_pullup_at = new Date().toISOString();
+        patch.status = "pulling_up";
+        smsPullup += 1;
+      } else if (sent.error) {
+        errors.push(`${row.token}: ${sent.error}`);
+      }
     }
 
     await supabase.from("route_owner_tracking").update(patch).eq("id", row.id);
   }
 
-  return { checked: rows?.length ?? 0, sms30, arriving15, errors };
+  return {
+    checked: rows?.length ?? 0,
+    sms30,
+    sms15,
+    smsPullup,
+    skippedQuietHours,
+    arriving15,
+    errors
+  };
 }
