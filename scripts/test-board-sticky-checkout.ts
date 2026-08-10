@@ -72,13 +72,13 @@ assert.equal(
   "authoritative empty poll keeps sticky checkout until basket is confirmed empty"
 );
 
-// The server holds a checked-out dog for its full display window, so an empty
-// confirmed-basket poll past the client bridge means there is genuinely nothing left.
+// Once recognized, a checkout stays for its full display window even if the
+// basket reports confirmed-empty (stale sibling / cache lag must not flicker it off).
 sticky = mergeStickyCheckoutDogs(sticky, [], now, { basketAuthoritative: true, basketConfirmedEmpty: true });
 assert.equal(
   stickyCheckoutStateToDogs(sticky).length,
-  0,
-  "confirmed empty basket clears sticky rows once the client bridge lapses"
+  1,
+  "confirmed empty basket must not wipe a still-recognized sticky checkout"
 );
 
 sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
@@ -95,10 +95,15 @@ sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog, otherDog], now);
 sticky = mergeStickyCheckoutDogs(sticky, [otherDog], now, { basketAuthoritative: true, pruneMissingFromBasket: true });
 assert.equal(
   stickyCheckoutStateToDogs(sticky).length,
-  1,
-  "authoritative basket poll prunes a dog the server no longer returns"
+  2,
+  "authoritative basket poll keeps recognized dogs missing from a laggy basket snapshot"
 );
-assert.deepEqual(stickyCheckoutStateToDogs(sticky).map((dog) => dog.animal_name), ["Nova"]);
+assert.deepEqual(
+  stickyCheckoutStateToDogs(sticky)
+    .map((dog) => dog.animal_name)
+    .sort(),
+  ["Brody", "Nova"]
+);
 
 sticky = mergeStickyCheckoutDogs(new Map(), [webhookDog], now);
 sticky = mergeStickyCheckoutDogs(sticky, [otherDog], now);

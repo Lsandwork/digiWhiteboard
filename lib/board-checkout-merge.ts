@@ -138,9 +138,19 @@ export function mergeCheckoutListsForDisplay(
   const nowMs = options.nowMs ?? Date.now();
   const serverKeys = new Set(serverCheckouts.flatMap((dog) => getTransitionMatchKeys(dog)));
 
-  // Confirmed-empty basket: drop everyone except brand-new webhook prompts still in add-grace.
+  // Empty basket polls must not wipe dogs the whiteboard already recognized.
+  // Only expiry / explicit hide / suppressed keys remove a painted card.
   if (options.basketConfirmedEmpty) {
-    const hold = previousCheckouts.filter((dog) => isWebhookCheckoutWithinAddGrace(dog, nowMs));
+    const hold = previousCheckouts.filter((dog) => {
+      if (options.allowSticky === false) {
+        return isWebhookCheckoutWithinAddGrace(dog, nowMs) || isWebhookCheckoutWithinCacheGrace(dog, nowMs);
+      }
+      return (
+        isRecognizedBoardDogSticky(dog, nowMs) ||
+        isWebhookCheckoutWithinAddGrace(dog, nowMs) ||
+        isWebhookCheckoutWithinCacheGrace(dog, nowMs)
+      );
+    });
     return preserveDogPhotos(previousCheckouts, mergeCheckoutDogs(serverCheckouts, hold));
   }
 
@@ -160,7 +170,7 @@ export function mergeCheckoutListsForDisplay(
 export function mergeBoardResponse(
   previous: LiveBoardResponse,
   next: LiveBoardResponse,
-  options: { suppressedKeys?: Set<string> } = {}
+  options: { suppressedKeys?: Set<string>; basketConfirmedEmpty?: boolean } = {}
 ): LiveBoardResponse {
   // Soft/stale/empty payloads must not wipe dogs that realtime just painted.
   const suspiciousEmpty =
@@ -175,8 +185,10 @@ export function mergeBoardResponse(
   const checkingIn = mergeCheckinListsForDisplay(next.checking_in, previous.checking_in, Date.now(), {
     suppressedKeys: options.suppressedKeys
   });
+  // Never invent "confirmed empty" from a single basket_filtered poll — that caused
+  // appear→disappear→reappear when a sibling instance briefly returned an empty basket.
   const checkingOut = mergeCheckoutListsForDisplay(next.checking_out, previous.checking_out, {
-    basketConfirmedEmpty: Boolean(next.basket_filtered && !next.checking_out.length),
+    basketConfirmedEmpty: Boolean(options.basketConfirmedEmpty),
     suppressedKeys: options.suppressedKeys
   });
 

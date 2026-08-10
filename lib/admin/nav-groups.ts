@@ -386,6 +386,8 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
             "trainer_ops",
             "ops_system_health",
             "shift_handoff",
+            // Flat Dashboard leaf — one click opens Commissions (no nested section).
+            "package_commissions",
             "demo_push",
             "overview",
             "whiteboard_preview",
@@ -396,7 +398,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
             "checklist"
           ],
           visible
-        )
+        ).map((item) => (item.tab === "package_commissions" ? leaf("package_commissions", "Commissions") : item))
       )
     );
 
@@ -431,16 +433,6 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
           ...singles(["admin_trainer_entries", ...MANAGEMENT_FLOOR_TABS], visible)
         ]),
         true
-      )
-    );
-
-    // Flat leaf under the section so one click on Commissions opens the tab
-    // (no nested group that only toggles expand/collapse).
-    entries.push(
-      ...sectionEntries(
-        "staff_commissions",
-        "Commissions",
-        COMMISSIONS_TABS.filter((tab) => visible.has(tab)).map((tab) => leaf(tab, "Commissions"))
       )
     );
 

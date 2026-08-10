@@ -153,7 +153,11 @@ assert.equal(
   null,
   "Commissions must be a flat leaf so one click opens the tab"
 );
-assert.equal(findNavSectionForTab(adminNav, "package_commissions"), "Commissions");
+assert.equal(
+  findNavSectionForTab(adminNav, "package_commissions"),
+  "Dashboard",
+  "Admin Commissions is a Dashboard leaf for one-click open"
+);
 assert.equal(
   findNavGroupForTab(adminNav, "package_commissions"),
   null,
@@ -172,6 +176,17 @@ assert.equal(
   trainerNav.some((entry) => entry.type === "group" && entry.id === "commissions"),
   false,
   "nested Commissions group must be removed"
+);
+
+const adminCommissionsLeaf = adminNav.find(
+  (entry) => entry.type === "item" && entry.tab === "package_commissions"
+);
+assert.ok(adminCommissionsLeaf && adminCommissionsLeaf.type === "item");
+assert.equal(adminCommissionsLeaf.label, "Commissions");
+assert.equal(
+  adminNav.some((entry) => entry.type === "section" && entry.id === "staff_commissions"),
+  false,
+  "separate Commissions accordion section removed for admin — Dashboard leaf only"
 );
 
 const supportComplaints = adminNav.find((entry) => entry.type === "group" && entry.id === "support_complaints");

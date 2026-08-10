@@ -175,6 +175,36 @@ const heldCheckout = mergeCheckoutListsForDisplay([], [webhookCheckout], {
 assert.equal(heldCheckout.length, 1);
 assert.equal(heldCheckout[0]?.animal_name, "Atlas");
 
+const heldThroughConfirmedEmpty = mergeCheckoutListsForDisplay([], [webhookCheckout], {
+  basketConfirmedEmpty: true,
+  nowMs: recentMs
+});
+assert.equal(
+  heldThroughConfirmedEmpty.length,
+  1,
+  "confirmed-empty basket must keep a recognized checkout on the board"
+);
+
+const boardKeepsCheckoutOnEmptyBasket = mergeBoardResponse(
+  {
+    ...emptyBoard,
+    checking_out: [webhookCheckout],
+    counts: { checking_in: 0, checking_out: 1, total: 1 }
+  },
+  {
+    ...emptyBoard,
+    basket_filtered: true,
+    checking_out: [],
+    counts: { checking_in: 0, checking_out: 0, total: 0 },
+    last_updated: new Date(recentMs).toISOString()
+  }
+);
+assert.equal(
+  boardKeepsCheckoutOnEmptyBasket.checking_out.length,
+  1,
+  "mergeBoardResponse must not treat a single empty basket poll as confirmed-empty wipe"
+);
+
 const staleEmptyBoard = mergeBoardResponse(
   {
     ...emptyBoard,

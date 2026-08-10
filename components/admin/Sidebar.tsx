@@ -480,17 +480,17 @@ export function Sidebar({
     if (!activeGroupId) return;
     const changed = prevActiveGroupIdRef.current !== activeGroupId;
     prevActiveGroupIdRef.current = activeGroupId;
+    // Only clear manual-collapse when the user navigates into a *different* group.
     if (changed) userCollapsedGroupsRef.current.delete(activeGroupId);
+    // Honor manual collapse — never auto-reopen while the user kept this group shut.
     if (userCollapsedGroupsRef.current.has(activeGroupId)) return;
-    const timer = window.setTimeout(() => {
-      setExpandedGroups((current) => {
-        if (current.has(activeGroupId) || userCollapsedGroupsRef.current.has(activeGroupId)) return current;
-        const next = new Set(current);
-        next.add(activeGroupId);
-        return next;
-      });
-    }, 0);
-    return () => window.clearTimeout(timer);
+    if (!changed) return;
+    setExpandedGroups((current) => {
+      if (current.has(activeGroupId) || userCollapsedGroupsRef.current.has(activeGroupId)) return current;
+      const next = new Set(current);
+      next.add(activeGroupId);
+      return next;
+    });
   }, [activeGroupId]);
 
   useEffect(() => {
@@ -498,18 +498,17 @@ export function Sidebar({
     const changed = prevActiveSectionIdRef.current !== activeSectionId;
     prevActiveSectionIdRef.current = activeSectionId;
     if (changed) userCollapsedSectionsRef.current.delete(activeSectionId);
+    // Honor manual collapse — collapsing a section must not bounce open on the next paint.
     if (userCollapsedSectionsRef.current.has(activeSectionId)) return;
-    const timer = window.setTimeout(() => {
-      setExpandedSections((current) => {
-        if (current.has(activeSectionId) || userCollapsedSectionsRef.current.has(activeSectionId)) {
-          return current;
-        }
-        const next = new Set(current);
-        next.add(activeSectionId);
-        return next;
-      });
-    }, 0);
-    return () => window.clearTimeout(timer);
+    if (!changed) return;
+    setExpandedSections((current) => {
+      if (current.has(activeSectionId) || userCollapsedSectionsRef.current.has(activeSectionId)) {
+        return current;
+      }
+      const next = new Set(current);
+      next.add(activeSectionId);
+      return next;
+    });
   }, [activeSectionId]);
 
   useEffect(() => {

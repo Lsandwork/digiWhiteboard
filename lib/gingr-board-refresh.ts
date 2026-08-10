@@ -1,5 +1,6 @@
 import { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
 import { canCallGingrEndpoint } from "@/lib/gingr-request-guard";
+import { recordGingrBackOfHouseHeartbeat } from "@/lib/gingr-sync-heartbeat";
 
 /**
  * Background refresh of the cached Gingr back-of-house board.
@@ -32,7 +33,10 @@ export async function refreshGingrBoardCache(now = Date.now()) {
 
   lastBoardRefreshAt = now;
   boardRefreshInFlight = fetchGingrBackOfHouse({ allReservationTypes: true })
-    .then(() => undefined)
+    .then(async (board) => {
+      // Best-effort connectivity signal for Ops — never throw into the refresh path.
+      await recordGingrBackOfHouseHeartbeat(board, now).catch(() => undefined);
+    })
     .catch(() => undefined)
     .finally(() => {
       boardRefreshInFlight = null;

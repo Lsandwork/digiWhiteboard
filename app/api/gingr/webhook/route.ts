@@ -49,7 +49,7 @@ async function recordWebhookEvent(
   verified: boolean,
   options: { processed: boolean; processingError?: string | null }
 ) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("gingr_webhook_events")
     .insert({
       webhook_type: webhookType || null,
@@ -63,6 +63,11 @@ async function recordWebhookEvent(
     })
     .select("id")
     .single();
+
+  if (error) {
+    console.error("gingr_webhook_events insert failed", error.message);
+    return null;
+  }
 
   return data?.id ?? null;
 }
@@ -192,9 +197,13 @@ export async function POST(request: Request) {
 
       invalidateBoardTransitionCaches();
 
-      after(async () => {
-        const eventId = await recordWebhookEvent(supabase, payload, webhookType, verified, { processed: true });
+      // Persist audit immediately so Ops "Gingr Connected" stays truthful.
+      // Dog row is already written — this is one extra insert after the board paint.
+      const eventId = await recordWebhookEvent(supabase, payload, webhookType, verified, {
+        processed: true
+      });
 
+      after(async () => {
         await supabase.from("board_activity_log").insert({
           gingr_reservation_id: dog.gingr_reservation_id,
           animal_name: dog.animal_name,
@@ -246,11 +255,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, webhook_type: webhookType });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Webhook processing failed.";
-      after(async () => {
-        await recordWebhookEvent(supabase, payload, webhookType, verified, {
-          processed: false,
-          processingError: message
-        });
+      // Record failures synchronously so Ops health can surface a real disconnect.
+      await recordWebhookEvent(supabase, payload, webhookType, verified, {
+        processed: false,
+        processingError: message
       });
       return NextResponse.json({ error: message }, { status: 500 });
     }

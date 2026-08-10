@@ -4,6 +4,7 @@ import { listOpsNotificationsForUser } from "@/lib/ops-command-center/notificati
 import { listRecentOpsEvents } from "@/lib/ops-command-center/events";
 import { countDogsByStatus } from "@/lib/ops-command-center/status";
 import type { OpsEvent, OpsNotification, OpsTask } from "@/lib/ops-command-center/types";
+import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
 
 export type NeedsAttentionItem = {
   id: string;
@@ -113,7 +114,7 @@ export async function buildOpsCommandCenterSnapshot(input: {
 }): Promise<OpsCommandCenterSnapshot> {
   const supabase = getServiceSupabase();
 
-  const [checkingIn, checkingOut, openTasks, notifications, recentEvents, statusCounts, lastWebhook] =
+  const [checkingIn, checkingOut, openTasks, notifications, recentEvents, statusCounts, lastWebhook, lastDogSeen] =
     await Promise.all([
       supabase
         .from("live_transition_dogs")
@@ -142,6 +143,13 @@ export async function buildOpsCommandCenterSnapshot(input: {
         .from("gingr_webhook_events")
         .select("created_at")
         .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("live_transition_dogs")
+        .select("last_seen_from_gingr_at")
+        .not("last_seen_from_gingr_at", "is", null)
+        .order("last_seen_from_gingr_at", { ascending: false })
         .limit(1)
         .maybeSingle()
     ]);
@@ -199,22 +207,12 @@ export async function buildOpsCommandCenterSnapshot(input: {
     });
   }
 
-  const lastWebhookAt = lastWebhook.data?.created_at ? String(lastWebhook.data.created_at) : null;
-  const webhookAgeMs = lastWebhookAt ? Date.now() - new Date(lastWebhookAt).getTime() : null;
-  const gingrStatus =
-    webhookAgeMs == null
-      ? "unknown"
-      : webhookAgeMs <= 15 * 60_000
-        ? "healthy"
-        : webhookAgeMs <= 60 * 60_000
-          ? "degraded"
-          : "offline";
-  const gingrDetail =
-    webhookAgeMs == null
-      ? "No Gingr webhook events recorded yet."
-      : webhookAgeMs > 15 * 60_000
-        ? `Gingr synchronization delayed — last successful webhook ${Math.round(webhookAgeMs / 60000)} minutes ago.`
-        : `Last Gingr webhook ${Math.round(webhookAgeMs / 60000)} minute(s) ago.`;
+  const gingrHealth = evaluateGingrHealth({
+    lastWebhookAt: lastWebhook.data?.created_at ? String(lastWebhook.data.created_at) : null,
+    lastDogSeenAt: lastDogSeen.data?.last_seen_from_gingr_at
+      ? String(lastDogSeen.data.last_seen_from_gingr_at)
+      : null
+  });
 
   return {
     greetingName: greetingNameFromEmail(input.email, input.displayName),
@@ -239,16 +237,9 @@ export async function buildOpsCommandCenterSnapshot(input: {
     notifications,
     recentEvents,
     gingrHealth: {
-      status: gingrStatus,
-      label:
-        gingrStatus === "healthy"
-          ? "Gingr ● Connected"
-          : gingrStatus === "degraded"
-            ? "Gingr ● Sync delayed"
-            : gingrStatus === "offline"
-              ? "Gingr ● Disconnected"
-              : "Gingr ● Status unknown",
-      detail: gingrDetail
+      status: gingrHealth.status,
+      label: gingrHealth.label,
+      detail: gingrHealth.detail
     },
     tools: toolsForRole(input.roleKey)
   };
