@@ -217,11 +217,13 @@ export async function POST(request: Request) {
     if (action === "approve_plan") {
       const planId = String(body.planId ?? "").trim();
       if (!planId) return NextResponse.json({ error: "planId is required." }, { status: 400 });
+      const sendOwnerSms = body.sendOwnerSms === true || body.sendOwnerSms === "true";
       const result = await approvePlan({
         planId,
         actorAdminId: session.adminUserId,
         actorEmail: session.email,
-        actorRole: session.role
+        actorRole: session.role,
+        sendOwnerSms
       });
       return NextResponse.json(result);
     }

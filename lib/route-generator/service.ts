@@ -1035,8 +1035,11 @@ export async function approvePlan(params: {
   actorAdminId?: string | null;
   actorEmail?: string | null;
   actorRole?: string | null;
+  /** Explicit staff opt-in. Default false — Approve alone never texts owners. */
+  sendOwnerSms?: boolean;
 }) {
   const supabase = getServiceSupabase();
+  const sendOwnerSms = Boolean(params.sendOwnerSms);
   const { data: plan, error } = await supabase
     .from("route_plans")
     .update({
@@ -1054,18 +1057,28 @@ export async function approvePlan(params: {
     entityId: params.planId,
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
-    actorRole: params.actorRole
+    actorRole: params.actorRole,
+    newValue: { sendOwnerSms }
   });
 
-  // Create owner tracking links (+ SMS when Twilio is configured).
+  // Create owner tracking links. SMS only when sendOwnerSms is checked.
   let tracking: {
     created: number;
     smsQueued: number;
     smsConfigured: boolean;
+    smsEnabled: boolean;
+    smsDeferredQuietHours: boolean;
     smsErrors: string[];
-  } = { created: 0, smsQueued: 0, smsConfigured: false, smsErrors: [] };
+  } = {
+    created: 0,
+    smsQueued: 0,
+    smsConfigured: false,
+    smsEnabled: sendOwnerSms,
+    smsDeferredQuietHours: false,
+    smsErrors: []
+  };
   try {
-    tracking = await createOwnerTrackingForPlan(params.planId);
+    tracking = await createOwnerTrackingForPlan(params.planId, { sendSms: sendOwnerSms });
     await writeRouteAuditEvent({
       action: "route_generator.owner_tracking_created",
       entityType: "route_plan",

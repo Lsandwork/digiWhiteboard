@@ -116,6 +116,7 @@ export function RouteGeneratorPanel() {
     skippedOccurrences: SkippedOccurrence[];
   } | null>(null);
   const [bundle, setBundle] = useState<PlanBundle | null>(null);
+  const [sendOwnerSms, setSendOwnerSms] = useState(false);
   const [visibleVans, setVisibleVans] = useState<Record<string, boolean>>({});
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<string | null>(null);
@@ -389,21 +390,44 @@ export function RouteGeneratorPanel() {
       showToast("Generate routes before approving.", "error");
       return;
     }
+    if (sendOwnerSms) {
+      const ok = window.confirm(
+        "Send owner tracking SMS for this plan?\n\nOwners will get a tracking link now (only during 6 AM–8 PM Pacific), then ETA texts when Samsara shows the van actually moving toward their stop.\n\nOvernight / parked vans will not text."
+      );
+      if (!ok) return;
+    }
     try {
-      const body = await postAction("approve_plan", { planId: bundle.plan.id });
+      const body = await postAction("approve_plan", {
+        planId: bundle.plan.id,
+        sendOwnerSms
+      });
       await hydratePlan(bundle.plan.id);
       const tracking = body.tracking as
-        | { smsQueued?: number; smsConfigured?: boolean; smsErrors?: string[] }
+        | {
+            smsQueued?: number;
+            smsConfigured?: boolean;
+            smsEnabled?: boolean;
+            smsDeferredQuietHours?: boolean;
+            smsErrors?: string[];
+          }
         | undefined;
       if (tracking?.smsQueued) {
         showToast(`Plan approved. Sent ${tracking.smsQueued} owner tracking SMS.`, "success");
-      } else if (tracking?.smsConfigured === false) {
+      } else if (tracking?.smsDeferredQuietHours) {
+        showToast(
+          "Plan approved. Owner SMS opted in, but quiet hours (8 PM–6 AM PT) blocked sending — ETA alerts stay off until daytime service hours with a moving van.",
+          "error"
+        );
+      } else if (tracking?.smsEnabled && tracking?.smsConfigured === false) {
         showToast("Plan approved, but Twilio is not configured — tracking links created without SMS.", "error");
-      } else if (tracking?.smsErrors?.length) {
+      } else if (tracking?.smsEnabled && tracking?.smsErrors?.length) {
         showToast(`Plan approved. Tracking SMS issue: ${tracking.smsErrors[0]}`, "error");
+      } else if (tracking?.smsEnabled) {
+        showToast("Plan approved. Owner SMS alerts enabled (no link texts needed yet).", "success");
       } else {
-        showToast("Plan approved.", "success");
+        showToast("Plan approved. Owner SMS alerts were not enabled.", "success");
       }
+      setSendOwnerSms(false);
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Approve failed.", "error");
     }
@@ -590,7 +614,8 @@ export function RouteGeneratorPanel() {
             onChange={(event) => setDate(event.target.value)}
           />
         </label>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2 sm:items-end">
+          <div className="flex flex-wrap gap-2">
           <button type="button" className="admin-btn-primary" disabled={busy} onClick={() => void pullReport()}>
             <RefreshCw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} />
             {busy ? "Working…" : "Pull Report"}
@@ -629,6 +654,26 @@ export function RouteGeneratorPanel() {
             <Download className="h-4 w-4" />
             Export Samsara CSV
           </button>
+          </div>
+          <label
+            className="flex max-w-xl cursor-pointer items-start gap-2 rounded-xl border border-admin-border bg-black/25 px-3 py-2 text-left text-xs text-admin-muted"
+            title="Required to text owners. Uses Samsara live GPS and blocks overnight / parked-van alerts."
+          >
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={sendOwnerSms}
+              disabled={busy || !bundle?.plan.id || bundle.plan.status === "approved"}
+              onChange={(event) => setSendOwnerSms(event.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-white">Send owner tracking SMS alerts</span>
+              <span className="mt-0.5 block">
+                Off by default. When checked, Approve may send tracking links (6 AM–8 PM PT only) and enable
+                ETA texts only while Samsara shows the van moving near the planned stop window.
+              </span>
+            </span>
+          </label>
         </div>
       </section>
 
