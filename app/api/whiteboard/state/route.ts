@@ -1,4 +1,7 @@
+import { after } from "next/server";
 import { NextResponse } from "next/server";
+import { refreshRetiredTransitionKeys } from "@/lib/board-fast-checkout";
+import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { debugBoardLog, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { CastBoardType } from "@/lib/whiteboard/cast-options";
@@ -45,6 +48,15 @@ export async function GET(request: Request) {
 
     void persistWhiteboardState(supabase, state).catch(() => {
       // Cache persistence is best-effort.
+    });
+
+    // Cast TVs are often the only client polling, so they must keep the Gingr
+    // board cache warm too. Runs after the response, never blocking the TV.
+    after(async () => {
+      await Promise.all([
+        refreshGingrBoardCache().catch(() => null),
+        refreshRetiredTransitionKeys(supabase).catch(() => null)
+      ]);
     });
 
     if (ifNoneMatch && ifNoneMatch === state.version) {

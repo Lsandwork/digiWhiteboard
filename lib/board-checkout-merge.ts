@@ -196,6 +196,11 @@ function checkoutKeysForDog(dog: LiveDog) {
   return keys;
 }
 
+/** Identity keys used to match the same dog across Gingr rows and Supabase rows. */
+export function getTransitionMatchKeys(dog: LiveDog) {
+  return checkoutKeysForDog(dog);
+}
+
 export function buildGingrCheckoutKeySet(dogs: LiveDog[]) {
   const keys = new Set<string>();
   for (const dog of dogs) {

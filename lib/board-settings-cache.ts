@@ -12,7 +12,7 @@ export const SETTINGS_CACHE_TTL_MS = 8_000;
 export const BOARD_OVERLAY_CACHE_TTL_MS = 5_000;
 export const FAST_CHECKOUT_CACHE_TTL_MS = 400;
 export const LIVE_BOARD_CACHE_TTL_MS = 1_000;
-export const WHITEBOARD_STATE_CACHE_TTL_MS = 2_000;
+export const WHITEBOARD_STATE_CACHE_TTL_MS = 800;
 export const DISPLAY_SYNC_CACHE_TTL_MS = 5_000;
 
 export function cachedLoadAdminSettings(supabase: SupabaseClient) {

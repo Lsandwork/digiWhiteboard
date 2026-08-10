@@ -1,7 +1,7 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
 import { reconcileCachedBasketClears, sweepExpiredTransitionRows } from "@/lib/board-fast-checkout";
-import { refreshGingrBasketCache } from "@/lib/gingr-basket-refresh";
+import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
       after(async () => {
         // Runs after the response — lobby guests never wait on a Gingr round trip.
         const [, cleared, swept] = await Promise.all([
-          refreshGingrBasketCache().catch(() => null),
+          refreshGingrBoardCache().catch(() => null),
           reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 })),
           sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 }))
         ]);

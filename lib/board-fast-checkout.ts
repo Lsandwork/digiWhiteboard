@@ -2,6 +2,7 @@ import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { getCachedGingrBasketCheckoutKeys } from "@/lib/basket-cleared-checkout";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import {
+  getTransitionMatchKeys,
   isDogInGingrCheckoutBasket,
   mergeCheckoutDogs,
   reconcileGingrSourcedCheckouts,
@@ -22,6 +23,7 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 const FAST_CHECKOUT_QUERY_TIMEOUT_MS = 1500;
 const FAST_CHECKOUT_PHOTO_TIMEOUT_MS = 800;
+const FAST_BOARD_ROW_LIMIT = 80;
 
 export type FastCheckoutLoadResult = {
   checking_out: LiveDog[];
@@ -46,13 +48,88 @@ function enrichDogs(dogs: LiveDog[]) {
   }));
 }
 
-function loadCachedGingrCheckoutDogs(now: Date) {
+function loadCachedGingrBoardDogs(now: Date) {
   const cachedBoard = getCachedBackOfHouseBoard(now.getTime(), true);
   if (!cachedBoard) return [];
+  return enrichDogs(mapGingrBoardToLiveDogs(cachedBoard));
+}
 
-  return enrichDogs(mapGingrBoardToLiveDogs(cachedBoard)).filter(
+function loadCachedGingrCheckoutDogs(now: Date, gingrBoardDogs = loadCachedGingrBoardDogs(now)) {
+  return gingrBoardDogs.filter(
     (dog) => dog.display_status === "checking_out" && !shouldExpireCheckoutDog(dog, now)
   );
+}
+
+/**
+ * Gingr's back-of-house feed is the only signal for a check-in that never sent a
+ * webhook. Without it the dog waited for the 20-60s full board poll.
+ */
+function loadCachedGingrCheckinDogs(now: Date, gingrBoardDogs = loadCachedGingrBoardDogs(now)) {
+  return gingrBoardDogs.filter(
+    (dog) => dog.display_status === "checking_in" && !shouldExpireCheckinDog(dog, now)
+  );
+}
+
+/**
+ * Reservations the board already retired, mapped to when they were retired.
+ *
+ * Gingr keeps reporting a dog for the length of its display window, so without
+ * this a manually hidden or already-expired dog would pop back onto the board.
+ */
+export type RetiredTransitionKeys = Map<string, number>;
+
+function buildRetiredTransitionKeys(rows: LiveDog[]): RetiredTransitionKeys {
+  const retired: RetiredTransitionKeys = new Map();
+  for (const row of rows) {
+    const retiredAtMs = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+    if (!Number.isFinite(retiredAtMs)) continue;
+    for (const key of getTransitionMatchKeys(row)) {
+      retired.set(key, Math.max(retired.get(key) ?? 0, retiredAtMs));
+    }
+  }
+  return retired;
+}
+
+/**
+ * Refreshed in the background, never on the hot path: suppression only needs to be
+ * seconds-accurate, and the board must not pay a query to learn what it retired.
+ */
+const RETIRED_LOOKBACK_MS = 15 * 60 * 1000;
+const RETIRED_REFRESH_MS = 10_000;
+const RETIRED_SCAN_LIMIT = 200;
+
+let cachedRetiredKeys: RetiredTransitionKeys = new Map();
+let lastRetiredRefreshAt = 0;
+
+export async function refreshRetiredTransitionKeys(supabase: SupabaseClient, now = new Date()) {
+  if (Date.now() - lastRetiredRefreshAt < RETIRED_REFRESH_MS) {
+    return { skipped: true as const, size: cachedRetiredKeys.size };
+  }
+  lastRetiredRefreshAt = Date.now();
+
+  const { data, error } = await supabase
+    .from("live_transition_dogs")
+    .select("gingr_reservation_id, gingr_animal_id, updated_at")
+    .eq("hidden", true)
+    .gte("updated_at", new Date(now.getTime() - RETIRED_LOOKBACK_MS).toISOString())
+    .order("updated_at", { ascending: false })
+    .limit(RETIRED_SCAN_LIMIT);
+
+  if (error) throw error;
+
+  cachedRetiredKeys = buildRetiredTransitionKeys((data ?? []) as LiveDog[]);
+  return { skipped: false as const, size: cachedRetiredKeys.size };
+}
+
+/** A Gingr row is stale only when we retired it *after* the event Gingr reports. */
+function isRetiredGingrDog(dog: LiveDog, retired: RetiredTransitionKeys) {
+  if (!retired.size) return false;
+  const anchor = dog.status_started_at ?? dog.updated_at;
+  const anchorMs = anchor ? new Date(anchor).getTime() : 0;
+  return getTransitionMatchKeys(dog).some((key) => {
+    const retiredAtMs = retired.get(key);
+    return retiredAtMs != null && retiredAtMs >= anchorMs;
+  });
 }
 
 /**
@@ -67,8 +144,8 @@ export function resolveGingrCheckoutBasketKeys(now: Date) {
   );
 }
 
-function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[]) {
-  const gingrCheckouts = loadCachedGingrCheckoutDogs(now);
+function mergeVisibleCheckouts(now: Date, promptedCheckouts: LiveDog[], gingrCheckoutDogs?: LiveDog[]) {
+  const gingrCheckouts = gingrCheckoutDogs ?? loadCachedGingrCheckoutDogs(now);
   const gingrCheckoutKeys = resolveGingrCheckoutBasketKeys(now);
   let visibleCheckouts = mergeCheckoutDogs(gingrCheckouts, promptedCheckouts);
   let basketFiltered = false;
@@ -112,8 +189,8 @@ export async function loadFastPromptedCheckouts(
         )
         .eq("hidden", false)
         .eq("display_status", "checking_out")
-        // Newest first: a row limit must never hide the dog that just checked out.
-        .order("status_started_at", { ascending: false })
+        // Newest first, nulls last: a row limit must never hide the dog that just checked out.
+        .order("status_started_at", { ascending: false, nullsFirst: false })
         .limit(40)
     ),
     FAST_CHECKOUT_QUERY_TIMEOUT_MS,
@@ -174,9 +251,10 @@ export async function loadFastBoardTransitions(
         )
         .eq("hidden", false)
         .in("display_status", ["checking_in", "checking_out"])
-        // Newest first: a row limit must never hide the dog that just transitioned.
-        .order("status_started_at", { ascending: false })
-        .limit(80)
+        // Newest first, and never let null anchors sort ahead of real transitions —
+        // a row limit must not hide the dog that just checked in or out.
+        .order("status_started_at", { ascending: false, nullsFirst: false })
+        .limit(FAST_BOARD_ROW_LIMIT)
     ),
     FAST_CHECKOUT_QUERY_TIMEOUT_MS,
     "fast-board live_transition_dogs"
@@ -185,15 +263,23 @@ export async function loadFastBoardTransitions(
   if (error) throw error;
 
   const rows = enrichDogs((data ?? []) as LiveDog[]);
+  const gingrBoardDogs = loadCachedGingrBoardDogs(now).filter(
+    (dog) => !isRetiredGingrDog(dog, cachedRetiredKeys)
+  );
+
   const checkinRows = rows.filter((dog) => dog.display_status === "checking_in");
-  const visibleCheckins = checkinRows.filter((dog) => !shouldExpireCheckinDog(dog, now));
+  const visibleCheckins = mergeCheckoutDogs(
+    loadCachedGingrCheckinDogs(now, gingrBoardDogs),
+    checkinRows.filter((dog) => !shouldExpireCheckinDog(dog, now))
+  );
 
   const checkoutRows = rows.filter((dog) => dog.display_status === "checking_out");
   const prompted = checkoutRows.filter(isPromptedCheckoutDog);
   const expiredCount = prompted.filter((dog) => shouldExpireCheckoutDog(dog, now)).length;
   const { visibleCheckouts, basketFiltered } = mergeVisibleCheckouts(
     now,
-    prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now))
+    prompted.filter((dog) => !shouldExpireCheckoutDog(dog, now)),
+    loadCachedGingrCheckoutDogs(now, gingrBoardDogs)
   );
 
   let visible = applyCachedBackOfHousePhotos([...visibleCheckins, ...visibleCheckouts]);

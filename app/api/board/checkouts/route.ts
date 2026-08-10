@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import {
   loadFastBoardTransitions,
   reconcileCachedBasketClears,
+  refreshRetiredTransitionKeys,
   sweepExpiredTransitionRows
 } from "@/lib/board-fast-checkout";
 import { FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
-import { refreshGingrBasketCache } from "@/lib/gingr-basket-refresh";
+import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -66,8 +67,9 @@ export async function GET(request: Request) {
       const supabase = getServiceSupabase();
       // Never awaited by the board response — keeps the Gingr basket ~5s fresh
       // so a dog added to the basket shows up without waiting for the slow poll.
-      const [, cleared, swept] = await Promise.all([
-        refreshGingrBasketCache().catch(() => null),
+      const [, , cleared, swept] = await Promise.all([
+        refreshGingrBoardCache().catch(() => null),
+        refreshRetiredTransitionKeys(supabase, now).catch(() => null),
         reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 })),
         sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 }))
       ]);

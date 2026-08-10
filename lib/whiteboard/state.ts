@@ -18,8 +18,13 @@ const FEATURE_TIMEOUT_MS = 2500;
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-export const WHITEBOARD_STATE_POLL_MS = 6000;
-export const WHITEBOARD_STATE_ALERT_POLL_MS = 4000;
+/**
+ * Cast TVs repaint from Realtime, but a missed Realtime event must not cost six
+ * seconds. Responses are ETag/304 and share a short server TTL, so a tight poll
+ * costs little more than an empty round trip.
+ */
+export const WHITEBOARD_STATE_POLL_MS = 2000;
+export const WHITEBOARD_STATE_ALERT_POLL_MS = 1500;
 
 export type CastLiteDog = {
   id: string;

@@ -72,7 +72,9 @@ function gingrUrl(subdomain: string, path: string, params: Record<string, string
 async function fetchGingrJson<T>(url: string, endpoint: "back_of_house" | "reservation_types"): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
-  const revalidateSeconds = endpoint === "back_of_house" ? 9 : 600;
+  // Must not exceed the back-of-house cooldown or the data cache becomes the
+  // bottleneck for how quickly a new dog can reach the board.
+  const revalidateSeconds = endpoint === "back_of_house" ? 3 : 600;
 
   try {
     markGingrEndpointCalled(endpoint);

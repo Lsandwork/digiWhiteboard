@@ -36,7 +36,8 @@ const query = buildCastLiteQuery({ noVideo: true, debugBoard: true });
 assert.match(query, /noVideo=1/);
 assert.match(query, /debugBoard=1/);
 
-assert.equal(WHITEBOARD_STATE_POLL_MS, 6000);
-assert.ok(WHITEBOARD_STATE_POLL_MS >= 4000);
+assert.equal(WHITEBOARD_STATE_POLL_MS, 2000);
+// Cast TVs must repaint within a couple of seconds even if Realtime drops an event.
+assert.ok(WHITEBOARD_STATE_POLL_MS <= 2000);
 
 console.log("whiteboard state tests passed");
