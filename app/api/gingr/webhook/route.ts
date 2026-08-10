@@ -40,6 +40,55 @@ function isCheckoutCompletion(webhookType: string) {
   return webhookType === "check_out" || webhookType === "checked_out";
 }
 
+const NO_EVENT_ID = "00000000-0000-0000-0000-000000000000";
+
+async function recordWebhookEvent(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  payload: GingrWebhookPayload,
+  webhookType: string,
+  verified: boolean,
+  options: { processed: boolean; processingError?: string | null }
+) {
+  const { data } = await supabase
+    .from("gingr_webhook_events")
+    .insert({
+      webhook_type: webhookType || null,
+      entity_id: payload.entity_id ? String(payload.entity_id) : null,
+      entity_type: payload.entity_type ?? null,
+      signature: payload.signature ?? null,
+      verified,
+      processed: options.processed,
+      processing_error: options.processingError ?? null,
+      payload
+    })
+    .select("id")
+    .single();
+
+  return data?.id ?? null;
+}
+
+/** Guards duplicate side effects (alerts) without blocking the board write. */
+async function hasRecentDuplicateEvent(
+  supabase: ReturnType<typeof getServiceSupabase>,
+  webhookType: string,
+  entityId: string | null,
+  excludeEventId: string | null
+) {
+  if (!entityId) return false;
+  const { data } = await supabase
+    .from("gingr_webhook_events")
+    .select("id")
+    .eq("webhook_type", webhookType)
+    .eq("entity_id", entityId)
+    .eq("verified", true)
+    .eq("processed", true)
+    .neq("id", excludeEventId ?? NO_EVENT_ID)
+    .gte("created_at", new Date(Date.now() - 30_000).toISOString())
+    .limit(1);
+
+  return Boolean(data?.length);
+}
+
 async function findExistingDog(supabase: ReturnType<typeof getServiceSupabase>, reservationId: string | null, animalId: string | null) {
   if (reservationId) {
     const { data } = await supabase
@@ -69,6 +118,96 @@ export async function POST(request: Request) {
   const supabase = getServiceSupabase();
   const webhookType = String(payload.webhook_type ?? "");
   const verified = verifyGingrSignature(payload, getGingrWebhookSignatureKey());
+
+  // A dog appearing on the whiteboard is the only latency-critical outcome here.
+  // Write the transition first and defer the audit row, dedupe, and alerts to
+  // after() — that is one Supabase round trip instead of four before the board
+  // (and Realtime) can see the dog.
+  if (verified && activeTypes.has(webhookType)) {
+    const dog = normalizeDog(payload);
+    const entityId = payload.entity_id ? String(payload.entity_id) : null;
+
+    try {
+      const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
+      const nowDate = new Date();
+      const now = nowDate.toISOString();
+      const windowExpired =
+        existing &&
+        !existing.hidden &&
+        (webhookType === "checking_out"
+          ? shouldExpireCheckoutDog(existing as LiveDog, nowDate)
+          : shouldExpireCheckinDog(existing as LiveDog, nowDate));
+      const continuing =
+        !windowExpired && isContinuingSameTransition(existing, webhookType as "checking_in" | "checking_out");
+      const statusStartedAt = continuing && existing?.status_started_at ? existing.status_started_at : now;
+      const existingUntil = continuing ? existing?.display_until : null;
+      const row = {
+        ...dog,
+        current_status: webhookType,
+        display_status: webhookType,
+        hidden: false,
+        status_started_at: statusStartedAt,
+        completed_at: continuing ? existing?.completed_at ?? null : null,
+        display_until:
+          webhookType === "checking_out"
+            ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil, nowDate)
+            : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil, nowDate),
+        last_seen_from_gingr_at: now,
+        raw_payload: { ...payload, source: "gingr_webhook" },
+        updated_at: now
+      };
+
+      const mutation = existing
+        ? supabase.from("live_transition_dogs").update(row).eq("id", existing.id).select("*").single()
+        : supabase.from("live_transition_dogs").insert(row).select("*").single();
+      const { data: savedDog, error } = await mutation;
+      if (error) throw error;
+
+      invalidateBoardTransitionCaches();
+
+      after(async () => {
+        const eventId = await recordWebhookEvent(supabase, payload, webhookType, verified, { processed: true });
+
+        await supabase.from("board_activity_log").insert({
+          gingr_reservation_id: dog.gingr_reservation_id,
+          animal_name: dog.animal_name,
+          action: webhookType,
+          previous_status: existing?.current_status ?? null,
+          new_status: webhookType,
+          source: "webhook",
+          details: { dog_id: savedDog.id }
+        });
+
+        if (continuing) return;
+        if (await hasRecentDuplicateEvent(supabase, webhookType, entityId, eventId)) return;
+
+        if (webhookType === "checking_in") {
+          await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
+          try {
+            const { evaluateFighterRotationAlertForCheckIn } = await import(
+              "@/lib/staff/fighter-rotation-alerts"
+            );
+            await evaluateFighterRotationAlertForCheckIn(supabase, savedDog);
+          } catch (error) {
+            console.error("fighter-rotation: check-in alert failed", error);
+          }
+        } else if (webhookType === "checking_out") {
+          await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
+        }
+      });
+
+      return NextResponse.json({ ok: true, webhook_type: webhookType });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Webhook processing failed.";
+      after(async () => {
+        await recordWebhookEvent(supabase, payload, webhookType, verified, {
+          processed: false,
+          processingError: message
+        });
+      });
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
 
   const { data: event, error: eventError } = await supabase
     .from("gingr_webhook_events")
@@ -132,77 +271,6 @@ export async function POST(request: Request) {
       await upsertIncidentFromGingrWebhook(supabase, payload, event.id);
       await supabase.from("gingr_webhook_events").update({ processed: true }).eq("id", event.id);
       return NextResponse.json({ ok: true, webhook_type: webhookType });
-    }
-
-    if (activeTypes.has(webhookType)) {
-      const dog = normalizeDog(payload);
-      const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
-      const nowDate = new Date();
-      const now = nowDate.toISOString();
-      const windowExpired =
-        existing &&
-        !existing.hidden &&
-        (webhookType === "checking_out"
-          ? shouldExpireCheckoutDog(existing as LiveDog, nowDate)
-          : shouldExpireCheckinDog(existing as LiveDog, nowDate));
-      const continuing =
-        !windowExpired &&
-        isContinuingSameTransition(existing, webhookType as "checking_in" | "checking_out");
-      const statusStartedAt = continuing && existing?.status_started_at ? existing.status_started_at : now;
-      const existingUntil = continuing ? existing?.display_until : null;
-      const row = {
-        ...dog,
-        current_status: webhookType,
-        display_status: webhookType,
-        hidden: false,
-        status_started_at: statusStartedAt,
-        completed_at: continuing ? existing?.completed_at ?? null : null,
-        display_until:
-          webhookType === "checking_out"
-            ? resolveActiveCheckoutDisplayUntil(statusStartedAt, existingUntil, nowDate)
-            : resolveActiveCheckinDisplayUntil(statusStartedAt, existingUntil, nowDate),
-        last_seen_from_gingr_at: now,
-        raw_payload: { ...payload, source: "gingr_webhook" },
-        updated_at: now
-      };
-
-      const mutation = existing
-        ? supabase.from("live_transition_dogs").update(row).eq("id", existing.id).select("*").single()
-        : supabase.from("live_transition_dogs").insert(row).select("*").single();
-      const { data: savedDog, error } = await mutation;
-      if (error) throw error;
-
-      // Ack Gingr as soon as the dog is on the board path. Activity log, Shelly,
-      // and Fighter/Rotations alerts must not delay the webhook response.
-      invalidateBoardTransitionCaches();
-
-      after(async () => {
-        await supabase.from("board_activity_log").insert({
-          gingr_reservation_id: dog.gingr_reservation_id,
-          animal_name: dog.animal_name,
-          action: webhookType,
-          previous_status: existing?.current_status ?? null,
-          new_status: webhookType,
-          source: "webhook",
-          details: { dog_id: savedDog.id }
-        });
-
-        if (continuing) return;
-
-        if (webhookType === "checking_in") {
-          await triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(savedDog));
-          try {
-            const { evaluateFighterRotationAlertForCheckIn } = await import(
-              "@/lib/staff/fighter-rotation-alerts"
-            );
-            await evaluateFighterRotationAlertForCheckIn(supabase, savedDog);
-          } catch (error) {
-            console.error("fighter-rotation: check-in alert failed", error);
-          }
-        } else if (webhookType === "checking_out") {
-          await triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(savedDog));
-        }
-      });
     }
 
     if (acceptedPassiveTypes.has(webhookType)) {
