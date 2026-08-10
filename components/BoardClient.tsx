@@ -833,15 +833,24 @@ export function BoardClient({
         <div
           className={`mx-auto flex h-full w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6 ${tvMode ? "fitdog-board-canvas-inner" : "max-w-[1920px]"}`}
         >
-        <BoardHeader
-          connection={connection}
-          clockTime={dateTime.time}
-          clockDate={dateTime.date}
-          lastUpdated={board.last_updated}
-          wakeLockStatus={wakeLockStatus}
-          onRequestWakeLock={() => void requestWakeLock()}
-          castKeeperMode={castKeeperMode}
-        />
+        {!(
+          showEmergencyCastFullscreen ||
+          isEmergencyStaffPush ||
+          effectiveGroomingNotice ||
+          effectiveTrainerNotice ||
+          showCastFullscreen ||
+          showActivePushFullscreen
+        ) ? (
+          <BoardHeader
+            connection={connection}
+            clockTime={dateTime.time}
+            clockDate={dateTime.date}
+            lastUpdated={board.last_updated}
+            wakeLockStatus={wakeLockStatus}
+            onRequestWakeLock={() => void requestWakeLock()}
+            castKeeperMode={castKeeperMode}
+          />
+        ) : null}
 
         {fetchError && !hasBoardData ? (
           <BoardErrorBanner
@@ -863,7 +872,13 @@ export function BoardClient({
             onDismiss={() => void reloadEmergencyCast()}
           />
         ) : isEmergencyStaffPush ? (
-          <StaffPushNoticeFullscreen notice={activePushNotice!} />
+          <StaffPushNoticeFullscreen
+            notice={activePushNotice!}
+            clockTime={dateTime.time}
+            clockDate={dateTime.date}
+            lastUpdated={board.last_updated}
+            connection={connection}
+          />
         ) : effectiveGroomingNotice ? (
           <GroomingPushNoticeOverlay
             notice={effectiveGroomingNotice}
@@ -891,7 +906,13 @@ export function BoardClient({
             onDismiss={() => void reloadCastVideo()}
           />
         ) : showActivePushFullscreen ? (
-          <StaffPushNoticeFullscreen notice={activePushNotice!} />
+          <StaffPushNoticeFullscreen
+            notice={activePushNotice!}
+            clockTime={dateTime.time}
+            clockDate={dateTime.date}
+            lastUpdated={board.last_updated}
+            connection={connection}
+          />
         ) : (
           <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
             {staffBoardLayout.variant === "loading" ? (

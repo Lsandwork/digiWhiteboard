@@ -109,14 +109,16 @@ export function DemoBoardClient() {
       </div>
 
       <div className="mx-auto flex h-full w-full max-w-[1920px] flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
-        <BoardHeader
-          connection="live"
-          clockTime={dateTime.time}
-          clockDate={dateTime.date}
-          lastUpdated={board.last_updated}
-          wakeLockStatus="unsupported"
-          onRequestWakeLock={() => undefined}
-        />
+        {!(activeGroomingNotice || (activePushNotice && !hasVisibleDogs)) ? (
+          <BoardHeader
+            connection="live"
+            clockTime={dateTime.time}
+            clockDate={dateTime.date}
+            lastUpdated={board.last_updated}
+            wakeLockStatus="unsupported"
+            onRequestWakeLock={() => undefined}
+          />
+        ) : null}
 
         {activeGroomingNotice ? (
           <GroomingPushNoticeOverlay
@@ -127,7 +129,13 @@ export function DemoBoardClient() {
             clockDate={groomingClock.clockDate}
           />
         ) : activePushNotice && !hasVisibleDogs ? (
-          <StaffPushNoticeFullscreen notice={activePushNotice} />
+          <StaffPushNoticeFullscreen
+            notice={activePushNotice}
+            clockTime={dateTime.time}
+            clockDate={dateTime.date}
+            lastUpdated={board.last_updated}
+            connection="live"
+          />
         ) : (
           <div className={`grid min-h-0 flex-1 gap-4 ${activePushNotice ? "xl:grid-cols-[minmax(0,1fr)_420px]" : ""} lg:gap-5 xl:gap-6`}>
             <div className="grid min-h-0 gap-4 lg:grid-cols-2 lg:gap-5 xl:gap-6">

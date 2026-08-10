@@ -21,6 +21,15 @@ body {
   min-height: 100dvh;
 }
 
+/* Soft navy dim behind OpsAlert takeovers — replaces the old striped push veil. */
+.ops-alert-board-dim {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(4, 13, 28, 0.55);
+}
+
 @media (min-width: 1280px) {
   .board-shell {
     height: 100vh;
