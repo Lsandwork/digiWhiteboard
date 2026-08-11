@@ -29,12 +29,17 @@ Never generate, display, assign, import, or reference Van 4.
 
 This is usually a **bad data row**, not Digi being down. Digi never uploads to Samsara — staff download a CSV and upload it in `cloud.samsara.com`.
 
-Common causes Digi now blocks before download:
+Common causes Digi now **blocks before download** (fail-closed — no file is offered):
 1. Missing **Latitude / Longitude / Full Address** on any stop
 2. Stop times on the **wrong calendar day** (UTC/ETA drift)
-3. Multiline or oversized **Stop Notes**
-4. **0,0** / invalid coordinates
+3. Multiline, non-ASCII, or oversized **Stop Notes** (ZWSP/emoji/smart quotes stripped; otherwise blocked)
+4. **0,0** / near-zero / invalid coordinates
 5. Driver + vehicle both assigned
+6. Vehicle name not exactly **Van 01 / 02 / 03 / 05 / 06** (soft warnings removed — hard error)
+7. Arrival === departure, or non-monotonic times across a route
+8. CSV round-trip mismatch (wrong column count / blank required cells)
+
+If Samsara still shows **Internal Server Error**, you are almost certainly uploading an **old Downloads copy** (e.g. `fitdog-samsara-routes-2026-08-11-2.csv` from a prior export). Delete old copies, re-export from Digi, and upload **only** the newest file Digi just downloaded.
 
 **Never reuse another day's CSV** (e.g. Friday's file on Monday). Digi blocks wrong-day export unless a manager uses emergency override with a written reason. Always **Re-export Samsara CSV** from today's approved plan.
 

@@ -72,6 +72,18 @@ Pickup synthesis still starts at **07:00 AM**. These times feed the Samsara CSV 
 
 `ROUTE_GENERATOR_ENABLED`, `SAMSARA_CSV_EXPORT_ENABLED`, `SAMSARA_API_TOKEN`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_MESSAGING_SERVICE_SID`, `TWILIO_FROM_NUMBER`, `CRON_SECRET`, `NEXT_PUBLIC_SITE_URL`
 
+## Fail-closed validation (never download a 500-prone file)
+
+Before Digi returns a CSV download it runs hard checks including:
+- Exact headers A–K
+- Vehicle roster only: `Van 01|02|03|05|06`
+- Address + lat/lng present; no near-zero coords
+- Same operating-date datetimes; departure **after** arrival; monotonic route times
+- Single-line printable-ASCII notes ≤ 480 chars
+- CSV round-trip parse of every data row
+
+If any check fails, export returns **422** and **no file** is downloaded.
+
 ## Van 4
 
 Never generate, display, assign, import, or reference Van 4.

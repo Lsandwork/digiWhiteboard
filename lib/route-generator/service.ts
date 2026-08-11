@@ -30,6 +30,7 @@ import {
   formatSamsaraCsvDateTime,
   formatSamsaraCoordinate,
   getCanonicalSamsaraTemplate,
+  isAllowedSamsaraVehicleName,
   normalizeSamsaraVehicleName,
   sanitizeSamsaraNotes,
   sanitizeSamsaraText,
@@ -1234,10 +1235,10 @@ export async function exportSamsaraCsv(params: {
         etaDeparture && !Number.isNaN(etaDeparture.getTime())
           ? formatSamsaraCsvDateTime(etaDeparture)
           : synthesized.departure;
-      // Samsara requires both times; departure must not precede arrival.
+      // Samsara requires both times; departure must be strictly after arrival.
       const arrivalMs = etaArrival && !Number.isNaN(etaArrival.getTime()) ? etaArrival.getTime() : null;
       const departureMs = etaDeparture && !Number.isNaN(etaDeparture.getTime()) ? etaDeparture.getTime() : null;
-      if (arrivalMs != null && (departureMs == null || departureMs < arrivalMs)) {
+      if (arrivalMs != null && (departureMs == null || departureMs <= arrivalMs)) {
         scheduledDeparture = formatSamsaraCsvDateTime(new Date(arrivalMs + 5 * 60_000));
       }
       if (!scheduledArrival.trim()) scheduledArrival = synthesized.arrival;
@@ -1260,13 +1261,26 @@ export async function exportSamsaraCsv(params: {
       const notesWithRoute =
         stopNotes.trim() ||
         `${route.wave_name || ""}`.trim();
+      const safeRouteName = sanitizeSamsaraText(routeName);
+      const baseStopName = sanitizeSamsaraText(String(stop.owner_name || stop.stop_kind || "Stop")) || "Stop";
+      // Unique stop labels within a route (depot start/end used to collide and confuse Samsara).
+      const sameNameCount = rows.filter(
+        (r) =>
+          r.routeName === safeRouteName &&
+          (r.stopName === baseStopName || r.stopName.startsWith(`${baseStopName} (`))
+      ).length;
+      const stopName =
+        sameNameCount === 0
+          ? baseStopName
+          : sanitizeSamsaraText(`${baseStopName} (${sameNameCount + 1})`) || `${baseStopName} ${sameNameCount + 1}`;
+
       rows.push({
-        routeName,
-        routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
+        routeName: safeRouteName,
+        routeNotes: sanitizeSamsaraNotes(`${route.wave_name} · ${route.vehicle_pool}`),
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
         driverName: "",
-        stopName: sanitizeSamsaraText(String(stop.owner_name || stop.stop_kind || "Stop")),
+        stopName,
         stopNotes: sanitizeSamsaraNotes(notesWithRoute),
         stopAddress: sanitizeSamsaraText(stop.address || ""),
         scheduledArrival,
@@ -1279,7 +1293,34 @@ export async function exportSamsaraCsv(params: {
     });
   }
 
+  // Hard fail: vehicle names must be exact Samsara roster before building the file.
+  for (const row of rows) {
+    try {
+      row.vehicleName = normalizeSamsaraVehicleName(row.vehicleName);
+    } catch (error) {
+      throw new RouteGeneratorClientError(
+        error instanceof Error ? error.message : "Invalid Samsara vehicle name.",
+        422,
+        "csv_validation_failed"
+      );
+    }
+    if (!isAllowedSamsaraVehicleName(row.vehicleName)) {
+      throw new RouteGeneratorClientError(
+        `CSV validation failed — vehicle "${row.vehicleName}" on ${row.routeName} must be Van 01/02/03/05/06 exactly (as named in Samsara).`,
+        422,
+        "csv_validation_failed"
+      );
+    }
+  }
+
   const built = buildCsv({ template, rows });
+  if (built.errors.length) {
+    throw new RouteGeneratorClientError(
+      `CSV build failed — ${built.errors.slice(0, 5).join("; ")}`,
+      422,
+      "csv_validation_failed"
+    );
+  }
   const validation = validateExport({
     template,
     rows,
@@ -1289,7 +1330,7 @@ export async function exportSamsaraCsv(params: {
   if (!validation.ok) {
     const details = (validation.report.errors as string[]).slice(0, 8).join("; ") || "unknown error";
     throw new RouteGeneratorClientError(
-      `CSV validation failed — fix these stops before uploading to Samsara: ${details}`,
+      `CSV validation failed — Digi will not download a file Samsara may reject: ${details}`,
       422,
       "csv_validation_failed"
     );
