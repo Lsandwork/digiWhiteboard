@@ -1,48 +1,60 @@
 import assert from "node:assert/strict";
 import {
-  formatJasperDepartLabel,
   isJasperDemoSmsEnabled,
   isWithinJasperDemoSmsWindow,
-  jasperDemoDepartAtMs,
-  laMinutesSinceMidnight,
-  maybeAdvanceJasperDemoSms,
-  todayLa
+  maybeAdvanceJasperDemoSms
 } from "@/lib/route-generator/jasper-demo-run";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 async function main() {
-  // Default: demo SMS must be OFF (production-safe).
-  delete process.env.JASPER_DEMO_SMS_ENABLED;
   assert.equal(isJasperDemoSmsEnabled(), false);
-
-  const morning = Date.parse("2026-08-11T16:26:00.000Z"); // 9:26am PDT
-  assert.ok(laMinutesSinceMidnight(morning) < 12 * 60, "fixture should be morning PT");
-  assert.equal(isWithinJasperDemoSmsWindow(morning), false, "morning must be outside demo window");
-
-  const evening = Date.parse("2026-08-12T04:10:00.000Z"); // 9:10pm PDT
-  assert.ok(isWithinJasperDemoSmsWindow(evening), "9:10pm PT must be inside demo window");
-
-  const depart = jasperDemoDepartAtMs(morning);
-  assert.equal(todayLa(morning), "2026-08-11");
-  assert.match(formatJasperDepartLabel(depart), /9:08pm/i);
-
-  const disabled = await maybeAdvanceJasperDemoSms({ nowMs: morning });
-  assert.equal(disabled.skipped, true);
-  assert.equal(disabled.reason, "jasper_demo_sms_disabled");
+  assert.equal(isWithinJasperDemoSmsWindow(Date.now()), false);
 
   process.env.JASPER_DEMO_SMS_ENABLED = "true";
-  assert.equal(isJasperDemoSmsEnabled(), true);
-
-  const outside = await maybeAdvanceJasperDemoSms({ nowMs: morning });
-  assert.equal(outside.skipped, true);
   assert.equal(
-    outside.reason,
-    "outside_demo_evening_window",
-    "even when enabled, morning must not send 9:08pm departing SMS"
+    isJasperDemoSmsEnabled(),
+    false,
+    "env flag must not re-enable Jasper demo SMS"
+  );
+
+  const morning = Date.parse("2026-08-11T16:26:00.000Z"); // 9:26am PDT
+  const evening = Date.parse("2026-08-12T04:08:00.000Z"); // 9:08pm PDT
+
+  const morningResult = await maybeAdvanceJasperDemoSms({ nowMs: morning, force: true });
+  assert.equal(morningResult.skipped, true);
+  assert.equal(morningResult.reason, "jasper_demo_sms_permanently_disabled");
+
+  const eveningResult = await maybeAdvanceJasperDemoSms({ nowMs: evening, force: true });
+  assert.equal(eveningResult.skipped, true);
+  assert.equal(
+    eveningResult.reason,
+    "jasper_demo_sms_permanently_disabled",
+    "9:08pm demo send must be impossible even with force"
+  );
+
+  // Production ETA cron must not import the demo sender.
+  const etaCron = readFileSync(join(process.cwd(), "app/api/cron/route-eta-alerts/route.ts"), "utf8");
+  assert.equal(
+    /maybeAdvanceJasperDemoSms/.test(etaCron),
+    false,
+    "route-eta-alerts must not call Jasper demo SMS"
+  );
+  assert.equal(
+    /jasper-demo-run/.test(etaCron),
+    false,
+    "route-eta-alerts must not import jasper-demo-run"
+  );
+
+  const trackApi = readFileSync(join(process.cwd(), "app/api/track/[token]/route.ts"), "utf8");
+  assert.equal(
+    /maybeAdvanceJasperDemoSms|jasper-demo-run/.test(trackApi),
+    false,
+    "public track API must not advance Jasper demo SMS"
   );
 
   delete process.env.JASPER_DEMO_SMS_ENABLED;
-
-  console.log("test-jasper-demo-sms-guards: ok");
+  console.log("test-jasper-demo-sms-guards: ok (9:08pm demo path permanently dead)");
 }
 
 main().catch((error) => {
