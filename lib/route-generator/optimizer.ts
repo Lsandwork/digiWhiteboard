@@ -230,62 +230,29 @@ export function optimizeRoutes(params: {
     };
   });
 
-  // Assign locked households first
-  for (const stop of enriched) {
-    const lockedVan = params.lockedVanByHousehold?.[stop.householdKey];
-    if (!lockedVan) continue;
-    assertNeverVan4(lockedVan);
-    const bucket = buckets.get(lockedVan);
-    if (!bucket) {
-      unassigned.push(stop);
-      continue;
-    }
-    const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical;
-    if (service && !isServiceEligibleForVan(service, bucket.vehicle)) {
-      // Manual / skipped-class / taxi assignments may intentionally pin a service onto a van.
-      warnings.push(
-        `${stop.address}: locked onto ${lockedVan.replace("van_", "Van ")} even though default eligibility excludes ${service}.`
-      );
-    }
-    const check = capacityAllows({
-      vehicle: bucket.vehicle,
-      currentDogs: bucket.dogs,
-      currentLoad: bucket.load,
-      currentLarge: bucket.large,
-      currentStops: bucket.stops.length,
-      addDogs: stop.dogCount,
-      addLoad: stop.load,
-      addLarge: stop.large,
-      addStops: 1
-    });
-    if (!check.ok) {
-      unassigned.push(stop);
-      warnings.push(...check.reasons.map((r) => `${stop.address}: ${r}`));
-      continue;
-    }
+  type EnrichedStop = (typeof enriched)[number];
+
+  function placeOnBucket(bucket: Bucket, stop: EnrichedStop) {
     bucket.stops.push(stop);
     bucket.dogs += stop.dogCount;
     bucket.load += stop.load;
     bucket.large += stop.large;
   }
 
-  const unlocked = enriched.filter((s) => !params.lockedVanByHousehold?.[s.householdKey]);
-  // Assign earliest deadlines first so late-window proximity packing cannot starve early classes.
-  unlocked.sort((a, b) => {
-    const aKey = groupTimelinessSortKey(a, params.direction);
-    const bKey = groupTimelinessSortKey(b, params.direction);
-    if (aKey !== bKey) return aKey - bKey;
-    return b.load - a.load || a.address.localeCompare(b.address);
-  });
+  function eligibleBuckets(service: CanonicalService | null | undefined): Bucket[] {
+    return [...buckets.values()].filter((bucket) => {
+      if (!service) return true;
+      return isServiceEligibleForVan(service, bucket.vehicle);
+    });
+  }
 
-  for (const stop of unlocked) {
-    const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical;
-    let placed = false;
-    const candidates = [...buckets.values()]
-      .filter((bucket) => {
-        if (!service) return true;
-        return isServiceEligibleForVan(service, bucket.vehicle);
-      })
+  function rankCandidates(
+    stop: EnrichedStop,
+    service: CanonicalService | null | undefined,
+    options?: { ignoreCapacity?: boolean; excludeVanKeys?: Set<string> }
+  ) {
+    return eligibleBuckets(service)
+      .filter((bucket) => !options?.excludeVanKeys?.has(bucket.vehicle.vanKey))
       .map((bucket) => {
         const check = capacityAllows({
           vehicle: bucket.vehicle,
@@ -315,34 +282,137 @@ export function optimizeRoutes(params: {
         const score = dist + timingPenalty + clash - affinity;
         return { bucket, check, dist, score, clash };
       })
-      .filter((c) => c.check.ok && c.clash < 500)
-      .sort((a, b) => a.score - b.score || a.dist - b.dist || a.bucket.dogs - b.bucket.dogs);
+      .filter((c) => c.clash < 500 && (options?.ignoreCapacity || c.check.ok))
+      .sort(
+        (a, b) =>
+          a.score - b.score ||
+          a.dist - b.dist ||
+          a.bucket.dogs - b.bucket.dogs ||
+          a.bucket.vehicle.vanKey.localeCompare(b.bucket.vehicle.vanKey)
+      );
+  }
 
-    if (candidates[0]) {
-      const { bucket } = candidates[0];
-      bucket.stops.push(stop);
-      bucket.dogs += stop.dogCount;
-      bucket.load += stop.load;
-      bucket.large += stop.large;
-      placed = true;
+  const placedKeys = new Set<string>();
+
+  // Assign locked households first. If the pinned van is missing/full, fall back to
+  // other eligible vans so manual taxi / skipped-class pins are not dead-ends.
+  for (const stop of enriched) {
+    const lockedVan = params.lockedVanByHousehold?.[stop.householdKey];
+    if (!lockedVan) continue;
+    assertNeverVan4(lockedVan);
+    const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical ?? null;
+    const bucket = buckets.get(lockedVan);
+    if (bucket) {
+      if (service && !isServiceEligibleForVan(service, bucket.vehicle)) {
+        // Manual / skipped-class / taxi assignments may intentionally pin a service onto a van.
+        warnings.push(
+          `${stop.address}: locked onto ${lockedVan.replace("van_", "Van ")} even though default eligibility excludes ${service}.`
+        );
+      }
+      const check = capacityAllows({
+        vehicle: bucket.vehicle,
+        currentDogs: bucket.dogs,
+        currentLoad: bucket.load,
+        currentLarge: bucket.large,
+        currentStops: bucket.stops.length,
+        addDogs: stop.dogCount,
+        addLoad: stop.load,
+        addLarge: stop.large,
+        addStops: 1
+      });
+      if (check.ok) {
+        placeOnBucket(bucket, stop);
+        placedKeys.add(stop.householdKey);
+        continue;
+      }
+      warnings.push(...check.reasons.map((r) => `${stop.address}: locked ${lockedVan.replace("van_", "Van ")} — ${r}`));
+    } else {
+      warnings.push(
+        `${stop.address}: locked van ${lockedVan.replace("van_", "Van ")} is inactive or missing — trying other eligible vans.`
+      );
     }
 
-    if (!placed) {
-      unassigned.push(stop);
-      const clashBlocked = [...buckets.values()].some(
-        (bucket) =>
-          (!service || isServiceEligibleForVan(service, bucket.vehicle)) &&
-          sharedDogTimingClashPenalty(bucket.stops, stop) >= 500
+    const fallback = rankCandidates(stop, service, { excludeVanKeys: new Set([lockedVan]) })[0];
+    if (fallback) {
+      placeOnBucket(fallback.bucket, stop);
+      placedKeys.add(stop.householdKey);
+      warnings.push(
+        `${stop.address}: moved from locked ${lockedVan.replace("van_", "Van ")} to ${fallback.bucket.vehicle.vanKey.replace("van_", "Van ")} (capacity/availability).`
       );
-      if (clashBlocked) {
-        warnings.push(
-          `${stop.address}: shared dog has overlapping class windows with another stop — left unassigned for review.`
-        );
-      } else if (service) {
-        warnings.push(`${stop.address}: no eligible van has capacity for ${service}.`);
-      } else {
-        warnings.push(`${stop.address}: could not assign household.`);
-      }
+      continue;
+    }
+
+    // Last resort for locked pins: soft-overflow onto the locked van when it exists.
+    if (bucket && sharedDogTimingClashPenalty(bucket.stops, stop) < 500) {
+      placeOnBucket(bucket, stop);
+      placedKeys.add(stop.householdKey);
+      warnings.push(
+        `${stop.address}: OVERFLOW onto locked ${lockedVan.replace("van_", "Van ")} over capacity — coordinator must rebalance.`
+      );
+      continue;
+    }
+
+    unassigned.push(stop);
+  }
+
+  const unlocked = enriched.filter((s) => !placedKeys.has(s.householdKey));
+  // Assign earliest deadlines first so late-window proximity packing cannot starve early classes.
+  unlocked.sort((a, b) => {
+    const aKey = groupTimelinessSortKey(a, params.direction);
+    const bKey = groupTimelinessSortKey(b, params.direction);
+    if (aKey !== bKey) return aKey - bKey;
+    return b.load - a.load || a.address.localeCompare(b.address);
+  });
+
+  const deferredOverflow: EnrichedStop[] = [];
+
+  for (const stop of unlocked) {
+    const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical ?? null;
+    const candidates = rankCandidates(stop, service);
+    if (candidates[0]) {
+      placeOnBucket(candidates[0].bucket, stop);
+      placedKeys.add(stop.householdKey);
+      continue;
+    }
+
+    const clashBlocked = eligibleBuckets(service).some(
+      (bucket) => sharedDogTimingClashPenalty(bucket.stops, stop) >= 500
+    );
+    if (clashBlocked) {
+      unassigned.push(stop);
+      warnings.push(
+        `${stop.address}: shared dog has overlapping class windows with another stop — left unassigned for review.`
+      );
+      continue;
+    }
+
+    // Capacity/eligibility starvation — keep for soft overflow so valid legs still
+    // land on a van route the coordinator can edit (never only a blocked list).
+    deferredOverflow.push(stop);
+  }
+
+  for (const stop of deferredOverflow) {
+    const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical ?? null;
+    const overflow = rankCandidates(stop, service, { ignoreCapacity: true })[0];
+    if (overflow) {
+      placeOnBucket(overflow.bucket, stop);
+      placedKeys.add(stop.householdKey);
+      warnings.push(
+        `${stop.address}: OVERFLOW onto ${overflow.bucket.vehicle.vanKey.replace("van_", "Van ")} over capacity for ${service || "service"} — coordinator must rebalance or split vans.`
+      );
+      continue;
+    }
+
+    unassigned.push(stop);
+    if (service) {
+      const anyEligible = eligibleBuckets(service).length > 0;
+      warnings.push(
+        anyEligible
+          ? `${stop.address}: no eligible van could take ${service} (timing clash on every candidate).`
+          : `${stop.address}: no active van is eligible for ${service}.`
+      );
+    } else {
+      warnings.push(`${stop.address}: could not assign household.`);
     }
   }
 
@@ -511,26 +581,36 @@ export function optimizeRoutes(params: {
       notes: `End at ${endBase.name}`
     });
 
+    const vanLabel = String(vanKey).replace("van_", "Van ");
+    const routeWarnings = warnings.filter((w) => w.includes(vanLabel) || w.includes(String(vanKey)));
+    const hasOverflow = routeWarnings.some((w) => /OVERFLOW/i.test(w));
     routes.push({
       vanKey: vanKey as FitdogVanKey,
       vehiclePool: bucket.vehicle.vehiclePool,
       direction: params.direction,
-      waveName: params.direction === "pickup" ? "Morning Pickup" : "Afternoon Drop-Off",
+      waveName: hasOverflow
+        ? `${params.direction === "pickup" ? "Morning Pickup" : "Afternoon Drop-Off"} (OVERFLOW — rebalance)`
+        : params.direction === "pickup"
+          ? "Morning Pickup"
+          : "Afternoon Drop-Off",
       stops,
       totalDogs: bucket.dogs,
       loadUnitsUsed: bucket.load,
       largeDogs: bucket.large,
       serviceTypes,
-      warnings: [],
+      warnings: routeWarnings,
       estimatedDistanceMiles: Math.round(distance * 10) / 10,
       estimatedDriveMinutes: Math.round(distance * 3.2)
     });
   }
 
+  const hasOverflow = warnings.some((w) => /OVERFLOW/i.test(w));
   let label: OptimizationResult["label"] = "optimized";
-  if (unassigned.length) label = "needs_management_review";
+  if (unassigned.length || hasOverflow) label = "needs_management_review";
   if (!routes.length && params.households.length) label = "infeasible";
-  if (routes.length && unassigned.length === 0 && warnings.length) label = "feasible_not_fully_optimized";
+  if (routes.length && unassigned.length === 0 && warnings.length && !hasOverflow) {
+    label = "feasible_not_fully_optimized";
+  }
 
   return { label, seed, routes, unassigned, warnings };
 }

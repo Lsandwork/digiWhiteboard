@@ -55,7 +55,7 @@ function legId(item: NormalizedReportItem): string {
 
 function itemSource(item: NormalizedReportItem): string {
   const raw = item.raw as Record<string, unknown>;
-  if (raw?.source === "manual" || raw?.manual === true) return "Manual";
+  if (raw?.source === "manual" || raw?.source === "manual_taxi" || raw?.manual === true) return "Manual";
   if (raw?.source === "gingr_taxi" || String(raw?.source || "").includes("gingr")) return "Gingr";
   return "Fitdog/Gingr";
 }
