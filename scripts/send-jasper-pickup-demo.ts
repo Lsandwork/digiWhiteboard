@@ -1,13 +1,15 @@
 /**
- * Demo run: Jasper pickup live-track SMS (no Samsara export).
+ * MANUAL staff demo only — never wire this into production cron.
+ *
+ * Requires: JASPER_DEMO_SMS_ENABLED=true
  *
  * Van starts Lincoln & Manchester → 7742 Redlands St, Playa Del Rey, CA 90293.
  * Driver start clock: 9:08pm PT (or now if that time already passed today).
  * Sends SMS to 2139131391 and follow-ups as the van approaches / pulls up in real time.
  *
  * Usage:
- *   npx tsx scripts/send-jasper-pickup-demo.ts [phone]
- *   npx tsx scripts/send-jasper-pickup-demo.ts 2139131391 --no-followup
+ *   JASPER_DEMO_SMS_ENABLED=true npx tsx scripts/send-jasper-pickup-demo.ts [phone]
+ *   JASPER_DEMO_SMS_ENABLED=true npx tsx scripts/send-jasper-pickup-demo.ts 2139131391 --no-followup
  */
 import { loadEnvFiles } from "./load-env-local";
 loadEnvFiles();
@@ -15,6 +17,13 @@ loadEnvFiles();
 import { getSmsProvider } from "../lib/integrations/sms/provider";
 import { getPublicSiteUrl } from "../lib/site-url";
 import { getDemoDriveState, getOwnerTrackingDemo } from "../lib/route-generator/owner-tracking";
+
+if (process.env.JASPER_DEMO_SMS_ENABLED !== "true") {
+  console.error(
+    "Refusing to send Jasper demo SMS. Set JASPER_DEMO_SMS_ENABLED=true for an intentional staff demo only."
+  );
+  process.exit(1);
+}
 
 const TO = (process.argv[2] && !process.argv[2].startsWith("-") ? process.argv[2] : null) || "2139131391";
 const NO_FOLLOWUP = process.argv.includes("--no-followup");
