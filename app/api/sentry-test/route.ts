@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
  * DELETE after confirming an issue appears in Sentry.
  *
  * GET /api/sentry-test?token=$SENTRY_TEST_SECRET
+ * Also try the client page: /sentry-example-page (calls myUndefinedFunction()).
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -25,12 +26,20 @@ export async function GET(request: Request) {
     );
   }
 
-  const err = new Error("Sentry test error — delete /api/sentry-test after verification");
-  Sentry.captureException(err);
-  await Sentry.flush(2000);
+  try {
+    // Classic Sentry docs trigger — intentional ReferenceError on the server runtime
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).myUndefinedFunction();
+  } catch (error) {
+    Sentry.captureException(error);
+    await Sentry.flush(2000);
+    return NextResponse.json({
+      ok: true,
+      message:
+        "myUndefinedFunction() ReferenceError sent to Sentry. Check Issues within ~30s, then delete this route and /sentry-example-page.",
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
 
-  return NextResponse.json({
-    ok: true,
-    message: "Test exception sent to Sentry. Check Issues within ~30s, then delete this route."
-  });
+  return NextResponse.json({ error: "Expected ReferenceError was not thrown" }, { status: 500 });
 }
