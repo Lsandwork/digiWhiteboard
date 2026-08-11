@@ -33,6 +33,8 @@
     "test:route-generator-production-final": "tsx scripts/test-route-generator-production-final.ts",
     "test:route-generator-all": "npm run test:route-generator && npm run test:samsara-csv && npm run test:household-coords && npm run test:route-generator-production-final && npm run test:route-owner-sms && npm run test:route-owner-sms-kill-switch && npm run test:jasper-demo-sms-guards",
     "test:ops-command-center": "tsx scripts/test-ops-command-center-foundation.ts",
+    "test:system-health": "tsx scripts/test-system-health-debugging.ts",
+    "ruffops:debug": "tsx scripts/ruffops-debug.ts",
     "setup:route-generator-shadow": "tsx scripts/setup-route-generator-shadow.ts",
     "setup:route-generator-bases": "tsx scripts/seed-route-generator-bases.ts",
     "smoke:route-generator-shadow": "tsx scripts/run-route-generator-shadow-smoke.ts",

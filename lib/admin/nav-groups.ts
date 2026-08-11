@@ -53,11 +53,18 @@ export const AUTOMATIC_BLOG_NAV_ROUTE: NavRouteLeaf = {
 
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
-  options?: { includeRuffly?: boolean; includeRouteGenerator?: boolean }
+  options?: {
+    includeRuffly?: boolean;
+    includeRouteGenerator?: boolean;
+    includeSystemHealth?: boolean;
+  }
 ): NavEntry[] {
   const globalSection: NavEntry[] = [section("global_apps", "Applications")];
   if (options?.includeRouteGenerator) {
     globalSection.push(leaf("route_generator"));
+  }
+  if (options?.includeSystemHealth) {
+    globalSection.push(leaf("ops_system_health"));
   }
   globalSection.push(GINGR_NAV_ROUTE);
   if (options?.includeRuffly !== false) {
@@ -164,7 +171,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   driver_mode: "Driver / Hiker Mode",
   overnight_command: "Overnight Command",
   trainer_ops: "Trainer Ops",
-  ops_system_health: "System Health",
+  ops_system_health: "System Health & Debugging",
   shift_handoff: "Shift Handoff"
 };
 
@@ -178,7 +185,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   driver_mode: "Mobile next-stop workflow with offline-safe completion.",
   overnight_command: "Overnight rounds, meds, and escalation.",
   trainer_ops: "Training session ops around Gingr bookings.",
-  ops_system_health: "Gingr/Samsara/Twilio/storage health without secrets.",
+  ops_system_health:
+    "Live observability, route audits, integration failures, and Cursor debug evidence — without secrets.",
   shift_handoff: "Structured shift handoff with acknowledgement.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
@@ -384,7 +392,6 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
             "driver_mode",
             "overnight_command",
             "trainer_ops",
-            "ops_system_health",
             "shift_handoff",
             // Flat Dashboard leaf — one click opens Commissions (no nested section).
             "package_commissions",
@@ -701,7 +708,8 @@ export function buildStaffPanelNav(
   entries = insertBlogGeneratorIntoDashboard(entries, roleCanSeeBlogNav(role));
   return appendAuthenticatedGlobalRoutes(entries, {
     includeRuffly: roleCanSeeRufflyNav(role),
-    includeRouteGenerator: visibleTabs.includes("route_generator")
+    includeRouteGenerator: visibleTabs.includes("route_generator"),
+    includeSystemHealth: visibleTabs.includes("ops_system_health")
   });
 }
 

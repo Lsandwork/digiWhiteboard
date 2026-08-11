@@ -1,0 +1,32 @@
+# Cursor / agent instructions for RuffOps
+
+## WHEN DEBUGGING AN EXISTING RUFFOPS BUG
+
+1. Do not guess immediately.
+2. Inspect relevant implementation in the repo.
+3. Query RuffOps diagnostics where available (`npm run ruffops:debug`).
+4. Look for recent errors.
+5. Look for failed route audits / quality gate FAIL.
+6. Use correlation IDs (`RG-YYYYMMDD-#####`).
+7. Compare expected versus actual system behavior (dogs, destinations, integrations).
+8. Identify root cause at the smallest correct layer.
+9. Fix that layer only.
+10. Add regression coverage (fixtures, not hardcoded production dog names in app logic).
+11. Run relevant tests (`npm run test:system-health`, `npm run test:route-generator-all`, `npm run typecheck`).
+12. Explain evidence supporting the fix.
+
+### Before changing Route Generator behavior for a production bug
+
+When diagnostics are available:
+
+```bash
+npm run ruffops:debug -- context --feature route-generator --last 48h
+npm run ruffops:debug -- search "Captain"
+npm run ruffops:debug -- bug <CORRELATION_ID>
+```
+
+Do **not** depend on a live production connection for normal development. Offline fixtures and unit tests must continue to work.
+
+### Privacy
+
+Never request or commit secrets. Cursor debug output is sanitized — do not ask for full SMS bodies, payment data, or credentials.

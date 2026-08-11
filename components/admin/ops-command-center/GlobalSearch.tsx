@@ -23,7 +23,7 @@ const QUICK_TABS: Array<{ tab: string; label: string; keywords: string }> = [
   { tab: "driver_mode", label: "Driver / Hiker Mode", keywords: "route stop van samsara" },
   { tab: "overnight_command", label: "Overnight Command", keywords: "rounds medication feeding" },
   { tab: "trainer_ops", label: "Trainer Ops", keywords: "session homework training" },
-  { tab: "ops_system_health", label: "System Health", keywords: "gingr twilio samsara integrations" },
+  { tab: "ops_system_health", label: "System Health & Debugging", keywords: "gingr twilio samsara integrations cursor debug route audit errors" },
   { tab: "shift_handoff", label: "Shift Handoff", keywords: "handover overnight morning" },
   { tab: "crossover_communication", label: "Team Log", keywords: "crossover notes" },
   { tab: "walks_board", label: "Walks Board", keywords: "walk overdue" },
