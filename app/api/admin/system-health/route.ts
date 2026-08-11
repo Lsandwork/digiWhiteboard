@@ -16,7 +16,9 @@ import {
   loadRouteAuditDetail,
   loadIntegrationCalls,
   loadApiLogs,
-  loadBackgroundJobs
+  loadBackgroundJobs,
+  loadStorageHealth,
+  loadUserActivity
 } from "@/lib/system-health/dashboard";
 import {
   saveSystemHealthSettings,
@@ -133,11 +135,19 @@ export async function GET(request: Request) {
         payload = { data: await loadApiLogs({ limit: Number(url.searchParams.get("limit") || 100) }) };
         break;
       case "jobs":
-        payload = { data: await loadBackgroundJobs({ limit: Number(url.searchParams.get("limit") || 50) }) };
+        payload = {
+          data: await loadBackgroundJobs({
+            limit: Number(url.searchParams.get("limit") || 50),
+            status: url.searchParams.get("status") || undefined
+          })
+        };
+        break;
+      case "storage":
+        payload = { data: await loadStorageHealth() };
         break;
       case "user_activity":
         payload = {
-          data: await loadLiveActivity({
+          data: await loadUserActivity({
             limit: Number(url.searchParams.get("limit") || 100)
           })
         };

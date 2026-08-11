@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type SectionId =
   | "overview"
@@ -8,6 +8,7 @@ type SectionId =
   | "errors"
   | "route_audits"
   | "integrations"
+  | "storage"
   | "api_logs"
   | "jobs"
   | "user_activity"
@@ -22,6 +23,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "errors", label: "Errors" },
   { id: "route_audits", label: "Route Audits" },
   { id: "integrations", label: "Integrations" },
+  { id: "storage", label: "Cloud Storage" },
   { id: "api_logs", label: "API Logs" },
   { id: "jobs", label: "Background Jobs" },
   { id: "user_activity", label: "User Activity" },
@@ -31,16 +33,29 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "settings", label: "Settings" }
 ];
 
+const JOB_STATUSES = [
+  "all",
+  "queued",
+  "running",
+  "waiting_for_authentication",
+  "completed",
+  "completed_with_warnings",
+  "failed",
+  "cancelled"
+] as const;
+
 function statusClass(status: string) {
   const s = String(status || "").toUpperCase();
-  if (s === "HEALTHY" || s === "PASS" || s === "PASSED" || s === "OPERATIONAL") {
+  if (s === "HEALTHY" || s === "PASS" || s === "PASSED" || s === "OPERATIONAL" || s === "TRUE" || s === "OK") {
     return "bg-emerald-500/20 text-emerald-200 border-emerald-400/30";
   }
-  if (s === "WARNING" || s === "PASS_WITH_WARNINGS") {
+  if (s === "WARNING" || s === "PASS_WITH_WARNINGS" || s === "WAITING_FOR_AUTHENTICATION") {
     return "bg-amber-500/20 text-amber-100 border-amber-400/30";
   }
-  if (s === "DEGRADED") return "bg-orange-500/20 text-orange-100 border-orange-400/30";
-  if (s === "FAILED" || s === "FAIL" || s === "ERROR" || s === "CRITICAL") {
+  if (s === "DEGRADED" || s === "RUNNING" || s === "QUEUED") {
+    return "bg-orange-500/20 text-orange-100 border-orange-400/30";
+  }
+  if (s === "FAILED" || s === "FAIL" || s === "ERROR" || s === "CRITICAL" || s === "FALSE") {
     return "bg-rose-500/20 text-rose-100 border-rose-400/30";
   }
   return "bg-white/10 text-admin-muted border-white/10";
@@ -48,7 +63,9 @@ function statusClass(status: string) {
 
 function StatusBadge({ value }: { value: string }) {
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${statusClass(value)}`}>
+    <span
+      className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${statusClass(value)}`}
+    >
       {value || "UNKNOWN"}
     </span>
   );
@@ -79,7 +96,41 @@ function Card({
 }
 
 function Empty({ text }: { text: string }) {
-  return <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-admin-muted">{text}</p>;
+  return (
+    <p className="rounded-xl border border-dashed border-white/10 px-4 py-8 text-center text-sm text-admin-muted">
+      {text}
+    </p>
+  );
+}
+
+function ToolBar({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-2">{children}</div>;
+}
+
+function ToolButton({
+  label,
+  onClick,
+  active,
+  tone = "default"
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  tone?: "default" | "accent" | "danger";
+}) {
+  const toneClass =
+    tone === "accent"
+      ? "border-fitdog-orange/40 bg-fitdog-orange/20 text-white"
+      : tone === "danger"
+        ? "border-rose-400/40 bg-rose-500/15 text-rose-50"
+        : active
+          ? "border-white/30 bg-white/15 text-white"
+          : "border-white/15 bg-white/5 text-white hover:bg-white/10";
+  return (
+    <button type="button" onClick={onClick} className={`rounded-xl border px-3 py-1.5 text-xs font-medium ${toneClass}`}>
+      {label}
+    </button>
+  );
 }
 
 async function copyText(text: string) {
@@ -89,6 +140,17 @@ async function copyText(text: string) {
   } catch {
     return false;
   }
+}
+
+function serviceTargetTab(serviceId: string): SectionId {
+  if (serviceId === "storage") return "storage";
+  if (serviceId === "background_worker" || serviceId === "job_queue") return "jobs";
+  if (serviceId === "route_generator") return "route_audits";
+  if (["gingr", "samsara", "twilio", "maps", "email", "realtime"].includes(serviceId)) {
+    return "integrations";
+  }
+  if (serviceId === "ruffops") return "errors";
+  return "overview";
 }
 
 export function SystemHealthDebuggingApp() {
@@ -103,6 +165,10 @@ export function SystemHealthDebuggingApp() {
   const [sectionData, setSectionData] = useState<unknown>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<Record<string, unknown> | null>(null);
+  const [jobStatusFilter, setJobStatusFilter] = useState<string>("all");
+  const [liveSeverity, setLiveSeverity] = useState<string>("all");
+  const [errorFilter, setErrorFilter] = useState<string>("all");
+  const [integrationFilter, setIntegrationFilter] = useState<string>("all");
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -120,6 +186,38 @@ export function SystemHealthDebuggingApp() {
     }
   }, []);
 
+  const loadSection = useCallback(
+    async (id: SectionId, opts?: { jobStatus?: string }) => {
+      const view =
+        id === "api_logs"
+          ? "api_logs"
+          : id === "jobs"
+            ? "jobs"
+            : id === "storage"
+              ? "storage"
+              : id === "user_activity"
+                ? "user_activity"
+                : id === "system_events" || id === "live"
+                  ? "events"
+                  : id === "errors"
+                    ? "errors"
+                    : id === "integrations"
+                      ? "integrations"
+                      : null;
+      if (!view) return;
+      const params = new URLSearchParams({ view });
+      if (id === "jobs" && opts?.jobStatus && opts.jobStatus !== "all") {
+        params.set("status", opts.jobStatus);
+      }
+      if (id === "live" && liveSeverity !== "all") params.set("severity", liveSeverity);
+      const res = await fetch(`/api/admin/system-health?${params.toString()}`, { cache: "no-store" });
+      const body = await res.json();
+      if (res.ok) setSectionData(body.data ?? body);
+      else setError(body.error || "Failed to load section");
+    },
+    [liveSeverity]
+  );
+
   useEffect(() => {
     void refresh();
     const id = window.setInterval(() => void refresh(), 60_000);
@@ -127,26 +225,17 @@ export function SystemHealthDebuggingApp() {
   }, [refresh]);
 
   useEffect(() => {
-    if (section === "overview" || section === "live" || section === "errors" || section === "route_audits" || section === "integrations" || section === "settings" || section === "cursor_bridge") {
+    if (
+      section === "overview" ||
+      section === "route_audits" ||
+      section === "settings" ||
+      section === "cursor_bridge" ||
+      section === "debug_search"
+    ) {
       return;
     }
-    void (async () => {
-      const view =
-        section === "api_logs"
-          ? "api_logs"
-          : section === "jobs"
-            ? "jobs"
-            : section === "user_activity"
-              ? "user_activity"
-              : section === "system_events"
-                ? "events"
-                : null;
-      if (!view) return;
-      const res = await fetch(`/api/admin/system-health?view=${view}`, { cache: "no-store" });
-      const body = await res.json();
-      if (res.ok) setSectionData(body.data ?? body);
-    })();
-  }, [section]);
+    void loadSection(section, { jobStatus: jobStatusFilter });
+  }, [section, jobStatusFilter, loadSection]);
 
   useEffect(() => {
     if (!selectedAudit) {
@@ -171,6 +260,11 @@ export function SystemHealthDebuggingApp() {
   const audits = (bundle?.audits as Array<Record<string, unknown>>) || [];
   const integrations = (bundle?.integrations as Array<Record<string, unknown>>) || [];
   const liveDebug = (bundle?.liveDebug as Array<Record<string, unknown>>) || [];
+
+  const storageService = services.find((s) => s.id === "storage");
+  const storageBuckets = ((storageService?.meta as Record<string, unknown>)?.buckets as Array<
+    Record<string, unknown>
+  >) || [];
 
   const go = (id: SectionId) => setSection(id);
 
@@ -237,11 +331,65 @@ export function SystemHealthDebuggingApp() {
     setCopyNote(ok ? "Debug context copied" : "Could not copy — see developer details");
   };
 
+  const mutateError = async (action: "resolve_error" | "reopen_error", errorId: string) => {
+    const res = await fetch("/api/admin/system-health", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, errorId })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error || "Unable to update error");
+      return;
+    }
+    setCopyNote(action === "resolve_error" ? "Error marked resolved" : "Error reopened");
+    void refresh();
+    void loadSection("errors");
+  };
+
   const headerSubtitle = useMemo(
     () =>
-      "Operational observability for RuffOps — real audits, errors, integrations, and Cursor evidence bundles.",
+      "Live probes for RuffOps — Route Generator, worker/queue, Supabase cloud storage, Realtime, integrations, and Cursor evidence.",
     []
   );
+
+  const liveRows = useMemo(() => {
+    const source =
+      section === "system_events" && Array.isArray(sectionData)
+        ? (sectionData as Array<Record<string, unknown>>)
+        : section === "live" && Array.isArray(sectionData)
+          ? (sectionData as Array<Record<string, unknown>>)
+          : activity;
+    if (liveSeverity === "all") return source;
+    return source.filter((ev) => String(ev.severity || "").toLowerCase() === liveSeverity);
+  }, [activity, liveSeverity, section, sectionData]);
+
+  const filteredErrors = useMemo(() => {
+    const source =
+      section === "errors" && Array.isArray(sectionData)
+        ? (sectionData as Array<Record<string, unknown>>)
+        : errors;
+    if (errorFilter === "all") return source;
+    return source.filter((e) => String(e.status || "unresolved") === errorFilter);
+  }, [errors, errorFilter, section, sectionData]);
+
+  const filteredIntegrations = useMemo(() => {
+    const source =
+      section === "integrations" && Array.isArray(sectionData)
+        ? (sectionData as Array<Record<string, unknown>>)
+        : integrations;
+    if (integrationFilter === "all") return source;
+    return source.filter((r) => String(r.integration) === integrationFilter);
+  }, [integrationFilter, integrations, section, sectionData]);
+
+  const jobsPayload = (sectionData as Record<string, unknown> | null) || null;
+  const jobs = (jobsPayload?.jobs as Array<Record<string, unknown>>) || [];
+  const jobCounts = (jobsPayload?.counts as Record<string, number>) || {};
+  const apiLogs = Array.isArray(sectionData) ? (sectionData as Array<Record<string, unknown>>) : [];
+  const storageProbe =
+    section === "storage" && sectionData && typeof sectionData === "object"
+      ? (sectionData as Record<string, unknown>)
+      : null;
 
   return (
     <section className="space-y-4">
@@ -252,13 +400,7 @@ export function SystemHealthDebuggingApp() {
             <p className="mt-1 max-w-3xl text-sm text-admin-muted">{headerSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white hover:bg-white/10"
-            >
-              Refresh
-            </button>
+            <ToolButton label="Refresh probes" onClick={() => void refresh()} tone="accent" />
             {copyNote ? <span className="self-center text-xs text-emerald-300">{copyNote}</span> : null}
           </div>
         </div>
@@ -288,7 +430,12 @@ export function SystemHealthDebuggingApp() {
       {section === "overview" && overview ? (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Card title="System Health" value={String(summary.systemHealth || "UNKNOWN")} onClick={() => go("integrations")} />
+            <Card
+              title="System Health"
+              value={String(summary.systemHealth || "UNKNOWN")}
+              hint="Worst critical service"
+              onClick={() => go("integrations")}
+            />
             <Card title="Errors Today" value={Number(summary.errorsToday || 0)} onClick={() => go("errors")} />
             <Card title="Warnings Today" value={Number(summary.warningsToday || 0)} onClick={() => go("live")} />
             <Card title="Failed Jobs" value={Number(summary.failedJobs || 0)} onClick={() => go("jobs")} />
@@ -304,13 +451,23 @@ export function SystemHealthDebuggingApp() {
             />
             <Card title="Users Active" value={Number(summary.usersActive || 0)} onClick={() => go("user_activity")} />
             <Card
-              title="Deploy Version"
-              value={String(summary.releaseVersion || "—")}
-              hint="Recent deploy / commit"
+              title="Queue Depth"
+              value={summary.queueDepth != null ? Number(summary.queueDepth) : "—"}
+              onClick={() => go("jobs")}
             />
             <Card
+              title="Storage Buckets OK"
+              value={summary.storageBucketsOk != null ? Number(summary.storageBucketsOk) : "—"}
+              onClick={() => go("storage")}
+            />
+            <Card title="Deploy Version" value={String(summary.releaseVersion || "—")} hint="Recent deploy / commit" />
+            <Card
               title="Last Route Generation"
-              value={summary.lastRouteGeneration ? new Date(String(summary.lastRouteGeneration)).toLocaleString() : "—"}
+              value={
+                summary.lastRouteGeneration
+                  ? new Date(String(summary.lastRouteGeneration)).toLocaleString()
+                  : "—"
+              }
               onClick={() => go("route_audits")}
             />
             <Card
@@ -319,7 +476,9 @@ export function SystemHealthDebuggingApp() {
             />
             <Card
               title="Last Samsara Export"
-              value={summary.lastSamsaraExport ? new Date(String(summary.lastSamsaraExport)).toLocaleString() : "—"}
+              value={
+                summary.lastSamsaraExport ? new Date(String(summary.lastSamsaraExport)).toLocaleString() : "—"
+              }
             />
           </div>
 
@@ -329,7 +488,8 @@ export function SystemHealthDebuggingApp() {
               <ul className="mt-2 space-y-1 text-sm text-amber-50/90">
                 {liveDebug.map((row) => (
                   <li key={String(row.id)}>
-                    {String(row.feature)} · expires {row.expires_at ? new Date(String(row.expires_at)).toLocaleString() : "—"}
+                    {String(row.feature)} · expires{" "}
+                    {row.expires_at ? new Date(String(row.expires_at)).toLocaleString() : "—"}
                   </li>
                 ))}
               </ul>
@@ -338,7 +498,12 @@ export function SystemHealthDebuggingApp() {
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {services.map((svc) => (
-              <div key={String(svc.id)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <button
+                key={String(svc.id)}
+                type="button"
+                onClick={() => go(serviceTargetTab(String(svc.id)))}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-white/20"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold text-white">{String(svc.label)}</p>
                   <StatusBadge value={String(svc.status || "UNKNOWN")} />
@@ -364,8 +529,10 @@ export function SystemHealthDebuggingApp() {
                     <dd className="text-white">{svc.successRate24h != null ? `${svc.successRate24h}%` : "—"}</dd>
                   </div>
                 </dl>
-                {svc.lastError ? <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p> : null}
-              </div>
+                {svc.lastError ? (
+                  <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p>
+                ) : null}
+              </button>
             ))}
           </div>
         </div>
@@ -373,17 +540,28 @@ export function SystemHealthDebuggingApp() {
 
       {section === "live" || section === "user_activity" || section === "system_events" ? (
         <div className="space-y-3">
-          {(section === "system_events" && Array.isArray(sectionData)
-            ? (sectionData as Array<Record<string, unknown>>)
-            : activity
-          ).length === 0 ? (
+          <ToolBar>
+            {(["all", "info", "warning", "error", "critical"] as const).map((sev) => (
+              <ToolButton
+                key={sev}
+                label={sev}
+                active={liveSeverity === sev}
+                onClick={() => {
+                  setLiveSeverity(sev);
+                  if (section === "live" || section === "system_events") void loadSection(section);
+                }}
+              />
+            ))}
+            <ToolButton
+              label="Reload feed"
+              onClick={() => void loadSection(section === "user_activity" ? "user_activity" : section)}
+            />
+          </ToolBar>
+          {liveRows.length === 0 ? (
             <Empty text="No diagnostic history available yet." />
           ) : (
             <ul className="space-y-2">
-              {(section === "system_events" && Array.isArray(sectionData)
-                ? (sectionData as Array<Record<string, unknown>>)
-                : activity
-              ).map((ev) => (
+              {liveRows.map((ev) => (
                 <li key={String(ev.id)} className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="text-sm text-white">
@@ -397,6 +575,18 @@ export function SystemHealthDebuggingApp() {
                   <p className="mt-1 text-xs text-admin-muted">
                     {[ev.user_email, ev.module, ev.correlation_id, ev.integration].filter(Boolean).join(" · ")}
                   </p>
+                  {ev.correlation_id ? (
+                    <button
+                      type="button"
+                      className="mt-2 text-xs text-fitdog-orange underline"
+                      onClick={() => {
+                        setSelectedAudit(String(ev.correlation_id));
+                        go("route_audits");
+                      }}
+                    >
+                      Open correlation
+                    </button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -406,10 +596,16 @@ export function SystemHealthDebuggingApp() {
 
       {section === "errors" ? (
         <div className="space-y-3">
-          {errors.length === 0 ? (
+          <ToolBar>
+            {(["all", "unresolved", "resolved"] as const).map((f) => (
+              <ToolButton key={f} label={f} active={errorFilter === f} onClick={() => setErrorFilter(f)} />
+            ))}
+            <ToolButton label="Reload errors" onClick={() => void loadSection("errors")} />
+          </ToolBar>
+          {filteredErrors.length === 0 ? (
             <Empty text="No captured errors yet." />
           ) : (
-            errors.map((err) => (
+            filteredErrors.map((err) => (
               <div key={String(err.id)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -423,28 +619,31 @@ export function SystemHealthDebuggingApp() {
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {err.correlation_id ? (
-                    <button
-                      type="button"
-                      className="rounded-lg border border-white/15 px-2 py-1 text-xs text-white"
+                    <ToolButton
+                      label="Open related audit"
                       onClick={() => {
                         setSelectedAudit(String(err.correlation_id));
                         go("route_audits");
                       }}
-                    >
-                      Open related audit
-                    </button>
+                    />
                   ) : null}
-                  <button
-                    type="button"
-                    className="rounded-lg border border-white/15 px-2 py-1 text-xs text-white"
+                  <ToolButton
+                    label="Copy diagnostic"
                     onClick={() =>
                       void copyText(
                         `Error ${err.id}\n${err.error_message}\nmodule=${err.application_module}\ncorrelation=${err.correlation_id || ""}`
                       ).then((ok) => setCopyNote(ok ? "Diagnostic summary copied" : "Copy failed"))
                     }
-                  >
-                    Copy diagnostic summary
-                  </button>
+                  />
+                  {String(err.status) !== "resolved" ? (
+                    <ToolButton
+                      label="Resolve"
+                      tone="accent"
+                      onClick={() => void mutateError("resolve_error", String(err.id))}
+                    />
+                  ) : (
+                    <ToolButton label="Reopen" onClick={() => void mutateError("reopen_error", String(err.id))} />
+                  )}
                 </div>
               </div>
             ))
@@ -455,8 +654,11 @@ export function SystemHealthDebuggingApp() {
       {section === "route_audits" ? (
         <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
           <div className="space-y-2">
+            <ToolBar>
+              <ToolButton label="Refresh audits" onClick={() => void refresh()} />
+            </ToolBar>
             {audits.length === 0 ? (
-              <Empty text="No route audits yet. Generate routes to create the first audit." />
+              <Empty text="No route audits yet. Generate routes to create the first audit (migration 072)." />
             ) : (
               audits.map((a) => (
                 <button
@@ -491,24 +693,15 @@ export function SystemHealthDebuggingApp() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h3 className="font-semibold text-white">{selectedAudit}</h3>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="rounded-lg border border-white/15 px-2 py-1 text-xs text-white"
-                      onClick={() => void copyDebugContext(selectedAudit)}
-                    >
-                      Copy Debug Context
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-white/15 px-2 py-1 text-xs text-white"
+                    <ToolButton label="Copy Debug Context" onClick={() => void copyDebugContext(selectedAudit)} />
+                    <ToolButton
+                      label="Copy Cursor Command"
                       onClick={() =>
                         void copyText(`npm run ruffops:debug -- bug ${selectedAudit}`).then((ok) =>
                           setCopyNote(ok ? "Cursor command copied" : "Copy failed")
                         )
                       }
-                    >
-                      Copy Cursor Command
-                    </button>
+                    />
                   </div>
                 </div>
                 {(() => {
@@ -563,8 +756,9 @@ export function SystemHealthDebuggingApp() {
                                 <StatusBadge value={String(t.validation_status || t.eligibility || "—")} />
                               </div>
                               <p className="mt-1 text-xs text-admin-muted">
-                                {String(t.service_canonical || t.service_raw || "")} · {String(t.direction || "")} · expected{" "}
-                                {String(t.expected_destination || "—")} · generated {String(t.generated_destination || "—")}
+                                {String(t.service_canonical || t.service_raw || "")} · {String(t.direction || "")} ·
+                                expected {String(t.expected_destination || "—")} · generated{" "}
+                                {String(t.generated_destination || "—")}
                                 {t.error_code ? ` · ${String(t.error_code)}` : ""}
                               </p>
                             </li>
@@ -591,25 +785,47 @@ export function SystemHealthDebuggingApp() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {services
               .filter((s) =>
-                ["gingr", "samsara", "twilio", "maps", "email", "database", "storage"].includes(String(s.id))
+                ["gingr", "samsara", "twilio", "maps", "email", "database", "storage", "realtime"].includes(
+                  String(s.id)
+                )
               )
               .map((svc) => (
-                <div key={String(svc.id)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <button
+                  key={String(svc.id)}
+                  type="button"
+                  onClick={() => go(serviceTargetTab(String(svc.id)))}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left"
+                >
                   <div className="flex items-center justify-between">
                     <p className="font-semibold text-white">{String(svc.label)}</p>
                     <StatusBadge value={String(svc.status)} />
                   </div>
                   <p className="mt-2 text-sm text-admin-muted">{String(svc.detail)}</p>
-                </div>
+                  <p className="mt-2 text-xs text-admin-muted">
+                    {svc.responseTimeMs != null ? `${svc.responseTimeMs} ms · ` : ""}
+                    {svc.lastSuccessAt ? `last ${new Date(String(svc.lastSuccessAt)).toLocaleString()}` : ""}
+                  </p>
+                </button>
               ))}
           </div>
+          <ToolBar>
+            {(["all", "gingr", "samsara", "twilio"] as const).map((f) => (
+              <ToolButton
+                key={f}
+                label={f}
+                active={integrationFilter === f}
+                onClick={() => setIntegrationFilter(f)}
+              />
+            ))}
+            <ToolButton label="Reload calls" onClick={() => void loadSection("integrations")} />
+          </ToolBar>
           <div>
             <p className="mb-2 text-xs uppercase tracking-wide text-admin-muted">Recent integration calls</p>
-            {integrations.length === 0 ? (
+            {filteredIntegrations.length === 0 ? (
               <Empty text="No integration diagnostic calls recorded yet." />
             ) : (
               <ul className="space-y-2">
-                {integrations.map((row) => (
+                {filteredIntegrations.map((row) => (
                   <li key={String(row.id)} className="rounded-xl border border-white/10 px-3 py-2 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-white">
@@ -629,14 +845,203 @@ export function SystemHealthDebuggingApp() {
         </div>
       ) : null}
 
-      {section === "api_logs" || section === "jobs" ? (
-        <div>
+      {section === "storage" ? (
+        <div className="space-y-4">
+          <ToolBar>
+            <ToolButton label="Re-probe buckets" tone="accent" onClick={() => void loadSection("storage")} />
+            <ToolButton
+              label="Copy bucket report"
+              onClick={() =>
+                void copyText(JSON.stringify(storageProbe || { buckets: storageBuckets }, null, 2)).then((ok) =>
+                  setCopyNote(ok ? "Storage report copied" : "Copy failed")
+                )
+              }
+            />
+          </ToolBar>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-semibold text-white">Supabase Cloud Storage</h3>
+                <p className="mt-1 text-sm text-admin-muted">
+                  {(storageProbe?.detail as string) ||
+                    (storageService?.detail as string) ||
+                    "Probes photo-uploads, cast-videos, cast-tv-media, lobby-slideshow."}
+                </p>
+              </div>
+              <StatusBadge
+                value={String(storageProbe?.status || storageService?.status || "UNKNOWN")}
+              />
+            </div>
+            <p className="mt-2 text-xs text-admin-muted">
+              Backend: Supabase Storage · binaries never leave object storage · metadata in Postgres
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              ((storageProbe?.buckets as Array<Record<string, unknown>>) || storageBuckets) as Array<
+                Record<string, unknown>
+              >
+            ).map((b) => (
+              <div key={String(b.bucket)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-mono text-sm text-white">{String(b.bucket)}</p>
+                  <StatusBadge value={b.listOk ? "HEALTHY" : "FAILED"} />
+                </div>
+                <p className="mt-2 text-sm text-admin-muted">{String(b.purpose || "")}</p>
+                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-admin-muted">
+                  <div>
+                    <dt>Critical</dt>
+                    <dd className="text-white">{b.critical ? "yes" : "optional"}</dd>
+                  </div>
+                  <div>
+                    <dt>Latency</dt>
+                    <dd className="text-white">{b.latencyMs != null ? `${b.latencyMs} ms` : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>Sample objects</dt>
+                    <dd className="text-white">
+                      {b.objectSampleCount != null ? Number(b.objectSampleCount) : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Present</dt>
+                    <dd className="text-white">{b.present ? "yes" : "no"}</dd>
+                  </div>
+                </dl>
+                {b.error ? <p className="mt-2 text-xs text-rose-200">{String(b.error)}</p> : null}
+              </div>
+            ))}
+          </div>
+          {!storageProbe && storageBuckets.length === 0 ? (
+            <Empty text="Run Refresh probes on Overview, then open Cloud Storage." />
+          ) : null}
+        </div>
+      ) : null}
+
+      {section === "api_logs" ? (
+        <div className="space-y-3">
+          <ToolBar>
+            <ToolButton label="Reload API logs" onClick={() => void loadSection("api_logs")} />
+            <ToolButton
+              label="Copy latest 20"
+              onClick={() =>
+                void copyText(JSON.stringify(apiLogs.slice(0, 20), null, 2)).then((ok) =>
+                  setCopyNote(ok ? "API logs copied" : "Copy failed")
+                )
+              }
+            />
+          </ToolBar>
           {!sectionData ? (
             <Empty text="Loading…" />
+          ) : apiLogs.length === 0 ? (
+            <Empty text="No API diagnostic logs yet." />
           ) : (
-            <pre className="max-h-[32rem] overflow-auto rounded-2xl border border-white/10 bg-black/30 p-4 text-[11px] text-admin-muted">
-              {JSON.stringify(sectionData, null, 2)}
-            </pre>
+            <div className="overflow-x-auto rounded-2xl border border-white/10">
+              <table className="min-w-full text-left text-xs text-admin-muted">
+                <thead className="bg-white/[0.04] text-[11px] uppercase tracking-wide">
+                  <tr>
+                    <th className="px-3 py-2">Time</th>
+                    <th className="px-3 py-2">Method</th>
+                    <th className="px-3 py-2">Endpoint</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Latency</th>
+                    <th className="px-3 py-2">User</th>
+                    <th className="px-3 py-2">Request</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {apiLogs.map((row) => (
+                    <tr key={String(row.id)} className="border-t border-white/5">
+                      <td className="px-3 py-2 whitespace-nowrap text-white">
+                        {row.occurred_at ? new Date(String(row.occurred_at)).toLocaleString() : "—"}
+                      </td>
+                      <td className="px-3 py-2">{String(row.method || "")}</td>
+                      <td className="px-3 py-2 font-mono text-white">{String(row.endpoint || "")}</td>
+                      <td className="px-3 py-2">
+                        <StatusBadge value={String(row.status_code || "")} />
+                      </td>
+                      <td className="px-3 py-2">{row.latency_ms != null ? `${row.latency_ms} ms` : "—"}</td>
+                      <td className="px-3 py-2">{String(row.user_email || "—")}</td>
+                      <td className="px-3 py-2 font-mono">{String(row.request_id || row.correlation_id || "—")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {section === "jobs" ? (
+        <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+            {Object.entries(jobCounts).map(([k, v]) => (
+              <Card key={k} title={k.replace(/_/g, " ")} value={Number(v)} onClick={() => setJobStatusFilter(k)} />
+            ))}
+            <Card
+              title="Failed today"
+              value={Number((jobsPayload?.failedToday as number) || 0)}
+              onClick={() => setJobStatusFilter("failed")}
+            />
+          </div>
+          <ToolBar>
+            {JOB_STATUSES.map((s) => (
+              <ToolButton
+                key={s}
+                label={s}
+                active={jobStatusFilter === s}
+                onClick={() => setJobStatusFilter(s)}
+              />
+            ))}
+            <ToolButton label="Reload jobs" onClick={() => void loadSection("jobs", { jobStatus: jobStatusFilter })} />
+          </ToolBar>
+          {!sectionData ? (
+            <Empty text="Loading…" />
+          ) : jobs.length === 0 ? (
+            <Empty text={(jobsPayload?.note as string) || "No route worker jobs found."} />
+          ) : (
+            <ul className="space-y-2">
+              {jobs.map((job) => (
+                <li key={String(job.id)} className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-white">
+                        {String(job.job_type)}{" "}
+                        <span className="font-mono text-xs text-admin-muted">{String(job.id).slice(0, 8)}</span>
+                      </p>
+                      <p className="mt-1 text-xs text-admin-muted">
+                        attempts {Number(job.attempts || 0)}/{Number(job.max_attempts || 0)} · created{" "}
+                        {job.created_at ? new Date(String(job.created_at)).toLocaleString() : "—"}
+                        {job.completed_at
+                          ? ` · completed ${new Date(String(job.completed_at)).toLocaleString()}`
+                          : ""}
+                      </p>
+                    </div>
+                    <StatusBadge value={String(job.status)} />
+                  </div>
+                  {job.error_message ? (
+                    <p className="mt-2 text-xs text-rose-200">{String(job.error_message)}</p>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {job.correlation_id ? (
+                      <ToolButton
+                        label={`Open ${String(job.correlation_id)}`}
+                        onClick={() => {
+                          setSelectedAudit(String(job.correlation_id));
+                          go("route_audits");
+                        }}
+                      />
+                    ) : null}
+                    <ToolButton
+                      label="Copy job id"
+                      onClick={() =>
+                        void copyText(String(job.id)).then((ok) => setCopyNote(ok ? "Job id copied" : "Copy failed"))
+                      }
+                    />
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       ) : null}
@@ -649,14 +1054,11 @@ export function SystemHealthDebuggingApp() {
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Dog, correlation ID, employee, error…"
               className="min-w-[16rem] flex-1 rounded-xl border border-white/15 bg-black/30 px-3 py-2 text-sm text-white"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void runSearch();
+              }}
             />
-            <button
-              type="button"
-              onClick={() => void runSearch()}
-              className="rounded-xl border border-fitdog-orange/40 bg-fitdog-orange/20 px-4 py-2 text-sm text-white"
-            >
-              Search
-            </button>
+            <ToolButton label="Search" tone="accent" onClick={() => void runSearch()} />
           </div>
           {searchResult ? (
             <pre className="max-h-[28rem] overflow-auto rounded-2xl border border-white/10 bg-black/30 p-4 text-[11px] text-admin-muted">
@@ -686,13 +1088,11 @@ export function SystemHealthDebuggingApp() {
               <li>npm run ruffops:debug -- bug RG-YYYYMMDD-#####</li>
             </ul>
           </div>
-          <button
-            type="button"
+          <ToolButton
+            label="Enable Live Debug (Route Generator, 30 min)"
+            tone="accent"
             onClick={() => void startLiveDebug()}
-            className="rounded-xl border border-amber-400/40 bg-amber-500/15 px-4 py-2 text-sm text-amber-50"
-          >
-            Enable Live Debug (Route Generator, 30 min)
-          </button>
+          />
         </div>
       ) : null}
 
@@ -721,13 +1121,7 @@ export function SystemHealthDebuggingApp() {
               />
             </label>
           ))}
-          <button
-            type="button"
-            onClick={() => void saveSettings()}
-            className="rounded-xl border border-fitdog-orange/40 bg-fitdog-orange/20 px-4 py-2 text-sm text-white"
-          >
-            Save settings
-          </button>
+          <ToolButton label="Save settings" tone="accent" onClick={() => void saveSettings()} />
         </div>
       ) : null}
     </section>

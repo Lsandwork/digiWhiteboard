@@ -120,6 +120,24 @@ Configurable in Settings. Cleanup jobs should use these values (scheduled retent
 
 Audit/event writes never throw into Route Generator success path. Quality gates are computed in-process; DB persistence is best-effort.
 
+## Functional probes (UNKNOWN → real status)
+
+`lib/system-health/health-checks.ts` runs evidence-based probes. Aggregate **SYSTEM HEALTH** uses critical services only (`AGGREGATE_SERVICE_IDS`) so optional cards (email unset, etc.) do not poison the header.
+
+| Card | Probe module | Evidence |
+| --- | --- | --- |
+| Route Generator | `probes/route-generator.ts` | `system_health_route_audits` → `route_plans` → `route_audit_events` → settings/maps ready |
+| Background Worker | `probes/worker.ts` | `GET $ROUTE_WORKER_URL/health` + recent `route_worker_jobs` completions |
+| Job Queue | `probes/worker.ts` | Queue depth, stuck running >1h, failed-today counts |
+| Cloud Storage | `probes/storage.ts` | Lists Supabase buckets: `photo-uploads`, `cast-videos`, `cast-tv-media`, `lobby-slideshow` |
+| Realtime | `probes/realtime.ts` | Realtime HTTP gateway + `live_transition_dogs` freshness |
+
+### Cloud storage model
+
+RuffOps does **not** use Vercel Blob for operational media. Binaries live in **Supabase Storage**; Postgres holds metadata (`photo_upload_items`, `cast_tv_media`, etc.). Health checks `NEXT_PUBLIC_SUPABASE_URL` (never the unused `MEDIA_LIBRARY_BUCKET` / `SUPABASE_URL` env mistakes).
+
+UI tab **Cloud Storage** (`?view=storage`) re-probes buckets with latency and sample object counts.
+
 ## Optional MCP
 
 Not required. Prefer CLI + HTTP debug API. An MCP server can wrap the same `lib/system-health/debug-bridge` functions as read-only tools if desired.

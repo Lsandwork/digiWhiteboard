@@ -16,8 +16,10 @@ import {
   missingFromReconciliation,
   computeQualityGate
 } from "../lib/system-health/route-audit";
+import { aggregateSystemHealth } from "../lib/system-health/health-checks";
 import type { ReconciliationReport } from "../lib/route-generator/reconciliation";
 import type { NormalizedReportItem } from "../lib/route-generator/parser";
+import type { ServiceHealthCard } from "../lib/system-health/health-checks";
 
 function item(partial: Partial<NormalizedReportItem> & Pick<NormalizedReportItem, "direction" | "dogName">): NormalizedReportItem {
   return {
@@ -304,14 +306,39 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   assert.equal(pipeline.find((s) => s.key === "route_assignment")?.status, "FAIL");
 }
 
-// --- Wiring / navigation / permissions presence ---
+// --- Aggregate health (critical services only) ---
+{
+  const base: Omit<ServiceHealthCard, "id" | "label" | "status"> = {
+    responseTimeMs: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    lastError: null,
+    errorsLastHour: 0,
+    errorsLast24h: 0,
+    successRate24h: null,
+    detail: ""
+  };
+  const healthy = aggregateSystemHealth([
+    { id: "database", label: "Database", status: "HEALTHY", ...base },
+    { id: "email", label: "Email", status: "WARNING", ...base },
+    { id: "storage", label: "Storage", status: "HEALTHY", ...base }
+  ]);
+  assert.equal(healthy, "HEALTHY");
+
+  const degraded = aggregateSystemHealth([
+    { id: "database", label: "Database", status: "HEALTHY", ...base },
+    { id: "job_queue", label: "Job Queue", status: "DEGRADED", ...base },
+    { id: "email", label: "Email", status: "FAILED", ...base }
+  ]);
+  assert.equal(degraded, "DEGRADED");
+}
+
+// --- Wiring / navigation / permissions / probes presence ---
 {
   const nav = readFileSync(resolve(__dirname, "../lib/admin/nav-groups.ts"), "utf8");
   assert.ok(nav.includes("includeSystemHealth"));
   assert.ok(nav.includes("System Health & Debugging"));
-  assert.ok(!nav.includes('"ops_system_health",\n            "shift_handoff"') || true);
-  // Must appear under Applications helper, not only Dashboard list
-  assert.ok(nav.includes("leaf(\"ops_system_health\")"));
+  assert.ok(nav.includes('leaf("ops_system_health")'));
 
   const perms = readFileSync(resolve(__dirname, "../lib/admin/permissions.ts"), "utf8");
   for (const key of [
@@ -337,6 +364,26 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
 
   const dashboard = readFileSync(resolve(__dirname, "../components/admin/AdminDashboard.tsx"), "utf8");
   assert.ok(dashboard.includes("SystemHealthDebuggingApp"));
+
+  const health = readFileSync(resolve(__dirname, "../lib/system-health/health-checks.ts"), "utf8");
+  assert.ok(health.includes("probeCloudStorage"));
+  assert.ok(health.includes("probeRealtime"));
+  assert.ok(health.includes("probeBackgroundWorker"));
+  assert.ok(health.includes("probeJobQueue"));
+  assert.ok(health.includes("probeRouteGenerator"));
+  assert.ok(health.includes("aggregateSystemHealth"));
+
+  const storage = readFileSync(resolve(__dirname, "../lib/system-health/probes/storage.ts"), "utf8");
+  assert.ok(storage.includes("PHOTO_UPLOAD_BUCKET"));
+  assert.ok(storage.includes("CAST_TV_BUCKET"));
+
+  const ui = readFileSync(
+    resolve(__dirname, "../components/admin/system-health/SystemHealthDebuggingApp.tsx"),
+    "utf8"
+  );
+  assert.ok(ui.includes('id: "storage"'));
+  assert.ok(ui.includes("Re-probe buckets"));
+  assert.ok(ui.includes("Failed today"));
 }
 
 console.log("test-system-health-debugging: ok");
