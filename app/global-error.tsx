@@ -1,6 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
+import NextError from "next/error";
 import { useEffect } from "react";
 
 export default function GlobalError({
@@ -39,6 +40,10 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body style={{ margin: 0, background: "#02060b", color: "white", fontFamily: "system-ui, sans-serif" }}>
+        {/* Sentry / Next.js default error surface (statusCode 0 = unknown client error) */}
+        <div style={{ display: "none" }} aria-hidden>
+          <NextError statusCode={0} />
+        </div>
         <main
           style={{
             minHeight: "100vh",
