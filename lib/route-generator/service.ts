@@ -26,6 +26,7 @@ import {
 import {
   buildCsv,
   buildRouteName,
+  enforceMonotonicRouteSchedule,
   ensureScheduleOnOperatingDate,
   formatSamsaraCsvDateTime,
   formatSamsaraCoordinate,
@@ -1316,6 +1317,11 @@ export async function exportSamsaraCsv(params: {
     }
   }
 
+  // Repair stop ordering before building. Facility and depot stops are timed from
+  // different baselines, so a route could end earlier than its previous stop —
+  // Samsara answers those uploads with Internal Server Error.
+  const schedule = enforceMonotonicRouteSchedule(rows);
+
   const built = buildCsv({ template, rows });
   if (built.errors.length) {
     throw new RouteGeneratorClientError(
@@ -1339,7 +1345,18 @@ export async function exportSamsaraCsv(params: {
     );
   }
 
-  const fileName = `fitdog-samsara-routes-${operatingDate}.csv`;
+  // Stamp the download time. A date-only name let the browser dedupe repeat exports to
+  // "-2"/"-5", and coordinators uploaded whichever copy Finder showed first — including
+  // pre-fix files that Samsara rejects.
+  const exportStamp = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Los_Angeles",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  })
+    .format(new Date())
+    .replace(":", "");
+  const fileName = `fitdog-samsara-routes-${operatingDate}-${exportStamp}.csv`;
   const { data: job, error } = await supabase
     .from("route_export_jobs")
     .insert({
@@ -1350,6 +1367,8 @@ export async function exportSamsaraCsv(params: {
       validation_report: {
         ...validation.report,
         realignedScheduleCount,
+        scheduleAdjustedStops: schedule.adjustedStops,
+        scheduleAdjustments: schedule.adjustments.slice(0, 40),
         today,
         operatingDate
       },
@@ -1382,10 +1401,11 @@ export async function exportSamsaraCsv(params: {
     validation: {
       ...validation.report,
       realignedScheduleCount,
+      scheduleAdjustedStops: schedule.adjustedStops,
+      scheduleAdjustments: schedule.adjustments.slice(0, 40),
       today,
       operatingDate,
-      uploadReminder:
-        "Upload this CSV to Samsara today only. Never reuse a previous day's file (e.g. Friday) for a later day."
+      uploadReminder: `Upload ${fileName} to Samsara now. Delete older fitdog-samsara-routes-*.csv files from Downloads first — uploading an earlier copy is what causes Samsara's Internal Server Error.`
     },
     job
   };
