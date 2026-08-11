@@ -57,7 +57,8 @@ Live map + ETA:
   - Real owner ETA SMS only (Samsara GPS + quiet hours + moving-van gates)
   - SMS when driver is ~**30 minutes** out
   - Map banner + SMS when ~**15 minutes** out
-  - **Does not** run the Jasper demo SMS path (that demo caused morning “9:08pm departing” texts and is disabled unless `JASPER_DEMO_SMS_ENABLED=true`)
+  - **Does not** run the Jasper demo SMS path (permanently disabled)
+- Staff UI: Route Generator → **Tracking / SMS** tab lists stops, link/ETA stamps, enable/disable alerts, resend link, and SMS event history (`route_owner_sms_events`)
 
 ## Van drop-off start times (Pacific)
 

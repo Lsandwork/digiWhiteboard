@@ -14,6 +14,7 @@ import {
   routeOwnerSmsQuietHoursMessage,
   ROUTE_OWNER_SMS_MIN_SPEED_MPH
 } from "@/lib/route-generator/sms-policy";
+import { recordOwnerSmsEvent } from "@/lib/route-generator/owner-tracking-admin";
 
 function publicSiteUrl(): string {
   // Owner tracking always lives on the Digi-Board host — never Ruffly's public URL.
@@ -437,32 +438,38 @@ export async function createOwnerTrackingForPlan(
       const plannedWindowEnd = stop.requested_window_end ? String(stop.requested_window_end) : null;
 
       let token = existing?.token;
+      let trackingId = existing?.id ? String(existing.id) : null;
       if (!existing) {
         token = newToken();
-        const { error } = await supabase.from("route_owner_tracking").insert({
-          plan_id: planId,
-          route_id: route.id,
-          stop_id: stop.id,
-          token,
-          operating_date: String(plan.operating_date).slice(0, 10),
-          direction: route.direction,
-          van_key: route.van_key,
-          samsara_vehicle_name: vehicleNameByKey.get(String(route.van_key)) || null,
-          samsara_serial: vehicleSerialByKey.get(String(route.van_key)) || null,
-          owner_name: stop.owner_name,
-          dog_names: dogNames.length ? dogNames : [`${stop.dog_count || 1} dog(s)`],
-          owner_phone_e164: phone,
-          stop_address: stop.address,
-          stop_latitude: stop.latitude,
-          stop_longitude: stop.longitude,
-          planned_arrival_at: plannedArrivalAt,
-          planned_window_start: plannedWindowStart,
-          planned_window_end: plannedWindowEnd,
-          // Only staff checkbox enables owner SMS. Approve alone never texts.
-          sms_alerts_enabled: sendSmsRequested,
-          status: "pending"
-        });
+        const { data: inserted, error } = await supabase
+          .from("route_owner_tracking")
+          .insert({
+            plan_id: planId,
+            route_id: route.id,
+            stop_id: stop.id,
+            token,
+            operating_date: String(plan.operating_date).slice(0, 10),
+            direction: route.direction,
+            van_key: route.van_key,
+            samsara_vehicle_name: vehicleNameByKey.get(String(route.van_key)) || null,
+            samsara_serial: vehicleSerialByKey.get(String(route.van_key)) || null,
+            owner_name: stop.owner_name,
+            dog_names: dogNames.length ? dogNames : [`${stop.dog_count || 1} dog(s)`],
+            owner_phone_e164: phone,
+            stop_address: stop.address,
+            stop_latitude: stop.latitude,
+            stop_longitude: stop.longitude,
+            planned_arrival_at: plannedArrivalAt,
+            planned_window_start: plannedWindowStart,
+            planned_window_end: plannedWindowEnd,
+            // Only staff checkbox enables owner SMS. Approve alone never texts.
+            sms_alerts_enabled: sendSmsRequested,
+            status: "pending"
+          })
+          .select("id")
+          .single();
         if (error) throw new Error(error.message);
+        trackingId = inserted?.id ? String(inserted.id) : null;
         created += 1;
       } else {
         const patch: Record<string, unknown> = {
@@ -492,6 +499,20 @@ export async function createOwnerTrackingForPlan(
           body,
           purpose: "transactional",
           idempotencyKey: `route-track-link:${stop.id}`
+        });
+        await recordOwnerSmsEvent({
+          trackingId,
+          planId,
+          operatingDate: String(plan.operating_date).slice(0, 10),
+          kind: "link",
+          toE164: phone,
+          bodyPreview: body,
+          ok: sent.ok,
+          error: sent.ok ? null : sent.error || "Twilio send failed",
+          providerMessageId: sent.providerMessageId || null,
+          actorEmail: "system",
+          actorRole: "approve_plan",
+          meta: { stopId: stop.id }
         });
         if (sent.ok) {
           await supabase
@@ -718,6 +739,20 @@ export async function processOwnerEtaAlerts(): Promise<{
         purpose: "transactional",
         idempotencyKey: `route-eta-30:${row.id}`
       });
+      await recordOwnerSmsEvent({
+        trackingId: String(row.id),
+        planId: String(row.plan_id),
+        operatingDate: String(row.operating_date).slice(0, 10),
+        kind: "eta_30",
+        toE164: String(row.owner_phone_e164),
+        bodyPreview: body,
+        ok: sent.ok,
+        error: sent.ok ? null : sent.error || "Twilio send failed",
+        providerMessageId: sent.providerMessageId || null,
+        actorEmail: "cron",
+        actorRole: "route-eta-alerts",
+        meta: { etaMinutes }
+      });
       if (sent.ok) {
         patch.notified_30_at = new Date().toISOString();
         sms30 += 1;
@@ -733,11 +768,26 @@ export async function processOwnerEtaAlerts(): Promise<{
       if (canSendSms && !row.notified_15_at) {
         const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
         const url = `${publicSiteUrl()}/track/${row.token}`;
+        const body = `Fitdog: your driver is ~${etaMinutes} minutes out for ${dogs}. Live map: ${url}`;
         const sent = await sms.send({
           to: String(row.owner_phone_e164),
-          body: `Fitdog: your driver is ~${etaMinutes} minutes out for ${dogs}. Live map: ${url}`,
+          body,
           purpose: "transactional",
           idempotencyKey: `route-eta-15:${row.id}`
+        });
+        await recordOwnerSmsEvent({
+          trackingId: String(row.id),
+          planId: String(row.plan_id),
+          operatingDate: String(row.operating_date).slice(0, 10),
+          kind: "eta_15",
+          toE164: String(row.owner_phone_e164),
+          bodyPreview: body,
+          ok: sent.ok,
+          error: sent.ok ? null : sent.error || "Twilio send failed",
+          providerMessageId: sent.providerMessageId || null,
+          actorEmail: "cron",
+          actorRole: "route-eta-alerts",
+          meta: { etaMinutes }
         });
         if (sent.ok) {
           patch.notified_15_at = new Date().toISOString();
@@ -752,11 +802,26 @@ export async function processOwnerEtaAlerts(): Promise<{
       const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
       const url = `${publicSiteUrl()}/track/${row.token}`;
       const stop = row.stop_address ? ` at ${row.stop_address}` : "";
+      const body = `Fitdog: driver is pulling up for ${dogs}${stop} right now. ${url}`;
       const sent = await sms.send({
         to: String(row.owner_phone_e164),
-        body: `Fitdog: driver is pulling up for ${dogs}${stop} right now. ${url}`,
+        body,
         purpose: "transactional",
         idempotencyKey: `route-eta-pullup:${row.id}`
+      });
+      await recordOwnerSmsEvent({
+        trackingId: String(row.id),
+        planId: String(row.plan_id),
+        operatingDate: String(row.operating_date).slice(0, 10),
+        kind: "pullup",
+        toE164: String(row.owner_phone_e164),
+        bodyPreview: body,
+        ok: sent.ok,
+        error: sent.ok ? null : sent.error || "Twilio send failed",
+        providerMessageId: sent.providerMessageId || null,
+        actorEmail: "cron",
+        actorRole: "route-eta-alerts",
+        meta: { etaMinutes }
       });
       if (sent.ok) {
         patch.notified_pullup_at = new Date().toISOString();
