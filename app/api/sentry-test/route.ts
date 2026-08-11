@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
+import { resolveSentryDsn } from "@/lib/sentry-dsn";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.SENTRY_DSN && !process.env.NEXT_PUBLIC_SENTRY_DSN) {
+  if (!resolveSentryDsn(false)) {
     return NextResponse.json(
       { error: "Sentry DSN not configured (set SENTRY_DSN / NEXT_PUBLIC_SENTRY_DSN)" },
       { status: 503 }

@@ -4,18 +4,36 @@ import * as Sentry from "@sentry/nextjs";
 import Head from "next/head";
 import { useEffect, useState } from "react";
 
+type Connectivity =
+  | "checking"
+  | "ok"
+  | "sentry-unreachable"
+  | "no-dsn-configured"
+  | "other";
+
 export default function Page() {
   const [hasSentError, setHasSentError] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
+  const [connectivity, setConnectivity] = useState<Connectivity>("checking");
 
   useEffect(() => {
     Sentry.logger.info("Sentry example page loaded");
     async function checkConnectivity() {
       const result = await Sentry.diagnoseSdkConnectivity();
-      setIsConnected(result !== "sentry-unreachable");
+      if (result === "sentry-unreachable") {
+        setConnectivity("sentry-unreachable");
+      } else if (result === "no-dsn-configured") {
+        setConnectivity("no-dsn-configured");
+      } else if (!result) {
+        setConnectivity("ok");
+      } else {
+        setConnectivity("other");
+      }
     }
     checkConnectivity();
   }, []);
+
+  const canThrow =
+    connectivity === "ok" || connectivity === "checking" || connectivity === "other";
 
   return (
     <div>
@@ -81,19 +99,28 @@ export default function Page() {
             // @ts-expect-error intentional undefined call for Sentry verification
             myUndefinedFunction();
           }}
-          disabled={!isConnected}
+          disabled={!canThrow}
         >
           <span>Throw Sample Error</span>
         </button>
 
         {hasSentError ? (
           <p className="success">Error sent to Sentry.</p>
-        ) : !isConnected ? (
+        ) : connectivity === "sentry-unreachable" ? (
           <div className="connectivity-error">
             <p>
               It looks like network requests to Sentry are being blocked, which
               will prevent errors from being captured. Try disabling your
               ad-blocker to complete the test.
+            </p>
+          </div>
+        ) : connectivity === "no-dsn-configured" ? (
+          <div className="connectivity-error">
+            <p>
+              Sentry DSN is not configured in this build (
+              <code>NEXT_PUBLIC_SENTRY_DSN</code> / <code>SENTRY_DSN</code>).
+              Set the env on Vercel and redeploy, or rely on the built-in
+              public DSN fallback after this fix ships.
             </p>
           </div>
         ) : (
