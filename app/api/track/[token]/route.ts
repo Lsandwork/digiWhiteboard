@@ -18,8 +18,7 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     const view = await getOwnerTrackingPublic(token, { startedAtMs });
     if (!view) return NextResponse.json({ error: "Tracking link not found." }, { status: 404 });
 
-    // Intentionally do NOT advance Jasper demo SMS from public track polls.
-    // Opening a map must never text an owner. Demo SMS is opt-in cron only.
+    // Jasper demo SMS is permanently disabled — opening a map must never text anyone.
 
     return NextResponse.json(view);
   } catch (error) {
