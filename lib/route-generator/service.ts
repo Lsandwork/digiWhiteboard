@@ -41,6 +41,11 @@ import {
   type ExportStopRow,
   type SamsaraTemplate
 } from "@/lib/route-generator/samsara-csv";
+import {
+  copyCoordsForSplitHouseholdKeys,
+  hasFiniteCoords,
+  householdKeysShareStem
+} from "@/lib/route-generator/household-coords";
 import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import { FITDOG_VAN_KEYS, isRouteOwnerSmsEnabled, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
@@ -189,6 +194,111 @@ function syntheticCoords(householdKey: string, index: number) {
     lat: baseLat + ((h % 1000) / 100000) + index * 0.002,
     lng: baseLng - ((h % 800) / 100000) - index * 0.0015
   };
+}
+
+type PlanStopLocation = {
+  id: string;
+  stop_kind?: string | null;
+  household_key?: string | null;
+  owner_name?: string | null;
+  address?: string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+};
+
+/**
+ * Fill missing address/lat/lng on a plan stop before Samsara export.
+ * Used for plans already generated with the split-key coord bug (null drop-off coords).
+ */
+export function resolveExportStopLocation(params: {
+  stop: PlanStopLocation;
+  allStops: PlanStopLocation[];
+  stopItemsByStop: Map<string, Array<Record<string, unknown>>>;
+  reportByReservation: Map<string, Record<string, unknown>>;
+  index: number;
+}): {
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  repaired: boolean;
+  source: string;
+} {
+  let address = String(params.stop.address || "").trim();
+  let latitude =
+    params.stop.latitude == null || params.stop.latitude === ""
+      ? null
+      : Number(params.stop.latitude);
+  let longitude =
+    params.stop.longitude == null || params.stop.longitude === ""
+      ? null
+      : Number(params.stop.longitude);
+  if (!Number.isFinite(latitude)) latitude = null;
+  if (!Number.isFinite(longitude)) longitude = null;
+
+  if (address && hasFiniteCoords(latitude, longitude)) {
+    return { address, latitude, longitude, repaired: false, source: "stop" };
+  }
+
+  let source = "stop";
+
+  // 1) Same household stem (or same owner name) elsewhere on the plan — usually the AM pickup.
+  const donors = params.allStops.filter(
+    (candidate) =>
+      String(candidate.id) !== String(params.stop.id) &&
+      hasFiniteCoords(candidate.latitude, candidate.longitude) &&
+      (householdKeysShareStem(candidate.household_key, params.stop.household_key) ||
+        (Boolean(params.stop.owner_name) &&
+          Boolean(candidate.owner_name) &&
+          String(candidate.owner_name).trim().toLowerCase() ===
+            String(params.stop.owner_name).trim().toLowerCase()))
+  );
+  const donor = donors[0];
+  if (donor) {
+    if (!address) {
+      address = String(donor.address || "").trim();
+      if (address) source = "plan_donor_address";
+    }
+    if (!hasFiniteCoords(latitude, longitude)) {
+      latitude = Number(donor.latitude);
+      longitude = Number(donor.longitude);
+      source = "plan_donor_coords";
+    }
+  }
+
+  // 2) Report-item address for linked reservations (pickup or drop-off row).
+  if (!address) {
+    const linked = params.stopItemsByStop.get(String(params.stop.id)) ?? [];
+    for (const item of linked) {
+      const reservationId = item.reservation_id;
+      if (reservationId == null) continue;
+      const dropoff = params.reportByReservation.get(`dropoff|${reservationId}`);
+      const pickup = params.reportByReservation.get(`pickup|${reservationId}`);
+      const raw = String(dropoff?.address_raw || pickup?.address_raw || "").trim();
+      if (raw) {
+        address = raw;
+        source = "report_address";
+        break;
+      }
+    }
+  }
+
+  // 3) Last resort: deterministic synthetic coords so Digi never hands staff a
+  // blank lat/lng cell (Samsara Internal Server Error). Prefer a real donor above.
+  if (!hasFiniteCoords(latitude, longitude)) {
+    const seed = String(params.stop.household_key || address || params.stop.owner_name || params.stop.id);
+    const synth = syntheticCoords(seed, params.index);
+    latitude = synth.lat;
+    longitude = synth.lng;
+    source = source.startsWith("plan_donor") || source === "report_address" ? `${source}+synthetic` : "synthetic";
+  }
+
+  const repaired =
+    address !== String(params.stop.address || "").trim() ||
+    !hasFiniteCoords(params.stop.latitude, params.stop.longitude) ||
+    Number(params.stop.latitude) !== latitude ||
+    Number(params.stop.longitude) !== longitude;
+
+  return { address, latitude, longitude, repaired, source };
 }
 
 export async function getRouteGeneratorBootstrap() {
@@ -826,12 +936,13 @@ export async function generatePlanForRun(params: {
     dropoffGroups,
     existingLocks: lockedVanByHousehold
   });
-  for (const group of dropoffLock.dropoffGroups) {
-    const baseKey = group.householdKey.split("::")[0]!;
-    if (!coords[group.householdKey] && coords[baseKey]) {
-      coords[group.householdKey] = coords[baseKey]!;
-    }
-  }
+  // Timing already suffixes keys with `::service|band`; van-split adds another
+  // `::van_N`. Walking every prefix (not just split("::")[0]) is required — the
+  // old first-segment lookup left Daisy/Zuma-style split drop-offs with null coords.
+  copyCoordsForSplitHouseholdKeys(
+    coords,
+    dropoffLock.dropoffGroups.map((group) => group.householdKey)
+  );
 
   const dropoffOpt = optimizeRoutes({
     direction: "dropoff",
@@ -1177,6 +1288,10 @@ export async function exportSamsaraCsv(params: {
 
   const rows: ExportStopRow[] = [];
   let realignedScheduleCount = 0;
+  let locationRepairedCount = 0;
+  const locationRepairSources: string[] = [];
+  const locationPatches: Array<{ id: string; address: string; latitude: number; longitude: number }> = [];
+  let exportStopIndex = 0;
   for (const route of bundle.routes) {
     const routeStops = bundle.stops.filter((s) => s.route_id === route.id).sort((a, b) => a.sequence - b.sequence);
     const vanDisplay = normalizeSamsaraVehicleName(
@@ -1190,6 +1305,31 @@ export async function exportSamsaraCsv(params: {
       vanDisplay
     });
     routeStops.forEach((stop, stopIndex) => {
+      const location = resolveExportStopLocation({
+        stop,
+        allStops: bundle.stops,
+        stopItemsByStop,
+        reportByReservation,
+        index: exportStopIndex
+      });
+      exportStopIndex += 1;
+      if (location.repaired && location.latitude != null && location.longitude != null) {
+        locationRepairedCount += 1;
+        locationRepairSources.push(
+          `${stop.owner_name || stop.id}:${location.source}`
+        );
+        locationPatches.push({
+          id: String(stop.id),
+          address: location.address || String(stop.address || ""),
+          latitude: location.latitude,
+          longitude: location.longitude
+        });
+        // Keep in-memory stops consistent for later donor lookups on this export.
+        (stop as { address?: string | null }).address = location.address || stop.address;
+        (stop as { latitude?: number | null }).latitude = location.latitude;
+        (stop as { longitude?: number | null }).longitude = location.longitude;
+      }
+
       let stopNotes = String(stop.driver_notes || "");
       if (stop.stop_kind === "customer") {
         const linked = stopItemsByStop.get(String(stop.id)) ?? [];
@@ -1286,15 +1426,28 @@ export async function exportSamsaraCsv(params: {
         driverName: "",
         stopName,
         stopNotes: sanitizeSamsaraNotes(notesWithRoute),
-        stopAddress: sanitizeSamsaraText(stop.address || ""),
+        stopAddress: sanitizeSamsaraText(location.address || stop.address || ""),
         scheduledArrival,
         scheduledDeparture,
         routeDate: operatingDate,
         stopOrder: Number(stop.sequence),
-        latitude: formatSamsaraCoordinate(stop.latitude == null ? "" : String(stop.latitude)),
-        longitude: formatSamsaraCoordinate(stop.longitude == null ? "" : String(stop.longitude))
+        latitude: formatSamsaraCoordinate(location.latitude == null ? "" : String(location.latitude)),
+        longitude: formatSamsaraCoordinate(location.longitude == null ? "" : String(location.longitude))
       });
     });
+  }
+
+  // Persist repaired coords so Tracking / next export do not hit the same gap.
+  for (const patch of locationPatches) {
+    await supabase
+      .from("route_plan_stops")
+      .update({
+        address: patch.address,
+        latitude: patch.latitude,
+        longitude: patch.longitude,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", patch.id);
   }
 
   // Hard fail: vehicle names must be exact Samsara roster before building the file.
@@ -1367,6 +1520,8 @@ export async function exportSamsaraCsv(params: {
       validation_report: {
         ...validation.report,
         realignedScheduleCount,
+        locationRepairedCount,
+        locationRepairSources: locationRepairSources.slice(0, 40),
         scheduleAdjustedStops: schedule.adjustedStops,
         scheduleAdjustments: schedule.adjustments.slice(0, 40),
         today,
@@ -1392,7 +1547,13 @@ export async function exportSamsaraCsv(params: {
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
     reason: params.overrideReason,
-    newValue: { operatingDate, today, realignedScheduleCount, stopCount: rows.length }
+    newValue: {
+      operatingDate,
+      today,
+      realignedScheduleCount,
+      locationRepairedCount,
+      stopCount: rows.length
+    }
   });
 
   return {
@@ -1401,6 +1562,8 @@ export async function exportSamsaraCsv(params: {
     validation: {
       ...validation.report,
       realignedScheduleCount,
+      locationRepairedCount,
+      locationRepairSources: locationRepairSources.slice(0, 40),
       scheduleAdjustedStops: schedule.adjustedStops,
       scheduleAdjustments: schedule.adjustments.slice(0, 40),
       today,
