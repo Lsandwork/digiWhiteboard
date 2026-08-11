@@ -15,7 +15,8 @@ import {
   getPlanBundle,
   getReportRun,
   getRouteGeneratorBootstrap,
-  pullReportForDate
+  pullReportForDate,
+  setPlanOwnerTextsEnabled
 } from "@/lib/route-generator/service";
 import { listGingrTaxiServicesByDate } from "@/lib/route-generator/gingr-taxi";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/route-generator/owner-tracking-admin";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 async function requireAccess(request: Request, permission: Parameters<typeof hasRoutePermission>[1]) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };
@@ -143,6 +144,7 @@ export async function POST(request: Request) {
       : action === "generate_plan"
         ? "route_generator.generate"
         : action === "approve_plan" ||
+            action === "set_owner_texts" ||
             action === "tracking_resend_link" ||
             action === "tracking_set_sms_alerts" ||
             action === "tracking_clear_notified" ||
@@ -252,6 +254,25 @@ export async function POST(request: Request) {
         sendOwnerSms
       });
       return NextResponse.json(result);
+    }
+
+    if (action === "set_owner_texts") {
+      const planId = String(body.planId ?? "").trim();
+      if (!planId) return NextResponse.json({ error: "planId is required." }, { status: 400 });
+      const enabled = body.enabled === true || body.enabled === "true";
+      const result = await setPlanOwnerTextsEnabled({
+        planId,
+        enabled,
+        actorAdminId: session.adminUserId,
+        actorEmail: session.email,
+        actorRole: session.role
+      });
+      return NextResponse.json({
+        ...result,
+        message: enabled
+          ? "Owner tracking texts enabled for this plan."
+          : "Owner tracking texts disabled for this plan (future alerts suppressed)."
+      });
     }
 
     if (action === "tracking_resend_link") {

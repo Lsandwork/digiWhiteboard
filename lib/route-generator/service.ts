@@ -1,6 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { fitdogRouteReportProvider } from "@/lib/route-generator/fitdog-provider";
-import { groupHouseholdsWithFacilities } from "@/lib/route-generator/facility";
+import { annotateFacilityItems, groupHouseholdsWithFacilities, isFacilityHouseholdKey } from "@/lib/route-generator/facility";
 import {
   promoteSkippedOccurrenceToItems,
   serviceForAssignedVan,
@@ -46,6 +46,9 @@ import {
   hasFiniteCoords,
   householdKeysShareStem
 } from "@/lib/route-generator/household-coords";
+import { geocodeMany } from "@/lib/route-generator/geocode";
+import { reconcileTransportLegs, formatMissingLeg } from "@/lib/route-generator/reconciliation";
+import { formatPostalAddress } from "@/lib/route-generator/destination";
 import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import { FITDOG_VAN_KEYS, isRouteOwnerSmsEnabled, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
@@ -56,7 +59,6 @@ import {
   normalizeBaseKey,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
-import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
 import { createOwnerTrackingForPlan } from "@/lib/route-generator/owner-tracking";
 import { buildCustomerStopNotesFromReportRows } from "@/lib/route-generator/stop-notes";
 import {
@@ -830,51 +832,77 @@ export async function generatePlanForRun(params: {
 
   const sizeLoads = await getSetting<SizeLoadConfig>("dog_size_loads", { configured: false });
 
-  const normalized = (items ?? []).map((row) => ({
-    direction: row.direction as "pickup" | "dropoff",
-    reservationId: row.reservation_id,
-    customerId: row.customer_id,
-    ownerFirstName: row.owner_first_name,
-    ownerLastName: row.owner_last_name,
-    ownerFullName: row.owner_full_name,
-    dogId: row.dog_id,
-    dogName: row.dog_name,
-    serviceRaw: row.service_raw,
-    serviceCanonical: row.service_canonical,
-    addressRaw: row.address_raw,
-    addressStreet: row.address_street,
-    addressUnit: row.address_unit,
-    addressCity: row.address_city,
-    addressState: row.address_state,
-    addressZip: row.address_zip,
-    ownerPhoneMasked: row.owner_phone_masked,
-    timeWindowStart: timeWindowFromRow(row as Record<string, unknown>, "start"),
-    timeWindowEnd: timeWindowFromRow(row as Record<string, unknown>, "end"),
-    dogSize: row.dog_size,
-    specialNotes: row.special_notes,
-    driverNotes: row.driver_notes,
-    reservationNotes: row.reservation_notes,
-    householdKey: [row.address_street, row.address_unit, row.address_city, row.address_state, row.address_zip]
-      .filter(Boolean)
-      .join("|")
-      .toLowerCase(),
-    validationStatus: row.validation_status,
-    validationReasons: row.validation_reasons ?? [],
-    raw: row.raw ?? {}
-  }));
+  const normalized = (items ?? []).map((row) => {
+    const raw = (row.raw ?? {}) as Record<string, unknown>;
+    const locationTypeRaw = String(raw.location_type || raw.locationType || "").toUpperCase();
+    const locationType =
+      locationTypeRaw === "HOME" ||
+      locationTypeRaw === "FITDOG" ||
+      locationTypeRaw === "HUB" ||
+      locationTypeRaw === "OUTING" ||
+      locationTypeRaw === "CUSTOM"
+        ? locationTypeRaw
+        : null;
+    return {
+      direction: row.direction as "pickup" | "dropoff",
+      reservationId: row.reservation_id as string | null,
+      customerId: row.customer_id as string | null,
+      ownerFirstName: row.owner_first_name as string | null,
+      ownerLastName: row.owner_last_name as string | null,
+      ownerFullName: row.owner_full_name as string | null,
+      dogId: row.dog_id as string | null,
+      dogName: row.dog_name as string | null,
+      serviceRaw: row.service_raw as string | null,
+      serviceCanonical: row.service_canonical as NormalizedReportItem["serviceCanonical"],
+      locationType: locationType as NormalizedReportItem["locationType"],
+      addressRaw: row.address_raw as string | null,
+      addressStreet: row.address_street as string | null,
+      addressUnit: row.address_unit as string | null,
+      addressCity: row.address_city as string | null,
+      addressState: row.address_state as string | null,
+      addressZip: row.address_zip as string | null,
+      ownerPhoneMasked: row.owner_phone_masked as string | null,
+      timeWindowStart: timeWindowFromRow(row as Record<string, unknown>, "start"),
+      timeWindowEnd: timeWindowFromRow(row as Record<string, unknown>, "end"),
+      dogSize: row.dog_size as string | null,
+      specialNotes: row.special_notes as string | null,
+      driverNotes: row.driver_notes as string | null,
+      reservationNotes: row.reservation_notes as string | null,
+      householdKey: [row.address_street, row.address_unit, row.address_city, row.address_state, row.address_zip]
+        .filter(Boolean)
+        .join("|")
+        .toLowerCase(),
+      validationStatus: row.validation_status as NormalizedReportItem["validationStatus"],
+      validationReasons: (row.validation_reasons ?? []) as string[],
+      raw: raw as NormalizedReportItem["raw"]
+    } satisfies NormalizedReportItem;
+  });
 
-  const validNormalized = normalized.filter((i) => i.validationStatus !== "error");
-  const sharedDogConflicts = detectSharedDogTimingConflicts(validNormalized);
+  // Facility annotation MUST run before the error filter. Fitdog often omits street
+  // fields on Club/Hub destinations and only sends a location name — those used to be
+  // validationStatus=error and silently vanished (Captain/Luna/Mattie-class failures).
+  const annotatedAll = annotateFacilityItems(normalized, locations);
+  const recoverable = annotatedAll.filter((item) => {
+    if (item.validationStatus !== "error") return true;
+    // Still blocked only when we truly have no destination after facility recovery.
+    return Boolean(item.addressRaw || item.atFacility);
+  });
+  const stillBlocked = annotatedAll.filter(
+    (item) => item.validationStatus === "error" && !item.addressRaw && !item.atFacility
+  );
+  const sharedDogConflicts = detectSharedDogTimingConflicts(recoverable);
 
   const pickupGroups = groupHouseholdsWithFacilities(
-    validNormalized.filter((i) => i.direction === "pickup"),
+    recoverable.filter((i) => i.direction === "pickup"),
     locations
   );
   const dropoffGroups = groupHouseholdsWithFacilities(
-    validNormalized.filter((i) => i.direction === "dropoff"),
+    recoverable.filter((i) => i.direction === "dropoff"),
     locations
   );
-  const needsReview = normalized.filter((i) => i.validationStatus !== "ok");
+  const needsReview = annotatedAll.filter(
+    (i) => i.validationStatus !== "ok" || stillBlocked.includes(i)
+  );
 
   const lockedVanByHousehold: Record<string, FitdogVanKey> = {};
   for (const group of [...pickupGroups, ...dropoffGroups]) {
@@ -887,26 +915,49 @@ export async function generatePlanForRun(params: {
     }
   }
 
+  // Geocode real customer addresses. NEVER invent Santa Monica synthetic pins for homes —
+  // those caused Samsara map pins to land in the wrong place (BUG 1).
   const coords: Record<string, { lat: number; lng: number }> = {};
+  const customerAddresses = [...pickupGroups, ...dropoffGroups]
+    .filter((g) => !isFacilityHouseholdKey(g.householdKey))
+    .map((g) => String(g.address || "").trim())
+    .filter(Boolean);
+  const geocoded = await geocodeMany(customerAddresses);
+
   [...pickupGroups, ...dropoffGroups].forEach((g, index) => {
-    if (
-      g.householdKey.startsWith("facility:club") &&
-      locations.club.latitude != null &&
-      locations.club.longitude != null
-    ) {
-      coords[g.householdKey] = { lat: locations.club.latitude, lng: locations.club.longitude };
+    if (g.householdKey.startsWith("facility:club") && locations.club.latitude != null) {
+      coords[g.householdKey] = { lat: locations.club.latitude, lng: locations.club.longitude! };
       return;
     }
-    if (
-      g.householdKey.startsWith("facility:hub") &&
-      locations.hub.latitude != null &&
-      locations.hub.longitude != null
-    ) {
-      coords[g.householdKey] = { lat: locations.hub.latitude, lng: locations.hub.longitude };
+    if (g.householdKey.startsWith("facility:hub") && locations.hub.latitude != null) {
+      coords[g.householdKey] = { lat: locations.hub.latitude, lng: locations.hub.longitude! };
       return;
     }
+    if (g.householdKey.startsWith("facility:kenneth_hahn") && locations.kenneth_hahn.latitude != null) {
+      coords[g.householdKey] = {
+        lat: locations.kenneth_hahn.latitude,
+        lng: locations.kenneth_hahn.longitude!
+      };
+      return;
+    }
+    if (g.householdKey.startsWith("facility:huntington") && locations.huntington.latitude != null) {
+      coords[g.householdKey] = {
+        lat: locations.huntington.latitude,
+        lng: locations.huntington.longitude!
+      };
+      return;
+    }
+    const hit = geocoded.get(String(g.address || "").trim());
+    if (hit) {
+      coords[g.householdKey] = { lat: hit.latitude, lng: hit.longitude };
+      return;
+    }
+    // Last resort for shadow/tests without Maps key — deterministic but flagged in summary.
     coords[g.householdKey] = syntheticCoords(g.householdKey, index);
   });
+  const usedSyntheticCustomerCoords = [...pickupGroups, ...dropoffGroups].some(
+    (g) => !isFacilityHouseholdKey(g.householdKey) && !geocoded.has(String(g.address || "").trim())
+  );
 
   const effectiveDepot: DepotConfig = {
     ...depot,
@@ -976,19 +1027,50 @@ export async function generatePlanForRun(params: {
   }
 
   const status =
+    stillBlocked.length ||
     needsReview.some((i) => i.validationStatus === "error") ||
     pickupOpt.unassigned.length ||
     dropoffOpt.unassigned.length ||
-    sharedDogConflicts.length > 0
+    sharedDogConflicts.length > 0 ||
+    usedSyntheticCustomerCoords
       ? "needs_review"
       : "ready_for_approval";
+
+  // Build assignment refs for reconciliation — capacity overflow stays UNASSIGNED, never silent.
+  const assignedStopRefs = [...pickupOpt.routes, ...dropoffOpt.routes].flatMap((route) =>
+    route.stops
+      .filter((stop) => stop.stopKind === "customer")
+      .map((stop) => ({
+        stopId: `${route.vanKey}:${route.direction}:${stop.sequence}:${stop.householdKey || stop.ownerName}`,
+        routeVanKey: route.vanKey,
+        routeName: `${route.waveName || route.direction} ${route.vanKey}`,
+        direction: route.direction as "pickup" | "dropoff",
+        reservationIds: stop.reservationIds || [],
+        dogIds: stop.dogIds || [],
+        dogNames: stop.dogNames || [],
+        householdKey: stop.householdKey
+      }))
+  );
+  // Also mark optimizer-unassigned households' dogs as UNASSIGNED via missing match.
+  const reconciliation = reconcileTransportLegs({
+    items: annotatedAll,
+    assignedStops: assignedStopRefs
+  });
+  if (!reconciliation.ok) {
+    // Force needs_review whenever any leg is missing — never approve a silent drop.
+  }
+
+  const planStatus =
+    reconciliation.ok && status === "ready_for_approval" && !usedSyntheticCustomerCoords
+      ? "ready_for_approval"
+      : "needs_review";
 
   const { data: plan, error: planError } = await supabase
     .from("route_plans")
     .insert({
       operating_date: run.operating_date,
       report_run_id: run.id,
-      status,
+      status: planStatus,
       current_version: 1,
       shadow_mode: true,
       summary: {
@@ -996,11 +1078,28 @@ export async function generatePlanForRun(params: {
         dropoffDogs: dropoffGroups.reduce((n, g) => n + g.dogCount, 0),
         households: pickupGroups.length + dropoffGroups.length,
         vansUsed: new Set([...pickupOpt.routes, ...dropoffOpt.routes].map((r) => r.vanKey)).size,
-        unassigned: pickupOpt.unassigned.length + dropoffOpt.unassigned.length,
+        unassigned: reconciliation.unassignedCount,
         needsReview: needsReview.length,
         sharedDogConflicts: sharedDogConflicts.length,
         pickupLabel: pickupOpt.label,
-        dropoffLabel: dropoffOpt.label
+        dropoffLabel: dropoffOpt.label,
+        services: annotatedAll.length,
+        transportLegs: reconciliation.expectedCount,
+        assignedLegs: reconciliation.assignedCount,
+        blockedLegs: reconciliation.blockedCount,
+        missingLegs: reconciliation.missingCount,
+        addressIssues: usedSyntheticCustomerCoords ? customerAddresses.length - geocoded.size : 0,
+        usedSyntheticCustomerCoords,
+        ownerTextsEnabled: false,
+        vehicleAlreadyAtFirstStop: true,
+        reconciliation: {
+          ok: reconciliation.ok,
+          expectedCount: reconciliation.expectedCount,
+          assignedCount: reconciliation.assignedCount,
+          unassignedCount: reconciliation.unassignedCount,
+          blockedCount: reconciliation.blockedCount,
+          missing: reconciliation.missing.slice(0, 50).map(formatMissingLeg)
+        }
       },
       created_by: params.actorAdminId ?? null,
       created_by_email: params.actorEmail ?? null
@@ -1009,13 +1108,19 @@ export async function generatePlanForRun(params: {
     .single();
   if (planError || !plan) throw new Error(planError?.message || "Unable to create plan.");
 
-  const snapshot = { pickupOpt, dropoffOpt, needsReviewCount: needsReview.length };
+  const snapshot = {
+    pickupOpt,
+    dropoffOpt,
+    needsReviewCount: needsReview.length,
+    reconciliation,
+    usedSyntheticCustomerCoords
+  };
   await supabase.from("route_plan_versions").insert({
     plan_id: plan.id,
     version_number: 1,
     snapshot,
     optimization_seed: `${pickupOpt.seed}|${dropoffOpt.seed}`,
-    optimization_label: status === "needs_review" ? "needs_management_review" : "optimized",
+    optimization_label: planStatus === "needs_review" ? "needs_management_review" : "optimized",
     created_by: params.actorAdminId ?? null,
     created_by_email: params.actorEmail ?? null
   });
@@ -1158,12 +1263,55 @@ export async function approvePlan(params: {
 }) {
   const supabase = getServiceSupabase();
   const sendOwnerSms = Boolean(params.sendOwnerSms);
+  const bundle = await getPlanBundle(params.planId);
+  const summary = (bundle.plan.summary ?? {}) as Record<string, unknown>;
+  const reconciliationSummary = (summary.reconciliation ?? null) as {
+    ok?: boolean;
+    missing?: string[];
+    expectedCount?: number;
+    assignedCount?: number;
+  } | null;
+
+  // Approval gate — never approve when transport legs are missing or addresses are broken.
+  if (reconciliationSummary && reconciliationSummary.ok === false) {
+    const missing = (reconciliationSummary.missing ?? []).slice(0, 8).join("; ");
+    throw new RouteGeneratorClientError(
+      `ROUTES NEED ATTENTION — ${reconciliationSummary.missing?.length ?? "some"} transportation leg(s) are unassigned or blocked. ${missing}`,
+      409,
+      "reconciliation_failed"
+    );
+  }
+  const locationIssues = bundle.stops.filter((stop) => {
+    if (stop.stop_kind === "depot_start" || stop.stop_kind === "depot_end") {
+      return !String(stop.address || "").trim() || !hasFiniteCoords(stop.latitude, stop.longitude);
+    }
+    if (stop.stop_kind !== "customer") return false;
+    return !String(stop.address || "").trim() || !hasFiniteCoords(stop.latitude, stop.longitude);
+  });
+  if (locationIssues.length) {
+    throw new RouteGeneratorClientError(
+      `${locationIssues.length} stop(s) need location review before this route can be approved/sent to Samsara: ${locationIssues
+        .slice(0, 5)
+        .map((s) => s.owner_name || s.id)
+        .join(", ")}`,
+      409,
+      "address_validation_failed"
+    );
+  }
+
+  const nextSummary = {
+    ...summary,
+    ownerTextsEnabled: sendOwnerSms,
+    vehicleAlreadyAtFirstStop: true
+  };
+
   const { data: plan, error } = await supabase
     .from("route_plans")
     .update({
       status: "approved",
       approved_by: params.actorAdminId ?? null,
-      approved_at: new Date().toISOString()
+      approved_at: new Date().toISOString(),
+      summary: nextSummary
     })
     .eq("id", params.planId)
     .select("*")
@@ -1176,7 +1324,7 @@ export async function approvePlan(params: {
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
-    newValue: { sendOwnerSms }
+    newValue: { sendOwnerSms, vehicleAlreadyAtFirstStop: true }
   });
 
   // Create owner tracking links. SMS only when sendOwnerSms is checked AND kill switch is on.
@@ -1216,6 +1364,76 @@ export async function approvePlan(params: {
   }
 
   return { plan, tracking };
+}
+
+/**
+ * Toggle owner tracking texts independently of approval.
+ * Does not regenerate routes, duplicate Samsara exports, or clear assignments.
+ */
+export async function setPlanOwnerTextsEnabled(params: {
+  planId: string;
+  enabled: boolean;
+  actorAdminId?: string | null;
+  actorEmail?: string | null;
+  actorRole?: string | null;
+}) {
+  const supabase = getServiceSupabase();
+  const bundle = await getPlanBundle(params.planId);
+  const status = String(bundle.plan.status || "");
+  if (!["approved", "exported", "ready_for_approval", "needs_review"].includes(status)) {
+    throw new RouteGeneratorClientError(
+      `Cannot change owner texts while plan status is "${status}".`,
+      409,
+      "invalid_plan_status"
+    );
+  }
+
+  const summary = {
+    ...((bundle.plan.summary ?? {}) as Record<string, unknown>),
+    ownerTextsEnabled: Boolean(params.enabled)
+  };
+  const { data: plan, error } = await supabase
+    .from("route_plans")
+    .update({ summary, updated_at: new Date().toISOString() })
+    .eq("id", params.planId)
+    .select("*")
+    .single();
+  if (error || !plan) throw new Error(error?.message || "Unable to update owner texts setting.");
+
+  // When enabling after approval, create/enable tracking without forcing link spam if quiet hours.
+  let tracking: Awaited<ReturnType<typeof createOwnerTrackingForPlan>> | null = null;
+  if (params.enabled && (status === "approved" || status === "exported")) {
+    if (!isRouteOwnerSmsEnabled()) {
+      throw new RouteGeneratorClientError(
+        "Owner SMS is disabled system-wide (ROUTE_OWNER_SMS_ENABLED). Turn it on in Vercel for live route days.",
+        409,
+        "route_owner_sms_disabled"
+      );
+    }
+    tracking = await createOwnerTrackingForPlan(params.planId, { sendSms: true });
+  }
+  if (!params.enabled) {
+    // Disable future ETA alerts on all tracking rows for this plan — do not revoke links already sent.
+    await supabase
+      .from("route_owner_tracking")
+      .update({ sms_alerts_enabled: false })
+      .eq("plan_id", params.planId)
+      .eq("sms_alerts_enabled", true);
+  }
+
+  await writeRouteAuditEvent({
+    action: params.enabled
+      ? "route_generator.owner_texts_enabled"
+      : "route_generator.owner_texts_disabled",
+    entityType: "route_plan",
+    entityId: params.planId,
+    actorAdminId: params.actorAdminId,
+    actorEmail: params.actorEmail,
+    actorRole: params.actorRole,
+    newValue: { ownerTextsEnabled: params.enabled, tracking }
+  });
+
+  return { plan, tracking, ownerTextsEnabled: Boolean(params.enabled) };
 }
 
 export async function exportSamsaraCsv(params: {
@@ -1401,10 +1619,16 @@ export async function exportSamsaraCsv(params: {
       scheduledDeparture = aligned.departure;
       if (aligned.realigned) realignedScheduleCount += 1;
 
-      // Prefer stop notes; include route wave context when present.
       const notesWithRoute =
-        stopNotes.trim() ||
-        `${route.wave_name || ""}`.trim();
+        stop.stop_kind === "depot_start"
+          ? [
+              "START: Vehicle is expected to already be at this stop when the route begins (Samsara: check 'Vehicle is expected to already be at this stop').",
+              stopNotes.trim(),
+              `${route.wave_name || ""}`.trim()
+            ]
+              .filter(Boolean)
+              .join(" | ")
+          : stopNotes.trim() || `${route.wave_name || ""}`.trim();
       const safeRouteName = sanitizeSamsaraText(routeName);
       const baseStopName = sanitizeSamsaraText(String(stop.owner_name || stop.stop_kind || "Stop")) || "Stop";
       // Unique stop labels within a route (depot start/end used to collide and confuse Samsara).
@@ -1418,15 +1642,24 @@ export async function exportSamsaraCsv(params: {
           ? baseStopName
           : sanitizeSamsaraText(`${baseStopName} (${sameNameCount + 1})`) || `${baseStopName} ${sameNameCount + 1}`;
 
+      // Full Address must be a postal address — never a dog/owner nickname.
+      const postal =
+        formatPostalAddress({
+          street1: location.address,
+          country: "USA"
+        }) || location.address || String(stop.address || "");
+
       rows.push({
         routeName: safeRouteName,
-        routeNotes: sanitizeSamsaraNotes(`${route.wave_name} | ${route.vehicle_pool}`),
+        routeNotes: sanitizeSamsaraNotes(
+          `${route.wave_name} | ${route.vehicle_pool} | vehicleAlreadyAtFirstStop=true`
+        ),
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
         driverName: "",
         stopName,
         stopNotes: sanitizeSamsaraNotes(notesWithRoute),
-        stopAddress: sanitizeSamsaraText(location.address || stop.address || ""),
+        stopAddress: sanitizeSamsaraText(postal),
         scheduledArrival,
         scheduledDeparture,
         routeDate: operatingDate,
@@ -1568,7 +1801,7 @@ export async function exportSamsaraCsv(params: {
       scheduleAdjustments: schedule.adjustments.slice(0, 40),
       today,
       operatingDate,
-      uploadReminder: `Upload ${fileName} to Samsara now. Delete older fitdog-samsara-routes-*.csv files from Downloads first — uploading an earlier copy is what causes Samsara's Internal Server Error.`
+      uploadReminder: `Upload ${fileName} to Samsara now. On each route's starting stop, leave checked: "Vehicle is expected to already be at this stop when the route begins." Delete older fitdog-samsara-routes-*.csv files from Downloads first — uploading an earlier copy causes Samsara Internal Server Error.`
     },
     job
   };
