@@ -6,8 +6,9 @@ import { isRufflyEnabled } from "@/lib/ruffly/flags";
 export const dynamic = "force-dynamic";
 
 /**
- * Ruffly Gingr webhook endpoint (parallel to board /api/gingr/webhook).
- * Configure in Gingr as: https://staff.ruffops.com/api/ruffly/webhooks/gingr
+ * Ruffly-only Gingr webhook endpoint (diagnostics / replay).
+ * Production Gingr UI must stay on DigiBoard `/api/gingr/webhook` because Gingr
+ * allows only one URL; that route fans out into `ingestGingrWebhook`.
  */
 export async function POST(request: Request) {
   if (!isRufflyEnabled() && process.env.RUFFLY_WEBHOOKS_ALWAYS_ACCEPT !== "true") {
