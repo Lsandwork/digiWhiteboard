@@ -34,6 +34,11 @@ import {
 } from "@/lib/system-health/debug-bridge";
 import { recordApiLog } from "@/lib/system-health/integrations";
 import { createRequestId } from "@/lib/system-health/correlation";
+import {
+  applySystemHealthMigration072,
+  checkSystemHealthSchema,
+  loadSystemHealthMigrationSql
+} from "@/lib/system-health/ensure-schema";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +157,19 @@ export async function GET(request: Request) {
           })
         };
         break;
+      case "schema": {
+        const supabase = getServiceSupabase();
+        payload = { data: await checkSystemHealthSchema(supabase) };
+        break;
+      }
+      case "migration_sql":
+        payload = {
+          data: {
+            file: "072_system_health_debugging.sql",
+            sql: loadSystemHealthMigrationSql()
+          }
+        };
+        break;
       case "settings":
         payload = { settings: await loadSystemHealthSettings() };
         break;
@@ -198,7 +216,7 @@ export async function POST(request: Request) {
   const action = String(body.action || "");
 
   const permission: PermissionKey =
-    action === "save_settings" || action === "start_live_debug"
+    action === "save_settings" || action === "start_live_debug" || action === "apply_migration_072"
       ? "system_health.configure"
       : action === "bug_context" || action === "search" || action === "context"
         ? "system_health.developer"
@@ -245,6 +263,25 @@ export async function POST(request: Request) {
           scopeIntegration: body.integration ? String(body.integration) : null
         });
         return NextResponse.json({ ok: true, session });
+      }
+      case "apply_migration_072": {
+        const before = await checkSystemHealthSchema(getServiceSupabase());
+        if (before.ready) {
+          return NextResponse.json({
+            ok: true,
+            applied: false,
+            alreadyReady: true,
+            schema: before,
+            detail: "Migration 072 already applied — all System Health tables present."
+          });
+        }
+        const result = await applySystemHealthMigration072();
+        const after = await checkSystemHealthSchema(getServiceSupabase());
+        return NextResponse.json({
+          ...result,
+          ok: result.ok && after.ready,
+          schema: after
+        });
       }
       case "resolve_error":
       case "reopen_error":

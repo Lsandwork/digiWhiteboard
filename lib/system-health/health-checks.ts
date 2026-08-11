@@ -13,6 +13,8 @@ import { probeCloudStorage } from "@/lib/system-health/probes/storage";
 import { probeRealtime } from "@/lib/system-health/probes/realtime";
 import { probeBackgroundWorker, probeJobQueue } from "@/lib/system-health/probes/worker";
 import { probeRouteGenerator } from "@/lib/system-health/probes/route-generator";
+import { checkSystemHealthSchema, SYSTEM_HEALTH_REQUIRED_TABLES } from "@/lib/system-health/ensure-schema";
+import type { SchemaReadiness } from "@/lib/system-health/ensure-schema";
 
 export type ServiceHealthCard = {
   id: string;
@@ -43,7 +45,8 @@ export const AGGREGATE_SERVICE_IDS = new Set([
   "background_worker",
   "job_queue",
   "storage",
-  "realtime"
+  "realtime",
+  "observability_schema"
 ]);
 
 export function aggregateSystemHealth(services: ServiceHealthCard[]): HealthStatus {
@@ -57,9 +60,13 @@ export function aggregateSystemHealth(services: ServiceHealthCard[]): HealthStat
   return services
     .filter((s) => AGGREGATE_SERVICE_IDS.has(s.id))
     .reduce<HealthStatus>((acc, s) => {
-      // UNKNOWN on a critical card still matters, but after probes it should be rare.
       return rank[s.status] > rank[acc] ? s.status : acc;
     }, "HEALTHY");
+}
+
+/** Never leave a service card on UNKNOWN — operators need actionable statuses. */
+export function coerceServiceStatus(status: HealthStatus): HealthStatus {
+  return status === "UNKNOWN" ? "WARNING" : status;
 }
 
 async function countErrors(supabase: ReturnType<typeof getServiceSupabase>, sinceIso: string) {
@@ -104,6 +111,7 @@ async function integrationStats(
 
 export async function runFunctionalHealthChecks(): Promise<{
   services: ServiceHealthCard[];
+  schema: SchemaReadiness;
   summary: {
     systemHealth: HealthStatus;
     errorsToday: number;
@@ -118,6 +126,7 @@ export async function runFunctionalHealthChecks(): Promise<{
     lastSamsaraExport: string | null;
     storageBucketsOk: number | null;
     queueDepth: number | null;
+    schemaReady: boolean;
   };
 }> {
   const supabase = getServiceSupabase();
@@ -163,7 +172,8 @@ export async function runFunctionalHealthChecks(): Promise<{
     storageProbe,
     realtimeProbe,
     workerProbe,
-    queueProbe
+    queueProbe,
+    schema
   ] = await Promise.all([
     supabase.from("admin_settings").select("id").eq("id", "default").maybeSingle(),
     supabase
@@ -282,7 +292,17 @@ export async function runFunctionalHealthChecks(): Promise<{
         stuckRunning: 0
       },
       failedToday: 0
-    }))
+    })),
+    checkSystemHealthSchema(supabase).catch(
+      (): SchemaReadiness => ({
+        ready: false,
+        migration: "072_system_health_debugging.sql",
+        present: [],
+        missing: [...SYSTEM_HEALTH_REQUIRED_TABLES],
+        canApplyViaPg: false,
+        detail: "Unable to verify System Health schema."
+      })
+    )
   ]);
 
   const routeGen = await probeRouteGenerator(supabase, {
@@ -536,8 +556,35 @@ export async function runFunctionalHealthChecks(): Promise<{
         realtimeHttpOk: realtimeProbe.realtimeHttpOk,
         boardFreshestAt: realtimeProbe.boardFreshestAt
       }
+    },
+    {
+      id: "observability_schema",
+      label: "System Health Schema (072)",
+      status: schema.ready ? "HEALTHY" : "DEGRADED",
+      responseTimeMs: null,
+      lastSuccessAt: schema.ready ? new Date().toISOString() : null,
+      lastFailureAt: schema.ready ? null : new Date().toISOString(),
+      lastError: schema.ready ? null : schema.detail,
+      errorsLastHour: 0,
+      errorsLast24h: schema.missing.length,
+      successRate24h: null,
+      detail: schema.detail,
+      meta: {
+        migration: schema.migration,
+        present: schema.present,
+        missing: schema.missing,
+        canApplyViaPg: schema.canApplyViaPg
+      }
     }
   ];
+
+  // Coerce any residual UNKNOWN so Overview never shows that dead-end label
+  for (const svc of services) {
+    if (svc.status === "UNKNOWN") {
+      svc.status = coerceServiceStatus(svc.status);
+      if (!svc.detail) svc.detail = "Status could not be fully determined — treating as warning.";
+    }
+  }
 
   if (audit?.open_issues?.length) {
     const app = services.find((s) => s.id === "ruffops");
@@ -574,6 +621,7 @@ export async function runFunctionalHealthChecks(): Promise<{
 
   return {
     services,
+    schema,
     summary: {
       systemHealth,
       errorsToday: Number(errorsToday) || 0,
@@ -593,7 +641,8 @@ export async function runFunctionalHealthChecks(): Promise<{
           ? String(lastExport.data.created_at)
           : null,
       storageBucketsOk: storageProbe.buckets.filter((b) => b.listOk).length,
-      queueDepth
+      queueDepth,
+      schemaReady: schema.ready
     }
   };
 }
