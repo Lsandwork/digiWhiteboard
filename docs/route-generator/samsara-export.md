@@ -65,7 +65,7 @@ Live map + ETA:
 | Vans | Drop-off start | Why |
 |------|----------------|-----|
 | Van 1, 2, 3 | **10:30 AM** | Outing return (Hahn / Beach) home drop-offs |
-| Van 5, 6 | **12:00 PM** | Club vans — group classes end at noon; Van 5 primary for taxi / club drop-offs |
+| Van 5, 6 | **12:00 PM** | Club vans for Group Class / Taxi — **either/or same day** (Van 5 primary; Van 6 only when Van 5 inactive) |
 
 Pickup synthesis still starts at **07:00 AM**. These times feed the Samsara CSV when stop ETAs were not persisted.
 
