@@ -32,14 +32,17 @@ This is usually a **bad data row**, not Digi being down. Digi never uploads to S
 Common causes Digi now **blocks before download** (fail-closed — no file is offered):
 1. Missing **Latitude / Longitude / Full Address** on any stop
 2. Stop times on the **wrong calendar day** (UTC/ETA drift)
-3. Multiline, non-ASCII, or oversized **Stop Notes** (ZWSP/emoji/smart quotes stripped; otherwise blocked)
+3. Multiline, non-ASCII, or oversized **Stop Notes** (ZWSP/emoji/smart quotes stripped; middle-dot `·` blocked — use ASCII `|`)
 4. **0,0** / near-zero / invalid coordinates
 5. Driver + vehicle both assigned
 6. Vehicle name not exactly **Van 01 / 02 / 03 / 05 / 06** (soft warnings removed — hard error)
 7. Arrival === departure, or non-monotonic times across a route
 8. CSV round-trip mismatch (wrong column count / blank required cells)
+9. Missing CRLF line endings or UTF-8 BOM
 
-If Samsara still shows **Internal Server Error**, you are almost certainly uploading an **old Downloads copy** (e.g. `fitdog-samsara-routes-2026-08-11-2.csv` from a prior export). Delete old copies, re-export from Digi, and upload **only** the newest file Digi just downloaded.
+Datetime cells must match official sample style: **`m/d/yyyy H:mm`** (e.g. `8/11/2026 7:05`), not zero-padded `08/11/2026 07:05`.
+
+If Samsara still shows **Internal Server Error**, you are almost certainly uploading an **old Downloads copy** (e.g. `fitdog-samsara-routes-2026-08-11-2.csv` from a prior export that still had middle-dot notes or padded datetimes). Delete old copies, re-export from Digi, and upload **only** the newest file Digi just downloaded.
 
 **Never reuse another day's CSV** (e.g. Friday's file on Monday). Digi blocks wrong-day export unless a manager uses emergency override with a written reason. Always **Re-export Samsara CSV** from today's approved plan.
 

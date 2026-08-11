@@ -46,7 +46,8 @@ function phoneFromItem(item: NormalizedReportItem): string | null {
 
 /**
  * Build Samsara Stop Notes for drivers: dogs, owner phone, and pickup/drop-off instructions.
- * Notes may include newlines in-memory; CSV export flattens them with " · " for Samsara upload safety.
+ * Notes may include newlines in-memory; CSV export flattens them with ASCII " | "
+ * for Samsara upload safety (never middle-dot · — non-ASCII / ISE risk).
  */
 export function buildCustomerStopNotes(params: {
   items: NormalizedReportItem[];
@@ -65,7 +66,7 @@ export function buildCustomerStopNotes(params: {
   const lines: string[] = [];
   if (isFacility) {
     lines.push(
-      `Fitdog facility stop — ${dogNames.length || items.length} dog(s) already on-site: ${dogNames.join(", ") || "dogs"}`
+      `Fitdog facility stop - ${dogNames.length || items.length} dog(s) already on-site: ${dogNames.join(", ") || "dogs"}`
     );
     if (facilityLabel) lines.push(`Location: ${facilityLabel}`);
   } else {
@@ -73,7 +74,7 @@ export function buildCustomerStopNotes(params: {
   }
 
   if (phones.length) {
-    lines.push(`Phone: ${phones.join(" · ")}`);
+    lines.push(`Phone: ${phones.join(" | ")}`);
   }
 
   const instructionLabel = direction === "pickup" ? "Pickup instructions" : "Drop-off instructions";
