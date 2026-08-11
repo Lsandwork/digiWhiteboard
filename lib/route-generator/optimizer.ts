@@ -31,6 +31,10 @@ import {
   sharedDogTimingClashPenalty,
   windowCompatibilityPenalty
 } from "@/lib/route-generator/timing";
+import {
+  remapClubVanLocks,
+  resolveClubVanFleet
+} from "@/lib/route-generator/club-vans";
 
 export type DepotConfig = {
   name: string;
@@ -178,7 +182,18 @@ export function optimizeRoutes(params: {
     }
   };
 
-  const vehicles = params.vehicles
+  // Club vans (5/6): Group Class + Taxi — either/or same day, Van 5 primary.
+  const clubFleet = resolveClubVanFleet(params.vehicles);
+  warnings.push(...clubFleet.warnings);
+  const lockRemap = remapClubVanLocks({
+    lockedVanByHousehold: params.lockedVanByHousehold,
+    primaryClubVan: clubFleet.primaryClubVan,
+    excludedClubVans: clubFleet.excludedClubVans
+  });
+  warnings.push(...lockRemap.warnings);
+  const lockedVanByHousehold = lockRemap.locks;
+
+  const vehicles = clubFleet.vehicles
     .filter((v) => v.active)
     .map((v) => {
       assertNeverVan4(v.vanKey);
@@ -194,7 +209,7 @@ export function optimizeRoutes(params: {
       seed,
       routes: [],
       unassigned: params.households,
-      warnings: ["No active vans available."]
+      warnings: ["No active vans available.", ...warnings]
     };
   }
 
@@ -297,7 +312,7 @@ export function optimizeRoutes(params: {
   // Assign locked households first. If the pinned van is missing/full, fall back to
   // other eligible vans so manual taxi / skipped-class pins are not dead-ends.
   for (const stop of enriched) {
-    const lockedVan = params.lockedVanByHousehold?.[stop.householdKey];
+    const lockedVan = lockedVanByHousehold?.[stop.householdKey];
     if (!lockedVan) continue;
     assertNeverVan4(lockedVan);
     const service = stop.items.find((i) => i.serviceCanonical)?.serviceCanonical ?? null;
@@ -543,7 +558,7 @@ export function optimizeRoutes(params: {
         dogNames: stop.items.map((i) => i.dogName || "Dog"),
         dogIds: stop.items.map((i) => i.dogId || "").filter(Boolean),
         reservationIds: stop.items.map((i) => i.reservationId || "").filter(Boolean),
-        locked: Boolean(params.lockedVanByHousehold?.[stop.householdKey]),
+        locked: Boolean(lockedVanByHousehold?.[stop.householdKey]),
         ownerPhoneDisplay: phones[0] ?? null,
         requestedWindowStart: eta?.requestedWindowStart ?? null,
         requestedWindowEnd: eta?.requestedWindowEnd ?? null,

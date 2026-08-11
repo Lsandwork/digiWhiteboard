@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createRouteCorrelationId, isRouteCorrelationId } from "../lib/system-health/correlation";
-import { sanitizeForCursor, buildAddressDiagnostic, assertNoSecrets } from "../lib/system-health/sanitize";
+import { sanitizeForCursor, buildAddressDiagnostic, assertNoSecrets, sanitizeForUi } from "../lib/system-health/sanitize";
 import { fingerprintError } from "../lib/system-health/errors";
 import {
   buildPipelineStages,
@@ -102,6 +102,16 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   const addr = buildAddressDiagnostic({ street: "Main", city: "Santa Monica", zip: "90401", geocodeStatus: "INVALID" });
   assert.equal(addr.postal_code_present, true);
   assert.equal(addr.city, "Santa Monica");
+
+  // correlation_id must survive phone-masking (digits look phone-like)
+  const ui = sanitizeForUi({
+    correlation_id: "RG-20260811-00172",
+    request_id: "req_abc123",
+    note: "call 3105551212"
+  }) as Record<string, unknown>;
+  assert.equal(ui.correlation_id, "RG-20260811-00172");
+  assert.equal(ui.request_id, "req_abc123");
+  assert.match(String(ui.note), /•••/);
 }
 
 // --- Error fingerprint grouping ---

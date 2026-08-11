@@ -13,6 +13,11 @@ import { assertNeverVan4, FITDOG_VAN_KEYS } from "../lib/route-generator/flags";
 import { formatStopDisplayName, groupHouseholds } from "../lib/route-generator/households";
 import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
 import { lockDropoffGroupsToPickupVans, optimizeRoutes } from "../lib/route-generator/optimizer";
+import {
+  PRIMARY_CLUB_VAN,
+  remapClubVanLocks,
+  resolveClubVanFleet
+} from "../lib/route-generator/club-vans";
 import { DEFAULT_FITDOG_LOCATIONS, resolveRouteEndpoints } from "../lib/route-generator/locations";
 import { serviceForAssignedVan } from "../lib/route-generator/fitdog-api";
 import {
@@ -1602,7 +1607,8 @@ assert.equal(
   assert.equal(overflowOpt.label, "needs_management_review");
 }
 
-// Locked taxi falls back to another eligible club van when pinned van is full
+// Locked taxi: club vans are either/or (Van 5 primary) — Van 6 must not run same day.
+// When Van 5 is full, overflow stays on Van 5 (or management review) instead of spinning Van 6.
 {
   const taxiStop = {
     householdKey: "5 taxi ave|santa monica|ca|90401::taxi-service|open",
@@ -1718,16 +1724,103 @@ assert.equal(
       [taxiStop.householdKey]: { lat: 34.03, lng: -118.48 }
     }
   });
-  // Place Osita first on van_5 (unlocked, sorts before or with), Oscar locked to van_5 then falls back
+  assert.ok(
+    lockedOpt.warnings.some((w) => /mutually exclusive|Van 5 only/i.test(w)),
+    "must warn that club vans are either/or"
+  );
+  assert.equal(
+    lockedOpt.routes.some((r) => r.vanKey === "van_6"),
+    false,
+    "Van 6 must not receive routes when Van 5 is active"
+  );
   const oscarRoute = lockedOpt.routes.find((r) =>
     r.stops.some((s) => s.stopKind === "customer" && s.dogNames.includes("Oscar"))
   );
-  assert.ok(oscarRoute, "Oscar must be assigned");
-  assert.equal(lockedOpt.unassigned.length, 0);
-  assert.ok(
-    oscarRoute?.vanKey === "van_6" || oscarRoute?.vanKey === "van_5",
-    "Oscar stays on an eligible club van"
-  );
+  // Oscar may overflow onto Van 5 or remain unassigned for management review — never Van 6.
+  if (oscarRoute) {
+    assert.equal(oscarRoute.vanKey, "van_5");
+  } else {
+    assert.ok(lockedOpt.unassigned.some((u) => u.items.some((i) => i.dogName === "Oscar")));
+  }
+}
+
+// Club van exclusivity: Group Class + Taxi with both vans active → only Van 5
+{
+  const fleet = resolveClubVanFleet([
+    {
+      vanKey: "van_5",
+      active: true,
+      vehiclePool: "club",
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Group Class", "Taxi Service"],
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_6",
+      active: true,
+      vehiclePool: "club",
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Group Class", "Taxi Service"],
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_1",
+      active: true,
+      vehiclePool: "outing",
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Adventure Hike"],
+      capacityConfigured: true
+    }
+  ]);
+  assert.equal(fleet.primaryClubVan, PRIMARY_CLUB_VAN);
+  assert.deepEqual(fleet.excludedClubVans, ["van_6"]);
+  assert.equal(fleet.vehicles.some((v) => v.vanKey === "van_6"), false);
+  assert.equal(fleet.vehicles.some((v) => v.vanKey === "van_5"), true);
+
+  const remapped = remapClubVanLocks({
+    lockedVanByHousehold: { "hh-a": "van_6", "hh-b": "van_5" },
+    primaryClubVan: fleet.primaryClubVan,
+    excludedClubVans: fleet.excludedClubVans
+  });
+  assert.equal(remapped.locks["hh-a"], "van_5");
+  assert.equal(remapped.locks["hh-b"], "van_5");
+
+  // Van 5 inactive → Van 6 becomes the day's club van
+  const fallback = resolveClubVanFleet([
+    {
+      vanKey: "van_5",
+      active: false,
+      vehiclePool: "club",
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Group Class", "Taxi Service"],
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_6",
+      active: true,
+      vehiclePool: "club",
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Group Class", "Taxi Service"],
+      capacityConfigured: true
+    }
+  ]);
+  assert.equal(fallback.primaryClubVan, "van_6");
+  assert.deepEqual(fallback.excludedClubVans, []);
 }
 
 console.log("route-generator tests: ok");
