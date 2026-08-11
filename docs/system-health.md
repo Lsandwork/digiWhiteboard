@@ -145,10 +145,17 @@ Not required. Prefer CLI + HTTP debug API. An MCP server can wrap the same `lib/
 ## Migration
 
 ```bash
-# via existing project tooling
-npm run db:push -- supabase/migrations/072_system_health_debugging.sql
+# Local / CI with DB password
+npm run db:push -- 072_system_health_debugging.sql
 # or apply 072 in Supabase SQL editor
 ```
+
+In production, System Health Overview detects missing `system_health_*` tables and offers:
+
+1. **Apply migration 072 now** — requires `SUPABASE_DB_PASSWORD` or `DATABASE_URL` on Vercel (server-side only)
+2. **Copy 072 SQL** — paste into Supabase → SQL Editor → Run
+
+API: `POST /api/admin/system-health` `{ "action": "apply_migration_072" }` (permission `system_health.configure`).
 
 ## Tests
 
