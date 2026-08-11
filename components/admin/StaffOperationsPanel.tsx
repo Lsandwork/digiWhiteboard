@@ -13,7 +13,7 @@ import {
   UserRound
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
-import { OpsRowActions } from "@/components/admin/ui/OpsRowActions";
+import { OpsRowActions, type OpsRowMenuItem } from "@/components/admin/ui/OpsRowActions";
 import { RichText } from "@/components/admin/ui/RichText";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { htmlToPlainText } from "@/lib/html/rich-text";
@@ -93,6 +93,7 @@ const ISSUE_SORT_ACCESSORS: SortAccessors<ActiveIssue> = {
   assigned_to: (item) => item.assigned_to ?? "",
   priority: (item) => STAFF_PRIORITIES.indexOf(item.priority),
   reported_at: (item) => item.reported_at,
+  updated_at: (item) => item.updated_at,
   status: (item) => item.status
 };
 
@@ -1050,22 +1051,61 @@ function FollowUpCard({ item, busy, onMutate, onDetail }: { item: OwnerFollowUp;
   );
 }
 
+function matchesIssueFilters(item: ActiveIssue, filters: Filters, options?: { includeArchived?: boolean }) {
+  const includeArchived = options?.includeArchived ?? false;
+  if (!includeArchived && item.status === "Archived") return false;
+  if (includeArchived && item.status !== "Archived") return false;
+  if (filters.priority && item.priority !== filters.priority) return false;
+  if (filters.status) {
+    if (includeArchived) {
+      if (filters.status !== "Archived") return false;
+    } else if (filters.status === "Archived" || item.status !== filters.status) {
+      return false;
+    }
+  }
+  if (filters.assignedTo && item.assigned_to !== filters.assignedTo) return false;
+  if (filters.urgentOnly && item.priority !== "High" && item.priority !== "Critical") return false;
+  return includesQuery(
+    [item.title, item.notes, item.related_owner_name, item.related_dog_name, item.reported_by, item.assigned_to],
+    filters.query
+  );
+}
+
 function IssuesPage(props: {
   data: StaffOpsPayload | null; loading: boolean; busy: boolean; filters: Filters; setFilters: (filters: Filters) => void; page: number; setPage: (page: number) => void; recentActivity: StaffActivityLog[]; nowMs: number; staffOptions: string[]; onMutate: StaffOpsMutate; onRefresh: () => Promise<void>; onDetail: (item: ActiveIssue) => void; detail: { type: StaffOpsTab; item: CrossoverMessage | OwnerFollowUp | ActiveIssue } | null; onCloseDetail: () => void;
 }) {
   const [form, setForm] = useState<IssueForm>(emptyIssueForm);
-  const rows = useMemo(() => (props.data?.active_issues ?? []).filter((item) => {
-    if (props.filters.priority && item.priority !== props.filters.priority) return false;
-    if (props.filters.status && item.status !== props.filters.status) return false;
-    if (props.filters.assignedTo && item.assigned_to !== props.filters.assignedTo) return false;
-    if (props.filters.urgentOnly && item.priority !== "High" && item.priority !== "Critical") return false;
-    return includesQuery([item.title, item.notes, item.related_owner_name, item.related_dog_name, item.reported_by, item.assigned_to], props.filters.query);
-  }), [props.data?.active_issues, props.filters]);
+  const [archivedPage, setArchivedPage] = useState(1);
+  const rows = useMemo(
+    () => (props.data?.active_issues ?? []).filter((item) => matchesIssueFilters(item, props.filters)),
+    [props.data?.active_issues, props.filters]
+  );
+  const archivedRows = useMemo(
+    () => (props.data?.active_issues ?? []).filter((item) => matchesIssueFilters(item, props.filters, { includeArchived: true })),
+    [props.data?.active_issues, props.filters]
+  );
   const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, ISSUE_SORT_ACCESSORS, "reported_at", "desc");
+  const {
+    sortedRows: sortedArchivedRows,
+    sortKey: archivedSortKey,
+    sortDir: archivedSortDir,
+    toggleSort: toggleArchivedSort
+  } = useClientSort(archivedRows, ISSUE_SORT_ACCESSORS, "updated_at", "desc");
   const paged = paginate(sortedRows, props.page);
+  const archivedPaged = paginate(sortedArchivedRows, archivedPage);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setArchivedPage(1), 0);
+    return () => window.clearTimeout(timer);
+  }, [props.filters]);
+
   function handleToggleSort(column: string) {
     toggleSort(column);
     if (props.page !== 1) props.setPage(1);
+  }
+  function handleToggleArchivedSort(column: string) {
+    toggleArchivedSort(column);
+    if (archivedPage !== 1) setArchivedPage(1);
   }
   const autoReported = rows.filter((item) => item.source_table === "crossover_messages" || item.source_table === "owner_follow_ups");
   async function submit() {
@@ -1074,9 +1114,9 @@ function IssuesPage(props: {
   }
   return (
     <div className="crossover-dashboard crossover-dashboard__layout space-y-5">
-      <PageHeader title="Active Issues" subtitle="Track urgent and active issues from front desk, crossover communications, and owner follow up." loading={props.loading} />
+      <PageHeader title="Active Issues" subtitle="Track urgent and active issues from front desk, crossover, and owner follow up. Archive moves a row into the Archived Issues Log." loading={props.loading} />
       <StatGrid cards={[
-        { label: "Open Issues", value: rows.filter((item) => item.status !== "Resolved" && item.status !== "Archived").length, helper: "Need attention", icon: <AlertTriangle className="h-5 w-5" /> },
+        { label: "Open Issues", value: rows.filter((item) => item.status !== "Resolved").length, helper: "Need attention", icon: <AlertTriangle className="h-5 w-5" /> },
         { label: "Auto-Logged Urgent", value: autoReported.length, helper: "Pulled from urgent logs", icon: <BellRing className="h-5 w-5" /> },
         { label: "Assigned Today", value: rows.filter((item) => isToday(item.created_at) && item.assigned_to).length, helper: "Requires follow up", icon: <UserRound className="h-5 w-5" /> },
         { label: "Critical", value: rows.filter((item) => item.priority === "Critical").length, helper: "Immediate action", icon: <ShieldAlert className="h-5 w-5" /> }
@@ -1087,7 +1127,7 @@ function IssuesPage(props: {
             <div className="crossover-card__header">
               <div>
                 <h3 className="crossover-card__title">Active Issues Queue</h3>
-                <p className="crossover-card__subtitle">Track and manage active issues across sources and teams.</p>
+                <p className="crossover-card__subtitle">Open and in-progress issues. Archived items leave this queue.</p>
               </div>
               <button className="crossover-btn crossover-btn--outline" type="button" onClick={() => void props.onRefresh()}>Refresh</button>
             </div>
@@ -1098,6 +1138,30 @@ function IssuesPage(props: {
             <MobileCards rows={paged.rows} render={(item) => <IssueCard item={item} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} />} />
             <Pager page={paged.page} maxPage={paged.maxPage} total={sortedRows.length} onPage={props.setPage} />
           </section>
+          <section className="crossover-card crossover-card--conversations">
+            <div className="crossover-card__header">
+              <div>
+                <h3 className="crossover-card__title">Archived Issues Log</h3>
+                <p className="crossover-card__subtitle">Issues marked Archived. Reopen to return them to the Active Issues Queue.</p>
+              </div>
+            </div>
+            <DesktopIssuesTable
+              rows={archivedPaged.rows}
+              busy={props.busy}
+              onMutate={props.onMutate}
+              onDetail={props.onDetail}
+              sortKey={archivedSortKey}
+              sortDir={archivedSortDir}
+              onToggleSort={handleToggleArchivedSort}
+              variant="archived"
+              emptyLabel="No archived issues."
+            />
+            <MobileCards
+              rows={archivedPaged.rows}
+              render={(item) => <IssueCard item={item} busy={props.busy} onMutate={props.onMutate} onDetail={props.onDetail} variant="archived" />}
+            />
+            <Pager page={archivedPaged.page} maxPage={archivedPaged.maxPage} total={sortedArchivedRows.length} onPage={setArchivedPage} />
+          </section>
           <EscalationsSection items={rows} />
         </div>
         <div className="space-y-5"><AutoReportedPanel items={autoReported} onOpen={props.onDetail} /><IssueFormCard form={form} setForm={setForm} busy={props.busy} staffOptions={props.staffOptions} onSubmit={submit} /></div>
@@ -1107,7 +1171,42 @@ function IssuesPage(props: {
   );
 }
 
-function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, onToggleSort }: { rows: ActiveIssue[]; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void; sortKey: string; sortDir: "asc" | "desc"; onToggleSort: (column: string) => void }) {
+function issueRowMenuItems(item: ActiveIssue, onMutate: StaffOpsMutate, variant: "active" | "archived"): OpsRowMenuItem[] {
+  if (variant === "archived") {
+    return [
+      { label: "Reopen", onClick: () => void onMutate("Unable to reopen.", { action: "update_issue", id: item.id, status: "Open" }, "Issue reopened.") },
+      { label: "Push to Whiteboard", onClick: () => void onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.title, message: item.notes ?? item.category, priority: item.priority }, "Pushed to Staff Whiteboard.") }
+    ];
+  }
+  return [
+    { label: "Reopen", onClick: () => void onMutate("Unable to reopen.", { action: "update_issue", id: item.id, status: "Open" }, "Issue reopened.") },
+    { label: "Escalate", onClick: () => void onMutate("Unable to update priority.", { action: "update_issue", id: item.id, priority: "Critical" }, "Issue marked critical.") },
+    { label: "Push to Whiteboard", onClick: () => void onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.title, message: item.notes ?? item.category, priority: item.priority }, "Pushed to Staff Whiteboard.") },
+    { label: "Archive", onClick: () => void onMutate("Unable to archive.", { action: "update_issue", id: item.id, status: "Archived" }, "Issue archived.") }
+  ];
+}
+
+function DesktopIssuesTable({
+  rows,
+  busy,
+  onMutate,
+  onDetail,
+  sortKey,
+  sortDir,
+  onToggleSort,
+  variant = "active",
+  emptyLabel = "No active issues found."
+}: {
+  rows: ActiveIssue[];
+  busy: boolean;
+  onMutate: StaffOpsMutate;
+  onDetail: (item: ActiveIssue) => void;
+  sortKey: string;
+  sortDir: "asc" | "desc";
+  onToggleSort: (column: string) => void;
+  variant?: "active" | "archived";
+  emptyLabel?: string;
+}) {
   return (
     <div className="crossover-table-wrap hidden md:block">
       <table className="crossover-table active-issues-table">
@@ -1145,25 +1244,36 @@ function DesktopIssuesTable({ rows, busy, onMutate, onDetail, sortKey, sortDir, 
                 <OpsRowActions
                   busy={busy}
                   onDetail={() => onDetail(item)}
-                  onResolve={() => void onMutate("Unable to resolve.", { action: "update_issue", id: item.id, status: "Resolved" }, "Issue resolved.")}
-                  menuItems={[
-                    { label: "Reopen", onClick: () => void onMutate("Unable to reopen.", { action: "update_issue", id: item.id, status: "Open" }, "Issue reopened.") },
-                    { label: "Escalate", onClick: () => void onMutate("Unable to update priority.", { action: "update_issue", id: item.id, priority: "Critical" }, "Issue marked critical.") },
-                    { label: "Push to Whiteboard", onClick: () => void onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.title, message: item.notes ?? item.category, priority: item.priority }, "Pushed to Staff Whiteboard.") },
-                    { label: "Archive", onClick: () => void onMutate("Unable to archive.", { action: "update_issue", id: item.id, status: "Archived" }, "Issue archived.") }
-                  ]}
+                  onResolve={
+                    variant === "active"
+                      ? () => void onMutate("Unable to resolve.", { action: "update_issue", id: item.id, status: "Resolved" }, "Issue resolved.")
+                      : undefined
+                  }
+                  menuItems={issueRowMenuItems(item, onMutate, variant)}
                 />
               </td>
             </tr>
           ))}
-          {!rows.length ? <tr><td className="crossover-table__empty-row crossover-table__muted" colSpan={9}>No active issues found.</td></tr> : null}
+          {!rows.length ? <tr><td className="crossover-table__empty-row crossover-table__muted" colSpan={9}>{emptyLabel}</td></tr> : null}
         </tbody>
       </table>
     </div>
   );
 }
 
-function IssueCard({ item, busy, onMutate, onDetail }: { item: ActiveIssue; busy: boolean; onMutate: StaffOpsMutate; onDetail: (item: ActiveIssue) => void }) {
+function IssueCard({
+  item,
+  busy,
+  onMutate,
+  onDetail,
+  variant = "active"
+}: {
+  item: ActiveIssue;
+  busy: boolean;
+  onMutate: StaffOpsMutate;
+  onDetail: (item: ActiveIssue) => void;
+  variant?: "active" | "archived";
+}) {
   return (
     <article className="crossover-card crossover-card--sidebar">
       <p className="crossover-table__subject-title">{item.title}</p>
@@ -1177,13 +1287,12 @@ function IssueCard({ item, busy, onMutate, onDetail }: { item: ActiveIssue; busy
         className="mt-4"
         busy={busy}
         onDetail={() => onDetail(item)}
-        onResolve={() => void onMutate("Unable to resolve.", { action: "update_issue", id: item.id, status: "Resolved" }, "Issue resolved.")}
-        menuItems={[
-          { label: "Reopen", onClick: () => void onMutate("Unable to reopen.", { action: "update_issue", id: item.id, status: "Open" }, "Issue reopened.") },
-          { label: "Escalate", onClick: () => void onMutate("Unable to update priority.", { action: "update_issue", id: item.id, priority: "Critical" }, "Issue marked critical.") },
-          { label: "Push to Whiteboard", onClick: () => void onMutate("Unable to push.", { action: "push_to_whiteboard", title: item.title, message: item.notes ?? item.category, priority: item.priority }, "Pushed to Staff Whiteboard.") },
-          { label: "Archive", onClick: () => void onMutate("Unable to archive.", { action: "update_issue", id: item.id, status: "Archived" }, "Issue archived.") }
-        ]}
+        onResolve={
+          variant === "active"
+            ? () => void onMutate("Unable to resolve.", { action: "update_issue", id: item.id, status: "Resolved" }, "Issue resolved.")
+            : undefined
+        }
+        menuItems={issueRowMenuItems(item, onMutate, variant)}
       />
     </article>
   );
@@ -1285,7 +1394,9 @@ function AutoReportedPanel({ items, onOpen }: { items: ActiveIssue[]; onOpen: (i
 }
 
 function EscalationsSection({ items }: { items: ActiveIssue[] }) {
-  const urgent = items.filter((item) => item.priority === "High" || item.priority === "Critical").slice(0, 4);
+  const urgent = items
+    .filter((item) => item.status !== "Resolved" && (item.priority === "High" || item.priority === "Critical"))
+    .slice(0, 4);
   return <section className="admin-card p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-xl font-black text-white">Escalations & Follow-Up</h3><p className="text-sm text-admin-muted">High priority issues that require immediate action and follow-up.</p></div><span className="text-xs text-fitdog-orange">View all escalations</span></div><div className="grid gap-3 md:grid-cols-2">{urgent.map((item) => <article key={item.id} className="rounded-2xl border border-red-300/20 bg-red-500/10 p-4"><Badge type="priority" value={item.priority} /><h4 className="mt-3 font-black text-white">{item.title}</h4><p className="mt-1 text-sm text-admin-muted"><RichText value={item.notes} plain empty="No notes." /></p><p className="mt-3 text-xs text-admin-muted">Assigned to {item.assigned_to ?? "Unassigned"} • Due {formatDateTime(item.due_at)}</p></article>)}{!urgent.length ? <p className="text-sm text-admin-muted">No high priority escalations.</p> : null}</div></section>;
 }
 
