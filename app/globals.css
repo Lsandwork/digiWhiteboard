@@ -1517,6 +1517,170 @@ html.staff-tv-display .board-card--solo p {
   font-size: 2rem;
 }
 
+/*
+ * Staff TV / cast: fill the 1080p canvas so multi-dog lists are readable across the room.
+ * Solo cards were already large; default list cards stayed laptop-sized and left empty space.
+ */
+html.staff-tv-display {
+  --staff-tv-name: clamp(2.35rem, 2.8vw, 3.1rem);
+  --staff-tv-meta: clamp(1.2rem, 1.45vw, 1.55rem);
+  --staff-tv-chip: 1.15rem;
+  --staff-tv-panel-title: 2.75rem;
+  --staff-tv-avatar: clamp(7.25rem, 11vh, 9.5rem);
+  --staff-tv-card-gap: clamp(0.75rem, 1.2vh, 1.15rem);
+}
+
+html.staff-tv-display .fitdog-board-canvas-inner {
+  padding: 1.1rem 2rem 1rem;
+}
+
+html.staff-tv-display .board-header--tv {
+  margin-bottom: 0.85rem;
+  gap: 0.85rem;
+}
+
+html.staff-tv-display .board-header--tv > div:first-child {
+  gap: 1rem;
+}
+
+html.staff-tv-display .board-header--tv a,
+html.staff-tv-display .board-header--tv > div:first-child > div:first-child {
+  width: 5.5rem !important;
+  height: 5.5rem !important;
+}
+
+html.staff-tv-display .board-header--tv h1 {
+  font-size: 2.65rem;
+  line-height: 1.05;
+}
+
+html.staff-tv-display .board-header--tv h1 + p {
+  margin-top: 0.35rem;
+  font-size: 1.05rem;
+}
+
+html.staff-tv-display .board-header__updated {
+  display: none;
+}
+
+html.staff-tv-display .fitdog-board-canvas-inner > footer {
+  display: none;
+}
+
+html.staff-tv-display .board-panel {
+  padding: 1.15rem 1.35rem;
+}
+
+html.staff-tv-display .board-panel > div:first-child {
+  margin-bottom: 0.85rem;
+}
+
+html.staff-tv-display .board-panel h2 {
+  font-size: var(--staff-tv-panel-title);
+  letter-spacing: 0.04em;
+}
+
+html.staff-tv-display .board-panel .text-xs,
+html.staff-tv-display .board-panel .sm\:text-sm {
+  font-size: 1.05rem;
+}
+
+html.staff-tv-display .board-panel .text-3xl,
+html.staff-tv-display .board-panel .sm\:text-4xl {
+  font-size: 3rem;
+}
+
+html.staff-tv-display .board-panel-cards {
+  gap: var(--staff-tv-card-gap);
+  justify-content: stretch;
+}
+
+html.staff-tv-display .board-card:not(.board-card--solo) {
+  flex: 1 1 0;
+  min-height: clamp(7.75rem, 11.5vh, 10.5rem);
+  padding: 1.15rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 1.35rem;
+}
+
+html.staff-tv-display .board-dog-card__grid {
+  gap: 1.15rem 1.35rem;
+}
+
+html.staff-tv-display .board-dog-avatar:not(.board-dog-avatar--solo) {
+  width: var(--staff-tv-avatar) !important;
+  height: var(--staff-tv-avatar) !important;
+  border-width: 3px;
+}
+
+html.staff-tv-display .board-dog-name {
+  font-size: var(--staff-tv-name);
+  line-height: 1.08;
+}
+
+html.staff-tv-display .board-dog-meta {
+  margin-top: 0.35rem;
+  font-size: var(--staff-tv-meta);
+  -webkit-line-clamp: 2;
+}
+
+html.staff-tv-display .board-dog-status .rounded-full,
+html.staff-tv-display .checkout-ready-badge {
+  font-size: var(--staff-tv-chip);
+  padding: 0.55rem 1.05rem;
+  letter-spacing: 0.06em;
+}
+
+/* Fewer dogs → even larger rows so the panel does not look empty */
+html.staff-tv-display .board-panel-cards[data-dog-count="2"] .board-card:not(.board-card--solo),
+html.staff-tv-display .board-panel-cards[data-dog-count="3"] .board-card:not(.board-card--solo) {
+  min-height: clamp(10rem, 16vh, 14rem);
+  padding: 1.35rem 1.6rem;
+}
+
+html.staff-tv-display .board-panel-cards[data-dog-count="2"] {
+  --staff-tv-name: clamp(3rem, 3.6vw, 3.75rem);
+  --staff-tv-meta: clamp(1.35rem, 1.7vw, 1.75rem);
+  --staff-tv-avatar: clamp(8.5rem, 14vh, 11rem);
+  --staff-tv-chip: 1.3rem;
+}
+
+html.staff-tv-display .board-panel-cards[data-dog-count="3"],
+html.staff-tv-display .board-panel-cards[data-dog-count="4"] {
+  --staff-tv-name: clamp(2.6rem, 3.1vw, 3.35rem);
+  --staff-tv-meta: clamp(1.25rem, 1.55vw, 1.6rem);
+  --staff-tv-avatar: clamp(7.75rem, 12vh, 10rem);
+}
+
+/* Many dogs: keep readable floor, allow scroll inside the panel */
+html.staff-tv-display .board-panel-cards[data-dog-count="7"] .board-card:not(.board-card--solo),
+html.staff-tv-display .board-panel-cards[data-dog-count="8"] .board-card:not(.board-card--solo),
+html.staff-tv-display .board-panel-cards[data-dog-count="9"] .board-card:not(.board-card--solo),
+html.staff-tv-display .board-panel-cards[data-dog-count="10"] .board-card:not(.board-card--solo) {
+  flex: 0 0 auto;
+  min-height: 7.25rem;
+}
+
+html.staff-tv-display .board-panel-cards[data-dog-count="7"],
+html.staff-tv-display .board-panel-cards[data-dog-count="8"],
+html.staff-tv-display .board-panel-cards[data-dog-count="9"],
+html.staff-tv-display .board-panel-cards[data-dog-count="10"] {
+  --staff-tv-name: 2.2rem;
+  --staff-tv-meta: 1.15rem;
+  --staff-tv-avatar: 6.75rem;
+  --staff-tv-chip: 1.05rem;
+}
+
+/* Keep staff TV sizing on the fixed canvas; avoid cast-mode 100vw fight */
+html.fitdog-cast-mode.staff-tv-display .fitdog-tv-stage--staff,
+html.fitdog-cast-mode.staff-tv-display .fitdog-board-canvas-inner {
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
 html.lobby-tv-display .fitdog-lobby-canvas-inner {
   min-height: 0;
   height: 100%;

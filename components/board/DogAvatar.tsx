@@ -139,9 +139,9 @@ export function DogAvatar({ dog, mode, size = "default", isAlerting = false, isN
   return (
     <div
       className={clsx(
-        "relative shrink-0 overflow-hidden rounded-full border-2",
+        "board-dog-avatar relative shrink-0 overflow-hidden rounded-full border-2",
         size === "solo"
-          ? "h-[132px] w-[132px] border-[3px] sm:h-[168px] sm:w-[168px] lg:h-[208px] lg:w-[208px] xl:h-[240px] xl:w-[240px]"
+          ? "board-dog-avatar--solo h-[132px] w-[132px] border-[3px] sm:h-[168px] sm:w-[168px] lg:h-[208px] lg:w-[208px] xl:h-[240px] xl:w-[240px]"
           : "h-[88px] w-[88px] sm:h-[100px] sm:w-[100px]",
         mode === "in"
           ? "border-fitdog-blue/80 shadow-glowBlue"
