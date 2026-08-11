@@ -9,6 +9,10 @@ import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
 import { loadSystemHealthAudit } from "@/lib/admin/system-health-audit";
 import type { HealthStatus } from "@/lib/system-health/types";
+import { probeCloudStorage } from "@/lib/system-health/probes/storage";
+import { probeRealtime } from "@/lib/system-health/probes/realtime";
+import { probeBackgroundWorker, probeJobQueue } from "@/lib/system-health/probes/worker";
+import { probeRouteGenerator } from "@/lib/system-health/probes/route-generator";
 
 export type ServiceHealthCard = {
   id: string;
@@ -23,7 +27,40 @@ export type ServiceHealthCard = {
   successRate24h: number | null;
   detail: string;
   logsHref?: string;
+  /** Structured probe evidence for UI tools (buckets, queue counts, etc.) */
+  meta?: Record<string, unknown>;
 };
+
+/** Services that drive the aggregate SYSTEM HEALTH rollup. Optional integrations
+ * left UNKNOWN (e.g. email unset) must not poison the header. */
+export const AGGREGATE_SERVICE_IDS = new Set([
+  "ruffops",
+  "database",
+  "authentication",
+  "gingr",
+  "samsara",
+  "route_generator",
+  "background_worker",
+  "job_queue",
+  "storage",
+  "realtime"
+]);
+
+export function aggregateSystemHealth(services: ServiceHealthCard[]): HealthStatus {
+  const rank: Record<HealthStatus, number> = {
+    FAILED: 4,
+    DEGRADED: 3,
+    WARNING: 2,
+    UNKNOWN: 1,
+    HEALTHY: 0
+  };
+  return services
+    .filter((s) => AGGREGATE_SERVICE_IDS.has(s.id))
+    .reduce<HealthStatus>((acc, s) => {
+      // UNKNOWN on a critical card still matters, but after probes it should be rare.
+      return rank[s.status] > rank[acc] ? s.status : acc;
+    }, "HEALTHY");
+}
 
 async function countErrors(supabase: ReturnType<typeof getServiceSupabase>, sinceIso: string) {
   const { count } = await supabase
@@ -52,9 +89,7 @@ async function integrationStats(
   const lastOk = rows.find((r) => r.success === true);
   const avgLatency =
     rows.length > 0
-      ? Math.round(
-          rows.reduce((n, r) => n + Number(r.latency_ms || 0), 0) / rows.length
-        )
+      ? Math.round(rows.reduce((n, r) => n + Number(r.latency_ms || 0), 0) / rows.length)
       : null;
   return {
     total,
@@ -81,6 +116,8 @@ export async function runFunctionalHealthChecks(): Promise<{
     lastRouteGeneration: string | null;
     lastGingrSync: string | null;
     lastSamsaraExport: string | null;
+    storageBucketsOk: number | null;
+    queueDepth: number | null;
   };
 }> {
   const supabase = getServiceSupabase();
@@ -118,13 +155,15 @@ export async function runFunctionalHealthChecks(): Promise<{
     warningsToday,
     routeFail,
     integFail,
-    lastRoute,
     lastExport,
     gingrStats,
     samsaraStats,
     twilioStats,
-    jobsFailed,
-    activeUsers
+    activeUsers,
+    storageProbe,
+    realtimeProbe,
+    workerProbe,
+    queueProbe
   ] = await Promise.all([
     supabase.from("admin_settings").select("id").eq("id", "default").maybeSingle(),
     supabase
@@ -170,14 +209,6 @@ export async function runFunctionalHealthChecks(): Promise<{
         .eq("success", false)
         .gte("occurred_at", todayIso)
     ),
-    safeMaybe<{ finished_at: string | null; started_at: string | null; status: string | null }>(() =>
-      supabase
-        .from("system_health_route_audits")
-        .select("finished_at, started_at, status")
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    ),
     safeMaybe<{ created_at: string | null; status: string | null }>(() =>
       supabase
         .from("route_export_jobs")
@@ -189,13 +220,6 @@ export async function runFunctionalHealthChecks(): Promise<{
     integrationStats(supabase, "gingr", dayAgo).catch(() => null),
     integrationStats(supabase, "samsara", dayAgo).catch(() => null),
     integrationStats(supabase, "twilio", dayAgo).catch(() => null),
-    safeCount(() =>
-      supabase
-        .from("route_worker_jobs")
-        .select("id", { count: "exact", head: true })
-        .in("status", ["failed", "dead", "error"])
-        .gte("created_at", todayIso)
-    ),
     (async () => {
       try {
         const r = await supabase
@@ -209,8 +233,71 @@ export async function runFunctionalHealthChecks(): Promise<{
       } catch {
         return 0;
       }
-    })()
+    })(),
+    probeCloudStorage(supabase).catch((err) => ({
+      status: "FAILED" as HealthStatus,
+      detail: err instanceof Error ? err.message : "Storage probe failed",
+      responseTimeMs: null,
+      lastSuccessAt: null,
+      lastFailureAt: new Date().toISOString(),
+      lastError: err instanceof Error ? err.message : String(err),
+      buckets: [],
+      recentMediaAt: null
+    })),
+    probeRealtime(supabase).catch((err) => ({
+      status: "FAILED" as HealthStatus,
+      detail: err instanceof Error ? err.message : "Realtime probe failed",
+      responseTimeMs: null,
+      lastSuccessAt: null,
+      lastFailureAt: new Date().toISOString(),
+      lastError: err instanceof Error ? err.message : String(err),
+      realtimeHttpOk: null,
+      boardFreshestAt: null
+    })),
+    probeBackgroundWorker(supabase).catch((err) => ({
+      status: "FAILED" as HealthStatus,
+      detail: err instanceof Error ? err.message : "Worker probe failed",
+      responseTimeMs: null,
+      lastSuccessAt: null,
+      lastFailureAt: new Date().toISOString(),
+      lastError: err instanceof Error ? err.message : String(err),
+      workerUrlConfigured: Boolean(process.env.ROUTE_WORKER_URL),
+      httpOk: null
+    })),
+    probeJobQueue(supabase).catch((err) => ({
+      status: "FAILED" as HealthStatus,
+      detail: err instanceof Error ? err.message : "Queue probe failed",
+      responseTimeMs: null,
+      lastSuccessAt: null,
+      lastFailureAt: new Date().toISOString(),
+      lastError: err instanceof Error ? err.message : String(err),
+      counts: {
+        queued: 0,
+        running: 0,
+        waitingAuth: 0,
+        completed: 0,
+        completedWithWarnings: 0,
+        failed: 0,
+        cancelled: 0,
+        stuckRunning: 0
+      },
+      failedToday: 0
+    }))
   ]);
+
+  const routeGen = await probeRouteGenerator(supabase, {
+    routeFailToday: Number(routeFail) || 0
+  }).catch((err) => ({
+    status: "WARNING" as HealthStatus,
+    detail: err instanceof Error ? err.message : "Route generator probe failed",
+    responseTimeMs: null,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    lastError: err instanceof Error ? err.message : String(err),
+    errorsLast24h: Number(routeFail) || 0,
+    lastRouteGeneration: null,
+    source: "module_ready" as const
+  }));
 
   const dbMs = Date.now() - started;
   const gingr = evaluateGingrHealth({
@@ -223,33 +310,13 @@ export async function runFunctionalHealthChecks(): Promise<{
   const sms = getSmsProvider();
   const mapsConfigured = Boolean(process.env.GOOGLE_MAPS_API_KEY?.trim());
 
-  // Functional: recent route audit failures → Route Generator WARNING/DEGRADED
-  let routeGenStatus: HealthStatus = "UNKNOWN";
-  let routeGenDetail = "No route audits recorded yet.";
-  if (lastRoute && "data" in lastRoute && lastRoute.data) {
-    const st = String(lastRoute.data.status || "");
-    if (st === "failed") {
-      routeGenStatus = "DEGRADED";
-      routeGenDetail = "Most recent route audit failed quality gate.";
-    } else if (st === "warning") {
-      routeGenStatus = "WARNING";
-      routeGenDetail = "Most recent route audit passed with warnings.";
-    } else if (st === "passed") {
-      routeGenStatus = "HEALTHY";
-      routeGenDetail = "Most recent route audit passed.";
-    }
-  }
-  if (Number(routeFail) > 0 && routeGenStatus === "HEALTHY") {
-    routeGenStatus = "WARNING";
-    routeGenDetail = `${routeFail} failed route audit(s) today.`;
-  }
-
-  let samsaraStatus: HealthStatus = isSamsaraLiveConfigured() ? "HEALTHY" : "UNKNOWN";
+  let samsaraStatus: HealthStatus = isSamsaraLiveConfigured() ? "HEALTHY" : "WARNING";
   let samsaraDetail = isSamsaraLiveConfigured()
     ? "Live GPS configured (secrets not exposed)."
     : "Samsara live GPS not configured.";
   if (samsaraStats && samsaraStats.failures > 0) {
-    samsaraStatus = samsaraStats.successRate != null && samsaraStats.successRate < 80 ? "DEGRADED" : "WARNING";
+    samsaraStatus =
+      samsaraStats.successRate != null && samsaraStats.successRate < 80 ? "DEGRADED" : "WARNING";
     samsaraDetail = `${samsaraStats.failures} export/API failure(s) in last 24h.`;
   }
   if (lastExport && "data" in lastExport && lastExport.data) {
@@ -267,7 +334,7 @@ export async function runFunctionalHealthChecks(): Promise<{
         ? "DEGRADED"
         : gingr.status === "offline"
           ? "FAILED"
-          : "UNKNOWN";
+          : "WARNING";
   if (gingrStats && gingrStats.failures > 0 && gingrStatus === "HEALTHY") {
     gingrStatus = "WARNING";
   }
@@ -319,7 +386,9 @@ export async function runFunctionalHealthChecks(): Promise<{
       responseTimeMs: gingrStats?.avgLatency ?? null,
       lastSuccessAt: gingr.freshestAt || gingrStats?.lastSuccessAt || null,
       lastFailureAt: gingrStats?.lastFailureAt || null,
-      lastError: gingrStats?.lastError || (webhook.data?.processing_error ? String(webhook.data.processing_error) : null),
+      lastError:
+        gingrStats?.lastError ||
+        (webhook.data?.processing_error ? String(webhook.data.processing_error) : null),
       errorsLastHour: 0,
       errorsLast24h: gingrStats?.failures ?? 0,
       successRate24h: gingrStats?.successRate ?? null,
@@ -345,7 +414,7 @@ export async function runFunctionalHealthChecks(): Promise<{
         ? twilioStats && twilioStats.failures > 0
           ? "WARNING"
           : "HEALTHY"
-        : "UNKNOWN",
+        : "WARNING",
       responseTimeMs: twilioStats?.avgLatency ?? null,
       lastSuccessAt: twilioStats?.lastSuccessAt || null,
       lastFailureAt: twilioStats?.lastFailureAt || null,
@@ -360,27 +429,23 @@ export async function runFunctionalHealthChecks(): Promise<{
     {
       id: "route_generator",
       label: "Route Generator",
-      status: routeGenStatus,
-      responseTimeMs: null,
-      lastSuccessAt:
-        lastRoute && "data" in lastRoute && lastRoute.data?.finished_at
-          ? String(lastRoute.data.finished_at)
-          : lastRoute && "data" in lastRoute && lastRoute.data?.started_at
-            ? String(lastRoute.data.started_at)
-            : null,
-      lastFailureAt: routeGenStatus === "DEGRADED" ? new Date().toISOString() : null,
-      lastError: routeGenStatus === "DEGRADED" ? routeGenDetail : null,
+      status: routeGen.status,
+      responseTimeMs: routeGen.responseTimeMs,
+      lastSuccessAt: routeGen.lastSuccessAt,
+      lastFailureAt: routeGen.lastFailureAt,
+      lastError: routeGen.lastError,
       errorsLastHour: 0,
-      errorsLast24h: Number(routeFail) || 0,
+      errorsLast24h: routeGen.errorsLast24h,
       successRate24h: null,
-      detail: routeGenDetail
+      detail: routeGen.detail,
+      meta: { source: routeGen.source }
     },
     {
       id: "maps",
       label: "Maps / Geocoding",
-      status: mapsConfigured ? "HEALTHY" : "UNKNOWN",
+      status: mapsConfigured ? "HEALTHY" : "WARNING",
       responseTimeMs: null,
-      lastSuccessAt: null,
+      lastSuccessAt: mapsConfigured ? new Date().toISOString() : null,
       lastFailureAt: null,
       lastError: null,
       errorsLastHour: 0,
@@ -393,36 +458,38 @@ export async function runFunctionalHealthChecks(): Promise<{
     {
       id: "background_worker",
       label: "Background Worker",
-      status: Number(jobsFailed) > 0 ? "WARNING" : "UNKNOWN",
-      responseTimeMs: null,
-      lastSuccessAt: null,
-      lastFailureAt: Number(jobsFailed) > 0 ? new Date().toISOString() : null,
-      lastError: Number(jobsFailed) > 0 ? `${jobsFailed} failed job(s) today` : null,
+      status: workerProbe.status,
+      responseTimeMs: workerProbe.responseTimeMs,
+      lastSuccessAt: workerProbe.lastSuccessAt,
+      lastFailureAt: workerProbe.lastFailureAt,
+      lastError: workerProbe.lastError,
       errorsLastHour: 0,
-      errorsLast24h: Number(jobsFailed) || 0,
+      errorsLast24h: queueProbe.failedToday,
       successRate24h: null,
-      detail:
-        Number(jobsFailed) > 0
-          ? `${jobsFailed} failed route worker job(s) today.`
-          : "No failed worker jobs recorded today (or table empty)."
+      detail: workerProbe.detail,
+      meta: {
+        workerUrlConfigured: workerProbe.workerUrlConfigured,
+        httpOk: workerProbe.httpOk
+      }
     },
     {
       id: "job_queue",
       label: "Job Queue",
-      status: Number(jobsFailed) > 5 ? "DEGRADED" : Number(jobsFailed) > 0 ? "WARNING" : "UNKNOWN",
-      responseTimeMs: null,
-      lastSuccessAt: null,
-      lastFailureAt: null,
-      lastError: null,
+      status: queueProbe.status,
+      responseTimeMs: queueProbe.responseTimeMs,
+      lastSuccessAt: queueProbe.lastSuccessAt,
+      lastFailureAt: queueProbe.lastFailureAt,
+      lastError: queueProbe.lastError,
       errorsLastHour: 0,
-      errorsLast24h: Number(jobsFailed) || 0,
+      errorsLast24h: queueProbe.failedToday,
       successRate24h: null,
-      detail: "route_worker_jobs queue."
+      detail: queueProbe.detail,
+      meta: { counts: queueProbe.counts, failedToday: queueProbe.failedToday }
     },
     {
       id: "email",
       label: "Email Provider",
-      status: process.env.RESEND_API_KEY || process.env.SMTP_HOST ? "HEALTHY" : "UNKNOWN",
+      status: process.env.RESEND_API_KEY || process.env.SMTP_HOST ? "HEALTHY" : "WARNING",
       responseTimeMs: null,
       lastSuccessAt: null,
       lastFailureAt: null,
@@ -437,29 +504,38 @@ export async function runFunctionalHealthChecks(): Promise<{
     },
     {
       id: "storage",
-      label: "Storage",
-      status: process.env.MEDIA_LIBRARY_BUCKET || process.env.SUPABASE_URL ? "HEALTHY" : "UNKNOWN",
-      responseTimeMs: null,
-      lastSuccessAt: null,
-      lastFailureAt: null,
-      lastError: null,
+      label: "Cloud Storage",
+      status: storageProbe.status,
+      responseTimeMs: storageProbe.responseTimeMs,
+      lastSuccessAt: storageProbe.lastSuccessAt || storageProbe.recentMediaAt,
+      lastFailureAt: storageProbe.lastFailureAt,
+      lastError: storageProbe.lastError,
       errorsLastHour: 0,
       errorsLast24h: 0,
       successRate24h: null,
-      detail: "Media metadata in DB; binaries in object storage when configured."
+      detail: storageProbe.detail,
+      meta: {
+        buckets: storageProbe.buckets,
+        recentMediaAt: storageProbe.recentMediaAt,
+        backend: "supabase_storage"
+      }
     },
     {
       id: "realtime",
       label: "Realtime / WebSocket",
-      status: process.env.SUPABASE_URL ? "HEALTHY" : "UNKNOWN",
-      responseTimeMs: null,
-      lastSuccessAt: null,
-      lastFailureAt: null,
-      lastError: null,
+      status: realtimeProbe.status,
+      responseTimeMs: realtimeProbe.responseTimeMs,
+      lastSuccessAt: realtimeProbe.lastSuccessAt || realtimeProbe.boardFreshestAt,
+      lastFailureAt: realtimeProbe.lastFailureAt,
+      lastError: realtimeProbe.lastError,
       errorsLastHour: 0,
       errorsLast24h: 0,
       successRate24h: null,
-      detail: "Uses Supabase realtime when enabled for board/ops feeds."
+      detail: realtimeProbe.detail,
+      meta: {
+        realtimeHttpOk: realtimeProbe.realtimeHttpOk,
+        boardFreshestAt: realtimeProbe.boardFreshestAt
+      }
     }
   ];
 
@@ -471,16 +547,7 @@ export async function runFunctionalHealthChecks(): Promise<{
     }
   }
 
-  const rank: Record<HealthStatus, number> = {
-    FAILED: 4,
-    DEGRADED: 3,
-    WARNING: 2,
-    UNKNOWN: 1,
-    HEALTHY: 0
-  };
-  const systemHealth = services.reduce<HealthStatus>((acc, s) => {
-    return rank[s.status] > rank[acc] ? s.status : acc;
-  }, "HEALTHY");
+  const systemHealth = aggregateSystemHealth(services);
 
   // Persist latest checks (best-effort)
   try {
@@ -502,27 +569,31 @@ export async function runFunctionalHealthChecks(): Promise<{
     /* ignore */
   }
 
+  const queueDepth =
+    queueProbe.counts.queued + queueProbe.counts.running + queueProbe.counts.waitingAuth;
+
   return {
     services,
     summary: {
       systemHealth,
       errorsToday: Number(errorsToday) || 0,
       warningsToday: Number(warningsToday) || 0,
-      failedJobs: Number(jobsFailed) || 0,
+      failedJobs: queueProbe.failedToday,
       integrationFailures: Number(integFail) || 0,
       routeAuditFailures: Number(routeFail) || 0,
       usersActive: Number(activeUsers) || 0,
       releaseVersion:
-        process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || process.env.NEXT_PUBLIC_APP_VERSION || null,
-      lastRouteGeneration:
-        lastRoute && "data" in lastRoute && lastRoute.data
-          ? String(lastRoute.data.finished_at || lastRoute.data.started_at || "")
-          : null,
+        process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+        process.env.NEXT_PUBLIC_APP_VERSION ||
+        null,
+      lastRouteGeneration: routeGen.lastRouteGeneration,
       lastGingrSync: gingr.freshestAt,
       lastSamsaraExport:
         lastExport && "data" in lastExport && lastExport.data?.created_at
           ? String(lastExport.data.created_at)
-          : null
+          : null,
+      storageBucketsOk: storageProbe.buckets.filter((b) => b.listOk).length,
+      queueDepth
     }
   };
 }

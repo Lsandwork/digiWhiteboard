@@ -3,6 +3,7 @@ import { isSamsaraLiveConfigured } from "@/lib/route-generator/samsara-live";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { loadSystemHealthAudit, toOverviewSystemHealth } from "@/lib/admin/system-health-audit";
 import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
+import { probeCloudStorage } from "@/lib/system-health/probes/storage";
 
 export type IntegrationHealthRow = {
   id: string;
@@ -19,9 +20,16 @@ function mapGingrStatus(status: ReturnType<typeof evaluateGingrHealth>["status"]
   return "unknown" as const;
 }
 
+function mapProbeStatus(status: string): IntegrationHealthRow["status"] {
+  if (status === "HEALTHY") return "operational";
+  if (status === "WARNING" || status === "DEGRADED") return "degraded";
+  if (status === "FAILED") return "down";
+  return "unknown";
+}
+
 export async function buildOpsSystemHealth() {
   const supabase = getServiceSupabase();
-  const [webhook, lastDogSeen, audit, boardCount] = await Promise.all([
+  const [webhook, lastDogSeen, audit, boardCount, storage] = await Promise.all([
     supabase
       .from("gingr_webhook_events")
       .select("created_at, processing_error")
@@ -39,7 +47,8 @@ export async function buildOpsSystemHealth() {
     supabase
       .from("live_transition_dogs")
       .select("id", { count: "exact", head: true })
-      .eq("hidden", false)
+      .eq("hidden", false),
+    probeCloudStorage(supabase).catch(() => null)
   ]);
 
   const gingr = evaluateGingrHealth({
@@ -79,9 +88,9 @@ export async function buildOpsSystemHealth() {
     {
       id: "storage",
       label: "RuffOps Cloud Storage",
-      status: process.env.MEDIA_LIBRARY_BUCKET || process.env.SUPABASE_URL ? "operational" : "unknown",
-      detail: "Media metadata in DB; binaries should remain in object storage/CDN.",
-      lastSuccessAt: null
+      status: storage ? mapProbeStatus(storage.status) : "unknown",
+      detail: storage ? storage.detail : "Cloud storage probe unavailable.",
+      lastSuccessAt: storage?.lastSuccessAt || storage?.recentMediaAt || null
     },
     {
       id: "database",
@@ -115,7 +124,8 @@ export async function buildOpsSystemHealth() {
       "Secrets and API keys are never returned by this endpoint.",
       "Gingr remains authoritative for reservations, packages, and payments.",
       "Connected status uses webhook audit OR live dog sync timestamps — not audit alone.",
-      "Webhook URL must be https://fitdog.ruffops.com/api/gingr/webhook (or your staff host)."
+      "Webhook URL must be https://fitdog.ruffops.com/api/gingr/webhook (or your staff host).",
+      "Cloud storage probes Supabase buckets: photo-uploads, cast-videos, cast-tv-media, lobby-slideshow."
     ]
   };
 }
