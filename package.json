@@ -76,6 +76,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@google/generative-ai": "^0.24.1",
+    "@sentry/nextjs": "^10.70.0",
     "@sparticuz/chromium": "^147.0.0",
     "@supabase/supabase-js": "^2.45.4",
     "bcryptjs": "^3.0.3",
