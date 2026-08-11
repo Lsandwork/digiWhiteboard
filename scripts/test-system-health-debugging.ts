@@ -384,6 +384,11 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   assert.ok(ui.includes('id: "storage"'));
   assert.ok(ui.includes("Re-probe buckets"));
   assert.ok(ui.includes("Failed today"));
+  assert.ok(ui.includes("Apply migration 072"));
+
+  const ensure = readFileSync(resolve(__dirname, "../lib/system-health/ensure-schema.ts"), "utf8");
+  assert.ok(ensure.includes("072_system_health_debugging.sql"));
+  assert.ok(ensure.includes("system_health_route_audits"));
 }
 
 console.log("test-system-health-debugging: ok");

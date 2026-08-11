@@ -218,6 +218,7 @@ export async function loadSystemHealthDashboardBundle() {
     audits,
     integrations,
     settings,
-    liveDebug
+    liveDebug,
+    schema: (overview as { schema?: unknown })?.schema ?? null
   };
 }

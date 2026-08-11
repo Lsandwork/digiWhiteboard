@@ -62,11 +62,17 @@ function statusClass(status: string) {
 }
 
 function StatusBadge({ value }: { value: string }) {
+  const raw = String(value || "").trim();
+  // Never show UNKNOWN — it is a dead-end label for operators
+  const normalized =
+    !raw || raw.toUpperCase() === "UNKNOWN"
+      ? "WARNING"
+      : raw;
   return (
     <span
-      className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${statusClass(value)}`}
+      className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${statusClass(normalized)}`}
     >
-      {value || "UNKNOWN"}
+      {normalized}
     </span>
   );
 }
@@ -169,6 +175,7 @@ export function SystemHealthDebuggingApp() {
   const [liveSeverity, setLiveSeverity] = useState<string>("all");
   const [errorFilter, setErrorFilter] = useState<string>("all");
   const [integrationFilter, setIntegrationFilter] = useState<string>("all");
+  const [schemaBusy, setSchemaBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -260,13 +267,62 @@ export function SystemHealthDebuggingApp() {
   const audits = (bundle?.audits as Array<Record<string, unknown>>) || [];
   const integrations = (bundle?.integrations as Array<Record<string, unknown>>) || [];
   const liveDebug = (bundle?.liveDebug as Array<Record<string, unknown>>) || [];
+  const schema =
+    ((bundle?.schema as Record<string, unknown> | null) ||
+      ((overview as Record<string, unknown> | null)?.schema as Record<string, unknown> | null) ||
+      null);
 
-  const storageService = services.find((s) => s.id === "storage");
-  const storageBuckets = ((storageService?.meta as Record<string, unknown>)?.buckets as Array<
-    Record<string, unknown>
-  >) || [];
+  const applyMigration072 = async () => {
+    setSchemaBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/system-health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply_migration_072" })
+      });
+      const body = await res.json();
+      if (!res.ok || body.ok === false) {
+        setError(body.detail || body.error || "Unable to apply migration 072");
+        return;
+      }
+      setCopyNote(body.detail || "Migration 072 applied");
+      void refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Apply failed");
+    } finally {
+      setSchemaBusy(false);
+    }
+  };
+
+  const copyMigrationSql = async () => {
+    setSchemaBusy(true);
+    try {
+      const res = await fetch("/api/admin/system-health?view=migration_sql", { cache: "no-store" });
+      const body = await res.json();
+      if (!res.ok) {
+        // Fall back to public path hint for non-configure roles
+        const ok = await copyText(
+          "Open supabase/migrations/072_system_health_debugging.sql in the repo and paste into Supabase SQL Editor."
+        );
+        setCopyNote(ok ? "Fallback instruction copied" : "Copy failed");
+        if (!res.ok) setError(body.error || "Need configure permission to fetch SQL");
+        return;
+      }
+      const sql = String(body.data?.sql || "");
+      const ok = await copyText(sql);
+      setCopyNote(ok ? "Migration 072 SQL copied — paste into Supabase SQL Editor" : "Copy failed");
+    } finally {
+      setSchemaBusy(false);
+    }
+  };
 
   const go = (id: SectionId) => setSection(id);
+
+  const storageService = services.find((s) => s.id === "storage");
+  const storageBuckets =
+    ((storageService?.meta as Record<string, unknown>)?.buckets as Array<Record<string, unknown>>) ||
+    [];
 
   const runSearch = async () => {
     const res = await fetch("/api/admin/system-health", {
@@ -355,11 +411,10 @@ export function SystemHealthDebuggingApp() {
 
   const liveRows = useMemo(() => {
     const source =
-      section === "system_events" && Array.isArray(sectionData)
+      (section === "system_events" || section === "live" || section === "user_activity") &&
+      Array.isArray(sectionData)
         ? (sectionData as Array<Record<string, unknown>>)
-        : section === "live" && Array.isArray(sectionData)
-          ? (sectionData as Array<Record<string, unknown>>)
-          : activity;
+        : activity;
     if (liveSeverity === "all") return source;
     return source.filter((ev) => String(ev.severity || "").toLowerCase() === liveSeverity);
   }, [activity, liveSeverity, section, sectionData]);
@@ -429,10 +484,43 @@ export function SystemHealthDebuggingApp() {
 
       {section === "overview" && overview ? (
         <div className="space-y-4">
+          {schema && schema.ready === false ? (
+            <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 p-4">
+              <p className="text-sm font-semibold text-rose-50">Migration 072 required</p>
+              <p className="mt-1 text-sm text-rose-50/90">{String(schema.detail || "")}</p>
+              <p className="mt-2 text-xs text-rose-100/80">
+                Missing tables: {Array.isArray(schema.missing) ? schema.missing.join(", ") : "—"}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <ToolButton
+                  label={schemaBusy ? "Working…" : "Apply migration 072 now"}
+                  tone="accent"
+                  onClick={() => void applyMigration072()}
+                />
+                <ToolButton
+                  label="Copy 072 SQL"
+                  onClick={() => void copyMigrationSql()}
+                />
+              </div>
+              <p className="mt-2 text-xs text-admin-muted">
+                One-click apply needs <code>SUPABASE_DB_PASSWORD</code> or <code>DATABASE_URL</code> on
+                Vercel. Otherwise paste the copied SQL into the Supabase SQL Editor and run it.
+              </p>
+            </div>
+          ) : schema?.ready ? (
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-50">
+              System Health schema (072) is present.
+            </div>
+          ) : null}
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Card
               title="System Health"
-              value={String(summary.systemHealth || "UNKNOWN")}
+              value={String(
+                !summary.systemHealth || String(summary.systemHealth).toUpperCase() === "UNKNOWN"
+                  ? "WARNING"
+                  : summary.systemHealth
+              )}
               hint="Worst critical service"
               onClick={() => go("integrations")}
             />
@@ -459,6 +547,12 @@ export function SystemHealthDebuggingApp() {
               title="Storage Buckets OK"
               value={summary.storageBucketsOk != null ? Number(summary.storageBucketsOk) : "—"}
               onClick={() => go("storage")}
+            />
+            <Card
+              title="Schema 072"
+              value={summary.schemaReady === false ? "MISSING" : summary.schemaReady ? "OK" : "—"}
+              hint="system_health_* tables"
+              onClick={() => go("settings")}
             />
             <Card title="Deploy Version" value={String(summary.releaseVersion || "—")} hint="Recent deploy / commit" />
             <Card
@@ -1097,7 +1191,24 @@ export function SystemHealthDebuggingApp() {
       ) : null}
 
       {section === "settings" && settingsDraft ? (
-        <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <h3 className="font-semibold text-white">Migration 072 — System Health schema</h3>
+            <p className="mt-1 text-sm text-admin-muted">
+              {schema
+                ? String(schema.detail || "")
+                : "Refresh Overview to load schema readiness."}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <ToolButton
+                label={schemaBusy ? "Working…" : "Apply migration 072"}
+                tone="accent"
+                onClick={() => void applyMigration072()}
+              />
+              <ToolButton label="Copy 072 SQL" onClick={() => void copyMigrationSql()} />
+            </div>
+          </div>
+          <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
           {(
             [
               ["debugLoggingEnabled", "Debug logging enabled"],
@@ -1122,6 +1233,7 @@ export function SystemHealthDebuggingApp() {
             </label>
           ))}
           <ToolButton label="Save settings" tone="accent" onClick={() => void saveSettings()} />
+          </div>
         </div>
       ) : null}
     </section>

@@ -10,6 +10,7 @@ export * from "@/lib/system-health/integrations";
 export * from "@/lib/system-health/debug-bridge";
 export * from "@/lib/system-health/dashboard";
 export * from "@/lib/system-health/retention";
+export * from "@/lib/system-health/ensure-schema";
 export * from "@/lib/system-health/probes/storage";
 export * from "@/lib/system-health/probes/realtime";
 export * from "@/lib/system-health/probes/worker";
