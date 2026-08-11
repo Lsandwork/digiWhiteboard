@@ -1,7 +1,7 @@
 /**
  * Route Generator health from system_health_route_audits, with fallbacks to
- * route_plans / route_audit_events so the card is never stuck on UNKNOWN when
- * the module is operable but no 072 audit row exists yet.
+ * route_plans / route_audit_events so the card reflects operability — not
+ * normal workflow states like needs_review.
  */
 
 import type { HealthStatus } from "@/lib/system-health/types";
@@ -20,6 +20,17 @@ export type RouteGeneratorProbeResult = {
   lastRouteGeneration: string | null;
   source: "system_health_route_audits" | "route_plans" | "route_audit_events" | "module_ready";
 };
+
+/** Plan statuses that mean the generator ran successfully (ops may still review). */
+const HEALTHY_PLAN_STATUSES = new Set([
+  "draft",
+  "needs_review",
+  "ready_for_approval",
+  "approved",
+  "exported",
+  "synced_to_samsara",
+  "superseded"
+]);
 
 export async function probeRouteGenerator(
   supabase: Supabase,
@@ -55,9 +66,12 @@ export async function probeRouteGenerator(
       } else if (st === "warning") {
         status = "WARNING";
         detail = "Most recent route audit passed with warnings.";
-      } else if (st === "passed") {
+      } else if (st === "passed" || st === "running") {
         status = "HEALTHY";
-        detail = "Most recent route audit passed.";
+        detail =
+          st === "running"
+            ? "Route audit in progress."
+            : "Most recent route audit passed.";
       }
 
       if (routeFailToday > 0 && status === "HEALTHY") {
@@ -81,11 +95,11 @@ export async function probeRouteGenerator(
     /* fall through */
   }
 
-  // 2) Fallback: latest route plan
+  // 2) Fallback: latest route plan (needs_review is a normal post-generate state)
   try {
     const { data } = await supabase
       .from("route_plans")
-      .select("id, status, created_at, updated_at, operating_date")
+      .select("id, status, created_at, updated_at, operating_date, summary")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -93,8 +107,17 @@ export async function probeRouteGenerator(
     if (data) {
       const st = String(data.status || "");
       const at = String(data.updated_at || data.created_at || "");
+      const summary =
+        data.summary && typeof data.summary === "object"
+          ? (data.summary as Record<string, unknown>)
+          : {};
+      const correlationId = summary.correlationId ? String(summary.correlationId) : null;
+      const gate = summary.systemHealthQualityGate
+        ? String(summary.systemHealthQualityGate)
+        : null;
+
       let status: HealthStatus = "HEALTHY";
-      let detail = `Latest plan ${st} for ${data.operating_date || "n/a"} (no system_health audit row yet — run generate after migration 072).`;
+      let detail = "";
       let lastFailureAt: string | null = null;
       let lastError: string | null = null;
 
@@ -103,8 +126,27 @@ export async function probeRouteGenerator(
         detail = "Latest route plan status is failed.";
         lastFailureAt = at;
         lastError = detail;
-      } else if (st === "needs_review" || st === "generating") {
+      } else if (st === "generating") {
+        // In-progress generate is fine unless we later detect stuck jobs via queue probe
+        status = "HEALTHY";
+        detail = `Route plan generating for ${data.operating_date || "n/a"}.`;
+      } else if (HEALTHY_PLAN_STATUSES.has(st)) {
+        status = "HEALTHY";
+        const reviewNote =
+          st === "needs_review" || st === "ready_for_approval"
+            ? " awaiting management review"
+            : "";
+        detail = correlationId
+          ? `Latest plan ${st} for ${data.operating_date || "n/a"}${reviewNote} (${correlationId}${gate ? `, gate ${gate}` : ""}).`
+          : `Latest plan ${st} for ${data.operating_date || "n/a"}${reviewNote}. System Health audit row not found yet (generate again to backfill, or check audit persistence).`;
+      } else {
         status = "WARNING";
+        detail = `Latest plan has unexpected status "${st}".`;
+      }
+
+      if (routeFailToday > 0 && status === "HEALTHY") {
+        status = "WARNING";
+        detail = `${routeFailToday} failed route audit(s) today. Latest plan ${st}.`;
       }
 
       return {

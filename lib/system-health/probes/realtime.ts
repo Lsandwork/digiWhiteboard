@@ -36,7 +36,6 @@ async function probeRealtimeHttp(projectUrl: string): Promise<{
     return { ok: false, latencyMs: 0, error: "missing_supabase_key", statusCode: null };
   }
 
-  // Prefer dedicated health path; fall back to realtime root.
   const candidates = [
     `${projectUrl.replace(/\/$/, "")}/realtime/v1/api/tenants/realtime-dev/health`,
     `${projectUrl.replace(/\/$/, "")}/realtime/v1/`
@@ -55,7 +54,6 @@ async function probeRealtimeHttp(projectUrl: string): Promise<{
         signal: AbortSignal.timeout(8_000)
       });
       lastStatus = res.status;
-      // 2xx/4xx (auth/path) still proves the realtime gateway is up; 5xx/network = bad
       if (res.status < 500) {
         return { ok: true, latencyMs: Date.now() - started, error: null, statusCode: res.status };
       }
@@ -70,6 +68,57 @@ async function probeRealtimeHttp(projectUrl: string): Promise<{
     error: lastError,
     statusCode: lastStatus
   };
+}
+
+function freshestIso(...values: Array<string | null | undefined>) {
+  let best: string | null = null;
+  let bestMs = -Infinity;
+  for (const value of values) {
+    if (!value) continue;
+    const ms = new Date(value).getTime();
+    if (!Number.isFinite(ms)) continue;
+    if (ms > bestMs) {
+      bestMs = ms;
+      best = value;
+    }
+  }
+  return best;
+}
+
+async function loadBoardFreshest(supabase: Supabase): Promise<{
+  at: string | null;
+  error: string | null;
+}> {
+  try {
+    // updated_at can lag if some writers only touch last_seen_from_gingr_at
+    const [byUpdated, bySeen] = await Promise.all([
+      supabase
+        .from("live_transition_dogs")
+        .select("updated_at, last_seen_from_gingr_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("live_transition_dogs")
+        .select("updated_at, last_seen_from_gingr_at")
+        .not("last_seen_from_gingr_at", "is", null)
+        .order("last_seen_from_gingr_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ]);
+    const err = byUpdated.error?.message || bySeen.error?.message || null;
+    const at = freshestIso(
+      byUpdated.data?.updated_at ? String(byUpdated.data.updated_at) : null,
+      byUpdated.data?.last_seen_from_gingr_at
+        ? String(byUpdated.data.last_seen_from_gingr_at)
+        : null,
+      bySeen.data?.updated_at ? String(bySeen.data.updated_at) : null,
+      bySeen.data?.last_seen_from_gingr_at ? String(bySeen.data.last_seen_from_gingr_at) : null
+    );
+    return { at, error: at ? null : err };
+  } catch (err) {
+    return { at: null, error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export async function probeRealtime(supabase: Supabase): Promise<RealtimeProbeResult> {
@@ -89,26 +138,10 @@ export async function probeRealtime(supabase: Supabase): Promise<RealtimeProbeRe
 
   const [http, board] = await Promise.all([
     probeRealtimeHttp(projectUrl),
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("live_transition_dogs")
-          .select("updated_at, last_seen_from_gingr_at")
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (error) return { at: null as string | null, error: error.message };
-        const at =
-          (data?.updated_at && String(data.updated_at)) ||
-          (data?.last_seen_from_gingr_at && String(data.last_seen_from_gingr_at)) ||
-          null;
-        return { at, error: null as string | null };
-      } catch (err) {
-        return { at: null as string | null, error: err instanceof Error ? err.message : String(err) };
-      }
-    })()
+    loadBoardFreshest(supabase)
   ]);
 
+  const boardAgeMs = board.at ? Math.max(0, Date.now() - new Date(board.at).getTime()) : null;
   let status: HealthStatus = "HEALTHY";
   let detail = "";
   let lastError: string | null = null;
@@ -125,17 +158,25 @@ export async function probeRealtime(supabase: Supabase): Promise<RealtimeProbeRe
     lastError = http.error;
   } else if (!board.at) {
     status = "HEALTHY";
-    detail = `Realtime gateway responding (${http.latencyMs} ms). No recent board row updates yet.`;
+    detail = `Realtime gateway responding (${http.latencyMs} ms). No board row timestamps yet.`;
+  } else if (boardAgeMs != null && boardAgeMs > 24 * 60 * 60_000) {
+    // Gateway up, but board evidence is stale — informational, not a hard failure
+    // (overnight quiet boards are normal; still call out >24h)
+    status = "HEALTHY";
+    detail = `Realtime gateway OK (${http.latencyMs} ms). Last board evidence ${Math.round(boardAgeMs / 3600000)}h ago (${new Date(board.at).toLocaleString()}).`;
   } else {
     status = "HEALTHY";
-    detail = `Realtime OK (${http.latencyMs} ms). Board feed evidence at ${new Date(board.at).toLocaleString()}.`;
+    const mins = boardAgeMs != null ? Math.round(boardAgeMs / 60000) : null;
+    detail = `Realtime OK (${http.latencyMs} ms). Board feed evidence ${
+      mins != null ? `${mins}m ago` : "present"
+    } (${new Date(board.at).toLocaleString()}).`;
   }
 
   return {
     status,
     detail,
     responseTimeMs: http.latencyMs || null,
-    lastSuccessAt: http.ok || board.at ? new Date().toISOString() : null,
+    lastSuccessAt: http.ok ? new Date().toISOString() : board.at,
     lastFailureAt,
     lastError,
     realtimeHttpOk: http.ok,

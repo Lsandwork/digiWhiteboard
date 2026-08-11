@@ -389,6 +389,21 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   const ensure = readFileSync(resolve(__dirname, "../lib/system-health/ensure-schema.ts"), "utf8");
   assert.ok(ensure.includes("072_system_health_debugging.sql"));
   assert.ok(ensure.includes("system_health_route_audits"));
+
+  const routeProbe = readFileSync(
+    resolve(__dirname, "../lib/system-health/probes/route-generator.ts"),
+    "utf8"
+  );
+  assert.ok(routeProbe.includes("HEALTHY_PLAN_STATUSES"));
+  assert.ok(routeProbe.includes("needs_review"));
+  assert.ok(!routeProbe.includes('st === "needs_review" || st === "generating") {\n        status = "WARNING"'));
+
+  const realtimeProbeSrc = readFileSync(
+    resolve(__dirname, "../lib/system-health/probes/realtime.ts"),
+    "utf8"
+  );
+  assert.ok(realtimeProbeSrc.includes("loadBoardFreshest"));
+  assert.ok(realtimeProbeSrc.includes("last_seen_from_gingr_at"));
 }
 
 console.log("test-system-health-debugging: ok");

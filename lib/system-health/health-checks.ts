@@ -154,7 +154,7 @@ export async function runFunctionalHealthChecks(): Promise<{
   };
 
   const [
-    dbProbe,
+    dbProbeTimed,
     webhook,
     lastDogSeen,
     audit,
@@ -175,7 +175,15 @@ export async function runFunctionalHealthChecks(): Promise<{
     queueProbe,
     schema
   ] = await Promise.all([
-    supabase.from("admin_settings").select("id").eq("id", "default").maybeSingle(),
+    (async () => {
+      const t0 = Date.now();
+      const result = await supabase
+        .from("admin_settings")
+        .select("id")
+        .eq("id", "default")
+        .maybeSingle();
+      return { ...result, latencyMs: Date.now() - t0 };
+    })(),
     supabase
       .from("gingr_webhook_events")
       .select("created_at, processing_error")
@@ -305,6 +313,10 @@ export async function runFunctionalHealthChecks(): Promise<{
     )
   ]);
 
+  const dbProbe = dbProbeTimed;
+  const dbMs = dbProbeTimed.latencyMs;
+  const totalProbeMs = Date.now() - started;
+
   const routeGen = await probeRouteGenerator(supabase, {
     routeFailToday: Number(routeFail) || 0
   }).catch((err) => ({
@@ -319,7 +331,6 @@ export async function runFunctionalHealthChecks(): Promise<{
     source: "module_ready" as const
   }));
 
-  const dbMs = Date.now() - started;
   const gingr = evaluateGingrHealth({
     lastWebhookAt: webhook.data?.created_at ? String(webhook.data.created_at) : null,
     lastDogSeenAt: lastDogSeen.data?.last_seen_from_gingr_at
@@ -364,14 +375,14 @@ export async function runFunctionalHealthChecks(): Promise<{
       id: "ruffops",
       label: "RuffOps Application",
       status: "HEALTHY",
-      responseTimeMs: dbMs,
+      responseTimeMs: totalProbeMs,
       lastSuccessAt: new Date().toISOString(),
       lastFailureAt: null,
       lastError: null,
       errorsLastHour: Number(errorsHour) || 0,
       errorsLast24h: Number(errorsDay) || 0,
       successRate24h: null,
-      detail: "Admin application responding."
+      detail: `Admin application responding (full probe suite ${totalProbeMs} ms).`
     },
     {
       id: "database",
@@ -384,7 +395,7 @@ export async function runFunctionalHealthChecks(): Promise<{
       errorsLastHour: 0,
       errorsLast24h: 0,
       successRate24h: null,
-      detail: dbProbe.error ? "Database probe failed." : "admin_settings probe ok."
+      detail: dbProbe.error ? "Database probe failed." : `admin_settings probe ok (${dbMs} ms).`
     },
     {
       id: "authentication",
