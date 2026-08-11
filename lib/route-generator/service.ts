@@ -26,16 +26,20 @@ import {
 import {
   buildCsv,
   buildRouteName,
+  ensureScheduleOnOperatingDate,
   formatSamsaraCsvDateTime,
   formatSamsaraCoordinate,
   getCanonicalSamsaraTemplate,
   normalizeSamsaraVehicleName,
   sanitizeSamsaraNotes,
+  sanitizeSamsaraText,
   synthesizeStopSchedule,
+  todayInLosAngeles,
   validateExport,
   type ExportStopRow,
   type SamsaraTemplate
 } from "@/lib/route-generator/samsara-csv";
+import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import { FITDOG_VAN_KEYS, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
 import type { VehicleCapacityConfig, SizeLoadConfig } from "@/lib/route-generator/capacity";
@@ -1107,11 +1111,28 @@ export async function exportSamsaraCsv(params: {
   overrideReason?: string;
 }) {
   const bundle = await getPlanBundle(params.planId);
-  if (bundle.plan.status !== "approved" && !params.emergencyOverride) {
-    throw new Error("CSV generation was blocked because the route plan has not been approved.");
+  const planStatus = String(bundle.plan.status || "");
+  const operatingDate = String(bundle.plan.operating_date || "").slice(0, 10);
+  const today = todayInLosAngeles();
+
+  // Allow re-download after the first export — blocking "exported" forced coordinators
+  // to reuse stale Downloads copies (e.g. Friday's CSV) when today's re-export failed.
+  if (!["approved", "exported"].includes(planStatus) && !params.emergencyOverride) {
+    throw new RouteGeneratorClientError(
+      "CSV generation was blocked because the route plan has not been approved.",
+      400,
+      "plan_not_approved"
+    );
   }
   if (params.emergencyOverride && !params.overrideReason?.trim()) {
-    throw new Error("Emergency export requires a written reason.");
+    throw new RouteGeneratorClientError("Emergency export requires a written reason.", 400, "override_reason_required");
+  }
+  if (operatingDate && operatingDate !== today && !params.emergencyOverride) {
+    throw new RouteGeneratorClientError(
+      `This plan is for ${operatingDate}, but today is ${today}. Exporting another day's CSV is blocked — Samsara must only receive today's routes. Pull/generate today's plan, or use emergency override with a written reason.`,
+      409,
+      "wrong_operating_day"
+    );
   }
 
   // Always use Samsara's exact A–K bulk-upload headers. Never trust a stale
@@ -1150,14 +1171,18 @@ export async function exportSamsaraCsv(params: {
   );
 
   const rows: ExportStopRow[] = [];
+  let realignedScheduleCount = 0;
   for (const route of bundle.routes) {
     const routeStops = bundle.stops.filter((s) => s.route_id === route.id).sort((a, b) => a.sequence - b.sequence);
-    const vanDisplay = vehicleNameByKey.get(String(route.van_key)) || String(route.van_key);
+    const vanDisplay = normalizeSamsaraVehicleName(
+      vehicleNameByKey.get(String(route.van_key)) || String(route.van_key)
+    );
     const direction = route.direction as "pickup" | "dropoff";
     const routeName = buildRouteName({
-      date: String(bundle.plan.operating_date),
+      date: operatingDate,
       direction,
-      vanDisplay: String(route.display_name || vanDisplay)
+      // Always use Samsara vehicle label in the route name (never a freeform display_name).
+      vanDisplay
     });
     routeStops.forEach((stop, stopIndex) => {
       let stopNotes = String(stop.driver_notes || "");
@@ -1195,7 +1220,7 @@ export async function exportSamsaraCsv(params: {
         ? new Date(String(stopRecord.eta_departure))
         : null;
       const synthesized = synthesizeStopSchedule({
-        operatingDate: String(bundle.plan.operating_date),
+        operatingDate,
         direction,
         stopIndex,
         stopCount: routeStops.length,
@@ -1217,6 +1242,20 @@ export async function exportSamsaraCsv(params: {
       }
       if (!scheduledArrival.trim()) scheduledArrival = synthesized.arrival;
       if (!scheduledDeparture.trim()) scheduledDeparture = synthesized.departure;
+
+      const aligned = ensureScheduleOnOperatingDate({
+        operatingDate,
+        arrival: scheduledArrival,
+        departure: scheduledDeparture,
+        direction,
+        stopIndex,
+        stopCount: routeStops.length,
+        vanKey: String(route.van_key ?? "")
+      });
+      scheduledArrival = aligned.arrival;
+      scheduledDeparture = aligned.departure;
+      if (aligned.realigned) realignedScheduleCount += 1;
+
       // Prefer stop notes; include route wave context when present.
       const notesWithRoute =
         stopNotes.trim() ||
@@ -1225,14 +1264,14 @@ export async function exportSamsaraCsv(params: {
         routeName,
         routeNotes: `${route.wave_name} · ${route.vehicle_pool}`,
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
-        vehicleName: normalizeSamsaraVehicleName(vanDisplay),
+        vehicleName: vanDisplay,
         driverName: "",
-        stopName: String(stop.owner_name || stop.stop_kind || "Stop").trim(),
+        stopName: sanitizeSamsaraText(String(stop.owner_name || stop.stop_kind || "Stop")),
         stopNotes: sanitizeSamsaraNotes(notesWithRoute),
-        stopAddress: stop.address || "",
+        stopAddress: sanitizeSamsaraText(stop.address || ""),
         scheduledArrival,
         scheduledDeparture,
-        routeDate: String(bundle.plan.operating_date),
+        routeDate: operatingDate,
         stopOrder: Number(stop.sequence),
         latitude: formatSamsaraCoordinate(stop.latitude == null ? "" : String(stop.latitude)),
         longitude: formatSamsaraCoordinate(stop.longitude == null ? "" : String(stop.longitude))
@@ -1241,14 +1280,22 @@ export async function exportSamsaraCsv(params: {
   }
 
   const built = buildCsv({ template, rows });
-  const validation = validateExport({ template, rows, csv: built.csv });
+  const validation = validateExport({
+    template,
+    rows,
+    csv: built.csv,
+    operatingDate
+  });
   if (!validation.ok) {
-    throw new Error(
-      `CSV validation failed: ${(validation.report.errors as string[]).join("; ") || "unknown error"}`
+    const details = (validation.report.errors as string[]).slice(0, 8).join("; ") || "unknown error";
+    throw new RouteGeneratorClientError(
+      `CSV validation failed — fix these stops before uploading to Samsara: ${details}`,
+      422,
+      "csv_validation_failed"
     );
   }
 
-  const fileName = `fitdog-samsara-routes-${bundle.plan.operating_date}.csv`;
+  const fileName = `fitdog-samsara-routes-${operatingDate}.csv`;
   const { data: job, error } = await supabase
     .from("route_export_jobs")
     .insert({
@@ -1256,7 +1303,12 @@ export async function exportSamsaraCsv(params: {
       version_number: bundle.plan.current_version,
       status: "completed",
       file_name: fileName,
-      validation_report: validation.report,
+      validation_report: {
+        ...validation.report,
+        realignedScheduleCount,
+        today,
+        operatingDate
+      },
       emergency_override: Boolean(params.emergencyOverride),
       override_reason: params.overrideReason ?? null,
       created_by: params.actorAdminId ?? null,
@@ -1276,8 +1328,21 @@ export async function exportSamsaraCsv(params: {
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
-    reason: params.overrideReason
+    reason: params.overrideReason,
+    newValue: { operatingDate, today, realignedScheduleCount, stopCount: rows.length }
   });
 
-  return { fileName, csv: built.csv, validation: validation.report, job };
+  return {
+    fileName,
+    csv: built.csv,
+    validation: {
+      ...validation.report,
+      realignedScheduleCount,
+      today,
+      operatingDate,
+      uploadReminder:
+        "Upload this CSV to Samsara today only. Never reuse a previous day's file (e.g. Friday) for a later day."
+    },
+    job
+  };
 }

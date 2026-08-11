@@ -433,13 +433,17 @@ export function RouteGeneratorPanel() {
     }
   }
 
-  async function exportCsv() {
+  async function exportCsv(options?: { emergencyOverride?: boolean; overrideReason?: string }) {
     if (!bundle?.plan.id) {
       showToast("Generate and approve routes before exporting.", "error");
       return;
     }
     try {
-      const body = await postAction("export_csv", { planId: bundle.plan.id });
+      const body = await postAction("export_csv", {
+        planId: bundle.plan.id,
+        emergencyOverride: Boolean(options?.emergencyOverride),
+        overrideReason: options?.overrideReason
+      });
       setCsvPreview(body.csv);
       const blob = new Blob([body.csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -448,7 +452,11 @@ export function RouteGeneratorPanel() {
       a.download = body.fileName;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("Samsara CSV exported. Confirm headers use Stop Arrival Time / Stop Departure Time / Stop Notes before upload.", "success");
+      await hydratePlan(String(bundle.plan.id), { quiet: true });
+      const reminder =
+        body.validation?.uploadReminder ||
+        "Upload this CSV to Samsara today only. Never reuse a previous day's file.";
+      showToast(`Samsara CSV exported. ${reminder}`, "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Export failed.", "error");
     }
@@ -478,12 +486,35 @@ export function RouteGeneratorPanel() {
       showToast("Generate routes first, then approve and export.", "error");
       return;
     }
-    if (bundle.plan.status !== "approved") {
+    if (bundle.plan.status !== "approved" && bundle.plan.status !== "exported") {
       showToast("Approve the route plan before exporting CSV.", "error");
+      return;
+    }
+    const planDate = String(bundle.plan.operating_date || date).slice(0, 10);
+    const today = todayLA();
+    if (planDate !== today) {
+      const confirmed = window.confirm(
+        `This plan is for ${planDate}, but today is ${today}.\n\nUploading another day's CSV to Samsara is blocked by default.\n\nOnly continue with emergency override if a manager explicitly approved exporting ${planDate}.`
+      );
+      if (!confirmed) return;
+      const reason = window.prompt(
+        `Emergency override reason for exporting ${planDate} routes (required):`,
+        ""
+      );
+      if (!reason?.trim()) {
+        showToast("Emergency export cancelled — a written reason is required.", "error");
+        return;
+      }
+      void exportCsv({ emergencyOverride: true, overrideReason: reason.trim() });
       return;
     }
     void exportCsv();
   }
+
+  const canExportCsv =
+    Boolean(bundle?.plan.id) &&
+    (bundle?.plan.status === "approved" || bundle?.plan.status === "exported");
+  const isWrongOperatingDay = Boolean(date && date !== todayLA());
 
   const pickupRoutes = useMemo(
     () => (bundle?.routes ?? []).filter((r) => r.direction === "pickup"),
@@ -604,6 +635,25 @@ export function RouteGeneratorPanel() {
         </div>
       </header>
 
+      {isWrongOperatingDay ? (
+        <div className="flex items-start gap-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-50">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Operating date is <strong>{date}</strong>, but today is <strong>{todayLA()}</strong>. Samsara CSV
+            export for a non-today plan is blocked unless a manager uses emergency override. Never upload
+            Friday&apos;s (or any prior day&apos;s) CSV to Samsara on a later day.
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-50">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Export only today&apos;s CSV to Samsara. Digi blocks wrong-day exports and validates stop
+            times/coords/notes so bulk upload does not return Internal Server Error.
+          </p>
+        </div>
+      )}
+
       <section className="admin-card flex flex-col gap-3 p-4 lg:flex-row lg:items-end lg:justify-between">
         <label className="block text-sm">
           <span className="admin-label">Operating date</span>
@@ -640,19 +690,21 @@ export function RouteGeneratorPanel() {
           </button>
           <button
             type="button"
-            className={bundle?.plan.status === "approved" ? "admin-btn-primary" : "admin-btn-secondary"}
+            className={canExportCsv ? "admin-btn-primary" : "admin-btn-secondary"}
             disabled={busy}
             title={
               !bundle
                 ? "Generate routes first"
-                : bundle.plan.status !== "approved"
+                : !canExportCsv
                   ? "Approve the route plan before exporting"
-                  : "Export approved plan as Samsara CSV"
+                  : bundle.plan.status === "exported"
+                    ? "Re-download today's Samsara CSV (do not reuse an old file)"
+                    : "Export approved plan as Samsara CSV"
             }
             onClick={onExportClick}
           >
             <Download className="h-4 w-4" />
-            Export Samsara CSV
+            {bundle?.plan.status === "exported" ? "Re-export Samsara CSV" : "Export Samsara CSV"}
           </button>
           </div>
           <label

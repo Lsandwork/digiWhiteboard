@@ -19,6 +19,7 @@ import {
 } from "@/lib/route-generator/service";
 import { listGingrTaxiServicesByDate } from "@/lib/route-generator/gingr-taxi";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
+import { isRouteGeneratorClientError } from "@/lib/route-generator/errors";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -284,6 +285,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
   } catch (error) {
+    if (isRouteGeneratorClientError(error)) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status }
+      );
+    }
     console.error("[route-generator] POST failed", error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Route Generator request failed." },

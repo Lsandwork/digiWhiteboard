@@ -25,6 +25,19 @@ Never generate, display, assign, import, or reference Van 4.
 
 ## Samsara CSV upload errors
 
+### "Internal Server Error" on Samsara bulk upload
+
+This is usually a **bad data row**, not Digi being down. Digi never uploads to Samsara — staff download a CSV and upload it in `cloud.samsara.com`.
+
+Common causes Digi now blocks before download:
+1. Missing **Latitude / Longitude / Full Address** on any stop
+2. Stop times on the **wrong calendar day** (UTC/ETA drift)
+3. Multiline or oversized **Stop Notes**
+4. **0,0** / invalid coordinates
+5. Driver + vehicle both assigned
+
+**Never reuse another day's CSV** (e.g. Friday's file on Monday). Digi blocks wrong-day export unless a manager uses emergency override with a written reason. Always **Re-export Samsara CSV** from today's approved plan.
+
 ### "One or more column headers are not supported"
 
 Wrong header names. Digi must export the exact Samsara template (not `Notes` / `Scheduled Arrival Time`).
@@ -47,13 +60,14 @@ Header names passed, but a data row failed validation.
 2. **Departure earlier than arrival**.
 3. **Vehicle name mismatch** — must exactly match Samsara (`Van 01`, `Van 02`, `Van 03`, `Van 05`, `Van 06`).
 4. **Driver + vehicle both set** — leave `Assigned Driver Username` blank when assigning by vehicle.
-5. Re-uploading an old export from a bad header revision.
+5. Re-uploading an old export from a bad header revision / different operating date.
 
 ### Fix
-1. Re-export from Route Generator after the latest deploy (do not reuse `fitdog-samsara-routes-2026-08-10.csv` if it still shows `Notes` / `Scheduled Arrival Time`).
+1. Re-export from Route Generator for **today's** plan (use **Re-export Samsara CSV** if already exported — do not reuse an old Downloads copy).
 2. Open the CSV in a text editor and confirm the header line matches the required list above.
-3. Confirm every data row has both Stop Arrival Time and Stop Departure Time.
+3. Confirm every data row has both Stop Arrival Time and Stop Departure Time on today's date.
 4. Confirm `Assigned Vehicle Name` values exist verbatim in the Samsara Vehicles list.
+5. If Digi shows `CSV validation failed`, fix the listed stops (geocode / notes) and export again — do not upload a broken file to Samsara.
 
 ## Notes for troubleshooting
 Live Fitdog credentials and the current Samsara sample template must be validated by Fitdog before claiming production verification.

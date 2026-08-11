@@ -156,21 +156,94 @@ export function formatSamsaraCoordinate(value: string | number | null | undefine
   return String(Number(n.toFixed(7)));
 }
 
+/** Max Stop Notes length — longer cells have triggered Samsara bulk-upload 500s. */
+export const SAMSARA_STOP_NOTES_MAX_CHARS = 480;
+
+/** Calendar date in America/Los_Angeles as YYYY-MM-DD. */
+export function todayInLosAngeles(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+}
+
+/** Extract MM/DD/YYYY → YYYY-MM-DD from a Samsara CSV datetime cell. */
+export function operatingDateFromSamsaraCsvDateTime(value: string): string | null {
+  const parsed = parseSamsaraCsvDateTime(value);
+  if (!parsed) return null;
+  const m = String(value)
+    .trim()
+    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+/);
+  if (!m) return null;
+  return `${m[3]}-${String(Number(m[1])).padStart(2, "0")}-${String(Number(m[2])).padStart(2, "0")}`;
+}
+
+/** True when a Samsara datetime cell is on the plan's operating date. */
+export function samsaraCsvDateTimeMatchesOperatingDate(value: string, operatingDate: string): boolean {
+  const cellDate = operatingDateFromSamsaraCsvDateTime(value);
+  return Boolean(cellDate && cellDate === operatingDate);
+}
+
 /**
  * Flatten multiline driver notes for CSV bulk upload.
  * Newlines inside quoted cells are valid CSV, but Samsara's importer often marks
- * those rows as incorrect — use a single-line separator instead.
+ * those rows as incorrect / Internal Server Error — keep one short line.
  */
 export function sanitizeSamsaraNotes(value: string | null | undefined): string {
-  return String(value ?? "")
+  const flat = String(value ?? "")
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
+    // Strip control chars that have crashed Samsara's importer.
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .join(" · ")
     .replace(/\s+/g, " ")
     .trim();
+  if (flat.length <= SAMSARA_STOP_NOTES_MAX_CHARS) return flat;
+  return `${flat.slice(0, SAMSARA_STOP_NOTES_MAX_CHARS - 1).trimEnd()}…`;
+}
+
+/** Sanitize stop/route display text for CSV cells. */
+export function sanitizeSamsaraText(value: string | null | undefined): string {
+  return String(value ?? "")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * If an ETA datetime landed on the wrong calendar day (UTC/storage drift),
+ * rebuild arrival/departure on the plan operating date using synthesized times.
+ */
+export function ensureScheduleOnOperatingDate(params: {
+  operatingDate: string;
+  arrival: string;
+  departure: string;
+  direction: "pickup" | "dropoff";
+  stopIndex: number;
+  stopCount: number;
+  vanKey?: string | null;
+}): { arrival: string; departure: string; realigned: boolean } {
+  const arrivalOk =
+    !params.arrival.trim() || samsaraCsvDateTimeMatchesOperatingDate(params.arrival, params.operatingDate);
+  const departureOk =
+    !params.departure.trim() ||
+    samsaraCsvDateTimeMatchesOperatingDate(params.departure, params.operatingDate);
+  if (arrivalOk && departureOk && params.arrival.trim() && params.departure.trim()) {
+    return { arrival: params.arrival, departure: params.departure, realigned: false };
+  }
+  const synthesized = synthesizeStopSchedule({
+    operatingDate: params.operatingDate,
+    direction: params.direction,
+    stopIndex: params.stopIndex,
+    stopCount: params.stopCount,
+    vanKey: params.vanKey
+  });
+  return { arrival: synthesized.arrival, departure: synthesized.departure, realigned: true };
 }
 
 /** Parse `MM/DD/YYYY HH:mm` used in our Samsara CSV cells. */
@@ -315,6 +388,8 @@ export function validateExport(params: {
   template: SamsaraTemplate;
   rows: ExportStopRow[];
   csv: string;
+  /** When set, every stop arrival/departure must fall on this YYYY-MM-DD. */
+  operatingDate?: string;
 }): {
   ok: boolean;
   report: Record<string, unknown>;
@@ -352,10 +427,24 @@ export function validateExport(params: {
         errors.push(
           `Departure before arrival on ${row.routeName} stop "${row.stopName}" (${row.scheduledArrival} → ${row.scheduledDeparture})`
         );
+      } else if (params.operatingDate) {
+        if (!samsaraCsvDateTimeMatchesOperatingDate(row.scheduledArrival, params.operatingDate)) {
+          errors.push(
+            `Arrival date must be ${params.operatingDate} on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledArrival}"). Wrong-day times cause Samsara upload failures.`
+          );
+        }
+        if (!samsaraCsvDateTimeMatchesOperatingDate(row.scheduledDeparture, params.operatingDate)) {
+          errors.push(
+            `Departure date must be ${params.operatingDate} on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledDeparture}").`
+          );
+        }
       }
     }
-    if (!row.stopAddress?.trim() && (!row.latitude || !row.longitude)) {
-      errors.push(`Stop "${row.stopName}" on ${row.routeName} needs Full Address or lat/lng.`);
+    // Raw lat/lng mode: Samsara bulk upload often 500s when any of these are missing.
+    if (!row.stopAddress?.trim() || !row.latitude?.trim() || !row.longitude?.trim()) {
+      errors.push(
+        `Stop "${row.stopName}" on ${row.routeName} needs Full Address, Latitude, and Longitude before Samsara upload.`
+      );
     }
     if (row.latitude && !/^-?\d+(\.\d+)?$/.test(row.latitude.trim())) {
       errors.push(`Invalid Latitude on ${row.routeName} stop "${row.stopName}": ${row.latitude}`);
@@ -363,8 +452,32 @@ export function validateExport(params: {
     if (row.longitude && !/^-?\d+(\.\d+)?$/.test(row.longitude.trim())) {
       errors.push(`Invalid Longitude on ${row.routeName} stop "${row.stopName}": ${row.longitude}`);
     }
+    const latN = Number(row.latitude);
+    const lngN = Number(row.longitude);
+    if (row.latitude && row.longitude && Number.isFinite(latN) && Number.isFinite(lngN)) {
+      if (latN === 0 && lngN === 0) {
+        errors.push(`Stop "${row.stopName}" on ${row.routeName} has 0,0 coordinates — fix geocode before upload.`);
+      } else if (latN < -90 || latN > 90 || lngN < -180 || lngN > 180) {
+        errors.push(`Stop "${row.stopName}" on ${row.routeName} has out-of-range coordinates.`);
+      } else if (latN < 32 || latN > 36 || lngN > -114 || lngN < -122) {
+        // Soft SoCal envelope — warn only (taxi / edge addresses can sit near the rim).
+        warnings.push(
+          `Stop "${row.stopName}" on ${row.routeName} coordinates look outside the usual Fitdog service area (${row.latitude}, ${row.longitude}).`
+        );
+      }
+    }
     if (/\n|\r/.test(row.stopNotes || "")) {
       errors.push(`Multiline Notes on ${row.routeName} stop "${row.stopName}" — flatten before upload.`);
+    }
+    if ((row.stopNotes || "").length > SAMSARA_STOP_NOTES_MAX_CHARS) {
+      errors.push(
+        `Stop Notes too long on ${row.routeName} stop "${row.stopName}" (${row.stopNotes.length} chars). Cap at ${SAMSARA_STOP_NOTES_MAX_CHARS}.`
+      );
+    }
+    if (row.driverName?.trim() && row.vehicleName?.trim()) {
+      errors.push(
+        `Route ${row.routeName} assigns both driver and vehicle — leave Assigned Driver Username blank when using Van 01–06.`
+      );
     }
   }
 
@@ -403,6 +516,7 @@ export function validateExport(params: {
       routeCount: byRoute.size,
       stopCount: params.rows.length,
       headerMatch: errors.every((e) => !/header/i.test(e)),
+      operatingDate: params.operatingDate ?? null,
       errors,
       warnings,
       validationResult: errors.length === 0 ? "passed" : "failed"

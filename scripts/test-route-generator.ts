@@ -35,14 +35,17 @@ import {
   buildCsv,
   buildRouteName,
   escapeCsvCell,
+  ensureScheduleOnOperatingDate,
   formatSamsaraCoordinate,
   getCanonicalSamsaraTemplate,
   normalizeSamsaraVehicleName,
   sanitizeSamsaraNotes,
   SAMSARA_BULK_UPLOAD_HEADERS,
+  SAMSARA_STOP_NOTES_MAX_CHARS,
   SAMSARA_UNSUPPORTED_HEADERS,
   dropoffStartTimeForVan,
   synthesizeStopSchedule,
+  todayInLosAngeles,
   validateExport
 } from "../lib/route-generator/samsara-csv";
 import { buildCustomerStopNotes, formatPhoneForDriver, phoneDigitsE164 } from "../lib/route-generator/stop-notes";
@@ -664,8 +667,46 @@ assert.equal(
 assert.equal(normalizeSamsaraVehicleName("Van 1"), "Van 01");
 assert.equal(normalizeSamsaraVehicleName("van_5"), "Van 05");
 assert.equal(sanitizeSamsaraNotes("Dogs: Indy\nPhone: (310) 555-1212"), "Dogs: Indy · Phone: (310) 555-1212");
+assert.ok(sanitizeSamsaraNotes(`${"x".repeat(600)}`).length <= SAMSARA_STOP_NOTES_MAX_CHARS);
+assert.ok(!sanitizeSamsaraNotes("Dogs\u0000Indy").includes("\u0000"));
 assert.equal(formatSamsaraCoordinate("34.01950000000001"), "34.0195");
 assert.equal(formatSamsaraCoordinate("-118.49120000000002"), "-118.4912");
+assert.match(todayInLosAngeles(), /^\d{4}-\d{2}-\d{2}$/);
+
+const wrongDay = ensureScheduleOnOperatingDate({
+  operatingDate: "2026-08-11",
+  arrival: "08/07/2026 07:00",
+  departure: "08/07/2026 07:05",
+  direction: "pickup",
+  stopIndex: 0,
+  stopCount: 3
+});
+assert.equal(wrongDay.realigned, true);
+assert.equal(wrongDay.arrival, "08/11/2026 07:00");
+assert.equal(wrongDay.departure, "08/11/2026 07:05");
+
+const missingCoords = validateExport({
+  template: getCanonicalSamsaraTemplate(),
+  rows: [
+    {
+      ...rows[0]!,
+      latitude: "",
+      longitude: ""
+    },
+    rows[1]!
+  ],
+  csv: built.csv,
+  operatingDate: "2026-07-26"
+});
+assert.equal(missingCoords.ok, false, "missing lat/lng must fail before Samsara upload");
+
+const sameDayValidation = validateExport({
+  template: getCanonicalSamsaraTemplate(),
+  rows,
+  csv: built.csv,
+  operatingDate: "2026-07-26"
+});
+assert.equal(sameDayValidation.ok, true, JSON.stringify(sameDayValidation.report));
 
 // Drop-off start: Van 1/2/3 at 10:30; Van 5/6 (club / group class) at 12:00.
 assert.deepEqual(dropoffStartTimeForVan("van_1"), { hour: 10, minute: 30 });

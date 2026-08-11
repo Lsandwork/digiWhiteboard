@@ -33,7 +33,14 @@ Exact Samsara bulk-upload columns A–K:
 
 Every stop row must include **both** stop arrival and departure. Vehicle names must match Samsara exactly (`Van 01` … `Van 06`, never Van 04). Leave driver username blank when assigning by vehicle.
 
-If Samsara says **"One or more column headers are not supported"** or **"One or more rows are incorrect"**, see [troubleshooting](./troubleshooting.md).
+If Samsara says **"Internal Server Error"**, **"One or more column headers are not supported"**, or **"One or more rows are incorrect"**, see [troubleshooting](./troubleshooting.md).
+
+### Same-day rule (required)
+
+- Digi exports only for the plan **operating date**.
+- Export of a non-today plan is **blocked** unless a manager uses emergency override with a written reason.
+- After the first export, use **Re-export Samsara CSV** — do not upload Friday’s (or any prior) file on a later day.
+- Digi validates lat/lng/address, same-day stop times, and flattened notes before download so Samsara bulk upload does not 500.
 
 ## Owner live tracking (Uber-style map)
 
