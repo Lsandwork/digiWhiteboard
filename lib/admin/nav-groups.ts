@@ -210,7 +210,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
   walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
-  route_generator: "Pull Fitdog pickup/drop-off reports, optimize van routes, and export Samsara CSVs.",
+  route_generator: "Pull Fitdog reports, build van routes, export Samsara CSVs, and track owner SMS / live maps.",
   staff_directory: "Edit staff names, roles, and contact info.",
   staff_create_user: "Create a new staff admin login.",
   users: "Manage admin users, roles, and permissions.",

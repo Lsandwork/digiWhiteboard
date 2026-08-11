@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { RouteGeneratorExtras } from "@/components/admin/RouteGeneratorExtras";
+import { RouteGeneratorTrackingTab } from "@/components/admin/RouteGeneratorTrackingTab";
 import type { FitdogLocationsConfig } from "@/lib/route-generator/locations";
 import type { SkippedOccurrence } from "@/lib/route-generator/fitdog-api";
 import type { GingrTaxiServiceRow } from "@/lib/route-generator/gingr-taxi";
@@ -34,6 +35,7 @@ type TabId =
   | "extras"
   | "raw"
   | "exports"
+  | "tracking"
   | "audit"
   | "settings";
 
@@ -428,6 +430,7 @@ export function RouteGeneratorPanel() {
         showToast("Plan approved. Owner SMS alerts were not enabled.", "success");
       }
       setSendOwnerSms(false);
+      setTab("tracking");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Approve failed.", "error");
     }
@@ -757,6 +760,7 @@ export function RouteGeneratorPanel() {
             ["dropoff", "Drop-Off Routes"],
             ["needs_review", "Needs Review"],
             ["extras", "Skipped / Taxi"],
+            ["tracking", "Tracking / SMS"],
             ["raw", "Raw Report"],
             ["exports", "Export History"],
             ["settings", "Settings"]
@@ -912,6 +916,15 @@ export function RouteGeneratorPanel() {
           onAssignSkipped={assignSkipped}
           onAddManualTaxi={addManualTaxi}
           onAddGingrTaxi={addGingrTaxi}
+        />
+      ) : null}
+
+      {tab === "tracking" ? (
+        <RouteGeneratorTrackingTab
+          operatingDate={date}
+          planId={bundle?.plan?.id ?? bootstrap?.latestPlan?.id ?? null}
+          busy={busy}
+          onBusy={setBusy}
         />
       ) : null}
 

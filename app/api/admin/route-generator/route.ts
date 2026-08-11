@@ -20,6 +20,13 @@ import {
 import { listGingrTaxiServicesByDate } from "@/lib/route-generator/gingr-taxi";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import { isRouteGeneratorClientError } from "@/lib/route-generator/errors";
+import {
+  cancelOwnerTracking,
+  clearOwnerTrackingNotified,
+  listOwnerTracking,
+  resendOwnerTrackingLinkSms,
+  setOwnerTrackingSmsAlerts
+} from "@/lib/route-generator/owner-tracking-admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -86,6 +93,20 @@ export async function GET(request: Request) {
         .limit(100);
       return NextResponse.json({ events: data ?? [] });
     }
+    if (view === "tracking") {
+      const date = url.searchParams.get("date") || "";
+      const result = await listOwnerTracking({
+        date,
+        planId: url.searchParams.get("planId"),
+        van: url.searchParams.get("van"),
+        direction: url.searchParams.get("direction"),
+        status: url.searchParams.get("status"),
+        sms: (url.searchParams.get("sms") as "all" | "enabled" | "disabled") || "all",
+        link: (url.searchParams.get("link") as "all" | "sent" | "not_sent" | "missing_phone") || "all",
+        q: url.searchParams.get("q")
+      });
+      return NextResponse.json(result);
+    }
     const bootstrap = await getRouteGeneratorBootstrap();
     return NextResponse.json({
       ...bootstrap,
@@ -121,7 +142,11 @@ export async function POST(request: Request) {
       ? "route_generator.pull_report"
       : action === "generate_plan"
         ? "route_generator.generate"
-        : action === "approve_plan"
+        : action === "approve_plan" ||
+            action === "tracking_resend_link" ||
+            action === "tracking_set_sms_alerts" ||
+            action === "tracking_clear_notified" ||
+            action === "tracking_cancel"
           ? "route_generator.approve"
           : action === "export_csv"
             ? "route_generator.export"
@@ -227,6 +252,78 @@ export async function POST(request: Request) {
         sendOwnerSms
       });
       return NextResponse.json(result);
+    }
+
+    if (action === "tracking_resend_link") {
+      const trackingId = String(body.trackingId ?? "").trim();
+      if (!trackingId) return NextResponse.json({ error: "trackingId is required." }, { status: 400 });
+      const result = await resendOwnerTrackingLinkSms({
+        trackingId,
+        forceQuietHours: body.forceQuietHours === true || body.forceQuietHours === "true",
+        actor: {
+          adminId: session.adminUserId,
+          email: session.email,
+          role: session.role
+        }
+      });
+      return NextResponse.json({ ...result, message: `Tracking link SMS resent to ${result.to}.` });
+    }
+
+    if (action === "tracking_set_sms_alerts") {
+      const trackingId = String(body.trackingId ?? "").trim();
+      if (!trackingId) return NextResponse.json({ error: "trackingId is required." }, { status: 400 });
+      const enabled = body.enabled === true || body.enabled === "true";
+      const result = await setOwnerTrackingSmsAlerts({
+        trackingId,
+        enabled,
+        actor: {
+          adminId: session.adminUserId,
+          email: session.email,
+          role: session.role
+        }
+      });
+      return NextResponse.json({
+        ...result,
+        message: enabled ? "ETA SMS alerts enabled for this stop." : "ETA SMS alerts disabled for this stop."
+      });
+    }
+
+    if (action === "tracking_clear_notified") {
+      const trackingId = String(body.trackingId ?? "").trim();
+      if (!trackingId) return NextResponse.json({ error: "trackingId is required." }, { status: 400 });
+      const stageRaw = String(body.stage ?? "all");
+      const stage =
+        stageRaw === "30" ||
+        stageRaw === "15" ||
+        stageRaw === "pullup" ||
+        stageRaw === "link" ||
+        stageRaw === "all"
+          ? stageRaw
+          : "all";
+      const result = await clearOwnerTrackingNotified({
+        trackingId,
+        stage,
+        actor: {
+          adminId: session.adminUserId,
+          email: session.email,
+          role: session.role
+        }
+      });
+      return NextResponse.json({ ...result, message: `Cleared SMS stamps (${stage}).` });
+    }
+
+    if (action === "tracking_cancel") {
+      const trackingId = String(body.trackingId ?? "").trim();
+      if (!trackingId) return NextResponse.json({ error: "trackingId is required." }, { status: 400 });
+      const result = await cancelOwnerTracking({
+        trackingId,
+        actor: {
+          adminId: session.adminUserId,
+          email: session.email,
+          role: session.role
+        }
+      });
+      return NextResponse.json({ ...result, message: "Tracking cancelled and SMS alerts disabled." });
     }
 
     if (action === "export_csv") {
