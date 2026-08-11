@@ -636,6 +636,23 @@ export function RouteGeneratorPanel() {
               <ShieldAlert className="h-3.5 w-3.5" /> Feature flag off (shadow/setup)
             </span>
           ) : null}
+          {/* Reads the live server flag, so this is the authoritative answer to
+              "can anyone be texted right now?" without opening Vercel. */}
+          {bootstrap.ownerSmsEnabled === false ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-200"
+              title="ROUTE_OWNER_SMS_ENABLED is not set on this deployment. No owner can receive a route text."
+            >
+              <ShieldAlert className="h-3.5 w-3.5" /> Owner SMS OFF system-wide
+            </span>
+          ) : bootstrap.ownerSmsEnabled === true ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-rose-400/50 bg-rose-500/15 px-2 py-0.5 font-semibold text-rose-100"
+              title="ROUTE_OWNER_SMS_ENABLED is true on this deployment. Approving with the SMS box checked can text owners."
+            >
+              <ShieldAlert className="h-3.5 w-3.5" /> Owner SMS is ARMED
+            </span>
+          ) : null}
         </div>
       </header>
 
