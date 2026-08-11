@@ -126,45 +126,47 @@ function RufflyPageInner({ username, role, access, flags }: Props) {
             <ThemeToggle />
           </div>
 
-          <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
-            <div className="flex items-center gap-3">
-              <Image src={RUFFLY_NAV_ICON} alt="" width={40} height={40} />
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-[#1f2933]">{RUFFLY_WORDMARK}</h1>
-                <p className="text-xs text-slate-500">{RUFFLY_DESCRIPTOR}</p>
+          <div className="ruffly-canvas light-canvas space-y-4">
+            <header className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white px-4 py-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Image src={RUFFLY_NAV_ICON} alt="" width={40} height={40} />
+                <div>
+                  <h1 className="text-xl font-semibold tracking-tight text-[#1f2933]">{RUFFLY_WORDMARK}</h1>
+                  <p className="text-xs text-slate-600">{RUFFLY_DESCRIPTOR}</p>
+                </div>
               </div>
-            </div>
-            <Link
-              href="/admin?board=staff&tab=crossover_communication"
-              className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Back to Digi-board
-            </Link>
-          </header>
+              <Link
+                href="/admin?board=staff&tab=crossover_communication"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Back to Digi-board
+              </Link>
+            </header>
 
-          <div className="grid min-h-[70vh] grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-            <nav className="rounded-2xl border border-orange-100 bg-[#fff8f3] p-3" aria-label="Ruffly sections">
-              <ul className="space-y-1">
-                {rufflyNav.map((item) => {
-                  const active = page === item.id;
-                  return (
-                    <li key={item.id}>
-                      <Link
-                        href={item.href}
-                        className={`block rounded-xl px-3 py-2 text-sm font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6f26] ${
-                          active ? "bg-[#ff6f26] text-white shadow-sm" : "text-slate-700 hover:bg-white"
-                        }`}
-                      >
-                        {item.label}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
-              <RufflyWorkspace page={page} flags={flags} />
-            </section>
+            <div className="grid min-h-[70vh] grid-cols-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+              <nav className="rounded-2xl border border-orange-100 bg-[#fff8f3] p-3" aria-label="Ruffly sections">
+                <ul className="space-y-1">
+                  {rufflyNav.map((item) => {
+                    const active = page === item.id;
+                    return (
+                      <li key={item.id}>
+                        <Link
+                          href={item.href}
+                          className={`block rounded-xl px-3 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#ff6f26] ${
+                            active ? "bg-[#ff6f26] text-white shadow-sm" : "text-slate-800 hover:bg-white"
+                          }`}
+                        >
+                          {item.label}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+              <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+                <RufflyWorkspace page={page} flags={flags} />
+              </section>
+            </div>
           </div>
         </div>
       </div>
@@ -174,7 +176,7 @@ function RufflyPageInner({ username, role, access, flags }: Props) {
 
 export function RufflyPageClient(props: Props) {
   return (
-    <Suspense fallback={<div className="p-8 text-sm text-slate-500">Loading Ruffly…</div>}>
+    <Suspense fallback={<div className="ruffly-canvas light-canvas p-8 text-sm font-medium text-slate-800">Loading Ruffly…</div>}>
       <RufflyPageInner {...props} />
     </Suspense>
   );

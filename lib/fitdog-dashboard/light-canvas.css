@@ -1,0 +1,109 @@
+/*
+ * High-contrast light canvases inside the Digi-board admin shell.
+ *
+ * Dark theme sets .admin-theme { color: near-white }. Light surfaces (Ruffly,
+ * white panels) that omit text-* classes then paint white-on-white.
+ * Scope .light-canvas / .ruffly-canvas to always use dark ink, for every theme.
+ */
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) {
+  --fitdog-text: #12213a;
+  --fitdog-text-secondary: #334155;
+  --fitdog-text-muted: #475569;
+  --admin-muted: #475569;
+  --crossover-text: #12213a;
+  --crossover-muted: #475569;
+  --text-primary: #12213a;
+  --text-secondary: #334155;
+  --text-muted: #475569;
+
+  color: #12213a;
+}
+
+/* Form labels and plain copy inherit readable ink */
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(label, h1, h2, h3, h4, h5, h6) {
+  color: #1e293b;
+}
+
+/* Muted helpers — floor at slate-600 so wizard steps / captions stay readable */
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(
+    .text-slate-400,
+    .text-slate-500,
+    .text-gray-400,
+    .text-gray-500,
+    .text-zinc-400,
+    .text-zinc-500,
+    .text-admin-muted,
+    .admin-muted
+  ) {
+  color: #475569 !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(.text-slate-600, .text-gray-600, .text-zinc-600) {
+  color: #334155 !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(.text-slate-700, .text-gray-700, .text-zinc-700) {
+  color: #1e293b !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(.text-slate-800, .text-slate-900, .text-gray-800, .text-gray-900, .text-\[\#1f2933\]) {
+  color: #0f172a !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) .text-emerald-700 {
+  color: #047857 !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(.text-rose-700, .text-rose-800) {
+  color: #be123c !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) .text-amber-900 {
+  color: #78350f !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) .text-\[\#ff6f26\] {
+  color: #ff6f26 !important;
+}
+
+/* Outline / secondary controls — never inherit shell white */
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(button, a, [role="button"]) {
+  color: #12213a;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(button, a)[class*="border-slate-"] {
+  color: #0f172a !important;
+  background-color: #ffffff;
+}
+
+/* Brand fills keep pure white labels (beats light-theme readable-canvas remaps) */
+.admin-theme :is(.light-canvas, .ruffly-canvas) .text-white,
+.admin-theme :is(.light-canvas, .ruffly-canvas) [class*="text-white/"] {
+  color: #ffffff !important;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(input, textarea, select) {
+  color: #0f172a !important;
+  background-color: #ffffff !important;
+  caret-color: #0f172a;
+}
+
+.admin-theme :is(.light-canvas, .ruffly-canvas) :is(input, textarea, select)::placeholder {
+  color: #64748b !important;
+  opacity: 1;
+}
+
+/* Public Ruffly host pages (outside admin-theme) */
+.ruffly-public-canvas {
+  color: #12213a;
+  background: #ffffff;
+}
+
+.ruffly-public-canvas :is(h1, h2, h3, p, label, strong) {
+  color: inherit;
+}
+
+.ruffly-public-canvas :is(.text-slate-500, .text-slate-600) {
+  color: #475569 !important;
+}

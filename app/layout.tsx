@@ -8,6 +8,7 @@ import "../lib/fitdog-dashboard/theme.css";
 import "../lib/fitdog-dashboard/theme-light.css";
 import "../lib/fitdog-dashboard/theme-clear.css";
 import "../lib/fitdog-dashboard/theme-readable-canvas.css";
+import "../lib/fitdog-dashboard/light-canvas.css";
 import "../lib/theme/button-states.css";
 
 export const metadata: Metadata = {
