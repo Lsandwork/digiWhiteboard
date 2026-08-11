@@ -85,8 +85,8 @@ export function annotateFacilityItems(
       householdKey: key,
       specialNotes: [item.specialNotes, `At ${facility.name} — no home ${item.direction}`]
         .filter(Boolean)
-        .join(" · "),
-      driverNotes: [item.driverNotes, `Facility stop: ${facility.name}`].filter(Boolean).join(" · "),
+        .join(" | "),
+      driverNotes: [item.driverNotes, `Facility stop: ${facility.name}`].filter(Boolean).join(" | "),
       validationStatus: item.validationStatus === "error" ? "warning" : item.validationStatus,
       validationReasons: (item.validationReasons || []).filter((r) => !/missing address/i.test(r))
     };
