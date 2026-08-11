@@ -1026,13 +1026,20 @@ export async function generatePlanForRun(params: {
     );
   }
 
+  const hasOverflowPlacement =
+    pickupOpt.warnings.some((w) => /OVERFLOW/i.test(w)) ||
+    dropoffOpt.warnings.some((w) => /OVERFLOW/i.test(w)) ||
+    pickupOpt.label === "needs_management_review" ||
+    dropoffOpt.label === "needs_management_review";
+
   const status =
     stillBlocked.length ||
     needsReview.some((i) => i.validationStatus === "error") ||
     pickupOpt.unassigned.length ||
     dropoffOpt.unassigned.length ||
     sharedDogConflicts.length > 0 ||
-    usedSyntheticCustomerCoords
+    usedSyntheticCustomerCoords ||
+    hasOverflowPlacement
       ? "needs_review"
       : "ready_for_approval";
 

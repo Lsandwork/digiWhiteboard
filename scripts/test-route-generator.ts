@@ -1456,4 +1456,278 @@ assert.equal(
   );
 }
 
+// Soft overflow: Adventure Hike HOME stops still land on a van when capacity is exhausted
+{
+  function hikeHousehold(name: string, street: string) {
+    return {
+      householdKey: `${street.toLowerCase()}|la|ca|90008::adventure-hike|07:00-09:00`,
+      direction: "pickup" as const,
+      address: `${street}, Los Angeles, CA 90008`,
+      ownerName: name,
+      dogCount: 1,
+      items: [
+        {
+          direction: "pickup" as const,
+          reservationId: `r-${name}`,
+          customerId: "c",
+          ownerFirstName: null,
+          ownerLastName: null,
+          ownerFullName: null,
+          dogId: `d-${name}`,
+          dogName: name,
+          serviceRaw: "Adventure Hikes",
+          serviceCanonical: "Adventure Hike" as const,
+          addressRaw: `${street}, Los Angeles, CA 90008`,
+          addressStreet: street,
+          addressUnit: null,
+          addressCity: "Los Angeles",
+          addressState: "CA",
+          addressZip: "90008",
+          ownerPhoneMasked: null,
+          timeWindowStart: "07:00",
+          timeWindowEnd: "09:00",
+          dogSize: "Medium",
+          specialNotes: null,
+          driverNotes: null,
+          reservationNotes: null,
+          householdKey: `${street.toLowerCase()}|la|ca|90008::adventure-hike|07:00-09:00`,
+          validationStatus: "ok" as const,
+          validationReasons: [],
+          raw: { location_type: "HOME" }
+        }
+      ]
+    };
+  }
+
+  const overflowVehicles = [
+    {
+      vanKey: "van_1",
+      active: true,
+      vehiclePool: "outing" as const,
+      maxDogs: 1,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Adventure Hike"] as Array<"Adventure Hike">,
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_2",
+      active: true,
+      vehiclePool: "outing" as const,
+      maxDogs: 1,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Adventure Hike"] as Array<"Adventure Hike">,
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_3",
+      active: true,
+      vehiclePool: "outing" as const,
+      maxDogs: 1,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Adventure Hike", "Beach Excursion"] as Array<"Adventure Hike" | "Beach Excursion">,
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_5",
+      active: true,
+      vehiclePool: "club" as const,
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Trainer-Led Hike", "Group Class", "Taxi Service"] as Array<
+        "Trainer-Led Hike" | "Group Class" | "Taxi Service"
+      >,
+      capacityConfigured: true
+    },
+    {
+      vanKey: "van_6",
+      active: true,
+      vehiclePool: "club" as const,
+      maxDogs: 8,
+      maxLoadUnits: 20,
+      maxLargeDogs: 4,
+      maxStops: 20,
+      eligibleServices: ["Trainer-Led Hike", "Group Class", "Taxi Service"] as Array<
+        "Trainer-Led Hike" | "Group Class" | "Taxi Service"
+      >,
+      capacityConfigured: true
+    }
+  ];
+
+  const overflowHouseholds = [
+    hikeHousehold("FillerA", "1 Cap St"),
+    hikeHousehold("FillerB", "2 Cap St"),
+    hikeHousehold("FillerC", "3 Cap St"),
+    hikeHousehold("Captain", "10 Trail St"),
+    hikeHousehold("Luna", "11 Trail St"),
+    hikeHousehold("Mattie", "12 Trail St")
+  ];
+  const overflowOpt = optimizeRoutes({
+    direction: "pickup",
+    households: overflowHouseholds,
+    vehicles: overflowVehicles,
+    depot: {
+      name: "Hub",
+      address: "2140 Westwood Blvd",
+      latitude: 34.04,
+      longitude: -118.43,
+      timezone: "America/Los_Angeles",
+      verified: true
+    },
+    sizeLoads: { Small: 1, Medium: 1, Large: 2, "Extra Large": 2.5, Unknown: 1, configured: true },
+    seed: "overflow-hike",
+    coordsByHousehold: Object.fromEntries(
+      overflowHouseholds.map((h, i) => [h.householdKey, { lat: 34.01 + i * 0.01, lng: -118.4 - i * 0.01 }])
+    ),
+    operatingDate: "2026-08-11"
+  });
+  const overflowNames = overflowOpt.routes.flatMap((r) =>
+    r.stops.filter((s) => s.stopKind === "customer").flatMap((s) => s.dogNames)
+  );
+  assert.ok(overflowNames.includes("Captain"), "Captain must land on an overflow van stop");
+  assert.ok(overflowNames.includes("Luna"), "Luna must land on an overflow van stop");
+  assert.ok(overflowNames.includes("Mattie"), "Mattie must land on an overflow van stop");
+  assert.equal(overflowOpt.unassigned.length, 0, "capacity overflow must not leave hike dogs unassigned");
+  assert.ok(
+    overflowOpt.warnings.some((w) => /OVERFLOW/i.test(w)),
+    "overflow placement must warn the coordinator"
+  );
+  assert.equal(overflowOpt.label, "needs_management_review");
+}
+
+// Locked taxi falls back to another eligible club van when pinned van is full
+{
+  const taxiStop = {
+    householdKey: "5 taxi ave|santa monica|ca|90401::taxi-service|open",
+    direction: "pickup" as const,
+    address: "5 Taxi Ave, Santa Monica, CA 90401",
+    ownerName: "Oscar",
+    dogCount: 1,
+    items: [
+      {
+        direction: "pickup" as const,
+        reservationId: "taxi-oscar",
+        customerId: null,
+        ownerFirstName: null,
+        ownerLastName: null,
+        ownerFullName: null,
+        dogId: null,
+        dogName: "Oscar",
+        serviceRaw: "Taxi",
+        serviceCanonical: "Taxi Service" as const,
+        addressRaw: "5 Taxi Ave, Santa Monica, CA 90401",
+        addressStreet: "5 Taxi Ave",
+        addressUnit: null,
+        addressCity: "Santa Monica",
+        addressState: "CA",
+        addressZip: "90401",
+        ownerPhoneMasked: null,
+        timeWindowStart: null,
+        timeWindowEnd: null,
+        dogSize: "Unknown",
+        specialNotes: null,
+        driverNotes: null,
+        reservationNotes: null,
+        householdKey: "5 taxi ave|santa monica|ca|90401::taxi-service|open",
+        validationStatus: "ok" as const,
+        validationReasons: [],
+        raw: { source: "manual_taxi", locked_van: "van_5", location_type: "HOME" }
+      }
+    ]
+  };
+  const filler = {
+    ...taxiStop,
+    householdKey: "9 other|santa monica|ca|90401::group-class|open",
+    ownerName: "Osita",
+    items: [
+      {
+        ...taxiStop.items[0]!,
+        reservationId: "gc-osita",
+        dogName: "Osita",
+        serviceRaw: "Group Class",
+        serviceCanonical: "Group Class" as const,
+        householdKey: "9 other|santa monica|ca|90401::group-class|open",
+        raw: { location_type: "HOME" }
+      }
+    ]
+  };
+  const lockedOpt = optimizeRoutes({
+    direction: "pickup",
+    households: [filler, taxiStop],
+    vehicles: [
+      {
+        vanKey: "van_5",
+        active: true,
+        vehiclePool: "club" as const,
+        maxDogs: 1,
+        maxLoadUnits: 20,
+        maxLargeDogs: 4,
+        maxStops: 20,
+        eligibleServices: ["Trainer-Led Hike", "Group Class", "Taxi Service"] as Array<
+          "Trainer-Led Hike" | "Group Class" | "Taxi Service"
+        >,
+        capacityConfigured: true
+      },
+      {
+        vanKey: "van_6",
+        active: true,
+        vehiclePool: "club" as const,
+        maxDogs: 8,
+        maxLoadUnits: 20,
+        maxLargeDogs: 4,
+        maxStops: 20,
+        eligibleServices: ["Trainer-Led Hike", "Group Class", "Taxi Service"] as Array<
+          "Trainer-Led Hike" | "Group Class" | "Taxi Service"
+        >,
+        capacityConfigured: true
+      },
+      {
+        vanKey: "van_1",
+        active: true,
+        vehiclePool: "outing" as const,
+        maxDogs: 8,
+        maxLoadUnits: 20,
+        maxLargeDogs: 4,
+        maxStops: 20,
+        eligibleServices: ["Adventure Hike"] as Array<"Adventure Hike">,
+        capacityConfigured: true
+      }
+    ],
+    depot: {
+      name: "Club",
+      address: "1712 21st St",
+      latitude: 34.02,
+      longitude: -118.47,
+      timezone: "America/Los_Angeles",
+      verified: true
+    },
+    sizeLoads: { Unknown: 1, configured: true },
+    seed: "locked-taxi-fallback",
+    lockedVanByHousehold: {
+      [taxiStop.householdKey]: "van_5"
+    },
+    coordsByHousehold: {
+      [filler.householdKey]: { lat: 34.02, lng: -118.49 },
+      [taxiStop.householdKey]: { lat: 34.03, lng: -118.48 }
+    }
+  });
+  // Place Osita first on van_5 (unlocked, sorts before or with), Oscar locked to van_5 then falls back
+  const oscarRoute = lockedOpt.routes.find((r) =>
+    r.stops.some((s) => s.stopKind === "customer" && s.dogNames.includes("Oscar"))
+  );
+  assert.ok(oscarRoute, "Oscar must be assigned");
+  assert.equal(lockedOpt.unassigned.length, 0);
+  assert.ok(
+    oscarRoute?.vanKey === "van_6" || oscarRoute?.vanKey === "van_5",
+    "Oscar stays on an eligible club van"
+  );
+}
+
 console.log("route-generator tests: ok");
