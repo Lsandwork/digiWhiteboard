@@ -1,6 +1,7 @@
 import { parseAddress, householdKey } from "@/lib/route-generator/address";
 import { classifyDirection, normalizeServiceName } from "@/lib/route-generator/services";
 import type { CanonicalService } from "@/lib/route-generator/flags";
+import type { LocationType } from "@/lib/route-generator/destination";
 
 export type RawReportRow = Record<string, string>;
 
@@ -15,6 +16,8 @@ export type NormalizedReportItem = {
   dogName: string | null;
   serviceRaw: string | null;
   serviceCanonical: CanonicalService | null;
+  /** Explicit destination for THIS leg — never inferred from the opposite wave. */
+  locationType?: LocationType | null;
   addressRaw: string | null;
   addressStreet: string | null;
   addressUnit: string | null;

@@ -8,6 +8,11 @@ import { normalizeServiceName } from "@/lib/route-generator/services";
 import { householdKey, parseAddress } from "@/lib/route-generator/address";
 import type { CanonicalService } from "@/lib/route-generator/flags";
 import type { DogSize } from "@/lib/route-generator/capacity";
+import {
+  resolveDestinationFromFitdogDetail,
+  type LocationType
+} from "@/lib/route-generator/destination";
+import { DEFAULT_FITDOG_LOCATIONS } from "@/lib/route-generator/locations";
 
 type FitdogAddress = {
   id?: number;
@@ -209,10 +214,24 @@ function buildItem(params: {
           ? String(owner.id)
           : null;
 
-  const address =
-    direction === "pickup"
-      ? addressFromDetail(product.pickup_location_detail)
-      : addressFromDetail(product.drop_off_location_detail);
+  const destination = resolveDestinationFromFitdogDetail({
+    detail: direction === "pickup" ? product.pickup_location_detail : product.drop_off_location_detail,
+    isDefault: direction === "pickup" ? product.is_default_pickup : product.is_default_dropoff,
+    locations: DEFAULT_FITDOG_LOCATIONS
+  });
+
+  const address = {
+    raw: destination.formattedAddress,
+    street: destination.street1,
+    unit: destination.street2,
+    city: destination.city,
+    state: destination.state,
+    zip: destination.postalCode,
+    notes: cleanText(
+      (direction === "pickup" ? product.pickup_location_detail : product.drop_off_location_detail)
+        ?.location_notes
+    )
+  };
 
   const parsed = parseAddress(
     address.raw ||
@@ -236,10 +255,11 @@ function buildItem(params: {
       : formatTime(occurrence.dropoff_end_time);
 
   const reasons: string[] = [];
-  if (!address.raw) reasons.push("Missing address");
+  if (!address.raw && !destination.facilityKey) reasons.push("Missing address");
   if (!dogName) reasons.push("Missing dog name");
   if (!dogSize) reasons.push("Missing dog size");
 
+  // Facility destinations are valid even when Fitdog omits street fields.
   const validationStatus = reasons.some((r) => /missing address/i.test(r))
     ? "error"
     : reasons.length
@@ -248,6 +268,7 @@ function buildItem(params: {
 
   const locationDetail =
     direction === "pickup" ? product.pickup_location_detail : product.drop_off_location_detail;
+  const locationType: LocationType = destination.locationType;
   const raw: RawReportRow = {
     reservation_id: String(product.id),
     customer_id: customerId || "",
@@ -264,7 +285,11 @@ function buildItem(params: {
     dog_size: dogSize || "",
     weight: product.dog_detail?.weight != null ? String(product.dog_detail.weight) : "",
     location_notes: address.notes || "",
-    location_name: cleanText(locationDetail?.name) || "",
+    location_name: destination.displayName || cleanText(locationDetail?.name) || "",
+    location_type: locationType,
+    location_source: destination.source,
+    source_location_id: destination.sourceLocationId || "",
+    is_default_location: destination.isDefault == null ? "" : String(destination.isDefault),
     occurrence_id: String(occurrence.id),
     class_id: String(occurrence.training_class ?? occurrence.training_class_detail?.id ?? ""),
     status: String(product.status_detail ?? product.status ?? "")
@@ -281,6 +306,7 @@ function buildItem(params: {
     dogName,
     serviceRaw,
     serviceCanonical,
+    locationType,
     addressRaw: address.raw,
     addressStreet: address.street || parsed.street || null,
     addressUnit: address.unit || parsed.unit || null,
@@ -294,7 +320,7 @@ function buildItem(params: {
     specialNotes: address.notes,
     driverNotes: address.notes,
     reservationNotes: cleanText(product.notes),
-    householdKey: address.raw ? householdKey(parsed) : null,
+    householdKey: address.raw ? householdKey(parsed) : destination.facilityKey ? `facility:${destination.facilityKey}` : null,
     validationStatus,
     validationReasons: reasons,
     raw

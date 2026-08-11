@@ -72,10 +72,13 @@ export function annotateFacilityItems(
     const facility = resolveBaseLocation(locations, facilityKey);
     const parsed = parseAddress(facility.address);
     const key = facilityHouseholdKey(facilityKey, item.serviceCanonical || item.serviceRaw);
+    const locationType =
+      facilityKey === "hub" ? "HUB" : facilityKey === "club" ? "FITDOG" : "OUTING";
     return {
       ...item,
       facilityKey,
       atFacility: true,
+      locationType,
       addressRaw: facility.address,
       addressStreet: parsed.street || facility.address,
       addressUnit: null,
@@ -88,7 +91,13 @@ export function annotateFacilityItems(
         .join(" | "),
       driverNotes: [item.driverNotes, `Facility stop: ${facility.name}`].filter(Boolean).join(" | "),
       validationStatus: item.validationStatus === "error" ? "warning" : item.validationStatus,
-      validationReasons: (item.validationReasons || []).filter((r) => !/missing address/i.test(r))
+      validationReasons: (item.validationReasons || []).filter((r) => !/missing address/i.test(r)),
+      raw: {
+        ...item.raw,
+        location_type: locationType,
+        location_name: facility.name,
+        address: facility.address
+      }
     };
   });
 }

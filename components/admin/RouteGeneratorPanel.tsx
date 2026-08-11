@@ -83,7 +83,7 @@ type PlanBundle = {
     report_run_id?: string | null;
     status: string;
     current_version: number;
-    summary: Record<string, number | string>;
+    summary: Record<string, unknown>;
     shadow_mode: boolean;
   };
   routes: Array<Record<string, unknown>>;
@@ -730,26 +730,48 @@ export function RouteGeneratorPanel() {
           </div>
           <label
             className="flex max-w-xl cursor-pointer items-start gap-2 rounded-xl border border-admin-border bg-black/25 px-3 py-2 text-left text-xs text-admin-muted"
-            title="Required to text owners. Uses Samsara live GPS and blocks overnight / parked-van alerts."
+            title="Owner texts are independent of approval. You can change this before or after Approve."
           >
             <input
               type="checkbox"
               className="mt-0.5"
-              checked={sendOwnerSms}
-              disabled={
-                busy ||
-                !bundle?.plan.id ||
-                bundle.plan.status === "approved" ||
-                bootstrap?.ownerSmsEnabled === false
+              checked={
+                sendOwnerSms ||
+                Boolean((bundle?.plan.summary as { ownerTextsEnabled?: boolean } | undefined)?.ownerTextsEnabled)
               }
-              onChange={(event) => setSendOwnerSms(event.target.checked)}
+              disabled={busy || !bundle?.plan.id || bootstrap?.ownerSmsEnabled === false}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setSendOwnerSms(enabled);
+                const status = bundle?.plan.status;
+                if (
+                  bundle?.plan.id &&
+                  (status === "approved" || status === "exported" || status === "ready_for_approval")
+                ) {
+                  void (async () => {
+                    try {
+                      await postAction("set_owner_texts", { planId: bundle.plan.id, enabled });
+                      await hydratePlan(String(bundle.plan.id), { quiet: true });
+                      showToast(
+                        enabled
+                          ? "Owner tracking texts enabled for this plan."
+                          : "Owner tracking texts disabled for this plan.",
+                        "success"
+                      );
+                    } catch (error) {
+                      setSendOwnerSms(!enabled);
+                      showToast(error instanceof Error ? error.message : "Unable to update owner texts.", "error");
+                    }
+                  })();
+                }
+              }}
             />
             <span>
-              <span className="font-medium text-white">Send owner tracking SMS alerts</span>
+              <span className="font-medium text-white">Owner Tracking Texts</span>
               <span className="mt-0.5 block">
                 {bootstrap?.ownerSmsEnabled === false
                   ? "Owner SMS is OFF system-wide (ROUTE_OWNER_SMS_ENABLED). No owner will be texted until an admin turns that flag on in Vercel for live route days."
-                  : "Off by default. When checked, Approve may send tracking links (6 AM–8 PM PT only) and enable ETA texts only while Samsara shows the van moving near the planned stop window."}
+                  : "Independent of approval — toggle before or after Approve. Does not regenerate routes or re-export to Samsara."}
               </span>
             </span>
           </label>
@@ -806,6 +828,50 @@ export function RouteGeneratorPanel() {
 
       {tab === "overview" ? (
         <div className="space-y-4">
+          {(() => {
+            const summary = (bundle?.plan.summary ?? {}) as Record<string, unknown>;
+            const missing = (summary.reconciliation as { missing?: string[] } | undefined)?.missing ?? [];
+            const missingCount = Number(summary.missingLegs ?? missing.length ?? 0);
+            const addressIssues = Number(summary.addressIssues ?? 0);
+            const assigned = Number(summary.assignedLegs ?? 0);
+            const expected = Number(summary.transportLegs ?? 0);
+            const ready = Boolean(bundle) && missingCount === 0 && addressIssues === 0 && expected > 0;
+            return (
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <OverviewCard label="Services / legs" value={`${summary.services ?? "—"} / ${expected || "—"}`} />
+                  <OverviewCard label="Assigned" value={String(assigned || "—")} />
+                  <OverviewCard
+                    label="Unassigned / blocked"
+                    value={String(missingCount || 0)}
+                    tone={missingCount ? "warn" : undefined}
+                  />
+                  <OverviewCard
+                    label="Status"
+                    value={ready ? "READY" : bundle ? "NEEDS ATTENTION" : "—"}
+                    tone={ready ? undefined : "warn"}
+                  />
+                </div>
+                {missingCount > 0 || addressIssues > 0 ? (
+                  <div className="rounded-2xl border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-50">
+                    <p className="font-semibold">ROUTES NEED ATTENTION</p>
+                    <p className="mt-1 text-rose-100/90">
+                      {missingCount ? `${missingCount} transportation leg(s) unassigned or blocked. ` : null}
+                      {addressIssues ? `${addressIssues} address issue(s) need review. ` : null}
+                      Approval is blocked until every valid service is accounted for and locations resolve.
+                    </p>
+                    {missing.length ? (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-rose-50/95">
+                        {missing.slice(0, 12).map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+              </>
+            );
+          })()}
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <OverviewCard label="Pickup dogs" value={String(bundle?.plan.summary?.pickupDogs ?? pullMeta?.pickup ?? "—")} />
             <OverviewCard label="Drop-off dogs" value={String(bundle?.plan.summary?.dropoffDogs ?? pullMeta?.dropoff ?? "—")} />
