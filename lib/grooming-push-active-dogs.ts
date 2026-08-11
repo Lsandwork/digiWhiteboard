@@ -349,7 +349,9 @@ export async function loadActiveDogsForGroomingPush(
   }
 
   const cachedBoard = getCachedBackOfHouseBoard(Date.now(), true);
-  let board = cachedBoard;
+  // The cache returns source "gingr_back_of_house" while a live fetch can also report
+  // "disabled"/cooldown sources, so hold the widened shape both paths satisfy.
+  let board: { checking_in: unknown[]; checking_out: unknown[]; source: string } | null = cachedBoard;
   let boardFetchError: string | null = null;
   if (gingrMode === "allow_fetch" && (forceRefresh || !cachedBoard)) {
     try {
