@@ -708,6 +708,51 @@ const sameDayValidation = validateExport({
 });
 assert.equal(sameDayValidation.ok, true, JSON.stringify(sameDayValidation.report));
 
+// Hard blocks that previously slipped through and caused Samsara Internal Server Error.
+const badVehicle = validateExport({
+  template: getCanonicalSamsaraTemplate(),
+  rows: rows.map((row) => ({ ...row, vehicleName: "Club Shuttle" })),
+  csv: buildCsv({
+    template: getCanonicalSamsaraTemplate(),
+    rows: rows.map((row) => ({ ...row, vehicleName: "Club Shuttle" }))
+  }).csv,
+  operatingDate: "2026-07-26"
+});
+assert.equal(badVehicle.ok, false, "non-roster vehicle must fail closed");
+
+const equalDwell = validateExport({
+  template: getCanonicalSamsaraTemplate(),
+  rows: [
+    { ...rows[0]!, scheduledArrival: "07/26/2026 07:00", scheduledDeparture: "07/26/2026 07:00" },
+    rows[1]!,
+    rows[2]!
+  ],
+  csv: built.csv,
+  operatingDate: "2026-07-26"
+});
+assert.equal(equalDwell.ok, false, "arrival === departure must fail");
+
+const nonMono = validateExport({
+  template: getCanonicalSamsaraTemplate(),
+  rows: [
+    rows[0]!,
+    {
+      ...rows[1]!,
+      scheduledArrival: "07/26/2026 07:04",
+      scheduledDeparture: "07/26/2026 07:09"
+    },
+    rows[2]!
+  ],
+  csv: built.csv,
+  operatingDate: "2026-07-26"
+});
+assert.equal(nonMono.ok, false, "arrival before previous departure must fail");
+
+assert.ok(!sanitizeSamsaraNotes("Dogs\u200bIndy — “Buddy” 🐶").includes("\u200b"));
+assert.ok(!/[^\x20-\x7E]/.test(sanitizeSamsaraNotes("Dogs\u200bIndy — “Buddy” 🐶")));
+assert.ok(sanitizeSamsaraNotes(`${"x".repeat(600)}`).endsWith("..."));
+assert.ok(!sanitizeSamsaraNotes(`${"x".repeat(600)}`).includes("…"));
+
 // Drop-off start: Van 1/2/3 at 10:30; Van 5/6 (club / group class) at 12:00.
 assert.deepEqual(dropoffStartTimeForVan("van_1"), { hour: 10, minute: 30 });
 assert.deepEqual(dropoffStartTimeForVan("van_2"), { hour: 10, minute: 30 });

@@ -158,6 +158,35 @@ export function formatSamsaraCoordinate(value: string | number | null | undefine
 
 /** Max Stop Notes length — longer cells have triggered Samsara bulk-upload 500s. */
 export const SAMSARA_STOP_NOTES_MAX_CHARS = 480;
+export const SAMSARA_STOP_NAME_MAX_CHARS = 120;
+export const SAMSARA_ROUTE_NAME_MAX_CHARS = 120;
+export const SAMSARA_ADDRESS_MAX_CHARS = 250;
+
+/** Exact Samsara vehicle roster labels Digi may export. */
+export const SAMSARA_ALLOWED_VEHICLE_NAMES = ["Van 01", "Van 02", "Van 03", "Van 05", "Van 06"] as const;
+
+export function isAllowedSamsaraVehicleName(value: string | null | undefined): boolean {
+  return (SAMSARA_ALLOWED_VEHICLE_NAMES as readonly string[]).includes(String(value ?? "").trim());
+}
+
+/**
+ * Strip characters that have crashed Samsara's bulk CSV importer (ZWSP, bidi,
+ * emoji, smart punctuation). Keep printable ASCII (optionally newlines for notes).
+ */
+export function toSamsaraSafeAscii(value: string, options?: { keepNewlines?: boolean }): string {
+  const mapped = String(value ?? "")
+    .normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF\u00A0\u2028\u2029]/g, " ")
+    .replace(/[\u202A-\u202E\u2066-\u2069]/g, "")
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
+    .replace(/[\u2013\u2014\u2212]/g, "-")
+    .replace(/\u2026/g, "...");
+  if (options?.keepNewlines) {
+    return mapped.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ");
+  }
+  return mapped.replace(/[^\x20-\x7E]/g, " ");
+}
 
 /** Calendar date in America/Los_Angeles as YYYY-MM-DD. */
 export function todayInLosAngeles(now = new Date()): string {
@@ -189,13 +218,12 @@ export function samsaraCsvDateTimeMatchesOperatingDate(value: string, operatingD
 /**
  * Flatten multiline driver notes for CSV bulk upload.
  * Newlines inside quoted cells are valid CSV, but Samsara's importer often marks
- * those rows as incorrect / Internal Server Error — keep one short line.
+ * those rows as incorrect / Internal Server Error — keep one short ASCII line.
  */
 export function sanitizeSamsaraNotes(value: string | null | undefined): string {
-  const flat = String(value ?? "")
+  const flat = toSamsaraSafeAscii(String(value ?? ""), { keepNewlines: true })
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
-    // Strip control chars that have crashed Samsara's importer.
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
     .split("\n")
     .map((line) => line.trim())
@@ -204,15 +232,50 @@ export function sanitizeSamsaraNotes(value: string | null | undefined): string {
     .replace(/\s+/g, " ")
     .trim();
   if (flat.length <= SAMSARA_STOP_NOTES_MAX_CHARS) return flat;
-  return `${flat.slice(0, SAMSARA_STOP_NOTES_MAX_CHARS - 1).trimEnd()}…`;
+  return `${flat.slice(0, SAMSARA_STOP_NOTES_MAX_CHARS - 3).trimEnd()}...`;
 }
 
 /** Sanitize stop/route display text for CSV cells. */
 export function sanitizeSamsaraText(value: string | null | undefined): string {
-  return String(value ?? "")
+  return toSamsaraSafeAscii(String(value ?? ""))
     .replace(/[\u0000-\u001F\u007F]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Parse one CSV line respecting quotes (for post-build round-trip checks). */
+export function parseCsvLine(line: string, delimiter = ","): string[] {
+  const cells: string[] = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]!;
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+      continue;
+    }
+    if (ch === delimiter) {
+      cells.push(current);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  cells.push(current);
+  return cells;
 }
 
 /**
@@ -396,8 +459,9 @@ export function validateExport(params: {
 } {
   const errors: string[] = [];
   const warnings: string[] = [];
+  const datetimeRe = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/;
   const headerLine = params.csv.split(/\r?\n/)[0] ?? "";
-  const parsedHeaders = headerLine.split(params.template.delimiter).map((h) => h.replace(/^"|"$/g, "").trim());
+  const parsedHeaders = parseCsvLine(headerLine, params.template.delimiter).map((h) => h.trim());
   const canonical = SAMSARA_BULK_UPLOAD_HEADERS.join("|");
   if (parsedHeaders.join("|") !== canonical) {
     errors.push(
@@ -411,21 +475,35 @@ export function validateExport(params: {
   }
   if (!params.rows.length) errors.push("Export has no stop rows.");
   for (const row of params.rows) {
+    if (!row.routeName?.trim()) {
+      errors.push(`Missing Route Name on a stop row.`);
+    } else if (row.routeName.length > SAMSARA_ROUTE_NAME_MAX_CHARS) {
+      errors.push(`Route Name too long (${row.routeName.length} chars): ${row.routeName.slice(0, 40)}…`);
+    }
     if (!row.stopName?.trim()) {
-      errors.push(`Missing Stop Name on route ${row.routeName}`);
+      errors.push(`Missing Stop Name on route ${row.routeName || "(unnamed)"}`);
+    } else if (row.stopName.length > SAMSARA_STOP_NAME_MAX_CHARS) {
+      errors.push(
+        `Stop Name too long on ${row.routeName} ("${row.stopName.slice(0, 40)}…", ${row.stopName.length} chars).`
+      );
     }
     if (!row.scheduledArrival?.trim() || !row.scheduledDeparture?.trim()) {
       errors.push(`Missing scheduled arrival/departure on route ${row.routeName} stop "${row.stopName}"`);
     } else {
+      if (!datetimeRe.test(row.scheduledArrival.trim()) || !datetimeRe.test(row.scheduledDeparture.trim())) {
+        errors.push(
+          `Datetime must be MM/DD/YYYY HH:mm (zero-padded) on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledArrival}" / "${row.scheduledDeparture}").`
+        );
+      }
       const arrival = parseSamsaraCsvDateTime(row.scheduledArrival);
       const departure = parseSamsaraCsvDateTime(row.scheduledDeparture);
       if (!arrival || !departure) {
         errors.push(
           `Bad datetime on ${row.routeName} stop "${row.stopName}" (use MM/DD/YYYY HH:mm). Got arrival="${row.scheduledArrival}" departure="${row.scheduledDeparture}"`
         );
-      } else if (departure.getTime() < arrival.getTime()) {
+      } else if (departure.getTime() <= arrival.getTime()) {
         errors.push(
-          `Departure before arrival on ${row.routeName} stop "${row.stopName}" (${row.scheduledArrival} → ${row.scheduledDeparture})`
+          `Departure must be after arrival on ${row.routeName} stop "${row.stopName}" (${row.scheduledArrival} → ${row.scheduledDeparture}). Equal times cause Samsara Internal Server Error.`
         );
       } else if (params.operatingDate) {
         if (!samsaraCsvDateTimeMatchesOperatingDate(row.scheduledArrival, params.operatingDate)) {
@@ -446,6 +524,11 @@ export function validateExport(params: {
         `Stop "${row.stopName}" on ${row.routeName} needs Full Address, Latitude, and Longitude before Samsara upload.`
       );
     }
+    if (row.stopAddress && row.stopAddress.length > SAMSARA_ADDRESS_MAX_CHARS) {
+      errors.push(
+        `Full Address too long on ${row.routeName} stop "${row.stopName}" (${row.stopAddress.length} chars).`
+      );
+    }
     if (row.latitude && !/^-?\d+(\.\d+)?$/.test(row.latitude.trim())) {
       errors.push(`Invalid Latitude on ${row.routeName} stop "${row.stopName}": ${row.latitude}`);
     }
@@ -455,8 +538,8 @@ export function validateExport(params: {
     const latN = Number(row.latitude);
     const lngN = Number(row.longitude);
     if (row.latitude && row.longitude && Number.isFinite(latN) && Number.isFinite(lngN)) {
-      if (latN === 0 && lngN === 0) {
-        errors.push(`Stop "${row.stopName}" on ${row.routeName} has 0,0 coordinates — fix geocode before upload.`);
+      if ((Math.abs(latN) < 1e-4 && Math.abs(lngN) < 1e-4) || (latN === 0 && lngN === 0)) {
+        errors.push(`Stop "${row.stopName}" on ${row.routeName} has near-zero coordinates — fix geocode before upload.`);
       } else if (latN < -90 || latN > 90 || lngN < -180 || lngN > 180) {
         errors.push(`Stop "${row.stopName}" on ${row.routeName} has out-of-range coordinates.`);
       } else if (latN < 32 || latN > 36 || lngN > -114 || lngN < -122) {
@@ -469,6 +552,16 @@ export function validateExport(params: {
     if (/\n|\r/.test(row.stopNotes || "")) {
       errors.push(`Multiline Notes on ${row.routeName} stop "${row.stopName}" — flatten before upload.`);
     }
+    if (/[^\x20-\x7E]/.test(row.stopNotes || "")) {
+      errors.push(
+        `Non-ASCII characters in Stop Notes on ${row.routeName} stop "${row.stopName}" — sanitize before upload (Samsara Internal Server Error risk).`
+      );
+    }
+    if (/[^\x20-\x7E]/.test(row.stopName || "") || /[^\x20-\x7E]/.test(row.stopAddress || "")) {
+      errors.push(
+        `Non-ASCII characters in Stop Name/Address on ${row.routeName} stop "${row.stopName}" — sanitize before upload.`
+      );
+    }
     if ((row.stopNotes || "").length > SAMSARA_STOP_NOTES_MAX_CHARS) {
       errors.push(
         `Stop Notes too long on ${row.routeName} stop "${row.stopName}" (${row.stopNotes.length} chars). Cap at ${SAMSARA_STOP_NOTES_MAX_CHARS}.`
@@ -479,6 +572,16 @@ export function validateExport(params: {
         `Route ${row.routeName} assigns both driver and vehicle — leave Assigned Driver Username blank when using Van 01–06.`
       );
     }
+    if (!String(row.vehicleName || "").trim()) {
+      errors.push(`Missing Assigned Vehicle Name on route ${row.routeName || "(unnamed)"}.`);
+    } else if (!isAllowedSamsaraVehicleName(row.vehicleName)) {
+      errors.push(
+        `Vehicle "${row.vehicleName}" on ${row.routeName} must exactly match Samsara roster: Van 01, Van 02, Van 03, Van 05, Van 06 (never Van 04).`
+      );
+    }
+    if (/van\s*4/i.test(row.vehicleName) || /van_4/i.test(row.routeName)) {
+      errors.push("Van 4 must never appear in exports.");
+    }
   }
 
   const byRoute = new Map<string, ExportStopRow[]>();
@@ -486,28 +589,87 @@ export function validateExport(params: {
     const list = byRoute.get(row.routeName) ?? [];
     list.push(row);
     byRoute.set(row.routeName, list);
-    if (!row.vehicleName) errors.push(`Missing vehicle name on route ${row.routeName}`);
-    if (/van\s*4/i.test(row.vehicleName) || /van_4/i.test(row.routeName)) {
-      errors.push("Van 4 must never appear in exports.");
-    }
-    // Prefer exact Samsara roster labels (Van 01…). Soft warning only if non-standard.
-    if (row.vehicleName && !/^Van 0[12356]$/.test(row.vehicleName)) {
-      warnings.push(
-        `Vehicle "${row.vehicleName}" on ${row.routeName} should exactly match a Samsara vehicle name (Van 01, Van 02, Van 03, Van 05, Van 06).`
-      );
-    }
   }
 
   for (const [routeName, stops] of byRoute) {
     if (stops.length < 2) errors.push(`Route ${routeName} has fewer than two stops.`);
+    const ordered = [...stops].sort((a, b) => a.stopOrder - b.stopOrder);
     const orders = stops.map((s) => s.stopOrder);
-    const sorted = [...orders].sort((a, b) => a - b);
-    if (orders.join(",") !== sorted.join(",")) warnings.push(`Route ${routeName} stop order was resorted for validation.`);
+    const sortedOrders = [...orders].sort((a, b) => a - b);
+    if (orders.join(",") !== sortedOrders.join(",")) {
+      warnings.push(`Route ${routeName} stop order was resorted for validation.`);
+    }
+    for (let i = 1; i < ordered.length; i += 1) {
+      const prev = ordered[i - 1]!;
+      const cur = ordered[i]!;
+      const prevDep = parseSamsaraCsvDateTime(prev.scheduledDeparture);
+      const curArr = parseSamsaraCsvDateTime(cur.scheduledArrival);
+      if (prevDep && curArr && curArr.getTime() < prevDep.getTime()) {
+        errors.push(
+          `Non-monotonic times on ${routeName}: stop "${cur.stopName}" arrives before previous departure (${prev.scheduledDeparture} → ${cur.scheduledArrival}).`
+        );
+      }
+    }
   }
 
   // ZIP / scientific notation checks on addresses
   for (const row of params.rows) {
     if (/\d+e\+\d+/i.test(row.stopAddress)) errors.push("Scientific notation detected in an address/ZIP field.");
+  }
+
+  // Round-trip the built CSV — Digi must never hand staff a file Samsara will 500 on.
+  const dataLines = params.csv
+    .split(/\r?\n/)
+    .slice(1)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0);
+  if (dataLines.length !== params.rows.length) {
+    errors.push(
+      `CSV row count mismatch (file has ${dataLines.length} data rows, exporter built ${params.rows.length}).`
+    );
+  }
+  for (let i = 0; i < dataLines.length; i += 1) {
+    const cells = parseCsvLine(dataLines[i]!, params.template.delimiter);
+    if (cells.length !== SAMSARA_BULK_UPLOAD_HEADERS.length) {
+      errors.push(
+        `CSV line ${i + 2} has ${cells.length} columns (expected ${SAMSARA_BULK_UPLOAD_HEADERS.length}).`
+      );
+      continue;
+    }
+    const [
+      routeName,
+      driver,
+      vehicle,
+      stopName,
+      arrival,
+      departure,
+      notes,
+      addressName,
+      lat,
+      lng,
+      fullAddress
+    ] = cells;
+    if (String(driver || "").trim()) {
+      errors.push(`CSV line ${i + 2}: Assigned Driver Username must be blank when using vehicles.`);
+    }
+    if (String(addressName || "").trim()) {
+      errors.push(`CSV line ${i + 2}: Address Name must be blank for raw lat/lng uploads.`);
+    }
+    if (!isAllowedSamsaraVehicleName(vehicle || "")) {
+      errors.push(`CSV line ${i + 2}: vehicle "${vehicle}" is not on the Samsara roster.`);
+    }
+    if (!datetimeRe.test(String(arrival || "").trim()) || !datetimeRe.test(String(departure || "").trim())) {
+      errors.push(`CSV line ${i + 2}: bad arrival/departure datetime format.`);
+    }
+    if (!/^-?\d+(\.\d+)?$/.test(String(lat || "").trim()) || !/^-?\d+(\.\d+)?$/.test(String(lng || "").trim())) {
+      errors.push(`CSV line ${i + 2}: Latitude/Longitude must be plain numbers.`);
+    }
+    if (!String(routeName || "").trim() || !String(stopName || "").trim() || !String(fullAddress || "").trim()) {
+      errors.push(`CSV line ${i + 2}: Route Name, Stop Name, and Full Address are required.`);
+    }
+    if (/[^\x20-\x7E]/.test(String(notes || "")) || /\n|\r/.test(String(notes || ""))) {
+      errors.push(`CSV line ${i + 2}: Stop Notes must be single-line printable ASCII.`);
+    }
   }
 
   return {
@@ -517,7 +679,7 @@ export function validateExport(params: {
       stopCount: params.rows.length,
       headerMatch: errors.every((e) => !/header/i.test(e)),
       operatingDate: params.operatingDate ?? null,
-      errors,
+      errors: errors.slice(0, 40),
       warnings,
       validationResult: errors.length === 0 ? "passed" : "failed"
     }
