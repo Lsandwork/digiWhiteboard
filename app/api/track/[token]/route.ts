@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { after } from "next/server";
 import {
   getOwnerTrackingPublic,
   isOwnerTrackingDemoToken
@@ -19,30 +18,9 @@ export async function GET(request: Request, context: { params: Promise<{ token: 
     const view = await getOwnerTrackingPublic(token, { startedAtMs });
     if (!view) return NextResponse.json({ error: "Tracking link not found." }, { status: 404 });
 
-    // Jasper demo: advance Twilio SMS (start → approaching → pulling up → arrived) while the map is open.
-    let jasperDemo: Record<string, unknown> | undefined;
-    if (token.trim().toLowerCase() === "jasper") {
-      const wantStatus = new URL(request.url).searchParams.get("sms") === "1";
-      if (wantStatus) {
-        try {
-          const { maybeAdvanceJasperDemoSms } = await import("@/lib/route-generator/jasper-demo-run");
-          jasperDemo = await maybeAdvanceJasperDemoSms();
-        } catch (error) {
-          jasperDemo = { ok: false, error: error instanceof Error ? error.message : "demo failed" };
-        }
-      } else {
-        after(async () => {
-          try {
-            const { maybeAdvanceJasperDemoSms } = await import("@/lib/route-generator/jasper-demo-run");
-            await maybeAdvanceJasperDemoSms();
-          } catch (error) {
-            console.error("jasper demo sms advance failed", error);
-          }
-        });
-      }
-    }
+    // Jasper demo SMS is permanently disabled — opening a map must never text anyone.
 
-    return NextResponse.json(jasperDemo ? { ...view, jasperDemo } : view);
+    return NextResponse.json(view);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to load tracking." },

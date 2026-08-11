@@ -54,8 +54,10 @@ Live map + ETA:
 - Polls Samsara vehicle GPS when `SAMSARA_API_TOKEN` is set
 - Owners see an Uber Eats–style map with live minutes
 - Cron `/api/cron/route-eta-alerts` (every 2 minutes):
+  - Real owner ETA SMS only (Samsara GPS + quiet hours + moving-van gates)
   - SMS when driver is ~**30 minutes** out
   - Map banner + SMS when ~**15 minutes** out
+  - **Does not** run the Jasper demo SMS path (that demo caused morning “9:08pm departing” texts and is disabled unless `JASPER_DEMO_SMS_ENABLED=true`)
 
 ## Van drop-off start times (Pacific)
 
