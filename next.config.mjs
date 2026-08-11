@@ -70,8 +70,9 @@ export default withSentryConfig(nextConfig, {
   // Upload wider set of client source files for better stack traces
   widenClientFileUpload: true,
 
-  // Proxy API route to bypass ad-blockers
-  tunnelRoute: "/monitoring",
+  // Do not use tunnelRoute: "/monitoring" — under current Next/Turbopack
+  // setups the tunnel often 404s and silently drops client envelopes.
+  // Events go directly to Sentry ingest (DSN is public by design).
 
   // Suppress non-CI build noise
   silent: !process.env.CI
