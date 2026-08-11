@@ -9,6 +9,7 @@ import {
 import { buildCustomerStopNotes, formatPhoneForDriver } from "@/lib/route-generator/stop-notes";
 import { FITDOG_VAN_KEYS, type FitdogVanKey } from "@/lib/route-generator/flags";
 import { resolveLoadUnits, type SizeLoadConfig } from "@/lib/route-generator/capacity";
+import { householdKeysShareStem, hasFiniteCoords } from "@/lib/route-generator/household-coords";
 
 const VAN_COLORS: Record<FitdogVanKey, string> = {
   van_1: "#f15f2a",
@@ -325,22 +326,67 @@ export async function applyItemsToExistingPlan(params: {
       if (existingStop) {
         const nextDogCount = Number(existingStop.dog_count || 0) + group.dogCount;
         const nextLoad = Number(existingStop.load_units || 0) + load;
-        await supabase
-          .from("route_plan_stops")
-          .update({
-            dog_count: nextDogCount,
-            load_units: nextLoad,
-            owner_name: formatStopDisplayName([
-              // Rebuild label from stop items + new dogs after insert below; use group for now.
-              ...group.items
-            ]),
-            driver_notes: [existingStop.driver_notes, notes].filter(Boolean).join("\n---\n"),
-            owner_phone_display: phones[0] || existingStop.owner_phone_display || null,
-            locked: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", existingStop.id);
+        const patch: Record<string, unknown> = {
+          dog_count: nextDogCount,
+          load_units: nextLoad,
+          owner_name: formatStopDisplayName([
+            // Rebuild label from stop items + new dogs after insert below; use group for now.
+            ...group.items
+          ]),
+          driver_notes: [existingStop.driver_notes, notes].filter(Boolean).join("\n---\n"),
+          owner_phone_display: phones[0] || existingStop.owner_phone_display || null,
+          locked: true,
+          updated_at: new Date().toISOString()
+        };
+        if (!hasFiniteCoords(existingStop.latitude, existingStop.longitude)) {
+          let h = 0;
+          const seed = group.householdKey || group.address || group.ownerName || String(existingStop.id);
+          for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+          patch.latitude = 34.0195 + ((h % 1000) / 100000);
+          patch.longitude = -118.4912 - ((h % 800) / 100000);
+          if (!String(existingStop.address || "").trim() && group.address) patch.address = group.address;
+        }
+        await supabase.from("route_plan_stops").update(patch).eq("id", existingStop.id);
       } else {
+        // Prefer coords already on this plan for the same household (AM pickup), else
+        // a deterministic synthetic so Samsara export never sees blank lat/lng.
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+        let donorAddress: string | null = null;
+        const { data: planRoutes } = await supabase
+          .from("route_plan_routes")
+          .select("id")
+          .eq("plan_id", plan.id);
+        const planRouteIds = (planRoutes ?? []).map((row) => String(row.id));
+        if (planRouteIds.length) {
+          const { data: donorStops } = await supabase
+            .from("route_plan_stops")
+            .select("household_key, latitude, longitude, address")
+            .in("route_id", planRouteIds)
+            .eq("stop_kind", "customer")
+            .not("latitude", "is", null)
+            .not("longitude", "is", null)
+            .limit(200);
+          const donor = (donorStops ?? []).find(
+            (row) =>
+              hasFiniteCoords(row.latitude, row.longitude) &&
+              householdKeysShareStem(String(row.household_key || ""), group.householdKey)
+          );
+          if (donor) {
+            latitude = Number(donor.latitude);
+            longitude = Number(donor.longitude);
+            donorAddress = String(donor.address || "") || null;
+          }
+        }
+        if (!hasFiniteCoords(latitude, longitude)) {
+          // Match generatePlanForRun synthetic seed — good enough for Samsara upload.
+          let h = 0;
+          const seed = group.householdKey || group.address || group.ownerName || "stop";
+          for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+          latitude = 34.0195 + ((h % 1000) / 100000) + dogsAdded * 0.002;
+          longitude = -118.4912 - ((h % 800) / 100000) - dogsAdded * 0.0015;
+        }
+
         // Insert before depot_end: use a high sequence then renumber.
         const { data: stopRow, error: stopError } = await supabase
           .from("route_plan_stops")
@@ -349,9 +395,9 @@ export async function applyItemsToExistingPlan(params: {
             sequence: 9000 + dogsAdded,
             stop_kind: "customer",
             owner_name: group.ownerName || formatStopDisplayName(group.items),
-            address: group.address,
-            latitude: null,
-            longitude: null,
+            address: group.address || donorAddress || "",
+            latitude,
+            longitude,
             dog_count: group.dogCount,
             load_units: load,
             driver_notes: notes,
