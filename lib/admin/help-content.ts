@@ -97,20 +97,35 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     id: "what-is-this",
-    title: "What are these whiteboards?",
-    summary: "Two TV boards plus Digi-Board tools: Lobby for guests, Staff for the yard, and Team Log for shift handoffs.",
+    title: "What is Fitdog Digi-Board (RuffOps)?",
+    summary: "Live ops layer for Fitdog: Lobby and Staff TVs, My Shift / Ops Command Center, Team Log, Grooming Push, Route Generator, and more — Gingr stays the business system of record.",
     category: "Start Here",
-    keywords: ["overview", "intro", "lobby", "staff", "difference", "boards", "team log", "digi-board"],
+    keywords: [
+      "overview",
+      "intro",
+      "lobby",
+      "staff",
+      "difference",
+      "boards",
+      "team log",
+      "digi-board",
+      "ruffops",
+      "ops command center",
+      "my shift"
+    ],
     steps: [
       "Lobby Whiteboard — guest-facing lobby TV. Shows who is checking out, promotions, and class schedule.",
-      "Staff Digital Whiteboard — team TV behind the desk. Shows check-ins, check-outs, walk needs, and push notices.",
-      "Team Log — Digi-Board shift handoff log (Crossover / Open / Archived). Use it for notes, assessments, and owner updates.",
-      "Both TV boards read cached data from Supabase. They do not call Gingr directly.",
-      "Your Digi-Board login only shows the tabs your role can use — Help Center filters topics the same way."
+      "Staff Digital Whiteboard — team TV behind the desk. Shows check-ins, check-outs, walks, and push notices.",
+      "My Shift / Ops Command Center — your Digi-Board homepage for live dogs, tasks, alerts, and Gingr connection status.",
+      "Team Log — shift handoff log (Crossover / Open / Archived) for notes, assessments, and owner updates.",
+      "Role tools — Grooming Push, Commissions, Route Generator, Walks Board, and more appear only when your login allows them.",
+      "TV boards read cached Supabase data. Tools like Grooming Sync and Route Generator may call Gingr or Fitdog APIs when you use them.",
+      "Help Center only shows topics for your Digi-Board role — search for the tool name if you need a how-to."
     ],
     links: [
       { label: "Open Lobby Whiteboard", href: "/lobby/checkouts" },
       { label: "Open Staff Whiteboard", href: "/" },
+      { label: "Open My Shift", href: "/admin?board=staff&tab=my_shift" },
       { label: "Open Team Log", href: "/admin?board=staff&tab=crossover_communication" }
     ]
   },
@@ -135,18 +150,131 @@ export const HELP_ARTICLES: HelpArticle[] = [
     links: [{ label: "Digi-Board Login", href: "/admin/login" }]
   },
   {
+    id: "ops-command-center-help",
+    title: "How do Ops Command Center and My Shift work?",
+    summary: "Role-aware Digi-Board homepage for live dogs, tasks, alerts, and Gingr connection status — not a Gingr replacement.",
+    category: "Staff Board",
+    keywords: [
+      "ops command center",
+      "my shift",
+      "command center",
+      "needs attention",
+      "gingr connected",
+      "system health",
+      "front desk command",
+      "yard command",
+      "overnight",
+      "trainer ops"
+    ],
+    steps: [
+      "Open Staff → My Shift (your role homepage) or Ops Command Center (management live floor view).",
+      "Review Needs Attention, My Tasks, Alerts, and live arriving/leaving counts.",
+      "Check the Gingr pill — Connected means recent webhook or live dog sync activity; Disconnected means no fresh Gingr activity.",
+      "Use role tools (Front Desk Command, Yard Command, Driver Mode, Overnight, Trainer Ops, System Health, Shift Handoff) when your login includes them.",
+      "Find a Dog searches Digi-Board ops records — open Gingr for reservations, packages, and billing."
+    ],
+    tips: [
+      "RuffOps is the live operations layer. Gingr remains the business system of record.",
+      "If Gingr shows Disconnected, confirm the webhook URL is https://fitdog.ruffops.com/api/gingr/webhook and ask an admin to check System Health."
+    ],
+    adminTab: "ops_command_center",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
+  },
+  {
+    id: "grooming-push-help",
+    title: "How do I use Grooming Push?",
+    summary: "Select a dog checked in to Gingr, add an optional note, and push a high-priority alert to the Staff Digital Whiteboard.",
+    category: "Staff Board",
+    keywords: ["grooming push", "groomer", "sync", "checked in", "gingr dogs", "catch", "bath"],
+    steps: [
+      "Open Staff → Grooming Push (Push to Whiteboard).",
+      "Click Select dog from Gingr — Digi loads dogs currently checked in from Gingr (Pacific business day).",
+      "Tap Sync if the list looks empty or stale. Wait for the checked-in count to appear under the search box.",
+      "Search by dog or owner name, select the dog, optionally add a safety tag or note, then Push to Staff Whiteboard.",
+      "Use Type dog manually only when the dog is present but missing from Gingr’s checked-in list.",
+      "Clear the active grooming notice from the right panel when handlers have the dog."
+    ],
+    tips: [
+      "Sync pulls Gingr checked-in reservations — not only the short whiteboard checking-in basket.",
+      "If Sync shows an error (not just an empty list), tell an admin: GINGR_API_KEY / Gingr connectivity may be down.",
+      "Searching with no matches is different from zero dogs loaded — clear the search box to see the full list."
+    ],
+    adminTab: "grooming_push",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
+  },
+  {
+    id: "commissions-help",
+    title: "How do Package & Class Commissions work?",
+    summary: "Trainers and managers track package/class sales and earnings from the Commissions tab — one click opens the page.",
+    category: "Staff Board",
+    keywords: ["commissions", "package", "class", "trainer earnings", "sales"],
+    steps: [
+      "Open Staff → Commissions (Dashboard list for admins; Commissions section for trainers).",
+      "One click opens Package & Class Commissions — you should not need to open Complaints or Requests first.",
+      "Review rows for the selected date range, add comments or disputes when allowed, and confirm sales if your role can manage commissions.",
+      "Ask Fitdog AI about commissions only if your login can view them — answers stay inside Digi-Board permissions."
+    ],
+    tips: [
+      "Commissions live in Digi-Board; billing still happens in Gingr.",
+      "If Commissions is missing from your sidebar, your role needs view_package_commissions — ask an admin."
+    ],
+    adminTab: "package_commissions",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
+  },
+  {
+    id: "route-generator-help",
+    title: "How does Route Generator and Samsara export work?",
+    summary: "Pull Fitdog signups, build van routes, approve, then download today’s Samsara CSV — never reuse another day’s file.",
+    category: "Admin Dashboard",
+    keywords: [
+      "route generator",
+      "samsara",
+      "csv",
+      "van routes",
+      "upload",
+      "internal server error",
+      "friday csv",
+      "export"
+    ],
+    steps: [
+      "Open Applications → Route Generator (Staff board).",
+      "Set Operating date to today → Pull Report → Generate Routes → Approve Routes.",
+      "Click Export Samsara CSV (or Re-export after the first download).",
+      "Upload that new file in cloud.samsara.com the same day only.",
+      "If Digi says CSV validation failed, fix the listed stop (usually missing lat/lng) and export again — do not upload a broken file.",
+      "Wrong-day exports are blocked. Never upload Friday’s CSV (or any prior day) on a later day."
+    ],
+    tips: [
+      "Digi downloads the CSV; staff upload it in Samsara. A Samsara Internal Server Error usually means a bad row, not Digi being offline.",
+      "Van 4 must never appear. Vehicle names must match Samsara exactly (Van 01, 02, 03, 05, 06).",
+      "Owner SMS on Approve is opt-in and respects quiet hours / moving-van gates."
+    ],
+    adminTab: "route_generator",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
+  },
+  {
     id: "how-data-flows",
     title: "Where does checkout data come from?",
-    summary: "Gingr sends updates to Supabase. The boards only read that cached data.",
+    summary: "Gingr webhooks fill Supabase; TV boards read that cache. Some Digi tools also pull live Gingr/Fitdog data when you Sync or export.",
     category: "Data & Sync",
-    keywords: ["gingr", "supabase", "sync", "webhook", "cache", "data source"],
+    keywords: ["gingr", "supabase", "sync", "webhook", "cache", "data source", "checked in", "heartbeat"],
     steps: [
-      "Gingr sends checkout/check-in events to a webhook URL (shown in Integrations).",
-      "Those events are stored in Supabase — your safe, cached copy.",
-      "Lobby and Staff boards read from Supabase only. They never hit Gingr directly.",
-      "This keeps displays fast and protects your Gingr account from extra load."
+      "Gingr sends check-in/check-out events to the Digi webhook (Integrations shows the URL).",
+      "Events are stored in Supabase — the cached copy Lobby and Staff TVs read.",
+      "TV boards do not call Gingr for every refresh — that keeps displays fast and light on Gingr.",
+      "Ops Command Center Gingr Connected means recent webhook activity or live dog sync (heartbeat), not that Gingr is replaced.",
+      "Grooming Push Sync and similar tools may call Gingr’s reservations API for currently checked-in dogs when you ask for a fresh list.",
+      "Route Generator pulls Fitdog signup reports, then you download a Samsara CSV — Digi does not upload to Samsara for you."
     ],
-    adminTab: "integrations"
+    adminTab: "integrations",
+    tips: [
+      "If TVs are empty but Gingr has dogs, check Integrations and Logs for webhook failures first.",
+      "If Grooming Sync errors, that is usually GINGR_API_KEY or Gingr connectivity — not the TV cache."
+    ]
   },
   {
     id: "publish-changes",
@@ -332,18 +460,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "staff-display",
     title: "How does the staff checkout board work?",
-    summary: "Shows dogs checking in and out in real time from cached Gingr data.",
+    summary: "Shows dogs checking in and out from cached Gingr data, with sticky board dogs so brief empty syncs do not wipe the TV.",
     category: "Staff Board",
-    keywords: ["checkout", "checkin", "check-in", "check-out", "dogs", "queue"],
+    keywords: ["checkout", "checkin", "check-in", "check-out", "dogs", "queue", "flicker", "sticky"],
     steps: [
-      "When Gingr prompts a checkout, the dog appears on the staff board automatically.",
-      "No manual edits needed — staff board stays synced via Supabase.",
-      "Refresh interval controls how quickly new checkouts appear (default 2 seconds).",
-      "Hidden dogs can be managed through legacy admin APIs if needed."
+      "When Gingr prompts a check-in or check-out, the dog appears on the Staff Whiteboard via Supabase cache.",
+      "No manual edits needed for normal Gingr flow — the board refreshes on a short interval (often about 2 seconds).",
+      "Recognized board dogs stay sticky through short empty sync gaps so the TV does not flicker blank.",
+      "Grooming Push and other Digi notices can also appear as temporary overlays — clear them when handlers have the dog.",
+      "Lobby and Staff boards are independent URLs — use the Staff board link for the yard TV."
     ],
     adminTab: "display",
     adminBoard: "staff",
-    links: [{ label: "View Staff Board", href: "/" }]
+    links: [{ label: "View Staff Board", href: "/" }],
+    tips: [
+      "If the board looks empty, confirm dogs are active in Gingr, then Refresh Admin and reload the public board tab.",
+      "Grooming Push Sync lists Gingr checked-in dogs for picking — that list is separate from the short checking-in basket on the TV."
+    ]
   },
   {
     id: "push-notices",
@@ -514,7 +647,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "front-desk-coordinator",
     title: "What can a Front Desk Coordinator or Team Lead do?",
-    summary: "Coordinator and Team Lead accounts land on Team Log and use Staff Digi-Board tools for handoffs, push notices, follow-ups, and view-only Staff Directory.",
+    summary: "Coordinator and Team Lead accounts use My Shift, Team Log, Push Notices, Route Generator (when enabled), follow-ups, and view-only Staff Directory.",
     category: "Users & Login",
     keywords: [
       "front desk coordinator",
@@ -525,25 +658,32 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "push notices",
       "staff directory",
       "team log",
-      "crossover log"
+      "crossover log",
+      "route generator",
+      "my shift",
+      "ops command center"
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "After login you land on Staff → Team Log for today’s handoffs.",
+      "Start from My Shift / Ops tools for live dogs, tasks, and Gingr connection status when those tabs are on your login.",
       "Use Team Log → Crossover Log (today), Open Log (unresolved), and Archived Log (prior closed).",
       "Also use Owner Follow Up, Active Issues, Push Notices, Notifications, Walks Board, and Help Center.",
+      "If Route Generator is enabled: pull today’s report, generate/approve routes, then download today’s Samsara CSV and upload it in Samsara the same day — never reuse another day’s file.",
       "Staff Directory is view-only — search and review staff, but you cannot add, edit, or delete directory rows.",
       "You can delete only Team Log entries you created (Super Admin, Admin, and Management can delete any).",
       "You cannot access Lobby content tools, global settings, logs, integrations, or the full Admin Users area."
     ],
     adminTab: "crossover_communication",
     adminBoard: "staff",
-    tips: ["Use these roles for desk/team-lead staff who need live yard tools without full admin access."]
+    tips: [
+      "Use these roles for desk/team-lead staff who need live yard tools without full admin access.",
+      "Search Help for Route Generator, Push Notices, or Team Log when you need step-by-step screens."
+    ]
   },
   {
     id: "groomer-trainer-crossover",
     title: "What can a Groomer or Trainer do?",
-    summary: "Groomers and Trainers use Digi-Board push panels, Team Log handoffs, notifications, and (trainers) package & class commissions.",
+    summary: "Groomers use Grooming Push (Sync from Gingr checked-in dogs) and Team Log; Trainers use Trainer Push, Team Log, and Package & Class Commissions.",
     category: "Users & Login",
     keywords: [
       "groomer",
@@ -551,36 +691,45 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "crossover",
       "team log",
       "grooming",
+      "grooming push",
+      "sync",
       "training",
       "handoff",
       "commissions",
       "package",
       "class",
-      "check out"
+      "check out",
+      "my shift"
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Groomers usually open Staff → Grooming Push first, then Team Log for handoffs.",
-      "Trainers usually open Staff → Trainer Push first, then Team Log when notes are needed.",
+      "Open My Shift when it appears — your role homepage for tasks and alerts.",
+      "Groomers: open Staff → Grooming Push → Select dog from Gingr. Tap Sync if the list is empty; choose a checked-in dog, add a note if needed, then Push to Staff Whiteboard.",
+      "Trainers: open Staff → Trainer Push for training alerts, then Team Log when notes are needed.",
       "On Team Log, use Crossover Log for today’s notes. Assessment dogs: Mark Check Out so they stay on today’s log until the next day.",
       "You can delete only Team Log entries you created.",
-      "Trainers: open Package & Class Commissions to review earnings, comment, or dispute a row.",
+      "Trainers: open Commissions (one click) to review package/class earnings, comment, or dispute a row.",
       "Both roles also have Notifications, Video Links, Walks Board, and Help Center."
     ],
-    adminTab: "trainer_push",
+    adminTab: "grooming_push",
     adminBoard: "staff",
-    tips: ["Assign the Groomer or Trainer dashboard role in Admin Users or Staff Directory when creating a login."]
+    tips: [
+      "Grooming Sync loads dogs currently checked in to Gingr — not only the short whiteboard checking-in basket.",
+      "If Sync shows an error message, tell a lead or admin (Gingr API key / connectivity).",
+      "Assign the Groomer or Trainer dashboard role in Admin Users or Staff Directory when creating a login."
+    ]
   },
   {
     id: "dog-handler-basics",
     title: "What can a Dog Handler do?",
-    summary: "Dog Handler accounts use Staff Digi-Board tools for yard work, walks, daily checklist reminders, and Team Log notes.",
+    summary: "Dog Handler, Driver, and Hiker accounts use My Shift, Check List, Walks Board, Staff Whiteboard, and Team Log for yard work.",
     category: "Users & Login",
-    keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "team log", "driver", "hiker"],
+    keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "team log", "driver", "hiker", "my shift"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Open Check List first — today’s dog-handler daily recurring push notices appear there so you can mark each one completed.",
-      "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders.",
+      "Open My Shift when available — today’s needs-attention items and tasks for your role.",
+      "Open Check List — today’s dog-handler daily recurring push notices appear there so you can mark each one completed.",
+      "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders (including grooming catch notices).",
       "Open Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
       "Open Team Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
       "Open Notifications for alerts assigned to you, and Help Center anytime you need a guide.",
@@ -596,7 +745,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "management-role",
     title: "What can an Assistant Manager (Management) do?",
-    summary: "Management runs staff Digi-Board operations, reviews Team Log history, Fitdog Alerts, and can delete any Team Log entry when needed.",
+    summary: "Management runs Ops Command Center, Team Log, Fitdog Alerts, commissions, and other staff Digi tools — and can delete any Team Log entry when needed.",
     category: "Users & Login",
     keywords: [
       "assistant manager",
@@ -605,17 +754,22 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "permissions",
       "team log",
       "fitdog alerts",
-      "delete"
+      "delete",
+      "ops command center",
+      "commissions",
+      "route generator"
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned Management credentials.",
+      "Use Ops Command Center / My Shift for live floor state and Gingr Connected / Disconnected health.",
       "Use Staff tools: Team Log, Push Notices, Owner Follow Up, Active Issues, Fitdog Alerts, Staff Directory, and related tabs your login allows.",
       "On Team Log, review Crossover Log (today), Open Log, and Archived Log (prior closed items).",
       "Management can delete any Team Log entry — not only their own.",
-      "Help with commissions, write-ups, and management support tabs when those tools are enabled for your account.",
+      "Open Commissions in one click from the sidebar when you have package/class commission access.",
+      "Use Route Generator when enabled: export only today’s Samsara CSV and never upload a prior day’s file.",
       "Full Super Admin-only areas (integration secrets, permission matrix, some global settings) may still be restricted."
     ],
-    adminTab: "crossover_communication",
+    adminTab: "ops_command_center",
     adminBoard: "staff",
     tips: ["Email Lonnie@fitdog.com if you need a permission that is missing from your login."]
   },
@@ -697,16 +851,28 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "integrations-check",
     title: "How do I check if sync is healthy?",
-    summary: "Open Integrations to see Supabase status and webhook info.",
+    summary: "Use Integrations for Supabase/webhook health, and Ops Command Center for the live Gingr Connected pill.",
     category: "Data & Sync",
-    keywords: ["health", "status", "integration", "webhook", "failed", "test connection"],
-    steps: [
-      "Open the Integrations tab.",
-      "Check Supabase status and last sync time.",
-      "Review Failed webhook events count — zero is healthy.",
-      "Click Test Connection to verify Supabase read access (safe, no Gingr calls)."
+    keywords: [
+      "health",
+      "status",
+      "integration",
+      "webhook",
+      "failed",
+      "test connection",
+      "gingr connected",
+      "disconnected",
+      "system health"
     ],
-    adminTab: "integrations"
+    steps: [
+      "Open Integrations — check Supabase status, last sync time, and failed webhook count (zero is healthy).",
+      "Click Test Connection to verify Supabase read access (safe, no Gingr calls).",
+      "Open Ops Command Center / System Health — Gingr Connected means recent webhook or live dog sync activity.",
+      "Disconnected means no fresh Gingr activity — confirm webhook URL https://fitdog.ruffops.com/api/gingr/webhook and GINGR_API_KEY on Vercel.",
+      "For Grooming Push empty Sync with an error toast, treat it as Gingr API connectivity, not only TV cache."
+    ],
+    adminTab: "integrations",
+    tips: ["After env var changes on Vercel, redeploy once, then re-check Integrations and Ops Command Center."]
   },
   {
     id: "view-logs",
@@ -756,20 +922,30 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "troubleshoot-no-checkouts",
     title: "Checkouts aren't showing on the board",
-    summary: "Usually a sync or webhook issue — check Integrations and Logs.",
+    summary: "Usually a Gingr webhook/cache issue — check Integrations, Logs, and Ops Command Center Gingr health.",
     category: "Troubleshooting",
-    keywords: ["missing", "empty", "no dogs", "checkout not showing", "stale"],
+    keywords: [
+      "missing",
+      "empty",
+      "no dogs",
+      "checkout not showing",
+      "stale",
+      "gingr disconnected",
+      "grooming sync"
+    ],
     steps: [
-      "Confirm dogs are prompted for checkout in Gingr first.",
+      "Confirm dogs are checked in or prompted for checkout in Gingr first.",
+      "Open Ops Command Center — if Gingr shows Disconnected, fix webhook/API before expecting live board updates.",
       "Open Integrations — check last sync time and failed webhook count.",
-      "Open Logs — look for unprocessed webhook events.",
-      "Click Refresh in Admin, then reload the public board tab.",
-      "Lobby and Staff boards are independent — check the right URL."
+      "Open Logs — look for unprocessed or failed webhook events.",
+      "Click Refresh in Admin, then hard-reload the public board tab (Lobby vs Staff use different URLs).",
+      "Grooming Push empty list: tap Sync and read the message — an API error is different from “no checked-in dogs” or a search with no matches."
     ],
     adminTab: "integrations",
     links: [
       { label: "Lobby Board", href: "/lobby/checkouts" },
-      { label: "Staff Board", href: "/" }
+      { label: "Staff Board", href: "/" },
+      { label: "Ops Command Center", href: "/admin?board=staff&tab=ops_command_center" }
     ]
   },
   {
@@ -814,6 +990,10 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
   "first-login": EVERYONE,
   "env-vars": ADMIN_ONLY,
   "how-data-flows": ADMIN_ONLY,
+  "ops-command-center-help": STAFF_OPS_AND_ADMIN,
+  "grooming-push-help": STAFF_OPS_AND_ADMIN,
+  "commissions-help": STAFF_OPS_AND_ADMIN,
+  "route-generator-help": STAFF_OPS_AND_ADMIN,
   "publish-changes": ADMIN_ONLY,
   "lobby-messages": LOBBY_VIEWERS,
   "lobby-promotions": LOBBY_VIEWERS,
@@ -862,6 +1042,10 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "staff-ops-pages",
   "fitdog-alerts-help",
   "vip-auto-book-help",
+  "ops-command-center-help",
+  "grooming-push-help",
+  "commissions-help",
+  "route-generator-help",
   "push-notices",
   "schedule-push-notices",
   "staff-display",
@@ -872,6 +1056,8 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "publish-changes",
   "board-switcher",
   "preview-and-refresh",
+  "integrations-check",
+  "how-data-flows",
   "troubleshoot-no-checkouts",
   "lobby-tv-cast",
   "staff-tv-cast"
@@ -882,7 +1068,11 @@ const CROSSOVER_STAFF_ARTICLE_IDS = new Set([
   "what-is-this",
   "front-desk-log",
   "groomer-trainer-crossover",
+  "ops-command-center-help",
+  "grooming-push-help",
+  "commissions-help",
   "push-notices",
+  "staff-display",
   "staff-tv-cast",
   "troubleshoot-no-checkouts"
 ]);
@@ -892,6 +1082,8 @@ const DOG_HANDLER_ARTICLE_IDS = new Set([
   "what-is-this",
   "front-desk-log",
   "dog-handler-basics",
+  "ops-command-center-help",
+  "staff-display",
   "staff-tv-cast",
   "troubleshoot-no-checkouts"
 ]);
