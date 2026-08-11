@@ -34,11 +34,14 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
   const rootRef = useRef<HTMLDivElement>(null);
 
   const load = useMemo(
-    () => async (signal?: AbortSignal) => {
+    () => async (signal?: AbortSignal, options?: { fresh?: boolean }) => {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch("/api/gingr/active-dogs-for-grooming-push", { cache: "no-store", signal });
+        const url = options?.fresh
+          ? "/api/gingr/active-dogs-for-grooming-push?fresh=1"
+          : "/api/gingr/active-dogs-for-grooming-push";
+        const response = await fetch(url, { cache: "no-store", signal });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "Unable to load dogs from Gingr.");
         setDogs(body.dogs ?? []);
@@ -131,8 +134,9 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
             <button
               type="button"
               className="crossover-btn crossover-btn--ghost ml-auto inline-flex items-center gap-1 text-xs"
-              onClick={() => void load()}
+              onClick={() => void load(undefined, { fresh: true })}
               disabled={loading}
+              title="Refresh checked-in dogs from Gingr"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Sync
@@ -145,7 +149,9 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
             ) : error ? (
               <p className="grooming-dog-picker__empty grooming-dog-picker__empty--error">{error}</p>
             ) : grouped.length === 0 ? (
-              <p className="grooming-dog-picker__empty">No dogs are available from Gingr right now. Check back after the next board sync.</p>
+              <p className="grooming-dog-picker__empty">
+                No dogs checked in to Gingr right now. Tap Sync to refresh, or use Type dog manually if the dog is present.
+              </p>
             ) : (
               grouped.map((section) => (
                 <div key={section.group} className="grooming-dog-picker__group">

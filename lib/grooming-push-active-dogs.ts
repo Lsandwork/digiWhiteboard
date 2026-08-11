@@ -3,6 +3,11 @@ import { extractPhotoUrl } from "@/lib/board-utils";
 import { loadStoredAnimalPhotoMap } from "@/lib/animal-photo-store";
 import type { GingrBackOfHouseRecord } from "@/lib/gingr-board-sync";
 import { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
+import {
+  fetchCurrentlyCheckedInDogs,
+  invalidateCurrentlyCheckedInDogsCache,
+  type CheckedInGingrDog
+} from "@/lib/gingr-custom-animal-icons";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import type { LiveDog } from "@/lib/types";
 
@@ -225,6 +230,29 @@ function liveDogToMutable(dog: LiveDog): MutableDog {
   };
 }
 
+function checkedInReservationToMutable(dog: CheckedInGingrDog): MutableDog {
+  const reservationType = dog.reservationType ?? undefined;
+  const grooming = isGroomingType(reservationType);
+  return {
+    dogId: dog.animalId,
+    dogName: dog.dogName,
+    ownerName: dog.ownerName ?? undefined,
+    dogPhotoUrl: dog.photoUrl ?? undefined,
+    status: "checked_in",
+    displayStatus: "Checked In to Gingr",
+    group: "checked_in",
+    reservationId: dog.reservationId ?? undefined,
+    checkedInAt: dog.checkedInAt ?? undefined,
+    appointmentTime: undefined,
+    reservationType,
+    gingrAnimalId: dog.animalId,
+    checkedIn: true,
+    grooming,
+    reservation: !grooming && Boolean(reservationType),
+    appointment: false
+  };
+}
+
 function recordToMutable(record: GingrBackOfHouseRecord, now: Date, timeZone: string): MutableDog | null {
   if (!isRecordRelevantToday(record, now, timeZone)) return null;
 
@@ -272,10 +300,13 @@ export async function loadActiveDogsForGroomingPush(
      * Use for photo tagging and other non-critical UIs so Gingr stays reserved for live boards.
      */
     gingrMode?: "allow_fetch" | "cache_only";
+    /** Bust caches and re-query Gingr (Sync button). */
+    forceRefresh?: boolean;
   }
 ) {
   const timeZone = options?.timeZone ?? "America/Los_Angeles";
   const gingrMode = options?.gingrMode ?? "allow_fetch";
+  const forceRefresh = Boolean(options?.forceRefresh);
   const now = new Date();
   const map = new Map<string, MutableDog>();
 
@@ -283,20 +314,38 @@ export async function loadActiveDogsForGroomingPush(
     .from("live_transition_dogs")
     .select("*")
     .eq("hidden", false)
-    .eq("display_status", "checking_in")
+    .in("display_status", ["checking_in", "checking_out"])
     .order("animal_name", { ascending: true });
 
   if (!liveError) {
     for (const row of (liveRows ?? []) as LiveDog[]) {
+      // Transition board rows are facility-present for grooming catch, even mid check-out.
       mergeDog(map, liveDogToMutable(row));
     }
   }
 
+  let checkedInReservationCount = 0;
+  let checkedInFetchError: string | null = null;
+  if (gingrMode === "allow_fetch") {
+    if (forceRefresh) invalidateCurrentlyCheckedInDogsCache();
+    try {
+      // Authoritative onsite list — back_of_house.checking_in is only the arrival basket.
+      const checkedInDogs = await fetchCurrentlyCheckedInDogs({ force: forceRefresh });
+      checkedInReservationCount = checkedInDogs.length;
+      for (const dog of checkedInDogs) {
+        mergeDog(map, checkedInReservationToMutable(dog));
+      }
+    } catch (error) {
+      checkedInFetchError = error instanceof Error ? error.message : "checked_in_fetch_failed";
+      console.error("[grooming-push] checked-in reservations fetch failed:", checkedInFetchError);
+    }
+  }
+
   const cachedBoard = getCachedBackOfHouseBoard(Date.now(), true);
-  const board =
-    gingrMode === "cache_only"
-      ? cachedBoard
-      : cachedBoard ?? (await fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => null));
+  let board = cachedBoard;
+  if (gingrMode === "allow_fetch" && (forceRefresh || !cachedBoard)) {
+    board = await fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => cachedBoard);
+  }
   if (board) {
     for (const record of board.checking_in as GingrBackOfHouseRecord[]) {
       const mutable = recordToMutable(record, now, timeZone);
@@ -322,20 +371,21 @@ export async function loadActiveDogsForGroomingPush(
     return a.dogName.localeCompare(b.dogName);
   });
 
+  const usedCheckedInApi = gingrMode === "allow_fetch" && checkedInReservationCount > 0;
   return {
     dogs: enriched,
     meta: {
-      source:
-        gingrMode === "cache_only"
-          ? cachedBoard
-            ? "cache_and_supabase"
-            : "supabase_only"
-          : cachedBoard
-            ? "cache_and_supabase"
-            : "supabase_only",
+      source: usedCheckedInApi
+        ? "gingr_checked_in_reservations"
+        : board
+          ? "cache_and_supabase"
+          : "supabase_only",
       cached_gingr_records: board?.checking_in.length ?? 0,
       live_transition_rows: liveRows?.length ?? 0,
-      gingr_mode: gingrMode
+      checked_in_reservation_rows: checkedInReservationCount,
+      checked_in_fetch_error: checkedInFetchError,
+      gingr_mode: gingrMode,
+      force_refresh: forceRefresh
     }
   };
 }

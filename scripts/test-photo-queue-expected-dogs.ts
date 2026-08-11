@@ -12,6 +12,9 @@ const stubSupabase = {
       eq() {
         return this;
       },
+      in() {
+        return this;
+      },
       order() {
         return Promise.resolve({ data: [], error: null });
       }

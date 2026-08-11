@@ -10,9 +10,17 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   try {
+    const url = new URL(request.url);
+    const forceRefresh =
+      url.searchParams.get("fresh") === "1" ||
+      url.searchParams.get("sync") === "1" ||
+      url.searchParams.get("force") === "1";
     const supabase = getServiceSupabase();
     const settings = await loadAdminSettings(supabase);
-    const result = await loadActiveDogsForGroomingPush(supabase, { timeZone: settings.timezone });
+    const result = await loadActiveDogsForGroomingPush(supabase, {
+      timeZone: settings.timezone,
+      forceRefresh
+    });
 
     return NextResponse.json({
       dogs: result.dogs,
