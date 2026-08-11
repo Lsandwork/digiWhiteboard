@@ -2,6 +2,7 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
+import { isRouteOwnerSmsEnabled } from "@/lib/route-generator/flags";
 import {
   isWithinRouteOwnerSmsServiceHours,
   routeOwnerSmsQuietHoursMessage
@@ -278,6 +279,12 @@ export async function setOwnerTrackingSmsAlerts(input: {
   enabled: boolean;
   actor: Actor;
 }) {
+  if (input.enabled && !isRouteOwnerSmsEnabled()) {
+    throw new Error(
+      "Owner SMS is disabled (ROUTE_OWNER_SMS_ENABLED is off). Cannot enable stop alerts until the kill switch is turned on."
+    );
+  }
+
   const supabase = getServiceSupabase();
   const { data: row, error } = await supabase
     .from("route_owner_tracking")
@@ -326,6 +333,12 @@ export async function resendOwnerTrackingLinkSms(input: {
   /** Bypass quiet hours — staff must confirm in UI. */
   forceQuietHours?: boolean;
 }) {
+  if (!isRouteOwnerSmsEnabled()) {
+    throw new Error(
+      "Owner SMS is disabled (ROUTE_OWNER_SMS_ENABLED is off). Turn it on in Vercel only when routes are intentionally live."
+    );
+  }
+
   const supabase = getServiceSupabase();
   const { data: row, error } = await supabase
     .from("route_owner_tracking")

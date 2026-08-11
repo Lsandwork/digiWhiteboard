@@ -24,6 +24,17 @@ export function isSamsaraDirectSyncEnabled() {
   return envFlag("SAMSARA_DIRECT_SYNC_ENABLED", false);
 }
 
+/**
+ * Master kill switch for ALL Route Generator owner SMS (Approve link texts,
+ * ETA cron, Tracking-tab resend). Default OFF — must be explicitly enabled
+ * in Vercel after staff intentionally start routes for the day.
+ *
+ * Unsolicited overnight / no-route texts must never fire when this is unset.
+ */
+export function isRouteOwnerSmsEnabled() {
+  return envFlag("ROUTE_OWNER_SMS_ENABLED", false);
+}
+
 export const ROUTE_GENERATOR_PERMISSIONS = [
   "route_generator.view",
   "route_generator.pull_report",

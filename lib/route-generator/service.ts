@@ -42,7 +42,7 @@ import {
 } from "@/lib/route-generator/samsara-csv";
 import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
-import { FITDOG_VAN_KEYS, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
+import { FITDOG_VAN_KEYS, isRouteOwnerSmsEnabled, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
 import type { VehicleCapacityConfig, SizeLoadConfig } from "@/lib/route-generator/capacity";
 import {
   DEFAULT_FITDOG_LOCATIONS,
@@ -222,7 +222,8 @@ export async function getRouteGeneratorBootstrap() {
     mapsProvider: process.env.MAPS_PROVIDER?.trim() || "google",
     mapsConfigured: Boolean(
       process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY?.trim() || process.env.GOOGLE_MAPS_API_KEY?.trim()
-    )
+    ),
+    ownerSmsEnabled: isRouteOwnerSmsEnabled()
   };
 }
 
@@ -1066,13 +1067,14 @@ export async function approvePlan(params: {
     newValue: { sendOwnerSms }
   });
 
-  // Create owner tracking links. SMS only when sendOwnerSms is checked.
+  // Create owner tracking links. SMS only when sendOwnerSms is checked AND kill switch is on.
   let tracking: {
     created: number;
     smsQueued: number;
     smsConfigured: boolean;
     smsEnabled: boolean;
     smsDeferredQuietHours: boolean;
+    smsBlockedByKillSwitch: boolean;
     smsErrors: string[];
   } = {
     created: 0,
@@ -1080,6 +1082,7 @@ export async function approvePlan(params: {
     smsConfigured: false,
     smsEnabled: sendOwnerSms,
     smsDeferredQuietHours: false,
+    smsBlockedByKillSwitch: false,
     smsErrors: []
   };
   try {
