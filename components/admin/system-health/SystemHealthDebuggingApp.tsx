@@ -167,7 +167,8 @@ export function SystemHealthDebuggingApp() {
   const [search, setSearch] = useState("");
   const [searchResult, setSearchResult] = useState<unknown>(null);
   const [selectedAudit, setSelectedAudit] = useState<string | null>(null);
-  const [auditDetail, setAuditDetail] = useState<Record<string, unknown> | null>(null);
+  const [auditDetail, setAuditDetail] = useState<Record<string, unknown> | null | undefined>(undefined);
+  const [auditDetailMissing, setAuditDetailMissing] = useState(false);
   const [sectionData, setSectionData] = useState<unknown>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [settingsDraft, setSettingsDraft] = useState<Record<string, unknown> | null>(null);
@@ -246,16 +247,31 @@ export function SystemHealthDebuggingApp() {
 
   useEffect(() => {
     if (!selectedAudit) {
-      setAuditDetail(null);
+      setAuditDetail(undefined);
+      setAuditDetailMissing(false);
       return;
     }
+    setAuditDetail(undefined);
+    setAuditDetailMissing(false);
     void (async () => {
       const res = await fetch(
         `/api/admin/system-health?view=route_audit&correlationId=${encodeURIComponent(selectedAudit)}`,
         { cache: "no-store" }
       );
       const body = await res.json();
-      if (res.ok) setAuditDetail(body.data ?? body);
+      if (!res.ok) {
+        setError(body.error || "Failed to load route audit");
+        setAuditDetail(null);
+        setAuditDetailMissing(true);
+        return;
+      }
+      if (body.data == null) {
+        setAuditDetail(null);
+        setAuditDetailMissing(true);
+        return;
+      }
+      setAuditDetail(body.data as Record<string, unknown>);
+      setAuditDetailMissing(false);
     })();
   }, [selectedAudit]);
 
@@ -780,6 +796,8 @@ export function SystemHealthDebuggingApp() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             {!selectedAudit ? (
               <Empty text="Select a route audit to inspect pipeline and dog traces." />
+            ) : auditDetailMissing ? (
+              <Empty text="Audit not found for this correlation ID. Refresh Overview and re-select the audit." />
             ) : !auditDetail ? (
               <Empty text="Loading audit…" />
             ) : (

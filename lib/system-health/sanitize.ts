@@ -36,6 +36,17 @@ function redactString(value: string, options: SanitizeOptions): string {
   return out;
 }
 
+/** IDs that must never be phone-masked (digits look like phone fragments). */
+const PRESERVE_ID_KEY_RE =
+  /^(correlation_id|request_id|id|plan_id|report_run_id|audit_id|entity_id|job_id)$/i;
+
+function shouldPreserveIdentifier(key: string, value: string): boolean {
+  if (PRESERVE_ID_KEY_RE.test(key)) return true;
+  if (/^RG-\d{8}-\d{5}$/i.test(value.trim())) return true;
+  if (/^(req_|err_|RG-)/i.test(value.trim())) return true;
+  return false;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -56,6 +67,10 @@ export function sanitizeValue(value: unknown, options: SanitizeOptions = {}, dep
   for (const [key, raw] of Object.entries(value)) {
     if (SECRET_KEY_RE.test(key)) {
       out[key] = "[redacted-secret]";
+      continue;
+    }
+    if (typeof raw === "string" && shouldPreserveIdentifier(key, raw)) {
+      out[key] = raw;
       continue;
     }
     if (forDeveloper && PII_KEY_RE.test(key)) {
