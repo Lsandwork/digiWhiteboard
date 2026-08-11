@@ -329,15 +329,30 @@ export async function POST(request: Request) {
     if (action === "export_csv") {
       const planId = String(body.planId ?? "").trim();
       if (!planId) return NextResponse.json({ error: "planId is required." }, { status: 400 });
-      const result = await exportSamsaraCsv({
-        planId,
-        actorAdminId: session.adminUserId,
-        actorEmail: session.email,
-        actorRole: session.role,
-        emergencyOverride: Boolean(body.emergencyOverride),
-        overrideReason: body.overrideReason ? String(body.overrideReason) : undefined
-      });
-      return NextResponse.json(result);
+      try {
+        const result = await exportSamsaraCsv({
+          planId,
+          actorAdminId: session.adminUserId,
+          actorEmail: session.email,
+          actorRole: session.role,
+          emergencyOverride: Boolean(body.emergencyOverride),
+          overrideReason: body.overrideReason ? String(body.overrideReason) : undefined
+        });
+        return NextResponse.json(result);
+      } catch (error) {
+        if (isRouteGeneratorClientError(error)) throw error;
+        // Never hand business ops a bare "Internal Server Error" on export — that sent
+        // them back to a stale CSV in Downloads, which is what Samsara then rejected.
+        console.error("[route-generator] export_csv failed", error);
+        const detail = error instanceof Error ? error.message : "unknown error";
+        return NextResponse.json(
+          {
+            error: `Samsara CSV export could not finish: ${detail}. Nothing was downloaded — do NOT upload an older fitdog-samsara-routes file. Re-run Pull Report and Generate for today, then Export again.`,
+            code: "csv_export_failed"
+          },
+          { status: 422 }
+        );
+      }
     }
 
     if (action === "update_depot") {

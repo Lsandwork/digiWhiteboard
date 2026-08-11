@@ -184,6 +184,9 @@ export function toSamsaraSafeAscii(value: string, options?: { keepNewlines?: boo
     .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
     .replace(/[\u201C\u201D\u201E\u201F]/g, '"')
     .replace(/[\u2013\u2014\u2212]/g, "-")
+    // Legacy separators stored in driver notes. Map to ASCII "|" so drivers keep the
+    // visual break instead of the fields running together after the ASCII strip.
+    .replace(/[\u00B7\u2022\u2219\u30FB]/g, "|")
     .replace(/\u2026/g, "...");
   if (options?.keepNewlines) {
     return mapped.replace(/[^\x09\x0A\x0D\x20-\x7E]/g, " ");
@@ -331,6 +334,131 @@ export function parseSamsaraCsvDateTime(value: string): Date | null {
   const minute = Number(m[5]);
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
   return new Date(year, month - 1, day, hour, minute, 0, 0);
+}
+
+/** Minimum dwell Samsara needs between arrival and departure on one stop. */
+export const SAMSARA_MIN_STOP_DWELL_MINUTES = 5;
+/** Minimum travel gap between one stop's departure and the next stop's arrival. */
+export const SAMSARA_MIN_TRAVEL_GAP_MINUTES = 1;
+
+type WallClock = { month: number; day: number; year: number; minutes: number };
+
+/**
+ * Parse a CSV datetime cell as pure wall clock.
+ *
+ * `parseSamsaraCsvDateTime` returns a Date built in the *server* timezone, so
+ * re-formatting it with `formatSamsaraCsvDateTime` (America/Los_Angeles) shifts the
+ * time by the server offset — on Vercel (UTC) that silently moved stops by 7 hours.
+ * Schedule repair therefore works on wall-clock minutes and never round-trips a Date.
+ */
+function parseWallClock(value: string): WallClock | null {
+  const m = String(value)
+    .trim()
+    .match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const month = Number(m[1]);
+  const day = Number(m[2]);
+  const year = Number(m[3]);
+  const hour = Number(m[4]);
+  const minute = Number(m[5]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
+  return { month, day, year, minutes: hour * 60 + minute };
+}
+
+function formatWallClock(base: WallClock, minutes: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, minutes));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${base.month}/${base.day}/${base.year} ${hour}:${String(minute).padStart(2, "0")}`;
+}
+
+/**
+ * Force each route's stop times to move strictly forward.
+ *
+ * Facility ("already on-site") stops and the return-to-depot stop are timed from
+ * different baselines than the optimizer's customer legs, so a route could end at
+ * 11:18 after a stop that departed 11:50. Samsara answers those uploads with
+ * "Internal Server Error", and blocking the download instead pushed coordinators
+ * back to a stale CSV in Downloads. Repair the order here so the file is always
+ * uploadable, and report what moved.
+ */
+export function enforceMonotonicRouteSchedule(rows: ExportStopRow[]): {
+  adjustedStops: number;
+  adjustments: string[];
+} {
+  const byRoute = new Map<string, ExportStopRow[]>();
+  for (const row of rows) {
+    const list = byRoute.get(row.routeName) ?? [];
+    list.push(row);
+    byRoute.set(row.routeName, list);
+  }
+
+  let adjustedStops = 0;
+  const adjustments: string[] = [];
+
+  for (const [routeName, stops] of byRoute) {
+    const ordered = [...stops].sort((a, b) => a.stopOrder - b.stopOrder);
+    let previousDepartureMinutes: number | null = null;
+    let previousBase: WallClock | null = null;
+
+    for (const stop of ordered) {
+      const arrival = parseWallClock(stop.scheduledArrival);
+      const departure = parseWallClock(stop.scheduledDeparture);
+      const base: WallClock | null = arrival ?? departure ?? previousBase;
+      // Unparseable and no anchor to rebuild from — leave for validateExport to report.
+      if (!base) continue;
+
+      const originalArrivalMinutes: number | null = arrival ? arrival.minutes : null;
+      const originalDepartureMinutes: number | null = departure ? departure.minutes : null;
+      const originalDwell =
+        originalArrivalMinutes != null &&
+        originalDepartureMinutes != null &&
+        originalDepartureMinutes > originalArrivalMinutes
+          ? originalDepartureMinutes - originalArrivalMinutes
+          : SAMSARA_MIN_STOP_DWELL_MINUTES;
+
+      let arrivalMinutes: number =
+        originalArrivalMinutes ??
+        (previousDepartureMinutes == null
+          ? Math.max(0, (originalDepartureMinutes ?? 0) - SAMSARA_MIN_STOP_DWELL_MINUTES)
+          : previousDepartureMinutes + SAMSARA_MIN_TRAVEL_GAP_MINUTES);
+      if (previousDepartureMinutes != null) {
+        const earliest: number = previousDepartureMinutes + SAMSARA_MIN_TRAVEL_GAP_MINUTES;
+        if (arrivalMinutes < earliest) arrivalMinutes = earliest;
+      }
+      if (arrivalMinutes < 0) arrivalMinutes = 0;
+      let departureMinutes: number = originalDepartureMinutes ?? arrivalMinutes + originalDwell;
+
+      const arrivalMoved = originalArrivalMinutes == null || arrivalMinutes !== originalArrivalMinutes;
+      if (arrivalMoved || departureMinutes <= arrivalMinutes) {
+        departureMinutes = arrivalMinutes + Math.max(SAMSARA_MIN_STOP_DWELL_MINUTES, originalDwell);
+      }
+
+      const nextArrival = formatWallClock(base, arrivalMinutes);
+      const nextDeparture = formatWallClock(base, departureMinutes);
+      // Report only real time movement — rewriting `07:05` as `7:05` is formatting.
+      const movedMinutes =
+        originalArrivalMinutes == null ||
+        arrivalMinutes !== originalArrivalMinutes ||
+        originalDepartureMinutes == null ||
+        departureMinutes !== originalDepartureMinutes;
+      if (movedMinutes) {
+        adjustments.push(
+          `${routeName} stop "${stop.stopName}": ${stop.scheduledArrival || "(blank)"} -> ${nextArrival}, ${
+            stop.scheduledDeparture || "(blank)"
+          } -> ${nextDeparture}`
+        );
+        adjustedStops += 1;
+      }
+      stop.scheduledArrival = nextArrival;
+      stop.scheduledDeparture = nextDeparture;
+
+      previousDepartureMinutes = departureMinutes;
+      previousBase = base;
+    }
+  }
+
+  return { adjustedStops, adjustments };
 }
 
 /**
