@@ -1,0 +1,41 @@
+name: CI
+
+# A type error in #100 sat on main for hours: `next build` type-checks, so every
+# Vercel production deploy failed while the dashboard kept serving the last good
+# build. Nothing surfaced it, and fixes merged afterwards silently never shipped.
+# This runs the same checks Vercel runs, on every PR and every push to main.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Route Generator and SMS guard tests
+        run: npm run test:route-generator-all
+
+      # The check that actually matters for deploys — this is what failed on Vercel.
+      - name: Production build
+        run: npm run build
