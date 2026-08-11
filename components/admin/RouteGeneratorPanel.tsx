@@ -73,6 +73,7 @@ type Bootstrap = {
     status?: string;
     current_version?: number;
   } | null;
+  ownerSmsEnabled?: boolean;
 };
 
 type PlanBundle = {
@@ -718,14 +719,20 @@ export function RouteGeneratorPanel() {
               type="checkbox"
               className="mt-0.5"
               checked={sendOwnerSms}
-              disabled={busy || !bundle?.plan.id || bundle.plan.status === "approved"}
+              disabled={
+                busy ||
+                !bundle?.plan.id ||
+                bundle.plan.status === "approved" ||
+                bootstrap?.ownerSmsEnabled === false
+              }
               onChange={(event) => setSendOwnerSms(event.target.checked)}
             />
             <span>
               <span className="font-medium text-white">Send owner tracking SMS alerts</span>
               <span className="mt-0.5 block">
-                Off by default. When checked, Approve may send tracking links (6 AM–8 PM PT only) and enable
-                ETA texts only while Samsara shows the van moving near the planned stop window.
+                {bootstrap?.ownerSmsEnabled === false
+                  ? "Owner SMS is OFF system-wide (ROUTE_OWNER_SMS_ENABLED). No owner will be texted until an admin turns that flag on in Vercel for live route days."
+                  : "Off by default. When checked, Approve may send tracking links (6 AM–8 PM PT only) and enable ETA texts only while Samsara shows the van moving near the planned stop window."}
               </span>
             </span>
           </label>

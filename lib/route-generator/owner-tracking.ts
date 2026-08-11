@@ -15,6 +15,7 @@ import {
   ROUTE_OWNER_SMS_MIN_SPEED_MPH
 } from "@/lib/route-generator/sms-policy";
 import { recordOwnerSmsEvent } from "@/lib/route-generator/owner-tracking-admin";
+import { isRouteOwnerSmsEnabled } from "@/lib/route-generator/flags";
 
 function publicSiteUrl(): string {
   // Owner tracking always lives on the Digi-Board host — never Ruffly's public URL.
@@ -361,9 +362,11 @@ export async function createOwnerTrackingForPlan(
   smsConfigured: boolean;
   smsEnabled: boolean;
   smsDeferredQuietHours: boolean;
+  smsBlockedByKillSwitch: boolean;
   smsErrors: string[];
 }> {
-  const sendSmsRequested = Boolean(options.sendSms);
+  const ownerSmsAllowed = isRouteOwnerSmsEnabled();
+  const sendSmsRequested = Boolean(options.sendSms) && ownerSmsAllowed;
   const now = options.now ?? new Date();
   const supabase = getServiceSupabase();
   const { data: plan } = await supabase.from("route_plans").select("*").eq("id", planId).single();
@@ -396,6 +399,11 @@ export async function createOwnerTrackingForPlan(
   const sms = getSmsProvider();
   const quietHoursMessage = routeOwnerSmsQuietHoursMessage(now);
   const canSendLinkNow = sendSmsRequested && !quietHoursMessage;
+  if (options.sendSms && !ownerSmsAllowed) {
+    smsErrors.push(
+      "Owner SMS is disabled (ROUTE_OWNER_SMS_ENABLED is off). Tracking links were created without texting anyone."
+    );
+  }
   if (sendSmsRequested && !sms.isConfigured()) {
     smsErrors.push(
       "Twilio is not configured (need TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER)."
@@ -538,6 +546,7 @@ export async function createOwnerTrackingForPlan(
     smsConfigured: sms.isConfigured(),
     smsEnabled: sendSmsRequested,
     smsDeferredQuietHours: Boolean(sendSmsRequested && quietHoursMessage),
+    smsBlockedByKillSwitch: Boolean(options.sendSms && !ownerSmsAllowed),
     smsErrors: smsErrors.slice(0, 25)
   };
 }
@@ -640,12 +649,54 @@ export async function processOwnerEtaAlerts(): Promise<{
   smsPullup: number;
   skippedQuietHours: number;
   arriving15: number;
+  disabledAlerts: number;
+  skipped: boolean;
+  reason?: string;
   errors: string[];
 }> {
+  const empty = {
+    checked: 0,
+    sms30: 0,
+    sms15: 0,
+    smsPullup: 0,
+    skippedQuietHours: 0,
+    arriving15: 0,
+    disabledAlerts: 0,
+    skipped: true,
+    errors: [] as string[]
+  };
+
   const supabase = getServiceSupabase();
   const now = new Date();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now);
   const inServiceHours = isWithinRouteOwnerSmsServiceHours(now);
+
+  // Master kill switch — default off. Never text when routes are not intentionally live.
+  if (!isRouteOwnerSmsEnabled()) {
+    const { data: enabledRows } = await supabase
+      .from("route_owner_tracking")
+      .select("id")
+      .eq("sms_alerts_enabled", true)
+      .limit(2000);
+    const ids = (enabledRows ?? []).map((row) => String(row.id));
+    if (ids.length) {
+      await supabase.from("route_owner_tracking").update({ sms_alerts_enabled: false }).in("id", ids);
+    }
+    return {
+      ...empty,
+      disabledAlerts: ids.length,
+      reason: "route_owner_sms_disabled"
+    };
+  }
+
+  // Hard stop overnight — do not even evaluate ETA SMS outside 6 AM–8 PM PT.
+  if (!inServiceHours) {
+    return {
+      ...empty,
+      skippedQuietHours: 1,
+      reason: "quiet_hours"
+    };
+  }
 
   // Opt-in only: rows without sms_alerts_enabled never get owner SMS.
   const { data: rows, error: rowsError } = await supabase
@@ -657,12 +708,8 @@ export async function processOwnerEtaAlerts(): Promise<{
 
   if (rowsError) {
     return {
-      checked: 0,
-      sms30: 0,
-      sms15: 0,
-      smsPullup: 0,
-      skippedQuietHours: 0,
-      arriving15: 0,
+      ...empty,
+      skipped: false,
       errors: [rowsError.message]
     };
   }
@@ -842,6 +889,8 @@ export async function processOwnerEtaAlerts(): Promise<{
     smsPullup,
     skippedQuietHours,
     arriving15,
+    disabledAlerts: 0,
+    skipped: false,
     errors
   };
 }
