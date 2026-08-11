@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import clsx from "clsx";
 import { RefreshCw } from "lucide-react";
 import { ClockDate } from "@/components/board/ClockDate";
 import { LiveStatus } from "@/components/board/LiveStatus";
@@ -33,7 +34,7 @@ export function BoardHeader({
   const [logoFailed, setLogoFailed] = useState(false);
 
   return (
-    <header className="mb-5 grid gap-5 lg:mb-6 lg:grid-cols-[1fr_auto] lg:items-start">
+    <header className={clsx("mb-5 grid gap-5 lg:mb-6 lg:grid-cols-[1fr_auto] lg:items-start", castKeeperMode && "board-header--tv")}>
       <div className="flex min-w-0 items-start gap-4 sm:gap-5 lg:gap-6">
         {castKeeperMode ? (
           <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-fitdog-blue/70 bg-white p-1.5 shadow-glowBlue sm:h-24 sm:w-24 lg:h-28 lg:w-28">
@@ -95,7 +96,7 @@ export function BoardHeader({
 
         <ClockDate time={clockTime} date={clockDate} />
 
-        <div className="board-chip inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-300">
+        <div className="board-chip board-header__updated inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-300">
           <RefreshCw className="h-4 w-4 shrink-0" />
           Last updated {formatBoardTime(lastUpdated)}
         </div>

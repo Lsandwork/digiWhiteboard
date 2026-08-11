@@ -985,7 +985,7 @@ export function BoardClient({
           </div>
         )}
 
-        <footer className="mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
+        <footer className="board-shell-footer mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
           <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
           <span>Thank you for trusting us with your pups!</span>
           <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
