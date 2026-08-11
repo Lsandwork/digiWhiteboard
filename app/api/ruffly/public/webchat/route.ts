@@ -73,6 +73,7 @@ export async function POST(request: Request) {
   const visitorHash = hashToken(visitorRaw);
 
   let conversationId: string | null = null;
+  let persisted = false;
   try {
     const { data: visitor } = await supabase
       .from("ruffly_webchat_visitors")
@@ -116,12 +117,23 @@ export async function POST(request: Request) {
     }
 
     if (conversationId) {
-      await supabase.from("ruffly_messages").insert({
+      const { error: messageError } = await supabase.from("ruffly_messages").insert({
         conversation_id: conversationId,
         direction: "inbound",
         channel: "webchat",
         body: message
       });
+      persisted = !messageError;
+      if (!messageError) {
+        await supabase
+          .from("ruffly_conversations")
+          .update({
+            last_message_preview: message.slice(0, 240),
+            last_message_at: new Date().toISOString(),
+            status: handoff.handoff ? "waiting_staff" : "open"
+          })
+          .eq("id", conversationId);
+      }
     }
   } catch {
     // Tables may not exist yet — still return a safe reply.
@@ -133,6 +145,8 @@ export async function POST(request: Request) {
       handoff: true,
       reason: handoff.reason,
       visitorToken: visitorRaw,
+      conversationId,
+      persisted,
       disclosure: AI_DISCLOSURE
     });
   }
@@ -142,6 +156,8 @@ export async function POST(request: Request) {
       "Thanks for reaching out! I can share approved Fitdog info from our knowledge base once articles are published. Leave your name and dog’s name and our team will follow up.",
     handoff: false,
     visitorToken: visitorRaw,
+    conversationId,
+    persisted,
     disclosure: AI_DISCLOSURE
   });
 }
