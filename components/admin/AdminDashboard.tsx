@@ -34,11 +34,11 @@ import {
   DriverModePanel,
   FrontDeskCommandPanel,
   OvernightCommandPanel,
-  OpsSystemHealthPanel,
   ShiftHandoffPanel,
   TrainerOpsPanel,
   YardCommandPanel
 } from "@/components/admin/ops-command-center/RoleWorkspaces";
+import { SystemHealthDebuggingApp } from "@/components/admin/system-health/SystemHealthDebuggingApp";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { StaffCreateUserPage } from "@/components/admin/StaffCreateUserPage";
@@ -640,7 +640,7 @@ export function AdminDashboard() {
         {tab === "trainer_ops" ? (
           <TrainerOpsPanel onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)} />
         ) : null}
-        {tab === "ops_system_health" ? <OpsSystemHealthPanel /> : null}
+        {tab === "ops_system_health" ? <SystemHealthDebuggingApp /> : null}
         {tab === "shift_handoff" ? <ShiftHandoffPanel /> : null}
 
         {tab === "hr_hub" ? (

@@ -195,7 +195,15 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("route_generator.approve", "Route Generator: Approve", "Approve route plans for export."),
       p("route_generator.export", "Route Generator: Export", "Export validated Samsara CSV files."),
       p("route_generator.manage_settings", "Route Generator: Manage Settings", "Manage vans, depot, integrations, and templates."),
-      p("route_generator.view_audit", "Route Generator: View Audit", "View Route Generator audit events.")
+      p("route_generator.view_audit", "Route Generator: View Audit", "View Route Generator audit events."),
+      p("system_health.view", "System Health: View", "Open System Health & Debugging overview and live activity."),
+      p("system_health.errors", "System Health: Errors", "View and manage captured application errors."),
+      p("system_health.integrations", "System Health: Integrations", "View integration health and sanitized call logs."),
+      p("system_health.route_audits", "System Health: Route Audits", "Inspect route generation audits and dog decision traces."),
+      p("system_health.user_activity", "System Health: User Activity", "View operational user activity events."),
+      p("system_health.developer", "System Health: Developer", "Access Cursor debug bridge details and developer diagnostics."),
+      p("system_health.export", "System Health: Export", "Export sanitized diagnostic bundles."),
+      p("system_health.configure", "System Health: Configure", "Change System Health settings and live debug mode.")
     ]
   },
   {

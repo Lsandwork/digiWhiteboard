@@ -781,10 +781,17 @@ export async function generatePlanForRun(params: {
   actorAdminId?: string | null;
   actorEmail?: string | null;
   actorRole?: string | null;
+  correlationId?: string | null;
 }) {
+  const auditStartedAt = Date.now();
   const supabase = getServiceSupabase();
   const { data: run, error } = await supabase.from("route_report_runs").select("*").eq("id", params.reportRunId).single();
   if (error || !run) throw new Error(error?.message || "Report run not found.");
+
+  const { createRouteCorrelationId } = await import("@/lib/system-health/correlation");
+  const correlationId =
+    params.correlationId?.trim() ||
+    createRouteCorrelationId(String(run.operating_date).slice(0, 10));
 
   const { data: items, error: itemsError } = await supabase
     .from("route_report_items")
@@ -1215,10 +1222,58 @@ export async function generatePlanForRun(params: {
     entityId: plan.id,
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
-    actorRole: params.actorRole
+    actorRole: params.actorRole,
+    correlationId,
+    newValue: {
+      correlationId,
+      qualityHint: reconciliation.ok ? "ok" : "needs_review",
+      expectedLegs: reconciliation.expectedCount,
+      assignedLegs: reconciliation.assignedCount,
+      missingLegs: reconciliation.missingCount
+    }
   });
 
-  return getPlanBundle(plan.id);
+  // Permanent System Health route audit (fail-safe — never blocks generation).
+  try {
+    const { persistRouteGenerationAudit } = await import("@/lib/system-health/route-audit");
+    const auditResult = await persistRouteGenerationAudit({
+      correlationId,
+      planId: plan.id,
+      reportRunId: String(run.id),
+      operatingDate: operatingDate,
+      actorAdminId: params.actorAdminId,
+      actorEmail: params.actorEmail,
+      actorRole: params.actorRole,
+      items: annotatedAll,
+      reconciliation,
+      geocodedCount: geocoded.size,
+      addressCount: customerAddresses.length,
+      usedSyntheticCustomerCoords,
+      warnings: [...pickupOpt.warnings, ...dropoffOpt.warnings],
+      startedAt: auditStartedAt,
+      ownerTextsEnabled: false
+    });
+    if (auditResult?.correlationId) {
+      await supabase
+        .from("route_plans")
+        .update({
+          summary: {
+            ...(typeof plan.summary === "object" && plan.summary ? plan.summary : {}),
+            correlationId: auditResult.correlationId,
+            systemHealthQualityGate: auditResult.qualityGate
+          }
+        })
+        .eq("id", plan.id);
+    }
+  } catch (auditError) {
+    console.error("[route-generator] system health audit failed", auditError);
+  }
+
+  const bundle = await getPlanBundle(plan.id);
+  return {
+    ...bundle,
+    correlationId
+  };
 }
 
 export async function getPlanBundle(planId: string) {
@@ -1795,6 +1850,47 @@ export async function exportSamsaraCsv(params: {
       stopCount: rows.length
     }
   });
+
+  try {
+    const { recordIntegrationCall } = await import("@/lib/system-health/integrations");
+    const correlationId =
+      typeof bundle.plan?.summary === "object" && bundle.plan.summary
+        ? String((bundle.plan.summary as Record<string, unknown>).correlationId || "") || null
+        : null;
+    await recordIntegrationCall({
+      integration: "samsara",
+      action: "csv_export",
+      success: true,
+      feature: "route_generator",
+      recordCount: rows.length,
+      correlationId,
+      metadata: {
+        fileName,
+        operatingDate,
+        scheduleAdjustedStops: schedule.adjustedStops,
+        validationOk: validation.ok
+      }
+    });
+    if (correlationId) {
+      const { getServiceSupabase: getSb } = await import("@/lib/supabase/server");
+      const sb = getSb();
+      await sb
+        .from("system_health_route_audits")
+        .update({
+          samsara_summary: {
+            status: "exported",
+            fileName,
+            stopCount: rows.length,
+            validationOk: validation.ok,
+            scheduleAdjustedStops: schedule.adjustedStops
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq("correlation_id", correlationId);
+    }
+  } catch (err) {
+    console.error("[route-generator] samsara health log failed", err);
+  }
 
   return {
     fileName,

@@ -79,6 +79,14 @@ export type PermissionKey =
   | "route_generator.export"
   | "route_generator.manage_settings"
   | "route_generator.view_audit"
+  | "system_health.view"
+  | "system_health.errors"
+  | "system_health.integrations"
+  | "system_health.route_audits"
+  | "system_health.user_activity"
+  | "system_health.developer"
+  | "system_health.export"
+  | "system_health.configure"
   | "review_management_support"
   | "view_notifications"
   | "respond_to_notifications"
@@ -301,6 +309,14 @@ const ALL_PERMISSIONS = Object.freeze([
   "route_generator.export",
   "route_generator.manage_settings",
   "route_generator.view_audit",
+  "system_health.view",
+  "system_health.errors",
+  "system_health.integrations",
+  "system_health.route_audits",
+  "system_health.user_activity",
+  "system_health.developer",
+  "system_health.export",
+  "system_health.configure",
   "review_management_support",
   "view_notifications",
   "respond_to_notifications",
@@ -399,7 +415,9 @@ export const SUPER_ADMIN_ONLY_PERMISSIONS = new Set<PermissionKey>([
   "manage_gemini_settings",
   "manage_database_tools",
   "reopen_photo_upload_batches",
-  "manage_photo_upload_settings"
+  "manage_photo_upload_settings",
+  "system_health.developer",
+  "system_health.configure"
 ]);
 
 /** Staff file complaints/requests; admin and management review (and may also submit write-ups). */
@@ -522,6 +540,12 @@ const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
   "route_generator.approve",
   "route_generator.export",
   "route_generator.view_audit",
+  "system_health.view",
+  "system_health.errors",
+  "system_health.integrations",
+  "system_health.route_audits",
+  "system_health.user_activity",
+  "system_health.export",
   "view_hr_hub",
   "use_hr_consult",
   "view_analytics",
@@ -1022,7 +1046,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   driver_mode: "view_my_shift",
   overnight_command: "view_my_shift",
   trainer_ops: "view_my_shift",
-  ops_system_health: "view_ops_command_center",
+  ops_system_health: "system_health.view",
   shift_handoff: "view_my_shift",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",

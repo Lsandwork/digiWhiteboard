@@ -125,5 +125,6 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   walks_board: FITDOG_UI.frontDeskLog,
   // Distinct from Track Incidents / Active Issues (same triangle icon was confusing in the collapsed rail).
   route_generator: FITDOG_UI_PACK.browserWorld,
+  ops_system_health: FITDOG_SIDEBAR_ICONS.integrations,
   remote_cast: FITDOG_UI_PACK.castVideos
 };
