@@ -588,8 +588,8 @@ const rows = [
     stopName: "Depot",
     stopNotes: "start",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:00",
-    scheduledDeparture: "07/26/2026 07:05",
+    scheduledArrival: "7/26/2026 7:00",
+    scheduledDeparture: "7/26/2026 7:05",
     routeDate: "2026-07-26",
     stopOrder: 0,
     latitude: "34.01",
@@ -603,8 +603,8 @@ const rows = [
     stopName: "Alex Rivera",
     stopNotes: "2 dogs",
     stopAddress: "123 Ocean Ave, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:08",
-    scheduledDeparture: "07/26/2026 07:13",
+    scheduledArrival: "7/26/2026 7:08",
+    scheduledDeparture: "7/26/2026 7:13",
     routeDate: "2026-07-26",
     stopOrder: 1,
     latitude: "34.02",
@@ -618,8 +618,8 @@ const rows = [
     stopName: "Depot",
     stopNotes: "end",
     stopAddress: "Depot, Santa Monica, CA 90401",
-    scheduledArrival: "07/26/2026 07:16",
-    scheduledDeparture: "07/26/2026 07:21",
+    scheduledArrival: "7/26/2026 7:16",
+    scheduledDeparture: "7/26/2026 7:21",
     routeDate: "2026-07-26",
     stopOrder: 2,
     latitude: "34.01",
@@ -636,6 +636,7 @@ const validation = validateExport({
   csv: built.csv
 });
 assert.equal(validation.ok, true, JSON.stringify(validation.report));
+assert.ok(built.csv.includes("\r\n"), "Samsara official samples use CRLF");
 assert.ok(built.csv.includes("2026-07-26 AM Pickup - Van 01"));
 assert.ok(built.csv.includes("Full Address"));
 assert.ok(built.csv.includes("Stop Arrival Time"));
@@ -645,15 +646,15 @@ assert.ok(!built.csv.includes("Scheduled Arrival Time"));
 assert.ok(!built.csv.includes("Route Date"));
 assert.ok(!built.csv.includes("Stop Order"));
 assert.ok(!built.csv.toLowerCase().includes("van 4"));
-// Synthesized schedule stays in America/Los_Angeles civil time.
+// Synthesized schedule stays in America/Los_Angeles civil time (unpadded m/d/yyyy H:mm).
 const sched = synthesizeStopSchedule({
   operatingDate: "2026-07-27",
   direction: "pickup",
   stopIndex: 0,
   stopCount: 3
 });
-assert.equal(sched.arrival, "07/27/2026 07:00");
-assert.equal(sched.departure, "07/27/2026 07:05");
+assert.equal(sched.arrival, "7/27/2026 7:00");
+assert.equal(sched.departure, "7/27/2026 7:05");
 assert.equal(
   synthesizeStopSchedule({
     operatingDate: "2026-07-27",
@@ -661,12 +662,14 @@ assert.equal(
     stopIndex: 2,
     stopCount: 3
   }).departure,
-  "07/27/2026 07:21",
+  "7/27/2026 7:21",
   "final stop must still have a dwell so Samsara accepts departure"
 );
 assert.equal(normalizeSamsaraVehicleName("Van 1"), "Van 01");
 assert.equal(normalizeSamsaraVehicleName("van_5"), "Van 05");
-assert.equal(sanitizeSamsaraNotes("Dogs: Indy\nPhone: (310) 555-1212"), "Dogs: Indy · Phone: (310) 555-1212");
+assert.equal(sanitizeSamsaraNotes("Dogs: Indy\nPhone: (310) 555-1212"), "Dogs: Indy | Phone: (310) 555-1212");
+assert.ok(!/[^\x20-\x7E]/.test(sanitizeSamsaraNotes("Dogs: Indy\nPhone: (310) 555-1212")));
+assert.ok(!sanitizeSamsaraNotes("Dogs: Indy\nPhone: (310) 555-1212").includes("·"));
 assert.ok(sanitizeSamsaraNotes(`${"x".repeat(600)}`).length <= SAMSARA_STOP_NOTES_MAX_CHARS);
 assert.ok(!sanitizeSamsaraNotes("Dogs\u0000Indy").includes("\u0000"));
 assert.equal(formatSamsaraCoordinate("34.01950000000001"), "34.0195");
@@ -675,15 +678,15 @@ assert.match(todayInLosAngeles(), /^\d{4}-\d{2}-\d{2}$/);
 
 const wrongDay = ensureScheduleOnOperatingDate({
   operatingDate: "2026-08-11",
-  arrival: "08/07/2026 07:00",
-  departure: "08/07/2026 07:05",
+  arrival: "8/7/2026 7:00",
+  departure: "8/7/2026 7:05",
   direction: "pickup",
   stopIndex: 0,
   stopCount: 3
 });
 assert.equal(wrongDay.realigned, true);
-assert.equal(wrongDay.arrival, "08/11/2026 07:00");
-assert.equal(wrongDay.departure, "08/11/2026 07:05");
+assert.equal(wrongDay.arrival, "8/11/2026 7:00");
+assert.equal(wrongDay.departure, "8/11/2026 7:05");
 
 const missingCoords = validateExport({
   template: getCanonicalSamsaraTemplate(),
@@ -723,7 +726,7 @@ assert.equal(badVehicle.ok, false, "non-roster vehicle must fail closed");
 const equalDwell = validateExport({
   template: getCanonicalSamsaraTemplate(),
   rows: [
-    { ...rows[0]!, scheduledArrival: "07/26/2026 07:00", scheduledDeparture: "07/26/2026 07:00" },
+    { ...rows[0]!, scheduledArrival: "7/26/2026 7:00", scheduledDeparture: "7/26/2026 7:00" },
     rows[1]!,
     rows[2]!
   ],
@@ -738,8 +741,8 @@ const nonMono = validateExport({
     rows[0]!,
     {
       ...rows[1]!,
-      scheduledArrival: "07/26/2026 07:04",
-      scheduledDeparture: "07/26/2026 07:09"
+      scheduledArrival: "7/26/2026 7:04",
+      scheduledDeparture: "7/26/2026 7:09"
     },
     rows[2]!
   ],
@@ -752,6 +755,28 @@ assert.ok(!sanitizeSamsaraNotes("Dogs\u200bIndy — “Buddy” 🐶").includes(
 assert.ok(!/[^\x20-\x7E]/.test(sanitizeSamsaraNotes("Dogs\u200bIndy — “Buddy” 🐶")));
 assert.ok(sanitizeSamsaraNotes(`${"x".repeat(600)}`).endsWith("..."));
 assert.ok(!sanitizeSamsaraNotes(`${"x".repeat(600)}`).includes("…"));
+
+// Multi-line customer notes must pass Digi fail-closed validation (no middle-dot ·).
+{
+  const noteRows = [
+    {
+      ...rows[0]!,
+      stopNotes: sanitizeSamsaraNotes("1 dog(s): Indy\nPhone: (310) 555-1212\nPickup instructions: gate code 12")
+    },
+    rows[1]!,
+    rows[2]!
+  ];
+  const noteCsv = buildCsv({ template: getCanonicalSamsaraTemplate(), rows: noteRows }).csv;
+  const noteValidation = validateExport({
+    template: getCanonicalSamsaraTemplate(),
+    rows: noteRows,
+    csv: noteCsv,
+    operatingDate: "2026-07-26"
+  });
+  assert.equal(noteValidation.ok, true, JSON.stringify(noteValidation.report));
+  assert.ok(noteRows[0]!.stopNotes.includes(" | "));
+  assert.ok(!noteRows[0]!.stopNotes.includes("·"));
+}
 
 // Drop-off start: Van 1/2/3 at 10:30; Van 5/6 (club / group class) at 12:00.
 assert.deepEqual(dropoffStartTimeForVan("van_1"), { hour: 10, minute: 30 });
@@ -767,7 +792,7 @@ assert.equal(
     stopCount: 3,
     vanKey: "van_1"
   }).arrival,
-  "07/27/2026 10:30"
+  "7/27/2026 10:30"
 );
 assert.equal(
   synthesizeStopSchedule({
@@ -777,7 +802,7 @@ assert.equal(
     stopCount: 3,
     vanKey: "van_3"
   }).arrival,
-  "07/27/2026 10:30"
+  "7/27/2026 10:30"
 );
 assert.equal(
   synthesizeStopSchedule({
@@ -787,7 +812,7 @@ assert.equal(
     stopCount: 3,
     vanKey: "van_5"
   }).arrival,
-  "07/27/2026 12:00"
+  "7/27/2026 12:00"
 );
 assert.equal(
   synthesizeStopSchedule({
@@ -797,7 +822,7 @@ assert.equal(
     stopCount: 3,
     vanKey: "van_6"
   }).arrival,
-  "07/27/2026 12:00"
+  "7/27/2026 12:00"
 );
 
 // Dropoff fixture parses

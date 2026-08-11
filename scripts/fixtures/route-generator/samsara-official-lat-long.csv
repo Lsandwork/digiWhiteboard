@@ -1,0 +1,4 @@
+Route Name,Assigned Driver Username,Assigned Vehicle Name,Stop Name,Stop Arrival Time,Stop Departure Time,Stop Notes,Address Name,Latitude,Longitude,Full Address
+Route 2,,,Stop 1,,6/10/23 10:53,,,33.748675,-84.3905067,"206 Washington St SW, Atlanta, GA 30334"
+Route 2,,,Stop 2,6/10/23 11:30,,,,32.0675356,-81.0984271,"Savannah, GA 31401"
+Route 2,,,Stop 3,6/10/23 14:53,,,,33.748675,-84.3905067,"206 Washington St SW, Atlanta, GA 30334"

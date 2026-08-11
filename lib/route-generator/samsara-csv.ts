@@ -118,22 +118,25 @@ export function autoMapSamsaraHeaders(headers: string[]): Record<string, string 
 
 /**
  * Format a Date for Samsara route CSV upload in org-local wall time.
- * Samsara bulk upload expects M/D/YYYY H:mm (24h) — keep zero-padded for stable parsing.
+ * Official cloud.samsara.com bulk-upload samples use unpadded `m/d/yyyy H:mm`
+ * (e.g. `6/10/2026 1:30`, `8/11/2026 7:05`) — zero-padded `MM/DD/YYYY HH:mm`
+ * has coincided with Internal Server Error on upload.
  */
 export function formatSamsaraCsvDateTime(date: Date, timeZone = "America/Los_Angeles"): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
     minute: "2-digit",
     hour12: false
   }).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((p) => p.type === type)?.value ?? "";
-  const hour = get("hour") === "24" ? "00" : get("hour");
-  return `${get("month")}/${get("day")}/${get("year")} ${hour}:${get("minute")}`;
+  const hourRaw = get("hour");
+  const hour = hourRaw === "24" ? "0" : String(Number(hourRaw));
+  return `${Number(get("month"))}/${Number(get("day"))}/${get("year")} ${hour}:${get("minute")}`;
 }
 
 /** Pad Fitdog van labels to match Samsara vehicle names (Van 01 … Van 06). Never Van 04. */
@@ -219,6 +222,10 @@ export function samsaraCsvDateTimeMatchesOperatingDate(value: string, operatingD
  * Flatten multiline driver notes for CSV bulk upload.
  * Newlines inside quoted cells are valid CSV, but Samsara's importer often marks
  * those rows as incorrect / Internal Server Error — keep one short ASCII line.
+ *
+ * IMPORTANT: use ASCII `|` separators only. Middle-dot `·` (U+00B7) is non-ASCII;
+ * joining with it after toSamsaraSafeAscii re-introduced characters that Digi's
+ * fail-closed ASCII check rejects (blocking download) or that Samsara 500s on.
  */
 export function sanitizeSamsaraNotes(value: string | null | undefined): string {
   const flat = toSamsaraSafeAscii(String(value ?? ""), { keepNewlines: true })
@@ -228,11 +235,13 @@ export function sanitizeSamsaraNotes(value: string | null | undefined): string {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .join(" · ")
+    .join(" | ")
     .replace(/\s+/g, " ")
     .trim();
-  if (flat.length <= SAMSARA_STOP_NOTES_MAX_CHARS) return flat;
-  return `${flat.slice(0, SAMSARA_STOP_NOTES_MAX_CHARS - 3).trimEnd()}...`;
+  // Final ASCII pass — strips any separator mistakes and leftover non-ASCII.
+  const ascii = toSamsaraSafeAscii(flat).replace(/\s+/g, " ").trim();
+  if (ascii.length <= SAMSARA_STOP_NOTES_MAX_CHARS) return ascii;
+  return `${ascii.slice(0, SAMSARA_STOP_NOTES_MAX_CHARS - 3).trimEnd()}...`;
 }
 
 /** Sanitize stop/route display text for CSV cells. */
@@ -309,7 +318,7 @@ export function ensureScheduleOnOperatingDate(params: {
   return { arrival: synthesized.arrival, departure: synthesized.departure, realigned: true };
 }
 
-/** Parse `MM/DD/YYYY HH:mm` used in our Samsara CSV cells. */
+/** Parse `m/d/yyyy H:mm` used in our Samsara CSV cells (also accepts zero-padded). */
 export function parseSamsaraCsvDateTime(value: string): Date | null {
   const m = String(value)
     .trim()
@@ -444,7 +453,8 @@ export function buildCsv(params: {
     lines.push(cells.join(template.delimiter));
   }
 
-  return { csv: lines.join("\n") + "\n", errors };
+  // Official Samsara sample downloads use CRLF. Match exactly.
+  return { csv: lines.join("\r\n") + "\r\n", errors };
 }
 
 export function validateExport(params: {
@@ -459,7 +469,14 @@ export function validateExport(params: {
 } {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const datetimeRe = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/;
+  // Official samples: m/d/yyyy H:mm (unpadded). Also accept zero-padded legacy cells.
+  const datetimeRe = /^\d{1,2}\/\d{1,2}\/\d{4} \d{1,2}:\d{2}$/;
+  if (!params.csv.includes("\r\n")) {
+    errors.push("CSV must use CRLF line endings to match Samsara official sample downloads.");
+  }
+  if (params.csv.charCodeAt(0) === 0xfeff || params.csv.startsWith("\uFEFF")) {
+    errors.push("CSV must not include a UTF-8 BOM.");
+  }
   const headerLine = params.csv.split(/\r?\n/)[0] ?? "";
   const parsedHeaders = parseCsvLine(headerLine, params.template.delimiter).map((h) => h.trim());
   const canonical = SAMSARA_BULK_UPLOAD_HEADERS.join("|");
@@ -492,14 +509,14 @@ export function validateExport(params: {
     } else {
       if (!datetimeRe.test(row.scheduledArrival.trim()) || !datetimeRe.test(row.scheduledDeparture.trim())) {
         errors.push(
-          `Datetime must be MM/DD/YYYY HH:mm (zero-padded) on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledArrival}" / "${row.scheduledDeparture}").`
+          `Datetime must be m/d/yyyy H:mm (Samsara sample style) on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledArrival}" / "${row.scheduledDeparture}").`
         );
       }
       const arrival = parseSamsaraCsvDateTime(row.scheduledArrival);
       const departure = parseSamsaraCsvDateTime(row.scheduledDeparture);
       if (!arrival || !departure) {
         errors.push(
-          `Bad datetime on ${row.routeName} stop "${row.stopName}" (use MM/DD/YYYY HH:mm). Got arrival="${row.scheduledArrival}" departure="${row.scheduledDeparture}"`
+          `Bad datetime on ${row.routeName} stop "${row.stopName}" (use m/d/yyyy H:mm). Got arrival="${row.scheduledArrival}" departure="${row.scheduledDeparture}"`
         );
       } else if (departure.getTime() <= arrival.getTime()) {
         errors.push(
@@ -552,9 +569,9 @@ export function validateExport(params: {
     if (/\n|\r/.test(row.stopNotes || "")) {
       errors.push(`Multiline Notes on ${row.routeName} stop "${row.stopName}" — flatten before upload.`);
     }
-    if (/[^\x20-\x7E]/.test(row.stopNotes || "")) {
+    if (/[^\x20-\x7E]/.test(row.stopNotes || "") || /·|\u00B7/.test(row.stopNotes || "")) {
       errors.push(
-        `Non-ASCII characters in Stop Notes on ${row.routeName} stop "${row.stopName}" — sanitize before upload (Samsara Internal Server Error risk).`
+        `Non-ASCII characters in Stop Notes on ${row.routeName} stop "${row.stopName}" — sanitize before upload (Samsara Internal Server Error risk). Use ASCII "|" separators, never middle-dot ·.`
       );
     }
     if (/[^\x20-\x7E]/.test(row.stopName || "") || /[^\x20-\x7E]/.test(row.stopAddress || "")) {

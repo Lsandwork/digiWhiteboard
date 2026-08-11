@@ -1276,7 +1276,7 @@ export async function exportSamsaraCsv(params: {
 
       rows.push({
         routeName: safeRouteName,
-        routeNotes: sanitizeSamsaraNotes(`${route.wave_name} · ${route.vehicle_pool}`),
+        routeNotes: sanitizeSamsaraNotes(`${route.wave_name} | ${route.vehicle_pool}`),
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
         driverName: "",

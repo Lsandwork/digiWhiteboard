@@ -9,7 +9,7 @@ Every customer stop exported to Samsara includes:
 3. **Pickup / drop-off instructions** from Fitdog `location_notes` (gate codes, key locations, etc.)  
 4. Reservation notes when present  
 
-Notes are flattened to a single line (` · ` separators) in the CSV so Samsara bulk upload does not reject multiline rows.
+Notes are flattened to a single line (ASCII ` | ` separators) in the CSV so Samsara bulk upload does not reject multiline rows. Never use middle-dot `·` — it is non-ASCII and has caused Digi fail-closed 422s and Samsara Internal Server Error.
 
 Rebuild path: Generate Routes writes notes on `route_plan_stops.driver_notes`; Export rebuilds from Fitdog report items + stop item links as a safety net.
 
@@ -40,7 +40,7 @@ If Samsara says **"Internal Server Error"**, **"One or more column headers are n
 - Digi exports only for the plan **operating date**.
 - Export of a non-today plan is **blocked** unless a manager uses emergency override with a written reason.
 - After the first export, use **Re-export Samsara CSV** — do not upload Friday’s (or any prior) file on a later day.
-- Digi validates lat/lng/address, same-day stop times, and flattened notes before download so Samsara bulk upload does not 500.
+- Digi validates lat/lng/address, same-day stop times (`m/d/yyyy H:mm`, CRLF), and flattened ASCII notes before download so Samsara bulk upload does not 500.
 
 ## Owner live tracking (Uber-style map)
 
@@ -79,9 +79,11 @@ Before Digi returns a CSV download it runs hard checks including:
 - Exact headers A–K
 - Vehicle roster only: `Van 01|02|03|05|06`
 - Address + lat/lng present; no near-zero coords
-- Same operating-date datetimes; departure **after** arrival; monotonic route times
-- Single-line printable-ASCII notes ≤ 480 chars
+- Same operating-date datetimes in **unpadded** `m/d/yyyy H:mm` (official sample style); departure **after** arrival; monotonic route times
+- Single-line printable-ASCII notes ≤ 480 chars (ASCII `|` separators only — never `·`)
+- CRLF line endings; no UTF-8 BOM
 - CSV round-trip parse of every data row
+- Address Name blank (raw lat/lng mode)
 
 If any check fails, export returns **422** and **no file** is downloaded.
 
