@@ -489,7 +489,7 @@ export function optimizeRoutes(params: {
           windowNote
         ]
           .filter(Boolean)
-          .join(" · ")
+          .join(" | ")
       });
     });
 
