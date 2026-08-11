@@ -24,16 +24,58 @@ const ALL_ROLES: AdminUserRole[] = [
 const REQUIRED_FOR_EVERYONE = ["first-login", "change-password", "troubleshoot-login", "what-is-this"] as const;
 
 const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
-  owner_admin: ["env-vars", "front-desk-log", "fitdog-alerts-help", "add-admin-user", "viewer-basics"],
-  manager_admin: ["env-vars", "front-desk-log", "fitdog-alerts-help", "add-admin-user", "viewer-basics"],
-  assistant_manager: ["front-desk-log", "management-role", "staff-ops-pages", "fitdog-alerts-help"],
-  front_desk_coordinator: ["front-desk-log", "front-desk-coordinator", "staff-ops-pages", "fitdog-alerts-help"],
-  team_leader: ["front-desk-log", "front-desk-coordinator", "staff-ops-pages", "fitdog-alerts-help"],
-  groomer: ["front-desk-log", "groomer-trainer-crossover"],
-  trainer: ["front-desk-log", "groomer-trainer-crossover"],
-  daycare: ["front-desk-log", "dog-handler-basics"],
-  driver: ["front-desk-log", "dog-handler-basics"],
-  hiker: ["front-desk-log", "dog-handler-basics"],
+  owner_admin: [
+    "env-vars",
+    "front-desk-log",
+    "fitdog-alerts-help",
+    "add-admin-user",
+    "viewer-basics",
+    "ops-command-center-help",
+    "grooming-push-help",
+    "commissions-help",
+    "route-generator-help"
+  ],
+  manager_admin: [
+    "env-vars",
+    "front-desk-log",
+    "fitdog-alerts-help",
+    "add-admin-user",
+    "viewer-basics",
+    "ops-command-center-help",
+    "grooming-push-help",
+    "commissions-help",
+    "route-generator-help"
+  ],
+  assistant_manager: [
+    "front-desk-log",
+    "management-role",
+    "staff-ops-pages",
+    "fitdog-alerts-help",
+    "ops-command-center-help",
+    "commissions-help",
+    "route-generator-help"
+  ],
+  front_desk_coordinator: [
+    "front-desk-log",
+    "front-desk-coordinator",
+    "staff-ops-pages",
+    "fitdog-alerts-help",
+    "ops-command-center-help",
+    "route-generator-help"
+  ],
+  team_leader: [
+    "front-desk-log",
+    "front-desk-coordinator",
+    "staff-ops-pages",
+    "fitdog-alerts-help",
+    "ops-command-center-help",
+    "route-generator-help"
+  ],
+  groomer: ["front-desk-log", "groomer-trainer-crossover", "grooming-push-help", "ops-command-center-help"],
+  trainer: ["front-desk-log", "groomer-trainer-crossover", "commissions-help", "ops-command-center-help"],
+  daycare: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
+  driver: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
+  hiker: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
   marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast", "what-is-this"],
   viewer: ["lobby-messages", "lobby-tv-cast", "viewer-basics", "what-is-this"]
 };

@@ -3,11 +3,9 @@ import { extractPhotoUrl } from "@/lib/board-utils";
 import { loadStoredAnimalPhotoMap } from "@/lib/animal-photo-store";
 import type { GingrBackOfHouseRecord } from "@/lib/gingr-board-sync";
 import { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
-import {
-  fetchCurrentlyCheckedInDogs,
-  invalidateCurrentlyCheckedInDogsCache,
-  type CheckedInGingrDog
-} from "@/lib/gingr-custom-animal-icons";
+import type { CheckedInGingrDog } from "@/lib/gingr-custom-animal-icons";
+import { invalidateCurrentlyCheckedInDogsCache } from "@/lib/gingr-custom-animal-icons";
+import { fetchCurrentlyCheckedInDogsRobust } from "@/lib/gingr-checked-in-dogs";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import type { LiveDog } from "@/lib/types";
 
@@ -326,25 +324,40 @@ export async function loadActiveDogsForGroomingPush(
 
   let checkedInReservationCount = 0;
   let checkedInFetchError: string | null = null;
+  let checkedInFetchMeta: Record<string, unknown> = {};
   if (gingrMode === "allow_fetch") {
     if (forceRefresh) invalidateCurrentlyCheckedInDogsCache();
     try {
       // Authoritative onsite list — back_of_house.checking_in is only the arrival basket.
-      const checkedInDogs = await fetchCurrentlyCheckedInDogs({ force: forceRefresh });
-      checkedInReservationCount = checkedInDogs.length;
-      for (const dog of checkedInDogs) {
+      const checkedIn = await fetchCurrentlyCheckedInDogsRobust({ force: forceRefresh, now });
+      checkedInReservationCount = checkedIn.dogs.length;
+      checkedInFetchMeta = checkedIn.meta;
+      for (const dog of checkedIn.dogs) {
         mergeDog(map, checkedInReservationToMutable(dog));
       }
     } catch (error) {
       checkedInFetchError = error instanceof Error ? error.message : "checked_in_fetch_failed";
       console.error("[grooming-push] checked-in reservations fetch failed:", checkedInFetchError);
+      // Sync must not silently look "empty" — callers surface this error in the picker.
+      if (forceRefresh) {
+        throw new Error(
+          checkedInFetchError ||
+            "Unable to sync checked-in dogs from Gingr. Confirm GINGR_API_KEY and try Sync again."
+        );
+      }
     }
   }
 
   const cachedBoard = getCachedBackOfHouseBoard(Date.now(), true);
   let board = cachedBoard;
+  let boardFetchError: string | null = null;
   if (gingrMode === "allow_fetch" && (forceRefresh || !cachedBoard)) {
-    board = await fetchGingrBackOfHouse({ allReservationTypes: true }).catch(() => cachedBoard);
+    try {
+      board = await fetchGingrBackOfHouse({ allReservationTypes: true });
+    } catch (error) {
+      boardFetchError = error instanceof Error ? error.message : "back_of_house_failed";
+      board = cachedBoard;
+    }
   }
   if (board) {
     for (const record of board.checking_in as GingrBackOfHouseRecord[]) {
@@ -371,6 +384,16 @@ export async function loadActiveDogsForGroomingPush(
     return a.dogName.localeCompare(b.dogName);
   });
 
+  // Initial open with a hard Gingr failure and zero dogs should not look like a quiet empty day.
+  if (
+    gingrMode === "allow_fetch" &&
+    !forceRefresh &&
+    enriched.length === 0 &&
+    checkedInFetchError
+  ) {
+    throw new Error(checkedInFetchError);
+  }
+
   const usedCheckedInApi = gingrMode === "allow_fetch" && checkedInReservationCount > 0;
   return {
     dogs: enriched,
@@ -384,8 +407,10 @@ export async function loadActiveDogsForGroomingPush(
       live_transition_rows: liveRows?.length ?? 0,
       checked_in_reservation_rows: checkedInReservationCount,
       checked_in_fetch_error: checkedInFetchError,
+      board_fetch_error: boardFetchError,
       gingr_mode: gingrMode,
-      force_refresh: forceRefresh
+      force_refresh: forceRefresh,
+      ...checkedInFetchMeta
     }
   };
 }

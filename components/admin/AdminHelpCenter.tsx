@@ -27,7 +27,12 @@ type QuickLinkItem = {
 const QUICK_LINKS: QuickLinkItem[] = [
   { href: "/lobby/checkouts", label: "Lobby Whiteboard", roles: ["admin", "viewer", "marketing"] },
   { href: "/", label: "Staff Whiteboard", roles: ["admin", "staff_ops", "viewer", "handler"] },
+  { href: "/admin?board=staff&tab=my_shift", label: "My Shift", roles: ["admin", "staff_ops", "handler"] },
+  { href: "/admin?board=staff&tab=ops_command_center", label: "Ops Command Center", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=crossover_communication", label: "Team Log", roles: ["admin", "staff_ops", "handler"] },
+  { href: "/admin?board=staff&tab=grooming_push", label: "Grooming Push", roles: ["admin", "staff_ops"] },
+  { href: "/admin?board=staff&tab=package_commissions", label: "Commissions", roles: ["admin", "staff_ops"] },
+  { href: "/admin?board=staff&tab=route_generator", label: "Route Generator", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=fitdog_alerts", label: "Fitdog Alerts", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=vip_auto_book", label: "VIP Auto Book", roles: ["admin", "staff_ops"] },
   { href: "/admin?board=staff&tab=push_notices", label: "Push Notices", roles: ["admin", "staff_ops"] },
@@ -105,7 +110,7 @@ export function AdminHelpCenter({ role, onGoToTab }: AdminHelpCenterProps) {
           <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-admin-muted" aria-hidden />
           <input
             className="admin-input admin-help-search-input pl-12"
-            placeholder="Search help… e.g. team log, login, check out, cast, push notices"
+            placeholder="Search help… e.g. grooming push, route generator, my shift, team log, commissions"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             aria-label="Search help articles"

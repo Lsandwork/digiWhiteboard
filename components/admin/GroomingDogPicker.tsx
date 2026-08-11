@@ -29,6 +29,7 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
   const [dogs, setDogs] = useState<GroomingPushActiveDog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [syncMeta, setSyncMeta] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -38,17 +39,30 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
       setLoading(true);
       setError(null);
       try {
+        // Always bust caches on Sync; also bust on first open so stale empty lists don't stick.
         const url = options?.fresh
-          ? "/api/gingr/active-dogs-for-grooming-push?fresh=1"
-          : "/api/gingr/active-dogs-for-grooming-push";
+          ? `/api/gingr/active-dogs-for-grooming-push?fresh=1&t=${Date.now()}`
+          : `/api/gingr/active-dogs-for-grooming-push?t=${Date.now()}`;
         const response = await fetch(url, { cache: "no-store", signal });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error ?? "Unable to load dogs from Gingr.");
-        setDogs(body.dogs ?? []);
+        const nextDogs = Array.isArray(body.dogs) ? body.dogs : [];
+        setDogs(nextDogs);
+        const checkedInRows = Number(body.meta?.checked_in_reservation_rows ?? nextDogs.length);
+        const todayLa = body.meta?.todayLa ? String(body.meta.todayLa) : null;
+        setSyncMeta(
+          todayLa
+            ? `${checkedInRows} checked-in · ${todayLa} PT`
+            : `${checkedInRows} dog(s) from Gingr`
+        );
+        if (body.error && nextDogs.length === 0) {
+          setError(String(body.error));
+        }
       } catch (loadError) {
         if (!(loadError instanceof DOMException && loadError.name === "AbortError")) {
           setError(loadError instanceof Error ? loadError.message : "Unable to load dogs from Gingr.");
           setDogs([]);
+          setSyncMeta(null);
         }
       }
       setLoading(false);
@@ -58,7 +72,7 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
 
   useEffect(() => {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => void load(controller.signal), 0);
+    const timer = window.setTimeout(() => void load(controller.signal, { fresh: true }), 0);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -68,7 +82,7 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController();
-    const timer = window.setTimeout(() => void load(controller.signal), 0);
+    const timer = window.setTimeout(() => void load(controller.signal, { fresh: true }), 0);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
@@ -142,15 +156,20 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
               Sync
             </button>
           </div>
+          {syncMeta ? <p className="px-3 pb-1 text-[11px] text-admin-muted">{syncMeta}</p> : null}
 
           <div className="grooming-dog-picker__list">
             {loading ? (
               <p className="grooming-dog-picker__empty"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading dogs checked in to Gingr…</p>
             ) : error ? (
               <p className="grooming-dog-picker__empty grooming-dog-picker__empty--error">{error}</p>
-            ) : grouped.length === 0 ? (
+            ) : dogs.length === 0 ? (
               <p className="grooming-dog-picker__empty">
                 No dogs checked in to Gingr right now. Tap Sync to refresh, or use Type dog manually if the dog is present.
+              </p>
+            ) : grouped.length === 0 ? (
+              <p className="grooming-dog-picker__empty">
+                No matches for “{query.trim()}”. Clear search or try another name — {dogs.length} dog(s) are loaded from Gingr.
               </p>
             ) : (
               grouped.map((section) => (
