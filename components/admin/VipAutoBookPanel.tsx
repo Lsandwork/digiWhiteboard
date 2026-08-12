@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Crown, Plus, RefreshCw, Search } from "lucide-react";
+import { Crown, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import {
@@ -84,8 +85,37 @@ const emptyForm = {
   daysOfWeek: [] as number[],
   monthlyWeek: "",
   preferredTime: "",
+  platform: "APP",
+  pickupLocation: "",
+  dropoffLocation: "",
+  daysBookedLabel: "",
+  status: "active" as VipClientStatus,
   notes: ""
 };
+
+function formFromRow(row: VipAutoBookClient): typeof emptyForm {
+  return {
+    ownerName: row.ownerName || "",
+    dogName: row.dogName || "",
+    ownerEmail: row.ownerEmail || "",
+    ownerPhone: row.ownerPhone || "",
+    dogBreed: row.dogBreed || "",
+    fitdogOwnerId: row.fitdogOwnerId || "",
+    fitdogDogId: row.fitdogDogId || "",
+    serviceKind: row.serviceKind,
+    serviceName: row.serviceName || "",
+    cadence: row.cadence,
+    daysOfWeek: [...(row.daysOfWeek || [])],
+    monthlyWeek: row.monthlyWeek != null ? String(row.monthlyWeek) : "",
+    preferredTime: row.preferredTime || "",
+    platform: row.platform || "APP",
+    pickupLocation: row.pickupLocation || "",
+    dropoffLocation: row.dropoffLocation || "",
+    daysBookedLabel: row.daysBookedLabel || "",
+    status: row.status,
+    notes: row.notes || ""
+  };
+}
 
 function formatWhen(value: string | null | undefined) {
   if (!value) return "Never";
@@ -107,6 +137,10 @@ export function VipAutoBookPanel() {
   const [syncing, setSyncing] = useState(false);
   const [gingrSyncing, setGingrSyncing] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<VipAutoBookClient | null>(null);
   const [drawer, setDrawer] = useState<VipAutoBookClient | null>(null);
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | VipClientStatus>("all");
@@ -170,6 +204,7 @@ export function VipAutoBookPanel() {
   }, [dogQuery, ownerQuery]);
 
   const summary = data?.summary;
+  const canManage = Boolean(data?.canManage);
   const filteredHits = useMemo(() => {
     return hits.filter((hit) => {
       if (dogQuery.trim() && hit.dogName && !hit.dogName.toLowerCase().includes(dogQuery.trim().toLowerCase())) {
@@ -179,6 +214,29 @@ export function VipAutoBookPanel() {
       return true;
     });
   }, [hits, dogQuery]);
+
+  function resetFormState() {
+    setForm(emptyForm);
+    setOwnerQuery("");
+    setDogQuery("");
+    setHits([]);
+    setEditingId(null);
+  }
+
+  function openCreate() {
+    resetFormState();
+    setManualOpen(true);
+  }
+
+  function openEdit(row: VipAutoBookClient) {
+    setEditingId(row.id);
+    setForm(formFromRow(row));
+    setOwnerQuery(row.ownerName || "");
+    setDogQuery(row.dogName || "");
+    setHits([]);
+    setDrawer(null);
+    setManualOpen(true);
+  }
 
   function pickHit(hit: VipDirectoryHit) {
     setForm((prev) => ({
@@ -206,27 +264,32 @@ export function VipAutoBookPanel() {
     });
   }
 
-  async function createClient() {
+  async function saveClient() {
+    setSaving(true);
     try {
+      const payload = {
+        ...form,
+        monthlyWeek: form.monthlyWeek ? Number(form.monthlyWeek) : null
+      };
       const res = await fetch("/api/admin/vip-auto-book", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "create",
-          ...form,
-          monthlyWeek: form.monthlyWeek ? Number(form.monthlyWeek) : null
-        })
+        body: JSON.stringify(
+          editingId
+            ? { action: "update", id: editingId, ...payload }
+            : { action: "create", ...payload }
+        )
       });
       const json = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(json.error || "Could not save VIP client.");
-      showToast("VIP Auto Book client saved.", "success");
+      if (!res.ok) throw new Error(json.error || (editingId ? "Could not update VIP client." : "Could not save VIP client."));
+      showToast(editingId ? "VIP client updated." : "VIP Auto Book client saved.", "success");
       setManualOpen(false);
-      setForm(emptyForm);
-      setOwnerQuery("");
-      setDogQuery("");
+      resetFormState();
       await load();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Could not save VIP client.", "error");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -244,6 +307,28 @@ export function VipAutoBookPanel() {
       showToast("VIP client updated.", "success");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Update failed.", "error");
+    }
+  }
+
+  async function deleteClient() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/admin/vip-auto-book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id: deleteTarget.id })
+      });
+      const json = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(json.error || "Could not delete VIP client.");
+      showToast("VIP client deleted.", "success");
+      if (drawer?.id === deleteTarget.id) setDrawer(null);
+      setDeleteTarget(null);
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not delete VIP client.", "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -285,6 +370,38 @@ export function VipAutoBookPanel() {
     }
   }
 
+  function RowActions({ row }: { row: VipAutoBookClient }) {
+    if (!canManage) return null;
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        <button
+          type="button"
+          className="admin-icon-btn"
+          aria-label={`Edit ${row.dogName}`}
+          title="Edit"
+          onClick={(event) => {
+            event.stopPropagation();
+            openEdit(row);
+          }}
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          className="admin-icon-btn"
+          aria-label={`Delete ${row.dogName}`}
+          title="Delete"
+          onClick={(event) => {
+            event.stopPropagation();
+            setDeleteTarget(row);
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -306,7 +423,7 @@ export function VipAutoBookPanel() {
           <button
             type="button"
             className="crossover-btn crossover-btn--secondary"
-            disabled={syncing || gingrSyncing || !data?.canManage}
+            disabled={syncing || gingrSyncing || !canManage}
             onClick={() => void runDirectorySync()}
           >
             <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
@@ -315,7 +432,7 @@ export function VipAutoBookPanel() {
           <button
             type="button"
             className="crossover-btn crossover-btn--secondary"
-            disabled={syncing || gingrSyncing || !data?.canManage}
+            disabled={syncing || gingrSyncing || !canManage}
             onClick={() => void runGingrSync()}
           >
             <RefreshCw className={`h-4 w-4 ${gingrSyncing ? "animate-spin" : ""}`} />
@@ -324,13 +441,8 @@ export function VipAutoBookPanel() {
           <button
             type="button"
             className="crossover-btn crossover-btn--primary"
-            disabled={!data?.canManage}
-            onClick={() => {
-              setForm(emptyForm);
-              setOwnerQuery("");
-              setDogQuery("");
-              setManualOpen(true);
-            }}
+            disabled={!canManage}
+            onClick={openCreate}
           >
             <Plus className="h-4 w-4" />
             Add VIP Client
@@ -410,20 +522,23 @@ export function VipAutoBookPanel() {
                     <h3 className="vip-auto-book-mobile__dog">{row.dogName}</h3>
                     <p className="vip-auto-book-mobile__owner">{row.ownerName}</p>
                   </div>
-                  <button
-                    type="button"
-                    className={`crossover-btn vip-auto-book-table__rebook-btn shrink-0 ${
-                      row.needToRebook
-                        ? "crossover-btn--primary border-amber-400 bg-amber-500 text-black hover:bg-amber-400"
-                        : "crossover-btn--secondary"
-                    }`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void patchClient(row.id, { needToRebook: !row.needToRebook });
-                    }}
-                  >
-                    {row.needToRebook ? "Re-book: Yes" : "Re-book: No"}
-                  </button>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <button
+                      type="button"
+                      className={`crossover-btn vip-auto-book-table__rebook-btn ${
+                        row.needToRebook
+                          ? "crossover-btn--primary border-amber-400 bg-amber-500 text-black hover:bg-amber-400"
+                          : "crossover-btn--secondary"
+                      }`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void patchClient(row.id, { needToRebook: !row.needToRebook });
+                      }}
+                    >
+                      {row.needToRebook ? "Re-book: Yes" : "Re-book: No"}
+                    </button>
+                    <RowActions row={row} />
+                  </div>
                 </div>
 
                 <dl className="vip-auto-book-mobile__grid">
@@ -478,6 +593,7 @@ export function VipAutoBookPanel() {
                 <th>Last booked</th>
                 <th>Re-book</th>
                 <th>PU / DO</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -547,12 +663,15 @@ export function VipAutoBookPanel() {
                       <p className="vip-auto-book-table__primary">{row.pickupLocation || "—"}</p>
                       <p className="vip-auto-book-table__meta">{row.dropoffLocation || "—"}</p>
                     </td>
+                    <td onClick={(event) => event.stopPropagation()}>
+                      <RowActions row={row} />
+                    </td>
                   </tr>
                 );
               })}
               {!loading && !(data?.rows ?? []).length ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-sm text-admin-muted">
+                  <td colSpan={7} className="py-8 text-center text-sm text-admin-muted">
                     No VIP Auto Book clients yet. Add one and choose weekly/monthly class, hike, or excursion.
                   </td>
                 </tr>
@@ -565,16 +684,32 @@ export function VipAutoBookPanel() {
 
       <Modal
         open={manualOpen}
-        title="Add VIP Auto Book client"
-        description="Type dog or owner — matches from the Fitdog Sports directory will appear. Then set class/hike/excursion and weekly or monthly cadence."
-        onClose={() => setManualOpen(false)}
+        title={editingId ? "Edit VIP Auto Book client" : "Add VIP Auto Book client"}
+        description={
+          editingId
+            ? "Update dog/owner details, service, cadence, pickup/drop-off, or notes for this VIP row."
+            : "Type dog or owner — matches from the Fitdog Sports directory will appear. Then set class/hike/excursion and weekly or monthly cadence."
+        }
+        onClose={() => {
+          if (saving) return;
+          setManualOpen(false);
+          resetFormState();
+        }}
         footer={
           <div className="flex justify-end gap-2">
-            <button type="button" className="admin-btn-secondary" onClick={() => setManualOpen(false)}>
+            <button
+              type="button"
+              className="admin-btn-secondary"
+              disabled={saving}
+              onClick={() => {
+                setManualOpen(false);
+                resetFormState();
+              }}
+            >
               Cancel
             </button>
-            <button type="button" className="admin-btn-primary" onClick={() => void createClient()}>
-              Save VIP Client
+            <button type="button" className="admin-btn-primary" disabled={saving || !canManage} onClick={() => void saveClient()}>
+              {saving ? "Saving…" : editingId ? "Save Changes" : "Save VIP Client"}
             </button>
           </div>
         }
@@ -631,6 +766,22 @@ export function VipAutoBookPanel() {
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Owner phone</span>
+              <input
+                className="admin-input w-full"
+                value={form.ownerPhone}
+                onChange={(event) => setForm((prev) => ({ ...prev, ownerPhone: event.target.value }))}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Owner email</span>
+              <input
+                className="admin-input w-full"
+                value={form.ownerEmail}
+                onChange={(event) => setForm((prev) => ({ ...prev, ownerEmail: event.target.value }))}
+              />
+            </label>
+            <label className="block">
               <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Service type</span>
               <select
                 className="admin-input w-full"
@@ -676,6 +827,45 @@ export function VipAutoBookPanel() {
                 placeholder="e.g. 7:00 AM"
               />
             </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Platform</span>
+              <input
+                className="admin-input w-full"
+                value={form.platform}
+                onChange={(event) => setForm((prev) => ({ ...prev, platform: event.target.value }))}
+                placeholder="APP, Gingr, or Gingr / APP"
+              />
+            </label>
+            {editingId ? (
+              <label className="block">
+                <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Status</span>
+                <select
+                  className="admin-input w-full"
+                  value={form.status}
+                  onChange={(event) => setForm((prev) => ({ ...prev, status: event.target.value as VipClientStatus }))}
+                >
+                  <option value="active">Active</option>
+                  <option value="paused">Paused</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </label>
+            ) : null}
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Pickup</span>
+              <input
+                className="admin-input w-full"
+                value={form.pickupLocation}
+                onChange={(event) => setForm((prev) => ({ ...prev, pickupLocation: event.target.value }))}
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Drop-off</span>
+              <input
+                className="admin-input w-full"
+                value={form.dropoffLocation}
+                onChange={(event) => setForm((prev) => ({ ...prev, dropoffLocation: event.target.value }))}
+              />
+            </label>
           </div>
 
           {form.cadence === "weekly" || form.cadence === "custom" ? (
@@ -710,6 +900,16 @@ export function VipAutoBookPanel() {
           )}
 
           <label className="block">
+            <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Days booked label (optional)</span>
+            <input
+              className="admin-input w-full"
+              value={form.daysBookedLabel}
+              onChange={(event) => setForm((prev) => ({ ...prev, daysBookedLabel: event.target.value }))}
+              placeholder="Override schedule display if needed"
+            />
+          </label>
+
+          <label className="block">
             <span className="mb-1 block text-xs font-bold uppercase text-admin-muted">Notes</span>
             <textarea
               className="admin-input min-h-[90px] w-full"
@@ -729,30 +929,42 @@ export function VipAutoBookPanel() {
         footer={
           drawer ? (
             <div className="flex flex-wrap justify-end gap-2">
-              {drawer.status === "active" ? (
-                <button
-                  type="button"
-                  className="admin-btn-secondary"
-                  onClick={() => void patchClient(drawer.id, { status: "paused" })}
-                >
-                  Pause
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="admin-btn-secondary"
-                  onClick={() => void patchClient(drawer.id, { status: "active" })}
-                >
-                  Activate
-                </button>
-              )}
-              <button
-                type="button"
-                className="admin-btn-secondary"
-                onClick={() => void patchClient(drawer.id, { status: "cancelled" })}
-              >
-                Cancel VIP
-              </button>
+              {canManage ? (
+                <>
+                  <button type="button" className="admin-btn-secondary" onClick={() => openEdit(drawer)}>
+                    <Pencil className="mr-1 inline h-4 w-4" />
+                    Edit
+                  </button>
+                  <button type="button" className="admin-btn-danger" onClick={() => setDeleteTarget(drawer)}>
+                    <Trash2 className="mr-1 inline h-4 w-4" />
+                    Delete
+                  </button>
+                  {drawer.status === "active" ? (
+                    <button
+                      type="button"
+                      className="admin-btn-secondary"
+                      onClick={() => void patchClient(drawer.id, { status: "paused" })}
+                    >
+                      Pause
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="admin-btn-secondary"
+                      onClick={() => void patchClient(drawer.id, { status: "active" })}
+                    >
+                      Activate
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="admin-btn-secondary"
+                    onClick={() => void patchClient(drawer.id, { status: "cancelled" })}
+                  >
+                    Cancel VIP
+                  </button>
+                </>
+              ) : null}
               <button type="button" className="admin-btn-primary" onClick={() => setDrawer(null)}>
                 Close
               </button>
@@ -803,6 +1015,21 @@ export function VipAutoBookPanel() {
           </div>
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete VIP client?"
+        description={`This permanently removes ${deleteTarget?.dogName ?? "this dog"} (${deleteTarget?.ownerName ?? "owner"}) from VIP Auto Book. This cannot be undone.`}
+        confirmLabel="Delete row"
+        danger
+        busy={deleting}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+        onConfirm={() => {
+          void deleteClient();
+        }}
+      />
     </div>
   );
 }

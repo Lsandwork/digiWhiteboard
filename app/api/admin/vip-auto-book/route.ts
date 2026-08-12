@@ -6,6 +6,7 @@ import { isAdminOrManagementRole, isFrontDeskCoordinatorRole } from "@/lib/admin
 import { getUserAccess } from "@/lib/admin/user-access";
 import {
   createVipAutoBookClient,
+  deleteVipAutoBookClient,
   getLatestVipDirectorySync,
   getLatestVipGingrSync,
   getVipAutoBookSummary,
@@ -140,6 +141,10 @@ export async function POST(request: Request) {
         startsOn: body.startsOn != null ? String(body.startsOn) : null,
         endsOn: body.endsOn != null ? String(body.endsOn) : null,
         notes: body.notes != null ? String(body.notes) : "",
+        platform: body.platform != null ? String(body.platform) : null,
+        pickupLocation: body.pickupLocation != null ? String(body.pickupLocation) : null,
+        dropoffLocation: body.dropoffLocation != null ? String(body.dropoffLocation) : null,
+        daysBookedLabel: body.daysBookedLabel != null ? String(body.daysBookedLabel) : null,
         createdByUserId: gate.session?.adminUserId ?? null,
         createdByName: actor
       });
@@ -174,9 +179,18 @@ export async function POST(request: Request) {
         daysBookedLabel:
           body.daysBookedLabel !== undefined ? (body.daysBookedLabel ? String(body.daysBookedLabel) : null) : undefined,
         lastBookedFor:
-          body.lastBookedFor !== undefined ? (body.lastBookedFor ? String(body.lastBookedFor) : null) : undefined
+          body.lastBookedFor !== undefined ? (body.lastBookedFor ? String(body.lastBookedFor) : null) : undefined,
+        fitdogOwnerId: body.fitdogOwnerId !== undefined ? (body.fitdogOwnerId ? String(body.fitdogOwnerId) : null) : undefined,
+        fitdogDogId: body.fitdogDogId !== undefined ? (body.fitdogDogId ? String(body.fitdogDogId) : null) : undefined
       });
       return NextResponse.json({ ok: true, record });
+    }
+
+    if (action === "delete") {
+      const id = String(body.id ?? "");
+      if (!id) return NextResponse.json({ error: "Client id is required." }, { status: 400 });
+      const deleted = await deleteVipAutoBookClient(gate.supabase!, id);
+      return NextResponse.json({ ok: true, deleted });
     }
 
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });

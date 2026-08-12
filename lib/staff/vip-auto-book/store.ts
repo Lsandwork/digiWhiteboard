@@ -305,6 +305,22 @@ export async function updateVipAutoBookClient(
   return mapRow(data as Record<string, unknown>);
 }
 
+export async function deleteVipAutoBookClient(supabase: SupabaseClient, id: string) {
+  const clientId = String(id ?? "").trim();
+  if (!clientId) throw new Error("Client id is required.");
+
+  const { data, error } = await supabase
+    .from("vip_auto_book_clients")
+    .delete()
+    .eq("id", clientId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("VIP client not found.");
+  return { id: String((data as { id: string }).id) };
+}
+
 export async function searchVipDirectory(
   supabase: SupabaseClient,
   query: string,

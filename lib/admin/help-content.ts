@@ -590,6 +590,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Click Sync Fitdog Directory (or wait for the daily pull) to load owner/dog names from app.fitdog.com and confirm Last Day Booked (clears Re-book Needed when a future class is already booked).",
       "Add VIP Client — type a dog or owner name and pick a match from the popup list.",
       "Choose service type (Group Class, Adventure Hike, Beach Excursion, Trainer-Led Hike, etc.), cadence (weekly/monthly), and days or week of month.",
+      "Edit a row with the pencil icon (or open the row and click Edit) to change schedule, pickup/drop-off, notes, or status.",
+      "Delete a row with the trash icon (or Delete in the detail view) when the client should leave VIP Auto Book.",
       "Use the VIP list during booking windows so those dogs are never missed on Fitdog Sports."
     ],
     tips: [
