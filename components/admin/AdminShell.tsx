@@ -27,6 +27,7 @@ import {
   RuffOpsLockScreen,
   useRuffOpsLock
 } from "@/components/admin/ops-command-center/LockRuffOps";
+import { ShellLayoutSwitcher } from "@/components/shared/ShellLayoutSwitcher";
 import { getEffectiveDemoRole, usesDemoRoleSwitcher } from "@/lib/demo/session";
 
 type AdminShellProps = {
@@ -305,6 +306,8 @@ export function AdminShell({
             <div className="admin-content-main crossover-dashboard min-w-0 space-y-5">{children}</div>
             {showPreview && preview ? <aside className="admin-preview-column">{preview}</aside> : null}
           </div>
+
+          <ShellLayoutSwitcher />
         </div>
       </div>
 

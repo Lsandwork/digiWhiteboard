@@ -6340,6 +6340,94 @@ html[data-theme="clear"] .admin-detail-drawer__notes-body {
   }
 }
 
+/* Force desktop shell even on a phone-sized viewport */
+html[data-shell="desktop"] .admin-appbar,
+html[data-shell="desktop"] .admin-mobile-tabbar,
+html[data-shell="desktop"] .admin-board-subnav {
+  display: none !important;
+}
+
+html[data-shell="desktop"] .admin-header__desktop {
+  display: flex !important;
+}
+
+html[data-shell="desktop"] .admin-header {
+  position: static;
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: 0;
+}
+
+html[data-shell="desktop"] .admin-main {
+  padding: 1.25rem 1.5rem 2.5rem;
+}
+
+html[data-shell="desktop"] .admin-page-subtitle {
+  display: block;
+}
+
+html[data-shell="desktop"] .admin-header__label-full {
+  display: inline;
+}
+
+html[data-shell="desktop"] .admin-header__label-short {
+  display: none;
+}
+
+html[data-shell="desktop"] .admin-floating-dock {
+  bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+/* Bottom mobile/desktop switcher */
+.shell-layout-switcher {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.75rem;
+  padding: 1rem 0.5rem 0.35rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.shell-layout-switcher__placeholder {
+  display: block;
+  height: 2.5rem;
+}
+
+.shell-layout-switcher__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  padding: 0.55rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shell-layout-switcher__btn:hover {
+  border-color: rgba(255, 111, 38, 0.55);
+  color: #fff;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .shell-layout-switcher {
+  border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .shell-layout-switcher__btn {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: #334155;
+}
+
 .admin-board-subnav {
   display: none;
 }

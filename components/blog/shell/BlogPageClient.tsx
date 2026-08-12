@@ -7,6 +7,7 @@ import { BlogDashboardSidebar } from "@/components/blog/shell/BlogDashboardSideb
 import { BlogDashboardTopbar } from "@/components/blog/shell/BlogDashboardTopbar";
 import { BlogMobileTabBar } from "@/components/blog/shell/BlogMobileTabBar";
 import { BlogWorkspace } from "@/components/blog/shell/BlogWorkspace";
+import { ShellLayoutSwitcher } from "@/components/shared/ShellLayoutSwitcher";
 import {
   accessFromLegacyRole,
   effectiveAccessLabel,
@@ -137,6 +138,7 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
               canSubmitIdea={canAccess("blog.submit_idea") || canAccess("blog.create")}
               onDashboardCounts={setCounts}
             />
+            <ShellLayoutSwitcher />
           </div>
         </div>
       </div>
