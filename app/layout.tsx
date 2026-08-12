@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/boot-script";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <ChunkLoadRecovery />
         <ThemeProvider>{children}</ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
