@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { SHELL_LAYOUT_BOOT_SCRIPT } from "@/lib/shell-layout/boot-script";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/boot-script";
 import "./globals.css";
 import "../lib/theme/tokens.css";
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SHELL_LAYOUT_BOOT_SCRIPT }} />
       </head>
       <body>
         <ChunkLoadRecovery />

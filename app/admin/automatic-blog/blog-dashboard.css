@@ -638,6 +638,35 @@
   }
 }
 
+/* Force desktop Blog Generator chrome on phones */
+html[data-shell="desktop"] .blog-mobile-tabbar,
+html[data-shell="desktop"] .blog-dash__app-brand,
+html[data-shell="desktop"] .blog-dash__title-mobile {
+  display: none !important;
+}
+
+html[data-shell="desktop"] .blog-dash__title-desktop {
+  display: inline !important;
+}
+
+html[data-shell="desktop"] .blog-dash__content {
+  padding-bottom: 1rem;
+}
+
+html[data-shell="desktop"] .blog-dash__nav-link--mobile-hidden {
+  display: flex !important;
+}
+
+.blog-dash .shell-layout-switcher {
+  border-top-color: var(--fitdog-border, rgba(15, 23, 42, 0.08));
+}
+
+.blog-dash .shell-layout-switcher__btn {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: var(--fitdog-border, rgba(15, 23, 42, 0.12));
+  color: var(--fitdog-heading, #0f172a);
+}
+
 @media (max-width: 640px) {
   .blog-dash__content {
     padding-left: 12px;
