@@ -13,8 +13,10 @@ type UploadTargetResponse = {
 type UploadCompleteResponse = {
   error?: string;
   ok?: boolean;
-  item?: PhotoUploadItem;
+  skipped?: boolean;
+  item?: PhotoUploadItem | null;
   duplicate?: unknown;
+  message?: string;
 };
 
 async function requestUploadTarget(input: {
@@ -64,10 +66,28 @@ async function finalizeVideoUpload(input: {
     body: JSON.stringify(input)
   });
   const body = await readApiJson<UploadCompleteResponse>(response);
-  if (!response.ok || !body.item) {
+  if (!response.ok) {
     throw new Error(body.error ?? "Unable to finalize media upload.");
   }
-  return body;
+  if (body.skipped) {
+    return {
+      ok: true,
+      skipped: true as const,
+      item: null,
+      duplicate: body.duplicate ?? null,
+      message: body.message || "Skipped duplicate video."
+    };
+  }
+  if (!body.item) {
+    throw new Error(body.error ?? "Unable to finalize media upload.");
+  }
+  return {
+    ok: true,
+    skipped: false as const,
+    item: body.item,
+    duplicate: null,
+    message: undefined
+  };
 }
 
 function isVideoFile(file: File) {

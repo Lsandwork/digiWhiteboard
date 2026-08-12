@@ -7,6 +7,7 @@ import { UploadZone, type PendingUpload } from "@/components/admin/photo-upload-
 import {
   getPhotoBatch,
   preparePhotoExport,
+  purgeDuplicatePhotos,
   uploadPhotoFiles
 } from "@/components/admin/photo-upload-queue/api";
 import { isVideoFile, uploadMediaVideoDirect } from "@/lib/media-library/upload-client";
@@ -51,6 +52,19 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
+      // Remove existing content-hash duplicates (keep oldest) before showing the gallery.
+      try {
+        const purged = await purgeDuplicatePhotos();
+        if (purged.deleted > 0) {
+          showToast(
+            `Removed ${purged.deleted} duplicate photo${purged.deleted === 1 ? "" : "s"} from the library.`,
+            "success"
+          );
+        }
+      } catch {
+        // Non-blocking — library still loads if purge fails.
+      }
+
       const ensure = await fetch("/api/admin/photo-upload-queue?ensure_today=1", { cache: "no-store" });
       const ensureBody = await ensure.json();
       if (!ensure.ok) throw new Error(ensureBody.error || "Unable to open photo library.");
@@ -120,7 +134,13 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
           try {
             const photoFiles = batchItems.filter((item) => !isVideoFile(item.file));
             const videoFiles = batchItems.filter((item) => isVideoFile(item.file));
-            const results: Array<{ fileName: string; ok: boolean; item?: PhotoUploadItem; error?: string }> = [];
+            const results: Array<{
+              fileName: string;
+              ok: boolean;
+              skipped?: boolean;
+              item?: PhotoUploadItem;
+              error?: string;
+            }> = [];
 
             if (photoFiles.length) {
               const photoResults = await uploadPhotoFiles(
@@ -144,11 +164,20 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
                   )
                 );
                 const uploaded = await uploadMediaVideoDirect(pending.file, batchIdRef.current);
-                results.push({
-                  fileName: pending.file.name,
-                  ok: true,
-                  item: uploaded.item as PhotoUploadItem
-                });
+                if (uploaded.skipped) {
+                  results.push({
+                    fileName: pending.file.name,
+                    ok: true,
+                    skipped: true,
+                    error: uploaded.message || "Skipped duplicate video."
+                  });
+                } else {
+                  results.push({
+                    fileName: pending.file.name,
+                    ok: true,
+                    item: uploaded.item as PhotoUploadItem
+                  });
+                }
               } catch (error) {
                 results.push({
                   fileName: pending.file.name,
@@ -160,12 +189,23 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
 
             const byName = new Map(results.map((row) => [row.fileName, row]));
             const newItems: PhotoUploadItem[] = [];
+            let skippedCount = 0;
             setPendingUploads((prev) =>
               prev.map((item) => {
                 if (!ids.has(item.id)) return item;
                 const result =
                   byName.get(item.file.name) ||
                   results.find((row) => row.fileName === item.file.name);
+                if (result?.ok && result.skipped) {
+                  skippedCount += 1;
+                  return {
+                    ...item,
+                    status: "done" as const,
+                    progress: 100,
+                    error: result.error || "Skipped duplicate.",
+                    abort: undefined
+                  };
+                }
                 if (result?.ok && result.item) {
                   newItems.push(result.item as PhotoUploadItem);
                   return { ...item, status: "done" as const, progress: 100, error: undefined, abort: undefined };
@@ -179,6 +219,12 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
                 };
               })
             );
+            if (skippedCount > 0) {
+              showToast(
+                `Skipped ${skippedCount} duplicate image${skippedCount === 1 ? "" : "s"}.`,
+                "info"
+              );
+            }
             if (newItems.length) {
               setBatch((prev) => {
                 if (!prev) return prev;
@@ -231,7 +277,7 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
         window.setTimeout(() => void processUploadQueue(), 0);
       }
     }
-  }, []);
+  }, [showToast]);
 
   function queueFiles(files: File[]) {
     if (!files.length) return;

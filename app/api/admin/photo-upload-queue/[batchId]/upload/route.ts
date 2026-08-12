@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { processUploadedPhoto, storeProcessedPhoto } from "@/lib/photo-upload-queue/process";
-import { addPhotoItem } from "@/lib/photo-upload-queue/service";
+import { addPhotoItem, findDuplicateByHash } from "@/lib/photo-upload-queue/service";
 import {
   demoWriteGuard,
   isPhotoUploadAuthOk,
@@ -63,12 +63,45 @@ export async function POST(request: Request, context: RouteContext) {
     // Library uploads skip gingr-ready for speed; export path can generate later if null.
     const fastLibrary = form.get("fast_library") == null || String(form.get("fast_library")) !== "0";
 
+    // Claim hashes inside this request so identical files in the same batch are only stored once.
+    const claimedHashes = new Set<string>();
+    const claimHash = (hash: string) => {
+      const key = hash.trim().toLowerCase();
+      if (!key) return true;
+      if (claimedHashes.has(key)) return false;
+      claimedHashes.add(key);
+      return true;
+    };
+
     const results = await mapPool(files, SERVER_CONCURRENCY, async (file) => {
       try {
         if (file.size > PHOTO_UPLOAD_MAX_BYTES) {
           throw new Error("Each photo must be 25MB or smaller.");
         }
         const processed = await processUploadedPhoto(file);
+        const hash = String(processed.sha256 || "").trim().toLowerCase();
+
+        if (!claimHash(hash)) {
+          return {
+            fileName: file.name,
+            ok: true as const,
+            skipped: true as const,
+            duplicate: null,
+            error: "Skipped duplicate image in this upload."
+          };
+        }
+
+        const existing = hash ? await findDuplicateByHash(auth.supabase, hash) : null;
+        if (existing) {
+          return {
+            fileName: file.name,
+            ok: true as const,
+            skipped: true as const,
+            duplicate: existing,
+            error: `Skipped duplicate of ${existing.original_filename}`
+          };
+        }
+
         const stored = await storeProcessedPhoto({
           supabase: auth.supabase,
           batchId,
@@ -76,7 +109,7 @@ export async function POST(request: Request, context: RouteContext) {
           processed,
           skipGingrReady: fastLibrary
         });
-        const { item, duplicate } = await addPhotoItem(
+        const added = await addPhotoItem(
           auth.supabase,
           {
             batchId,
@@ -84,26 +117,58 @@ export async function POST(request: Request, context: RouteContext) {
             ...stored,
             yard,
             category,
-            photographer_name: photographer
+            photographer_name: photographer,
+            skipDuplicates: true
           },
           auth.actor
         );
-        return { fileName: file.name, ok: true as const, item, duplicate };
+
+        if (added.skipped) {
+          // Race: another request inserted the same hash after our check — drop orphaned files.
+          const orphanPaths = [
+            stored.original_storage_path,
+            stored.thumbnail_storage_path,
+            stored.gingr_ready_storage_path
+          ].filter((path): path is string => Boolean(path));
+          if (orphanPaths.length) {
+            const { removePhotoPaths } = await import("@/lib/photo-upload-queue/storage");
+            await removePhotoPaths(auth.supabase, orphanPaths).catch(() => undefined);
+          }
+          return {
+            fileName: file.name,
+            ok: true as const,
+            skipped: true as const,
+            duplicate: added.duplicate,
+            error: added.message
+          };
+        }
+
+        return {
+          fileName: file.name,
+          ok: true as const,
+          skipped: false as const,
+          item: added.item,
+          duplicate: null
+        };
       } catch (error) {
         return {
           fileName: file.name,
           ok: false as const,
+          skipped: false as const,
           error: error instanceof Error ? error.message : "Upload failed."
         };
       }
     });
 
-    const okCount = results.filter((r) => r.ok).length;
+    const uploaded = results.filter((r) => r.ok && !("skipped" in r && r.skipped)).length;
+    const skipped = results.filter((r) => r.ok && "skipped" in r && r.skipped).length;
+    const failed = results.filter((r) => !r.ok).length;
     return NextResponse.json({
-      ok: okCount > 0,
+      ok: uploaded > 0 || skipped > 0,
       results,
-      uploaded: okCount,
-      failed: results.length - okCount
+      uploaded,
+      skipped,
+      failed
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to upload photos.";
