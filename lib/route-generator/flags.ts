@@ -51,6 +51,14 @@ export type RouteGeneratorPermission = (typeof ROUTE_GENERATOR_PERMISSIONS)[numb
 export const FITDOG_VAN_KEYS = ["van_1", "van_2", "van_3", "van_5", "van_6"] as const;
 export type FitdogVanKey = (typeof FITDOG_VAN_KEYS)[number];
 
+/** How generatePlanForRun groups stops onto vans. Default keeps production auto-split. */
+export const ROUTE_GENERATION_MODES = ["automatic_split", "single_combined_route"] as const;
+export type RouteGenerationMode = (typeof ROUTE_GENERATION_MODES)[number];
+
+export function parseRouteGenerationMode(value: unknown): RouteGenerationMode {
+  return value === "single_combined_route" ? "single_combined_route" : "automatic_split";
+}
+
 export const CANONICAL_SERVICES = [
   "Adventure Hike",
   "Beach Excursion",

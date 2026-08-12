@@ -237,7 +237,9 @@ export async function POST(request: Request) {
         reportRunId,
         actorAdminId: session.adminUserId,
         actorEmail: session.email,
-        actorRole: session.role
+        actorRole: session.role,
+        routeGenerationMode:
+          body.routeGenerationMode === "single_combined_route" ? "single_combined_route" : "automatic_split"
       });
       return NextResponse.json(bundle);
     }

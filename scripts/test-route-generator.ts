@@ -9,7 +9,7 @@ import { buildAdminNav, buildStaffPanelNav } from "../lib/admin/nav-groups";
 import { ADMIN_TABS } from "../lib/admin/types";
 import { parseAddress, householdKey } from "../lib/route-generator/address";
 import { capacityAllows, resolveLoadUnits, isServiceEligibleForVan } from "../lib/route-generator/capacity";
-import { assertNeverVan4, FITDOG_VAN_KEYS } from "../lib/route-generator/flags";
+import { assertNeverVan4, FITDOG_VAN_KEYS, parseRouteGenerationMode } from "../lib/route-generator/flags";
 import { formatStopDisplayName, groupHouseholds } from "../lib/route-generator/households";
 import { groupHouseholdsWithFacilities } from "../lib/route-generator/facility";
 import { lockDropoffGroupsToPickupVans, optimizeRoutes } from "../lib/route-generator/optimizer";
@@ -39,7 +39,9 @@ import {
   autoMapSamsaraHeaders,
   buildCsv,
   buildRouteName,
+  combinedExportFileName,
   escapeCsvCell,
+  splitCombinedExportRows,
   ensureScheduleOnOperatingDate,
   formatSamsaraCoordinate,
   getCanonicalSamsaraTemplate,
@@ -1821,6 +1823,320 @@ assert.equal(
   ]);
   assert.equal(fallback.primaryClubVan, "van_6");
   assert.deepEqual(fallback.excludedClubVans, []);
+}
+
+assert.equal(parseRouteGenerationMode(undefined), "automatic_split");
+assert.equal(parseRouteGenerationMode("automatic_split"), "automatic_split");
+assert.equal(parseRouteGenerationMode("single_combined_route"), "single_combined_route");
+assert.equal(parseRouteGenerationMode("nope"), "automatic_split");
+assert.equal(
+  buildRouteName({ date: "2026-08-11", direction: "pickup", vanDisplay: "Van 01" }),
+  "2026-08-11 AM Pickup - Van 01"
+);
+assert.equal(
+  buildRouteName({ date: "2026-08-11", direction: "pickup", vanDisplay: "Van 01", combined: true }),
+  "2026-08-11 Combined AM Pickup"
+);
+assert.equal(
+  buildRouteName({ date: "2026-08-11", direction: "dropoff", vanDisplay: "Van 05", combined: true }),
+  "2026-08-11 Combined PM Drop-Off"
+);
+
+// One Big Route: same households as automatic_split, but one geographically ordered route and no capacity drop.
+{
+  const depot = {
+    name: "Fitdog",
+    address: "Depot",
+    latitude: 34.01,
+    longitude: -118.49,
+    timezone: "America/Los_Angeles",
+    verified: true
+  };
+  const sizeLoads = { Small: 1, Medium: 1.5, Large: 2, "Extra Large": 2.5, Unknown: 2, configured: true };
+  const coords = Object.fromEntries(
+    households.map((h, i) => [h.householdKey, { lat: 34.02 + i * 0.01, lng: -118.49 - i * 0.01 }])
+  );
+  const splitAgain = optimizeRoutes({
+    direction: "pickup",
+    households,
+    vehicles,
+    depot,
+    sizeLoads,
+    seed: "test-seed-1",
+    coordsByHousehold: coords,
+    routeGenerationMode: "automatic_split"
+  });
+  assert.equal(
+    JSON.stringify(splitAgain.routes.map((r) => r.vanKey)),
+    JSON.stringify(opt.routes.map((r) => r.vanKey)),
+    "automatic_split must match default optimizer van assignment"
+  );
+
+  const combined = optimizeRoutes({
+    direction: "pickup",
+    households,
+    vehicles,
+    depot,
+    sizeLoads,
+    seed: "test-seed-1",
+    coordsByHousehold: coords,
+    routeGenerationMode: "single_combined_route"
+  });
+  assert.equal(combined.routes.length, 1, "combined mode must emit a single route");
+  assert.equal(combined.unassigned.length, 0, "combined mode must not drop eligible households");
+  assert.match(combined.routes[0]!.waveName, /ONE BIG ROUTE/);
+  const combinedDogs = combined.routes[0]!.stops.flatMap((s) => s.dogNames);
+  for (const group of households) {
+    for (const item of group.items) {
+      if (item.dogName) {
+        assert.ok(combinedDogs.includes(item.dogName), `combined route missing ${item.dogName}`);
+      }
+    }
+  }
+
+  const tinyVan = [
+    {
+      vanKey: "van_1" as const,
+      active: true,
+      vehiclePool: "outing" as const,
+      maxDogs: 1,
+      maxLoadUnits: 1,
+      maxLargeDogs: 1,
+      maxStops: 1,
+      eligibleServices: ["Adventure Hike"] as Array<"Adventure Hike">,
+      capacityConfigured: true
+    }
+  ];
+  const overCapacity = optimizeRoutes({
+    direction: "pickup",
+    households: households.slice(0, Math.min(3, households.length)),
+    vehicles: tinyVan,
+    depot,
+    sizeLoads,
+    seed: "combined-capacity",
+    coordsByHousehold: coords,
+    routeGenerationMode: "single_combined_route"
+  });
+  assert.equal(overCapacity.routes.length, 1);
+  assert.equal(overCapacity.unassigned.length, 0, "combined mode must not omit dogs for van capacity");
+  assert.equal(overCapacity.warnings.some((w) => /OVERFLOW/i.test(w)), false);
+
+  function mixedItem(params: {
+    name: string;
+    service: "Adventure Hike" | "Beach Excursion" | "Trainer-Led Hike" | "Group Class" | "Taxi Service";
+    street: string;
+    lat: number;
+    lng: number;
+    facility?: boolean;
+  }) {
+    const householdKey = params.facility
+      ? `facility:hub:${params.service.toLowerCase().replace(/\s+/g, "-")}`
+      : `${params.street.toLowerCase()}|sm|ca|90401`;
+    return {
+      group: {
+        householdKey,
+        direction: "pickup" as const,
+        address: params.facility ? "Fitdog Hub" : `${params.street}, Santa Monica, CA 90401`,
+        ownerName: params.name,
+        dogCount: 1,
+        items: [
+          {
+            direction: "pickup" as const,
+            reservationId: `r-${params.name}`,
+            customerId: "c",
+            ownerFirstName: null,
+            ownerLastName: "Owner",
+            ownerFullName: `${params.name} Owner`,
+            dogId: `d-${params.name}`,
+            dogName: params.name,
+            serviceRaw: params.service,
+            serviceCanonical: params.service,
+            addressRaw: params.facility ? "Fitdog Hub" : `${params.street}, Santa Monica, CA 90401`,
+            addressStreet: params.facility ? null : params.street,
+            addressUnit: null,
+            addressCity: "Santa Monica",
+            addressState: "CA",
+            addressZip: "90401",
+            ownerPhoneMasked: "3105551001",
+            timeWindowStart: "07:00",
+            timeWindowEnd: "09:00",
+            dogSize: "Medium",
+            specialNotes: null,
+            driverNotes: null,
+            reservationNotes: null,
+            householdKey,
+            validationStatus: "ok" as const,
+            validationReasons: [],
+            raw: { phone: "3105551001", location_type: params.facility ? "FACILITY" : "HOME" }
+          }
+        ]
+      },
+      coord: { lat: params.lat, lng: params.lng }
+    };
+  }
+
+  const near = mixedItem({
+    name: "NearDog",
+    service: "Group Class",
+    street: "100 Ocean Ave",
+    lat: 34.046,
+    lng: -118.434
+  });
+  const far = mixedItem({
+    name: "FarDog",
+    service: "Adventure Hike",
+    street: "9000 Sunset Blvd",
+    lat: 33.72,
+    lng: -117.84
+  });
+  const taxi = mixedItem({
+    name: "TaxiDog",
+    service: "Taxi Service",
+    street: "200 Main St",
+    lat: 34.05,
+    lng: -118.45
+  });
+  const beach = mixedItem({
+    name: "BeachDog",
+    service: "Beach Excursion",
+    street: "50 PCH",
+    lat: 34.04,
+    lng: -118.5
+  });
+  const hike = mixedItem({
+    name: "HikeDog",
+    service: "Trainer-Led Hike",
+    street: "12 Palisades Dr",
+    lat: 34.048,
+    lng: -118.46
+  });
+  const facility = mixedItem({
+    name: "HubDog",
+    service: "Adventure Hike",
+    street: "Fitdog Hub",
+    lat: 34.0447,
+    lng: -118.4323,
+    facility: true
+  });
+  const mixedGroups = [far, near, taxi, beach, hike, facility];
+  const mixedCombined = optimizeRoutes({
+    direction: "pickup",
+    households: mixedGroups.map((row) => row.group),
+    vehicles,
+    depot,
+    sizeLoads,
+    seed: "combined-geo",
+    coordsByHousehold: Object.fromEntries(mixedGroups.map((row) => [row.group.householdKey, row.coord])),
+    routeGenerationMode: "single_combined_route"
+  });
+  assert.equal(mixedCombined.routes.length, 1);
+  assert.equal(mixedCombined.unassigned.length, 0);
+  const customerOrder = mixedCombined.routes[0]!.stops
+    .filter((s) => s.stopKind === "customer" && !String(s.householdKey || "").startsWith("facility:"))
+    .map((s) => s.dogNames[0]);
+  assert.ok(customerOrder.includes("NearDog") && customerOrder.includes("FarDog"));
+  assert.ok(
+    customerOrder.indexOf("NearDog") < customerOrder.indexOf("FarDog"),
+    `combined geographic order should visit NearDog before FarDog, got ${customerOrder.join(" -> ")}`
+  );
+  assert.notEqual(customerOrder[0], "FarDog", "combined route must not start with the farthest stop");
+  const hubStop = mixedCombined.routes[0]!.stops.find((s) => s.dogNames.includes("HubDog"));
+  assert.ok(hubStop);
+  assert.match(String(hubStop!.notes), /facility stop/i, "Fitdog-to-Fitdog must stay a facility stop, not a home stop");
+  const homeStop = mixedCombined.routes[0]!.stops.find((s) => s.dogNames.includes("NearDog"));
+  assert.ok(homeStop);
+  assert.equal(/facility stop/i.test(String(homeStop!.notes)), false, "home pickup must not become a facility stop");
+  assert.equal(
+    mixedCombined.warnings.some((w) => /mutually exclusive/i.test(w)),
+    false,
+    "combined mode must not apply club van either/or splitting"
+  );
+
+  const combinedCsvRows = mixedCombined.routes[0]!.stops.map((stop, index) => ({
+    routeName: buildRouteName({
+      date: "2026-08-11",
+      direction: "pickup" as const,
+      vanDisplay: "Van 01",
+      combined: true
+    }),
+    routeNotes: "ONE BIG ROUTE",
+    vehicleName: "Van 01",
+    driverName: "",
+    stopName: stop.ownerName || stop.stopKind,
+    stopNotes: sanitizeSamsaraNotes((stop.notes || "stop").replace(/\n/g, " | ")),
+    stopAddress: stop.address || "123 Ocean Ave, Santa Monica, CA 90401",
+    scheduledArrival: `8/11/2026 ${7 + index}:00`,
+    scheduledDeparture: `8/11/2026 ${7 + index}:05`,
+    routeDate: "2026-08-11",
+    stopOrder: stop.sequence,
+    latitude: String(stop.latitude ?? 34.01),
+    longitude: String(stop.longitude ?? -118.49)
+  }));
+  const combinedBuilt = buildCsv({
+    template: { headers: templateHeaders, delimiter: ",", encoding: "utf-8", mappings },
+    rows: combinedCsvRows
+  });
+  const combinedValidation = validateExport({
+    template: { headers: templateHeaders, delimiter: ",", encoding: "utf-8", mappings },
+    rows: combinedCsvRows,
+    csv: combinedBuilt.csv,
+    operatingDate: "2026-08-11"
+  });
+  assert.equal(
+    combinedValidation.ok,
+    true,
+    `combined Samsara CSV must validate: ${JSON.stringify(combinedValidation.report.errors)}`
+  );
+  assert.ok(combinedBuilt.csv.startsWith(SAMSARA_BULK_UPLOAD_HEADERS.join(",")));
+  assert.ok(combinedBuilt.csv.includes("2026-08-11 Combined AM Pickup"));
+  assert.equal(new Set(combinedCsvRows.map((row) => row.routeName)).size, 1);
+
+  const dropoffCombined = optimizeRoutes({
+    direction: "dropoff",
+    households: mixedGroups.map((row) => ({ ...row.group, direction: "dropoff" as const })),
+    vehicles,
+    depot,
+    sizeLoads,
+    seed: "combined-dropoff",
+    coordsByHousehold: Object.fromEntries(mixedGroups.map((row) => [row.group.householdKey, row.coord])),
+    routeGenerationMode: "single_combined_route"
+  });
+  assert.equal(dropoffCombined.routes.length, 1);
+  assert.match(dropoffCombined.routes[0]!.waveName, /ONE BIG ROUTE/);
+
+  const amName = buildRouteName({
+    date: "2026-08-11",
+    direction: "pickup",
+    vanDisplay: "Van 01",
+    combined: true
+  });
+  const pmName = buildRouteName({
+    date: "2026-08-11",
+    direction: "dropoff",
+    vanDisplay: "Van 01",
+    combined: true
+  });
+  const twoWaveRows = [
+    { ...combinedCsvRows[0]!, routeName: amName },
+    {
+      ...combinedCsvRows[0]!,
+      routeName: pmName,
+      stopName: "PM Depot"
+    }
+  ];
+  const splitFiles = splitCombinedExportRows(twoWaveRows);
+  assert.equal(splitFiles.pickup.length, 1);
+  assert.equal(splitFiles.dropoff.length, 1);
+  assert.equal(splitFiles.pickup[0]?.routeName, "2026-08-11 Combined AM Pickup");
+  assert.equal(splitFiles.dropoff[0]?.routeName, "2026-08-11 Combined PM Drop-Off");
+  assert.equal(
+    combinedExportFileName({ operatingDate: "2026-08-11", direction: "pickup", stamp: "1809" }),
+    "fitdog-big-route-am-pickup-2026-08-11-1809.csv"
+  );
+  assert.equal(
+    combinedExportFileName({ operatingDate: "2026-08-11", direction: "dropoff", stamp: "1809" }),
+    "fitdog-big-route-pm-dropoff-2026-08-11-1809.csv"
+  );
 }
 
 console.log("route-generator tests: ok");
