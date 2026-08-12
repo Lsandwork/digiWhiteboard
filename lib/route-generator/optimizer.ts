@@ -2,6 +2,7 @@ import {
   assertNeverVan4,
   type CanonicalService,
   type FitdogVanKey,
+  type RouteGenerationMode,
   FITDOG_VAN_KEYS
 } from "@/lib/route-generator/flags";
 import {
@@ -165,6 +166,8 @@ export function optimizeRoutes(params: {
   lockedVanByHousehold?: Record<string, FitdogVanKey>;
   /** YYYY-MM-DD — drives Van 3 Huntington vs Kenneth Hahn schedule. */
   operatingDate?: string | null;
+  /** Default automatic_split preserves production van assignment. */
+  routeGenerationMode?: RouteGenerationMode;
 }): OptimizationResult {
   const seed = params.seed || `${params.direction}:${params.households.length}:${Date.now()}`;
   const rng = mulberry32(hashSeed(seed));
@@ -182,14 +185,21 @@ export function optimizeRoutes(params: {
     }
   };
 
+  const combined = params.routeGenerationMode === "single_combined_route";
+
   // Club vans (5/6): Group Class + Taxi — either/or same day, Van 5 primary.
-  const clubFleet = resolveClubVanFleet(params.vehicles);
+  // Combined mode skips van exclusivity because stops are not divided by van.
+  const clubFleet = combined
+    ? { vehicles: params.vehicles, primaryClubVan: null, excludedClubVans: [], warnings: [] }
+    : resolveClubVanFleet(params.vehicles);
   warnings.push(...clubFleet.warnings);
-  const lockRemap = remapClubVanLocks({
-    lockedVanByHousehold: params.lockedVanByHousehold,
-    primaryClubVan: clubFleet.primaryClubVan,
-    excludedClubVans: clubFleet.excludedClubVans
-  });
+  const lockRemap = combined
+    ? { locks: { ...(params.lockedVanByHousehold || {}) }, warnings: [] }
+    : remapClubVanLocks({
+        lockedVanByHousehold: params.lockedVanByHousehold,
+        primaryClubVan: clubFleet.primaryClubVan,
+        excludedClubVans: clubFleet.excludedClubVans
+      });
   warnings.push(...lockRemap.warnings);
   const lockedVanByHousehold = lockRemap.locks;
 
@@ -309,8 +319,35 @@ export function optimizeRoutes(params: {
 
   const placedKeys = new Set<string>();
 
+  if (combined) {
+    const carrier =
+      buckets.get("van_1") ??
+      [...buckets.values()][0];
+    if (!carrier) {
+      return {
+        label: "infeasible",
+        seed,
+        routes: [],
+        unassigned: params.households,
+        warnings: ["No active vans available for combined route.", ...warnings]
+      };
+    }
+    for (const key of [...buckets.keys()]) {
+      if (key !== carrier.vehicle.vanKey) buckets.delete(key);
+    }
+    for (const stop of enriched) {
+      placeOnBucket(carrier, stop);
+      placedKeys.add(stop.householdKey);
+    }
+    warnings.push(
+      "ONE BIG ROUTE: all eligible stops were combined into a single geographically ordered route. Stops were not divided by van, driver, or capacity."
+    );
+  }
+
   // Assign locked households first. If the pinned van is missing/full, fall back to
   // other eligible vans so manual taxi / skipped-class pins are not dead-ends.
+  // Combined mode already placed every household on one bucket — skip van split.
+  if (!combined) {
   for (const stop of enriched) {
     const lockedVan = lockedVanByHousehold?.[stop.householdKey];
     if (!lockedVan) continue;
@@ -430,6 +467,7 @@ export function optimizeRoutes(params: {
       warnings.push(`${stop.address}: could not assign household.`);
     }
   }
+  }
 
   const routes: OptimizedRoute[] = [];
   for (const vanKey of FITDOG_VAN_KEYS) {
@@ -443,12 +481,14 @@ export function optimizeRoutes(params: {
         ) as CanonicalService[]
       )
     ];
-    const { startKey, endKey } = resolveRouteEndpoints({
-      vanKey,
-      direction: params.direction,
-      serviceTypes,
-      operatingDate: params.operatingDate
-    });
+    const { startKey, endKey } = combined
+      ? { startKey: "hub" as const, endKey: "hub" as const }
+      : resolveRouteEndpoints({
+          vanKey,
+          direction: params.direction,
+          serviceTypes,
+          operatingDate: params.operatingDate
+        });
     const startBase = resolveBaseLocation(locations, startKey);
     const endBase = resolveBaseLocation(locations, endKey);
     const startCoord =
@@ -597,17 +637,20 @@ export function optimizeRoutes(params: {
     });
 
     const vanLabel = String(vanKey).replace("van_", "Van ");
-    const routeWarnings = warnings.filter((w) => w.includes(vanLabel) || w.includes(String(vanKey)));
-    const hasOverflow = routeWarnings.some((w) => /OVERFLOW/i.test(w));
+    const routeWarnings = combined
+      ? warnings.filter((w) => /ONE BIG ROUTE/i.test(w) || w.includes(vanLabel) || w.includes(String(vanKey)))
+      : warnings.filter((w) => w.includes(vanLabel) || w.includes(String(vanKey)));
+    const hasOverflow = !combined && routeWarnings.some((w) => /OVERFLOW/i.test(w));
+    const pickupLabel = params.direction === "pickup" ? "Morning Pickup" : "Afternoon Drop-Off";
     routes.push({
       vanKey: vanKey as FitdogVanKey,
       vehiclePool: bucket.vehicle.vehiclePool,
       direction: params.direction,
-      waveName: hasOverflow
-        ? `${params.direction === "pickup" ? "Morning Pickup" : "Afternoon Drop-Off"} (OVERFLOW — rebalance)`
-        : params.direction === "pickup"
-          ? "Morning Pickup"
-          : "Afternoon Drop-Off",
+      waveName: combined
+        ? `ONE BIG ROUTE — ${pickupLabel}`
+        : hasOverflow
+          ? `${pickupLabel} (OVERFLOW — rebalance)`
+          : pickupLabel,
       stops,
       totalDogs: bucket.dogs,
       loadUnitsUsed: bucket.load,
@@ -619,11 +662,11 @@ export function optimizeRoutes(params: {
     });
   }
 
-  const hasOverflow = warnings.some((w) => /OVERFLOW/i.test(w));
+  const hasOverflow = !combined && warnings.some((w) => /OVERFLOW/i.test(w));
   let label: OptimizationResult["label"] = "optimized";
   if (unassigned.length || hasOverflow) label = "needs_management_review";
   if (!routes.length && params.households.length) label = "infeasible";
-  if (routes.length && unassigned.length === 0 && warnings.length && !hasOverflow) {
+  if (!combined && routes.length && unassigned.length === 0 && warnings.length && !hasOverflow) {
     label = "feasible_not_fully_optimized";
   }
 

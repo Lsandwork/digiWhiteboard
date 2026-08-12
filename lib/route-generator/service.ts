@@ -15,7 +15,8 @@ import {
 import {
   lockDropoffGroupsToPickupVans,
   optimizeRoutes,
-  type DepotConfig
+  type DepotConfig,
+  type OptimizationResult
 } from "@/lib/route-generator/optimizer";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import {
@@ -26,7 +27,9 @@ import {
 import {
   buildCsv,
   buildRouteName,
+  combinedExportFileName,
   enforceMonotonicRouteSchedule,
+  splitCombinedExportRows,
   ensureScheduleOnOperatingDate,
   formatSamsaraCsvDateTime,
   formatSamsaraCoordinate,
@@ -51,7 +54,14 @@ import { reconcileTransportLegs, formatMissingLeg } from "@/lib/route-generator/
 import { formatPostalAddress } from "@/lib/route-generator/destination";
 import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
-import { FITDOG_VAN_KEYS, isRouteOwnerSmsEnabled, type CanonicalService, type FitdogVanKey } from "@/lib/route-generator/flags";
+import {
+  FITDOG_VAN_KEYS,
+  isRouteOwnerSmsEnabled,
+  parseRouteGenerationMode,
+  type CanonicalService,
+  type FitdogVanKey,
+  type RouteGenerationMode
+} from "@/lib/route-generator/flags";
 import type { VehicleCapacityConfig, SizeLoadConfig } from "@/lib/route-generator/capacity";
 import {
   DEFAULT_FITDOG_LOCATIONS,
@@ -129,6 +139,106 @@ async function listVehicles(): Promise<VehicleCapacityConfig[]> {
       capacityConfigured: Boolean(row.capacity_configured)
     };
   });
+}
+
+function reportItemLooksLikeTaxi(row: Record<string, unknown>): boolean {
+  return /taxi/i.test(String(row.service_canonical || row.service_raw || ""));
+}
+
+function gingrTaxiAlreadyImported(existing: Array<Record<string, unknown>>, row: GingrTaxiServiceRow): boolean {
+  const reservationId = `gingr-taxi-${row.reservationId}`;
+  if (existing.some((item) => String(item.reservation_id || "") === reservationId)) return true;
+  const dogId = String(row.dogId || "").trim();
+  if (dogId) {
+    return existing.some((item) => String(item.dog_id || "") === dogId && reportItemLooksLikeTaxi(item));
+  }
+  const dogName = String(row.dogName || "").trim().toLowerCase();
+  if (!dogName) return false;
+  const street = String(row.address || "").trim().toLowerCase().slice(0, 12);
+  return existing.some(
+    (item) =>
+      reportItemLooksLikeTaxi(item) &&
+      String(item.dog_name || "").trim().toLowerCase() === dogName &&
+      (!street || String(item.address_raw || "").toLowerCase().includes(street))
+  );
+}
+
+/**
+ * Pull Gingr Taxi reservations for the operating date and add any that are not
+ * already on the report. Used by One Big Route so the extras tab is not required.
+ */
+async function mergeGingrTaxisIntoReportRun(params: {
+  reportRunId: string;
+  operatingDate: string;
+  existingItems: Array<Record<string, unknown>>;
+  metadata: ReportRunMetadata;
+}): Promise<{
+  items: Array<Record<string, unknown>>;
+  metadata: ReportRunMetadata;
+  added: number;
+  warning?: string;
+}> {
+  const gingr = await listGingrTaxiServicesByDate(params.operatingDate);
+  if (!gingr.configured) {
+    return {
+      items: params.existingItems,
+      metadata: params.metadata,
+      added: 0,
+      warning: gingr.error || "Gingr is not configured — Taxi services were not pulled."
+    };
+  }
+  if (gingr.error) {
+    return {
+      items: params.existingItems,
+      metadata: params.metadata,
+      added: 0,
+      warning: `Gingr Taxi pull failed: ${gingr.error}`
+    };
+  }
+  const toAdd = gingr.services.filter((row) => !gingrTaxiAlreadyImported(params.existingItems, row));
+  if (!toAdd.length) {
+    return { items: params.existingItems, metadata: params.metadata, added: 0 };
+  }
+  const normalized = toAdd.flatMap((row) => taxiRowToReportItems({ row }));
+  const supabase = getServiceSupabase();
+  const { data: inserted, error } = await supabase
+    .from("route_report_items")
+    .insert(reportItemsFromNormalized(params.reportRunId, normalized, params.operatingDate))
+    .select("*");
+  if (error) {
+    return {
+      items: params.existingItems,
+      metadata: params.metadata,
+      added: 0,
+      warning: `Gingr Taxi could not be saved onto the report: ${error.message}`
+    };
+  }
+  const addedIds = toAdd.map((row) => `gingr-taxi-${row.reservationId}`);
+  const nextMetadata: ReportRunMetadata = {
+    ...params.metadata,
+    gingrTaxiImported: [...new Set([...(params.metadata.gingrTaxiImported || []), ...addedIds])],
+    warnings: [
+      ...params.metadata.warnings,
+      `Imported ${toAdd.length} Gingr Taxi reservation(s) into AM pickup and PM drop-off.`
+    ]
+  };
+  const pickupAdded = normalized.filter((item) => item.direction === "pickup").length;
+  const dropoffAdded = normalized.filter((item) => item.direction === "dropoff").length;
+  await supabase
+    .from("route_report_runs")
+    .update({
+      metadata: nextMetadata,
+      pickup_count:
+        params.existingItems.filter((item) => item.direction === "pickup").length + pickupAdded,
+      dropoff_count:
+        params.existingItems.filter((item) => item.direction === "dropoff").length + dropoffAdded
+    })
+    .eq("id", params.reportRunId);
+  return {
+    items: [...params.existingItems, ...(inserted ?? [])],
+    metadata: nextMetadata,
+    added: toAdd.length
+  };
 }
 
 function asReportRunMetadata(value: unknown): ReportRunMetadata {
@@ -776,12 +886,66 @@ export async function addTaxiToReportRun(params: {
   return { run: updated, metadata: nextMetadata, items, planApply };
 }
 
+function summarizeOneBigRoute(params: {
+  pickupOpt: OptimizationResult;
+  dropoffOpt: OptimizationResult;
+  needsReview: Array<{ dogName?: string | null; ownerFullName?: string | null; validationReasons?: string[] }>;
+  gingrTaxiImported?: number;
+}) {
+  const routes = [...params.pickupOpt.routes, ...params.dropoffOpt.routes];
+  const customerStops = routes.flatMap((route) => route.stops.filter((stop) => stop.stopKind === "customer"));
+  const pickupStops = params.pickupOpt.routes.flatMap((route) =>
+    route.stops.filter((stop) => stop.stopKind === "customer")
+  );
+  const dropoffStops = params.dropoffOpt.routes.flatMap((route) =>
+    route.stops.filter((stop) => stop.stopKind === "customer")
+  );
+  const dogKeys = new Set<string>();
+  for (const stop of customerStops) {
+    const ids = stop.dogIds?.filter(Boolean) ?? [];
+    if (ids.length) {
+      for (const id of ids) dogKeys.add(id);
+    } else {
+      for (const name of stop.dogNames) dogKeys.add(`${stop.householdKey || stop.ownerName}:${name}`);
+    }
+  }
+  const services = [...new Set(routes.flatMap((route) => route.serviceTypes))];
+  const missingAddresses = customerStops
+    .filter((stop) => !String(stop.address || "").trim() || stop.latitude == null || stop.longitude == null)
+    .map((stop) => ({
+      dog: stop.dogNames.join(", ") || "Unknown dog",
+      customer: stop.ownerName || "Unknown customer",
+      stop: stop.address || stop.ownerName || "Stop",
+      field: !String(stop.address || "").trim() ? "address" : "coordinates",
+      correction: "Add a complete postal address and geocode before exporting to Samsara."
+    }));
+  const reviewWarnings = params.needsReview.flatMap((item) =>
+    (item.validationReasons || []).map(
+      (reason) =>
+        `${item.dogName || "Dog"} / ${item.ownerFullName || "customer"}: ${reason}`
+    )
+  );
+  return {
+    totalDogs: dogKeys.size || customerStops.reduce((n, stop) => n + stop.dogCount, 0),
+    totalStops: customerStops.length,
+    pickupStops: pickupStops.length,
+    dropoffStops: dropoffStops.length,
+    pickupDogs: params.pickupOpt.routes.reduce((n, route) => n + route.totalDogs, 0),
+    dropoffDogs: params.dropoffOpt.routes.reduce((n, route) => n + route.totalDogs, 0),
+    services,
+    gingrTaxiImported: params.gingrTaxiImported ?? 0,
+    warnings: [...params.pickupOpt.warnings, ...params.dropoffOpt.warnings, ...reviewWarnings].slice(0, 40),
+    missingAddresses
+  };
+}
+
 export async function generatePlanForRun(params: {
   reportRunId: string;
   actorAdminId?: string | null;
   actorEmail?: string | null;
   actorRole?: string | null;
   correlationId?: string | null;
+  routeGenerationMode?: RouteGenerationMode;
 }) {
   const auditStartedAt = Date.now();
   const supabase = getServiceSupabase();
@@ -793,11 +957,29 @@ export async function generatePlanForRun(params: {
     params.correlationId?.trim() ||
     createRouteCorrelationId(String(run.operating_date).slice(0, 10));
 
-  const { data: items, error: itemsError } = await supabase
+  const { data: loadedItems, error: itemsError } = await supabase
     .from("route_report_items")
     .select("*")
     .eq("report_run_id", params.reportRunId);
   if (itemsError) throw new Error(itemsError.message);
+  let items = loadedItems ?? [];
+  const routeGenerationMode = parseRouteGenerationMode(params.routeGenerationMode);
+  let gingrTaxiImported = 0;
+  let gingrTaxiWarning: string | null = null;
+  if (routeGenerationMode === "single_combined_route") {
+    const taxiMerge = await mergeGingrTaxisIntoReportRun({
+      reportRunId: params.reportRunId,
+      operatingDate: String(run.operating_date).slice(0, 10),
+      existingItems: items,
+      metadata: asReportRunMetadata(run.metadata)
+    });
+    items = taxiMerge.items;
+    gingrTaxiImported = taxiMerge.added;
+    gingrTaxiWarning = taxiMerge.warning ?? null;
+    if (taxiMerge.added > 0 && !gingrTaxiWarning) {
+      gingrTaxiWarning = `Imported ${taxiMerge.added} Gingr Taxi reservation(s) into AM pickup and PM drop-off.`;
+    }
+  }
 
   const vehicles = await listVehicles();
   const activeUnconfigured = vehicles.filter((v) => v.active && !v.capacityConfigured);
@@ -985,15 +1167,24 @@ export async function generatePlanForRun(params: {
     seed: `pickup:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
     lockedVanByHousehold,
-    operatingDate
+    operatingDate,
+    routeGenerationMode
   });
 
   // Drop-off must use the same van that picked each dog up (Van 3 never drops dogs it did not collect).
-  const dropoffLock = lockDropoffGroupsToPickupVans({
-    pickupRoutes: pickupOpt.routes,
-    dropoffGroups,
-    existingLocks: lockedVanByHousehold
-  });
+  // Combined mode does not split by van, so skip the van-lock split.
+  const dropoffLock =
+    routeGenerationMode === "single_combined_route"
+      ? {
+          dropoffGroups,
+          lockedVanByHousehold,
+          warnings: [] as string[]
+        }
+      : lockDropoffGroupsToPickupVans({
+          pickupRoutes: pickupOpt.routes,
+          dropoffGroups,
+          existingLocks: lockedVanByHousehold
+        });
   // Timing already suffixes keys with `::service|band`; van-split adds another
   // `::van_N`. Walking every prefix (not just split("::")[0]) is required — the
   // old first-segment lookup left Daisy/Zuma-style split drop-offs with null coords.
@@ -1012,7 +1203,8 @@ export async function generatePlanForRun(params: {
     seed: `dropoff:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
     lockedVanByHousehold: dropoffLock.lockedVanByHousehold,
-    operatingDate
+    operatingDate,
+    routeGenerationMode
   });
   if (dropoffLock.warnings.length) {
     dropoffOpt.warnings.push(...dropoffLock.warnings);
@@ -1031,6 +1223,9 @@ export async function generatePlanForRun(params: {
     pickupOpt.warnings.push(
       "Active van capacities are not fully configured — shadow placeholders were used. Confirm capacities before production."
     );
+  }
+  if (gingrTaxiWarning) {
+    pickupOpt.warnings.push(gingrTaxiWarning);
   }
 
   const hasOverflowPlacement =
@@ -1091,7 +1286,10 @@ export async function generatePlanForRun(params: {
         pickupDogs: pickupGroups.reduce((n, g) => n + g.dogCount, 0),
         dropoffDogs: dropoffGroups.reduce((n, g) => n + g.dogCount, 0),
         households: pickupGroups.length + dropoffGroups.length,
-        vansUsed: new Set([...pickupOpt.routes, ...dropoffOpt.routes].map((r) => r.vanKey)).size,
+        vansUsed:
+          routeGenerationMode === "single_combined_route"
+            ? 0
+            : new Set([...pickupOpt.routes, ...dropoffOpt.routes].map((r) => r.vanKey)).size,
         unassigned: reconciliation.unassignedCount,
         needsReview: needsReview.length,
         sharedDogConflicts: sharedDogConflicts.length,
@@ -1106,6 +1304,11 @@ export async function generatePlanForRun(params: {
         usedSyntheticCustomerCoords,
         ownerTextsEnabled: false,
         vehicleAlreadyAtFirstStop: true,
+        routeGenerationMode,
+        oneBigRoute:
+          routeGenerationMode === "single_combined_route"
+            ? summarizeOneBigRoute({ pickupOpt, dropoffOpt, needsReview, gingrTaxiImported })
+            : null,
         reconciliation: {
           ok: reconciliation.ok,
           expectedCount: reconciliation.expectedCount,
@@ -1127,7 +1330,8 @@ export async function generatePlanForRun(params: {
     dropoffOpt,
     needsReviewCount: needsReview.length,
     reconciliation,
-    usedSyntheticCustomerCoords
+    usedSyntheticCustomerCoords,
+    routeGenerationMode
   };
   await supabase.from("route_plan_versions").insert({
     plan_id: plan.id,
@@ -1226,6 +1430,7 @@ export async function generatePlanForRun(params: {
     correlationId,
     newValue: {
       correlationId,
+      routeGenerationMode,
       qualityHint: reconciliation.ok ? "ok" : "needs_review",
       expectedLegs: reconciliation.expectedCount,
       assignedLegs: reconciliation.assignedCount,
@@ -1566,6 +1771,9 @@ export async function exportSamsaraCsv(params: {
       .map((item) => [`${item.direction}|${item.reservation_id}`, item])
   );
 
+  const combinedExport =
+    parseRouteGenerationMode((bundle.plan.summary as { routeGenerationMode?: unknown } | undefined)?.routeGenerationMode) ===
+    "single_combined_route";
   const rows: ExportStopRow[] = [];
   let realignedScheduleCount = 0;
   let locationRepairedCount = 0;
@@ -1582,7 +1790,8 @@ export async function exportSamsaraCsv(params: {
       date: operatingDate,
       direction,
       // Always use Samsara vehicle label in the route name (never a freeform display_name).
-      vanDisplay
+      vanDisplay,
+      combined: combinedExport
     });
     routeStops.forEach((stop, stopIndex) => {
       const location = resolveExportStopLocation({
@@ -1714,7 +1923,9 @@ export async function exportSamsaraCsv(params: {
       rows.push({
         routeName: safeRouteName,
         routeNotes: sanitizeSamsaraNotes(
-          `${route.wave_name} | ${route.vehicle_pool} | vehicleAlreadyAtFirstStop=true`
+          combinedExport
+            ? `${route.wave_name} | not divided by van | vehicleAlreadyAtFirstStop=true`
+            : `${route.wave_name} | ${route.vehicle_pool} | vehicleAlreadyAtFirstStop=true`
         ),
         // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
@@ -1765,34 +1976,6 @@ export async function exportSamsaraCsv(params: {
     }
   }
 
-  // Repair stop ordering before building. Facility and depot stops are timed from
-  // different baselines, so a route could end earlier than its previous stop —
-  // Samsara answers those uploads with Internal Server Error.
-  const schedule = enforceMonotonicRouteSchedule(rows);
-
-  const built = buildCsv({ template, rows });
-  if (built.errors.length) {
-    throw new RouteGeneratorClientError(
-      `CSV build failed — ${built.errors.slice(0, 5).join("; ")}`,
-      422,
-      "csv_validation_failed"
-    );
-  }
-  const validation = validateExport({
-    template,
-    rows,
-    csv: built.csv,
-    operatingDate
-  });
-  if (!validation.ok) {
-    const details = (validation.report.errors as string[]).slice(0, 8).join("; ") || "unknown error";
-    throw new RouteGeneratorClientError(
-      `CSV validation failed — Digi will not download a file Samsara may reject: ${details}`,
-      422,
-      "csv_validation_failed"
-    );
-  }
-
   // Stamp the download time. A date-only name let the browser dedupe repeat exports to
   // "-2"/"-5", and coordinators uploaded whichever copy Finder showed first — including
   // pre-fix files that Samsara rejects.
@@ -1804,33 +1987,124 @@ export async function exportSamsaraCsv(params: {
   })
     .format(new Date())
     .replace(":", "");
-  const fileName = `fitdog-samsara-routes-${operatingDate}-${exportStamp}.csv`;
-  const { data: job, error } = await supabase
-    .from("route_export_jobs")
-    .insert({
-      plan_id: params.planId,
-      version_number: bundle.plan.current_version,
-      status: "completed",
-      file_name: fileName,
-      validation_report: {
-        ...validation.report,
-        realignedScheduleCount,
-        locationRepairedCount,
-        locationRepairSources: locationRepairSources.slice(0, 40),
-        scheduleAdjustedStops: schedule.adjustedStops,
-        scheduleAdjustments: schedule.adjustments.slice(0, 40),
-        today,
-        operatingDate
-      },
-      emergency_override: Boolean(params.emergencyOverride),
-      override_reason: params.overrideReason ?? null,
-      created_by: params.actorAdminId ?? null,
-      created_by_email: params.actorEmail ?? null,
-      completed_at: new Date().toISOString()
-    })
-    .select("*")
-    .single();
-  if (error) throw new Error(error.message);
+
+  type BuiltExportFile = {
+    fileName: string;
+    csv: string;
+    direction: "pickup" | "dropoff" | "all";
+    stopCount: number;
+    scheduleAdjustedStops: number;
+    validation: ReturnType<typeof validateExport>;
+  };
+
+  const buildValidatedFile = (
+    waveRows: ExportStopRow[],
+    fileName: string,
+    direction: BuiltExportFile["direction"]
+  ): BuiltExportFile => {
+    // Repair stop ordering before building. Facility and depot stops are timed from
+    // different baselines, so a route could end earlier than its previous stop —
+    // Samsara answers those uploads with Internal Server Error.
+    const schedule = enforceMonotonicRouteSchedule(waveRows);
+    const built = buildCsv({ template, rows: waveRows });
+    if (built.errors.length) {
+      throw new RouteGeneratorClientError(
+        `CSV build failed — ${built.errors.slice(0, 5).join("; ")}`,
+        422,
+        "csv_validation_failed"
+      );
+    }
+    const validation = validateExport({
+      template,
+      rows: waveRows,
+      csv: built.csv,
+      operatingDate
+    });
+    if (!validation.ok) {
+      const waveLabel =
+        direction === "pickup" ? "AM pickups" : direction === "dropoff" ? "PM drop-offs" : "export";
+      const details = (validation.report.errors as string[]).slice(0, 8).join("; ") || "unknown error";
+      throw new RouteGeneratorClientError(
+        `CSV validation failed on the ${waveLabel} file — Digi will not download a file Samsara may reject. Fix the dog/customer/stop listed, then export again: ${details}`,
+        422,
+        "csv_validation_failed"
+      );
+    }
+    return {
+      fileName,
+      csv: built.csv,
+      direction,
+      stopCount: waveRows.length,
+      scheduleAdjustedStops: schedule.adjustedStops,
+      validation
+    };
+  };
+
+  const files: BuiltExportFile[] = [];
+  if (combinedExport) {
+    const split = splitCombinedExportRows(rows);
+    if (split.pickup.length) {
+      files.push(
+        buildValidatedFile(
+          split.pickup,
+          combinedExportFileName({ operatingDate, direction: "pickup", stamp: exportStamp }),
+          "pickup"
+        )
+      );
+    }
+    if (split.dropoff.length) {
+      files.push(
+        buildValidatedFile(
+          split.dropoff,
+          combinedExportFileName({ operatingDate, direction: "dropoff", stamp: exportStamp }),
+          "dropoff"
+        )
+      );
+    }
+    if (!files.length) {
+      throw new RouteGeneratorClientError(
+        "One Big Route export has no AM pickup or PM drop-off stops to write.",
+        422,
+        "csv_validation_failed"
+      );
+    }
+  } else {
+    files.push(
+      buildValidatedFile(rows, `fitdog-samsara-routes-${operatingDate}-${exportStamp}.csv`, "all")
+    );
+  }
+
+  const primary = files[0]!;
+  let job: Record<string, unknown> | null = null;
+  for (const file of files) {
+    const { data: jobRow, error } = await supabase
+      .from("route_export_jobs")
+      .insert({
+        plan_id: params.planId,
+        version_number: bundle.plan.current_version,
+        status: "completed",
+        file_name: file.fileName,
+        validation_report: {
+          ...file.validation.report,
+          wave: file.direction,
+          realignedScheduleCount,
+          locationRepairedCount,
+          locationRepairSources: locationRepairSources.slice(0, 40),
+          scheduleAdjustedStops: file.scheduleAdjustedStops,
+          today,
+          operatingDate
+        },
+        emergency_override: Boolean(params.emergencyOverride),
+        override_reason: params.overrideReason ?? null,
+        created_by: params.actorAdminId ?? null,
+        created_by_email: params.actorEmail ?? null,
+        completed_at: new Date().toISOString()
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    if (!job) job = jobRow;
+  }
 
   await supabase.from("route_plans").update({ status: "exported" }).eq("id", params.planId);
 
@@ -1847,7 +2121,8 @@ export async function exportSamsaraCsv(params: {
       today,
       realignedScheduleCount,
       locationRepairedCount,
-      stopCount: rows.length
+      stopCount: rows.length,
+      files: files.map((file) => file.fileName)
     }
   });
 
@@ -1865,10 +2140,10 @@ export async function exportSamsaraCsv(params: {
       recordCount: rows.length,
       correlationId,
       metadata: {
-        fileName,
+        fileName: files.map((file) => file.fileName).join(", "),
         operatingDate,
-        scheduleAdjustedStops: schedule.adjustedStops,
-        validationOk: validation.ok
+        scheduleAdjustedStops: files.reduce((n, file) => n + file.scheduleAdjustedStops, 0),
+        validationOk: files.every((file) => file.validation.ok)
       }
     });
     if (correlationId) {
@@ -1879,10 +2154,10 @@ export async function exportSamsaraCsv(params: {
         .update({
           samsara_summary: {
             status: "exported",
-            fileName,
+            fileName: files.map((file) => file.fileName).join(", "),
             stopCount: rows.length,
-            validationOk: validation.ok,
-            scheduleAdjustedStops: schedule.adjustedStops
+            validationOk: files.every((file) => file.validation.ok),
+            scheduleAdjustedStops: files.reduce((n, file) => n + file.scheduleAdjustedStops, 0)
           },
           updated_at: new Date().toISOString()
         })
@@ -1892,19 +2167,29 @@ export async function exportSamsaraCsv(params: {
     console.error("[route-generator] samsara health log failed", err);
   }
 
+  const fileNames = files.map((file) => file.fileName);
+  const uploadReminder = combinedExport
+    ? `Upload both One Big Route files to Samsara now: ${fileNames.join(" and ")}. AM pickups and PM drop-offs are separate routes. On each route's starting stop, leave checked: "Vehicle is expected to already be at this stop when the route begins."`
+    : `Upload ${primary.fileName} to Samsara now. On each route's starting stop, leave checked: "Vehicle is expected to already be at this stop when the route begins." Delete older fitdog-samsara-routes-*.csv files from Downloads first — uploading an earlier copy causes Samsara Internal Server Error.`;
+
   return {
-    fileName,
-    csv: built.csv,
+    fileName: primary.fileName,
+    csv: primary.csv,
+    files: files.map((file) => ({
+      fileName: file.fileName,
+      csv: file.csv,
+      direction: file.direction,
+      stopCount: file.stopCount
+    })),
     validation: {
-      ...validation.report,
+      ...primary.validation.report,
       realignedScheduleCount,
       locationRepairedCount,
       locationRepairSources: locationRepairSources.slice(0, 40),
-      scheduleAdjustedStops: schedule.adjustedStops,
-      scheduleAdjustments: schedule.adjustments.slice(0, 40),
+      scheduleAdjustedStops: files.reduce((n, file) => n + file.scheduleAdjustedStops, 0),
       today,
       operatingDate,
-      uploadReminder: `Upload ${fileName} to Samsara now. On each route's starting stop, leave checked: "Vehicle is expected to already be at this stop when the route begins." Delete older fitdog-samsara-routes-*.csv files from Downloads first — uploading an earlier copy causes Samsara Internal Server Error.`
+      uploadReminder
     },
     job
   };

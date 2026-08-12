@@ -120,6 +120,7 @@ export function RouteGeneratorPanel() {
   } | null>(null);
   const [bundle, setBundle] = useState<PlanBundle | null>(null);
   const [sendOwnerSms, setSendOwnerSms] = useState(false);
+  const [generateAsOneBigRoute, setGenerateAsOneBigRoute] = useState(false);
   const [visibleVans, setVisibleVans] = useState<Record<string, boolean>>({});
   const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
   const [csvPreview, setCsvPreview] = useState<string | null>(null);
@@ -137,6 +138,10 @@ export function RouteGeneratorPanel() {
         return null;
       }
       setBundle(next);
+      setGenerateAsOneBigRoute(
+        String((next.plan?.summary as { routeGenerationMode?: string } | undefined)?.routeGenerationMode || "") ===
+          "single_combined_route"
+      );
       const nextReportRunId = next.plan?.report_run_id ? String(next.plan.report_run_id) : null;
       if (nextReportRunId) setReportRunId(nextReportRunId);
       if (next.plan?.operating_date) setDate(String(next.plan.operating_date).slice(0, 10));
@@ -245,6 +250,7 @@ export function RouteGeneratorPanel() {
       };
       setPullMeta(nextMeta);
       setBundle(null);
+      setGenerateAsOneBigRoute(false);
       if (skipped.length) setTab("extras");
       showToast(
         skipped.length
@@ -379,10 +385,18 @@ export function RouteGeneratorPanel() {
       return;
     }
     try {
-      const body = (await postAction("generate_plan", { reportRunId })) as PlanBundle;
+      const body = (await postAction("generate_plan", {
+        reportRunId,
+        routeGenerationMode: generateAsOneBigRoute ? "single_combined_route" : "automatic_split"
+      })) as PlanBundle;
       setBundle(body);
       setTab("overview");
-      showToast("Routes generated.", "success");
+      showToast(
+        generateAsOneBigRoute
+          ? "One Big Route generated: AM pickups and PM drop-offs. Gingr Taxi included when present."
+          : "Routes generated.",
+        "success"
+      );
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Generate failed.", "error");
     }
@@ -448,19 +462,36 @@ export function RouteGeneratorPanel() {
         emergencyOverride: Boolean(options?.emergencyOverride),
         overrideReason: options?.overrideReason
       });
-      setCsvPreview(body.csv);
-      const blob = new Blob([body.csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = body.fileName;
-      a.click();
-      URL.revokeObjectURL(url);
+      const exportFiles = (
+        Array.isArray(body.files) && body.files.length
+          ? body.files
+          : [{ csv: body.csv, fileName: body.fileName }]
+      ) as Array<{ csv: string; fileName: string }>;
+      setCsvPreview(
+        exportFiles
+          .map((file) => `--- ${file.fileName} ---\n${file.csv}`)
+          .join("\n")
+      );
+      for (const [index, file] of exportFiles.entries()) {
+        await new Promise((resolve) => window.setTimeout(resolve, index === 0 ? 0 : 250));
+        const blob = new Blob([file.csv], { type: "text/csv;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = file.fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
       await hydratePlan(String(bundle.plan.id), { quiet: true });
       const reminder =
         body.validation?.uploadReminder ||
         "Upload this CSV to Samsara today only. Never reuse a previous day's file.";
-      showToast(`Samsara CSV exported. ${reminder}`, "success");
+      showToast(
+        exportFiles.length > 1
+          ? `Exported ${exportFiles.length} Samsara CSVs (AM pickups and PM drop-offs). ${reminder}`
+          : `Samsara CSV exported. ${reminder}`,
+        "success"
+      );
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Export failed.", "error");
     }
@@ -719,15 +750,48 @@ export function RouteGeneratorPanel() {
                 : !canExportCsv
                   ? "Approve the route plan before exporting"
                   : bundle.plan.status === "exported"
-                    ? "Re-download today's Samsara CSV (do not reuse an old file)"
-                    : "Export approved plan as Samsara CSV"
+                    ? String((bundle.plan.summary as { routeGenerationMode?: string } | undefined)?.routeGenerationMode) ===
+                      "single_combined_route"
+                      ? "Re-download today's AM pickup and PM drop-off One Big Route CSVs"
+                      : "Re-download today's Samsara CSV (do not reuse an old file)"
+                    : String((bundle.plan.summary as { routeGenerationMode?: string } | undefined)?.routeGenerationMode) ===
+                        "single_combined_route"
+                      ? "Export AM pickup and PM drop-off One Big Route CSVs"
+                      : "Export approved plan as Samsara CSV"
             }
             onClick={onExportClick}
           >
             <Download className="h-4 w-4" />
-            {bundle?.plan.status === "exported" ? "Re-export Samsara CSV" : "Export Samsara CSV"}
+            {String((bundle?.plan.summary as { routeGenerationMode?: string } | undefined)?.routeGenerationMode) ===
+            "single_combined_route"
+              ? bundle?.plan.status === "exported"
+                ? "Re-export AM + PM CSVs"
+                : "Export AM + PM CSVs"
+              : bundle?.plan.status === "exported"
+                ? "Re-export Samsara CSV"
+                : "Export Samsara CSV"}
           </button>
           </div>
+          <label
+            className="flex max-w-xl cursor-pointer items-start gap-2 rounded-xl border border-admin-border bg-black/25 px-3 py-2 text-left text-xs text-admin-muted"
+            title="When checked, Generate Routes combines all eligible stops into one geographically ordered route instead of splitting by van."
+          >
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={generateAsOneBigRoute}
+              disabled={busy}
+              onChange={(event) => setGenerateAsOneBigRoute(event.target.checked)}
+            />
+            <span>
+              <span className="font-medium text-white">Generate as One Big Route</span>
+              <span className="mt-0.5 block">
+                Creates two combined Samsara-ready exports — AM pickups and PM drop-offs — without dividing stops between
+                vans. Automatically includes Gingr Taxi. The Route Coordinator uploads both CSVs to Samsara and separates
+                the stops manually.
+              </span>
+            </span>
+          </label>
           <label
             className="flex max-w-xl cursor-pointer items-start gap-2 rounded-xl border border-admin-border bg-black/25 px-3 py-2 text-left text-xs text-admin-muted"
             title="Owner texts are independent of approval. You can change this before or after Approve."
@@ -836,8 +900,101 @@ export function RouteGeneratorPanel() {
             const assigned = Number(summary.assignedLegs ?? 0);
             const expected = Number(summary.transportLegs ?? 0);
             const ready = Boolean(bundle) && missingCount === 0 && addressIssues === 0 && expected > 0;
+            const oneBigRoute = summary.oneBigRoute as
+              | {
+                  totalDogs?: number;
+                  totalStops?: number;
+                  pickupStops?: number;
+                  dropoffStops?: number;
+                  pickupDogs?: number;
+                  dropoffDogs?: number;
+                  services?: string[];
+                  gingrTaxiImported?: number;
+                  warnings?: string[];
+                  missingAddresses?: Array<{
+                    dog?: string;
+                    customer?: string;
+                    stop?: string;
+                    field?: string;
+                    correction?: string;
+                  }>;
+                }
+              | null
+              | undefined;
+            const isOneBigRoute = summary.routeGenerationMode === "single_combined_route";
+            const liveCustomerStops = (bundle?.stops ?? []).filter((stop) => stop.stop_kind === "customer");
+            const livePickupStops = liveCustomerStops.filter((stop) => {
+              const route = bundle?.routes.find((row) => row.id === stop.route_id);
+              return route?.direction === "pickup";
+            });
+            const liveDropoffStops = liveCustomerStops.filter((stop) => {
+              const route = bundle?.routes.find((row) => row.id === stop.route_id);
+              return route?.direction === "dropoff";
+            });
+            const liveDogs = liveCustomerStops.reduce((n, stop) => n + Number(stop.dog_count ?? 0), 0);
+            const liveServices = [
+              ...new Set(
+                (bundle?.routes ?? []).flatMap((route) =>
+                  Array.isArray(route.service_types) ? (route.service_types as string[]) : []
+                )
+              )
+            ];
             return (
               <>
+                {isOneBigRoute ? (
+                  <section className="rounded-2xl border border-sky-400/40 bg-sky-500/10 px-4 py-3 text-sm text-sky-50">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-sky-200">ONE BIG ROUTE</p>
+                    <p className="mt-1 text-sky-100/90">
+                      Two combined geographically ordered exports — AM pickups and PM drop-offs. Stops were not divided
+                      by van, driver, or capacity. Gingr Taxi is included when present.
+                    </p>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                      <OverviewCard
+                        label="Total dogs"
+                        value={String(oneBigRoute?.totalDogs ?? liveDogs)}
+                      />
+                      <OverviewCard
+                        label="Total stops"
+                        value={String(oneBigRoute?.totalStops ?? liveCustomerStops.length)}
+                      />
+                      <OverviewCard
+                        label="Pickups"
+                        value={`${oneBigRoute?.pickupDogs ?? livePickupStops.reduce((n, stop) => n + Number(stop.dog_count ?? 0), 0)} dogs / ${oneBigRoute?.pickupStops ?? livePickupStops.length} stops`}
+                      />
+                      <OverviewCard
+                        label="Drop-offs"
+                        value={`${oneBigRoute?.dropoffDogs ?? liveDropoffStops.reduce((n, stop) => n + Number(stop.dog_count ?? 0), 0)} dogs / ${oneBigRoute?.dropoffStops ?? liveDropoffStops.length} stops`}
+                      />
+                    </div>
+                    <p className="mt-3 text-xs text-sky-100/90">
+                      Services represented:{" "}
+                      {(oneBigRoute?.services?.length ? oneBigRoute.services : liveServices).join(", ") || "—"}
+                      {Number(oneBigRoute?.gingrTaxiImported) > 0
+                        ? ` · Gingr Taxi imported: ${String(oneBigRoute?.gingrTaxiImported)}`
+                        : ""}
+                    </p>
+                    {(oneBigRoute?.warnings?.length ?? 0) > 0 ? (
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-100">
+                        {oneBigRoute!.warnings!.slice(0, 12).map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {(oneBigRoute?.missingAddresses?.length ?? 0) > 0 ? (
+                      <div className="mt-2 rounded-xl border border-rose-400/40 bg-rose-500/10 px-3 py-2 text-rose-50">
+                        <p className="font-semibold">Missing / invalid addresses</p>
+                        <ul className="mt-1 list-disc space-y-1 pl-5">
+                          {oneBigRoute!.missingAddresses!.slice(0, 12).map((row, index) => (
+                            <li key={`${row.stop}-${index}`}>
+                              {row.dog || "Dog"} / {row.customer || "customer"} — {row.stop || "stop"}: {row.field}.{" "}
+                              {row.correction}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <OverviewCard label="Services / legs" value={`${summary.services ?? "—"} / ${expected || "—"}`} />
                   <OverviewCard label="Assigned" value={String(assigned || "—")} />

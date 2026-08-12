@@ -835,7 +835,29 @@ export function buildRouteName(params: {
   date: string; // YYYY-MM-DD
   direction: "pickup" | "dropoff";
   vanDisplay: string;
+  combined?: boolean;
 }): string {
   const wave = params.direction === "pickup" ? "AM Pickup" : "PM Drop-Off";
+  if (params.combined) return `${params.date} Combined ${wave}`;
   return `${params.date} ${wave} - ${params.vanDisplay}`;
+}
+
+/** Split One Big Route rows into the AM pickup file and the PM drop-off file. */
+export function splitCombinedExportRows(rows: ExportStopRow[]): {
+  pickup: ExportStopRow[];
+  dropoff: ExportStopRow[];
+} {
+  return {
+    pickup: rows.filter((row) => /AM Pickup/i.test(row.routeName)),
+    dropoff: rows.filter((row) => /PM Drop-Off/i.test(row.routeName))
+  };
+}
+
+export function combinedExportFileName(params: {
+  operatingDate: string;
+  direction: "pickup" | "dropoff";
+  stamp: string;
+}): string {
+  const wave = params.direction === "pickup" ? "am-pickup" : "pm-dropoff";
+  return `fitdog-big-route-${wave}-${params.operatingDate}-${params.stamp}.csv`;
 }
