@@ -5,6 +5,7 @@ import {
   requirePhotoUploadAccess
 } from "@/lib/photo-upload-queue/api-guard";
 import { listMediaLibrary } from "@/lib/media-library/service";
+import { purgeDuplicatePhotoItems } from "@/lib/photo-upload-queue/service";
 import type { MediaDatePreset, MediaTypeFilter } from "@/lib/media-library/types";
 
 export const dynamic = "force-dynamic";
@@ -46,8 +47,18 @@ export async function POST(request: Request) {
   const auth = await requirePhotoUploadAccess(request);
   if (!isPhotoUploadAuthOk(auth)) return auth.error;
 
-  return NextResponse.json(
-    { error: "Use batch upload or direct video upload endpoints for new media." },
-    { status: 405 }
-  );
+  try {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (body.action === "purge_duplicates") {
+      const result = await purgeDuplicatePhotoItems(auth.supabase, auth.actor);
+      return NextResponse.json({ ok: true, ...result });
+    }
+    return NextResponse.json(
+      { error: "Use batch upload or direct video upload endpoints for new media." },
+      { status: 405 }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to update media library.";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

@@ -194,6 +194,7 @@ export async function listMediaLibrary(
       { count: "exact" }
     )
     .neq("status", "failed")
+    .neq("status", "excluded")
     .order("created_at", { ascending: false })
     .range(from, to);
 
