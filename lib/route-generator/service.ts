@@ -2111,7 +2111,7 @@ export async function exportSamsaraCsv(params: {
   await writeRouteAuditEvent({
     action: "route_generator.csv_exported",
     entityType: "route_export_job",
-    entityId: job?.id,
+    entityId: job?.id != null ? String(job.id) : undefined,
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
