@@ -32,8 +32,14 @@ export type PhotoQueueDetailResponse = {
 export type PhotoUploadFileResult = {
   fileName: string;
   ok: boolean;
+  skipped?: boolean;
   item?: PhotoUploadItem;
   error?: string;
+  duplicate?: {
+    id?: string;
+    original_filename?: string;
+    batch_name?: string | null;
+  } | null;
 };
 
 export type PhotoExportResponse = {
@@ -138,6 +144,24 @@ export async function updatePhotoBatch(
   });
   const body = await readJson<{ batch: PhotoUploadBatch }>(response);
   return body.batch;
+}
+
+export async function purgeDuplicatePhotos(): Promise<{
+  deleted: number;
+  kept: number;
+  hashes: number;
+}> {
+  const response = await fetch("/api/admin/photo-upload-queue", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "purge_duplicates" })
+  });
+  const body = await readJson<{ deleted: number; kept: number; hashes: number }>(response);
+  return {
+    deleted: Number(body.deleted || 0),
+    kept: Number(body.kept || 0),
+    hashes: Number(body.hashes || 0)
+  };
 }
 
 export async function uploadPhotoFiles(

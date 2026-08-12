@@ -6,6 +6,7 @@ import {
   buildPhotoStoragePath,
   createPhotoSignedUrl,
   downloadPhotoBuffer,
+  removePhotoPaths,
   uploadPhotoBuffer
 } from "@/lib/photo-upload-queue/storage";
 import type {
@@ -452,19 +453,34 @@ export async function getOrCreateTodayLibraryBatch(supabase: SupabaseClient, act
   );
 }
 
+export type PhotoDuplicateMatch = {
+  id: string;
+  batch_id: string;
+  original_filename: string;
+  status: string;
+  uploaded_to_gingr_at: string | null;
+  batch_name: string | null;
+  service_date: string | null;
+  batch_status: string | null;
+};
+
 export async function findDuplicateByHash(
   supabase: SupabaseClient,
   sha256: string,
   excludeItemId?: string | null
-) {
+): Promise<PhotoDuplicateMatch | null> {
+  const hash = String(sha256 || "").trim().toLowerCase();
+  if (!hash) return null;
+
   let query = supabase
     .from("photo_upload_items")
     .select(
       "id, batch_id, original_filename, status, uploaded_to_gingr_at, created_at, photo_upload_batches!inner(batch_name, service_date, status)"
     )
-    .eq("sha256_hash", sha256)
+    .eq("sha256_hash", hash)
     .neq("status", "excluded")
-    .order("created_at", { ascending: false })
+    // Prefer the original (oldest) match so skip messages point at the kept file.
+    .order("created_at", { ascending: true })
     .limit(5);
 
   if (excludeItemId) query = query.neq("id", excludeItemId);
@@ -488,6 +504,19 @@ export async function findDuplicateByHash(
   };
 }
 
+export type AddPhotoItemResult =
+  | {
+      skipped: false;
+      item: PhotoUploadItem;
+      duplicate: PhotoDuplicateMatch | null;
+    }
+  | {
+      skipped: true;
+      item: null;
+      duplicate: PhotoDuplicateMatch;
+      message: string;
+    };
+
 export async function addPhotoItem(
   supabase: SupabaseClient,
   input: {
@@ -508,9 +537,11 @@ export async function addPhotoItem(
     internal_note?: string | null;
     media_kind?: "photo" | "video";
     duration_seconds?: number | null;
+    /** Default true — identical files are not inserted again. */
+    skipDuplicates?: boolean;
   },
   actor: PhotoQueueActor
-) {
+): Promise<AddPhotoItemResult> {
   const { data: batch, error: batchError } = await supabase
     .from("photo_upload_batches")
     .select("*")
@@ -522,7 +553,31 @@ export async function addPhotoItem(
     throw new Error("This batch is locked. Reopen it before adding photos.");
   }
 
-  const duplicate = await findDuplicateByHash(supabase, input.sha256_hash);
+  const sha256 = String(input.sha256_hash || "").trim().toLowerCase();
+  const skipDuplicates = input.skipDuplicates !== false;
+  const duplicate = sha256 ? await findDuplicateByHash(supabase, sha256) : null;
+  if (skipDuplicates && duplicate) {
+    await writeAudit(supabase, {
+      batchId: input.batchId,
+      photoItemId: duplicate.id,
+      action: "item.duplicate_skipped",
+      newValue: {
+        filename: input.original_filename,
+        sha256,
+        existing_item_id: duplicate.id,
+        existing_filename: duplicate.original_filename
+      },
+      performedBy: actorId(actor),
+      performedByName: actorName(actor)
+    });
+    return {
+      skipped: true,
+      item: null,
+      duplicate,
+      message: `Skipped duplicate of ${duplicate.original_filename}`
+    };
+  }
+
   // Library mode: photos are stored and viewable immediately. No Gingr/dog assignment required.
   const status: PhotoItemStatus = "ready_for_gingr";
 
@@ -545,13 +600,13 @@ export async function addPhotoItem(
     file_size: input.file_size,
     width: input.width,
     height: input.height,
-    sha256_hash: input.sha256_hash,
+    sha256_hash: sha256,
     yard: input.yard ?? batch.default_yard ?? null,
     category: input.category ?? batch.default_category ?? null,
     photographer_name: input.photographer_name ?? batch.photographer_name ?? null,
     internal_note: input.internal_note ?? null,
     status,
-    duplicate_of_item_id: duplicate?.id ?? null,
+    duplicate_of_item_id: null,
     duplicate_override: false,
     media_kind: mediaKind,
     duration_seconds: input.duration_seconds ?? null,
@@ -560,13 +615,27 @@ export async function addPhotoItem(
   };
 
   const { data, error } = await supabase.from("photo_upload_items").insert(row).select("*").single();
-  if (error || !data) throw new Error(error?.message || "Unable to save photo item.");
+  if (error || !data) {
+    // Unique index may catch a race with a concurrent upload of the same bytes.
+    if (/duplicate|unique/i.test(error?.message || "")) {
+      const raced = await findDuplicateByHash(supabase, sha256);
+      if (raced) {
+        return {
+          skipped: true,
+          item: null,
+          duplicate: raced,
+          message: `Skipped duplicate of ${raced.original_filename}`
+        };
+      }
+    }
+    throw new Error(error?.message || "Unable to save photo item.");
+  }
 
   await writeAudit(supabase, {
     batchId: input.batchId,
     photoItemId: data.id,
     action: "item.added",
-    newValue: { filename: input.original_filename, status, duplicate_of: duplicate?.id ?? null },
+    newValue: { filename: input.original_filename, status, duplicate_of: null },
     performedBy: actorId(actor),
     performedByName: actorName(actor)
   });
@@ -574,23 +643,115 @@ export async function addPhotoItem(
   await refreshBatchStatus(supabase, input.batchId);
 
   return {
+    skipped: false,
     item: {
       ...(data as PhotoUploadItem),
       dogs: [],
       thumbnail_url: photoMediaUrl(data.id, "thumbnail"),
       original_url: photoMediaUrl(data.id, "original"),
-      duplicate_info: duplicate
-        ? {
-            previous_batch_name: duplicate.batch_name,
-            previous_filename: duplicate.original_filename,
-            previous_uploaded_at: duplicate.uploaded_to_gingr_at,
-            previous_status: duplicate.status,
-            previous_service_date: duplicate.service_date
-          }
-        : null
+      duplicate_info: null
     } as PhotoUploadItem,
-    duplicate
+    duplicate: null
   };
+}
+
+/**
+ * Keep the oldest item for each content hash and hard-delete the rest (DB + storage).
+ * Also hard-deletes rows previously soft-excluded as duplicates so storage is cleaned.
+ * Safe to re-run; returns how many duplicate rows were removed.
+ */
+export async function purgeDuplicatePhotoItems(
+  supabase: SupabaseClient,
+  actor?: PhotoQueueActor | null
+): Promise<{ deleted: number; kept: number; hashes: number }> {
+  const { data, error } = await supabase
+    .from("photo_upload_items")
+    .select(
+      "id, batch_id, sha256_hash, created_at, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, status, excluded_reason"
+    )
+    .not("sha256_hash", "is", null)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message || "Unable to load photo items for duplicate purge.");
+
+  const active = (data ?? []).filter((row) => String(row.status) !== "excluded");
+  const softExcludedDupes = (data ?? []).filter(
+    (row) =>
+      String(row.status) === "excluded" &&
+      /duplicate/i.test(String(row.excluded_reason || ""))
+  );
+
+  const groups = new Map<string, typeof active>();
+  for (const row of active) {
+    const hash = String(row.sha256_hash || "").trim().toLowerCase();
+    if (!hash) continue;
+    const list = groups.get(hash) ?? [];
+    list.push(row);
+    groups.set(hash, list);
+  }
+
+  const toDelete: typeof active = [];
+  let kept = 0;
+  for (const [, rows] of groups) {
+    if (rows.length <= 1) {
+      kept += rows.length;
+      continue;
+    }
+    kept += 1;
+    toDelete.push(...rows.slice(1));
+  }
+  // Finish cleaning soft-excluded duplicates (e.g. from migration) by removing files + rows.
+  toDelete.push(...softExcludedDupes);
+
+  // De-dupe delete list by id (a row could theoretically match both paths).
+  const deleteMap = new Map(toDelete.map((row) => [String(row.id), row]));
+  const uniqueDeletes = [...deleteMap.values()];
+
+  if (!uniqueDeletes.length) {
+    return { deleted: 0, kept, hashes: groups.size };
+  }
+
+  const paths = uniqueDeletes.flatMap((row) => [
+    row.original_storage_path,
+    row.thumbnail_storage_path,
+    row.gingr_ready_storage_path
+  ]);
+  await removePhotoPaths(
+    supabase,
+    paths.filter((path): path is string => Boolean(path))
+  );
+
+  const ids = uniqueDeletes.map((row) => String(row.id));
+  const batchIds = [...new Set(uniqueDeletes.map((row) => String(row.batch_id)))];
+
+  // Clear self-references from items that pointed at a deleted duplicate.
+  await supabase
+    .from("photo_upload_items")
+    .update({ duplicate_of_item_id: null })
+    .in("duplicate_of_item_id", ids);
+
+  const chunkSize = 200;
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize);
+    const { error: deleteError } = await supabase.from("photo_upload_items").delete().in("id", chunk);
+    if (deleteError) throw new Error(deleteError.message || "Unable to delete duplicate photo items.");
+  }
+
+  for (const batchId of batchIds) {
+    await refreshBatchStatus(supabase, batchId);
+  }
+
+  if (actor && batchIds[0]) {
+    await writeAudit(supabase, {
+      batchId: batchIds[0],
+      photoItemId: null,
+      action: "library.duplicates_purged",
+      newValue: { deleted: ids.length, kept, hashes: groups.size },
+      performedBy: actorId(actor),
+      performedByName: actorName(actor)
+    });
+  }
+
+  return { deleted: ids.length, kept, hashes: groups.size };
 }
 
 async function recomputeItemStatus(

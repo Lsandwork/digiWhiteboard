@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { buildExportFileName, deriveItemStatus } from "../lib/photo-upload-queue/process";
 import { suggestedBatchName } from "../lib/photo-upload-queue/types";
-import { sanitizePhotoFileName } from "../lib/photo-upload-queue/storage";
+import { sanitizePhotoFileName, sha256Hex } from "../lib/photo-upload-queue/storage";
 
 assert.equal(deriveItemStatus({ dogCount: 0, hasDuplicate: false, duplicateOverride: false, excluded: false }), "needs_dog_assignment");
 assert.equal(deriveItemStatus({ dogCount: 1, hasDuplicate: true, duplicateOverride: false, excluded: false }), "needs_review");
@@ -19,5 +19,11 @@ assert.match(exportName, /^2026-07-18_Buddy-Max_Daycare_001\.jpg$/);
 
 assert.equal(suggestedBatchName("2026-07-18", "Marketing"), "Fitdog Photos – 2026-07-18 – Marketing");
 assert.ok(sanitizePhotoFileName("Buddy!! Photo #1.jpg").length > 0);
+
+const a = sha256Hex(Buffer.from("same-bytes"));
+const b = sha256Hex(Buffer.from("same-bytes"));
+const c = sha256Hex(Buffer.from("other-bytes"));
+assert.equal(a, b, "identical bytes must share a hash for duplicate skipping");
+assert.notEqual(a, c);
 
 console.log("photo-upload-queue unit tests passed");

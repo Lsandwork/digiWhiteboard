@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw, Search } from "lucide-react";
 import { listMediaLibrary } from "@/components/admin/media-library/api";
+import { purgeDuplicatePhotos } from "@/components/admin/photo-upload-queue/api";
 import {
   MediaLibraryCard,
   MediaLibraryEmptyState,
@@ -56,6 +57,20 @@ export function MediaLibraryPanel() {
       else setLoading(true);
 
       try {
+        if (!append && nextPage === 1) {
+          try {
+            const purged = await purgeDuplicatePhotos();
+            if (purged.deleted > 0) {
+              showToast(
+                `Removed ${purged.deleted} duplicate image${purged.deleted === 1 ? "" : "s"} from the media library.`,
+                "success"
+              );
+            }
+          } catch {
+            // Non-blocking — gallery still loads if purge fails.
+          }
+        }
+
         const result = await listMediaLibrary({
           page: nextPage,
           pageSize: 48,

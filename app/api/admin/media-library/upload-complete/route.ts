@@ -4,7 +4,8 @@ import {
   isPhotoUploadAuthOk,
   requirePhotoUploadAccess
 } from "@/lib/photo-upload-queue/api-guard";
-import { addPhotoItem } from "@/lib/photo-upload-queue/service";
+import { addPhotoItem, findDuplicateByHash } from "@/lib/photo-upload-queue/service";
+import { removePhotoPaths } from "@/lib/photo-upload-queue/storage";
 import {
   assertStorageObjectExists,
   buildVideoStoredFilename,
@@ -54,7 +55,22 @@ export async function POST(request: Request) {
       fileName
     });
 
-    const { item, duplicate } = await addPhotoItem(
+    const existing = await findDuplicateByHash(auth.supabase, sha256);
+    if (existing) {
+      await removePhotoPaths(
+        auth.supabase,
+        [storagePath, posterStoragePath].filter((path): path is string => Boolean(path))
+      ).catch(() => undefined);
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        item: null,
+        duplicate: existing,
+        message: `Skipped duplicate of ${existing.original_filename}`
+      });
+    }
+
+    const added = await addPhotoItem(
       auth.supabase,
       {
         batchId,
@@ -69,15 +85,31 @@ export async function POST(request: Request) {
         height: null,
         sha256_hash: sha256,
         media_kind: "video",
-        duration_seconds: Number.isFinite(durationSeconds) ? durationSeconds : null
+        duration_seconds: Number.isFinite(durationSeconds) ? durationSeconds : null,
+        skipDuplicates: true
       },
       auth.actor
     );
 
+    if (added.skipped) {
+      await removePhotoPaths(
+        auth.supabase,
+        [storagePath, posterStoragePath].filter((path): path is string => Boolean(path))
+      ).catch(() => undefined);
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        item: null,
+        duplicate: added.duplicate,
+        message: added.message
+      });
+    }
+
     return NextResponse.json({
       ok: true,
-      item,
-      duplicate: duplicate ?? null
+      skipped: false,
+      item: added.item,
+      duplicate: null
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to finalize media upload.";

@@ -106,7 +106,13 @@ export async function downloadPhotoBuffer(supabase: SupabaseClient, path: string
 }
 
 export async function removePhotoPaths(supabase: SupabaseClient, paths: string[]) {
-  const clean = paths.filter(Boolean);
+  const clean = [...new Set(paths.map((path) => String(path || "").trim()).filter(Boolean))];
   if (!clean.length) return;
-  await supabase.storage.from(PHOTO_UPLOAD_BUCKET).remove(clean);
+  // Storage remove is capped; chunk to avoid silent truncation on large purges.
+  const chunkSize = 100;
+  for (let i = 0; i < clean.length; i += chunkSize) {
+    const chunk = clean.slice(i, i + chunkSize);
+    const { error } = await supabase.storage.from(PHOTO_UPLOAD_BUCKET).remove(chunk);
+    if (error) throw new Error(error.message || "Unable to delete photo files from storage.");
+  }
 }

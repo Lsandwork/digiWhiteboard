@@ -4,7 +4,8 @@ import {
   getOrCreateTodayLibraryBatch,
   listBatches,
   listCategories,
-  listYards
+  listYards,
+  purgeDuplicatePhotoItems
 } from "@/lib/photo-upload-queue/service";
 import {
   demoWriteGuard,
@@ -67,6 +68,10 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    if (body.action === "purge_duplicates") {
+      const result = await purgeDuplicatePhotoItems(auth.supabase, auth.actor);
+      return NextResponse.json({ ok: true, ...result });
+    }
     if (body.action === "ensure_today" || body.ensure_today) {
       const batch = await getOrCreateTodayLibraryBatch(auth.supabase, auth.actor);
       return NextResponse.json({ batch });
