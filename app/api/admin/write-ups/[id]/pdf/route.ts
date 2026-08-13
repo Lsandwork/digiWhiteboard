@@ -39,13 +39,13 @@ export async function GET(request: Request, context: RouteContext) {
 
     const pdf = await getWriteUpPdfBytes(supabase, id);
     if (!pdf) {
-      return NextResponse.json({ error: "PDF has not been generated for this write-up." }, { status: 404 });
+      return NextResponse.json({ error: "No file is attached to this write-up." }, { status: 404 });
     }
 
     return new NextResponse(new Uint8Array(pdf.bytes), {
       status: 200,
       headers: {
-        "content-type": "application/pdf",
+        "content-type": pdf.content_type || "application/pdf",
         "content-disposition": `attachment; filename="${pdf.filename}"`,
         "cache-control": "no-store"
       }

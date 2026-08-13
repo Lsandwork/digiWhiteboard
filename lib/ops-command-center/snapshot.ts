@@ -131,8 +131,7 @@ function toolsForRole(roleKey: string): Array<{ tab: string; label: string }> {
       return [
         { tab: "walks_board", label: "Walks / Yard" },
         { tab: "push_notices", label: "Push Alerts" },
-        { tab: "active_issues", label: "Active Issues" },
-        { tab: "route_generator", label: "Routes" }
+        { tab: "active_issues", label: "Active Issues" }
       ];
     case "groomer":
       return [
@@ -148,9 +147,13 @@ function toolsForRole(roleKey: string): Array<{ tab: string; label: string }> {
       ];
     case "driver":
     case "hiker":
-    case "daycare":
       return [
         { tab: "route_generator", label: "Routes" },
+        { tab: "walks_board", label: "Walks" },
+        { tab: "checklist", label: "Checklist" }
+      ];
+    case "daycare":
+      return [
         { tab: "walks_board", label: "Walks" },
         { tab: "checklist", label: "Checklist" }
       ];

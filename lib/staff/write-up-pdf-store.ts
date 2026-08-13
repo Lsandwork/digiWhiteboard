@@ -6,8 +6,10 @@ type WriteUpPdfRecord = {
   report_id: string;
   filename: string;
   pdf_base64: string;
+  content_type?: string;
   generated_at: string;
   hr_tracked: true;
+  uploaded?: boolean;
 };
 
 type WriteUpPdfState = {
@@ -65,19 +67,21 @@ export function warningNoticePdfFilename(employeeName: string, reportId: string)
   return `Fitdog-Warning-Notice-${safeName}-${reportId.slice(0, 8)}.pdf`;
 }
 
-export async function saveWriteUpPdf(
+export async function saveWriteUpAttachment(
   supabase: SupabaseClient,
   reportId: string,
-  employeeName: string,
-  pdfBytes: Uint8Array
+  bytes: Uint8Array,
+  options: { filename: string; contentType?: string; uploaded?: boolean }
 ) {
   const generated_at = new Date().toISOString();
   const record: WriteUpPdfRecord = {
     report_id: reportId,
-    filename: warningNoticePdfFilename(employeeName, reportId),
-    pdf_base64: Buffer.from(pdfBytes).toString("base64"),
+    filename: options.filename,
+    pdf_base64: Buffer.from(bytes).toString("base64"),
+    content_type: options.contentType || "application/pdf",
     generated_at,
-    hr_tracked: true
+    hr_tracked: true,
+    uploaded: Boolean(options.uploaded)
   };
 
   const state = await loadState(supabase);
@@ -88,7 +92,19 @@ export async function saveWriteUpPdf(
     throw new Error("Write-up PDF storage is not available.");
   }
 
-  return { filename: record.filename, generated_at };
+  return { filename: record.filename, generated_at, content_type: record.content_type || "application/pdf" };
+}
+
+export async function saveWriteUpPdf(
+  supabase: SupabaseClient,
+  reportId: string,
+  employeeName: string,
+  pdfBytes: Uint8Array
+) {
+  return saveWriteUpAttachment(supabase, reportId, pdfBytes, {
+    filename: warningNoticePdfFilename(employeeName, reportId),
+    contentType: "application/pdf"
+  });
 }
 
 export async function getWriteUpPdfRecord(supabase: SupabaseClient, reportId: string) {
@@ -102,6 +118,7 @@ export async function getWriteUpPdfBytes(supabase: SupabaseClient, reportId: str
   return {
     filename: record.filename,
     generated_at: record.generated_at,
+    content_type: record.content_type || "application/pdf",
     bytes: Buffer.from(record.pdf_base64, "base64")
   };
 }

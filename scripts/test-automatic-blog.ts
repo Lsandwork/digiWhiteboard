@@ -171,13 +171,10 @@ assert.ok(
 );
 
 const teamLeadNav = buildStaffPanelNav(staffTabs, "staff", "team_leader");
-assert.ok(
+assert.equal(
   teamLeadNav.some((entry) => entry.type === "item" && entry.tab === "route_generator"),
-  "Team Leads with Route Generator access should see it under Applications"
-);
-assert.ok(
-  teamLeadNav.some((entry) => entry.type === "section" && entry.id === "global_apps"),
-  "Team Lead nav should include Applications"
+  false,
+  "Team Lead hub sidebar does not list Route Generator"
 );
 
 const trainerNav = buildStaffPanelNav(staffTabs, "staff", "trainer");

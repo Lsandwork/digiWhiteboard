@@ -234,7 +234,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Fitdog Alerts (app.fitdog.com payments) are not on the Team Lead dashboard. Coordinator dashboards, including a coordinator who also has a Team Lead account, stay unchanged.",
       "Floor Ops covers Ops Command Center, Team Log, follow-ups, active issues, walks, and photo upload.",
       "Whiteboard covers Standard Notices, Yard Camera Push, Grooming Push, and Live Preview.",
-      "Apps covers Route Generator, Gingr, and Ruffly."
+      "Apps covers Gingr and Ruffly. Route Generator is Super Admin, Admin, Management, and Transportation only."
     ],
     adminTab: "yard_command",
     adminBoard: "staff",
@@ -264,7 +264,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Primary tabs: My Shift, Driver / Hiker Mode, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
       "Floor Ops opens Team Log, Checklist, Walks Board, photo upload / Media Library, and Write Ups.",
-      "Apps opens Gingr when you need the business system of record."
+      "Apps opens Gingr when you need the business system of record. Driver/Hiker (Transportation) also gets Route Generator there."
     ],
     audiences: ["staff_ops"]
   },
@@ -279,7 +279,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Floor Ops — command centers, floor operations, photos, and cameras.",
       "Whiteboard — all push-to-board and display/cast tools.",
       "Support — Support Command Center for complaints, PIPs, and urgent cases.",
-      "People & HR — staff directory, users, HR records, write-ups, and PIP.",
+      "People & HR — staff directory, users, HR records (including uploaded paper write-ups), write-ups, and PIP.",
       "Apps — Route Generator, System Health, Blog Generator, Gingr, Ruffly.",
       "Admin — Overview, analytics, settings, logs, integrations, templates, and notifications."
     ],
@@ -368,7 +368,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "route-generator-help",
     title: "How does Route Generator and Samsara export work?",
-    summary: "Pull Fitdog signups, build van routes, approve, then download today’s Samsara CSV — never reuse another day’s file.",
+    summary: "Super Admin, Admin, Management, and Transportation can pull Fitdog signups, build van routes, approve, then download today’s Samsara CSV — never reuse another day’s file.",
     category: "Admin Dashboard",
     keywords: [
       "route generator",
@@ -381,7 +381,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "export"
     ],
     steps: [
-      "Open Applications → Route Generator (Staff board).",
+      "Open Apps → Route Generator (Staff board). Only Super Admin, Admin, Management, and Transportation logins can open it.",
       "Set Operating date to today → Pull Report → Generate Routes → Approve Routes.",
       "Click Export Samsara CSV (or Re-export after the first download).",
       "Upload that new file in cloud.samsara.com the same day only.",
@@ -790,7 +790,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "front-desk-coordinator",
     title: "What can a Front Desk Coordinator or Team Lead do?",
-    summary: "Coordinator and Team Lead accounts use My Shift, Team Log, Push Notices, Route Generator (when enabled), follow-ups, and view-only Staff Directory.",
+    summary: "Coordinator and Team Lead accounts use My Shift, Team Log, Push Notices, follow-ups, and view-only Staff Directory.",
     category: "Users & Login",
     keywords: [
       "front desk coordinator",
@@ -812,7 +812,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Start from My Shift / Front Desk Command or Yard Command for live dogs and Gingr connection status.",
       "Team Lead dashboard: My Shift Needs Attention is assigned Open Log + Active Issues, plus previous Team Lead Team Log notes. Coordinator dashboards still see the full desk view including Fitdog Alerts.",
       "Open Floor Ops for Team Log, Owner Follow Up, Active Issues, Walks Board, and photos.",
-      "Open Whiteboard for Push Notices and related live alerts; open Apps for Route Generator / Gingr / Ruffly when enabled.",
+      "Open Whiteboard for Push Notices and related live alerts; open Apps for Gingr / Ruffly when enabled.",
       "Staff Directory is view-only for Front Desk — search and review staff, but you cannot add, edit, or delete directory rows.",
       "You can delete only Team Log entries you created (Super Admin, Admin, and Management can delete any).",
       "You cannot access Lobby content tools, global settings, logs, integrations, or the full Admin Users area."
@@ -821,7 +821,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     adminBoard: "staff",
     tips: [
       "Use these roles for desk/team-lead staff who need live yard tools without full admin access.",
-      "Search Help for Route Generator, Push Notices, or Team Log when you need step-by-step screens."
+      "Search Help for Push Notices or Team Log when you need step-by-step screens."
     ]
   },
   {
@@ -1274,7 +1274,11 @@ export function articleVisibleToRole(article: HelpArticle, role: AdminUserRole):
     return audiences.includes("staff_ops") || audiences.includes("viewer") || MANAGEMENT_EXTRA_ARTICLE_IDS.has(article.id);
   }
 
-  if (role === "daycare" || role === "driver" || role === "hiker") {
+  if (role === "driver" || role === "hiker") {
+    return DOG_HANDLER_ARTICLE_IDS.has(article.id) || article.id === "route-generator-help";
+  }
+
+  if (role === "daycare") {
     return DOG_HANDLER_ARTICLE_IDS.has(article.id);
   }
 

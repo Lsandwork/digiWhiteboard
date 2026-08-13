@@ -74,8 +74,8 @@ const REQUIRED_BY_ROLE: Record<AdminUserRole, string[]> = {
   groomer: ["front-desk-log", "groomer-trainer-crossover", "grooming-push-help", "ops-command-center-help"],
   trainer: ["front-desk-log", "groomer-trainer-crossover", "commissions-help", "ops-command-center-help"],
   daycare: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
-  driver: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
-  hiker: ["front-desk-log", "dog-handler-basics", "ops-command-center-help"],
+  driver: ["front-desk-log", "dog-handler-basics", "ops-command-center-help", "route-generator-help"],
+  hiker: ["front-desk-log", "dog-handler-basics", "ops-command-center-help", "route-generator-help"],
   marketing: ["marketing-account", "lobby-promotions", "lobby-tv-cast", "what-is-this"],
   viewer: ["lobby-messages", "lobby-tv-cast", "viewer-basics", "what-is-this"]
 };

@@ -94,41 +94,59 @@ assert.equal(
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "route_generator", "team_leader", "staff"),
-  true,
-  "Team Leads with transportation access can open Route Generator"
+  false,
+  "Team Leads must not open Route Generator"
 );
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "route_generator", "front_desk_coordinator", "staff"),
+  false,
+  "Front Desk Coordinators must not open Route Generator"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "route_generator", "driver", "staff"),
+  true,
+  "Transportation Driver/Hiker can open Route Generator"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "hiker"), "route_generator", "hiker", "staff"),
+  true,
+  "Transportation Driver/Hiker can open Route Generator"
+);
+{
+  const transportationDept = accessFromLegacyRole(null, null, "team_leader");
+  transportationDept.departments = ["transportation"];
+  assert.equal(
+    canAccessAdminTab(transportationDept, "route_generator", "team_leader", "staff"),
+    true,
+    "Transportation department assignment can open Route Generator"
+  );
+}
 
 {
   const access = accessFromLegacyRole(null, null, "owner_admin");
   const visible = ADMIN_TABS.filter((tab) => canAccessAdminTab(access, tab, "owner_admin", "staff"));
   const nav = buildStaffPanelNav(visible, "staff", "owner_admin");
-  let section: string | null = null;
-  let routeGeneratorSection: string | null = null;
-  for (const entry of nav) {
-    if (entry.type === "section") {
-      section = entry.id;
-      continue;
-    }
-    if (entry.type === "item" && entry.tab === "route_generator") {
-      routeGeneratorSection = section;
-      break;
-    }
-  }
-  assert.equal(
-    routeGeneratorSection,
-    "global_apps",
-    "Route Generator must sit under Applications with Gingr / Ruffly"
+  assert.ok(visible.includes("route_generator"), "Super Admin can open Route Generator");
+  assert.ok(
+    nav.some((entry) => entry.type === "item" && entry.tab === "sa_apps_hub"),
+    "Route Generator stays under the Apps hub for Super Admin"
   );
 
-  const marlonNav = buildStaffPanelNav(
+  const teamLeadNav = buildStaffPanelNav(
     ADMIN_TABS.filter((tab) => canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), tab, "team_leader", "staff")),
     "staff",
     "team_leader"
   );
-  assert.ok(
-    marlonNav.some((entry) => entry.type === "item" && entry.tab === "route_generator"),
-    "marlon@fitdog.com (Team Lead) must see Route Generator under Applications"
+  assert.equal(
+    teamLeadNav.some((entry) => entry.type === "item" && entry.tab === "route_generator"),
+    false,
+    "Team Lead sidebar must not list Route Generator"
   );
+
+  const driverNavTabs = ADMIN_TABS.filter((tab) =>
+    canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), tab, "driver", "staff")
+  );
+  assert.ok(driverNavTabs.includes("route_generator"), "Driver/Hiker visible tabs include Route Generator");
 }
 
 // Never Van 4

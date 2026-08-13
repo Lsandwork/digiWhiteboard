@@ -677,6 +677,17 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "view_my_shift",
 ];
 
+/** Transportation / Driver-Hiker Route Generator operations (no settings). */
+const TRANSPORTATION_ROUTE_PERMISSIONS: PermissionKey[] = [
+  "route_generator.view",
+  "route_generator.pull_report",
+  "route_generator.generate",
+  "route_generator.edit",
+  "route_generator.approve",
+  "route_generator.export",
+  "route_generator.view_audit"
+];
+
 /** Dog Handler panel — checklist, support, uploads, shift entry; view write-ups about them only. */
 const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
@@ -722,13 +733,6 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
   "receive_walks_board_reminders",
   "manage_photo_upload_queue",
   "download_photo_uploads",
-  "route_generator.view",
-  "route_generator.pull_report",
-  "route_generator.generate",
-  "route_generator.edit",
-  "route_generator.approve",
-  "route_generator.export",
-  "route_generator.view_audit",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -788,7 +792,6 @@ export const TEAM_LEADER_TABS = [
   "walks_board",
   "notifications",
   "management_support",
-  "route_generator",
   "settings",
   "help"
 ] as const;
@@ -859,8 +862,8 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   groomer: GROOMER_PERMISSIONS,
   trainer: TRAINER_PERMISSIONS,
   daycare: DOG_HANDLER_PERMISSIONS,
-  driver: DOG_HANDLER_PERMISSIONS,
-  hiker: DOG_HANDLER_PERMISSIONS,
+  driver: [...DOG_HANDLER_PERMISSIONS, ...TRANSPORTATION_ROUTE_PERMISSIONS],
+  hiker: [...DOG_HANDLER_PERMISSIONS, ...TRANSPORTATION_ROUTE_PERMISSIONS],
   overnight: STAFF_VIEWER_PERMISSIONS,
   maintenance: STAFF_VIEWER_PERMISSIONS,
   staff: STAFF_VIEWER_PERMISSIONS,
@@ -1287,6 +1290,33 @@ export function isMarketingLegacyRole(legacyRole?: string | null) {
   return legacyRole === "marketing";
 }
 
+const ROUTE_GENERATOR_ROLE_KEYS: RoleKey[] = ["super_admin", "admin", "management", "driver", "hiker"];
+
+/**
+ * Route Generator — Super Admin, Admin, Management, and Transportation only.
+ * Transportation = Driver/Hiker login or the Transportation department checkbox.
+ */
+export function canAccessRouteGenerator(
+  access?: UserAccess | null,
+  legacyRole?: string | null
+): boolean {
+  if (
+    isFullAdminLegacyRole(legacyRole) ||
+    legacyRole === "assistant_manager" ||
+    legacyRole === "management" ||
+    legacyRole === "driver" ||
+    legacyRole === "hiker"
+  ) {
+    return true;
+  }
+  if (isSuperAdminAccess(access) || hasAnyRole(access, ROUTE_GENERATOR_ROLE_KEYS)) {
+    return true;
+  }
+  if (access?.departments.includes("transportation")) return true;
+  const roleKey = legacyRoleToRoleKey(legacyRole);
+  return ROUTE_GENERATOR_ROLE_KEYS.includes(roleKey);
+}
+
 /**
  * Blog Generator access — Super Admin, Admin, and Marketing only.
  * Checks legacy session role and RBAC role keys.
@@ -1392,12 +1422,7 @@ export function canAccessAdminTab(
   // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
   if (tab === "route_generator") {
     if (board !== "staff") return false;
-    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
-    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
-    if (hasPermission(effective, "route_generator.view")) return true;
-    if (hasAnyRole(effective, ["super_admin", "admin", "management"])) return true;
-    const roleKey = legacyRoleToRoleKey(legacyRole);
-    return roleKey === "super_admin" || roleKey === "admin" || roleKey === "management";
+    return canAccessRouteGenerator(access, legacyRole);
   }
 
   // Same staff-board gate as Route Generator for walks / checklist / Fitdog alerts.
