@@ -4,7 +4,14 @@
  */
 
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { listStaffOps, type ActiveIssue, type OwnerFollowUp, type StaffOpsPriority } from "@/lib/staff/admin-ops";
+import {
+  listStaffOps,
+  type ActiveIssue,
+  type CrossoverMessage,
+  type OwnerFollowUp,
+  type StaffDirectoryMember,
+  type StaffOpsPriority
+} from "@/lib/staff/admin-ops";
 import { listOpenAlerts } from "@/lib/fitdog-ops/store";
 import type { OperationsAlert } from "@/lib/fitdog-ops/types";
 
@@ -19,7 +26,7 @@ const CLOSED_STATUSES = new Set([
 
 export type OpsWorkItem = {
   id: string;
-  kind: "ops_task" | "owner_follow_up" | "active_issue" | "payment_alert" | "ops_notification";
+  kind: "ops_task" | "owner_follow_up" | "active_issue" | "payment_alert" | "ops_notification" | "open_log";
   title: string;
   detail: string | null;
   priority: "critical" | "high" | "attention" | "informational";
@@ -103,6 +110,25 @@ export function issueToWorkItem(row: ActiveIssue): OpsWorkItem {
   };
 }
 
+export function openLogToWorkItem(row: CrossoverMessage): OpsWorkItem {
+  const detail = [row.log_type, row.assigned_to || row.assigned_team, String(row.details || row.message || "").trim()]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    id: `openlog:${row.id}`,
+    kind: "open_log",
+    title: row.subject || row.log_type || "Open log",
+    detail: detail || null,
+    priority: mapStaffPriority(row.priority, row.urgent),
+    statusLabel: row.status,
+    dueAt: row.due_at ?? null,
+    dogName: row.related_dog_name,
+    ownerName: row.related_owner_name,
+    hrefTab: "crossover_communication",
+    completable: false
+  };
+}
+
 export function alertToWorkItem(row: OperationsAlert): OpsWorkItem {
   const amount =
     row.amount_due != null && Number(row.amount_due) > 0 ? `$${Number(row.amount_due).toFixed(2)} due` : null;
@@ -150,6 +176,8 @@ export async function loadStaffOpsFeed() {
     followUps,
     issues,
     paymentAlerts,
+    crossoverMessages: ops?.crossover_messages || ([] as CrossoverMessage[]),
+    staffDirectory: ops?.staff_directory || ([] as StaffDirectoryMember[]),
     followUpItems,
     issueItems,
     alertItems,

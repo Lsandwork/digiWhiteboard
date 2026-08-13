@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import {
   alertToWorkItem,
   followUpToWorkItem,
-  issueToWorkItem
+  issueToWorkItem,
+  openLogToWorkItem
 } from "../lib/ops-command-center/adapters/staff-ops-feed";
-import type { ActiveIssue, OwnerFollowUp } from "../lib/staff/admin-ops";
+import type { ActiveIssue, CrossoverMessage, OwnerFollowUp } from "../lib/staff/admin-ops";
 import type { OperationsAlert } from "../lib/fitdog-ops/types";
 
 const followUp = followUpToWorkItem({
@@ -92,5 +93,36 @@ assert.equal(alert.kind, "payment_alert");
 assert.equal(alert.priority, "critical");
 assert.equal(alert.hrefTab, "fitdog_alerts");
 assert.match(alert.detail || "", /\$49\.00 due/);
+
+const openLog = openLogToWorkItem({
+  id: "ol-1",
+  subject: "Watch Milo overnight",
+  message: "Limping",
+  details: "Limping",
+  log_type: "Dog Update",
+  from_department: "Team Lead",
+  to_department: "Team Leaders",
+  priority: "High",
+  status: "Open",
+  related_dog_name: "Milo",
+  related_owner_name: null,
+  related_route: null,
+  traffic_weather_issue: null,
+  template_title: null,
+  template_field_values: null,
+  created_by: "Brian",
+  submitted_by: "Brian",
+  assigned_to: "Halle",
+  assigned_team: "Team Leaders",
+  reported_to: null,
+  department_area: "Team Lead",
+  urgent: false,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  resolved_at: null
+} as CrossoverMessage);
+assert.equal(openLog.kind, "open_log");
+assert.equal(openLog.hrefTab, "crossover_communication");
+assert.equal(openLog.priority, "high");
 
 console.log("ops-command-center-live-feed: ok");

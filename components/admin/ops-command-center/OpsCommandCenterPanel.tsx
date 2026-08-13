@@ -247,7 +247,11 @@ export function OpsCommandCenterPanel({
           label="Critical alerts"
           value={data.shiftSummary.criticalAlerts}
           tone="red"
-          onClick={onNavigate ? () => onNavigate("fitdog_alerts") : undefined}
+          onClick={
+            onNavigate
+              ? () => onNavigate(data.teamLeadView?.enabled ? "active_issues" : "fitdog_alerts")
+              : undefined
+          }
         />
         <SummaryCard
           label="Owner follow-ups"
@@ -292,36 +296,77 @@ export function OpsCommandCenterPanel({
               ))}
             </ul>
           ) : (
-            <EmptyState text="Nothing urgent right now. Keep monitoring the floor." />
+            <EmptyState
+              text={
+                data.teamLeadView?.enabled && mode === "my_shift"
+                  ? "Nothing assigned to you in Open Log or Active Issues."
+                  : "Nothing urgent right now. Keep monitoring the floor."
+              }
+            />
           )}
         </section>
 
-        <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">Live board right now</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <CountChip label="Arriving" value={data.boardCounts.checkingIn} />
-            <CountChip label="Leaving" value={data.boardCounts.checkingOut} />
-            <CountChip label="On floor" value={data.shiftSummary.dogsOnFloor ?? data.shiftSummary.dogsOnsite} />
-            {mode === "ops_command_center"
-              ? liveEntries.slice(0, 5).map(([status, count]) => (
-                  <CountChip key={status} label={status.replace(/_/g, " ")} value={count} />
-                ))
-              : null}
-          </div>
+        {mode === "my_shift" && data.teamLeadView?.enabled ? (
+          <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-white">Previous team lead notes</h3>
+              {onNavigate ? (
+                <button type="button" className="text-xs text-sky-300 underline" onClick={() => onNavigate("crossover_communication")}>
+                  Team Log
+                </button>
+              ) : null}
+            </div>
+            {data.teamLeadView.previousLeadName ? (
+              <p className="mb-3 text-xs text-admin-muted">
+                From {data.teamLeadView.previousLeadName} · Team Log
+              </p>
+            ) : null}
+            {data.teamLeadView.shiftNotes.length ? (
+              <ul className="space-y-2">
+                {data.teamLeadView.shiftNotes.map((note) => (
+                  <li key={note.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
+                    <p className="text-sm font-medium text-white">{note.title}</p>
+                    {note.detail ? <p className="mt-0.5 text-xs text-admin-muted">{note.detail}</p> : null}
+                    {note.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{note.dogName}</p> : null}
+                    <p className="mt-1 text-[11px] text-admin-muted">
+                      {formatDue(note.createdAt)}
+                      {note.status ? ` · ${note.status}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState text="No previous Team Lead shift notes in the Team Log yet." />
+            )}
+          </section>
+        ) : (
+          <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-white">Live board right now</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <CountChip label="Arriving" value={data.boardCounts.checkingIn} />
+              <CountChip label="Leaving" value={data.boardCounts.checkingOut} />
+              <CountChip label="On floor" value={data.shiftSummary.dogsOnFloor ?? data.shiftSummary.dogsOnsite} />
+              {mode === "ops_command_center"
+                ? liveEntries.slice(0, 5).map(([status, count]) => (
+                    <CountChip key={status} label={status.replace(/_/g, " ")} value={count} />
+                  ))
+                : null}
+            </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <LaneList
-              title="Arriving"
-              dogs={data.boardLanes?.arriving || []}
-              empty="No dogs in the arrival basket."
-            />
-            <LaneList
-              title="Leaving"
-              dogs={data.boardLanes?.leaving || []}
-              empty="No dogs waiting for pickup."
-            />
-          </div>
-        </section>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <LaneList
+                title="Arriving"
+                dogs={data.boardLanes?.arriving || []}
+                empty="No dogs in the arrival basket."
+              />
+              <LaneList
+                title="Leaving"
+                dogs={data.boardLanes?.leaving || []}
+                empty="No dogs waiting for pickup."
+              />
+            </div>
+          </section>
+        )}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -519,6 +564,7 @@ function inferKind(id: string): OpsWorkItem["kind"] {
   if (id.startsWith("followup:")) return "owner_follow_up";
   if (id.startsWith("issue:")) return "active_issue";
   if (id.startsWith("payment:")) return "payment_alert";
+  if (id.startsWith("openlog:")) return "open_log";
   return "ops_notification";
 }
 
@@ -591,6 +637,8 @@ function kindLabel(kind: OpsWorkItem["kind"]) {
       return "Payment";
     case "ops_notification":
       return "Notice";
+    case "open_log":
+      return "Open log";
     default:
       return "Task";
   }
