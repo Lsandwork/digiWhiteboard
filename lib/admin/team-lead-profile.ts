@@ -18,6 +18,21 @@ export function isCoordinatorDashboardRole(value?: string | null) {
   return token === "front_desk_coordinator" || token === "front_desk";
 }
 
+/** Active Front Desk / coordinator dashboard login (including dual coordinator + Team Lead). */
+export function isCoordinatorDashboardUser(input: {
+  legacyRole?: string | null;
+  access?: UserAccess | null;
+}): boolean {
+  const roles = input.access?.roles || [];
+  const primary = input.access?.primaryRole || null;
+  const legacy = String(input.legacyRole || "").trim();
+  return (
+    isCoordinatorDashboardRole(legacy) ||
+    isCoordinatorDashboardRole(primary) ||
+    roles.includes("front_desk_coordinator")
+  );
+}
+
 /** Staff-directory / assignment labels that mean Team Lead (not Front Desk). */
 export function isTeamLeadDepartmentLabel(value?: string | null) {
   const token = String(value || "").trim().toLowerCase();

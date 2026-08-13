@@ -26,7 +26,15 @@ const CLOSED_STATUSES = new Set([
 
 export type OpsWorkItem = {
   id: string;
-  kind: "ops_task" | "owner_follow_up" | "active_issue" | "payment_alert" | "ops_notification" | "open_log";
+  kind:
+    | "ops_task"
+    | "owner_follow_up"
+    | "active_issue"
+    | "payment_alert"
+    | "ops_notification"
+    | "open_log"
+    | "facility_service"
+    | "birthday";
   title: string;
   detail: string | null;
   priority: "critical" | "high" | "attention" | "informational";
