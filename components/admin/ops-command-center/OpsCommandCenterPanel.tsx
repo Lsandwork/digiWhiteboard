@@ -249,7 +249,14 @@ export function OpsCommandCenterPanel({
           tone="red"
           onClick={
             onNavigate
-              ? () => onNavigate(data.teamLeadView?.enabled ? "active_issues" : "fitdog_alerts")
+              ? () =>
+                  onNavigate(
+                    data.teamLeadView?.enabled
+                      ? "active_issues"
+                      : data.groomerView?.enabled
+                        ? "crossover_communication"
+                        : "fitdog_alerts"
+                  )
               : undefined
           }
         />
@@ -298,7 +305,7 @@ export function OpsCommandCenterPanel({
           ) : (
             <EmptyState
               text={
-                data.teamLeadView?.enabled && mode === "my_shift"
+                (data.teamLeadView?.enabled || data.groomerView?.enabled) && mode === "my_shift"
                   ? "Nothing assigned to you in Open Log or Active Issues."
                   : "Nothing urgent right now. Keep monitoring the floor."
               }
@@ -337,6 +344,33 @@ export function OpsCommandCenterPanel({
               </ul>
             ) : (
               <EmptyState text="No previous Team Lead shift notes in the Team Log yet." />
+            )}
+          </section>
+        ) : mode === "my_shift" && data.groomerView?.enabled ? (
+          <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-white">Today’s additional services</h3>
+              <span className="text-xs text-admin-muted">{data.groomerView.additionalServices.length}</span>
+            </div>
+            <p className="mb-3 text-xs text-admin-muted">
+              Gingr facility calendar{data.groomerView.serviceDate ? ` · ${data.groomerView.serviceDate}` : ""} · Free walk excluded
+            </p>
+            {data.groomerView.additionalServices.length ? (
+              <ul className="max-h-[28rem] space-y-2 overflow-auto pr-1">
+                {data.groomerView.additionalServices.map((service) => (
+                  <li key={service.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
+                    <p className="text-sm font-medium text-white">{service.serviceName}</p>
+                    {service.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{service.dogName}</p> : null}
+                    {service.ownerName ? <p className="mt-0.5 text-xs text-admin-muted">{service.ownerName}</p> : null}
+                    <p className="mt-1 text-[11px] text-admin-muted">
+                      {service.scheduledAt ? formatDue(service.scheduledAt) : "Scheduled today"}
+                      {service.reservationType ? ` · ${service.reservationType}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState text="No additional services on today’s Gingr facility calendar (free walk excluded)." />
             )}
           </section>
         ) : (

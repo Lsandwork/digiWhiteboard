@@ -5,6 +5,7 @@ import {
   type UserAccess
 } from "@/lib/admin/permissions";
 import { isTeamLeadDashboardUser } from "@/lib/admin/team-lead-profile";
+import { isGroomerDashboardUser } from "@/lib/admin/groomer-profile";
 
 /** Roles authorized for Fitdog payment alerts (UI + API). */
 export const FITDOG_ALERT_ALLOWED_ROLES: RoleKey[] = [
@@ -22,12 +23,14 @@ export function isFitdogAlertsRole(role?: string | null): boolean {
 
 export function canViewFitdogAlerts(access: UserAccess | null | undefined, legacyRole?: string | null): boolean {
   if (isTeamLeadDashboardUser({ legacyRole, access })) return false;
+  if (isGroomerDashboardUser({ legacyRole, access })) return false;
   if (hasPermission(access, "view_fitdog_alerts") || hasPermission(access, "manage_fitdog_alerts")) return true;
   return isFitdogAlertsRole(legacyRole ?? access?.primaryRole ?? null);
 }
 
 export function canManageFitdogAlerts(access: UserAccess | null | undefined, legacyRole?: string | null): boolean {
   if (isTeamLeadDashboardUser({ legacyRole, access })) return false;
+  if (isGroomerDashboardUser({ legacyRole, access })) return false;
   if (hasPermission(access, "manage_fitdog_alerts")) return true;
   if (!legacyRole && !access) return false;
   const primary = legacyRoleToRoleKey(legacyRole ?? access?.primaryRole ?? null);
