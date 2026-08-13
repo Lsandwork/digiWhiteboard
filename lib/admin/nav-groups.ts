@@ -172,7 +172,12 @@ const TAB_LABELS: Record<AdminTab, string> = {
   overnight_command: "Overnight Command",
   trainer_ops: "Trainer Ops",
   ops_system_health: "System Health & Debugging",
-  shift_handoff: "Shift Handoff"
+  shift_handoff: "Shift Handoff",
+  sa_floor_hub: "Floor Ops",
+  sa_whiteboard_hub: "Whiteboard",
+  sa_people_hub: "People & HR",
+  sa_apps_hub: "Apps",
+  sa_admin_hub: "Admin"
 };
 
 const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
@@ -188,6 +193,11 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   ops_system_health:
     "Live observability, route audits, integration failures, and Cursor debug evidence — without secrets.",
   shift_handoff: "Structured shift handoff with acknowledgement.",
+  sa_floor_hub: "Open floor command centers, operations tools, photos, and cameras from one place.",
+  sa_whiteboard_hub: "Push notices, preview the board, and manage TV / cast setup.",
+  sa_people_hub: "Staff directory, HR records, write-ups, and PIP tracking.",
+  sa_apps_hub: "Route Generator, System Health, Blog Generator, Gingr, and Ruffly.",
+  sa_admin_hub: "Overview, analytics, settings, logs, integrations, and admin utilities.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
   promotions: "Manage lobby promotion cards shown during idle time.",
@@ -694,12 +704,47 @@ export function roleCanSeeBlogNav(role?: string | null) {
   return role === "owner_admin" || role === "manager_admin" || role === "marketing";
 }
 
+/**
+ * Super Admin staff sidebar: max 10 primary tabs/icons.
+ * Demoted tools remain reachable from hub pages (permissions unchanged).
+ */
+export function buildSuperAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
+  const visible = new Set(visibleTabs);
+  const primary: AdminTab[] = [
+    "my_shift",
+    "ops_command_center",
+    "sa_floor_hub",
+    "sa_whiteboard_hub",
+    "ms_hub",
+    "sa_people_hub",
+    "package_commissions",
+    "sa_apps_hub",
+    "sa_admin_hub",
+    "help"
+  ];
+  const leaves = primary
+    .filter((tab) => visible.has(tab))
+    .map((tab) =>
+      tab === "package_commissions"
+        ? leaf("package_commissions", "Commissions")
+        : tab === "ms_hub"
+          ? leaf("ms_hub", "Support")
+          : leaf(tab)
+    );
+  return sectionEntries("super_admin_home", "Super Admin", leaves);
+}
+
 /** Pick the staff-panel sidebar layout for the signed-in role. */
 export function buildStaffPanelNav(
   visibleTabs: AdminTab[],
   board: AdminBoardType,
   role?: string | null
 ): NavEntry[] {
+  // Super Admin gets a dedicated 10-tab staff IA. Lobby/marketing boards keep full admin nav.
+  if (role === "owner_admin" && board === "staff") {
+    return buildSuperAdminNav(visibleTabs);
+  }
+
   let entries: NavEntry[];
   if (role === "trainer") entries = buildTrainerNav(visibleTabs);
   else if (role === "team_leader") entries = buildTeamLeadNav(visibleTabs);

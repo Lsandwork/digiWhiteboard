@@ -96,6 +96,8 @@ import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 import { WalksBoardPanel } from "@/components/admin/WalksBoardPanel";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
+import { SuperAdminHubPanel, SuperAdminNestedReturnBar } from "@/components/admin/SuperAdminHubPanel";
+import { isSuperAdminHubTab } from "@/lib/admin/super-admin-nav";
 
 const defaultStaff: StaffBoardSettings = {
   refresh_interval_ms: 2000,
@@ -379,7 +381,8 @@ export function AdminDashboard() {
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
   const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
+  const showSuperAdminNavCleanup = isSuperAdminLegacyRole(baseRole) && !isDemo && board === "staff";
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
   const isTrainerPanel = !isDemo && isTrainerRole(currentRole);
@@ -471,6 +474,14 @@ export function AdminDashboard() {
         showPreview={showPreview && !isStaffOverview && !isDemo && canSeeAdminUtilities && board !== "marketing"}
       >
         {error ? <p className="admin-error">{error}</p> : null}
+
+        {showSuperAdminNavCleanup ? (
+          <SuperAdminNestedReturnBar tab={tab} onNavigate={(nextTab) => setActiveTab(nextTab)} />
+        ) : null}
+
+        {showSuperAdminNavCleanup && isSuperAdminHubTab(tab) ? (
+          <SuperAdminHubPanel hubTab={tab} onNavigate={(nextTab) => setActiveTab(nextTab)} />
+        ) : null}
 
         {tab === "demo_push" ? <DemoPushPanel /> : null}
         {tab === "checklist" ? <HandlerChecklistPanel /> : null}

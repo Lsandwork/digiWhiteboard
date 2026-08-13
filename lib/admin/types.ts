@@ -105,7 +105,12 @@ export type AdminTab =
   | "overnight_command"
   | "trainer_ops"
   | "ops_system_health"
-  | "shift_handoff";
+  | "shift_handoff"
+  | "sa_floor_hub"
+  | "sa_whiteboard_hub"
+  | "sa_people_hub"
+  | "sa_apps_hub"
+  | "sa_admin_hub";
 
 export const ADMIN_TABS: AdminTab[] = [
   "checklist",
@@ -171,7 +176,12 @@ export const ADMIN_TABS: AdminTab[] = [
   "overnight_command",
   "trainer_ops",
   "ops_system_health",
-  "shift_handoff"
+  "shift_handoff",
+  "sa_floor_hub",
+  "sa_whiteboard_hub",
+  "sa_people_hub",
+  "sa_apps_hub",
+  "sa_admin_hub"
 ];
 
 export const ADMIN_HR_TABS = ["write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult"] as const;
