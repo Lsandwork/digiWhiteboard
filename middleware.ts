@@ -24,6 +24,44 @@ import {
   rewriteBlogsPublicPath
 } from "@/lib/blogs-domain";
 
+function sessionTokensFromRequest(request: NextRequest) {
+  const seen = new Set<string>();
+  const tokens: string[] = [];
+
+  const add = (value?: string | null) => {
+    const trimmed = String(value ?? "").trim();
+    if (!trimmed || seen.has(trimmed)) return;
+    seen.add(trimmed);
+    tokens.push(trimmed);
+  };
+
+  for (const cookie of request.cookies.getAll()) {
+    if (cookie.name === ADMIN_SESSION_COOKIE) add(cookie.value);
+  }
+
+  const header = request.headers.get("cookie") ?? "";
+  const escaped = ADMIN_SESSION_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matcher = new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`, "g");
+  for (const match of header.matchAll(matcher)) {
+    const raw = match[1] ?? "";
+    try {
+      add(decodeURIComponent(raw));
+    } catch {
+      add(raw);
+    }
+  }
+
+  return tokens;
+}
+
+async function sessionFromRequestCookies(request: NextRequest) {
+  for (const token of sessionTokensFromRequest(request)) {
+    const session = await verifyAdminSessionTokenEdge(token);
+    if (session) return session;
+  }
+  return null;
+}
+
 export async function middleware(request: NextRequest) {
   try {
     return await runMiddleware(request);
@@ -115,8 +153,7 @@ async function runMiddleware(request: NextRequest) {
     }
   }
 
-  const token = request.cookies.get(ADMIN_SESSION_COOKIE)?.value;
-  const session = await verifyAdminSessionTokenEdge(token);
+  const session = await sessionFromRequestCookies(request);
 
   if (pathname.startsWith("/admin/login")) {
     if (session && !session.mustChangePassword) {
