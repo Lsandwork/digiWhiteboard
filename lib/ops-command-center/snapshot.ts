@@ -15,7 +15,7 @@ import {
 } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { availableActionsForKind } from "@/lib/ops-command-center/work-item-actions";
 import type { UserAccess } from "@/lib/admin/permissions";
-import { isYardTeamLeadUser } from "@/lib/admin/team-lead-profile";
+import { isTeamLeadDashboardUser } from "@/lib/admin/team-lead-profile";
 import {
   assignedActiveIssues,
   assignedOpenLogMessages,
@@ -78,7 +78,7 @@ export type OpsCommandCenterSnapshot = {
     detail: string | null;
   };
   tools: Array<{ tab: string; label: string }>;
-  /** Yard Team Lead My Shift: previous TL Team Log notes + assigned Open Log / Active Issues. */
+  /** Team Lead dashboard My Shift: previous TL Team Log notes + assigned Open Log / Active Issues. */
   teamLeadView?: {
     enabled: boolean;
     previousLeadName: string | null;
@@ -297,10 +297,10 @@ export async function buildOpsCommandCenterSnapshot(input: {
     email: input.email,
     name: input.displayName
   });
-  const yardTeamLead = isYardTeamLeadUser({
+  const yardTeamLead = isTeamLeadDashboardUser({
     legacyRole: input.roleKey,
     access: input.access,
-    directoryDepartment: directoryMember?.department ?? null
+    dashboardRole: input.roleKey || null
   });
   const shiftActor = {
     name: input.displayName,
