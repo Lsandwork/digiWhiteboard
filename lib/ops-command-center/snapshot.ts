@@ -5,6 +5,12 @@ import { listRecentOpsEvents } from "@/lib/ops-command-center/events";
 import { countDogsByStatus } from "@/lib/ops-command-center/status";
 import type { OpsEvent, OpsNotification, OpsTask } from "@/lib/ops-command-center/types";
 import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
+import {
+  loadBoardLaneSamples,
+  loadStaffOpsFeed,
+  type BoardLaneDog,
+  type OpsWorkItem
+} from "@/lib/ops-command-center/adapters/staff-ops-feed";
 
 export type NeedsAttentionItem = {
   id: string;
@@ -22,9 +28,14 @@ export type OpsCommandCenterSnapshot = {
   generatedAt: string;
   shiftSummary: {
     dogsCheckingOut: number;
-    tasksDue: number;
+    dogsArriving: number;
+    openWork: number;
     criticalAlerts: number;
     ownerFollowUps: number;
+    dogsOnFloor: number;
+    /** @deprecated use dogsCheckingOut */
+    tasksDue: number;
+    /** @deprecated use dogsOnFloor */
     dogsOnsite: number;
   };
   liveCounts: Record<string, number>;
@@ -33,8 +44,17 @@ export type OpsCommandCenterSnapshot = {
     checkingOut: number;
     onsiteEstimate: number;
   };
+  boardLanes: {
+    arriving: BoardLaneDog[];
+    leaving: BoardLaneDog[];
+  };
   needsAttention: NeedsAttentionItem[];
+  /** Completable Command Center tasks assigned to the current user. */
   myTasks: OpsTask[];
+  /** Unified open work queue (tasks + follow-ups + issues + payment alerts). */
+  openWork: OpsWorkItem[];
+  /** Ops notifications + payment alerts for the Alerts feed. */
+  alertFeed: OpsWorkItem[];
   notifications: OpsNotification[];
   recentEvents: OpsEvent[];
   gingrHealth: {
@@ -105,6 +125,47 @@ function toolsForRole(roleKey: string): Array<{ tab: string; label: string }> {
   }
 }
 
+function severityRank(priority: OpsWorkItem["priority"]) {
+  if (priority === "critical") return 0;
+  if (priority === "high") return 1;
+  if (priority === "attention") return 2;
+  return 3;
+}
+
+function dueSoon(dueAt: string | null | undefined) {
+  if (!dueAt) return true;
+  return new Date(dueAt).getTime() <= Date.now() + 60 * 60 * 1000;
+}
+
+function taskToWorkItem(task: OpsTask): OpsWorkItem {
+  return {
+    id: `task:${task.id}`,
+    kind: "ops_task",
+    title: task.title,
+    detail: task.notes,
+    priority: task.priority,
+    statusLabel: task.status.replace(/_/g, " "),
+    dueAt: task.dueAt,
+    hrefTab: "my_shift",
+    completable: task.status !== "completed" && task.status !== "cancelled",
+    taskId: task.id
+  };
+}
+
+function notificationToWorkItem(note: OpsNotification): OpsWorkItem {
+  return {
+    id: `notif:${note.id}`,
+    kind: "ops_notification",
+    title: note.title,
+    detail: note.body,
+    priority: note.priority,
+    statusLabel: note.acknowledgedAt ? "Acknowledged" : "Unread",
+    dueAt: null,
+    hrefTab: note.hrefTab,
+    completable: false
+  };
+}
+
 export async function buildOpsCommandCenterSnapshot(input: {
   adminUserId?: string | null;
   email?: string | null;
@@ -114,98 +175,141 @@ export async function buildOpsCommandCenterSnapshot(input: {
 }): Promise<OpsCommandCenterSnapshot> {
   const supabase = getServiceSupabase();
 
-  const [checkingIn, checkingOut, openTasks, notifications, recentEvents, statusCounts, lastWebhook, lastDogSeen] =
-    await Promise.all([
-      supabase
-        .from("live_transition_dogs")
-        .select("id", { count: "exact", head: true })
-        .eq("display_status", "checking_in")
-        .eq("hidden", false),
-      supabase
-        .from("live_transition_dogs")
-        .select("id", { count: "exact", head: true })
-        .eq("display_status", "checking_out")
-        .eq("hidden", false),
-      listOpenOpsTasks({
-        assignedAdminId: input.adminUserId,
-        limit: 20
-      }).catch(() => [] as OpsTask[]),
-      input.adminUserId
-        ? listOpsNotificationsForUser(input.adminUserId, {
-            roleKey: input.roleKey,
-            limit: 20,
-            unreadOnly: false
-          }).catch(() => [] as OpsNotification[])
-        : Promise.resolve([] as OpsNotification[]),
-      listRecentOpsEvents(25).catch(() => [] as OpsEvent[]),
-      countDogsByStatus().catch(() => ({}) as Record<string, number>),
-      supabase
-        .from("gingr_webhook_events")
-        .select("created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("live_transition_dogs")
-        .select("last_seen_from_gingr_at")
-        .not("last_seen_from_gingr_at", "is", null)
-        .order("last_seen_from_gingr_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    ]);
-
-  // Owner follow-ups still live in staff ops JSON — count via best-effort helper.
-  let ownerFollowUps = 0;
-  try {
-    const { listStaffOps } = await import("@/lib/staff/admin-ops");
-    const ops = await listStaffOps(supabase);
-    ownerFollowUps = (ops.owner_follow_ups || []).filter((row) => {
-      const status = String(row.status || "").toLowerCase();
-      return !["resolved", "closed", "done", "archived"].includes(status);
-    }).length;
-  } catch {
-    ownerFollowUps = 0;
-  }
+  const [
+    checkingIn,
+    checkingOut,
+    allOpenTasks,
+    myTasks,
+    notifications,
+    recentEvents,
+    statusCounts,
+    lastWebhook,
+    lastDogSeen,
+    staffFeed,
+    boardLanes
+  ] = await Promise.all([
+    supabase
+      .from("live_transition_dogs")
+      .select("id", { count: "exact", head: true })
+      .eq("display_status", "checking_in")
+      .eq("hidden", false),
+    supabase
+      .from("live_transition_dogs")
+      .select("id", { count: "exact", head: true })
+      .eq("display_status", "checking_out")
+      .eq("hidden", false),
+    listOpenOpsTasks({ limit: 40 }).catch(() => [] as OpsTask[]),
+    listOpenOpsTasks({
+      assignedAdminId: input.adminUserId,
+      limit: 20
+    }).catch(() => [] as OpsTask[]),
+    input.adminUserId
+      ? listOpsNotificationsForUser(input.adminUserId, {
+          roleKey: input.roleKey,
+          limit: 20,
+          unreadOnly: false
+        }).catch(() => [] as OpsNotification[])
+      : Promise.resolve([] as OpsNotification[]),
+    listRecentOpsEvents(25).catch(() => [] as OpsEvent[]),
+    countDogsByStatus().catch(() => ({}) as Record<string, number>),
+    supabase
+      .from("gingr_webhook_events")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("live_transition_dogs")
+      .select("last_seen_from_gingr_at")
+      .not("last_seen_from_gingr_at", "is", null)
+      .order("last_seen_from_gingr_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    loadStaffOpsFeed().catch(() => ({
+      followUps: [],
+      issues: [],
+      paymentAlerts: [],
+      followUpItems: [] as OpsWorkItem[],
+      issueItems: [] as OpsWorkItem[],
+      alertItems: [] as OpsWorkItem[],
+      activityEvents: [] as Array<{
+        id: string;
+        category: "status";
+        title: string;
+        summary: string | null;
+        sourceModule: string;
+        actorName: string | null;
+        occurredAt: string;
+      }>,
+      ownerFollowUpCount: 0,
+      criticalPaymentCount: 0,
+      openIssueCount: 0
+    })),
+    loadBoardLaneSamples(8).catch(() => ({ arriving: [], leaving: [] }))
+  ]);
 
   const checkingInCount = checkingIn.count || 0;
   const checkingOutCount = checkingOut.count || 0;
-  const dogsOnsite =
+  const dogsOnFloorFromOps =
     (statusCounts.checked_in || 0) +
+    (statusCounts.arrived || 0) +
     (statusCounts.yard || 0) +
     (statusCounts.break || 0) +
     (statusCounts.grooming || 0) +
     (statusCounts.training || 0) +
     (statusCounts.outing || 0) +
     (statusCounts.transportation || 0) +
-    (statusCounts.overnight || 0);
+    (statusCounts.overnight || 0) +
+    (statusCounts.ready_for_pickup || 0);
 
-  const criticalAlerts = notifications.filter((n) => n.priority === "critical" && !n.resolvedAt).length;
-  const tasksDue = openTasks.filter((task) => {
-    if (!task.dueAt) return task.status === "open" || task.status === "in_progress";
-    return new Date(task.dueAt).getTime() <= Date.now() + 60 * 60 * 1000;
-  }).length;
+  const dogsOnFloor = Math.max(dogsOnFloorFromOps, checkingInCount + checkingOutCount);
 
-  const needsAttention: NeedsAttentionItem[] = [];
-  for (const task of openTasks.slice(0, 8)) {
-    needsAttention.push({
-      id: `task:${task.id}`,
-      severity: task.priority,
-      title: task.title,
-      detail: task.dueAt ? `Due ${new Date(task.dueAt).toLocaleTimeString()}` : task.notes,
-      hrefTab: "my_shift",
-      dogName: null
-    });
-  }
-  for (const note of notifications.filter((n) => !n.resolvedAt).slice(0, 8)) {
-    needsAttention.push({
-      id: `notif:${note.id}`,
-      severity: note.priority,
-      title: note.title,
-      detail: note.body,
-      hrefTab: note.hrefTab,
-      dogName: null
-    });
-  }
+  const taskWork = allOpenTasks.map(taskToWorkItem);
+  const myTaskWork = (input.adminUserId ? myTasks : allOpenTasks).map(taskToWorkItem);
+  const notifWork = notifications.filter((n) => !n.resolvedAt).map(notificationToWorkItem);
+
+  const openWork = [...myTaskWork, ...staffFeed.followUpItems, ...staffFeed.issueItems]
+    .sort((a, b) => severityRank(a.priority) - severityRank(b.priority) || String(a.dueAt || "").localeCompare(String(b.dueAt || "")))
+    .slice(0, 24);
+
+  const alertFeed = [...staffFeed.alertItems, ...notifWork]
+    .sort((a, b) => severityRank(a.priority) - severityRank(b.priority))
+    .slice(0, 20);
+
+  const needsAttentionRaw: NeedsAttentionItem[] = [
+    ...staffFeed.alertItems.filter((item) => item.priority === "critical" || item.priority === "high"),
+    ...staffFeed.issueItems.filter((item) => item.priority === "critical" || item.priority === "high"),
+    ...staffFeed.followUpItems.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
+    ...taskWork.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
+    ...notifWork.filter((item) => item.priority === "critical" || item.priority === "high")
+  ].map((item) => ({
+    id: item.id,
+    severity: item.priority,
+    title: item.title,
+    detail: item.detail,
+    hrefTab: item.hrefTab,
+    dogName: item.dogName ?? null
+  }));
+
+  const seenNeeds = new Set<string>();
+  const uniqueNeeds = needsAttentionRaw
+    .filter((item) => {
+      if (seenNeeds.has(item.id)) return false;
+      seenNeeds.add(item.id);
+      return true;
+    })
+    .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
+    .slice(0, 16);
+
+  const openWorkCount =
+    allOpenTasks.filter((task) => dueSoon(task.dueAt)).length +
+    staffFeed.followUpItems.filter((item) => dueSoon(item.dueAt)).length +
+    staffFeed.openIssueCount;
+
+  const criticalAlerts =
+    notifications.filter((n) => n.priority === "critical" && !n.resolvedAt).length +
+    staffFeed.criticalPaymentCount +
+    staffFeed.issueItems.filter((item) => item.priority === "critical").length;
 
   const gingrHealth = evaluateGingrHealth({
     lastWebhookAt: lastWebhook.data?.created_at ? String(lastWebhook.data.created_at) : null,
@@ -214,6 +318,32 @@ export async function buildOpsCommandCenterSnapshot(input: {
       : null
   });
 
+  // Merge ops events with staff activity when ops timeline is thin.
+  const mergedEvents: OpsEvent[] = [...recentEvents];
+  if (mergedEvents.length < 8) {
+    for (const activity of staffFeed.activityEvents) {
+      if (mergedEvents.length >= 20) break;
+      mergedEvents.push({
+        id: activity.id,
+        dogId: null,
+        eventType: "staff.activity",
+        category: activity.category,
+        title: activity.title,
+        summary: activity.summary,
+        actorAdminId: null,
+        actorName: activity.actorName,
+        actorRole: null,
+        sourceModule: activity.sourceModule,
+        sourceRecordType: "staff_activity_log",
+        sourceRecordId: activity.id,
+        severity: "informational",
+        payload: {},
+        occurredAt: activity.occurredAt,
+        createdAt: activity.occurredAt
+      });
+    }
+  }
+
   return {
     greetingName: greetingNameFromEmail(input.email, input.displayName),
     roleKey: input.roleKey,
@@ -221,21 +351,31 @@ export async function buildOpsCommandCenterSnapshot(input: {
     generatedAt: new Date().toISOString(),
     shiftSummary: {
       dogsCheckingOut: checkingOutCount,
-      tasksDue,
+      dogsArriving: checkingInCount,
+      openWork: openWorkCount,
       criticalAlerts,
-      ownerFollowUps,
-      dogsOnsite: dogsOnsite || checkingInCount + checkingOutCount
+      ownerFollowUps: staffFeed.ownerFollowUpCount,
+      dogsOnFloor,
+      tasksDue: openWorkCount,
+      dogsOnsite: dogsOnFloor
     },
-    liveCounts: statusCounts,
+    liveCounts: {
+      ...statusCounts,
+      arriving: checkingInCount,
+      leaving: checkingOutCount
+    },
     boardCounts: {
       checkingIn: checkingInCount,
       checkingOut: checkingOutCount,
-      onsiteEstimate: dogsOnsite || checkingInCount + checkingOutCount
+      onsiteEstimate: dogsOnFloor
     },
-    needsAttention: needsAttention.slice(0, 12),
-    myTasks: openTasks,
+    boardLanes,
+    needsAttention: uniqueNeeds,
+    myTasks: input.adminUserId ? myTasks : allOpenTasks,
+    openWork,
+    alertFeed,
     notifications,
-    recentEvents,
+    recentEvents: mergedEvents.slice(0, 20),
     gingrHealth: {
       status: gingrHealth.status,
       label: gingrHealth.label,

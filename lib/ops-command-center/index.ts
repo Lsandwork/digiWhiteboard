@@ -12,3 +12,9 @@ export * from "@/lib/ops-command-center/overnight-handoff";
 export * from "@/lib/ops-command-center/offline-queue";
 export * from "@/lib/ops-command-center/autosave";
 export { syncBoardDogToOpsCommandCenter } from "@/lib/ops-command-center/adapters/board";
+export {
+  loadStaffOpsFeed,
+  loadBoardLaneSamples,
+  searchBoardDogs,
+  type OpsWorkItem
+} from "@/lib/ops-command-center/adapters/staff-ops-feed";

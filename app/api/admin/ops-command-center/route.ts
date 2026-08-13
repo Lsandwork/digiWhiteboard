@@ -11,6 +11,7 @@ import {
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { buildOpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import { searchOpsDogs } from "@/lib/ops-command-center/dogs";
+import { searchBoardDogs } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { createOpsTask, updateOpsTaskStatus } from "@/lib/ops-command-center/tasks";
 import {
   acknowledgeOpsNotification,
@@ -54,8 +55,11 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() || "";
   if (q) {
-    const dogs = await searchOpsDogs(q, 25);
-    return NextResponse.json({ dogs });
+    const [dogs, boardDogs] = await Promise.all([
+      searchOpsDogs(q, 25).catch(() => []),
+      searchBoardDogs(q, 25).catch(() => [])
+    ]);
+    return NextResponse.json({ dogs, boardDogs });
   }
 
   const view = url.searchParams.get("view");

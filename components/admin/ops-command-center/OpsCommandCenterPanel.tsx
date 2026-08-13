@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
+import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
 
 type Mode = "my_shift" | "ops_command_center";
@@ -36,7 +37,7 @@ export function OpsCommandCenterPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [dogHits, setDogHits] = useState<OpsDog[]>([]);
+  const [dogHits, setDogHits] = useState<Array<OpsDog | BoardSearchHit>>([]);
   const [selectedDogId, setSelectedDogId] = useState<string | null>(null);
   const [dogProfile, setDogProfile] = useState<Record<string, unknown> | null>(null);
 
@@ -56,21 +57,28 @@ export function OpsCommandCenterPanel({
   }, []);
 
   useEffect(() => {
-    void load();
+    const boot = window.setTimeout(() => void load(), 0);
+    const timer = window.setInterval(() => void load(), 45_000);
+    return () => {
+      window.clearTimeout(boot);
+      window.clearInterval(timer);
+    };
   }, [load]);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setDogHits([]);
-      return;
-    }
+    const term = query.trim();
+    if (!term) return;
     const handle = window.setTimeout(async () => {
       try {
-        const res = await fetch(`/api/admin/ops-command-center?q=${encodeURIComponent(query.trim())}`, {
+        const res = await fetch(`/api/admin/ops-command-center?q=${encodeURIComponent(term)}`, {
           cache: "no-store"
         });
         const body = await res.json();
-        if (res.ok) setDogHits((body.dogs || []) as OpsDog[]);
+        if (res.ok) {
+          const opsDogs = (body.dogs || []) as OpsDog[];
+          const boardDogs = (body.boardDogs || []) as BoardSearchHit[];
+          setDogHits([...opsDogs, ...boardDogs]);
+        }
       } catch {
         setDogHits([]);
       }
@@ -79,19 +87,20 @@ export function OpsCommandCenterPanel({
   }, [query]);
 
   useEffect(() => {
-    if (!selectedDogId) {
-      setDogProfile(null);
-      return;
-    }
+    if (!selectedDogId || selectedDogId.startsWith("board:")) return;
+    let cancelled = false;
     void (async () => {
       const res = await fetch(`/api/admin/ops-command-center/dogs/${selectedDogId}`, { cache: "no-store" });
       const body = await res.json();
-      if (res.ok) setDogProfile(body);
+      if (!cancelled && res.ok) setDogProfile(body);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedDogId]);
 
   const title = mode === "my_shift" ? "My Shift" : "Operations Command Center";
-  const clock = useMemo(() => formatNow(), [data?.generatedAt]);
+  const clock = formatNow();
 
   async function completeTask(taskId: string) {
     await fetch("/api/admin/ops-command-center", {
@@ -137,7 +146,24 @@ export function OpsCommandCenterPanel({
 
   if (!data) return null;
 
-  const liveEntries = Object.entries(data.liveCounts).sort((a, b) => b[1] - a[1]);
+  const liveEntries = Object.entries(data.liveCounts)
+    .filter(([key]) => !["arriving", "leaving"].includes(key))
+    .sort((a, b) => b[1] - a[1]);
+
+  const openWork = data.openWork?.length ? data.openWork : data.myTasks.map(taskFallbackWorkItem);
+  const alertFeed = data.alertFeed?.length
+    ? data.alertFeed
+    : data.notifications.map((note) => ({
+        id: `notif:${note.id}`,
+        kind: "ops_notification" as const,
+        title: note.title,
+        detail: note.body,
+        priority: note.priority,
+        statusLabel: note.acknowledgedAt ? "Acknowledged" : "Unread",
+        dueAt: null,
+        hrefTab: note.hrefTab,
+        completable: false
+      }));
 
   return (
     <section className="space-y-5">
@@ -182,17 +208,42 @@ export function OpsCommandCenterPanel({
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SummaryCard label="Dogs checking out" value={data.shiftSummary.dogsCheckingOut} tone="orange" />
-        <SummaryCard label="Tasks due" value={data.shiftSummary.tasksDue} tone="amber" />
-        <SummaryCard label="Critical alerts" value={data.shiftSummary.criticalAlerts} tone="red" />
-        <SummaryCard label="Owner follow-ups" value={data.shiftSummary.ownerFollowUps} tone="blue" />
-        <SummaryCard label="Dogs onsite (ops)" value={data.shiftSummary.dogsOnsite} tone="green" />
+        <SummaryCard
+          label="Leaving now"
+          value={data.shiftSummary.dogsCheckingOut}
+          tone="orange"
+          onClick={onNavigate ? () => onNavigate("front_desk_command") : undefined}
+        />
+        <SummaryCard
+          label="Arriving now"
+          value={data.shiftSummary.dogsArriving ?? data.boardCounts.checkingIn}
+          tone="blue"
+          onClick={onNavigate ? () => onNavigate("front_desk_command") : undefined}
+        />
+        <SummaryCard
+          label="Open work"
+          value={data.shiftSummary.openWork ?? data.shiftSummary.tasksDue}
+          tone="amber"
+          onClick={onNavigate ? () => onNavigate("active_issues") : undefined}
+        />
+        <SummaryCard
+          label="Critical alerts"
+          value={data.shiftSummary.criticalAlerts}
+          tone="red"
+          onClick={onNavigate ? () => onNavigate("fitdog_alerts") : undefined}
+        />
+        <SummaryCard
+          label="Owner follow-ups"
+          value={data.shiftSummary.ownerFollowUps}
+          tone="green"
+          onClick={onNavigate ? () => onNavigate("owner_follow_up") : undefined}
+        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-white">Needs Attention</h3>
+            <h3 className="text-sm font-semibold text-white">Needs attention</h3>
             <span className="text-xs text-admin-muted">{data.needsAttention.length} items</span>
           </div>
           {data.needsAttention.length ? (
@@ -206,6 +257,7 @@ export function OpsCommandCenterPanel({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-white">{item.title}</p>
                     {item.detail ? <p className="mt-0.5 text-xs text-admin-muted">{item.detail}</p> : null}
+                    {item.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{item.dogName}</p> : null}
                   </div>
                   {item.hrefTab && onNavigate ? (
                     <button
@@ -225,134 +277,195 @@ export function OpsCommandCenterPanel({
         </section>
 
         <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">
-            {mode === "ops_command_center" ? "Live operating state" : "Board right now"}
-          </h3>
+          <h3 className="mb-3 text-sm font-semibold text-white">Live board right now</h3>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <CountChip label="Arriving" value={data.boardCounts.checkingIn} />
             <CountChip label="Leaving" value={data.boardCounts.checkingOut} />
+            <CountChip label="On floor" value={data.shiftSummary.dogsOnFloor ?? data.shiftSummary.dogsOnsite} />
             {mode === "ops_command_center"
-              ? liveEntries.slice(0, 8).map(([status, count]) => (
+              ? liveEntries.slice(0, 5).map(([status, count]) => (
                   <CountChip key={status} label={status.replace(/_/g, " ")} value={count} />
                 ))
               : null}
           </div>
-          {mode === "ops_command_center" && !liveEntries.length ? (
-            <p className="mt-3 text-xs text-admin-muted">
-              Shared ops status fills in as Gingr board events sync into the Command Center foundation.
-            </p>
-          ) : null}
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <LaneList
+              title="Arriving"
+              dogs={data.boardLanes?.arriving || []}
+              empty="No dogs in the arrival basket."
+            />
+            <LaneList
+              title="Leaving"
+              dogs={data.boardLanes?.leaving || []}
+              empty="No dogs waiting for pickup."
+            />
+          </div>
         </section>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">My Tasks</h3>
-          {data.myTasks.length ? (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white">Open work queue</h3>
+            <span className="text-xs text-admin-muted">{openWork.length}</span>
+          </div>
+          {openWork.length ? (
             <ul className="space-y-2">
-              {data.myTasks.map((task) => (
+              {openWork.slice(0, 12).map((item) => (
                 <li
-                  key={task.id}
+                  key={item.id}
                   className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-white">{task.title}</p>
+                    <p className="truncate text-sm text-white">{item.title}</p>
                     <p className="text-xs text-admin-muted">
-                      {task.priority} · {task.status.replace(/_/g, " ")}
-                      {task.dueAt ? ` · due ${new Date(task.dueAt).toLocaleTimeString()}` : ""}
+                      {kindLabel(item.kind)} · {item.priority}
+                      {item.dueAt ? ` · due ${formatDue(item.dueAt)}` : ""}
                     </p>
                   </div>
-                  {task.status !== "completed" && task.status !== "cancelled" ? (
-                    <button
-                      type="button"
-                      className="admin-btn-secondary shrink-0 px-2 py-1 text-xs"
-                      onClick={() => void completeTask(task.id)}
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Done
-                    </button>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {item.hrefTab && onNavigate ? (
+                      <button
+                        type="button"
+                        className="text-xs text-sky-300 underline"
+                        onClick={() => onNavigate(item.hrefTab!)}
+                      >
+                        Open
+                      </button>
+                    ) : null}
+                    {item.completable && item.taskId ? (
+                      <button
+                        type="button"
+                        className="admin-btn-secondary px-2 py-1 text-xs"
+                        onClick={() => void completeTask(item.taskId!)}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Done
+                      </button>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <EmptyState text="No open Command Center tasks assigned to you." />
+            <EmptyState text="No open follow-ups, issues, or Command Center tasks right now." />
           )}
         </section>
 
         <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">Alerts & notifications</h3>
-          {data.notifications.length ? (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white">Alerts feed</h3>
+            <span className="text-xs text-admin-muted">{alertFeed.length}</span>
+          </div>
+          {alertFeed.length ? (
             <ul className="space-y-2">
-              {data.notifications.slice(0, 8).map((note) => (
+              {alertFeed.slice(0, 10).map((item) => (
                 <li
-                  key={note.id}
+                  key={item.id}
                   className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm text-white">{note.title}</p>
-                    {note.body ? <p className="mt-0.5 text-xs text-admin-muted">{note.body}</p> : null}
+                    <p className="text-sm text-white">{item.title}</p>
+                    {item.detail ? <p className="mt-0.5 text-xs text-admin-muted">{item.detail}</p> : null}
                   </div>
-                  {!note.acknowledgedAt ? (
-                    <button
-                      type="button"
-                      className="admin-btn-secondary shrink-0 px-2 py-1 text-xs"
-                      onClick={() => void acknowledge(note.id)}
-                    >
-                      Ack
-                    </button>
-                  ) : (
-                    <span className="text-xs text-emerald-300">Ack’d</span>
-                  )}
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    {item.hrefTab && onNavigate ? (
+                      <button
+                        type="button"
+                        className="text-xs text-sky-300 underline"
+                        onClick={() => onNavigate(item.hrefTab!)}
+                      >
+                        Open
+                      </button>
+                    ) : null}
+                    {item.kind === "ops_notification" && item.id.startsWith("notif:") ? (
+                      item.statusLabel === "Unread" ? (
+                        <button
+                          type="button"
+                          className="admin-btn-secondary px-2 py-1 text-xs"
+                          onClick={() => void acknowledge(item.id.replace(/^notif:/, ""))}
+                        >
+                          Ack
+                        </button>
+                      ) : (
+                        <span className="text-xs text-emerald-300">Ack’d</span>
+                      )
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ul>
           ) : (
-            <EmptyState text="No Command Center notifications yet." />
+            <EmptyState text="No payment alerts or Command Center notifications right now." />
           )}
         </section>
       </div>
 
       <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-white">Find a dog (RuffOps ops profile)</h3>
+          <h3 className="text-sm font-semibold text-white">Find a dog</h3>
           <label className="relative block w-full sm:max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-admin-muted" />
             <input
               className="admin-input w-full pl-9"
               placeholder="Search dog, owner, or Gingr animal ID"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setQuery(next);
+                if (!next.trim()) {
+                  setDogHits([]);
+                  setSelectedDogId(null);
+                  setDogProfile(null);
+                }
+              }}
             />
           </label>
         </div>
         {dogHits.length ? (
           <ul className="mb-3 grid gap-2 sm:grid-cols-2">
-            {dogHits.map((dog) => (
-              <li key={dog.id}>
-                <button
-                  type="button"
-                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:border-sky-400/40"
-                  onClick={() => setSelectedDogId(dog.id)}
-                >
-                  <p className="text-sm font-medium text-white">{dog.name}</p>
-                  <p className="text-xs text-admin-muted">
-                    {dog.ownerName || "Owner unknown"}
-                    {dog.gingrAnimalId ? ` · Gingr #${dog.gingrAnimalId}` : ""}
-                  </p>
-                </button>
-              </li>
-            ))}
+            {dogHits.map((dog) => {
+              const id = "id" in dog ? dog.id : "";
+              const name = "name" in dog ? dog.name : "";
+              const owner = "ownerName" in dog ? dog.ownerName : null;
+              const isBoard = id.startsWith("board:");
+              return (
+                <li key={id}>
+                  <button
+                    type="button"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-left hover:border-sky-400/40"
+                    onClick={() => {
+                      if (isBoard) {
+                        setSelectedDogId(null);
+                        setDogProfile(null);
+                        onNavigate?.("front_desk_command");
+                        return;
+                      }
+                      setDogProfile(null);
+                      setSelectedDogId(id);
+                    }}
+                  >
+                    <p className="text-sm font-medium text-white">{name}</p>
+                    <p className="text-xs text-admin-muted">
+                      {owner || "Owner unknown"}
+                      {isBoard ? " · Live board" : ""}
+                      {"gingrAnimalId" in dog && dog.gingrAnimalId ? ` · Gingr #${dog.gingrAnimalId}` : ""}
+                    </p>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         ) : query.trim() ? (
-          <p className="mb-3 text-xs text-admin-muted">No ops dog matches yet. Profiles appear as board events sync.</p>
+          <p className="mb-3 text-xs text-admin-muted">No dog matches on ops profiles or the live board.</p>
         ) : null}
 
-        {dogProfile ? (
+        {selectedDogId && !selectedDogId.startsWith("board:") && dogProfile ? (
           <DogProfileCard profile={dogProfile} />
         ) : (
           <p className="text-xs text-admin-muted">
-            This is the RuffOps operational view — not a Gingr replacement. Open Gingr for reservations, packages, and
+            Search pulls RuffOps dog profiles and live Gingr board rows. Open Gingr for reservations, packages, and
             billing.
           </p>
         )}
@@ -401,6 +514,64 @@ export function OpsCommandCenterPanel({
   );
 }
 
+type BoardSearchHit = {
+  id: string;
+  name: string;
+  ownerName: string | null;
+  room?: string | null;
+  gingrAnimalId?: string | null;
+  displayStatus?: string | null;
+};
+
+function taskFallbackWorkItem(task: {
+  id: string;
+  title: string;
+  notes: string | null;
+  priority: OpsWorkItem["priority"];
+  status: string;
+  dueAt: string | null;
+}): OpsWorkItem {
+  return {
+    id: `task:${task.id}`,
+    kind: "ops_task",
+    title: task.title,
+    detail: task.notes,
+    priority: task.priority,
+    statusLabel: task.status.replace(/_/g, " "),
+    dueAt: task.dueAt,
+    hrefTab: "my_shift",
+    completable: task.status !== "completed" && task.status !== "cancelled",
+    taskId: task.id
+  };
+}
+
+function kindLabel(kind: OpsWorkItem["kind"]) {
+  switch (kind) {
+    case "owner_follow_up":
+      return "Follow-up";
+    case "active_issue":
+      return "Issue";
+    case "payment_alert":
+      return "Payment";
+    case "ops_notification":
+      return "Notice";
+    default:
+      return "Task";
+  }
+}
+
+function formatDue(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
 function greetingBucket() {
   const hour = Number(
     new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour: "numeric", hour12: false }).format(
@@ -415,11 +586,13 @@ function greetingBucket() {
 function SummaryCard({
   label,
   value,
-  tone
+  tone,
+  onClick
 }: {
   label: string;
   value: number;
   tone: "red" | "orange" | "amber" | "blue" | "green";
+  onClick?: () => void;
 }) {
   const tones: Record<string, string> = {
     red: "border-red-400/30 bg-red-500/10",
@@ -428,8 +601,17 @@ function SummaryCard({
     blue: "border-sky-400/30 bg-sky-500/10",
     green: "border-emerald-400/30 bg-emerald-500/10"
   };
+  const className = `rounded-2xl border px-3 py-3 text-left ${tones[tone]} ${onClick ? "cursor-pointer transition hover:brightness-110" : ""}`;
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        <p className="text-xs text-admin-muted">{label}</p>
+        <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
+      </button>
+    );
+  }
   return (
-    <div className={`rounded-2xl border px-3 py-3 ${tones[tone]}`}>
+    <div className={className}>
       <p className="text-xs text-admin-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold text-white">{value}</p>
     </div>
@@ -441,6 +623,37 @@ function CountChip({ label, value }: { label: string; value: number }) {
     <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
       <p className="text-[11px] uppercase tracking-wide text-admin-muted">{label}</p>
       <p className="text-lg font-semibold text-white">{value}</p>
+    </div>
+  );
+}
+
+function LaneList({
+  title,
+  dogs,
+  empty
+}: {
+  title: string;
+  dogs: Array<{ id: string; name: string; ownerName: string | null; room: string | null }>;
+  empty: string;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-admin-muted">{title}</p>
+      {dogs.length ? (
+        <ul className="space-y-1.5">
+          {dogs.slice(0, 6).map((dog) => (
+            <li key={dog.id} className="rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-1.5">
+              <p className="truncate text-sm text-white">{dog.name}</p>
+              <p className="truncate text-[11px] text-admin-muted">
+                {dog.ownerName || "Owner unknown"}
+                {dog.room ? ` · ${dog.room}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-admin-muted">{empty}</p>
+      )}
     </div>
   );
 }
