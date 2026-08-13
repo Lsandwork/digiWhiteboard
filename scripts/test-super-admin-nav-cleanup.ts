@@ -44,13 +44,13 @@ for (const tab of ADMIN_TABS) {
   assert.ok(parentHubForTab(tab), `demoted tab ${tab} must map back to a hub`);
 }
 
-// Other roles keep the richer sidebar (not clamped to 10).
+// Admin now shares the cleaned hub sidebar (≤10).
 const adminAccess = accessFromLegacyRole("admin-1", "admin@fitdog.com", "manager_admin");
 const adminVisible = ADMIN_TABS.filter((tab) => canAccessAdminTab(adminAccess, tab, "manager_admin", "staff"));
 const adminNav = buildStaffPanelNav(adminVisible, "staff", "manager_admin");
 assert.ok(
-  countNavIcons(adminNav) > 10,
-  "manager_admin sidebar should remain the full layout (not Super Admin cleanup)"
+  countNavIcons(adminNav) <= 10,
+  "manager_admin sidebar should use the cleaned hub layout (≤10)"
 );
 
 console.log("super-admin-nav-cleanup: ok", { iconCount, hubLinkedTabs: linked.size });

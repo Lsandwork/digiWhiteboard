@@ -102,7 +102,10 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
           tabLink("walks_board", "Walks Board", "Recurring walks board."),
           tabLink("track_incidents", "Track Incidents", "Incident tracking with Gingr sync."),
           tabLink("vet_visits", "Vet Visits", "Vet visits and required owner follow-up."),
-          tabLink("checklist", "Check List", "Personal handler checklist.")
+          tabLink("checklist", "Check List", "Personal handler checklist."),
+          tabLink("write_ups", "Write Ups", "Submit your write-up forms."),
+          tabLink("notifications", "Notifications", "Internal staff notifications."),
+          tabLink("settings", "Settings", "Your Digi-Board settings / profile.")
         ]
       },
       {
