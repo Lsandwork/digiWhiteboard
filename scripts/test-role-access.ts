@@ -85,6 +85,21 @@ assert.equal(
   true,
   "front desk coordinator can access Yard Push"
 );
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "ops_command_center", "front_desk_coordinator", "staff"),
+  true,
+  "front desk coordinator can open Ops Command Center from Floor Ops"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "ops_command_center", "team_leader", "staff"),
+  true,
+  "team lead can open Ops Command Center from Floor Ops"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "ops_command_center", "groomer", "staff"),
+  false,
+  "groomer does not get a standalone Ops Command Center tab"
+);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "yard_links", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "hr_hub", "daycare", "staff"), false);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "yard_links", "driver", "staff"), false);

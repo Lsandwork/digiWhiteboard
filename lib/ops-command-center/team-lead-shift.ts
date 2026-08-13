@@ -1,4 +1,4 @@
-import { isTeamLeadDepartmentLabel } from "@/lib/admin/team-lead-profile";
+import { isFrontDeskDepartmentLabel, isTeamLeadDepartmentLabel } from "@/lib/admin/team-lead-profile";
 import type { ActiveIssue, CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { belongsInOpenLog, shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
 
@@ -116,6 +116,65 @@ export function isCurrentUserSubmitter(message: CrossoverMessage, actor: ShiftAc
   if (!submitter) return false;
   const tokens = assignmentTokensForActor(actor);
   return tokens.some((token) => token.length >= 2 && (submitter === token || submitter.includes(token) || token.includes(submitter)));
+}
+
+export function isFrontDeskSubmitter(message: CrossoverMessage, directory: StaffDirectoryMember[]): boolean {
+  if (isTeamLeadDepartmentLabel(message.from_department) || isTeamLeadDepartmentLabel(message.department_area)) {
+    return false;
+  }
+  if (isFrontDeskDepartmentLabel(message.from_department) || isFrontDeskDepartmentLabel(message.department_area)) {
+    return true;
+  }
+  const submitter = normalizeToken(message.submitted_by || message.created_by);
+  if (!submitter) return false;
+  const member =
+    directory.find((entry) => normalizeToken(entry.name) === submitter) ||
+    directory.find((entry) => normalizeToken(entry.email) === submitter) ||
+    directory.find((entry) => normalizeToken(entry.admin_user_id) === submitter);
+  if (!member) {
+    return /front desk|coordinator/i.test(String(message.submitted_by || message.created_by || ""));
+  }
+  if (member.dashboard_role === "team_leader" || isTeamLeadDepartmentLabel(member.department)) return false;
+  return (
+    member.dashboard_role === "front_desk_coordinator" ||
+    isFrontDeskDepartmentLabel(member.department) ||
+    /front desk|coordinator/i.test(member.role || "")
+  );
+}
+
+export function previousFrontDeskShiftNotes(
+  messages: CrossoverMessage[],
+  actor: ShiftActor,
+  directory: StaffDirectoryMember[],
+  limit = 8
+): { previousLeadName: string | null; notes: TeamLeadShiftNote[] } {
+  const deskNotes = messages
+    .filter((message) => isFrontDeskSubmitter(message, directory))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const previous = deskNotes.filter((message) => !isCurrentUserSubmitter(message, actor));
+  const pool = previous.length
+    ? previous
+    : messages
+        .filter((message) => !isCurrentUserSubmitter(message, actor))
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  if (!pool.length) return { previousLeadName: null, notes: [] };
+
+  const previousLeadName = shiftLogSubmittedBy(pool[0]);
+  const prevKey = previousLeadName.trim().toLowerCase();
+  const notes = pool
+    .filter((message) => shiftLogSubmittedBy(message).trim().toLowerCase() === prevKey)
+    .slice(0, limit)
+    .map((message) => ({
+      id: message.id,
+      title: message.subject || message.log_type || "Shift note",
+      detail: String(message.details || message.message || "").trim() || null,
+      submittedBy: shiftLogSubmittedBy(message),
+      createdAt: message.created_at,
+      dogName: message.related_dog_name,
+      status: message.status
+    }));
+
+  return { previousLeadName, notes };
 }
 
 export function previousTeamLeadShiftNotes(

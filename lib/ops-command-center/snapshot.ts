@@ -23,6 +23,7 @@ import {
   assignedGroomerOpenLogMessages,
   assignedOpenLogMessages,
   directoryMemberForUser,
+  previousFrontDeskShiftNotes,
   previousTeamLeadShiftNotes,
   type TeamLeadShiftNote
 } from "@/lib/ops-command-center/team-lead-shift";
@@ -94,6 +95,12 @@ export type OpsCommandCenterSnapshot = {
   teamLeadView?: {
     enabled: boolean;
     previousLeadName: string | null;
+    shiftNotes: TeamLeadShiftNote[];
+  };
+  /** Coordinator dashboard My Shift: previous Front Desk Team Log notes. */
+  coordinatorView?: {
+    enabled: boolean;
+    previousName: string | null;
     shiftNotes: TeamLeadShiftNote[];
   };
   /** Groomer dashboard My Shift: Gingr additional services + assigned Open Log / Active Issues. */
@@ -217,7 +224,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
   const yardTeamLead = isTeamLeadDashboardUser({
     legacyRole: input.roleKey,
     access: input.access,
-    dashboardRole: input.roleKey || null
+    dashboardRole: input.roleKey || null,
+    email: input.email
   });
   const groomerDashboard = isGroomerDashboardUser({
     legacyRole: input.roleKey,
@@ -225,7 +233,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
   });
   const coordinatorDashboard = isCoordinatorDashboardUser({
     legacyRole: input.roleKey,
-    access: input.access
+    access: input.access,
+    email: input.email
   });
   const deskFacilityFeed = yardTeamLead || coordinatorDashboard;
 
@@ -363,6 +372,9 @@ export async function buildOpsCommandCenterSnapshot(input: {
       : [];
   const previousNotes = yardTeamLead
     ? previousTeamLeadShiftNotes(staffFeed.crossoverMessages || [], shiftActor, staffFeed.staffDirectory || [])
+    : { previousLeadName: null as string | null, notes: [] as TeamLeadShiftNote[] };
+  const previousFrontDeskNotes = coordinatorDashboard
+    ? previousFrontDeskShiftNotes(staffFeed.crossoverMessages || [], shiftActor, staffFeed.staffDirectory || [])
     : { previousLeadName: null as string | null, notes: [] as TeamLeadShiftNote[] };
   const roleWorkQueue = yardTeamLead || groomerDashboard;
 
@@ -506,6 +518,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
       enabled: yardTeamLead,
       previousLeadName: previousNotes.previousLeadName,
       shiftNotes: previousNotes.notes
+    },
+    coordinatorView: {
+      enabled: coordinatorDashboard,
+      previousName: previousFrontDeskNotes.previousLeadName,
+      shiftNotes: previousFrontDeskNotes.notes
     },
     groomerView: {
       enabled: groomerDashboard,

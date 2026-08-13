@@ -213,8 +213,8 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["front desk", "menu", "coordinator", "floor ops", "whiteboard"],
     steps: [
       "Primary tabs: My Shift, Front Desk Command, Floor Ops, Whiteboard, Apps, Staff Directory, Submit Request, Notifications, Settings, Help.",
-      "My Shift Needs Attention includes today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) plus dogs scheduled or checked in with a birthday today from the Gingr dog profile.",
-      "Floor Ops opens Team Log, Owner Follow Up, Active Issues, Fitdog Alerts, VIP Auto Book, Walks, photos, and Shift Handoff.",
+      "My Shift Needs Attention includes today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) plus dogs scheduled or checked in with a birthday today from the Gingr dog profile. Previous Front Desk Notes replace Live board on My Shift.",
+      "Floor Ops opens Ops Command Center, Team Log, Owner Follow Up, Active Issues, Fitdog Alerts, VIP Auto Book, Walks, photos, and Shift Handoff.",
       "Whiteboard opens Standard Notices, Grooming Push, Yard Camera Push, and display tools your login allows.",
       "Apps opens Gingr, Ruffly, and other connected apps."
     ],
@@ -229,10 +229,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "Admin Dashboard",
     keywords: ["team lead", "team leader", "menu", "yard command", "floor ops"],
     steps: [
-      "Primary tabs: My Shift, Ops Command Center, Yard Command, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
+      "Primary tabs: My Shift, Yard Command, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
       "My Shift Needs Attention shows Open Log and Active Issues assigned to you, plus today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) and dogs scheduled or checked in with a birthday today.",
       "Fitdog Alerts (app.fitdog.com payments) are not on the Team Lead dashboard. Coordinator dashboards, including a coordinator who also has a Team Lead account, stay unchanged.",
-      "Floor Ops covers Team Log, follow-ups, active issues, walks, and photo upload.",
+      "Floor Ops covers Ops Command Center, Team Log, follow-ups, active issues, walks, and photo upload.",
       "Whiteboard covers Standard Notices, Yard Camera Push, Grooming Push, and Live Preview.",
       "Apps covers Route Generator, Gingr, and Ruffly."
     ],
@@ -248,7 +248,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["trainer", "groomer", "menu", "trainer push", "grooming push", "commissions"],
     steps: [
       "Trainer primary: My Shift, Trainer Ops, Trainer Push, Commissions, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
-      "Groomer primary: My Shift, Grooming Push, Live Preview, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Groomer primary: My Shift, Grooming Push, Live Preview, Floor Ops, Apps, Submit Request, Notifications, Settings, Help. Ops Command Center is under Floor Ops when your login includes it.",
       "My Shift Needs Attention shows Open Log and Active Issues assigned to you. Today’s additional services come from the Gingr facility calendar (walks, taxi, club food, enrichment, and private training add-ons excluded). Fitdog Alerts are not on Groomer accounts.",
       "Floor Ops opens Team Log, Walks Board, and Video Links.",
       "Apps opens Gingr and Ruffly."
@@ -308,7 +308,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Open Staff → My Shift (your role homepage) or Ops Command Center (management live floor view).",
       "Review Needs Attention, My Tasks, Alerts, and live arriving/leaving counts.",
       "Team Lead dashboard: Needs Attention shows Open Log + Active Issues assigned to you, plus today’s Gingr facility-calendar services and birthday dogs (scheduled or checked in). My Shift shows previous Team Lead notes from Team Log instead of Live board. Fitdog / sports-app payment alerts stay off this login.",
-      "Coordinator My Shift Needs Attention keeps desk alerts/issues/follow-ups and also shows today’s Gingr facility-calendar services (Free Daily Walk excluded) plus birthday dogs from Gingr date of birth. Facility feed refreshes hourly 6am–7pm Pacific, 7 days a week.",
+      "Coordinator My Shift Needs Attention keeps desk alerts/issues/follow-ups and also shows today’s Gingr facility-calendar services (Free Daily Walk excluded) plus birthday dogs from Gingr date of birth. Previous Front Desk Notes replace Live board. Ops Command Center opens from Floor Ops. Facility feed refreshes hourly 6am–7pm Pacific, 7 days a week.",
       "Groomer dashboard: Needs Attention shows Open Log + Active Issues assigned to you. My Shift shows today’s Gingr facility-calendar additional services (walks, taxi, club food, enrichment, and private training add-ons excluded) instead of Live board. Fitdog / sports-app payment alerts stay off this login.",
       "Check the Gingr pill — Connected means recent webhook or live dog sync activity; Disconnected means no fresh Gingr activity.",
       "Use role tools (Front Desk Command, Yard Command, Driver Mode, Overnight, Trainer Ops, System Health, Shift Handoff) when your login includes them.",

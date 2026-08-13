@@ -84,7 +84,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
   },
   front_desk_coordinator: {
     sectionId: "front_desk_home",
-    sectionLabel: "Front Desk",
+    sectionLabel: "Front Desk Coordinator",
     primary: [
       { tab: "my_shift" },
       { tab: "front_desk_command" },
@@ -103,7 +103,6 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "Team Lead",
     primary: [
       { tab: "my_shift" },
-      { tab: "ops_command_center" },
       { tab: "yard_command" },
       { tab: "sa_floor_hub" },
       { tab: "sa_whiteboard_hub" },

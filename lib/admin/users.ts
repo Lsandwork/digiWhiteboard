@@ -10,6 +10,7 @@ import {
   canViewOwnWriteUpsForUser,
   hasPermission
 } from "@/lib/admin/permissions";
+import { isFrontDeskCoordinatorLoginEmail } from "@/lib/admin/team-lead-profile";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -57,7 +58,7 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
   owner_admin: "Super Admin",
   manager_admin: "Admin",
   assistant_manager: "Assistant Manager",
-  front_desk_coordinator: "Front Desk - Coordinator",
+  front_desk_coordinator: "Front Desk Coordinator",
   team_leader: "Team Lead",
   groomer: "Groomer",
   trainer: "Trainer",
@@ -69,6 +70,9 @@ export const ADMIN_SIDEBAR_ROLE_LABELS: Record<AdminUserRole, string> = {
 };
 
 export function getAdminSidebarRoleLabel(role?: string | null, email?: string | null): string {
+  if (isFrontDeskCoordinatorLoginEmail(email)) {
+    return ADMIN_SIDEBAR_ROLE_LABELS.front_desk_coordinator;
+  }
   if (role && role in ADMIN_SIDEBAR_ROLE_LABELS) {
     return ADMIN_SIDEBAR_ROLE_LABELS[role as AdminUserRole];
   }

@@ -491,6 +491,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "ruffly.leads.edit",
   "ruffly.reviews.view",
   "view_my_shift",
+  "view_ops_command_center",
   "view_ops_dog_profile",
   "manage_ops_tasks",
 ];
@@ -748,6 +749,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 export const FRONT_DESK_COORDINATOR_TABS = [
   "my_shift",
   "front_desk_command",
+  "ops_command_center",
   "shift_handoff",
   "crossover_communication",
   "push_notices",

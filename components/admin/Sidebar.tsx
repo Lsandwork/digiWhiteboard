@@ -13,6 +13,7 @@ import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 import { RUFFLY_NAV_ICON } from "@/lib/ruffly/branding/assets";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
+import { isFrontDeskCoordinatorLoginEmail } from "@/lib/admin/team-lead-profile";
 import {
   bucketNavEntries,
   buildStaffPanelNav,
@@ -28,11 +29,11 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 
 const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
-function sidebarPanelTitle(role?: string | null) {
+function sidebarPanelTitle(role?: string | null, email?: string | null) {
+  if (isFrontDeskCoordinatorLoginEmail(email) || role === "front_desk_coordinator") return "Front Desk Coordinator";
   if (role === "owner_admin") return "Super Admin";
   if (role === "manager_admin") return "Admin";
   if (role === "assistant_manager") return "Management";
-  if (role === "front_desk_coordinator") return "Front Desk";
   if (isTeamLeaderRole(role)) return "Team Lead Panel";
   if (isGroomerRole(role)) return "Groomer Panel";
   if (isTrainerRole(role)) return "Trainer Panel";
@@ -593,7 +594,7 @@ export function Sidebar({
           <div className="admin-sidebar-brand">
             <Image src={FITDOG_BRAND.logoBadge128} alt="Fitdog" width={44} height={44} className="rounded-full" />
             <div className="admin-sidebar-brand__text min-w-0">
-              <p className="admin-sidebar-brand__title truncate">{sidebarPanelTitle(role)}</p>
+              <p className="admin-sidebar-brand__title truncate">{sidebarPanelTitle(role, username)}</p>
               <p className="admin-sidebar-brand__subtitle truncate">{sidebarPanelSubtitle(role)}</p>
             </div>
           </div>

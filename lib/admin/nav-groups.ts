@@ -563,7 +563,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "team_lead_home",
       "My Shift",
-      compactEntries([...singles(["my_shift", "ops_command_center", "yard_command", "shift_handoff"], visible)])
+      compactEntries([...singles(["my_shift", "yard_command", "shift_handoff"], visible)])
     )
   );
 
