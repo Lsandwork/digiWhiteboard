@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { NextResponse } from "next/server";
 import { ADMIN_SESSION_COOKIE, SESSION_TTL_MS, getSessionSecret } from "@/lib/admin/session-constants";
 
@@ -108,6 +108,16 @@ export function getAdminSessionCookieOptions(
   };
 }
 
+function hostOnlyCookieOptions(maxAgeSeconds: number, requestHost?: string | null) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production" || shouldShareAcrossRuffops(requestHost),
+    path: "/",
+    maxAge: maxAgeSeconds
+  };
+}
+
 function serializeSetCookie(
   name: string,
   value: string,
@@ -140,27 +150,24 @@ function serializeSetCookie(
   return parts.join("; ");
 }
 
+function collectSetCookies(response: NextResponse) {
+  return typeof response.headers.getSetCookie === "function"
+    ? response.headers.getSetCookie()
+    : [...response.headers.entries()]
+        .filter(([key]) => key.toLowerCase() === "set-cookie")
+        .map(([, value]) => value);
+}
+
 /**
- * Next.js `cookies.set()` keeps one cookie per name, so clearing both a host-only
- * and Domain=.ruffops.com session requires raw Set-Cookie appends.
+ * Logout only. Never call this in the same response as setAdminSessionCookie —
+ * Safari drops the new session when Max-Age=0 and a new value share one name.
  */
 export function clearAdminSessionCookies(response: NextResponse, requestHost?: string | null) {
   const expired = new Date(0);
-  const secure = process.env.NODE_ENV === "production" || shouldShareAcrossRuffops(requestHost);
   const base = {
-    maxAge: 0,
-    expires: expired,
-    path: "/",
-    secure,
-    httpOnly: true,
-    sameSite: "lax" as const
+    ...hostOnlyCookieOptions(0, requestHost),
+    expires: expired
   };
-
-  try {
-    response.cookies.delete(ADMIN_SESSION_COOKIE);
-  } catch {
-    // ignore
-  }
 
   response.headers.append("Set-Cookie", serializeSetCookie(ADMIN_SESSION_COOKIE, "", base));
   response.headers.append(
@@ -169,30 +176,36 @@ export function clearAdminSessionCookies(response: NextResponse, requestHost?: s
   );
 }
 
-/** Set the session cookie after clearing any prior host-only / domain duplicates. */
+/**
+ * Write the session with Next.js cookies.set() (host-only). That is the path
+ * that actually sticks in Safari. Optionally add a shared Domain=.ruffops.com
+ * copy without expiring anything in this response.
+ */
 export function setAdminSessionCookie(
   response: NextResponse,
   token: string,
   requestHost?: string | null
 ) {
-  clearAdminSessionCookies(response, requestHost);
-  const options = getAdminSessionCookieOptions(undefined, requestHost);
+  const hostOnly = hostOnlyCookieOptions(SESSION_TTL_MS / 1000, requestHost);
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, hostOnly);
+
+  if (!shouldShareAcrossRuffops(requestHost)) return;
+
+  const alreadyHasDomain = collectSetCookies(response).some(
+    (value) =>
+      value.startsWith(`${ADMIN_SESSION_COOKIE}=`) &&
+      value.includes("Domain=.ruffops.com") &&
+      !/Max-Age=0(?:;|$)/.test(value)
+  );
+  if (alreadyHasDomain) return;
+
   response.headers.append(
     "Set-Cookie",
     serializeSetCookie(ADMIN_SESSION_COOKIE, token, {
-      maxAge: options.maxAge,
-      path: options.path,
-      domain: "domain" in options ? (options as { domain?: string }).domain : undefined,
-      secure: options.secure,
-      httpOnly: options.httpOnly,
-      sameSite: options.sameSite
+      ...hostOnly,
+      domain: ".ruffops.com"
     })
   );
-}
-
-export async function getAdminSession() {
-  const cookieStore = await cookies();
-  return verifyAdminSessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
 }
 
 function decodeCookieValue(value: string) {
@@ -203,11 +216,45 @@ function decodeCookieValue(value: string) {
   }
 }
 
-export function getAdminSessionFromRequest(request: Request) {
-  const cookieHeader = request.headers.get("cookie") ?? "";
+function sessionTokensFromCookieHeader(cookieHeader: string) {
+  const seen = new Set<string>();
+  const tokens: string[] = [];
   const escaped = ADMIN_SESSION_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = cookieHeader.match(new RegExp(`${escaped}=([^;]+)`));
-  return verifyAdminSessionToken(match?.[1] ? decodeCookieValue(match[1]) : null);
+  const matcher = new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`, "g");
+  for (const match of cookieHeader.matchAll(matcher)) {
+    const token = decodeCookieValue(match[1] ?? "").trim();
+    if (!token || seen.has(token)) continue;
+    seen.add(token);
+    tokens.push(token);
+  }
+  return tokens;
+}
+
+function sessionFromCookieHeader(cookieHeader: string) {
+  for (const token of sessionTokensFromCookieHeader(cookieHeader)) {
+    const session = verifyAdminSessionToken(token);
+    if (session) return session;
+  }
+  return null;
+}
+
+export async function getAdminSession() {
+  const headerList = await headers();
+  const fromHeader = sessionFromCookieHeader(headerList.get("cookie") ?? "");
+  if (fromHeader) return fromHeader;
+
+  const cookieStore = await cookies();
+  const stored = typeof cookieStore.getAll === "function" ? cookieStore.getAll() : [];
+  for (const cookie of stored) {
+    if (cookie.name !== ADMIN_SESSION_COOKIE) continue;
+    const session = verifyAdminSessionToken(cookie.value);
+    if (session) return session;
+  }
+  return verifyAdminSessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+}
+
+export function getAdminSessionFromRequest(request: Request) {
+  return sessionFromCookieHeader(request.headers.get("cookie") ?? "");
 }
 
 /** @deprecated Use getAdminSession().email */

@@ -105,6 +105,8 @@ export function AdminLogin() {
       const response = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
         body: JSON.stringify({ username, password }),
         signal: controller.signal
       });
@@ -154,6 +156,8 @@ export function AdminLogin() {
       const response = await fetch("/api/admin/change-own-password", {
         method: "POST",
         headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        cache: "no-store",
         body: JSON.stringify({
           password: newPassword,
           confirm_password: confirmPassword
