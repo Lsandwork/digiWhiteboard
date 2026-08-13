@@ -276,6 +276,7 @@ export function AdminShell({
                   </div>
                   <div className="admin-header__meta flex items-center gap-2">
                     <OpsGlobalSearch
+                      visibleTabs={visibleTabs}
                       onNavigate={(nextTab) => {
                         if ((ADMIN_TABS as readonly string[]).includes(nextTab)) {
                           handleTabChange(nextTab as AdminTab);

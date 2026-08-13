@@ -88,7 +88,8 @@ export async function GET(request: Request) {
     email: gate.session.email,
     displayName: gate.access.displayLabel || null,
     roleKey,
-    roleLabel: ROLE_LABELS[roleKey] || gate.access.displayLabel || "Staff"
+    roleLabel: ROLE_LABELS[roleKey] || gate.access.displayLabel || "Staff",
+    access: gate.access
   });
   return NextResponse.json(snapshot);
 }

@@ -12,7 +12,7 @@ import {
 import { recordOpsEvent } from "@/lib/ops-command-center/events";
 import { writeOpsAuditEvent } from "@/lib/ops-command-center/audit";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { updateOwnerFollowUp, updateActiveIssue } from "@/lib/staff/admin-ops";
+import { updateOwnerFollowUp, updateActiveIssue, updateCrossoverMessage } from "@/lib/staff/admin-ops";
 import { updateOperationsAlert } from "@/lib/fitdog-ops/store";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 
@@ -56,6 +56,7 @@ export function parseWorkItemId(rawId: string): { kind: WorkItemKind; sourceId: 
   if (id.startsWith("issue:")) return { kind: "active_issue", sourceId: id.slice(6) };
   if (id.startsWith("payment:")) return { kind: "payment_alert", sourceId: id.slice(8) };
   if (id.startsWith("notif:")) return { kind: "ops_notification", sourceId: id.slice(6) };
+  if (id.startsWith("openlog:")) return { kind: "open_log", sourceId: id.slice(8) };
   return null;
 }
 
@@ -65,6 +66,7 @@ export function availableActionsForKind(kind: WorkItemKind): WorkItemAction[] {
       return ["clear", "hide", "in_progress", "resolved", "delete"];
     case "owner_follow_up":
     case "active_issue":
+    case "open_log":
       return ["clear", "hide", "archive", "in_progress", "resolved", "delete"];
     case "payment_alert":
       return ["clear", "hide", "in_progress", "resolved", "delete"];
@@ -209,6 +211,18 @@ export async function applyWorkItemAction(input: {
     };
     const status = statusMap[input.action];
     const row = await updateActiveIssue(supabase, parsed.sourceId, { status }, actorName);
+    resultStatus = row.status;
+  } else if (parsed.kind === "open_log") {
+    const statusMap: Record<WorkItemAction, string> = {
+      clear: "Resolved",
+      hide: "Archived",
+      archive: "Archived",
+      in_progress: "In Progress",
+      resolved: "Resolved",
+      delete: "Archived"
+    };
+    const status = statusMap[input.action];
+    const row = await updateCrossoverMessage(supabase, parsed.sourceId, { status }, actorName);
     resultStatus = row.status;
   } else if (parsed.kind === "ops_notification") {
     if (input.action === "clear" || input.action === "hide" || input.action === "resolved" || input.action === "delete") {

@@ -8,10 +8,22 @@ import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
 import {
   loadBoardLaneSamples,
   loadStaffOpsFeed,
+  openLogToWorkItem,
+  issueToWorkItem,
   type BoardLaneDog,
   type OpsWorkItem
 } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { availableActionsForKind } from "@/lib/ops-command-center/work-item-actions";
+import type { UserAccess } from "@/lib/admin/permissions";
+import { isYardTeamLeadUser } from "@/lib/admin/team-lead-profile";
+import {
+  assignedActiveIssues,
+  assignedOpenLogMessages,
+  directoryMemberForUser,
+  previousTeamLeadShiftNotes,
+  type TeamLeadShiftNote
+} from "@/lib/ops-command-center/team-lead-shift";
+import type { CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 
 export type NeedsAttentionItem = {
   id: string;
@@ -66,6 +78,12 @@ export type OpsCommandCenterSnapshot = {
     detail: string | null;
   };
   tools: Array<{ tab: string; label: string }>;
+  /** Yard Team Lead My Shift: previous TL Team Log notes + assigned Open Log / Active Issues. */
+  teamLeadView?: {
+    enabled: boolean;
+    previousLeadName: string | null;
+    shiftNotes: TeamLeadShiftNote[];
+  };
 };
 
 function greetingNameFromEmail(email?: string | null, displayName?: string | null) {
@@ -175,6 +193,7 @@ export async function buildOpsCommandCenterSnapshot(input: {
   displayName?: string | null;
   roleKey: string;
   roleLabel: string;
+  access?: UserAccess | null;
 }): Promise<OpsCommandCenterSnapshot> {
   const supabase = getServiceSupabase();
 
@@ -232,6 +251,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
       followUps: [],
       issues: [],
       paymentAlerts: [],
+      crossoverMessages: [] as CrossoverMessage[],
+      staffDirectory: [] as StaffDirectoryMember[],
       followUpItems: [] as OpsWorkItem[],
       issueItems: [] as OpsWorkItem[],
       alertItems: [] as OpsWorkItem[],
@@ -271,21 +292,53 @@ export async function buildOpsCommandCenterSnapshot(input: {
   const myTaskWork = (input.adminUserId ? myTasks : allOpenTasks).map(taskToWorkItem);
   const notifWork = notifications.filter((n) => !n.resolvedAt).map(notificationToWorkItem);
 
-  const openWork = [...myTaskWork, ...staffFeed.followUpItems, ...staffFeed.issueItems]
+  const directoryMember = directoryMemberForUser(staffFeed.staffDirectory || [], {
+    adminUserId: input.adminUserId,
+    email: input.email,
+    name: input.displayName
+  });
+  const yardTeamLead = isYardTeamLeadUser({
+    legacyRole: input.roleKey,
+    access: input.access,
+    directoryDepartment: directoryMember?.department ?? null
+  });
+  const shiftActor = {
+    name: input.displayName,
+    email: input.email,
+    adminUserId: input.adminUserId,
+    directoryName: directoryMember?.name ?? null
+  };
+  const assignedLogs = yardTeamLead ? assignedOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map(openLogToWorkItem) : [];
+  const assignedIssues = yardTeamLead
+    ? assignedActiveIssues(staffFeed.issues || [], shiftActor).map(issueToWorkItem)
+    : [];
+  const previousNotes = yardTeamLead
+    ? previousTeamLeadShiftNotes(staffFeed.crossoverMessages || [], shiftActor, staffFeed.staffDirectory || [])
+    : { previousLeadName: null as string | null, notes: [] as TeamLeadShiftNote[] };
+
+  const openWork = (
+    yardTeamLead
+      ? [...myTaskWork, ...assignedIssues, ...assignedLogs]
+      : [...myTaskWork, ...staffFeed.followUpItems, ...staffFeed.issueItems]
+  )
     .sort((a, b) => severityRank(a.priority) - severityRank(b.priority) || String(a.dueAt || "").localeCompare(String(b.dueAt || "")))
     .slice(0, 24);
 
-  const alertFeed = [...staffFeed.alertItems, ...notifWork]
+  const alertFeed = [...(yardTeamLead ? [] : staffFeed.alertItems), ...notifWork]
     .sort((a, b) => severityRank(a.priority) - severityRank(b.priority))
     .slice(0, 20);
 
-  const needsAttentionRaw: NeedsAttentionItem[] = [
-    ...staffFeed.alertItems.filter((item) => item.priority === "critical" || item.priority === "high"),
-    ...staffFeed.issueItems.filter((item) => item.priority === "critical" || item.priority === "high"),
-    ...staffFeed.followUpItems.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
-    ...taskWork.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
-    ...notifWork.filter((item) => item.priority === "critical" || item.priority === "high")
-  ].map((item) => ({
+  const needsAttentionSource = yardTeamLead
+    ? [...assignedLogs, ...assignedIssues]
+    : [
+        ...staffFeed.alertItems.filter((item) => item.priority === "critical" || item.priority === "high"),
+        ...staffFeed.issueItems.filter((item) => item.priority === "critical" || item.priority === "high"),
+        ...staffFeed.followUpItems.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
+        ...taskWork.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
+        ...notifWork.filter((item) => item.priority === "critical" || item.priority === "high")
+      ];
+
+  const needsAttentionRaw: NeedsAttentionItem[] = needsAttentionSource.map((item) => ({
     id: item.id,
     kind: item.kind,
     severity: item.priority,
@@ -304,17 +357,21 @@ export async function buildOpsCommandCenterSnapshot(input: {
       return true;
     })
     .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
-    .slice(0, 16);
+    .slice(0, yardTeamLead ? 24 : 16);
 
-  const openWorkCount =
-    allOpenTasks.filter((task) => dueSoon(task.dueAt)).length +
-    staffFeed.followUpItems.filter((item) => dueSoon(item.dueAt)).length +
-    staffFeed.openIssueCount;
+  const openWorkCount = yardTeamLead
+    ? assignedLogs.length + assignedIssues.length + myTaskWork.filter((item) => dueSoon(item.dueAt)).length
+    : allOpenTasks.filter((task) => dueSoon(task.dueAt)).length +
+      staffFeed.followUpItems.filter((item) => dueSoon(item.dueAt)).length +
+      staffFeed.openIssueCount;
 
-  const criticalAlerts =
-    notifications.filter((n) => n.priority === "critical" && !n.resolvedAt).length +
-    staffFeed.criticalPaymentCount +
-    staffFeed.issueItems.filter((item) => item.priority === "critical").length;
+  const criticalAlerts = yardTeamLead
+    ? assignedLogs.filter((item) => item.priority === "critical").length +
+      assignedIssues.filter((item) => item.priority === "critical").length +
+      notifications.filter((n) => n.priority === "critical" && !n.resolvedAt).length
+    : notifications.filter((n) => n.priority === "critical" && !n.resolvedAt).length +
+      staffFeed.criticalPaymentCount +
+      staffFeed.issueItems.filter((item) => item.priority === "critical").length;
 
   const gingrHealth = evaluateGingrHealth({
     lastWebhookAt: lastWebhook.data?.created_at ? String(lastWebhook.data.created_at) : null,
@@ -386,6 +443,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
       label: gingrHealth.label,
       detail: gingrHealth.detail
     },
-    tools: toolsForRole(input.roleKey)
+    tools: toolsForRole(input.roleKey),
+    teamLeadView: {
+      enabled: yardTeamLead,
+      previousLeadName: previousNotes.previousLeadName,
+      shiftNotes: previousNotes.notes
+    }
   };
 }

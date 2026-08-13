@@ -34,9 +34,11 @@ const QUICK_TABS: Array<{ tab: string; label: string; keywords: string }> = [
 ];
 
 export function OpsGlobalSearch({
-  onNavigate
+  onNavigate,
+  visibleTabs
 }: {
   onNavigate: (tab: string, dogId?: string) => void;
+  visibleTabs?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -79,6 +81,7 @@ export function OpsGlobalSearch({
   const hits = useMemo(() => {
     const q = query.trim().toLowerCase();
     const tabHits: SearchHit[] = QUICK_TABS.filter((tab) => {
+      if (visibleTabs && !visibleTabs.includes(tab.tab)) return false;
       if (!q) return true;
       return `${tab.label} ${tab.keywords}`.toLowerCase().includes(q);
     }).map((tab) => ({
@@ -96,7 +99,7 @@ export function OpsGlobalSearch({
       dog
     }));
     return [...dogHits, ...tabHits].slice(0, 20);
-  }, [dogs, query]);
+  }, [dogs, query, visibleTabs]);
 
   return (
     <>
