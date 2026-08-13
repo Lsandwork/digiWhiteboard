@@ -117,10 +117,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Lobby Whiteboard — guest-facing lobby TV. Shows who is checking out, promotions, and class schedule.",
       "Staff Digital Whiteboard — team TV behind the desk. Shows check-ins, check-outs, walks, and push notices.",
       "My Shift / Ops Command Center — your Digi-Board homepage for live dogs, tasks, alerts, and Gingr connection status.",
-      "Team Log — shift handoff log (Crossover / Open / Archived) for notes, assessments, and owner updates.",
-      "Role tools — Grooming Push, Commissions, Route Generator, Walks Board, and more appear only when your login allows them.",
+      "Clean sidebar menu — each role has a short list of primary tabs (about 10 or fewer). Extra tools live inside hubs like Floor Ops, Whiteboard, People & HR, Apps, and Admin.",
+      "Team Log, pushes, photos, Route Generator, and other tools still work the same — open them from a hub button if they are not on the main sidebar.",
       "TV boards read cached Supabase data. Tools like Grooming Sync and Route Generator may call Gingr or Fitdog APIs when you use them.",
-      "Help Center only shows topics for your Digi-Board role — search for the tool name if you need a how-to."
+      "Help Center only shows topics for your Digi-Board role — search for the tool name if you need a how-to. Email Lonnie@fitdog.com anytime."
     ],
     links: [
       { label: "Open Lobby Whiteboard", href: "/lobby/checkouts" },
@@ -148,6 +148,140 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "If Digi-Board asks you to set a new password after login, complete that step before the dashboard opens."
     ],
     links: [{ label: "Digi-Board Login", href: "/admin/login" }]
+  },
+  {
+    id: "cleaned-menu-hubs",
+    title: "Where did my menu items go? (Hubs & cleaned sidebar)",
+    summary: "Digi-Board menus are shorter now. Primary tabs stay in the sidebar; everything else opens from Floor Ops, Whiteboard, Apps, People & HR, or Admin hubs — no tools were removed.",
+    category: "Start Here",
+    keywords: [
+      "menu",
+      "sidebar",
+      "hub",
+      "floor ops",
+      "whiteboard hub",
+      "apps hub",
+      "people hub",
+      "admin hub",
+      "missing tab",
+      "cleaned menu",
+      "navigation"
+    ],
+    steps: [
+      "Your sidebar shows about 10 primary tabs for your role (My Shift, command pages, hubs, Help).",
+      "Open Floor Ops for Team Log, follow-ups, issues, alerts, VIP Auto Book, walks, photos, checklist, write-ups, and role command centers.",
+      "Open Whiteboard for Standard Notices, Grooming/Trainer push, yard camera push, cast videos, emergency alerts, Live Preview, and TV & Cast Setup.",
+      "Open Apps for Route Generator, System Health, Blog Generator, Gingr, and Ruffly when your login allows them.",
+      "Admins also get People & HR and Admin hubs for staff accounts, HR, settings, logs, and integrations.",
+      "When you open a tool from a hub, use Back to [hub] at the top to return.",
+      "Nothing was deleted — if a tool used to be in the sidebar, it is still available from a hub or a primary tab."
+    ],
+    tips: [
+      "Search Help Center for the tool name (for example “VIP Auto Book” or “Route Generator”).",
+      "Still stuck? Email Lonnie@fitdog.com or open Help Center from the sidebar."
+    ],
+    adminTab: "sa_floor_hub",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops", "viewer"]
+  },
+  {
+    id: "need-help-card-dismiss",
+    title: "How do I hide the “Need help?” sidebar card?",
+    summary: "Every role can close the Need help? card. After you confirm, it stays hidden on that device; Help Center and Lonnie@fitdog.com remain available.",
+    category: "Start Here",
+    keywords: ["need help", "dismiss", "close", "sidebar", "help card", "lonnie", "help center"],
+    steps: [
+      "Find the orange Need help? card near the bottom of the left sidebar.",
+      "Click the X close button on the card.",
+      "Read the notice: you can still open Help Center in the menu or email Lonnie@fitdog.com.",
+      "Choose Got it — hide this to dismiss the card permanently on this device, or Keep showing to leave it visible.",
+      "Open Help anytime from the Help / Help Center tab in your sidebar menu."
+    ],
+    tips: [
+      "Dismiss preference is saved in this browser only.",
+      "Email Lonnie@fitdog.com if you need account or training help."
+    ],
+    adminTab: "help",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops", "viewer"]
+  },
+  {
+    id: "role-menu-front-desk",
+    title: "Front Desk menu: what is on my sidebar?",
+    summary: "Front Desk primary tabs plus Floor Ops, Whiteboard, and Apps hubs for every front-desk tool.",
+    category: "Admin Dashboard",
+    keywords: ["front desk", "menu", "coordinator", "floor ops", "whiteboard"],
+    steps: [
+      "Primary tabs: My Shift, Front Desk Command, Floor Ops, Whiteboard, Apps, Staff Directory, Submit Request, Notifications, Settings, Help.",
+      "Floor Ops opens Team Log, Owner Follow Up, Active Issues, Fitdog Alerts, VIP Auto Book, Walks, photos, and Shift Handoff.",
+      "Whiteboard opens Standard Notices, Grooming Push, Yard Camera Push, and display tools your login allows.",
+      "Apps opens Gingr, Ruffly, and other connected apps."
+    ],
+    adminTab: "front_desk_command",
+    adminBoard: "staff",
+    audiences: ["staff_ops"]
+  },
+  {
+    id: "role-menu-team-lead",
+    title: "Team Lead menu: what is on my sidebar?",
+    summary: "Team Lead primary tabs with Floor Ops, Whiteboard, and Apps hubs for yard and floor tools.",
+    category: "Admin Dashboard",
+    keywords: ["team lead", "team leader", "menu", "yard command", "floor ops"],
+    steps: [
+      "Primary tabs: My Shift, Ops Command Center, Yard Command, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
+      "Floor Ops covers Team Log, follow-ups, active issues, walks, and photo upload.",
+      "Whiteboard covers Standard Notices, Yard Camera Push, Grooming Push, and Live Preview.",
+      "Apps covers Route Generator, Gingr, and Ruffly."
+    ],
+    adminTab: "yard_command",
+    adminBoard: "staff",
+    audiences: ["staff_ops"]
+  },
+  {
+    id: "role-menu-trainer-groomer",
+    title: "Trainer & Groomer menus: where are my tools?",
+    summary: "Trainer and Groomer sidebars stay short. Team Log, walks, cameras, and apps open from Floor Ops and Apps hubs.",
+    category: "Admin Dashboard",
+    keywords: ["trainer", "groomer", "menu", "trainer push", "grooming push", "commissions"],
+    steps: [
+      "Trainer primary: My Shift, Trainer Ops, Trainer Push, Commissions, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Groomer primary: My Shift, Grooming Push, Live Preview, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Floor Ops opens Team Log, Walks Board, and Video Links.",
+      "Apps opens Gingr and Ruffly."
+    ],
+    audiences: ["staff_ops"]
+  },
+  {
+    id: "role-menu-dog-handler",
+    title: "Daycare / Driver / Hiker menu: where are my tools?",
+    summary: "Handler panels keep My Shift and Driver Mode up front. Checklist, walks, photos, write-ups, and Team Log live under Floor Ops.",
+    category: "Admin Dashboard",
+    keywords: ["daycare", "driver", "hiker", "handler", "menu", "checklist", "write ups"],
+    steps: [
+      "Primary tabs: My Shift, Driver / Hiker Mode, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Floor Ops opens Team Log, Checklist, Walks Board, photo upload / Media Library, and Write Ups.",
+      "Apps opens Gingr when you need the business system of record."
+    ],
+    audiences: ["staff_ops"]
+  },
+  {
+    id: "role-menu-admin",
+    title: "Admin & Management menu: hubs for every tool",
+    summary: "Admin, Management, and Super Admin share the cleaned 10-tab sidebar with Floor Ops, Whiteboard, Support, People & HR, Apps, and Admin hubs.",
+    category: "Admin Dashboard",
+    keywords: ["admin", "management", "super admin", "menu", "hubs", "people", "support"],
+    steps: [
+      "Primary tabs: My Shift, Ops Command Center, Floor Ops, Whiteboard, Support, People & HR, Commissions, Apps, Admin, Help.",
+      "Floor Ops — command centers, floor operations, photos, and cameras.",
+      "Whiteboard — all push-to-board and display/cast tools.",
+      "Support — Support Command Center for complaints, PIPs, and urgent cases.",
+      "People & HR — staff directory, users, HR records, write-ups, and PIP.",
+      "Apps — Route Generator, System Health, Blog Generator, Gingr, Ruffly.",
+      "Admin — Overview, analytics, settings, logs, integrations, templates, and notifications."
+    ],
+    adminTab: "sa_admin_hub",
+    adminBoard: "staff",
+    audiences: ["admin"]
   },
   {
     id: "ops-command-center-help",
@@ -667,11 +801,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Start from My Shift / Ops tools for live dogs, tasks, and Gingr connection status when those tabs are on your login.",
-      "Use Team Log → Crossover Log (today), Open Log (unresolved), and Archived Log (prior closed).",
-      "Also use Owner Follow Up, Active Issues, Push Notices, Notifications, Walks Board, and Help Center.",
-      "If Route Generator is enabled: pull today’s report, generate/approve routes, then download today’s Samsara CSV and upload it in Samsara the same day — never reuse another day’s file.",
-      "Staff Directory is view-only — search and review staff, but you cannot add, edit, or delete directory rows.",
+      "Your sidebar is cleaned: primary tabs plus Floor Ops, Whiteboard, and Apps hubs (see “Where did my menu items go?”).",
+      "Start from My Shift / Front Desk Command or Yard Command for live dogs and Gingr connection status.",
+      "Open Floor Ops for Team Log, Owner Follow Up, Active Issues, Walks Board, and photos.",
+      "Open Whiteboard for Push Notices and related live alerts; open Apps for Route Generator / Gingr / Ruffly when enabled.",
+      "Staff Directory is view-only for Front Desk — search and review staff, but you cannot add, edit, or delete directory rows.",
       "You can delete only Team Log entries you created (Super Admin, Admin, and Management can delete any).",
       "You cannot access Lobby content tools, global settings, logs, integrations, or the full Admin Users area."
     ],
@@ -705,9 +839,10 @@ export const HELP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
+      "Your sidebar stays short — use Floor Ops and Apps hubs for Team Log, walks, cameras, Gingr, and Ruffly.",
       "Open My Shift when it appears — your role homepage for tasks and alerts.",
-      "Groomers: open Staff → Grooming Push → Select dog from Gingr. Tap Sync if the list is empty; choose a checked-in dog, add a note if needed, then Push to Staff Whiteboard.",
-      "Trainers: open Staff → Trainer Push for training alerts, then Team Log when notes are needed.",
+      "Groomers: open Grooming Push → Select dog from Gingr. Tap Sync if the list is empty; choose a checked-in dog, add a note if needed, then Push to Staff Whiteboard.",
+      "Trainers: open Trainer Push for training alerts, Commissions for package/class sales, then Floor Ops → Team Log when notes are needed.",
       "On Team Log, use Crossover Log for today’s notes. Assessment dogs: Mark Check Out so they stay on today’s log until the next day.",
       "You can delete only Team Log entries you created.",
       "Trainers: open Commissions (one click) to review package/class earnings, comment, or dispute a row.",
@@ -729,11 +864,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "team log", "driver", "hiker", "my shift"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Open My Shift when available — today’s needs-attention items and tasks for your role.",
-      "Open Check List — today’s dog-handler daily recurring push notices appear there so you can mark each one completed.",
+      "Primary tabs: My Shift, Driver / Hiker Mode, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Open Floor Ops → Check List for today’s dog-handler daily recurring push notices and mark each one completed.",
       "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders (including grooming catch notices).",
-      "Open Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
-      "Open Team Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
+      "Open Floor Ops → Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
+      "Open Floor Ops → Team Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
       "Open Notifications for alerts assigned to you, and Help Center anytime you need a guide.",
       "Dog Handler / Driver / Hiker accounts do not manage Lobby content, admin users, integrations, or global settings."
     ],
@@ -759,16 +894,17 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "delete",
       "ops command center",
       "commissions",
-      "route generator"
+      "route generator",
+      "hubs"
     ],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned Management credentials.",
+      "Use the cleaned Admin-style sidebar: My Shift, Ops Command Center, Floor Ops, Whiteboard, Support, People & HR, Commissions, Apps, Admin, Help.",
       "Use Ops Command Center / My Shift for live floor state and Gingr Connected / Disconnected health.",
-      "Use Staff tools: Team Log, Push Notices, Owner Follow Up, Active Issues, Fitdog Alerts, Staff Directory, and related tabs your login allows.",
+      "Open Floor Ops / Whiteboard / Apps hubs for Team Log, Push Notices, Fitdog Alerts, Route Generator, and related tools.",
       "On Team Log, review Crossover Log (today), Open Log, and Archived Log (prior closed items).",
       "Management can delete any Team Log entry — not only their own.",
-      "Open Commissions in one click from the sidebar when you have package/class commission access.",
-      "Use Route Generator when enabled: export only today’s Samsara CSV and never upload a prior day’s file.",
+      "Open Commissions from the sidebar when you have package/class commission access.",
       "Full Super Admin-only areas (integration secrets, permission matrix, some global settings) may still be restricted."
     ],
     adminTab: "ops_command_center",
@@ -1033,6 +1169,8 @@ const ARTICLE_AUDIENCES: Record<string, HelpAudience[]> = {
 const CORE_ACCOUNT_ARTICLE_IDS = new Set([
   "what-is-this",
   "first-login",
+  "cleaned-menu-hubs",
+  "need-help-card-dismiss",
   "change-password",
   "troubleshoot-login",
   "staff-reminders"
@@ -1040,6 +1178,9 @@ const CORE_ACCOUNT_ARTICLE_IDS = new Set([
 
 const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "what-is-this",
+  "cleaned-menu-hubs",
+  "need-help-card-dismiss",
+  "role-menu-admin",
   "front-desk-log",
   "staff-ops-pages",
   "fitdog-alerts-help",
@@ -1053,8 +1194,12 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "staff-display",
   "management-role",
   "front-desk-coordinator",
+  "role-menu-front-desk",
+  "role-menu-team-lead",
   "groomer-trainer-crossover",
+  "role-menu-trainer-groomer",
   "dog-handler-basics",
+  "role-menu-dog-handler",
   "publish-changes",
   "board-switcher",
   "preview-and-refresh",
@@ -1068,8 +1213,11 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
 const CROSSOVER_STAFF_ARTICLE_IDS = new Set([
   ...CORE_ACCOUNT_ARTICLE_IDS,
   "what-is-this",
+  "cleaned-menu-hubs",
+  "need-help-card-dismiss",
   "front-desk-log",
   "groomer-trainer-crossover",
+  "role-menu-trainer-groomer",
   "ops-command-center-help",
   "grooming-push-help",
   "commissions-help",
@@ -1082,8 +1230,11 @@ const CROSSOVER_STAFF_ARTICLE_IDS = new Set([
 const DOG_HANDLER_ARTICLE_IDS = new Set([
   ...CORE_ACCOUNT_ARTICLE_IDS,
   "what-is-this",
+  "cleaned-menu-hubs",
+  "need-help-card-dismiss",
   "front-desk-log",
   "dog-handler-basics",
+  "role-menu-dog-handler",
   "ops-command-center-help",
   "staff-display",
   "staff-tv-cast",
@@ -1093,6 +1244,8 @@ const DOG_HANDLER_ARTICLE_IDS = new Set([
 const MARKETING_ARTICLE_IDS = new Set([
   ...CORE_ACCOUNT_ARTICLE_IDS,
   "what-is-this",
+  "cleaned-menu-hubs",
+  "need-help-card-dismiss",
   "marketing-account",
   "lobby-messages",
   "lobby-promotions",

@@ -23,22 +23,38 @@ import {
   getTabLabel,
   type NavEntry
 } from "@/lib/admin/nav-groups";
+import { SIDEBAR_NEED_HELP_DISMISS_KEY } from "@/lib/admin/role-hub-nav";
+import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 
 const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
 function sidebarPanelTitle(role?: string | null) {
   if (role === "owner_admin") return "Super Admin";
+  if (role === "manager_admin") return "Admin";
+  if (role === "assistant_manager") return "Management";
+  if (role === "front_desk_coordinator") return "Front Desk";
   if (isTeamLeaderRole(role)) return "Team Lead Panel";
   if (isGroomerRole(role)) return "Groomer Panel";
   if (isTrainerRole(role)) return "Trainer Panel";
+  if (role === "daycare" || role === "driver" || role === "hiker") return "My Panel";
   return "Fitdog Digi-board";
 }
 
 function sidebarPanelSubtitle(role?: string | null) {
-  if (role === "owner_admin") return "Clean menu · hubs inside";
-  if (isTeamLeaderRole(role)) return "Front Desk";
-  if (isGroomerRole(role)) return "Grooming";
-  if (isTrainerRole(role)) return "Training";
+  if (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "assistant_manager" ||
+    role === "front_desk_coordinator" ||
+    isTeamLeaderRole(role) ||
+    isGroomerRole(role) ||
+    isTrainerRole(role) ||
+    role === "daycare" ||
+    role === "driver" ||
+    role === "hiker"
+  ) {
+    return "Clean menu · hubs inside";
+  }
   return "Digi-board";
 }
 
@@ -456,6 +472,16 @@ export function Sidebar({
   const prevActiveGroupIdRef = useRef<string | null>(null);
   const prevActiveSectionIdRef = useRef<string | null>(null);
   const [badgeCounts, setBadgeCounts] = useState<Partial<Record<AdminTab, number>>>({});
+  const [needHelpVisible, setNeedHelpVisible] = useState(false);
+  const [needHelpConfirmOpen, setNeedHelpConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      setNeedHelpVisible(window.localStorage.getItem(SIDEBAR_NEED_HELP_DISMISS_KEY) !== "1");
+    } catch {
+      setNeedHelpVisible(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!visibleTabs.includes("fitdog_alerts")) return;
@@ -608,14 +634,31 @@ export function Sidebar({
         </nav>
 
         <div className="space-y-3 p-4">
-          {!isTeamLeaderRole(role) && !isGroomerRole(role) && !isTrainerRole(role) ? (
+          {needHelpVisible ? (
             <div className="admin-sidebar-help-card rounded-xl p-4">
-              <div className="mb-2 flex items-center gap-2 text-sm font-bold text-white">
-                <HelpCircle className="h-4 w-4 text-fitdog-orange" />
-                Need help?
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 text-sm font-bold text-white">
+                  <HelpCircle className="h-4 w-4 text-fitdog-orange" />
+                  Need help?
+                </div>
+                <button
+                  type="button"
+                  className="rounded p-0.5 text-admin-muted hover:bg-white/10 hover:text-white"
+                  aria-label="Close Need help card"
+                  title="Close"
+                  onClick={() => setNeedHelpConfirmOpen(true)}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <p className="text-xs text-admin-muted">Search setup guides for lobby board, staff board, and admin tools.</p>
-              <button type="button" className="admin-btn-ghost mt-2 inline-block text-xs" onClick={() => (onOpenHelp ? onOpenHelp() : handleSelect("help"))}>
+              <p className="text-xs text-admin-muted">
+                Search setup guides for your Digi-Board menu, hubs, whiteboard tools, and role pages.
+              </p>
+              <button
+                type="button"
+                className="admin-btn-ghost mt-2 inline-block text-xs"
+                onClick={() => (onOpenHelp ? onOpenHelp() : handleSelect("help"))}
+              >
                 Open Help Center
               </button>
             </div>
@@ -634,6 +677,24 @@ export function Sidebar({
           </div>
         </div>
       </aside>
+
+      <ConfirmDialog
+        open={needHelpConfirmOpen}
+        title="Hide “Need help?”"
+        description="If you need help later, open Help Center in the menu or email Lonnie@fitdog.com. This card will not show again on this device after you close it."
+        confirmLabel="Got it — hide this"
+        cancelLabel="Keep showing"
+        onCancel={() => setNeedHelpConfirmOpen(false)}
+        onConfirm={() => {
+          try {
+            window.localStorage.setItem(SIDEBAR_NEED_HELP_DISMISS_KEY, "1");
+          } catch {
+            // ignore storage errors — still hide for this session
+          }
+          setNeedHelpVisible(false);
+          setNeedHelpConfirmOpen(false);
+        }}
+      />
     </>
   );
 }

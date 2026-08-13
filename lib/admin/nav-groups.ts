@@ -1,5 +1,6 @@
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
 import { ADMIN_HR_TABS } from "@/lib/admin/types";
+import { isHubNavRole, ROLE_HUB_NAV } from "@/lib/admin/role-hub-nav";
 
 export type NavLeaf = {
   type: "item";
@@ -684,7 +685,7 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
   return entries;
 }
 
-function roleCanSeeRufflyNav(role?: string | null) {
+export function roleCanSeeRufflyNav(role?: string | null) {
   if (!role) return false;
   return (
     role === "owner_admin" ||
@@ -705,33 +706,23 @@ export function roleCanSeeBlogNav(role?: string | null) {
 }
 
 /**
- * Super Admin staff sidebar: max 10 primary tabs/icons.
+ * Hub-based staff sidebar for a role: max 10 primary tabs/icons.
  * Demoted tools remain reachable from hub pages (permissions unchanged).
  */
-export function buildSuperAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
+export function buildRoleHubStaffNav(visibleTabs: AdminTab[], role: string): NavEntry[] {
+  if (!isHubNavRole(role)) return [];
+  const config = ROLE_HUB_NAV[role];
   const visible = new Set(visibleTabs);
-  const primary: AdminTab[] = [
-    "my_shift",
-    "ops_command_center",
-    "sa_floor_hub",
-    "sa_whiteboard_hub",
-    "ms_hub",
-    "sa_people_hub",
-    "package_commissions",
-    "sa_apps_hub",
-    "sa_admin_hub",
-    "help"
-  ];
-  const leaves = primary
-    .filter((tab) => visible.has(tab))
-    .map((tab) =>
-      tab === "package_commissions"
-        ? leaf("package_commissions", "Commissions")
-        : tab === "ms_hub"
-          ? leaf("ms_hub", "Support")
-          : leaf(tab)
-    );
-  return sectionEntries("super_admin_home", "Super Admin", leaves);
+  const leaves = config.primary
+    .filter((item) => visible.has(item.tab))
+    .slice(0, 10)
+    .map((item) => leaf(item.tab, item.label));
+  return sectionEntries(config.sectionId, config.sectionLabel, leaves);
+}
+
+/** @deprecated use buildRoleHubStaffNav — kept for Super Admin call sites/tests */
+export function buildSuperAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
+  return buildRoleHubStaffNav(visibleTabs, "owner_admin");
 }
 
 /** Pick the staff-panel sidebar layout for the signed-in role. */
@@ -740,9 +731,9 @@ export function buildStaffPanelNav(
   board: AdminBoardType,
   role?: string | null
 ): NavEntry[] {
-  // Super Admin gets a dedicated 10-tab staff IA. Lobby/marketing boards keep full admin nav.
-  if (role === "owner_admin" && board === "staff") {
-    return buildSuperAdminNav(visibleTabs);
+  // Cleaned hub IA for staff roles (≤10 tabs). Lobby/marketing boards keep board-specific nav.
+  if (board === "staff" && isHubNavRole(role)) {
+    return buildRoleHubStaffNav(visibleTabs, role);
   }
 
   let entries: NavEntry[];

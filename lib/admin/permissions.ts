@@ -1445,7 +1445,7 @@ export function canAccessAdminTab(
     );
   }
 
-  // Super Admin menu hubs — only owner_admin / super_admin (not manager Admin).
+  // Menu hubs — staff board only, for roles whose cleaned sidebar includes that hub.
   if (
     tab === "sa_floor_hub" ||
     tab === "sa_whiteboard_hub" ||
@@ -1454,7 +1454,23 @@ export function canAccessAdminTab(
     tab === "sa_admin_hub"
   ) {
     if (board !== "staff") return false;
-    return isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access);
+    if (isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isFullAdminLegacyRole(legacyRole)) return true;
+    // Avoid circular imports: mirror role-hub-nav primary membership.
+    if (legacyRole === "assistant_manager") return true;
+    if (legacyRole === "front_desk_coordinator" || legacyRole === "team_leader") {
+      return tab === "sa_floor_hub" || tab === "sa_whiteboard_hub" || tab === "sa_apps_hub";
+    }
+    if (
+      legacyRole === "trainer" ||
+      legacyRole === "groomer" ||
+      legacyRole === "daycare" ||
+      legacyRole === "driver" ||
+      legacyRole === "hiker"
+    ) {
+      return tab === "sa_floor_hub" || tab === "sa_apps_hub";
+    }
+    return false;
   }
 
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
