@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { isSafeRelativePath } from "@/lib/safe-url";
+import { isSafeRelativePath, humanizeUnknownError } from "@/lib/safe-url";
 import "@/app/login-screen.css";
 
 const REMEMBER_USERNAME_KEY = "fitdog.login.rememberUsername";
@@ -136,9 +136,7 @@ export function AdminLogin() {
       setError(
         aborted
           ? "Sign-in is taking longer than usual. Check your connection and try again."
-          : loginError instanceof Error
-            ? loginError.message
-            : "Invalid username or password."
+          : humanizeUnknownError(loginError, "Invalid username or password.")
       );
     } finally {
       window.clearTimeout(timeout);
@@ -169,7 +167,7 @@ export function AdminLogin() {
       router.replace(next);
       router.refresh();
     } catch (changeError) {
-      setError(changeError instanceof Error ? changeError.message : "Unable to update password.");
+      setError(humanizeUnknownError(changeError, "Unable to update password."));
     } finally {
       setBusy(false);
     }

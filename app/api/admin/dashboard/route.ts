@@ -26,9 +26,10 @@ function parseBoardType(value: string | null): AdminBoardType {
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const url = new URL(request.url);
-  const board = parseBoardType(url.searchParams.get("board"));
-  const supabase = getServiceSupabase();
+  try {
+    const url = new URL(request.url);
+    const board = parseBoardType(url.searchParams.get("board"));
+    const supabase = getServiceSupabase();
 
   const [lobbySettings, staffSettings, adminSettings, promotions, checkouts, dogs, events, failedEvents] = await Promise.all([
     loadLobbySettings(supabase),
@@ -114,6 +115,13 @@ export async function GET(request: Request) {
     staff_dogs: dogs.data ?? [],
     env: getBoardEnvCheck()
   });
+  } catch (error) {
+    console.error("[admin-dashboard] GET failed:", error);
+    return NextResponse.json(
+      { error: "Unable to load admin dashboard. Reload and try again." },
+      { status: 500 }
+    );
+  }
 }
 
 async function loadAllPromotions(supabase: ReturnType<typeof getServiceSupabase>) {

@@ -1,6 +1,7 @@
 "use client";
 
 import type { WarningNoticeFormData } from "@/lib/staff/warning-notice-constants";
+import { htmlDateInputValue, normalizeHtmlDateValue } from "@/lib/dates/html-date";
 import {
   EMPTY_WARNING_NOTICE_FORM,
   WARNING_NOTICE_VIOLATION_TYPES,
@@ -34,9 +35,11 @@ function FieldLine({
       <input
         className="warning-notice-input"
         type={type}
-        value={value}
+        value={type === "date" ? htmlDateInputValue(value) : value}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) =>
+          onChange(type === "date" ? normalizeHtmlDateValue(event.target.value, "") : event.target.value)
+        }
       />
     </label>
   );
@@ -158,11 +161,11 @@ export function WarningNoticeForm({ form, onChange, disabled }: Props) {
                   <input
                     className="warning-notice-table-input"
                     type="date"
-                    value={row.date}
+                    value={htmlDateInputValue(row.date)}
                     disabled={disabled}
                     onChange={(event) => {
                       const previous_warnings = [...form.previous_warnings];
-                      previous_warnings[index] = { ...row, date: event.target.value };
+                      previous_warnings[index] = { ...row, date: normalizeHtmlDateValue(event.target.value, "") };
                       onChange({ ...form, previous_warnings });
                     }}
                   />

@@ -56,6 +56,10 @@ import { humanizeUnknownError } from "../lib/safe-url";
     humanizeUnknownError(new Error("The string did not match the expected pattern."), "Unable to upload write-up."),
     "Unable to upload write-up."
   );
+  assert.equal(
+    humanizeUnknownError(new Error("The string did not match the expected pattern."), "Unable to load admin dashboard. Reload and try again."),
+    "Unable to load admin dashboard. Reload and try again."
+  );
 }
 
 {
@@ -65,6 +69,18 @@ import { humanizeUnknownError } from "../lib/safe-url";
   assert.match(panel, /entered outside RuffOps|entered manually/);
   assert.match(panel, /pacificHtmlDate/);
   assert.match(panel, /noValidate/);
+}
+
+{
+  const dashboard = readFileSync(join(process.cwd(), "components/admin/AdminDashboard.tsx"), "utf8");
+  assert.match(dashboard, /humanizeUnknownError/);
+  assert.match(dashboard, /Unable to load admin dashboard/);
+}
+
+{
+  const recovery = readFileSync(join(process.cwd(), "components/ChunkLoadRecovery.tsx"), "utf8");
+  assert.match(recovery, /did not match the expected pattern/);
+  assert.match(recovery, /unregister/);
 }
 
 {

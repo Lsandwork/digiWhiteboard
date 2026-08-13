@@ -64,6 +64,7 @@ import { PreviewModal } from "@/components/admin/PreviewModal";
 import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
@@ -151,7 +152,7 @@ export function AdminDashboard() {
       if (!response.ok) throw new Error(body.error ?? "Unable to load admin dashboard.");
       setData(body as DashboardPayload);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Unable to load admin dashboard.");
+      setError(humanizeUnknownError(loadError, "Unable to load admin dashboard. Reload and try again."));
     } finally {
       setBusy(false);
       setRefreshing(false);
@@ -312,7 +313,7 @@ export function AdminDashboard() {
       showToast(`Publish successful — ${body.version}`, "success");
       await load(true);
     } catch (publishError) {
-      showToast(publishError instanceof Error ? publishError.message : "Publish failed.", "error");
+      showToast(humanizeUnknownError(publishError, "Publish failed."), "error");
     } finally {
       setBusy(false);
     }
@@ -325,8 +326,8 @@ export function AdminDashboard() {
       if (!response.ok) throw new Error("Refresh failed.");
       await load(true);
       showToast("Refresh complete.", "success");
-    } catch {
-      showToast("Refresh failed.", "error");
+    } catch (refreshError) {
+      showToast(humanizeUnknownError(refreshError, "Refresh failed."), "error");
     } finally {
       setRefreshing(false);
     }
@@ -338,7 +339,7 @@ export function AdminDashboard() {
       const nonce = await requestCastHardRefreshAllDisplays();
       showToast(`Cast displays will hard refresh now (signal #${nonce}).`, "success");
     } catch (castError) {
-      showToast(castError instanceof Error ? castError.message : "Cast refresh failed.", "error");
+      showToast(humanizeUnknownError(castError, "Cast refresh failed."), "error");
     } finally {
       setCastRefreshing(false);
     }
@@ -365,7 +366,16 @@ export function AdminDashboard() {
   if (!data) {
     return (
       <main className="admin-theme grid min-h-screen place-items-center p-6 text-white">
-        {error ? <p className="admin-error">{error}</p> : <p>Loading admin dashboard…</p>}
+        {error ? (
+          <div className="max-w-md space-y-4 text-center">
+            <p className="admin-error">{error}</p>
+            <button type="button" className="admin-btn-primary" onClick={() => void load()}>
+              Retry
+            </button>
+          </div>
+        ) : (
+          <p>Loading admin dashboard…</p>
+        )}
       </main>
     );
   }

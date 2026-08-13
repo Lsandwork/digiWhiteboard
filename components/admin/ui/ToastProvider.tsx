@@ -22,7 +22,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: ToastType = "success") => {
     const id = `${Date.now()}-${Math.random()}`;
-    setToasts((current) => [...current, { id, message, type }]);
+    const safeMessage = /did not match the expected pattern/i.test(message)
+      ? "Something went wrong. Reload the page and try again."
+      : message;
+    setToasts((current) => [...current, { id, message: safeMessage, type }]);
   }, []);
 
   const dismiss = useCallback((id: string) => {
