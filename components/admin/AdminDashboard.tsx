@@ -384,9 +384,9 @@ export function AdminDashboard() {
   const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
   const hubNavRole = isDemo ? currentRole : baseRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
-  const hubVisibleTabs = useMemo(
-    () => ADMIN_TABS.filter((item) => canAccessAdminTab(userAccess, item, hubNavRole, "staff", { isDemo })),
-    [userAccess, hubNavRole, isDemo]
+  // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
+  const hubVisibleTabs = ADMIN_TABS.filter((item) =>
+    canAccessAdminTab(userAccess, item, hubNavRole, "staff", { isDemo })
   );
   const isTeamLeadPanel = !isDemo && isTeamLeaderRole(currentRole);
   const isGroomerPanel = !isDemo && isGroomerRole(currentRole);
