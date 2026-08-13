@@ -8,6 +8,7 @@ import {
 } from "../lib/ops-command-center/team-lead-shift";
 import {
   additionalServicesFromReservation,
+  isExcludedGroomerAdditionalService,
   isFreeWalkService
 } from "../lib/ops-command-center/groomer-additional-services";
 import { canViewFitdogAlerts } from "../lib/fitdog-ops/access";
@@ -38,10 +39,16 @@ assert.equal(assignedToGroomerUser("Team Leaders", null, actor), false);
 assert.equal(assignedToGroomerUser("Halle", null, actor), false);
 
 assert.equal(isFreeWalkService("Free Walk"), true);
-assert.equal(isFreeWalkService("free-walk"), true);
-assert.equal(isFreeWalkService("Free Walks"), true);
-assert.equal(isFreeWalkService("Paid Walk"), false);
-assert.equal(isFreeWalkService("Nail Trim"), false);
+assert.equal(isExcludedGroomerAdditionalService("Free Daily Walk"), true);
+assert.equal(isExcludedGroomerAdditionalService("Group Walk"), true);
+assert.equal(isExcludedGroomerAdditionalService("Private Training - Business Only"), true);
+assert.equal(isExcludedGroomerAdditionalService("Daily Enrichment (3pm) - Business Only"), true);
+assert.equal(isExcludedGroomerAdditionalService("Club Food - Business Only"), true);
+assert.equal(isExcludedGroomerAdditionalService("Taxi Service - Business Only"), true);
+assert.equal(isExcludedGroomerAdditionalService("Puzzle Playtime"), true);
+assert.equal(isExcludedGroomerAdditionalService("Paid Walk"), false);
+assert.equal(isExcludedGroomerAdditionalService("Nail Trim"), false);
+assert.equal(isExcludedGroomerAdditionalService("Bath"), false);
 
 const reservation = {
   id: "1001",
@@ -50,10 +57,16 @@ const reservation = {
   owner: { first_name: "Sam", last_name: "Lee" },
   reservation_type: { type: "Daycare" },
   services: [
-    { id: "s1", name: "Free Walk", scheduled_at: "2026-08-13 08:00:00" },
+    { id: "s1", name: "Free Daily Walk", scheduled_at: "2026-08-13 08:00:00" },
     { id: "s2", name: "Bath", scheduled_at: "2026-08-13 10:00:00" },
     { id: "s3", name: "Nail Trim", scheduled_at: "2026-08-13 11:00:00" },
-    { id: "s4", name: "Teeth Brush", scheduled_at: "2026-08-12 09:00:00" }
+    { id: "s4", name: "Teeth Brush", scheduled_at: "2026-08-12 09:00:00" },
+    { id: "s5", name: "Group Walk", scheduled_at: "2026-08-13 09:00:00" },
+    { id: "s6", name: "Puzzle Playtime", scheduled_at: "2026-08-13 14:00:00" },
+    { id: "s7", name: "Taxi Service - Business Only", scheduled_at: "2026-08-13 07:30:00" },
+    { id: "s8", name: "Club Food - Business Only", scheduled_at: "2026-08-13 12:00:00" },
+    { id: "s9", name: "Daily Enrichment (3pm) - Business Only", scheduled_at: "2026-08-13 15:00:00" },
+    { id: "s10", name: "Private Training - Business Only", scheduled_at: "2026-08-13 16:00:00" }
   ]
 } as GingrReservation;
 

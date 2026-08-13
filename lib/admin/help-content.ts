@@ -248,7 +248,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Trainer primary: My Shift, Trainer Ops, Trainer Push, Commissions, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
       "Groomer primary: My Shift, Grooming Push, Live Preview, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
-      "My Shift Needs Attention shows Open Log and Active Issues assigned to you. Today’s additional services come from the Gingr facility calendar (Free Walk excluded). Fitdog Alerts are not on Groomer accounts.",
+      "My Shift Needs Attention shows Open Log and Active Issues assigned to you. Today’s additional services come from the Gingr facility calendar (walks, taxi, club food, enrichment, and private training add-ons excluded). Fitdog Alerts are not on Groomer accounts.",
       "Floor Ops opens Team Log, Walks Board, and Video Links.",
       "Apps opens Gingr and Ruffly."
     ],
@@ -307,7 +307,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Open Staff → My Shift (your role homepage) or Ops Command Center (management live floor view).",
       "Review Needs Attention, My Tasks, Alerts, and live arriving/leaving counts.",
       "Team Lead dashboard: Needs Attention shows Open Log + Active Issues assigned to you, and My Shift shows previous Team Lead notes from Team Log instead of Live board. Fitdog / sports-app payment alerts stay off this login. Coordinator dashboards are unchanged.",
-      "Groomer dashboard: Needs Attention shows Open Log + Active Issues assigned to you. My Shift shows today’s Gingr facility-calendar additional services (Free Walk excluded) instead of Live board. Fitdog / sports-app payment alerts stay off this login.",
+      "Groomer dashboard: Needs Attention shows Open Log + Active Issues assigned to you. My Shift shows today’s Gingr facility-calendar additional services (walks, taxi, club food, enrichment, and private training add-ons excluded) instead of Live board. Fitdog / sports-app payment alerts stay off this login.",
       "Check the Gingr pill — Connected means recent webhook or live dog sync activity; Disconnected means no fresh Gingr activity.",
       "Use role tools (Front Desk Command, Yard Command, Driver Mode, Overnight, Trainer Ops, System Health, Shift Handoff) when your login includes them.",
       "Find a Dog searches Digi-Board ops records — open Gingr for reservations, packages, and billing."
