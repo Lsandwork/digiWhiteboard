@@ -16,13 +16,20 @@ import {
 import { availableActionsForKind } from "@/lib/ops-command-center/work-item-actions";
 import type { UserAccess } from "@/lib/admin/permissions";
 import { isTeamLeadDashboardUser } from "@/lib/admin/team-lead-profile";
+import { isGroomerDashboardUser } from "@/lib/admin/groomer-profile";
 import {
   assignedActiveIssues,
+  assignedGroomerActiveIssues,
+  assignedGroomerOpenLogMessages,
   assignedOpenLogMessages,
   directoryMemberForUser,
   previousTeamLeadShiftNotes,
   type TeamLeadShiftNote
 } from "@/lib/ops-command-center/team-lead-shift";
+import {
+  loadTodaysAdditionalServices,
+  type GingrAdditionalService
+} from "@/lib/ops-command-center/groomer-additional-services";
 import type { CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 
 export type NeedsAttentionItem = {
@@ -83,6 +90,12 @@ export type OpsCommandCenterSnapshot = {
     enabled: boolean;
     previousLeadName: string | null;
     shiftNotes: TeamLeadShiftNote[];
+  };
+  /** Groomer dashboard My Shift: Gingr additional services + assigned Open Log / Active Issues. */
+  groomerView?: {
+    enabled: boolean;
+    serviceDate: string | null;
+    additionalServices: GingrAdditionalService[];
   };
 };
 
@@ -196,6 +209,15 @@ export async function buildOpsCommandCenterSnapshot(input: {
   access?: UserAccess | null;
 }): Promise<OpsCommandCenterSnapshot> {
   const supabase = getServiceSupabase();
+  const yardTeamLead = isTeamLeadDashboardUser({
+    legacyRole: input.roleKey,
+    access: input.access,
+    dashboardRole: input.roleKey || null
+  });
+  const groomerDashboard = isGroomerDashboardUser({
+    legacyRole: input.roleKey,
+    access: input.access
+  });
 
   const [
     checkingIn,
@@ -208,7 +230,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
     lastWebhook,
     lastDogSeen,
     staffFeed,
-    boardLanes
+    boardLanes,
+    additionalServicesFeed
   ] = await Promise.all([
     supabase
       .from("live_transition_dogs")
@@ -269,7 +292,10 @@ export async function buildOpsCommandCenterSnapshot(input: {
       criticalPaymentCount: 0,
       openIssueCount: 0
     })),
-    loadBoardLaneSamples(8).catch(() => ({ arriving: [], leaving: [] }))
+    loadBoardLaneSamples(8).catch(() => ({ arriving: [], leaving: [] })),
+    groomerDashboard
+      ? loadTodaysAdditionalServices().catch(() => ({ date: null as string | null, services: [] as GingrAdditionalService[] }))
+      : Promise.resolve({ date: null as string | null, services: [] as GingrAdditionalService[] })
   ]);
 
   const checkingInCount = checkingIn.count || 0;
@@ -297,38 +323,46 @@ export async function buildOpsCommandCenterSnapshot(input: {
     email: input.email,
     name: input.displayName
   });
-  const yardTeamLead = isTeamLeadDashboardUser({
-    legacyRole: input.roleKey,
-    access: input.access,
-    dashboardRole: input.roleKey || null
-  });
   const shiftActor = {
     name: input.displayName,
     email: input.email,
     adminUserId: input.adminUserId,
     directoryName: directoryMember?.name ?? null
   };
-  const assignedLogs = yardTeamLead ? assignedOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map(openLogToWorkItem) : [];
+  const assignedLogs = yardTeamLead
+    ? assignedOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map(openLogToWorkItem)
+    : groomerDashboard
+      ? assignedGroomerOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map((item) => ({
+          ...openLogToWorkItem(item),
+          hrefTab: "crossover_communication"
+        }))
+      : [];
   const assignedIssues = yardTeamLead
     ? assignedActiveIssues(staffFeed.issues || [], shiftActor).map(issueToWorkItem)
-    : [];
+    : groomerDashboard
+      ? assignedGroomerActiveIssues(staffFeed.issues || [], shiftActor).map((item) => ({
+          ...issueToWorkItem(item),
+          hrefTab: "crossover_communication"
+        }))
+      : [];
   const previousNotes = yardTeamLead
     ? previousTeamLeadShiftNotes(staffFeed.crossoverMessages || [], shiftActor, staffFeed.staffDirectory || [])
     : { previousLeadName: null as string | null, notes: [] as TeamLeadShiftNote[] };
+  const roleWorkQueue = yardTeamLead || groomerDashboard;
 
   const openWork = (
-    yardTeamLead
+    roleWorkQueue
       ? [...myTaskWork, ...assignedIssues, ...assignedLogs]
       : [...myTaskWork, ...staffFeed.followUpItems, ...staffFeed.issueItems]
   )
     .sort((a, b) => severityRank(a.priority) - severityRank(b.priority) || String(a.dueAt || "").localeCompare(String(b.dueAt || "")))
     .slice(0, 24);
 
-  const alertFeed = [...(yardTeamLead ? [] : staffFeed.alertItems), ...notifWork]
+  const alertFeed = [...(roleWorkQueue ? [] : staffFeed.alertItems), ...notifWork]
     .sort((a, b) => severityRank(a.priority) - severityRank(b.priority))
     .slice(0, 20);
 
-  const needsAttentionSource = yardTeamLead
+  const needsAttentionSource = roleWorkQueue
     ? [...assignedLogs, ...assignedIssues]
     : [
         ...staffFeed.alertItems.filter((item) => item.priority === "critical" || item.priority === "high"),
@@ -357,15 +391,15 @@ export async function buildOpsCommandCenterSnapshot(input: {
       return true;
     })
     .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
-    .slice(0, yardTeamLead ? 24 : 16);
+    .slice(0, roleWorkQueue ? 24 : 16);
 
-  const openWorkCount = yardTeamLead
+  const openWorkCount = roleWorkQueue
     ? assignedLogs.length + assignedIssues.length + myTaskWork.filter((item) => dueSoon(item.dueAt)).length
     : allOpenTasks.filter((task) => dueSoon(task.dueAt)).length +
       staffFeed.followUpItems.filter((item) => dueSoon(item.dueAt)).length +
       staffFeed.openIssueCount;
 
-  const criticalAlerts = yardTeamLead
+  const criticalAlerts = roleWorkQueue
     ? assignedLogs.filter((item) => item.priority === "critical").length +
       assignedIssues.filter((item) => item.priority === "critical").length +
       notifications.filter((n) => n.priority === "critical" && !n.resolvedAt).length
@@ -448,6 +482,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
       enabled: yardTeamLead,
       previousLeadName: previousNotes.previousLeadName,
       shiftNotes: previousNotes.notes
+    },
+    groomerView: {
+      enabled: groomerDashboard,
+      serviceDate: additionalServicesFeed.date,
+      additionalServices: additionalServicesFeed.services
     }
   };
 }

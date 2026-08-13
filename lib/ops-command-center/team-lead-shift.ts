@@ -40,6 +40,13 @@ export function assignmentTokensForActor(actor: ShiftActor): string[] {
   return [...tokens];
 }
 
+function assignedToActorName(assignedTo: string, assignedTeam: string, actor: ShiftActor) {
+  const tokens = assignmentTokensForActor(actor);
+  if (!tokens.length) return false;
+  const haystacks = [assignedTo, assignedTeam].filter(Boolean);
+  return haystacks.some((hay) => tokens.some((token) => token.length >= 2 && (hay === token || hay.includes(token) || token.includes(hay))));
+}
+
 export function assignedToTeamLeadUser(
   assignedTo: string | null | undefined,
   assignedTeam: string | null | undefined,
@@ -50,11 +57,25 @@ export function assignedToTeamLeadUser(
   if (!assigned && !team) return false;
   if (isTeamLeadDepartmentLabel(assigned) || isTeamLeadDepartmentLabel(team)) return true;
   if (assigned === "team leaders" || team === "team leaders") return true;
+  return assignedToActorName(assigned, team, actor);
+}
 
-  const tokens = assignmentTokensForActor(actor);
-  if (!tokens.length) return false;
-  const haystacks = [assigned, team].filter(Boolean);
-  return haystacks.some((hay) => tokens.some((token) => token.length >= 2 && (hay === token || hay.includes(token) || token.includes(hay))));
+export function isGroomingAssignmentLabel(value?: string | null) {
+  const token = normalizeToken(value);
+  if (!token) return false;
+  return token === "grooming team" || token === "groomers" || token === "groomer" || token === "grooming";
+}
+
+export function assignedToGroomerUser(
+  assignedTo: string | null | undefined,
+  assignedTeam: string | null | undefined,
+  actor: ShiftActor
+): boolean {
+  const assigned = normalizeToken(assignedTo);
+  const team = normalizeToken(assignedTeam);
+  if (!assigned && !team) return false;
+  if (isGroomingAssignmentLabel(assigned) || isGroomingAssignmentLabel(team)) return true;
+  return assignedToActorName(assigned, team, actor);
 }
 
 export function directoryMemberForUser(
@@ -135,4 +156,14 @@ export function assignedOpenLogMessages(messages: CrossoverMessage[], actor: Shi
 
 export function assignedActiveIssues(issues: ActiveIssue[], actor: ShiftActor): ActiveIssue[] {
   return issues.filter((issue) => assignedToTeamLeadUser(issue.assigned_to, null, actor));
+}
+
+export function assignedGroomerOpenLogMessages(messages: CrossoverMessage[], actor: ShiftActor): CrossoverMessage[] {
+  return messages.filter(
+    (message) => belongsInOpenLog(message) && assignedToGroomerUser(message.assigned_to, message.assigned_team, actor)
+  );
+}
+
+export function assignedGroomerActiveIssues(issues: ActiveIssue[], actor: ShiftActor): ActiveIssue[] {
+  return issues.filter((issue) => assignedToGroomerUser(issue.assigned_to, null, actor));
 }

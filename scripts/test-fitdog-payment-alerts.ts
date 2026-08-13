@@ -224,6 +224,8 @@ import { sanitizeFitdogPayload } from "../lib/fitdog-ops/sanitize";
   assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "fitdog_alerts", "trainer", "staff"), false);
   assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "fitdog_alerts", "team_leader", "staff"), false);
   assert.equal(canViewFitdogAlerts(accessFromLegacyRole(null, null, "team_leader"), "team_leader"), false);
+  assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "fitdog_alerts", "groomer", "staff"), false);
+  assert.equal(canViewFitdogAlerts(accessFromLegacyRole(null, null, "groomer"), "groomer"), false);
   {
     const dual = accessFromLegacyRole(null, null, "front_desk_coordinator");
     dual.roles = ["front_desk_coordinator", "team_leader"];
