@@ -241,7 +241,7 @@ export async function applyWorkItemAction(input: {
     }
   } else if (parsed.kind === "payment_alert") {
     const now = new Date().toISOString();
-    if (input.action === "in_progress" || input.action === "clear") {
+    if (input.action === "in_progress") {
       await updateOperationsAlert(
         supabase,
         parsed.sourceId,
@@ -272,7 +272,7 @@ export async function applyWorkItemAction(input: {
         }
       );
       resultStatus = "false_positive";
-    } else if (input.action === "resolved") {
+    } else if (input.action === "clear" || input.action === "resolved") {
       await updateOperationsAlert(
         supabase,
         parsed.sourceId,
@@ -280,11 +280,11 @@ export async function applyWorkItemAction(input: {
           status: "resolved",
           resolved_at: now,
           resolution_type: "manual_resolve",
-          resolution_notes: "Resolved from Command Center"
+          resolution_notes: `Command Center: ${workItemActionLabel(input.action)}`
         },
         {
           type: "status_change",
-          message: "Command Center: Resolved",
+          message: `Command Center: ${workItemActionLabel(input.action)}`,
           actor_user_id: input.actor?.adminId,
           actor_name: actorName
         }
