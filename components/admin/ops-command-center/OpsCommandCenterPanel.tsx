@@ -348,6 +348,39 @@ export function OpsCommandCenterPanel({
               <EmptyState text="No previous Team Lead shift notes in the Team Log yet." />
             )}
           </section>
+        ) : mode === "my_shift" && data.coordinatorView?.enabled ? (
+          <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-white">Previous Front Desk Notes</h3>
+              {onNavigate ? (
+                <button type="button" className="text-xs text-sky-300 underline" onClick={() => onNavigate("crossover_communication")}>
+                  Team Log
+                </button>
+              ) : null}
+            </div>
+            {data.coordinatorView.previousName ? (
+              <p className="mb-3 text-xs text-admin-muted">
+                From {data.coordinatorView.previousName} · Team Log
+              </p>
+            ) : null}
+            {data.coordinatorView.shiftNotes.length ? (
+              <ul className="space-y-2">
+                {data.coordinatorView.shiftNotes.map((note) => (
+                  <li key={note.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
+                    <p className="text-sm font-medium text-white">{note.title}</p>
+                    {note.detail ? <p className="mt-0.5 text-xs text-admin-muted">{note.detail}</p> : null}
+                    {note.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{note.dogName}</p> : null}
+                    <p className="mt-1 text-[11px] text-admin-muted">
+                      {formatDue(note.createdAt)}
+                      {note.status ? ` · ${note.status}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <EmptyState text="No previous Front Desk notes in the Team Log yet." />
+            )}
+          </section>
         ) : mode === "my_shift" && data.groomerView?.enabled ? (
           <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">

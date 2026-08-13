@@ -88,6 +88,7 @@ import {
 } from "@/lib/admin/permissions";
 import type { AdminUserRole } from "@/lib/admin/users";
 import { isGroomerRole, isTeamLeaderRole, isTrainerRole, isMarketingRole, isFullAdminRole, isFrontDeskCoordinatorRole, isAdminOrManagementRole } from "@/lib/admin/users";
+import { isFrontDeskCoordinatorLoginEmail } from "@/lib/admin/team-lead-profile";
 import { DemoPushPanel } from "@/components/demo/DemoPushPanel";
 import { getEffectiveDemoRole } from "@/lib/demo/session";
 import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, HandlerWriteUpsPanel } from "@/components/admin/HandlerBasicPanels";
@@ -377,12 +378,20 @@ export function AdminDashboard() {
   const isDemo = Boolean((data.session as { isDemo?: boolean } | undefined)?.isDemo);
   const demoRole = (data.session as { demoRole?: string } | undefined)?.demoRole ?? null;
   const baseRole = (data.session?.role ?? "owner_admin") as AdminUserRole;
-  const currentRole = (isDemo ? getEffectiveDemoRole(data.session ?? null) : baseRole) as AdminUserRole;
+  const currentRole = (isDemo
+    ? getEffectiveDemoRole(data.session ?? null)
+    : isFrontDeskCoordinatorLoginEmail(data.username)
+      ? "front_desk_coordinator"
+      : baseRole) as AdminUserRole;
   const userAccess = (data.session as { access?: UserAccess | null } | undefined)?.access
     ?? accessFromLegacyRole(data.session?.adminUserId ?? null, data.username ?? null, currentRole);
-  const displayLabel = isDemo ? `Demo — ${userAccess.displayLabel}` : userAccess.displayLabel;
+  const displayLabel = isDemo
+    ? `Demo — ${userAccess.displayLabel}`
+    : isFrontDeskCoordinatorLoginEmail(data.username)
+      ? "Front Desk Coordinator"
+      : userAccess.displayLabel;
   const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
-  const hubNavRole = isDemo ? currentRole : baseRole;
+  const hubNavRole = currentRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
   // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
   const hubVisibleTabs = ADMIN_TABS.filter((item) =>

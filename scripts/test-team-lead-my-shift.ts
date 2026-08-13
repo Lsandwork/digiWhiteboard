@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { accessFromLegacyRole } from "../lib/admin/permissions";
-import { isTeamLeadDashboardUser } from "../lib/admin/team-lead-profile";
+import { isCoordinatorDashboardUser, isTeamLeadDashboardUser } from "../lib/admin/team-lead-profile";
 import {
   assignedActiveIssues,
   assignedOpenLogMessages,
   assignedToTeamLeadUser,
+  previousFrontDeskShiftNotes,
   previousTeamLeadShiftNotes
 } from "../lib/ops-command-center/team-lead-shift";
 import { openLogToWorkItem } from "../lib/ops-command-center/adapters/staff-ops-feed";
@@ -71,6 +72,23 @@ assert.equal(
   }),
   false,
   "coordinator + team lead dual logins stay unchanged"
+);
+assert.equal(
+  isTeamLeadDashboardUser({
+    legacyRole: "team_leader",
+    access: tlAccess,
+    email: "angelica.n.wms@gmail.com"
+  }),
+  false,
+  "Angelica uses the Front Desk Coordinator dashboard"
+);
+assert.equal(
+  isCoordinatorDashboardUser({
+    legacyRole: "team_leader",
+    access: tlAccess,
+    email: "angelica.n.wms@gmail.com"
+  }),
+  true
 );
 
 const actor = { name: "Halle", email: "halle@fitdog.test", directoryName: "Halle" };
@@ -230,6 +248,37 @@ const notes = previousTeamLeadShiftNotes(
 assert.equal(notes.previousLeadName, "Brian");
 assert.equal(notes.notes[0].id, "n-brian-1");
 assert.equal(notes.notes.some((note) => note.id === "n-halle"), false);
+
+const deskNotes = previousFrontDeskShiftNotes(
+  [
+    log({
+      id: "fd-angelica",
+      subject: "My desk note",
+      status: "Open",
+      submitted_by: "Angelica",
+      created_by: "Angelica",
+      created_at: now,
+      from_department: "Front Desk",
+      department_area: "Front Desk"
+    }),
+    log({
+      id: "fd-lonnie",
+      subject: "CRITICAL STATUS",
+      status: "Open",
+      submitted_by: "Lonnie Sandoval",
+      created_by: "Lonnie Sandoval",
+      created_at: earlier,
+      from_department: "Front Desk",
+      department_area: "Front Desk",
+      details: "Handoff from last shift"
+    })
+  ],
+  { name: "Angelica", email: "angelica.n.wms@gmail.com", directoryName: "Angelica" },
+  directory
+);
+assert.equal(deskNotes.previousLeadName, "Lonnie Sandoval");
+assert.equal(deskNotes.notes[0].id, "fd-lonnie");
+assert.equal(deskNotes.notes.some((note) => note.id === "fd-angelica"), false);
 
 const workItem = openLogToWorkItem(openAssigned);
 assert.equal(workItem.kind, "open_log");

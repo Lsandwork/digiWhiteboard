@@ -1,6 +1,13 @@
 import type { UserAccess } from "@/lib/admin/permissions";
 import { FRONT_DESK_DEPARTMENT, TEAM_LEAD_DEPARTMENT } from "@/lib/staff/admin-ops";
 
+/** Logins that should use the Front Desk Coordinator dashboard even if stored as Team Lead. */
+const FRONT_DESK_COORDINATOR_LOGIN_EMAILS = new Set(["angelica.n.wms@gmail.com"]);
+
+export function isFrontDeskCoordinatorLoginEmail(email?: string | null) {
+  return FRONT_DESK_COORDINATOR_LOGIN_EMAILS.has(String(email || "").trim().toLowerCase());
+}
+
 function normalizeDashboardRole(value?: string | null) {
   return String(value || "")
     .trim()
@@ -22,7 +29,9 @@ export function isCoordinatorDashboardRole(value?: string | null) {
 export function isCoordinatorDashboardUser(input: {
   legacyRole?: string | null;
   access?: UserAccess | null;
+  email?: string | null;
 }): boolean {
+  if (isFrontDeskCoordinatorLoginEmail(input.email ?? input.access?.email)) return true;
   const roles = input.access?.roles || [];
   const primary = input.access?.primaryRole || null;
   const legacy = String(input.legacyRole || "").trim();
@@ -61,7 +70,9 @@ export function isTeamLeadDashboardUser(input: {
   legacyRole?: string | null;
   access?: UserAccess | null;
   dashboardRole?: string | null;
+  email?: string | null;
 }): boolean {
+  if (isFrontDeskCoordinatorLoginEmail(input.email ?? input.access?.email)) return false;
   const roles = input.access?.roles || [];
   const primary = input.access?.primaryRole || null;
   const legacy = String(input.legacyRole || "").trim();

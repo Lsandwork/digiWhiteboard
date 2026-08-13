@@ -36,6 +36,15 @@ for (const role of HUB_NAV_ROLES) {
     `${role} has accessible staff tabs missing from hubs/primary: ${missing.join(", ")}`
   );
 
+  const primaryTabs = ROLE_HUB_NAV[role].primary.map((item) => item.tab);
+  if (role === "team_leader" || role === "front_desk_coordinator" || role === "groomer") {
+    assert.equal(
+      primaryTabs.includes("ops_command_center"),
+      false,
+      `${role} must not show Ops Command Center as a primary sidebar tab`
+    );
+  }
+
   for (const articleId of ["cleaned-menu-hubs", "need-help-card-dismiss"]) {
     const articles = filterHelpArticlesForRole(role as AdminUserRole);
     assert.ok(
