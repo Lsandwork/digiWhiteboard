@@ -3,9 +3,8 @@ import { verifyAdminCredentials } from "@/lib/admin/auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { checkLoginRateLimit, clearLoginAttempts, recordFailedLogin } from "@/lib/admin/rate-limit";
 import {
-  ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
-  getAdminSessionCookieOptions
+  setAdminSessionCookie
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -67,9 +66,13 @@ export async function POST(request: Request) {
       forcePasswordChange: auth.forcePasswordChange ?? false,
       isDemo: auth.isDemo ?? false
     });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    setAdminSessionCookie(response, token, request.headers.get("host"));
     return response;
-  } catch {
-    return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
+  } catch (error) {
+    console.error("[admin.login] unexpected failure", error);
+    return NextResponse.json(
+      { error: "Sign-in is temporarily unavailable. Please try again in a moment." },
+      { status: 503 }
+    );
   }
 }
