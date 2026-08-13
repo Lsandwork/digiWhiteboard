@@ -78,9 +78,12 @@ export function GingrPageClient({ username, role, access, embedAllowed }: GingrP
   }, [navigateToTab]);
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.replace("/admin/login");
-    router.refresh();
+    try {
+      await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin", cache: "no-store" });
+    } catch {
+      // Still leave the app UI even if the network call fails.
+    }
+    window.location.assign("/admin/login");
   }
 
   function toggleSidebarCollapsed() {

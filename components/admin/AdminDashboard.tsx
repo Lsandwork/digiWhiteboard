@@ -133,13 +133,21 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const host = window.location.hostname.toLowerCase();
+    // fitdog.ruffops.com is staff DigiBoard only — keep users off lobby/marketing boards.
+    if (host === "fitdog.ruffops.com" && board !== "staff") {
+      window.localStorage.setItem("fitdog_admin_board", "staff");
+      const nextTab = tab === "overview" && !searchParams.get("tab") ? "crossover_communication" : tab;
+      router.replace(`/admin?board=staff&tab=${nextTab}`);
+      return;
+    }
     const stored = window.localStorage.getItem("fitdog_admin_board");
     if (!searchParams.get("board") && (stored === "staff" || stored === "marketing")) {
       const params = new URLSearchParams(searchParams.toString());
       params.set("board", stored);
       router.replace(`/admin?${params.toString()}`);
     }
-  }, [router, searchParams]);
+  }, [board, router, searchParams, tab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);
@@ -345,9 +353,13 @@ export function AdminDashboard() {
   }
 
   async function logout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.replace("/admin/login");
-    router.refresh();
+    try {
+      await fetch("/api/admin/logout", { method: "POST", credentials: "same-origin", cache: "no-store" });
+    } catch {
+      // Still leave the app UI even if the network call fails.
+    }
+    // Hard navigation so middleware re-reads cleared cookies (router.replace can keep a stale session).
+    window.location.assign("/admin/login");
   }
 
   function openBoard() {
