@@ -18,3 +18,11 @@ export {
   searchBoardDogs,
   type OpsWorkItem
 } from "@/lib/ops-command-center/adapters/staff-ops-feed";
+export {
+  applyWorkItemAction,
+  availableActionsForKind,
+  parseWorkItemId,
+  workItemActionLabel,
+  WORK_ITEM_ACTIONS,
+  type WorkItemAction
+} from "@/lib/ops-command-center/work-item-actions";

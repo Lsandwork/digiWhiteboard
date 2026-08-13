@@ -11,14 +11,17 @@ import {
   type BoardLaneDog,
   type OpsWorkItem
 } from "@/lib/ops-command-center/adapters/staff-ops-feed";
+import { availableActionsForKind } from "@/lib/ops-command-center/work-item-actions";
 
 export type NeedsAttentionItem = {
   id: string;
+  kind: OpsWorkItem["kind"];
   severity: "critical" | "high" | "attention" | "informational";
   title: string;
   detail: string | null;
   hrefTab: string | null;
   dogName?: string | null;
+  actions: Array<"clear" | "hide" | "archive" | "in_progress" | "resolved" | "delete">;
 };
 
 export type OpsCommandCenterSnapshot = {
@@ -284,11 +287,13 @@ export async function buildOpsCommandCenterSnapshot(input: {
     ...notifWork.filter((item) => item.priority === "critical" || item.priority === "high")
   ].map((item) => ({
     id: item.id,
+    kind: item.kind,
     severity: item.priority,
     title: item.title,
     detail: item.detail,
     hrefTab: item.hrefTab,
-    dogName: item.dogName ?? null
+    dogName: item.dogName ?? null,
+    actions: availableActionsForKind(item.kind)
   }));
 
   const seenNeeds = new Set<string>();
