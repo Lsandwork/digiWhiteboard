@@ -11,6 +11,7 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { htmlDateInputValue, normalizeHtmlDateValue, pacificHtmlDate } from "@/lib/dates/html-date";
 import { RouteGeneratorExtras } from "@/components/admin/RouteGeneratorExtras";
 import { RouteGeneratorTrackingTab } from "@/components/admin/RouteGeneratorTrackingTab";
 import type { FitdogLocationsConfig } from "@/lib/route-generator/locations";
@@ -96,12 +97,7 @@ type PlanBundle = {
 };
 
 function todayLA() {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
+  return pacificHtmlDate();
 }
 
 export function RouteGeneratorPanel() {
@@ -712,8 +708,8 @@ export function RouteGeneratorPanel() {
           <input
             type="date"
             className="admin-input mt-1"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
+            value={htmlDateInputValue(date)}
+            onChange={(event) => setDate(normalizeHtmlDateValue(event.target.value, pacificHtmlDate()))}
           />
         </label>
         <div className="flex flex-col gap-2 sm:items-end">

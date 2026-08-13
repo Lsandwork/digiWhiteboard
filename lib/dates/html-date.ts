@@ -31,6 +31,10 @@ export function pacificHtmlDate(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
+export function htmlDateInputValue(value: unknown): string {
+  return isHtmlDateValue(value) ? value.trim() : "";
+}
+
 export function normalizeHtmlDateValue(value: unknown, fallback = ""): string {
   const raw = String(value ?? "").trim();
   if (!raw) return fallback;

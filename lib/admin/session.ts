@@ -97,10 +97,19 @@ export async function getAdminSession() {
   return verifyAdminSessionToken(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
 }
 
+function decodeCookieValue(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export function getAdminSessionFromRequest(request: Request) {
   const cookieHeader = request.headers.get("cookie") ?? "";
-  const match = cookieHeader.match(new RegExp(`${ADMIN_SESSION_COOKIE}=([^;]+)`));
-  return verifyAdminSessionToken(match?.[1] ? decodeURIComponent(match[1]) : null);
+  const escaped = ADMIN_SESSION_COOKIE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = cookieHeader.match(new RegExp(`${escaped}=([^;]+)`));
+  return verifyAdminSessionToken(match?.[1] ? decodeCookieValue(match[1]) : null);
 }
 
 /** @deprecated Use getAdminSession().email */

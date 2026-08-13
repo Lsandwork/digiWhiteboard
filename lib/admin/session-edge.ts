@@ -25,10 +25,14 @@ function base64UrlToBytes(value: string) {
   if (!/^[A-Za-z0-9_-]+$/.test(value)) {
     throw new Error("Invalid base64url payload.");
   }
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/");
-  const padLen = (4 - (padded.length % 4)) % 4;
-  const binary = atob(padded + "=".repeat(padLen));
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  try {
+    const padded = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padLen = (4 - (padded.length % 4)) % 4;
+    const binary = atob(padded + "=".repeat(padLen));
+    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  } catch {
+    throw new Error("Invalid base64url payload.");
+  }
 }
 
 function bytesToBase64Url(bytes: Uint8Array) {
