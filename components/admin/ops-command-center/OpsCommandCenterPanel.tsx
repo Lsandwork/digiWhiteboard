@@ -353,7 +353,7 @@ export function OpsCommandCenterPanel({
               <span className="text-xs text-admin-muted">{data.groomerView.additionalServices.length}</span>
             </div>
             <p className="mb-3 text-xs text-admin-muted">
-              Gingr facility calendar{data.groomerView.serviceDate ? ` · ${data.groomerView.serviceDate}` : ""} · Free walk excluded
+              Gingr facility calendar{data.groomerView.serviceDate ? ` · ${data.groomerView.serviceDate}` : ""} · Walks, taxi, food, enrichment, and training add-ons excluded
             </p>
             {data.groomerView.additionalServices.length ? (
               <ul className="max-h-[28rem] space-y-2 overflow-auto pr-1">
@@ -370,7 +370,7 @@ export function OpsCommandCenterPanel({
                 ))}
               </ul>
             ) : (
-              <EmptyState text="No additional services on today’s Gingr facility calendar (free walk excluded)." />
+              <EmptyState text="No additional services on today’s Gingr facility calendar (walks, taxi, food, enrichment, and training add-ons excluded)." />
             )}
           </section>
         ) : (

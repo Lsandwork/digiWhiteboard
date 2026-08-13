@@ -25,10 +25,33 @@ function pickString(...values: unknown[]): string | null {
   return null;
 }
 
-export function isFreeWalkService(name?: string | null) {
-  const token = String(name || "").trim().toLowerCase();
+function normalizeServiceName(name?: string | null) {
+  return String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Yard/club add-ons that should not appear on Groomer My Shift. */
+export function isExcludedGroomerAdditionalService(name?: string | null) {
+  const token = normalizeServiceName(name);
   if (!token) return false;
-  return /\bfree[\s_-]*walks?\b/.test(token);
+  if (/\bfree\b.*\bwalks?\b/.test(token)) return true;
+  if (/\bgroup\s+walks?\b/.test(token)) return true;
+  if (token.includes("puzzle playtime")) return true;
+  if (token.includes("private training") && token.includes("business only")) return true;
+  if (token.includes("daily enrichment") && token.includes("business only")) return true;
+  if (token.includes("club food") && token.includes("business only")) return true;
+  if (token.includes("taxi service") && token.includes("business only")) return true;
+  return false;
+}
+
+/** @deprecated use isExcludedGroomerAdditionalService */
+export function isFreeWalkService(name?: string | null) {
+  return isExcludedGroomerAdditionalService(name);
 }
 
 function reservationServiceRows(reservation: GingrReservation): Array<Record<string, unknown>> {
@@ -101,7 +124,7 @@ export function additionalServicesFromReservation(
         serviceId: pickString(service.id, service.service_id, service.reservation_service_id)
       };
     })
-    .filter((row) => row.serviceName && !isFreeWalkService(row.serviceName) && serviceOnDate(row.service, date))
+    .filter((row) => row.serviceName && !isExcludedGroomerAdditionalService(row.serviceName) && serviceOnDate(row.service, date))
     .map((row) => ({
       id: `svc:${reservationId || "res"}:${row.serviceId || row.serviceName}:${row.scheduledAt || date}`,
       serviceName: row.serviceName,
