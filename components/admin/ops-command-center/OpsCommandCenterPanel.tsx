@@ -1,10 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { AlertTriangle, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
+import {
+  availableActionsForKind,
+  workItemActionLabel,
+  type WorkItemAction
+} from "@/lib/ops-command-center/work-item-actions";
 
 type Mode = "my_shift" | "ops_command_center";
 
@@ -13,6 +18,15 @@ const SEVERITY_DOT: Record<string, string> = {
   high: "bg-orange-500",
   attention: "bg-amber-400",
   informational: "bg-sky-400"
+};
+
+const ACTION_BUTTON_CLASS: Record<WorkItemAction, string> = {
+  clear: "border-sky-400/30 text-sky-100 hover:bg-sky-500/10",
+  hide: "border-slate-400/30 text-slate-100 hover:bg-slate-500/10",
+  archive: "border-violet-400/30 text-violet-100 hover:bg-violet-500/10",
+  in_progress: "border-amber-400/30 text-amber-100 hover:bg-amber-500/10",
+  resolved: "border-emerald-400/30 text-emerald-100 hover:bg-emerald-500/10",
+  delete: "border-rose-400/30 text-rose-100 hover:bg-rose-500/10"
 };
 
 function formatNow() {
@@ -40,6 +54,8 @@ export function OpsCommandCenterPanel({
   const [dogHits, setDogHits] = useState<Array<OpsDog | BoardSearchHit>>([]);
   const [selectedDogId, setSelectedDogId] = useState<string | null>(null);
   const [dogProfile, setDogProfile] = useState<Record<string, unknown> | null>(null);
+  const [busyItemId, setBusyItemId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -102,22 +118,23 @@ export function OpsCommandCenterPanel({
   const title = mode === "my_shift" ? "My Shift" : "Operations Command Center";
   const clock = formatNow();
 
-  async function completeTask(taskId: string) {
-    await fetch("/api/admin/ops-command-center", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "update_task_status", taskId, status: "completed" })
-    });
-    await load();
-  }
-
-  async function acknowledge(notificationId: string) {
-    await fetch("/api/admin/ops-command-center", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "acknowledge_notification", notificationId })
-    });
-    await load();
+  async function runWorkItemAction(itemId: string, workAction: WorkItemAction, itemTitle?: string | null) {
+    setBusyItemId(itemId);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/admin/ops-command-center", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "work_item_action", itemId, workAction, title: itemTitle || null })
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Unable to update row");
+      await load();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Unable to update row");
+    } finally {
+      setBusyItemId(null);
+    }
   }
 
   if (loading && !data) {
@@ -240,6 +257,10 @@ export function OpsCommandCenterPanel({
         />
       </div>
 
+      {actionError ? (
+        <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">{actionError}</div>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -251,23 +272,22 @@ export function OpsCommandCenterPanel({
               {data.needsAttention.map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5"
+                  className="flex flex-col gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5 sm:flex-row sm:items-start"
                 >
                   <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${SEVERITY_DOT[item.severity] || "bg-slate-400"}`} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-white">{item.title}</p>
                     {item.detail ? <p className="mt-0.5 text-xs text-admin-muted">{item.detail}</p> : null}
                     {item.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{item.dogName}</p> : null}
+                    <WorkItemActionButtons
+                      itemId={item.id}
+                      title={item.title}
+                      actions={item.actions?.length ? item.actions : availableActionsForKind(item.kind || inferKind(item.id))}
+                      busy={busyItemId === item.id}
+                      onAction={runWorkItemAction}
+                      onNavigate={item.hrefTab && onNavigate ? () => onNavigate(item.hrefTab!) : undefined}
+                    />
                   </div>
-                  {item.hrefTab && onNavigate ? (
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs text-sky-300 underline"
-                      onClick={() => onNavigate(item.hrefTab!)}
-                    >
-                      Open
-                    </button>
-                  ) : null}
                 </li>
               ))}
             </ul>
@@ -315,7 +335,7 @@ export function OpsCommandCenterPanel({
               {openWork.slice(0, 12).map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
+                  className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm text-white">{item.title}</p>
@@ -324,27 +344,14 @@ export function OpsCommandCenterPanel({
                       {item.dueAt ? ` · due ${formatDue(item.dueAt)}` : ""}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    {item.hrefTab && onNavigate ? (
-                      <button
-                        type="button"
-                        className="text-xs text-sky-300 underline"
-                        onClick={() => onNavigate(item.hrefTab!)}
-                      >
-                        Open
-                      </button>
-                    ) : null}
-                    {item.completable && item.taskId ? (
-                      <button
-                        type="button"
-                        className="admin-btn-secondary px-2 py-1 text-xs"
-                        onClick={() => void completeTask(item.taskId!)}
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        Done
-                      </button>
-                    ) : null}
-                  </div>
+                  <WorkItemActionButtons
+                    itemId={item.id}
+                    title={item.title}
+                    actions={availableActionsForKind(item.kind)}
+                    busy={busyItemId === item.id}
+                    onAction={runWorkItemAction}
+                    onNavigate={item.hrefTab && onNavigate ? () => onNavigate(item.hrefTab!) : undefined}
+                  />
                 </li>
               ))}
             </ul>
@@ -363,36 +370,20 @@ export function OpsCommandCenterPanel({
               {alertFeed.slice(0, 10).map((item) => (
                 <li
                   key={item.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
+                  className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2"
                 >
                   <div className="min-w-0">
                     <p className="text-sm text-white">{item.title}</p>
                     {item.detail ? <p className="mt-0.5 text-xs text-admin-muted">{item.detail}</p> : null}
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    {item.hrefTab && onNavigate ? (
-                      <button
-                        type="button"
-                        className="text-xs text-sky-300 underline"
-                        onClick={() => onNavigate(item.hrefTab!)}
-                      >
-                        Open
-                      </button>
-                    ) : null}
-                    {item.kind === "ops_notification" && item.id.startsWith("notif:") ? (
-                      item.statusLabel === "Unread" ? (
-                        <button
-                          type="button"
-                          className="admin-btn-secondary px-2 py-1 text-xs"
-                          onClick={() => void acknowledge(item.id.replace(/^notif:/, ""))}
-                        >
-                          Ack
-                        </button>
-                      ) : (
-                        <span className="text-xs text-emerald-300">Ack’d</span>
-                      )
-                    ) : null}
-                  </div>
+                  <WorkItemActionButtons
+                    itemId={item.id}
+                    title={item.title}
+                    actions={availableActionsForKind(item.kind)}
+                    busy={busyItemId === item.id}
+                    onAction={runWorkItemAction}
+                    onNavigate={item.hrefTab && onNavigate ? () => onNavigate(item.hrefTab!) : undefined}
+                  />
                 </li>
               ))}
             </ul>
@@ -522,6 +513,51 @@ type BoardSearchHit = {
   gingrAnimalId?: string | null;
   displayStatus?: string | null;
 };
+
+function inferKind(id: string): OpsWorkItem["kind"] {
+  if (id.startsWith("task:")) return "ops_task";
+  if (id.startsWith("followup:")) return "owner_follow_up";
+  if (id.startsWith("issue:")) return "active_issue";
+  if (id.startsWith("payment:")) return "payment_alert";
+  return "ops_notification";
+}
+
+function WorkItemActionButtons({
+  itemId,
+  title,
+  actions,
+  busy,
+  onAction,
+  onNavigate
+}: {
+  itemId: string;
+  title?: string | null;
+  actions: WorkItemAction[];
+  busy?: boolean;
+  onAction: (itemId: string, action: WorkItemAction, title?: string | null) => Promise<void>;
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      {onNavigate ? (
+        <button type="button" className="text-xs text-sky-300 underline" onClick={onNavigate} disabled={busy}>
+          Open
+        </button>
+      ) : null}
+      {actions.map((action) => (
+        <button
+          key={action}
+          type="button"
+          disabled={busy}
+          className={`rounded-md border px-2 py-0.5 text-[11px] font-medium disabled:opacity-50 ${ACTION_BUTTON_CLASS[action]}`}
+          onClick={() => void onAction(itemId, action, title)}
+        >
+          {busy ? "…" : workItemActionLabel(action)}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function taskFallbackWorkItem(task: {
   id: string;

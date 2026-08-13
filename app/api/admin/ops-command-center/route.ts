@@ -20,6 +20,11 @@ import {
 import { recordOpsEvent } from "@/lib/ops-command-center/events";
 import { buildOpsSystemHealth } from "@/lib/ops-command-center/system-health";
 import {
+  applyWorkItemAction,
+  WORK_ITEM_ACTIONS,
+  type WorkItemAction
+} from "@/lib/ops-command-center/work-item-actions";
+import {
   acknowledgeShiftHandoff,
   completeOvernightRound,
   createShiftHandoff,
@@ -143,6 +148,31 @@ export async function POST(request: Request) {
       notes: body.notes ? String(body.notes) : undefined
     });
     return NextResponse.json({ task });
+  }
+
+  if (action === "work_item_action") {
+    const itemId = String(body.itemId || "").trim();
+    const workAction = String(body.workAction || "").trim() as WorkItemAction;
+    if (!itemId || !WORK_ITEM_ACTIONS.includes(workAction)) {
+      return NextResponse.json({ error: "itemId and workAction are required" }, { status: 400 });
+    }
+    try {
+      const result = await applyWorkItemAction({
+        itemId,
+        action: workAction,
+        actor: {
+          adminId: gate.session.adminUserId,
+          email: gate.session.email,
+          name: gate.access.displayLabel || gate.session.email,
+          role: gate.session.role
+        },
+        title: body.title ? String(body.title) : null
+      });
+      return NextResponse.json(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to update work item";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
   }
 
   if (action === "acknowledge_notification") {
