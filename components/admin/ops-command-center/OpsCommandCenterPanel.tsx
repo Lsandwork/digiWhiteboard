@@ -305,9 +305,11 @@ export function OpsCommandCenterPanel({
           ) : (
             <EmptyState
               text={
-                (data.teamLeadView?.enabled || data.groomerView?.enabled) && mode === "my_shift"
+                data.groomerView?.enabled && mode === "my_shift"
                   ? "Nothing assigned to you in Open Log or Active Issues."
-                  : "Nothing urgent right now. Keep monitoring the floor."
+                  : data.teamLeadView?.enabled && mode === "my_shift"
+                    ? "No assigned Open Log/Issues, facility services, or birthdays right now."
+                    : "Nothing urgent right now. Keep monitoring the floor."
               }
             />
           )}
@@ -599,6 +601,8 @@ function inferKind(id: string): OpsWorkItem["kind"] {
   if (id.startsWith("issue:")) return "active_issue";
   if (id.startsWith("payment:")) return "payment_alert";
   if (id.startsWith("openlog:")) return "open_log";
+  if (id.startsWith("birthday:")) return "birthday";
+  if (id.startsWith("facility:")) return "facility_service";
   return "ops_notification";
 }
 
@@ -673,6 +677,10 @@ function kindLabel(kind: OpsWorkItem["kind"]) {
       return "Notice";
     case "open_log":
       return "Open log";
+    case "birthday":
+      return "Birthday";
+    case "facility_service":
+      return "Service";
     default:
       return "Task";
   }

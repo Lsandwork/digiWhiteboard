@@ -15,7 +15,7 @@ import {
 } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { availableActionsForKind } from "@/lib/ops-command-center/work-item-actions";
 import type { UserAccess } from "@/lib/admin/permissions";
-import { isTeamLeadDashboardUser } from "@/lib/admin/team-lead-profile";
+import { isCoordinatorDashboardUser, isTeamLeadDashboardUser } from "@/lib/admin/team-lead-profile";
 import { isGroomerDashboardUser } from "@/lib/admin/groomer-profile";
 import {
   assignedActiveIssues,
@@ -30,6 +30,11 @@ import {
   loadTodaysAdditionalServices,
   type GingrAdditionalService
 } from "@/lib/ops-command-center/groomer-additional-services";
+import {
+  facilityFeedToWorkItems,
+  loadCachedMyShiftFacilityFeed,
+  type MyShiftFacilityFeed
+} from "@/lib/ops-command-center/my-shift-facility-feed";
 import type { CrossoverMessage, StaffDirectoryMember } from "@/lib/staff/admin-ops";
 
 export type NeedsAttentionItem = {
@@ -218,6 +223,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
     legacyRole: input.roleKey,
     access: input.access
   });
+  const coordinatorDashboard = isCoordinatorDashboardUser({
+    legacyRole: input.roleKey,
+    access: input.access
+  });
+  const deskFacilityFeed = yardTeamLead || coordinatorDashboard;
 
   const [
     checkingIn,
@@ -231,7 +241,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
     lastDogSeen,
     staffFeed,
     boardLanes,
-    additionalServicesFeed
+    additionalServicesFeed,
+    cachedFacilityFeed
   ] = await Promise.all([
     supabase
       .from("live_transition_dogs")
@@ -295,7 +306,12 @@ export async function buildOpsCommandCenterSnapshot(input: {
     loadBoardLaneSamples(8).catch(() => ({ arriving: [], leaving: [] })),
     groomerDashboard
       ? loadTodaysAdditionalServices().catch(() => ({ date: null as string | null, services: [] as GingrAdditionalService[] }))
-      : Promise.resolve({ date: null as string | null, services: [] as GingrAdditionalService[] })
+      : Promise.resolve({ date: null as string | null, services: [] as GingrAdditionalService[] }),
+    deskFacilityFeed
+      ? loadCachedMyShiftFacilityFeed().catch(
+          () => ({ date: "", services: [], birthdays: [], syncedAt: null }) as MyShiftFacilityFeed
+        )
+      : Promise.resolve({ date: "", services: [], birthdays: [], syncedAt: null } as MyShiftFacilityFeed)
   ]);
 
   const checkingInCount = checkingIn.count || 0;
@@ -362,9 +378,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
     .sort((a, b) => severityRank(a.priority) - severityRank(b.priority))
     .slice(0, 20);
 
+  const facilityWork = deskFacilityFeed ? facilityFeedToWorkItems(cachedFacilityFeed) : [];
   const needsAttentionSource = roleWorkQueue
-    ? [...assignedLogs, ...assignedIssues]
+    ? [...facilityWork, ...assignedLogs, ...assignedIssues]
     : [
+        ...facilityWork,
         ...staffFeed.alertItems.filter((item) => item.priority === "critical" || item.priority === "high"),
         ...staffFeed.issueItems.filter((item) => item.priority === "critical" || item.priority === "high"),
         ...staffFeed.followUpItems.filter((item) => item.priority === "critical" || item.priority === "high" || dueSoon(item.dueAt)),
@@ -384,14 +402,20 @@ export async function buildOpsCommandCenterSnapshot(input: {
   }));
 
   const seenNeeds = new Set<string>();
-  const uniqueNeeds = needsAttentionRaw
-    .filter((item) => {
-      if (seenNeeds.has(item.id)) return false;
-      seenNeeds.add(item.id);
-      return true;
-    })
+  const uniqueNeedsRaw = needsAttentionRaw.filter((item) => {
+    if (seenNeeds.has(item.id)) return false;
+    seenNeeds.add(item.id);
+    return true;
+  });
+  const facilityNeeds = uniqueNeedsRaw.filter((item) => item.kind === "birthday" || item.kind === "facility_service");
+  const otherNeeds = uniqueNeedsRaw
+    .filter((item) => item.kind !== "birthday" && item.kind !== "facility_service")
     .sort((a, b) => severityRank(a.severity) - severityRank(b.severity))
     .slice(0, roleWorkQueue ? 24 : 16);
+  const uniqueNeeds = [
+    ...facilityNeeds.sort((a, b) => severityRank(a.severity) - severityRank(b.severity)),
+    ...otherNeeds
+  ];
 
   const openWorkCount = roleWorkQueue
     ? assignedLogs.length + assignedIssues.length + myTaskWork.filter((item) => dueSoon(item.dueAt)).length

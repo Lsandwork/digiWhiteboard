@@ -57,6 +57,8 @@ export function parseWorkItemId(rawId: string): { kind: WorkItemKind; sourceId: 
   if (id.startsWith("payment:")) return { kind: "payment_alert", sourceId: id.slice(8) };
   if (id.startsWith("notif:")) return { kind: "ops_notification", sourceId: id.slice(6) };
   if (id.startsWith("openlog:")) return { kind: "open_log", sourceId: id.slice(8) };
+  if (id.startsWith("birthday:")) return { kind: "birthday", sourceId: id.slice(9) };
+  if (id.startsWith("facility:")) return { kind: "facility_service", sourceId: id.slice(9) };
   return null;
 }
 
@@ -72,6 +74,9 @@ export function availableActionsForKind(kind: WorkItemKind): WorkItemAction[] {
       return ["clear", "hide", "in_progress", "resolved", "delete"];
     case "ops_notification":
       return ["clear", "hide", "resolved", "delete"];
+    case "facility_service":
+    case "birthday":
+      return [];
     default:
       return [];
   }

@@ -1,6 +1,9 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
+import { isExcludedGroomerAdditionalService } from "@/lib/ops-command-center/gingr-service-names";
+
+export { isExcludedGroomerAdditionalService } from "@/lib/ops-command-center/gingr-service-names";
 
 export type GingrAdditionalService = {
   id: string;
@@ -23,30 +26,6 @@ function pickString(...values: unknown[]): string | null {
     if (text) return text;
   }
   return null;
-}
-
-function normalizeServiceName(name?: string | null) {
-  return String(name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-/** Yard/club add-ons that should not appear on Groomer My Shift. */
-export function isExcludedGroomerAdditionalService(name?: string | null) {
-  const token = normalizeServiceName(name);
-  if (!token) return false;
-  if (/\bfree\b.*\bwalks?\b/.test(token)) return true;
-  if (/\bgroup\s+walks?\b/.test(token)) return true;
-  if (token.includes("puzzle playtime")) return true;
-  if (token.includes("private training") && token.includes("business only")) return true;
-  if (token.includes("daily enrichment") && token.includes("business only")) return true;
-  if (token.includes("club food") && token.includes("business only")) return true;
-  if (token.includes("taxi service") && token.includes("business only")) return true;
-  return false;
 }
 
 /** @deprecated use isExcludedGroomerAdditionalService */
@@ -99,7 +78,8 @@ function ownerNameFromReservation(reservation: GingrReservation) {
 
 export function additionalServicesFromReservation(
   reservation: GingrReservation,
-  date: string
+  date: string,
+  options?: { includeService?: (name: string) => boolean }
 ): GingrAdditionalService[] {
   const reservationId = pickString(reservation.reservation_id, reservation.id);
   const reservationType = pickString(
@@ -124,7 +104,11 @@ export function additionalServicesFromReservation(
         serviceId: pickString(service.id, service.service_id, service.reservation_service_id)
       };
     })
-    .filter((row) => row.serviceName && !isExcludedGroomerAdditionalService(row.serviceName) && serviceOnDate(row.service, date))
+    .filter((row) => {
+      if (!row.serviceName || !serviceOnDate(row.service, date)) return false;
+      if (options?.includeService) return options.includeService(row.serviceName);
+      return !isExcludedGroomerAdditionalService(row.serviceName);
+    })
     .map((row) => ({
       id: `svc:${reservationId || "res"}:${row.serviceId || row.serviceName}:${row.scheduledAt || date}`,
       serviceName: row.serviceName,
