@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import {
-  ADMIN_SESSION_COOKIE,
   createAdminSessionToken,
-  getAdminSessionCookieOptions,
-  getAdminSessionFromRequest
+  getAdminSessionFromRequest,
+  setAdminSessionCookie
 } from "@/lib/admin/session";
 import { isDemoSession } from "@/lib/demo/session";
 import { getAdminUserById, isAdminOrManagementRole, isFullAdminRole } from "@/lib/admin/users";
@@ -87,7 +86,7 @@ export async function POST(request: Request) {
     });
 
     const response = NextResponse.json({ ok: true, email: target.email, role: target.role });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    setAdminSessionCookie(response, token, request.headers.get("host"));
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to log in as employee.";
@@ -125,7 +124,7 @@ export async function DELETE(request: Request) {
     });
 
     const response = NextResponse.json({ ok: true, email: session.impersonatorEmail });
-    response.cookies.set(ADMIN_SESSION_COOKIE, token, getAdminSessionCookieOptions());
+    setAdminSessionCookie(response, token, request.headers.get("host"));
     return response;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to return to your account.";

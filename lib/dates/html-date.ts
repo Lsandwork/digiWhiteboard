@@ -6,7 +6,7 @@
 
 const HTML_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export function isHtmlDateValue(value: unknown): value is string {
+export function isHtmlDateValue(value: unknown): boolean {
   return typeof value === "string" && HTML_DATE.test(value.trim());
 }
 
@@ -32,7 +32,8 @@ export function pacificHtmlDate(now = new Date()): string {
 }
 
 export function htmlDateInputValue(value: unknown): string {
-  return isHtmlDateValue(value) ? value.trim() : "";
+  const raw = String(value ?? "").trim();
+  return isHtmlDateValue(raw) ? raw : "";
 }
 
 export function normalizeHtmlDateValue(value: unknown, fallback = ""): string {
