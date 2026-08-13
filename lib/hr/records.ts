@@ -16,6 +16,7 @@ export type HrRecord = {
   created_at: string;
   created_by: string | null;
   has_pdf: boolean;
+  uploaded: boolean;
   hr_tracked: boolean;
   complaint_category: string | null;
 };
@@ -63,6 +64,7 @@ export function toHrRecord(report: ManagementReport): HrRecord {
     created_at: report.created_at,
     created_by: report.created_by,
     has_pdf: Boolean(writeUp?.pdf_filename),
+    uploaded: report.source === "hr_upload",
     hr_tracked: writeUp?.hr_tracked ?? kind === "write_up",
     complaint_category: report.complaint_category
       ? getOwnerComplaintCategoryLabel(report.complaint_category)
@@ -85,10 +87,10 @@ export function buildHrHubStats(records: HrRecord[]) {
   };
 }
 
-export function formatHrReportType(type: ManagementReportType) {
+export function formatHrReportType(type: ManagementReportType, uploaded = false) {
   switch (type) {
     case "employee_write_up":
-      return "Employee Write-Up";
+      return uploaded ? "Uploaded Write-Up" : "Employee Write-Up";
     case "owner_complaint_dog_handler":
       return "Owner Complaint";
     case "groomer_complaint":
@@ -103,7 +105,7 @@ export function formatHrReportType(type: ManagementReportType) {
 export function hrRecordContextForConsult(report: ManagementReport) {
   const record = toHrRecord(report);
   const lines = [
-    `Record type: ${formatHrReportType(report.report_type)}`,
+    `Record type: ${formatHrReportType(report.report_type, report.source === "hr_upload")}`,
     `Title: ${report.title}`,
     `Subject: ${record.subject_name ?? "Unknown"}`,
     `Department: ${record.department ?? "Unknown"}`,

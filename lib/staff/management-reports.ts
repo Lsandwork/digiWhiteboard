@@ -92,7 +92,7 @@ export type ManagementReport = {
   summary: string;
   write_up_details: EmployeeWriteUpDetails | null;
   groomer_submission_details: GroomerSubmissionDetails | null;
-  source: "push_notice" | "team_lead_form" | "groomer_form" | "trainer_form";
+  source: "push_notice" | "team_lead_form" | "groomer_form" | "trainer_form" | "hr_upload";
   status: ManagementReportStatus;
   visibility: "admin_management" | "submitter_review";
   push_notice_id: string | null;
@@ -758,6 +758,119 @@ export async function createEmployeeWriteUpReport(
       detail: `${employee_department} · ${statement_of_violation}`,
       idempotencyKey: `sa-sms:write-up:${report.id}:created`,
       adminPath: "/admin?board=staff&tab=write_up_review"
+    },
+    supabase
+  );
+
+  return report;
+}
+
+export type CreateManualUploadedWriteUpInput = {
+  employee_name: string;
+  employee_department: string;
+  violation_date?: string | null;
+  documented_by?: string | null;
+  statement_of_violation?: string | null;
+  pdf_filename?: string | null;
+  pdf_generated_at?: string | null;
+};
+
+function pacificDateIso(value?: string | null) {
+  const trimmed = trimField(value, 32);
+  if (trimmed) return trimmed;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+}
+
+export async function createManualUploadedWriteUp(
+  supabase: SupabaseClient,
+  input: CreateManualUploadedWriteUpInput,
+  actor: string | null,
+  submittedByName?: string | null
+): Promise<ManagementReport> {
+  const employee_name = trimField(input.employee_name, MAX_NAME_LENGTH);
+  const employee_department = trimField(input.employee_department, 80);
+  const statement_of_violation =
+    trimField(input.statement_of_violation, MAX_FIELD_LENGTH) ||
+    "Manually uploaded write-up entered outside RuffOps. See attached file.";
+
+  if (!employee_name) throw new Error("Employee name is required.");
+  if (!employee_department) throw new Error("Employee department is required.");
+
+  const violation_date = pacificDateIso(input.violation_date);
+  const documented_by = trimField(input.documented_by, 120) || actor;
+  const write_up_details: EmployeeWriteUpDetails = {
+    employee_name,
+    employee_department,
+    violation_date,
+    violation_time: null,
+    documented_by,
+    violation_types: ["Other"],
+    violation_other: "Manually uploaded write-up",
+    statement_of_violation,
+    employee_statement: null,
+    date_of_warning: violation_date,
+    type_of_warning: "Uploaded write-up",
+    employee_number: null,
+    previous_warnings: [],
+    action_to_be_taken: null,
+    employee_signature: null,
+    employee_signature_date: null,
+    manager_signature: documented_by,
+    manager_signature_date: violation_date,
+    text_report: trimField(input.statement_of_violation, 8000) || statement_of_violation,
+    pdf_filename: trimField(input.pdf_filename, 160) || null,
+    pdf_generated_at: input.pdf_generated_at ?? null,
+    hr_tracked: true,
+    incident_date: violation_date,
+    incident_time: null,
+    incident_description: statement_of_violation,
+    corrective_action: null,
+    team_lead_signature: documented_by
+  };
+
+  const summary = `${employee_name} (${employee_department}) — uploaded write-up. ${statement_of_violation}`.slice(
+    0,
+    MAX_SUMMARY_LENGTH
+  );
+  const now = new Date().toISOString();
+  const report: ManagementReport = {
+    id: newId(),
+    report_type: "employee_write_up",
+    title: `Uploaded Write-Up — ${employee_name}`,
+    dog_handler_name: null,
+    complaint_category: null,
+    employee_name,
+    summary,
+    write_up_details,
+    groomer_submission_details: null,
+    source: "hr_upload",
+    status: "Needs Review",
+    visibility: "admin_management",
+    push_notice_id: null,
+    related_notes: "Manually uploaded write-up (entered outside RuffOps).",
+    reviewed_by: null,
+    reviewed_at: null,
+    created_by: actor,
+    submitted_by_name: trimField(submittedByName, 120) || null,
+    created_at: now,
+    updated_at: now
+  };
+
+  const state = await loadState(supabase);
+  await saveState(supabase, { reports: sortNewest([report, ...state.reports]) });
+
+  sendSuperAdminSmsAlertFireAndForget(
+    {
+      kind: "write_up",
+      title: `Write-up uploaded: ${employee_name}`,
+      detail: `${employee_department} · uploaded outside RuffOps`,
+      idempotencyKey: `sa-sms:write-up:${report.id}:uploaded`,
+      adminPath: "/admin?board=staff&tab=hr_hub"
     },
     supabase
   );

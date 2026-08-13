@@ -1,16 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, FileText, RefreshCw, Search, ShieldAlert, Trash2 } from "lucide-react";
+import { ExternalLink, FileText, RefreshCw, Search, ShieldAlert, Trash2, Upload } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { ManagementReport } from "@/lib/staff/management-reports";
+import { STAFF_DEPARTMENTS, type StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { buildHrHubStats, formatHrReportType, type HrRecord } from "@/lib/hr/records";
 
 type HubPayload = {
   records: HrRecord[];
   stats: ReturnType<typeof buildHrHubStats>;
+  currentUser?: { email: string | null; role: string | null };
 };
+
+const UPLOAD_DEPARTMENTS = [...STAFF_DEPARTMENTS, "Overnight", "Other"] as const;
 
 function formatWhen(value: string) {
   const date = new Date(value);
@@ -45,7 +49,7 @@ function HrRecordDetailModal({
     <Modal open={open} title={report.title} onClose={onClose}>
       <div className="space-y-4 text-sm">
         <div className="grid gap-2 md:grid-cols-2">
-          <p><span className="font-bold text-white">Type:</span> {formatHrReportType(report.report_type)}</p>
+          <p><span className="font-bold text-white">Type:</span> {formatHrReportType(report.report_type, report.source === "hr_upload")}</p>
           <p><span className="font-bold text-white">Status:</span> {report.admin_status ?? report.status}</p>
           <p><span className="font-bold text-white">Created:</span> {formatWhen(report.created_at)}</p>
           <p><span className="font-bold text-white">Created by:</span> {report.created_by ?? "—"}</p>
@@ -66,7 +70,7 @@ function HrRecordDetailModal({
                 download={writeUp.pdf_filename}
               >
                 <FileText className="h-4 w-4" />
-                Download warning notice PDF
+                {report.source === "hr_upload" ? "Download uploaded write-up" : "Download warning notice PDF"}
               </a>
             ) : null}
           </div>
@@ -97,6 +101,17 @@ export function HrHubPanel({
   const [detailOpen, setDetailOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const lastSelectedRowIndexRef = useRef<number | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [directory, setDirectory] = useState<StaffDirectoryMember[]>([]);
+  const [uploadForm, setUploadForm] = useState({
+    employee_name: "",
+    employee_department: "",
+    violation_date: "",
+    documented_by: "",
+    notes: ""
+  });
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -116,6 +131,25 @@ export function HrHubPanel({
     const timer = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
+        if (!response.ok) return;
+        const body = await response.json();
+        if (cancelled) return;
+        const members = Array.isArray(body.staff_directory) ? (body.staff_directory as StaffDirectoryMember[]) : [];
+        setDirectory(members.filter((member) => member.status === "Active"));
+      } catch {
+        // Directory picker is optional; names can still be typed.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const records = data?.records ?? [];
@@ -170,6 +204,74 @@ export function HrHubPanel({
     },
     [pageRowIds]
   );
+
+  function openUploadModal() {
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).format(new Date());
+    setUploadForm({
+      employee_name: "",
+      employee_department: "",
+      violation_date: today,
+      documented_by: data?.currentUser?.email ?? "",
+      notes: ""
+    });
+    setUploadFile(null);
+    setUploadOpen(true);
+  }
+
+  function chooseDirectoryEmployee(name: string) {
+    const member = directory.find((entry) => entry.name === name);
+    setUploadForm((current) => ({
+      ...current,
+      employee_name: name,
+      employee_department: member?.department || current.employee_department
+    }));
+  }
+
+  async function submitUpload() {
+    if (!uploadFile) {
+      showToast("Choose a write-up file to upload.", "error");
+      return;
+    }
+    if (!uploadForm.employee_name.trim()) {
+      showToast("Employee name is required.", "error");
+      return;
+    }
+    if (!uploadForm.employee_department.trim()) {
+      showToast("Employee department is required.", "error");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.set("file", uploadFile);
+      form.set("employee_name", uploadForm.employee_name.trim());
+      form.set("employee_department", uploadForm.employee_department.trim());
+      form.set("violation_date", uploadForm.violation_date.trim());
+      form.set("documented_by", uploadForm.documented_by.trim());
+      form.set("notes", uploadForm.notes.trim());
+
+      const response = await fetch("/api/admin/hr/upload-write-up", {
+        method: "POST",
+        body: form
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to upload write-up.");
+      showToast("Uploaded write-up added to HR Records.", "success");
+      setUploadOpen(false);
+      setUploadFile(null);
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to upload write-up.", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   async function openDetail(id: string) {
     try {
@@ -274,13 +376,23 @@ export function HrHubPanel({
         <div>
           <h2 className="admin-page-title">HR Records</h2>
           <p className="admin-page-subtitle">
-            All employee write-ups and workplace complaints in one place — write-ups, owner complaints, groomer and trainer complaints.
+            All employee write-ups and workplace complaints in one place — including paper write-ups entered outside RuffOps.
           </p>
         </div>
-        <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" onClick={() => void load()} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary inline-flex items-center gap-2"
+            onClick={openUploadModal}
+          >
+            <Upload className="h-4 w-4" />
+            Upload write-up
+          </button>
+          <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       {stats ? (
@@ -460,8 +572,10 @@ export function HrHubPanel({
                       />
                     </td>
                     <td>
-                      <span className={kindBadge(record.kind)}>{record.kind === "write_up" ? "Write-Up" : "Complaint"}</span>
-                      <p className="mt-1 text-xs text-admin-muted">{formatHrReportType(record.report_type)}</p>
+                      <span className={kindBadge(record.kind)}>
+                        {record.kind === "write_up" ? (record.uploaded ? "Uploaded" : "Write-Up") : "Complaint"}
+                      </span>
+                      <p className="mt-1 text-xs text-admin-muted">{formatHrReportType(record.report_type, record.uploaded)}</p>
                     </td>
                     <td>
                       <p className="font-bold text-white">{record.subject_name ?? "—"}</p>
@@ -507,6 +621,109 @@ export function HrHubPanel({
       </section>
 
       <HrRecordDetailModal report={detailReport} open={detailOpen} onClose={() => setDetailOpen(false)} />
+
+      <Modal
+        open={uploadOpen}
+        title="Upload write-up"
+        description="Use this for write-ups that were entered manually instead of creating them in RuffOps."
+        onClose={() => !uploading && setUploadOpen(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--ghost"
+              disabled={uploading}
+              onClick={() => setUploadOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--primary inline-flex items-center gap-2"
+              disabled={uploading}
+              onClick={() => void submitUpload()}
+            >
+              <Upload className="h-4 w-4" />
+              {uploading ? "Uploading…" : "Upload write-up"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm">
+          <label className="block space-y-1">
+            <span className="font-bold text-white">Employee</span>
+            <input
+              className="crossover-input w-full"
+              list="hr-upload-employees"
+              value={uploadForm.employee_name}
+              onChange={(event) => chooseDirectoryEmployee(event.target.value)}
+              placeholder="Name on the paper write-up"
+            />
+            <datalist id="hr-upload-employees">
+              {directory.map((member) => (
+                <option key={member.id} value={member.name} />
+              ))}
+            </datalist>
+          </label>
+
+          <label className="block space-y-1">
+            <span className="font-bold text-white">Department</span>
+            <select
+              className="crossover-input w-full"
+              value={uploadForm.employee_department}
+              onChange={(event) => setUploadForm((current) => ({ ...current, employee_department: event.target.value }))}
+            >
+              <option value="">Select department</option>
+              {UPLOAD_DEPARTMENTS.map((department) => (
+                <option key={department} value={department}>
+                  {department}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="block space-y-1">
+              <span className="font-bold text-white">Date of write-up</span>
+              <input
+                className="crossover-input w-full"
+                type="date"
+                value={uploadForm.violation_date}
+                onChange={(event) => setUploadForm((current) => ({ ...current, violation_date: event.target.value }))}
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="font-bold text-white">Documented by</span>
+              <input
+                className="crossover-input w-full"
+                value={uploadForm.documented_by}
+                onChange={(event) => setUploadForm((current) => ({ ...current, documented_by: event.target.value }))}
+              />
+            </label>
+          </div>
+
+          <label className="block space-y-1">
+            <span className="font-bold text-white">Notes (optional)</span>
+            <textarea
+              className="crossover-input min-h-[88px] w-full"
+              value={uploadForm.notes}
+              onChange={(event) => setUploadForm((current) => ({ ...current, notes: event.target.value }))}
+              placeholder="Short context if the scan doesn’t include it"
+            />
+          </label>
+
+          <label className="block space-y-1">
+            <span className="font-bold text-white">Write-up file</span>
+            <input
+              className="crossover-input w-full"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*"
+              onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+            />
+            <p className="text-xs text-admin-muted">PDF or image, 8 MB or smaller.</p>
+          </label>
+        </div>
+      </Modal>
     </div>
   );
 }
