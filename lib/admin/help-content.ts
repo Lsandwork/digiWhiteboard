@@ -230,7 +230,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Primary tabs: My Shift, Ops Command Center, Yard Command, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
       "My Shift Needs Attention shows Open Log and Active Issues assigned to you. Previous Team Lead notes from Team Log replace Live board on My Shift.",
-      "Fitdog Alerts (app.fitdog.com payments) are not on Team Lead accounts. Coordinator accounts that also have a Team Lead role stay unchanged.",
+      "Fitdog Alerts (app.fitdog.com payments) are not on the Team Lead dashboard. Coordinator dashboards, including a coordinator who also has a Team Lead account, stay unchanged.",
       "Floor Ops covers Team Log, follow-ups, active issues, walks, and photo upload.",
       "Whiteboard covers Standard Notices, Yard Camera Push, Grooming Push, and Live Preview.",
       "Apps covers Route Generator, Gingr, and Ruffly."
@@ -305,7 +305,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     steps: [
       "Open Staff → My Shift (your role homepage) or Ops Command Center (management live floor view).",
       "Review Needs Attention, My Tasks, Alerts, and live arriving/leaving counts.",
-      "Team Lead (Team Lead department only): Needs Attention shows Open Log + Active Issues assigned to you, and My Shift shows previous Team Lead notes from Team Log instead of Live board. Fitdog / sports-app payment alerts stay off this login. Coordinator logins are unchanged.",
+      "Team Lead dashboard: Needs Attention shows Open Log + Active Issues assigned to you, and My Shift shows previous Team Lead notes from Team Log instead of Live board. Fitdog / sports-app payment alerts stay off this login. Coordinator dashboards are unchanged.",
       "Check the Gingr pill — Connected means recent webhook or live dog sync activity; Disconnected means no fresh Gingr activity.",
       "Use role tools (Front Desk Command, Yard Command, Driver Mode, Overnight, Trainer Ops, System Health, Shift Handoff) when your login includes them.",
       "Find a Dog searches Digi-Board ops records — open Gingr for reservations, packages, and billing."
@@ -806,7 +806,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
       "Your sidebar is cleaned: primary tabs plus Floor Ops, Whiteboard, and Apps hubs (see “Where did my menu items go?”).",
       "Start from My Shift / Front Desk Command or Yard Command for live dogs and Gingr connection status.",
-      "Team Lead department logins: My Shift Needs Attention is assigned Open Log + Active Issues, plus previous Team Lead Team Log notes. Coordinator logins still see the full desk view including Fitdog Alerts.",
+      "Team Lead dashboard: My Shift Needs Attention is assigned Open Log + Active Issues, plus previous Team Lead Team Log notes. Coordinator dashboards still see the full desk view including Fitdog Alerts.",
       "Open Floor Ops for Team Log, Owner Follow Up, Active Issues, Walks Board, and photos.",
       "Open Whiteboard for Push Notices and related live alerts; open Apps for Route Generator / Gingr / Ruffly when enabled.",
       "Staff Directory is view-only for Front Desk — search and review staff, but you cannot add, edit, or delete directory rows.",

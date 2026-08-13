@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { accessFromLegacyRole } from "../lib/admin/permissions";
-import { isYardTeamLeadUser } from "../lib/admin/team-lead-profile";
+import { isTeamLeadDashboardUser } from "../lib/admin/team-lead-profile";
 import {
   assignedActiveIssues,
   assignedOpenLogMessages,
@@ -23,45 +23,54 @@ const dualAccess = {
 };
 
 assert.equal(
-  isYardTeamLeadUser({
+  isTeamLeadDashboardUser({
     legacyRole: "team_leader",
     access: tlAccess,
-    directoryDepartment: "Team Lead"
+    dashboardRole: "team_leader"
   }),
   true
 );
 assert.equal(
-  isYardTeamLeadUser({
+  isTeamLeadDashboardUser({
     legacyRole: "team_leader",
-    access: tlAccess,
-    directoryDepartment: null
+    access: tlAccess
   }),
   true
 );
 assert.equal(
-  isYardTeamLeadUser({
+  isTeamLeadDashboardUser({
     legacyRole: "team_leader",
     access: tlAccess,
-    directoryDepartment: "Front Desk"
+    dashboardRole: "team_leader"
   }),
-  false
+  true
 );
 assert.equal(
-  isYardTeamLeadUser({
-    legacyRole: "front_desk_coordinator",
-    access: coordinatorAccess,
-    directoryDepartment: "Front Desk"
-  }),
-  false
-);
-assert.equal(
-  isYardTeamLeadUser({
-    legacyRole: "team_leader",
-    access: dualAccess,
-    directoryDepartment: "Team Lead"
+  isTeamLeadDashboardUser({
+    legacyRole: "admin",
+    access: accessFromLegacyRole("a1", "admin@fitdog.test", "manager_admin"),
+    dashboardRole: "team_leader"
   }),
   false,
-  "coordinator + team lead dual accounts stay unchanged"
+  "non-Team-Lead dashboards stay unchanged even if directory dashboard_role is team_leader"
+);
+assert.equal(
+  isTeamLeadDashboardUser({
+    legacyRole: "front_desk_coordinator",
+    access: coordinatorAccess,
+    dashboardRole: "team_leader"
+  }),
+  false,
+  "coordinator dashboard stays unchanged even if a Team Lead account exists"
+);
+assert.equal(
+  isTeamLeadDashboardUser({
+    legacyRole: "team_leader",
+    access: dualAccess,
+    dashboardRole: "team_leader"
+  }),
+  false,
+  "coordinator + team lead dual logins stay unchanged"
 );
 
 const actor = { name: "Halle", email: "halle@fitdog.test", directoryName: "Halle" };

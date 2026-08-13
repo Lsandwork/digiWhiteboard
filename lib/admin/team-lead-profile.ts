@@ -1,7 +1,24 @@
 import type { UserAccess } from "@/lib/admin/permissions";
 import { FRONT_DESK_DEPARTMENT, TEAM_LEAD_DEPARTMENT } from "@/lib/staff/admin-ops";
 
-/** Staff-directory / assignment labels that mean Team Lead department (not Front Desk). */
+function normalizeDashboardRole(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+export function isTeamLeadDashboardRole(value?: string | null) {
+  const token = normalizeDashboardRole(value);
+  return token === "team_leader" || token === "team_lead";
+}
+
+export function isCoordinatorDashboardRole(value?: string | null) {
+  const token = normalizeDashboardRole(value);
+  return token === "front_desk_coordinator" || token === "front_desk";
+}
+
+/** Staff-directory / assignment labels that mean Team Lead (not Front Desk). */
 export function isTeamLeadDepartmentLabel(value?: string | null) {
   const token = String(value || "").trim().toLowerCase();
   if (!token) return false;
@@ -22,33 +39,33 @@ export function isFrontDeskDepartmentLabel(value?: string | null) {
 }
 
 /**
- * Pure yard Team Lead: team_leader role + Team Lead department.
- * Coordinators (including a coordinator who also holds a team-lead role) stay unchanged.
+ * Team Lead dashboard login: active Team Lead role/dashboard.
+ * Coordinator dashboards stay unchanged, including a coordinator who also has a separate Team Lead account.
  */
-export function isYardTeamLeadUser(input: {
+export function isTeamLeadDashboardUser(input: {
   legacyRole?: string | null;
   access?: UserAccess | null;
-  directoryDepartment?: string | null;
+  dashboardRole?: string | null;
 }): boolean {
   const roles = input.access?.roles || [];
   const primary = input.access?.primaryRole || null;
   const legacy = String(input.legacyRole || "").trim();
 
-  if (legacy === "front_desk_coordinator" || primary === "front_desk_coordinator") return false;
+  if (isCoordinatorDashboardRole(legacy) || isCoordinatorDashboardRole(primary)) return false;
   if (roles.includes("front_desk_coordinator")) return false;
 
-  const isTeamLeadRole =
-    legacy === "team_leader" || primary === "team_leader" || roles.includes("team_leader");
-  if (!isTeamLeadRole) return false;
+  // Active Team Lead dashboard/login only. Directory department is ignored.
+  return isTeamLeadDashboardRole(legacy) || isTeamLeadDashboardRole(primary);
+}
 
-  const dept = input.directoryDepartment;
-  if (dept && String(dept).trim()) {
-    if (isFrontDeskDepartmentLabel(dept) && !isTeamLeadDepartmentLabel(dept)) return false;
-    return isTeamLeadDepartmentLabel(dept);
-  }
-
-  // No directory row: team_leader without coordinator role defaults to Team Lead department.
-  return true;
+/** @deprecated use isTeamLeadDashboardUser — kept so older call sites keep compiling. */
+export function isYardTeamLeadUser(input: {
+  legacyRole?: string | null;
+  access?: UserAccess | null;
+  dashboardRole?: string | null;
+  directoryDepartment?: string | null;
+}) {
+  return isTeamLeadDashboardUser(input);
 }
 
 export { TEAM_LEAD_DEPARTMENT };
