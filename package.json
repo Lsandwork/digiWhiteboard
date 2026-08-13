@@ -59,6 +59,7 @@
     "test:ops-alert": "tsx scripts/test-ops-alert.ts",
     "test:write-up-access": "tsx scripts/test-write-up-access.ts",
     "test:hr-upload-write-up": "tsx scripts/test-hr-upload-write-up.ts",
+    "test:hr-consult-upload-scan": "tsx scripts/test-hr-consult-upload-scan.ts",
     "test:help-center-roles": "tsx scripts/test-help-center-roles.ts",
     "test:handler-checklist-daily": "tsx scripts/test-handler-checklist-daily.ts",
     "test:photo-upload-queue": "tsx scripts/test-photo-upload-queue.ts",

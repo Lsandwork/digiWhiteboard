@@ -115,6 +115,16 @@ export function hrRecordContextForConsult(report: ManagementReport) {
     `Summary: ${report.summary}`
   ];
 
+  if (report.source === "hr_upload") {
+    lines.push(
+      "",
+      "This is a manually uploaded write-up entered outside RuffOps. Scan the attached original file for the full context before advising."
+    );
+    if (report.write_up_details?.pdf_filename) {
+      lines.push(`Attached file: ${report.write_up_details.pdf_filename}`);
+    }
+  }
+
   if (report.write_up_details?.text_report) {
     lines.push("", "Full write-up text:", report.write_up_details.text_report);
   } else if (report.write_up_details?.statement_of_violation) {

@@ -23,7 +23,7 @@ function buildSystemInstruction(settings: AdminGlobalSettings) {
 Your job:
 - Help management think through write-ups, complaints, documentation, and next steps.
 - Ground guidance in California employment context (city: ${settings.hr_company_city}, state: ${settings.hr_company_region}).
-- ENGAGE before you advise: understand the situation with thoughtful follow-up questions.
+- ENGAGE before you advise on a blank topic. If a scanned/uploaded write-up is attached, read it first and lead with the best recommendation.
 - Offer practical options when asked — conversation scripts, documentation tips, escalation paths — without being preachy.
 
 Fitdog roles (critical — do not confuse these):
@@ -39,6 +39,13 @@ Response style — CRITICAL:
 - Plain text ONLY: never use markdown (no **, *, ***, # headers). No "Written Warning:" template blocks unless they asked you to draft one.
 - Sound like a senior HRBP over coffee — educated, calm, human — not a compliance memo.
 - Bullets only if the manager asked for a list; otherwise use short paragraphs.
+
+When an uploaded/scanned write-up file is attached:
+- Read every page. OCR handwritten notes if needed.
+- Extract employee, department, dates, violation type(s), prior warnings, statements, signatures, and anything unclear.
+- Then recommend the BEST next step for Fitdog managers and admins: coaching, documented conversation, written warning, PIP, investigation, or document-only — and why.
+- Give practical advice: what to say, what to document, who to involve (Team Lead vs Management vs Super Admin), and any California caution that actually matters.
+- Do not invent facts that are not in the document or the HR record metadata.
 
 Hard boundaries:
 - You are NOT a lawyer. Mention that naturally once when legal risk is real — not as a footer every time.
@@ -58,7 +65,8 @@ async function sendWithModel(
   modelName: string,
   settings: AdminGlobalSettings,
   history: HrConsultMessage[],
-  userMessage: string
+  userMessage: string,
+  attachment?: { mimeType: string; base64: string } | null
 ) {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
@@ -70,7 +78,14 @@ async function sendWithModel(
     history: historyToGemini(history)
   });
 
-  const result = await chat.sendMessage(userMessage);
+  const parts = attachment
+    ? [
+        { inlineData: { mimeType: attachment.mimeType, data: attachment.base64 } },
+        { text: userMessage }
+      ]
+    : userMessage;
+
+  const result = await chat.sendMessage(parts);
   const text = result.response.text()?.trim();
   if (!text) throw new Error("Gemini returned an empty response. Please try again.");
   return stripMarkdownFormatting(text);
@@ -81,6 +96,7 @@ export async function consultGeminiHr(params: {
   history: HrConsultMessage[];
   userMessage: string;
   recordContext?: string | null;
+  attachment?: { mimeType: string; base64: string; filename?: string } | null;
 }) {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) {
@@ -90,17 +106,22 @@ export async function consultGeminiHr(params: {
     throw new Error("HR Consult is disabled in Settings.");
   }
 
+  const scannedWriteUp = Boolean(params.attachment);
   const contextBlock = params.recordContext
     ? `\n\n---\nContext from an HR record the manager attached:\n${params.recordContext}\n---\n`
+    : "";
+  const scanBlock = scannedWriteUp
+    ? `\nThe original uploaded write-up file (${params.attachment?.filename || "attachment"}) is attached. Scan it fully before you advise.\n`
     : "";
 
   const priorUserTurns = params.history.filter((message) => message.role === "user").length;
   const styleHint = buildConversationalStyleHint({
     userMessage: params.userMessage,
-    priorUserTurns
+    priorUserTurns,
+    scannedWriteUp
   });
 
-  const message = `${contextBlock}${params.userMessage.trim()}\n\n[Style for this turn: ${styleHint}]`.trim();
+  const message = `${contextBlock}${scanBlock}${params.userMessage.trim()}\n\n[Style for this turn: ${styleHint}]`.trim();
   const primaryModel = resolveGeminiModel(params.settings.hr_consult_model);
   const models = geminiModelRetryChain(primaryModel);
   let lastError: unknown;
@@ -108,7 +129,16 @@ export async function consultGeminiHr(params: {
   for (let index = 0; index < models.length; index += 1) {
     const modelName = models[index]!;
     try {
-      return await sendWithModel(apiKey, modelName, params.settings, params.history, message);
+      return await sendWithModel(
+        apiKey,
+        modelName,
+        params.settings,
+        params.history,
+        message,
+        params.attachment
+          ? { mimeType: params.attachment.mimeType, base64: params.attachment.base64 }
+          : null
+      );
     } catch (error) {
       lastError = error;
       console.error(`[hr-consult] Gemini model failed: ${modelName}`, error);
