@@ -6,6 +6,7 @@ import { canAccessHrPanelsForUser } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { assertHrWriteUpUploadFile } from "@/lib/hr/upload-write-up";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import { toHrRecord } from "@/lib/hr/records";
 import { dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
 import { createManualUploadedWriteUp, updateManagementReport } from "@/lib/staff/management-reports";
@@ -98,7 +99,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, report, record: toHrRecord(report) });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to upload write-up.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: humanizeUnknownError(error, "Unable to upload write-up.") },
+      { status: 400 }
+    );
   }
 }

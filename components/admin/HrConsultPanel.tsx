@@ -5,6 +5,7 @@ import { Loader2, MessageCircleHeart, Paperclip, RotateCcw, Send, Sparkles, X } 
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { HrConsultMessage } from "@/lib/hr/consult-store";
 import { UPLOADED_WRITE_UP_SCAN_PROMPT } from "@/lib/hr/write-up-consult-copy";
+import { humanizeUnknownError } from "@/lib/safe-url";
 
 type ConsultSettings = {
   hr_consult_enabled: boolean;
@@ -56,7 +57,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
       if (!response.ok) throw new Error(body.error ?? "Unable to load HR Consult.");
       setPayload(body as ConsultPayload);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load HR Consult.", "error");
+      showToast(humanizeUnknownError(error, "Unable to load HR Consult."), "error");
     } finally {
       setLoading(false);
     }
@@ -133,7 +134,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
           : current
       );
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to send message.", "error");
+      showToast(humanizeUnknownError(error, "Unable to send message."), "error");
       setDraft(trimmed);
     } finally {
       setSending(false);
@@ -162,7 +163,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
       setPayload((current) => (current ? { ...current, thread: body.thread } : current));
       showToast("Conversation cleared.", "info");
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to clear conversation.", "error");
+      showToast(humanizeUnknownError(error, "Unable to clear conversation."), "error");
     }
   }
 

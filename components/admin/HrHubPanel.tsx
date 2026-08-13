@@ -7,6 +7,8 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { ManagementReport } from "@/lib/staff/management-reports";
 import { STAFF_DEPARTMENTS, type StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import { buildHrHubStats, formatHrReportType, type HrRecord } from "@/lib/hr/records";
+import { isHtmlDateValue, normalizeHtmlDateValue, pacificHtmlDate } from "@/lib/dates/html-date";
+import { humanizeUnknownError } from "@/lib/safe-url";
 
 type HubPayload = {
   records: HrRecord[];
@@ -206,16 +208,10 @@ export function HrHubPanel({
   );
 
   function openUploadModal() {
-    const today = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Los_Angeles",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit"
-    }).format(new Date());
     setUploadForm({
       employee_name: "",
       employee_department: "",
-      violation_date: today,
+      violation_date: pacificHtmlDate(),
       documented_by: data?.currentUser?.email ?? "",
       notes: ""
     });
@@ -252,7 +248,7 @@ export function HrHubPanel({
       form.set("file", uploadFile);
       form.set("employee_name", uploadForm.employee_name.trim());
       form.set("employee_department", uploadForm.employee_department.trim());
-      form.set("violation_date", uploadForm.violation_date.trim());
+      form.set("violation_date", normalizeHtmlDateValue(uploadForm.violation_date, pacificHtmlDate()));
       form.set("documented_by", uploadForm.documented_by.trim());
       form.set("notes", uploadForm.notes.trim());
 
@@ -267,7 +263,7 @@ export function HrHubPanel({
       setUploadFile(null);
       await load();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to upload write-up.", "error");
+      showToast(humanizeUnknownError(error, "Unable to upload write-up."), "error");
     } finally {
       setUploading(false);
     }
@@ -649,7 +645,14 @@ export function HrHubPanel({
           </>
         }
       >
-        <div className="space-y-4 text-sm">
+        <form
+          className="space-y-4 text-sm"
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitUpload();
+          }}
+        >
           <label className="block space-y-1">
             <span className="font-bold text-white">Employee</span>
             <input
@@ -688,8 +691,13 @@ export function HrHubPanel({
               <input
                 className="crossover-input w-full"
                 type="date"
-                value={uploadForm.violation_date}
-                onChange={(event) => setUploadForm((current) => ({ ...current, violation_date: event.target.value }))}
+                value={isHtmlDateValue(uploadForm.violation_date) ? uploadForm.violation_date : ""}
+                onChange={(event) =>
+                  setUploadForm((current) => ({
+                    ...current,
+                    violation_date: normalizeHtmlDateValue(event.target.value, "")
+                  }))
+                }
               />
             </label>
             <label className="block space-y-1">
@@ -722,7 +730,7 @@ export function HrHubPanel({
             />
             <p className="text-xs text-admin-muted">PDF or image, 8 MB or smaller.</p>
           </label>
-        </div>
+        </form>
       </Modal>
     </div>
   );

@@ -70,8 +70,14 @@ export function geminiUserFacingError(error: unknown): string {
   if (isGeminiModelNotFoundError(error)) {
     return "HR Consult could not reach Gemini right now. Please try again in a moment.";
   }
+  if (error instanceof Error && /re-upload the write-up/i.test(error.message)) {
+    return error.message;
+  }
   if (error instanceof Error && error.message.includes("disabled")) {
     return error.message;
+  }
+  if (error instanceof Error && /did not match the expected pattern/i.test(error.message)) {
+    return "Sam could not read that write-up file. Re-upload it as a PDF or photo and try Consult again.";
   }
   return "Sam could not respond just now. Please try again — if it keeps happening, check GEMINI_API_KEY and GEMINI_MODEL in Vercel.";
 }

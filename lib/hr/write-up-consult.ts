@@ -1,4 +1,4 @@
-import { inferHrWriteUpUploadContentType } from "@/lib/hr/upload-write-up";
+import { geminiInlineMimeForWriteUp } from "@/lib/hr/upload-write-up";
 import { isUploadedHrWriteUp } from "@/lib/hr/write-up-consult-copy";
 import { getWriteUpPdfBytes } from "@/lib/staff/write-up-pdf-store";
 
@@ -18,8 +18,10 @@ export async function loadHrConsultWriteUpAttachment(
 ): Promise<HrConsultWriteUpAttachment | null> {
   const file = await getWriteUpPdfBytes(supabase, reportId);
   if (!file?.bytes?.length) return null;
-  const mimeType =
-    inferHrWriteUpUploadContentType(file.filename, file.content_type) || file.content_type || "application/pdf";
+  const mimeType = geminiInlineMimeForWriteUp(file.filename, file.content_type);
+  if (!mimeType) {
+    throw new Error("Sam can scan PDF, JPEG, PNG, WEBP, or HEIC. Re-upload the write-up as a photo or PDF.");
+  }
   return {
     filename: file.filename,
     mimeType,

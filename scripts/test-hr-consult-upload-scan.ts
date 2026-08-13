@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildConversationalStyleHint } from "../lib/ai/sanitizeAiText";
+import { geminiUserFacingError } from "../lib/hr/gemini-config";
 import { isUploadedHrWriteUp, UPLOADED_WRITE_UP_SCAN_PROMPT } from "../lib/hr/write-up-consult-copy";
 import { hrRecordContextForConsult } from "../lib/hr/records";
 import type { ManagementReport } from "../lib/staff/management-reports";
@@ -74,6 +75,15 @@ assert.equal(
 }
 
 {
+  assert.match(
+    geminiUserFacingError(new Error("The string did not match the expected pattern.")),
+    /Re-upload it as a PDF or photo/i
+  );
+  const loader = readFileSync(join(process.cwd(), "lib/hr/write-up-consult.ts"), "utf8");
+  assert.match(loader, /geminiInlineMimeForWriteUp/);
+}
+
+{
   const route = readFileSync(join(process.cwd(), "app/api/admin/hr-consult/route.ts"), "utf8");
   assert.match(route, /isUploadedHrWriteUp/);
   assert.match(route, /loadHrConsultWriteUpAttachment/);
@@ -84,6 +94,7 @@ assert.equal(
   const panel = readFileSync(join(process.cwd(), "components/admin/HrConsultPanel.tsx"), "utf8");
   assert.match(panel, /UPLOADED_WRITE_UP_SCAN_PROMPT/);
   assert.match(panel, /Sam will scan the file/);
+  assert.match(panel, /humanizeUnknownError/);
 }
 
 assert.match(UPLOADED_WRITE_UP_SCAN_PROMPT, /best next step/i);

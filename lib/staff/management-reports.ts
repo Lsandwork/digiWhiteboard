@@ -1,6 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 import { displayActorLabel, loadActorNameLookup, looksLikeEmail } from "@/lib/admin/actor-display";
+import { normalizeHtmlDateValue, pacificHtmlDate } from "@/lib/dates/html-date";
 import type { OwnerComplaintCategory } from "@/lib/staff/push-notices";
 import { getOwnerComplaintCategoryLabel } from "@/lib/staff/push-notices";
 import { sendSuperAdminSmsAlertFireAndForget } from "@/lib/staff/super-admin-sms";
@@ -776,14 +777,7 @@ export type CreateManualUploadedWriteUpInput = {
 };
 
 function pacificDateIso(value?: string | null) {
-  const trimmed = trimField(value, 32);
-  if (trimmed) return trimmed;
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
+  return normalizeHtmlDateValue(trimField(value, 32), pacificHtmlDate());
 }
 
 export async function createManualUploadedWriteUp(

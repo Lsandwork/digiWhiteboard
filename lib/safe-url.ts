@@ -3,6 +3,19 @@
  * "The string did not match the expected pattern."
  */
 
+const SAFARI_PATTERN_ERROR = /did not match the expected pattern/i;
+
+export function isSafariPatternError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return SAFARI_PATTERN_ERROR.test(message);
+}
+
+export function humanizeUnknownError(error: unknown, fallback: string): string {
+  if (isSafariPatternError(error)) return fallback;
+  const message = error instanceof Error ? error.message.trim() : "";
+  return message || fallback;
+}
+
 function trimValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }

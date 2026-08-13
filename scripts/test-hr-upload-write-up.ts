@@ -3,15 +3,22 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   assertHrWriteUpUploadFile,
+  geminiInlineMimeForWriteUp,
   inferHrWriteUpUploadContentType,
   sanitizeHrWriteUpUploadFilename
 } from "../lib/hr/upload-write-up";
+import { isHtmlDateValue, normalizeHtmlDateValue, pacificHtmlDate } from "../lib/dates/html-date";
+import { humanizeUnknownError } from "../lib/safe-url";
 
 {
   assert.equal(inferHrWriteUpUploadContentType("scan.pdf", "application/pdf"), "application/pdf");
   assert.equal(inferHrWriteUpUploadContentType("photo.JPG", "image/jpeg"), "image/jpeg");
   assert.equal(inferHrWriteUpUploadContentType("write-up.png", ""), "image/png");
+  assert.equal(inferHrWriteUpUploadContentType("photo.jpg", "image/jpg"), "image/jpeg");
+  assert.equal(inferHrWriteUpUploadContentType("scan.pdf", "application/pdf; charset=binary"), "application/pdf");
   assert.equal(inferHrWriteUpUploadContentType("notes.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), null);
+  assert.equal(geminiInlineMimeForWriteUp("scan.HEIC", "image/heic"), "image/heic");
+  assert.equal(geminiInlineMimeForWriteUp("notes.docx", ""), null);
 }
 
 {
@@ -39,10 +46,25 @@ import {
 }
 
 {
+  const today = pacificHtmlDate();
+  assert.equal(isHtmlDateValue(today), true);
+  assert.equal(normalizeHtmlDateValue("2026/08/13"), "2026-08-13");
+  assert.equal(normalizeHtmlDateValue("8/13/2026"), "2026-08-13");
+  assert.equal(normalizeHtmlDateValue("\u20662026\u2069-\u206608\u2069-\u206613\u2069"), "2026-08-13");
+  assert.equal(isHtmlDateValue("2026/08/13"), false);
+  assert.equal(
+    humanizeUnknownError(new Error("The string did not match the expected pattern."), "Unable to upload write-up."),
+    "Unable to upload write-up."
+  );
+}
+
+{
   const panel = readFileSync(join(process.cwd(), "components/admin/HrHubPanel.tsx"), "utf8");
   assert.match(panel, /Upload write-up/);
   assert.match(panel, /\/api\/admin\/hr\/upload-write-up/);
   assert.match(panel, /entered outside RuffOps|entered manually/);
+  assert.match(panel, /pacificHtmlDate/);
+  assert.match(panel, /noValidate/);
 }
 
 {
