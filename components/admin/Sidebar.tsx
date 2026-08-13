@@ -27,6 +27,7 @@ import {
 const tabLabels = Object.fromEntries(ADMIN_TABS.map((tab) => [tab, getTabLabel(tab)])) as Record<AdminTab, string>;
 
 function sidebarPanelTitle(role?: string | null) {
+  if (role === "owner_admin") return "Super Admin";
   if (isTeamLeaderRole(role)) return "Team Lead Panel";
   if (isGroomerRole(role)) return "Groomer Panel";
   if (isTrainerRole(role)) return "Trainer Panel";
@@ -34,6 +35,7 @@ function sidebarPanelTitle(role?: string | null) {
 }
 
 function sidebarPanelSubtitle(role?: string | null) {
+  if (role === "owner_admin") return "Clean menu · hubs inside";
   if (isTeamLeaderRole(role)) return "Front Desk";
   if (isGroomerRole(role)) return "Grooming";
   if (isTrainerRole(role)) return "Training";

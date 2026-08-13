@@ -126,5 +126,19 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   // Distinct from Track Incidents / Active Issues (same triangle icon was confusing in the collapsed rail).
   route_generator: FITDOG_UI_PACK.browserWorld,
   ops_system_health: FITDOG_SIDEBAR_ICONS.integrations,
-  remote_cast: FITDOG_UI_PACK.castVideos
+  remote_cast: FITDOG_UI_PACK.castVideos,
+  my_shift: FITDOG_UI.dueToday,
+  ops_command_center: FITDOG_UI.openItems,
+  front_desk_command: FITDOG_UI.frontDeskLog,
+  yard_command: FITDOG_UI.videoLinks,
+  driver_mode: FITDOG_UI_PACK.browserWorld,
+  overnight_command: FITDOG_UI.urgent,
+  trainer_ops: FITDOG_UI.groomingPush,
+  shift_handoff: FITDOG_UI.frontDeskLog,
+  vip_auto_book: FITDOG_UI_PACK.ownerFollowUp,
+  sa_floor_hub: FITDOG_UI.frontDeskLog,
+  sa_whiteboard_hub: FITDOG_UI.pushNotices,
+  sa_people_hub: FITDOG_SIDEBAR_ICONS.staffDirectory,
+  sa_apps_hub: FITDOG_UI_PACK.browserWorld,
+  sa_admin_hub: FITDOG_SIDEBAR_ICONS.settings
 };

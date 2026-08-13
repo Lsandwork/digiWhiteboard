@@ -1048,6 +1048,11 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   trainer_ops: "view_my_shift",
   ops_system_health: "system_health.view",
   shift_handoff: "view_my_shift",
+  sa_floor_hub: "view_admin_panel",
+  sa_whiteboard_hub: "view_admin_panel",
+  sa_people_hub: "view_admin_panel",
+  sa_apps_hub: "view_admin_panel",
+  sa_admin_hub: "view_admin_panel",
   ms_hub: "review_management_support",
   ms_groomer_complaints: "review_management_support",
   ms_groomer_requests: "review_management_support",
@@ -1438,6 +1443,18 @@ export function canAccessAdminTab(
       roleKey === "management" ||
       roleKey === "front_desk_coordinator"
     );
+  }
+
+  // Super Admin menu hubs — only owner_admin / super_admin (not manager Admin).
+  if (
+    tab === "sa_floor_hub" ||
+    tab === "sa_whiteboard_hub" ||
+    tab === "sa_people_hub" ||
+    tab === "sa_apps_hub" ||
+    tab === "sa_admin_hub"
+  ) {
+    if (board !== "staff") return false;
+    return isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access);
   }
 
   if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
