@@ -9,6 +9,7 @@ import { appendHrConsultMessages, clearHrConsultThread, loadHrConsultThread } fr
 import { consultGeminiHr } from "@/lib/hr/gemini-consult";
 import { geminiUserFacingError, isGeminiConfigured, resolveGeminiModel } from "@/lib/hr/gemini-config";
 import { hrRecordContextForConsult, isHrRecord } from "@/lib/hr/records";
+import { isUploadedHrWriteUp, loadHrConsultWriteUpAttachment } from "@/lib/hr/write-up-consult";
 import { getManagementReportById } from "@/lib/staff/management-reports";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -78,11 +79,15 @@ export async function POST(request: Request) {
     const thread = await loadHrConsultThread(supabase, email);
 
     let recordContext: string | null = null;
+    let attachment: Awaited<ReturnType<typeof loadHrConsultWriteUpAttachment>> = null;
     const reportId = String(body.report_id ?? "").trim();
     if (reportId) {
       const report = await getManagementReportById(supabase, reportId);
       if (report && isHrRecord(report)) {
         recordContext = hrRecordContextForConsult(report);
+        if (isUploadedHrWriteUp(report)) {
+          attachment = await loadHrConsultWriteUpAttachment(supabase, report.id);
+        }
       }
     }
 
@@ -90,7 +95,8 @@ export async function POST(request: Request) {
       settings,
       history: thread.messages,
       userMessage: message,
-      recordContext
+      recordContext,
+      attachment
     });
 
     const updated = await appendHrConsultMessages(supabase, email, [
@@ -104,7 +110,11 @@ export async function POST(request: Request) {
       action: "hr.gemini.consult",
       targetType: "hr_consult",
       targetId: reportId || undefined,
-      details: { message_length: message.length, reply_length: reply.length }
+      details: {
+        message_length: message.length,
+        reply_length: reply.length,
+        scanned_upload: Boolean(attachment)
+      }
     });
 
     return NextResponse.json({

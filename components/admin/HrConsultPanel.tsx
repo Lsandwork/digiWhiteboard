@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageCircleHeart, Paperclip, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { HrConsultMessage } from "@/lib/hr/consult-store";
+import { UPLOADED_WRITE_UP_SCAN_PROMPT } from "@/lib/hr/write-up-consult-copy";
 
 type ConsultSettings = {
   hr_consult_enabled: boolean;
@@ -42,8 +43,10 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
   const [draft, setDraft] = useState("");
   const [attachedRecordId, setAttachedRecordId] = useState<string | null>(initialRecordId ?? null);
   const [attachedLabel, setAttachedLabel] = useState<string | null>(null);
+  const [attachedUploaded, setAttachedUploaded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const autoScanRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,21 +69,31 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
 
   useEffect(() => {
     if (!initialRecordId) return;
+    let cancelled = false;
     const timer = window.setTimeout(() => {
       setAttachedRecordId(initialRecordId);
       void (async () => {
-      try {
-        const response = await fetch(`/api/admin/hr?id=${encodeURIComponent(initialRecordId)}`, { cache: "no-store" });
-        const body = await response.json();
-        if (!response.ok) return;
-        const report = body.report as { title?: string; report_type?: string };
-        setAttachedLabel(report.title ?? "Attached HR record");
-      } catch {
-        setAttachedLabel("Attached HR record");
-      }
+        try {
+          const response = await fetch(`/api/admin/hr?id=${encodeURIComponent(initialRecordId)}`, { cache: "no-store" });
+          const body = await response.json();
+          if (!response.ok || cancelled) return;
+          const report = body.report as { title?: string; source?: string; report_type?: string };
+          const uploaded = report?.source === "hr_upload" || Boolean(body.record?.uploaded);
+          setAttachedUploaded(uploaded);
+          setAttachedLabel(
+            uploaded
+              ? `${report.title ?? "Uploaded write-up"} · Sam will scan the file`
+              : (report.title ?? "Attached HR record")
+          );
+        } catch {
+          if (!cancelled) setAttachedLabel("Attached HR record");
+        }
       })();
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [initialRecordId]);
 
   useEffect(() => {
@@ -96,7 +109,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
     return `${hr_company_city}, ${hr_company_region}`;
   }, [payload]);
 
-  async function sendMessage(text: string) {
+  const sendMessage = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || sending) return;
 
@@ -126,7 +139,15 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
       setSending(false);
       inputRef.current?.focus();
     }
-  }
+  }, [attachedRecordId, sending, showToast]);
+
+  useEffect(() => {
+    if (!attachedUploaded || !attachedRecordId || !ready || loading || sending) return;
+    if (autoScanRef.current) return;
+    if ((payload?.thread.messages.length ?? 0) > 0) return;
+    autoScanRef.current = true;
+    void sendMessage(UPLOADED_WRITE_UP_SCAN_PROMPT);
+  }, [attachedUploaded, attachedRecordId, ready, loading, sending, payload?.thread.messages.length, sendMessage]);
 
   async function clearThread() {
     try {
@@ -137,6 +158,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to clear conversation.");
+      autoScanRef.current = false;
       setPayload((current) => (current ? { ...current, thread: body.thread } : current));
       showToast("Conversation cleared.", "info");
     } catch (error) {
@@ -259,7 +281,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
             <div className="hr-consult-attach">
               <Paperclip className="h-4 w-4" />
               <span>{attachedLabel ?? "HR record attached for context"}</span>
-              <button type="button" aria-label="Remove attached record" onClick={() => { setAttachedRecordId(null); setAttachedLabel(null); }}>
+              <button type="button" aria-label="Remove attached record" onClick={() => { setAttachedRecordId(null); setAttachedLabel(null); setAttachedUploaded(false); }}>
                 <X className="h-4 w-4" />
               </button>
             </div>

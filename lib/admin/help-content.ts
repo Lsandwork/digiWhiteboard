@@ -279,7 +279,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Floor Ops — command centers, floor operations, photos, and cameras.",
       "Whiteboard — all push-to-board and display/cast tools.",
       "Support — Support Command Center for complaints, PIPs, and urgent cases.",
-      "People & HR — staff directory, users, HR records (including uploaded paper write-ups), write-ups, and PIP.",
+      "People & HR — staff directory, users, HR records (including uploaded paper write-ups), write-ups, PIP, and HR Consult (Sam scans uploaded write-ups and recommends next steps).",
       "Apps — Route Generator, System Health, Blog Generator, Gingr, Ruffly.",
       "Admin — Overview, analytics, settings, logs, integrations, templates, and notifications."
     ],

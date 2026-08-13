@@ -33,7 +33,11 @@ export function userRequestedDetailedAiReply(message: string): boolean {
 export function buildConversationalStyleHint(params: {
   userMessage: string;
   priorUserTurns: number;
+  scannedWriteUp?: boolean;
 }): string {
+  if (params.scannedWriteUp) {
+    return "An uploaded/scanned write-up is attached. Read the full document (OCR handwriting if needed). Summarize key facts briefly, then recommend the BEST next step for managers and admins with concrete advice. Short bullets are OK. Plain text only, not legal advice.";
+  }
   const wantsDetail = userRequestedDetailedAiReply(params.userMessage);
   if (wantsDetail) {
     return "The manager asked for detail or a draft. You may go longer, but stay conversational, plain text only, no markdown.";
