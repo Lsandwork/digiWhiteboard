@@ -65,6 +65,8 @@ async function sessionFromRequestCookies(request: NextRequest) {
 
 // Pin secrets so Vercel inlines them into Edge middleware (login verify).
 void getSessionSecret();
+void process.env.ADMIN_SESSION_SECRET;
+void process.env.ADMIN_PASSWORD;
 
 export async function middleware(request: NextRequest) {
   try {
@@ -91,7 +93,7 @@ export async function middleware(request: NextRequest) {
       const login = request.nextUrl.clone();
       login.pathname = "/admin/login";
       login.search = "";
-      login.searchParams.set("next", pathname);
+      login.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(login);
     }
     return NextResponse.next();
