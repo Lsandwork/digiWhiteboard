@@ -38,12 +38,13 @@ import {
 } from "@/lib/staff/admin-ops";
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
+import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-const STAFF_OPS_LOAD_TIMEOUT_MS = 8_000;
+const STAFF_OPS_LOAD_TIMEOUT_MS = 25_000;
+const STAFF_OPS_CACHE_TTL_MS = 20_000;
 
 function crossoverForbiddenResponse() {
   return NextResponse.json({ error: "You do not have permission to access Crossover Communication." }, { status: 403 });
@@ -116,11 +117,19 @@ export async function GET(request: Request) {
   }
 
   try {
-    const state = await withTimeoutOrThrow(
-      listStaffOps(getServiceSupabase({ timeoutMs: STAFF_OPS_LOAD_TIMEOUT_MS })),
+    const state = await withTimeoutFallback(
+      getOrLoadTtlCache("staff-ops:list", STAFF_OPS_CACHE_TTL_MS, () =>
+        listStaffOps(getServiceSupabase({ timeoutMs: STAFF_OPS_LOAD_TIMEOUT_MS }))
+      ),
       STAFF_OPS_LOAD_TIMEOUT_MS,
-      "staff operations"
+      null
     );
+    if (!state) {
+      return NextResponse.json(
+        { error: "Team Log is taking too long to load. Retry in a moment." },
+        { status: 503 }
+      );
+    }
     const readerSession = {
       email: session?.email ?? null,
       adminUserId: session?.adminUserId ?? null,
@@ -327,6 +336,8 @@ export async function POST(request: Request) {
     }).catch((error) => {
       console.error("[staff-operations] audit log failed:", error instanceof Error ? error.message : error);
     });
+
+    invalidateTtlCache("staff-ops:");
 
     return NextResponse.json({ ok: true, result });
   } catch (error) {

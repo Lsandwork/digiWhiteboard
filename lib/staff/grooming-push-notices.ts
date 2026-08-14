@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+
 export type GroomingPushNoticeStatus = "active" | "cleared" | "expired";
 
 export type GroomingPushNotice = {
@@ -185,26 +187,22 @@ function sortActiveNotices(notices: GroomingPushNotice[]) {
 
 type GroomingNoticeState = { notices: GroomingPushNotice[] };
 
-async function loadFallbackState(supabase: SupabaseClient): Promise<GroomingNoticeState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return { notices: [] };
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const raw = settings[SETTINGS_STORE_KEY];
-  if (!raw || typeof raw !== "object") return { notices: [] };
-  const notices = Array.isArray((raw as { notices?: unknown }).notices)
-    ? ((raw as { notices: GroomingPushNotice[] }).notices)
+function parseFallbackState(value: unknown): GroomingNoticeState {
+  if (!value || typeof value !== "object") return { notices: [] };
+  const notices = Array.isArray((value as { notices?: unknown }).notices)
+    ? ((value as { notices: GroomingPushNotice[] }).notices)
     : [];
   return { notices };
 }
 
+async function loadFallbackState(supabase: SupabaseClient): Promise<GroomingNoticeState> {
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseFallbackState, { notices: [] });
+  if (loaded === null) return { notices: [] };
+  return loaded;
+}
+
 async function saveFallbackState(supabase: SupabaseClient, state: GroomingNoticeState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: state
-  };
-  await supabase.from("admin_settings").upsert({ id: "default", settings, updated_at: new Date().toISOString() });
+  await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, state);
 }
 
 export function normalizeGroomingPushNoticeInput(input: GroomingPushNoticeInput, actor?: string | null) {

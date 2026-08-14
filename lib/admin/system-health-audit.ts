@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import { listDisplayDevices, queueDisplayCommand } from "@/lib/display-keeper-server";
 import { bumpCastHardReloadNonce } from "@/lib/display-sync-server";
 import { loadCastTvHeartbeat, isCastTvOnline } from "@/lib/cast-tv/media";
@@ -129,33 +130,18 @@ function parseState(value: unknown): SystemHealthAuditState {
 }
 
 async function loadState(supabase: SupabaseClient): Promise<SystemHealthAuditState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return emptyState();
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseState(settings[SETTINGS_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_KEY, parseState, emptyState());
+  if (loaded === null) return emptyState();
+  return loaded;
 }
 
 async function saveState(supabase: SupabaseClient, state: SystemHealthAuditState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) throw new Error("System health storage is not available.");
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_KEY]: {
-      ...state,
-      runs: state.runs.slice(0, MAX_RUNS),
-      recent_rows: state.recent_rows.slice(0, MAX_ROWS)
-    }
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_KEY, {
+    ...state,
+    runs: state.runs.slice(0, MAX_RUNS),
+    recent_rows: state.recent_rows.slice(0, MAX_ROWS)
+  });
+  if (!ok) throw new Error("System health storage is not available.");
 }
 
 export async function loadSystemHealthAudit(supabase: SupabaseClient) {

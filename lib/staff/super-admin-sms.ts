@@ -129,12 +129,15 @@ async function resolveSuperAdminPhone(supabase?: SupabaseClient | null): Promise
 
   if (supabase) {
     try {
-      const { data } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-      const settings = (data?.settings ?? {}) as Record<string, unknown>;
-      const stored = settings.staff_admin_ops as
-        | { staff_directory?: Array<{ name?: string; email?: string; phone?: string | null; status?: string }> }
-        | undefined;
-      const directory = Array.isArray(stored?.staff_directory) ? stored.staff_directory : [];
+      const { data } = await supabase
+        .from("admin_settings")
+        .select("settings->staff_admin_ops->staff_directory")
+        .eq("id", "default")
+        .maybeSingle();
+      const directoryRaw = (data as Record<string, unknown> | null)?.staff_directory;
+      const directory = Array.isArray(directoryRaw)
+        ? (directoryRaw as Array<{ name?: string; email?: string; phone?: string | null; status?: string }>)
+        : [];
       const lonnie = directory.find((member) => {
         const email = String(member.email || "")
           .trim()

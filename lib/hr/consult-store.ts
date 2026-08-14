@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+
 export type HrConsultMessage = {
   id: string;
   role: "user" | "assistant";
@@ -24,25 +26,22 @@ function threadKey(email: string) {
 }
 
 async function loadThreadsRaw(supabase: SupabaseClient): Promise<Record<string, HrConsultThread>> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return {};
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const raw = settings[SETTINGS_KEY];
-  if (!raw || typeof raw !== "object") return {};
-  return raw as Record<string, HrConsultThread>;
+  const loaded = await loadAdminSettingsJsonKey(
+    supabase,
+    SETTINGS_KEY,
+    (raw) => {
+      if (!raw || typeof raw !== "object") return {};
+      return raw as Record<string, HrConsultThread>;
+    },
+    {}
+  );
+  if (loaded === null) return {};
+  return loaded;
 }
 
 async function saveThreadsRaw(supabase: SupabaseClient, threads: Record<string, HrConsultThread>) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) throw error;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_KEY]: threads
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_KEY, threads);
+  if (!ok) throw new Error("Unable to save HR consult threads.");
 }
 
 export async function loadHrConsultThread(supabase: SupabaseClient, email: string) {

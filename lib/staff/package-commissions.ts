@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import {
   matchTrainerByName,
   parseCsvLine,
@@ -135,29 +136,23 @@ export function calculatePercentCommission(saleTotal: string | null | undefined,
 
 type PackageCommissionState = { rows: PackageCommissionRow[] };
 
-async function loadState(supabase: SupabaseClient): Promise<PackageCommissionState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return { rows: [] };
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const raw = settings[SETTINGS_STORE_KEY];
-  if (!raw || typeof raw !== "object") return { rows: [] };
-  const rows = Array.isArray((raw as { rows?: unknown }).rows)
-    ? ((raw as { rows: PackageCommissionRow[] }).rows)
+function parseState(value: unknown): PackageCommissionState {
+  if (!value || typeof value !== "object") return { rows: [] };
+  const rows = Array.isArray((value as { rows?: unknown }).rows)
+    ? ((value as { rows: PackageCommissionRow[] }).rows)
     : [];
   return { rows };
 }
 
+async function loadState(supabase: SupabaseClient): Promise<PackageCommissionState> {
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, { rows: [] });
+  if (loaded === null) return { rows: [] };
+  return loaded;
+}
+
 async function saveState(supabase: SupabaseClient, state: PackageCommissionState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) throw new Error("Unable to save package commissions.");
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: state
-  };
-  const { error: upsertError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (upsertError) throw new Error("Unable to save package commissions.");
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, state);
+  if (!ok) throw new Error("Unable to save package commissions.");
 }
 
 function sortRows(rows: PackageCommissionRow[]) {

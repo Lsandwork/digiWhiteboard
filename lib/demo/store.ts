@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import type { LiveBoardResponse } from "@/lib/types";
 import {
   buildDemoGroomingNotice,
@@ -24,10 +25,6 @@ import {
 
 const SETTINGS_KEY = "demo_sandbox";
 
-function isMissingRelation(error: { code?: string; message?: string } | null) {
-  return error?.code === "42P01" || error?.code === "PGRST205" || Boolean(error?.message?.includes("schema cache"));
-}
-
 function parseSandbox(value: unknown): DemoSandbox {
   if (!value || typeof value !== "object") return buildInitialDemoSandbox();
   const raw = value as Partial<DemoSandbox>;
@@ -43,32 +40,19 @@ function parseSandbox(value: unknown): DemoSandbox {
 }
 
 async function loadSandbox(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return buildInitialDemoSandbox();
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseSandbox(settings[SETTINGS_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(
+    supabase,
+    SETTINGS_KEY,
+    parseSandbox,
+    buildInitialDemoSandbox()
+  );
+  if (loaded === null) return buildInitialDemoSandbox();
+  return loaded;
 }
 
 async function saveSandbox(supabase: SupabaseClient, sandbox: DemoSandbox) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return false;
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_KEY]: sandbox
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) {
-    if (isMissingRelation(saveError)) return false;
-    throw saveError;
-  }
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_KEY, sandbox);
+  if (!ok) return false;
   return true;
 }
 
