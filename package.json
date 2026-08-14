@@ -36,6 +36,7 @@
     "test:route-generator-production-final": "tsx scripts/test-route-generator-production-final.ts",
     "test:route-generator-all": "npm run test:route-generator && npm run test:samsara-csv && npm run test:household-coords && npm run test:route-generator-production-final && npm run test:route-owner-sms && npm run test:route-owner-sms-kill-switch && npm run test:jasper-demo-sms-guards",
     "test:ops-command-center": "tsx scripts/test-ops-command-center-foundation.ts",
+    "test:bulk-shift-entries": "tsx scripts/test-bulk-shift-entries.ts",
     "test:team-lead-my-shift": "tsx scripts/test-team-lead-my-shift.ts && tsx scripts/test-ops-command-center-work-item-actions.ts && tsx scripts/test-ops-command-center-live-feed.ts",
     "test:groomer-my-shift": "tsx scripts/test-groomer-my-shift.ts",
     "test:system-health": "tsx scripts/test-system-health-debugging.ts",

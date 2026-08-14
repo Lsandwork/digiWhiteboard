@@ -876,6 +876,32 @@ export async function createCrossoverMessage(
   return record;
 }
 
+export async function createCrossoverMessages(
+  supabase: SupabaseClient,
+  entries: Record<string, unknown>[],
+  actor: string | null,
+  displayName?: string | null
+) {
+  if (!entries.length) throw new Error("Add at least one entry.");
+  if (entries.length > 25) throw new Error("Submit up to 25 entries at a time.");
+  const records: CrossoverMessage[] = [];
+  const errors: string[] = [];
+  for (const [index, entry] of entries.entries()) {
+    try {
+      records.push(await createCrossoverMessage(supabase, entry, actor, displayName));
+    } catch (error) {
+      errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : "Unable to save."}`);
+    }
+  }
+  if (!records.length) throw new Error(errors[0] || "Unable to save entries.");
+  return {
+    records,
+    saved: records.length,
+    failed: errors.length,
+    errors
+  };
+}
+
 function shiftLogAssignedLabel(record: CrossoverMessage) {
   return record.assigned_to ?? record.assigned_team ?? "Unassigned";
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { SortableTh, useClientSort, type SortAccessors } from "@/components/admin/ui/sortable-table";
+import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
 import { AddShiftLogEntryCard, type ShiftLogFormShape } from "@/components/admin/front-desk/FrontDeskLogUI";
 import { GingrPhotoUploadQueue } from "@/components/admin/photo-upload-queue/GingrPhotoUploadQueue";
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
@@ -11,6 +12,7 @@ import type { HandlerDailyChecklistItem } from "@/lib/staff/handler-checklist-da
 import type { ManagementReport } from "@/lib/staff/management-reports";
 import { shiftLogSubmittedBy, shiftLogType } from "@/lib/staff/front-desk-log";
 import { serializeTemplateFieldValues } from "@/lib/frontDeskLog/logTemplates";
+import { toCrossoverBulkPayload } from "@/lib/staff/bulk-shift-log";
 
 const HANDLER_ENTRY_SORT_ACCESSORS: SortAccessors<CrossoverMessage> = {
   subject: (item) => item.subject,
@@ -402,24 +404,75 @@ export function HandlerShiftEntryPanel() {
     }
   }
 
+  async function submitBulk(
+    entries: Parameters<typeof toCrossoverBulkPayload>[0],
+    defaults: Parameters<typeof toCrossoverBulkPayload>[1]
+  ) {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/admin/staff-operations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "create_crossover_bulk",
+          entries: toCrossoverBulkPayload(entries, { ...defaults, department_area: defaults.department_area || "Daycare" })
+        })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entries.");
+      const saved = Number(body.result?.saved ?? entries.length);
+      const failed = Number(body.result?.failed ?? 0);
+      showToast(
+        failed
+          ? `Saved ${saved} handler ${saved === 1 ? "entry" : "entries"}. ${failed} could not be saved.`
+          : saved === 1
+            ? "Handler shift entry saved to Team Log."
+            : `${saved} handler shift entries saved to Team Log.`,
+        failed && !saved ? "error" : "success"
+      );
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to save shift log entries.", "error");
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="crossover-dashboard space-y-5">
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Handler Shift Entry Log</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Submit shift log entries for daycare operations. Entries are reported to Team Log.
+          Add several daycare notes at once. Press Enter to start the next row, then submit them together to Team Log.
         </p>
         {loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
 
-      <AddShiftLogEntryCard
-        form={form}
-        patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
+      <BulkShiftLogComposer
+        title="Bulk Handler Shift Entries"
+        subtitle="Each row becomes its own Team Log entry. Press Enter for another row. Shift+Enter adds a line inside a note."
         busy={busy}
         assignOptions={assignOptions}
-        onSubmit={() => submit()}
-        onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
+        defaultLogType="Daycare Note"
+        defaultDepartment="Daycare"
+        submitLabel="Submit entries"
+        onSubmit={submitBulk}
       />
+
+      <details className="crossover-card p-5">
+        <summary className="cursor-pointer font-semibold text-white">Use a detailed template instead</summary>
+        <div className="mt-4">
+          <AddShiftLogEntryCard
+            form={form}
+            patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            busy={busy}
+            assignOptions={assignOptions}
+            onSubmit={() => submit()}
+            onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
+          />
+        </div>
+      </details>
 
       <HandlerEntriesTable entries={entries} />
     </div>

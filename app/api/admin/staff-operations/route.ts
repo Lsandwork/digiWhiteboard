@@ -19,6 +19,7 @@ import { createAndPushStaffNotice } from "@/lib/staff/push-notices";
 import {
   createActiveIssue,
   createCrossoverMessage,
+  createCrossoverMessages,
   createStaffDirectoryMember,
   deleteCrossoverMessage,
   deleteStaffDirectoryMember,
@@ -54,6 +55,7 @@ function staffOpsForbiddenResponse() {
 
 const CROSSOVER_ACTIONS = new Set([
   "create_crossover",
+  "create_crossover_bulk",
   "update_crossover",
   "reply_crossover",
   "delete_crossover",
@@ -159,7 +161,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const action = String(body.action ?? "");
 
-    if (action === "create_crossover" && !canCreateShiftLogEntry(role)) {
+    if ((action === "create_crossover" || action === "create_crossover_bulk") && !canCreateShiftLogEntry(role)) {
       return crossoverForbiddenResponse();
     }
     if (
@@ -192,6 +194,10 @@ export async function POST(request: Request) {
     if (action === "create_crossover") {
       result = await createCrossoverMessage(supabase, body, actor, actorDisplayName);
       auditAction = "staff.crossover.create";
+    } else if (action === "create_crossover_bulk") {
+      const entries = Array.isArray(body.entries) ? (body.entries as Record<string, unknown>[]) : [];
+      result = await createCrossoverMessages(supabase, entries, actor, actorDisplayName);
+      auditAction = "staff.crossover.create_bulk";
     } else if (action === "update_crossover") {
       const id = String(body.id ?? "");
       result = await updateCrossoverMessage(supabase, id, body, actorDisplayName);

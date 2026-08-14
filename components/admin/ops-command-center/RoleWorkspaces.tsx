@@ -1,11 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ClipboardList } from "lucide-react";
 import { OpsDogCard, type OpsDogCardModel } from "@/components/admin/ops-command-center/DogCard";
 import { OpsSidePanel } from "@/components/admin/ops-command-center/SidePanel";
 import { OpsPriorityBadge, OpsStatusBadge } from "@/components/admin/ops-command-center/StatusBadge";
+import { BulkEntryComposer } from "@/components/admin/ui/BulkEntryComposer";
+import { useToast } from "@/components/admin/ui/ToastProvider";
 import { enqueueOfflineAction, flushOfflineQueue, listOfflineQueue } from "@/lib/ops-command-center/offline-queue";
 import { loadAutosave, saveAutosave, clearAutosave } from "@/lib/ops-command-center/autosave";
+import {
+  compileShiftHandoff,
+  emptyShiftHandoffItem,
+  isShiftHandoffItemEmpty,
+  parseShiftHandoffItems,
+  SHIFT_HANDOFF_CATEGORIES,
+  type ShiftHandoffItem
+} from "@/lib/ops-command-center/shift-handoff-items";
 
 type BoardDog = {
   id: string;
@@ -378,11 +389,40 @@ export function TrainerOpsPanel({ onNavigate }: { onNavigate?: (tab: string) => 
   );
 }
 
+type ShiftHandoffDraft = {
+  fromShift?: string;
+  toShift?: string;
+  items?: unknown;
+};
+
+function readHandoffDraft(): ShiftHandoffDraft | null {
+  const stored = loadAutosave<ShiftHandoffDraft | { value?: ShiftHandoffDraft } | string>("shift_handoff_draft");
+  if (!stored) return null;
+  if (typeof stored === "string") return { items: [{ note: stored, category: "other" }] };
+  if (typeof stored === "object" && stored && "value" in stored && stored.value) return stored.value;
+  return stored as ShiftHandoffDraft;
+}
+
 export function ShiftHandoffPanel() {
-  const [summary, setSummary] = useState("");
+  const { showToast } = useToast();
   const [fromShift, setFromShift] = useState("Afternoon");
   const [toShift, setToShift] = useState("Overnight");
+  const [items, setItems] = useState<ShiftHandoffItem[]>([emptyShiftHandoffItem()]);
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
+  const [busy, setBusy] = useState(false);
+  const readyCount = compileShiftHandoff(items).count;
+
+  const persistDraft = useCallback((nextFrom: string, nextTo: string, nextItems: ShiftHandoffItem[]) => {
+    saveAutosave("shift_handoff_draft", { fromShift: nextFrom, toShift: nextTo, items: nextItems });
+  }, []);
+
+  useEffect(() => {
+    const draft = readHandoffDraft();
+    if (!draft) return;
+    if (draft.fromShift) setFromShift(draft.fromShift);
+    if (draft.toShift) setToShift(draft.toShift);
+    if (draft.items) setItems(parseShiftHandoffItems(draft.items));
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/ops-command-center?view=handoffs", { cache: "no-store" });
@@ -398,12 +438,21 @@ export function ShiftHandoffPanel() {
     <section className="space-y-4">
       <header className="rounded-2xl border border-admin-border bg-black/20 p-4">
         <h2 className="text-xl font-semibold text-white">Shift Handoff</h2>
-        <p className="mt-1 text-sm text-admin-muted">Structured handoff with acknowledgement and audit history.</p>
+        <p className="mt-1 text-sm text-admin-muted">
+          Record every item the incoming shift needs. Press Enter to add another row, then submit them together.
+        </p>
       </header>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-sm">
           <span className="admin-label">From</span>
-          <select className="admin-input mt-1" value={fromShift} onChange={(e) => setFromShift(e.target.value)}>
+          <select
+            className="admin-input mt-1"
+            value={fromShift}
+            onChange={(e) => {
+              setFromShift(e.target.value);
+              persistDraft(e.target.value, toShift, items);
+            }}
+          >
             {["Morning", "Afternoon", "Overnight"].map((s) => (
               <option key={s}>{s}</option>
             ))}
@@ -411,38 +460,95 @@ export function ShiftHandoffPanel() {
         </label>
         <label className="text-sm">
           <span className="admin-label">To</span>
-          <select className="admin-input mt-1" value={toShift} onChange={(e) => setToShift(e.target.value)}>
+          <select
+            className="admin-input mt-1"
+            value={toShift}
+            onChange={(e) => {
+              setToShift(e.target.value);
+              persistDraft(fromShift, e.target.value, items);
+            }}
+          >
             {["Morning", "Afternoon", "Overnight"].map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
         </label>
       </div>
-      <textarea
-        className="admin-input min-h-32 w-full"
-        placeholder="Unresolved incidents, meds, late pickups, transportation, follow-ups…"
-        value={summary}
-        onChange={(e) => {
-          setSummary(e.target.value);
-          saveAutosave("shift_handoff_draft", e.target.value);
-        }}
-      />
-      <button
-        type="button"
-        className="admin-btn-primary"
-        onClick={async () => {
-          await fetch("/api/admin/ops-command-center", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "create_shift_handoff", fromShift, toShift, summary })
-          });
-          setSummary("");
-          clearAutosave("shift_handoff_draft");
-          await load();
-        }}
-      >
-        Submit handoff
-      </button>
+      <div className="rounded-2xl border border-admin-border bg-black/20 p-4">
+        <BulkEntryComposer
+          rows={items}
+          onChange={(next) => {
+            setItems(next);
+            persistDraft(fromShift, toShift, next);
+          }}
+          createEmpty={emptyShiftHandoffItem}
+          isEmpty={isShiftHandoffItemEmpty}
+          busy={busy}
+          title="Handoff items"
+          description="Each row is one item for the incoming shift. Press Enter to add another row. Shift+Enter starts a new line in a note."
+          addLabel="Add handoff item"
+          columns={[
+            {
+              key: "category",
+              label: "Category",
+              kind: "select",
+              className: "bulk-entry-col--category",
+              options: SHIFT_HANDOFF_CATEGORIES.map((category) => ({ value: category.id, label: category.label }))
+            },
+            {
+              key: "note",
+              label: "Note",
+              kind: "textarea",
+              placeholder: "What the next shift needs to know"
+            }
+          ]}
+          footer={
+            <button
+              type="button"
+              className="admin-btn-primary"
+              disabled={busy || readyCount === 0}
+              onClick={async () => {
+                const compiled = compileShiftHandoff(items);
+                if (!compiled.count) {
+                  showToast("Add at least one handoff item.", "error");
+                  return;
+                }
+                setBusy(true);
+                try {
+                  const res = await fetch("/api/admin/ops-command-center", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      action: "create_shift_handoff",
+                      fromShift,
+                      toShift,
+                      items: items.filter((item) => !isShiftHandoffItemEmpty(item)),
+                      summary: compiled.summary,
+                      fields: compiled.fields
+                    })
+                  });
+                  const body = await res.json().catch(() => ({}));
+                  if (!res.ok) throw new Error(body.error ?? "Unable to submit shift handoff.");
+                  setItems([emptyShiftHandoffItem()]);
+                  clearAutosave("shift_handoff_draft");
+                  showToast(
+                    compiled.count === 1 ? "Shift handoff submitted." : `Shift handoff submitted with ${compiled.count} items.`,
+                    "success"
+                  );
+                  await load();
+                } catch (error) {
+                  showToast(error instanceof Error ? error.message : "Unable to submit shift handoff.", "error");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <ClipboardList className="h-4 w-4" aria-hidden />
+              {busy ? "Submitting…" : `Submit handoff (${readyCount})`}
+            </button>
+          }
+        />
+      </div>
       <div className="space-y-2">
         {rows.map((row) => (
           <div key={String(row.id)} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
@@ -469,7 +575,7 @@ export function ShiftHandoffPanel() {
                 </button>
               )}
             </div>
-            <p className="mt-1 text-sm text-admin-muted">{String(row.summary || "")}</p>
+            <p className="shift-handoff-history mt-1 text-sm text-admin-muted">{String(row.summary || "")}</p>
           </div>
         ))}
       </div>

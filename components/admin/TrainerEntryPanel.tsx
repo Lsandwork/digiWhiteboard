@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
 import {
   AddShiftLogEntryCard,
   type ShiftLogFormShape
@@ -9,6 +10,7 @@ import {
 import type { CrossoverMessage } from "@/lib/staff/admin-ops";
 import { shiftLogSubmittedBy } from "@/lib/staff/front-desk-log";
 import { serializeTemplateFieldValues } from "@/lib/frontDeskLog/logTemplates";
+import { toCrossoverBulkPayload } from "@/lib/staff/bulk-shift-log";
 
 const emptyForm: ShiftLogFormShape = {
   log_type: "Training Note",
@@ -117,24 +119,75 @@ export function TrainerEntryPanel() {
     }
   }
 
+  async function submitBulk(
+    entries: Parameters<typeof toCrossoverBulkPayload>[0],
+    defaults: Parameters<typeof toCrossoverBulkPayload>[1]
+  ) {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/admin/staff-operations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "create_crossover_bulk",
+          entries: toCrossoverBulkPayload(entries, { ...defaults, department_area: defaults.department_area || "Training" })
+        })
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.error ?? "Unable to save trainer entries.");
+      const saved = Number(body.result?.saved ?? entries.length);
+      const failed = Number(body.result?.failed ?? 0);
+      showToast(
+        failed
+          ? `Saved ${saved} trainer ${saved === 1 ? "entry" : "entries"}. ${failed} could not be saved.`
+          : saved === 1
+            ? "Trainer's entry saved."
+            : `${saved} trainer entries saved.`,
+        failed && !saved ? "error" : "success"
+      );
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to save trainer entries.", "error");
+      throw error;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="crossover-dashboard space-y-5">
       <header className="crossover-dashboard__page-header">
         <h2 className="crossover-dashboard__page-title">Trainer&apos;s Entry</h2>
         <p className="crossover-dashboard__page-subtitle">
-          Submit shift log entries for training notes, dog updates, and follow-ups. Only your entries are shown below.
+          Add several training notes at once. Press Enter to start the next row, then submit them together. Only your entries are shown below.
         </p>
         {loading ? <span className="admin-badge mt-3 inline-block">Loading...</span> : null}
       </header>
 
-      <AddShiftLogEntryCard
-        form={form}
-        patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
+      <BulkShiftLogComposer
+        title="Bulk Trainer Entries"
+        subtitle="Each row becomes its own Team Log entry. Press Enter for another row. Shift+Enter adds a line inside a note."
         busy={busy}
         assignOptions={assignOptions}
-        onSubmit={() => submit()}
-        onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
+        defaultLogType="Training Note"
+        defaultDepartment="Training"
+        submitLabel="Submit entries"
+        onSubmit={submitBulk}
       />
+
+      <details className="crossover-card p-5">
+        <summary className="cursor-pointer font-semibold text-white">Use a detailed template instead</summary>
+        <div className="mt-4">
+          <AddShiftLogEntryCard
+            form={form}
+            patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
+            busy={busy}
+            assignOptions={assignOptions}
+            onSubmit={() => submit()}
+            onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
+          />
+        </div>
+      </details>
 
       <section className="crossover-card p-5">
         <div className="crossover-card__header crossover-card__header--compact">
