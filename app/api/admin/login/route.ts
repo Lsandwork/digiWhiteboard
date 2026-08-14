@@ -8,12 +8,9 @@ import {
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
-
-const LOGIN_VERIFY_TIMEOUT_MS = 8_000;
 
 export async function POST(request: Request) {
   try {
@@ -35,11 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
     }
 
-    const auth = await withTimeoutOrThrow(
-      verifyAdminCredentials(username, password),
-      LOGIN_VERIFY_TIMEOUT_MS,
-      "login verify"
-    );
+    const auth = await verifyAdminCredentials(username, password);
     if (!auth.ok) {
       recordFailedLogin(`${clientKey}:${username.toLowerCase()}`);
       return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });

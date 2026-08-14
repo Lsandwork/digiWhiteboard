@@ -1,8 +1,7 @@
 import bcrypt from "bcryptjs";
 import { timingSafeEqual } from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { findAdminUserByEmail, verifyAdminUserPassword, type AdminUserRecord } from "@/lib/admin/users";
-import { loadAdminSettings } from "@/lib/admin/settings";
+import { findAdminUsersByEmails, verifyAdminUserPassword, type AdminUserRecord } from "@/lib/admin/users";
 import { DEMO_PASSWORD, findDemoAccount } from "@/lib/demo/constants";
 
 /** Canonical Super Admin identity (Lonnie Sandoval). */
@@ -39,20 +38,26 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(aBuf, bBuf);
 }
 
-/** Bound each DB call so a stalled query falls back to env/demo auth. */
-const AUTH_QUERY_TIMEOUT_MS = 4_000;
+/** Bound DB calls so a stalled query cannot block env/demo login. */
+const AUTH_QUERY_TIMEOUT_MS = 2_500;
+const ENV_ATTACH_TIMEOUT_MS = 800;
 
-function authSupabase() {
-  return getServiceSupabase({ timeoutMs: AUTH_QUERY_TIMEOUT_MS });
+function authSupabase(timeoutMs = AUTH_QUERY_TIMEOUT_MS) {
+  return getServiceSupabase({ timeoutMs });
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-    )
-  ]);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 export type AdminAuthResult = {
@@ -66,19 +71,40 @@ export type AdminAuthResult = {
   source: "database" | "env" | "demo";
 };
 
-async function resolveSuperAdminRecord(): Promise<AdminUserRecord | null> {
-  try {
-    const supabase = authSupabase();
-    const user = await withTimeout(
-      findAdminUserByEmail(supabase, SUPER_ADMIN_EMAIL),
-      AUTH_QUERY_TIMEOUT_MS,
-      "super admin lookup"
-    );
-    if (user && user.status === "active") return user;
-  } catch {
-    // ignore
-  }
-  return null;
+function resultFromDbUser(dbUser: AdminUserRecord, source: AdminAuthResult["source"]): AdminAuthResult {
+  const isDemoDbUser = dbUser.email.endsWith("@demo.com");
+  return {
+    ok: true,
+    email: dbUser.email,
+    adminUserId: dbUser.id,
+    role: dbUser.role,
+    demoRole: isDemoDbUser ? dbUser.role : undefined,
+    forcePasswordChange: dbUser.force_password_change,
+    isDemo: isDemoDbUser,
+    source
+  };
+}
+
+async function envPasswordMatches(password: string) {
+  const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
+  if (hash) return bcrypt.compare(password, hash);
+  const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
+  if (!legacyPassword) return false;
+  return safeEqual(password, legacyPassword);
+}
+
+function pickLoginUser(users: AdminUserRecord[], normalized: string) {
+  const active = users.filter((user) => user.status === "active");
+  return (
+    active.find((user) => user.email === normalized) ||
+    active.find((user) => user.email === SUPER_ADMIN_EMAIL) ||
+    null
+  );
+}
+
+async function lookupLoginUsers(emails: string[], timeoutMs = AUTH_QUERY_TIMEOUT_MS) {
+  const supabase = authSupabase(timeoutMs);
+  return withTimeout(findAdminUsersByEmails(supabase, emails), timeoutMs, "admin user lookup");
 }
 
 export async function verifyAdminCredentials(username: string, password: string): Promise<AdminAuthResult> {
@@ -97,78 +123,38 @@ export async function verifyAdminCredentials(username: string, password: string)
     };
   }
 
-  try {
-    const supabase = authSupabase();
-    for (const email of loginLookupEmails(normalized)) {
-      const dbUser = await withTimeout(
-        findAdminUserByEmail(supabase, email),
-        AUTH_QUERY_TIMEOUT_MS,
-        "admin user lookup"
-      );
-      if (!dbUser || dbUser.status !== "active") continue;
-      const valid = await verifyAdminUserPassword(dbUser, password);
-      if (!valid) continue;
-      const isDemoDbUser = dbUser.email.endsWith("@demo.com");
-      return {
-        ok: true,
-        email: dbUser.email,
-        adminUserId: dbUser.id,
-        role: dbUser.role,
-        demoRole: isDemoDbUser ? dbUser.role : undefined,
-        forcePasswordChange: dbUser.force_password_change,
-        isDemo: isDemoDbUser,
-        source: "database"
-      };
+  const envValid = isSuperAdminLoginAlias(normalized) ? await envPasswordMatches(password) : false;
+
+  // Env `admin` login must succeed even when Supabase is down or slow.
+  // Do not wait on settings/lookups before accepting a valid env password.
+  if (envValid) {
+    let superAdmin: AdminUserRecord | null = null;
+    try {
+      const users = await lookupLoginUsers([SUPER_ADMIN_EMAIL], ENV_ATTACH_TIMEOUT_MS);
+      superAdmin = pickLoginUser(users, SUPER_ADMIN_EMAIL);
+    } catch {
+      superAdmin = null;
     }
-  } catch {
-    // Fall through to env auth if DB unavailable.
-  }
-
-  const settings = await withTimeout(
-    loadAdminSettings(authSupabase()),
-    AUTH_QUERY_TIMEOUT_MS,
-    "admin settings"
-  ).catch(() => null);
-  if (settings && !settings.allow_env_admin_login) {
-    return { ok: false, email: normalized, source: "env" };
-  }
-
-  const expectedUsername = getAdminUsername().toLowerCase();
-  if (!isSuperAdminLoginAlias(normalized) && !safeEqual(normalized, expectedUsername)) {
-    return { ok: false, email: normalized, source: "env" };
-  }
-
-  let envValid = false;
-  const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
-  if (hash) {
-    envValid = await bcrypt.compare(password, hash);
-  } else {
-    const legacyPassword = process.env.ADMIN_PASSWORD?.trim();
-    if (!legacyPassword) return { ok: false, email: normalized, source: "env" };
-    envValid = safeEqual(password, legacyPassword);
-  }
-
-  if (!envValid) return { ok: false, email: normalized, source: "env" };
-
-  // Env "admin" login is the same person as Lonnie Sandoval Super Admin.
-  const superAdmin = await resolveSuperAdminRecord();
-  if (superAdmin) {
+    if (superAdmin) return resultFromDbUser(superAdmin, "env");
     return {
       ok: true,
-      email: superAdmin.email,
-      adminUserId: superAdmin.id,
-      role: superAdmin.role || "owner_admin",
-      forcePasswordChange: superAdmin.force_password_change,
+      email: SUPER_ADMIN_EMAIL,
+      role: "owner_admin",
       source: "env"
     };
   }
 
-  return {
-    ok: true,
-    email: SUPER_ADMIN_EMAIL,
-    role: "owner_admin",
-    source: "env"
-  };
+  try {
+    const users = await lookupLoginUsers(loginLookupEmails(normalized));
+    const dbUser = pickLoginUser(users, normalized);
+    if (dbUser && (await verifyAdminUserPassword(dbUser, password))) {
+      return resultFromDbUser(dbUser, "database");
+    }
+  } catch {
+    // Database unavailable — staff logins need the DB; env already handled above.
+  }
+
+  return { ok: false, email: normalized, source: "database" };
 }
 
 /** @deprecated Use verifyAdminCredentials */
