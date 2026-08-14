@@ -4,7 +4,7 @@ import { sanitizeLobbySettings } from "@/lib/lobby/validate";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-const defaultSettings: LobbySettings = {
+export const defaultLobbySettings: LobbySettings = {
   max_queue_count: 6,
   refresh_interval_ms: 5000,
   show_promotions: true,
@@ -22,15 +22,15 @@ export async function loadLobbySettings(supabase: SupabaseClient): Promise<Lobby
     const { data, error } = await supabase.from("lobby_settings").select("*").eq("id", "default").maybeSingle();
     if (error) {
       if (error.code === "42P01" || error.message.toLowerCase().includes("lobby_settings")) {
-        return defaultSettings;
+        return defaultLobbySettings;
       }
       throw error;
     }
-    if (!data) return defaultSettings;
+    if (!data) return defaultLobbySettings;
 
     return sanitizeLobbySettings(data);
   } catch {
-    return defaultSettings;
+    return defaultLobbySettings;
   }
 }
 
