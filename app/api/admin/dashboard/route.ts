@@ -50,6 +50,11 @@ async function optionalRows<T>(work: PromiseLike<{ data: T[] | null }>, label: s
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
+  const session = getAdminSessionFromRequest(request);
+  if (session?.mustChangePassword) {
+    return NextResponse.json({ error: "Password change required." }, { status: 403 });
+  }
+
   try {
     const url = new URL(request.url);
     const board = parseBoardType(url.searchParams.get("board"));
@@ -92,10 +97,9 @@ export async function GET(request: Request) {
   const siteUrl = publicOrigin(request);
   const webhookUrl = `${siteUrl}/api/gingr/webhook`;
 
-  const session = getAdminSessionFromRequest(request);
   await migrateLegacyUserAccess(supabase).catch(() => undefined);
   const access = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email).catch(() => null)
     : null;
   const profileUser = session?.adminUserId
     ? await getAdminUserById(supabase, session.adminUserId).catch(() => null)

@@ -137,6 +137,8 @@ export function AdminDashboard() {
     // Only fill in a missing board. Rewriting an explicit board here fights the
     // role-based board redirects below and ping-pongs the router forever.
     if (searchParams.get("board")) return;
+    // Users admin lives on the lobby board — never restore staff from storage here.
+    if (searchParams.get("tab") === "users") return;
     const stored = window.localStorage.getItem("fitdog_admin_board");
     if (stored === "staff" || stored === "marketing") {
       const params = new URLSearchParams(searchParams.toString());
@@ -248,7 +250,7 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (board === "staff" && tab === "users") {
-      router.replace("/admin?tab=users");
+      router.replace("/admin?board=lobby&tab=users");
     }
   }, [board, router, tab]);
 
@@ -270,8 +272,8 @@ export function AdminDashboard() {
   }
 
   function setActiveTab(nextTab: AdminTab, extraParams?: Record<string, string>) {
-    if (board === "staff" && nextTab === "users") {
-      router.replace("/admin?tab=users");
+    if (nextTab === "users") {
+      router.replace("/admin?board=lobby&tab=users");
       return;
     }
     // These tabs only exist on the staff board — force board so the click

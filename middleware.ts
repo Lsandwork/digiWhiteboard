@@ -23,6 +23,7 @@ import {
   legacyBlogRedirectUrl,
   rewriteBlogsPublicPath
 } from "@/lib/blogs-domain";
+import { isSafeRelativePath } from "@/lib/safe-url";
 
 function sessionTokensFromRequest(request: NextRequest) {
   const seen = new Set<string>();
@@ -163,6 +164,10 @@ async function runMiddleware(request: NextRequest) {
 
   if (pathname.startsWith("/admin/login")) {
     if (session && !session.mustChangePassword) {
+      const next = request.nextUrl.searchParams.get("next");
+      if (next && isSafeRelativePath(next)) {
+        return NextResponse.redirect(new URL(next, request.url));
+      }
       const role = session.role ?? "";
       if (session.isDemo) {
         return NextResponse.redirect(new URL("/admin?board=staff&tab=demo_push", request.url));
@@ -210,6 +215,10 @@ async function runMiddleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
       const tab = url.searchParams.get("tab");
+      if (tab === "users" && board !== "lobby") {
+        url.searchParams.set("board", "lobby");
+        return NextResponse.redirect(url);
+      }
       if (!tab && board !== "marketing" && board !== "lobby") {
         url.searchParams.set("board", "staff");
         url.searchParams.set("tab", firstAccessibleAdminTab(null, role, "staff"));

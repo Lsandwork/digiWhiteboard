@@ -59,4 +59,16 @@ function setCookies(res: NextResponse) {
   assert.equal(session?.email, "lonnie@fitdog.com");
 }
 
+{
+  const prev = process.env.ADMIN_COOKIE_DOMAIN;
+  process.env.ADMIN_COOKIE_DOMAIN = ".ruffops.com";
+  const res = NextResponse.json({ ok: true });
+  setAdminSessionCookie(res, "token.sig", "localhost:3111");
+  const cookies = setCookies(res).filter((value) => value.startsWith(`${ADMIN_SESSION_COOKIE}=`));
+  assert.equal(cookies.length, 1, "localhost only gets a host-only cookie");
+  assert.ok(!cookies[0]?.includes("Domain="), "localhost cookie has no Domain attribute");
+  assert.ok(!cookies[0]?.includes("Secure"), "localhost cookie is not Secure over HTTP");
+  process.env.ADMIN_COOKIE_DOMAIN = prev;
+}
+
 console.log("admin session cookie logout tests passed");

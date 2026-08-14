@@ -74,6 +74,10 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
           setMustChangePassword(true);
           setAdminUserId(body.adminUserId);
           if (body.username) setUsername(body.username);
+          return;
+        }
+        if (body.authenticated) {
+          window.location.assign(resolvePostLoginRoute(nextPath, body.role, body.isDemo));
         }
       } catch {
         // ignore
@@ -164,7 +168,7 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to update password.");
 
-      const next = resolvePostLoginRoute(nextPath, body.role);
+      const next = resolvePostLoginRoute(nextPath, body.role, body.isDemo);
       window.location.assign(next);
     } catch (changeError) {
       setError(humanizeUnknownError(changeError, "Unable to update password."));

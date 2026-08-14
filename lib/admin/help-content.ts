@@ -1341,7 +1341,8 @@ export function searchHelpArticles(
 }
 
 export function buildAdminTabHref(tab: AdminTab, board?: AdminBoardType) {
+  const resolvedBoard = tab === "users" ? (board ?? "lobby") : board;
   const params = new URLSearchParams({ tab });
-  if (board) params.set("board", board);
+  if (resolvedBoard) params.set("board", resolvedBoard);
   return `/admin?${params.toString()}`;
 }
