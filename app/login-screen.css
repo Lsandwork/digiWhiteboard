@@ -15,10 +15,11 @@
   position: relative;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(0, 0.48fr) minmax(0, 0.52fr);
+  grid-template-columns: minmax(0, 1fr) minmax(26rem, 32rem);
+  grid-template-areas: "brand form";
   background: var(--login-cream);
   color: var(--login-navy);
-  overflow: hidden;
+  overflow: auto;
 }
 
 html[data-theme="dark"] .login-screen {
@@ -43,9 +44,11 @@ html[data-theme="dark"] .login-screen {
 
 .login-screen__brand-panel {
   position: relative;
+  grid-area: brand;
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+  min-width: 0;
   padding: clamp(1.25rem, 2.4vw, 2.25rem) clamp(1.25rem, 2.5vw, 2.5rem) 1.25rem;
   background:
     radial-gradient(circle at 12% 18%, rgba(243, 108, 33, 0.12), transparent 28%),
@@ -225,9 +228,11 @@ html[data-theme="dark"] .login-screen__features {
 
 .login-screen__form-panel {
   position: relative;
+  grid-area: form;
   display: grid;
   place-items: center;
   min-height: 100dvh;
+  min-width: 0;
   padding: clamp(1.25rem, 3vw, 2.5rem);
   background:
     radial-gradient(circle at 85% 12%, rgba(243, 108, 33, 0.08), transparent 24%),
@@ -518,10 +523,6 @@ html[data-theme="dark"] .login-screen__error {
 }
 
 @media (max-width: 1024px) {
-  .login-screen {
-    grid-template-columns: minmax(0, 0.46fr) minmax(0, 0.54fr);
-  }
-
   .login-screen__feature-title {
     font-size: 0.72rem;
   }
@@ -531,9 +532,10 @@ html[data-theme="dark"] .login-screen__error {
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1100px) {
   .login-screen {
     grid-template-columns: 1fr;
+    grid-template-areas: "form";
     overflow: auto;
   }
 

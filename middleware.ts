@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ADMIN_SESSION_COOKIE } from "@/lib/admin/session-constants";
+import { ADMIN_SESSION_COOKIE, getSessionSecret } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
 import {
   firstAccessibleAdminTab,
@@ -62,6 +62,9 @@ async function sessionFromRequestCookies(request: NextRequest) {
   return null;
 }
 
+// Pin secrets so Vercel inlines them into Edge middleware (login verify).
+void getSessionSecret();
+
 export async function middleware(request: NextRequest) {
   try {
     return await runMiddleware(request);
@@ -69,6 +72,9 @@ export async function middleware(request: NextRequest) {
     // Never 500 the whole app on session/decode errors. For staff-only surfaces,
     // fail closed to login instead of silently serving protected pages.
     const { pathname } = request.nextUrl;
+    if (shouldRedirectFitdogRootToLogin(request.headers.get("host"), pathname)) {
+      return NextResponse.redirect(new URL(FITDOG_LOGIN_REDIRECT_PATH, request.url));
+    }
     const isPublicRuffly =
       pathname.startsWith("/ruffly/public") ||
       pathname.startsWith("/ruffly/review") ||
