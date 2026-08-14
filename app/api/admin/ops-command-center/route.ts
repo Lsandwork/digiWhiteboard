@@ -203,11 +203,21 @@ export async function POST(request: Request) {
   }
 
   if (action === "create_shift_handoff") {
+    const { compileShiftHandoff, parseShiftHandoffItems } = await import("@/lib/ops-command-center/shift-handoff-items");
+    const compiled = compileShiftHandoff(parseShiftHandoffItems(body.items));
+    const summary = compiled.summary || String(body.summary || "").trim();
+    if (!summary) {
+      return NextResponse.json({ error: "Add at least one handoff item." }, { status: 400 });
+    }
     const handoff = await createShiftHandoff({
       fromShift: String(body.fromShift || "Afternoon"),
       toShift: String(body.toShift || "Overnight"),
-      summary: String(body.summary || "").trim() || "Shift handoff submitted",
-      fields: {},
+      summary,
+      fields: compiled.count
+        ? compiled.fields
+        : ((body.fields && typeof body.fields === "object" && !Array.isArray(body.fields)
+            ? body.fields
+            : {}) as Record<string, string | null | undefined>),
       actor
     });
     return NextResponse.json({ handoff });

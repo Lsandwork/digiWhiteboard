@@ -39,6 +39,7 @@ import {
   STAFF_STATUSES,
   TEAM_LEAD_DEPARTMENT
 } from "@/lib/staff/admin-ops";
+import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
 import {
   ActiveShiftLogCard,
   AddShiftLogEntryCard,
@@ -59,6 +60,7 @@ import {
   validateTemplateFields,
   type TemplateFieldValues
 } from "@/lib/frontDeskLog/logTemplates";
+import { toCrossoverBulkPayload } from "@/lib/staff/bulk-shift-log";
 import {
   belongsInArchivedLog,
   belongsInCrossoverLog,
@@ -394,6 +396,16 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
           crossover_messages: [record, ...prev.crossover_messages.filter((item) => item.id !== record.id)]
         };
       }
+      if (action === "create_crossover_bulk") {
+        const records = Array.isArray((result as { records?: CrossoverMessage[] }).records)
+          ? (result as { records: CrossoverMessage[] }).records
+          : [];
+        const ids = new Set(records.map((item) => item.id));
+        return {
+          ...prev,
+          crossover_messages: [...records, ...prev.crossover_messages.filter((item) => !ids.has(item.id))]
+        };
+      }
       if (action === "update_crossover") {
         const record = result as CrossoverMessage;
         return {
@@ -459,8 +471,23 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? label);
-      showToast(success, "success");
-      applyMutationResult(String(payload.action ?? ""), body.result);
+      const action = String(payload.action ?? "");
+      if (action === "create_crossover_bulk") {
+        const result = body.result as { saved?: number; failed?: number; errors?: string[] } | undefined;
+        const saved = Number(result?.saved ?? 0);
+        const failed = Number(result?.failed ?? 0);
+        if (failed) {
+          showToast(
+            `Saved ${saved} ${saved === 1 ? "entry" : "entries"}. ${failed} could not be saved.`,
+            saved ? "success" : "error"
+          );
+        } else {
+          showToast(success, "success");
+        }
+      } else {
+        showToast(success, "success");
+      }
+      applyMutationResult(action, body.result);
       void load({ quiet: true });
       return true;
     } catch (error) {
@@ -629,6 +656,7 @@ function CrossoverPage(props: {
   onCloseDetail: () => void;
 }) {
   const [form, setForm] = useState<ShiftLogFormShape>(emptyShiftLogForm);
+  const [composerMode, setComposerMode] = useState<"bulk" | "template">("bulk");
   const [filters, setFilters] = useState<ShiftLogFilters>(emptyShiftLogFilters);
   const [openPage, setOpenPage] = useState(1);
   const [archivedPage, setArchivedPage] = useState(1);
@@ -647,6 +675,7 @@ function CrossoverPage(props: {
   const pickTemplate = useCallback((templateId: string) => {
     const template = getLogTemplateById(templateId);
     if (!template) return;
+    setComposerMode("template");
     setForm((current) => {
       const allowedKeys = new Set(template.fields.map((field) => field.key));
       const preserved: TemplateFieldValues = {};
@@ -670,7 +699,10 @@ function CrossoverPage(props: {
     if (!templateParam) return;
     const template = getLogTemplateById(templateParam);
     if (!template) return;
-    const timer = window.setTimeout(() => pickTemplate(template.id), 0);
+    const timer = window.setTimeout(() => {
+      pickTemplate(template.id);
+      setComposerMode("template");
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [pickTemplate]);
 
@@ -757,6 +789,21 @@ function CrossoverPage(props: {
       "Shift log entry saved."
     );
     if (ok) setForm(emptyShiftLogForm);
+  }
+
+  async function submitBulk(
+    entries: Parameters<typeof toCrossoverBulkPayload>[0],
+    defaults: Parameters<typeof toCrossoverBulkPayload>[1]
+  ) {
+    const ok = await props.onMutate(
+      "Unable to save shift log entries.",
+      {
+        action: "create_crossover_bulk",
+        entries: toCrossoverBulkPayload(entries, defaults)
+      },
+      entries.length === 1 ? "Shift log entry saved." : `${entries.length} shift log entries saved.`
+    );
+    if (!ok) throw new Error("Unable to save shift log entries.");
   }
 
   return (
@@ -848,18 +895,41 @@ function CrossoverPage(props: {
         {props.data?.permissions?.canCreate !== false ? (
           <>
             <div className="crossover-dashboard__workspace-form">
-              <AddShiftLogEntryCard
-                form={form}
-                patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
-                busy={props.busy}
-                assignOptions={props.staffOptions}
-                onSubmit={() => submit()}
-                onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
-              />
+              <div className="bulk-entry-mode-toggle" role="group" aria-label="Entry mode">
+                <button type="button" aria-pressed={composerMode === "bulk"} onClick={() => setComposerMode("bulk")}>
+                  Bulk entries
+                </button>
+                <button type="button" aria-pressed={composerMode === "template"} onClick={() => setComposerMode("template")}>
+                  Template form
+                </button>
+              </div>
+              {composerMode === "bulk" ? (
+                <BulkShiftLogComposer
+                  title="Bulk Shift Log Entries"
+                  subtitle="Add several notes at once. Press Enter to start the next row, then submit them together."
+                  busy={props.busy}
+                  assignOptions={props.staffOptions}
+                  defaultLogType="General Shift Note"
+                  defaultDepartment=""
+                  submitLabel="Submit entries"
+                  onSubmit={submitBulk}
+                />
+              ) : (
+                <AddShiftLogEntryCard
+                  form={form}
+                  patchForm={(patch) => setForm((current) => ({ ...current, ...patch }))}
+                  busy={props.busy}
+                  assignOptions={props.staffOptions}
+                  onSubmit={() => submit()}
+                  onSubmitAndFollowUp={() => submit({ create_owner_follow_up: true })}
+                />
+              )}
             </div>
-            <div className="crossover-dashboard__workspace-templates">
-              <QuickLogTemplatesSidebar selectedTemplateId={form.template_id} onPick={pickTemplate} />
-            </div>
+            {composerMode === "template" ? (
+              <div className="crossover-dashboard__workspace-templates">
+                <QuickLogTemplatesSidebar selectedTemplateId={form.template_id} onPick={pickTemplate} />
+              </div>
+            ) : null}
           </>
         ) : (
           <div className="crossover-dashboard__workspace-form">
