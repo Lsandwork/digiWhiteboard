@@ -33,8 +33,13 @@ export function shouldRedirectFitdogRootToLogin(
 }
 
 /**
- * On fitdog.ruffops.com, keep DigiBoard on the staff board (lobby/marketing boards
- * hide Route Generator + Operations tabs).
+ * On fitdog.ruffops.com, DigiBoard defaults to the staff board so Route Generator
+ * and Operations panels are not hidden behind the lobby board.
+ *
+ * Only applies when no board was chosen. Forcing an explicitly chosen board back
+ * to staff fights the role-based board redirects (a marketing account bounces
+ * staff -> marketing -> staff forever, which the browser reports as too many
+ * redirects) and makes the board switcher impossible to use on this host.
  */
 export function shouldForceFitdogStaffBoard(
   host: string | null | undefined,
@@ -44,5 +49,5 @@ export function shouldForceFitdogStaffBoard(
   if (!isFitdogHostname(host)) return false;
   if (!(pathname === "/admin" || pathname.startsWith("/admin/"))) return false;
   if (pathname.startsWith("/admin/login")) return false;
-  return board !== "staff";
+  return !board || !board.trim();
 }

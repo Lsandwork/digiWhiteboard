@@ -18,11 +18,15 @@ assert.equal(shouldRedirectFitdogRootToLogin("fitdog.ruffops.com", "/admin/login
 assert.equal(shouldRedirectFitdogRootToLogin("staff.ruffops.com", "/"), false);
 assert.match(FITDOG_LOGIN_REDIRECT_PATH, /board%3Dstaff|board=staff/);
 
-assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "lobby"), true);
-assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "marketing"), true);
+// Bare /admin on the Fitdog host defaults to the staff board.
+assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", null), true);
+assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", ""), true);
+// An explicit board is never rewritten — that loops staff <-> marketing forever.
+assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "lobby"), false);
+assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "marketing"), false);
 assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "staff"), false);
-assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin/login", "lobby"), false);
-assert.equal(shouldForceFitdogStaffBoard("staff.ruffops.com", "/admin", "lobby"), false);
+assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin/login", null), false);
+assert.equal(shouldForceFitdogStaffBoard("staff.ruffops.com", "/admin", null), false);
 
 assert.equal(parseAdminBoardType(null), "staff");
 assert.equal(parseAdminBoardType(undefined), "staff");

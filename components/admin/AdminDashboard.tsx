@@ -134,21 +134,16 @@ export function AdminDashboard() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const host = window.location.hostname.toLowerCase();
-    // fitdog.ruffops.com is staff DigiBoard only — keep users off lobby/marketing boards.
-    if (host === "fitdog.ruffops.com" && board !== "staff") {
-      window.localStorage.setItem("fitdog_admin_board", "staff");
-      const nextTab = tab === "overview" && !searchParams.get("tab") ? "crossover_communication" : tab;
-      router.replace(`/admin?board=staff&tab=${nextTab}`);
-      return;
-    }
+    // Only fill in a missing board. Rewriting an explicit board here fights the
+    // role-based board redirects below and ping-pongs the router forever.
+    if (searchParams.get("board")) return;
     const stored = window.localStorage.getItem("fitdog_admin_board");
-    if (!searchParams.get("board") && (stored === "staff" || stored === "marketing")) {
+    if (stored === "staff" || stored === "marketing") {
       const params = new URLSearchParams(searchParams.toString());
       params.set("board", stored);
       router.replace(`/admin?${params.toString()}`);
     }
-  }, [board, router, searchParams, tab]);
+  }, [router, searchParams]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);
