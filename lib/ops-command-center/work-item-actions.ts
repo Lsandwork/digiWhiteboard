@@ -228,7 +228,7 @@ export async function applyWorkItemAction(input: {
     };
     const status = statusMap[input.action];
     const row = await updateCrossoverMessage(supabase, parsed.sourceId, { status }, actorName);
-    resultStatus = row.status;
+    resultStatus = row.record.status;
   } else if (parsed.kind === "ops_notification") {
     if (input.action === "clear" || input.action === "hide" || input.action === "resolved" || input.action === "delete") {
       const note = await resolveOpsNotification({

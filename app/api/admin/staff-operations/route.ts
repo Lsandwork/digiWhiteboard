@@ -91,6 +91,11 @@ function canMutateFrontDeskLog(role: string | null) {
   return canEditFrontDeskLog(role) || canManageStaffOperations(role);
 }
 
+/** Any staff who can post to Team Log can also add shared updates/comments. */
+function canReplyToShiftLog(role: string | null) {
+  return canCreateShiftLogEntry(role) || canMutateFrontDeskLog(role);
+}
+
 function actorFromRequest(request: Request) {
   const session = getAdminSessionFromRequest(request);
   const role = getEffectiveAdminRole(request);
@@ -173,9 +178,11 @@ export async function POST(request: Request) {
     if ((action === "create_crossover" || action === "create_crossover_bulk") && !canCreateShiftLogEntry(role)) {
       return crossoverForbiddenResponse();
     }
+    if (action === "reply_crossover" && !canReplyToShiftLog(role)) {
+      return crossoverForbiddenResponse();
+    }
     if (
       (action === "update_crossover" ||
-        action === "reply_crossover" ||
         action === "delete_crossover" ||
         action === "move_crossover" ||
         action === "bulk_update_crossover") &&

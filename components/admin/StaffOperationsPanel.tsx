@@ -407,10 +407,15 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
         };
       }
       if (action === "update_crossover") {
-        const record = result as CrossoverMessage;
+        const payload = result as CrossoverMessage | { record?: CrossoverMessage; reply?: CrossoverReply | null };
+        const record = "record" in payload && payload.record ? payload.record : (payload as CrossoverMessage);
+        const reply = "reply" in payload ? payload.reply ?? null : null;
         return {
           ...prev,
-          crossover_messages: prev.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item))
+          crossover_messages: prev.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item)),
+          crossover_message_replies: reply
+            ? [reply, ...prev.crossover_message_replies.filter((item) => item.id !== reply.id)]
+            : prev.crossover_message_replies
         };
       }
       if (action === "reply_crossover") {
@@ -850,6 +855,7 @@ function CrossoverPage(props: {
             showRefresh={false}
             logBucket="crossover"
             showAll
+            replies={props.data?.crossover_message_replies ?? []}
           />
           <ActiveShiftLogCard
             rows={openRows}
@@ -881,6 +887,7 @@ function CrossoverPage(props: {
             logBucket="open"
             showAll={showAllOpen}
             onToggleShowAll={() => setShowAllOpen((value) => !value)}
+            replies={props.data?.crossover_message_replies ?? []}
           />
         </div>
         <div className="mt-3 flex justify-end">
@@ -967,6 +974,7 @@ function CrossoverPage(props: {
             logBucket="archived"
             showAll={showAllArchived}
             onToggleShowAll={() => setShowAllArchived((value) => !value)}
+            replies={props.data?.crossover_message_replies ?? []}
           />
         </div>
       </div>
@@ -1401,7 +1409,13 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
         : item.notes;
   const existingResolutionNotes =
     "resolution_notes" in item ? String(item.resolution_notes ?? "").trim() : "";
-  const replies = detail.type === "crossover" ? (data?.crossover_message_replies ?? []).filter((entry) => entry.crossover_message_id === item.id) : [];
+  const replies =
+    detail.type === "crossover"
+      ? (data?.crossover_message_replies ?? [])
+          .filter((entry) => entry.crossover_message_id === item.id)
+          .slice()
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      : [];
   const resolveStatus =
     detail.type === "crossover" ? resolveStatusForShiftLog(item as CrossoverMessage) : ("Resolved" as const);
   const resolveLabel =
@@ -1414,11 +1428,17 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
     if (ok) onClose();
   }
 
+  async function saveStatus(label: string, status: string, success: string) {
+    const payload: Record<string, unknown> = { action: updateAction, id: item.id, status };
+    if (resolution.trim()) payload.resolution_notes = resolution.trim();
+    await saveAndClose(label, payload, success);
+  }
+
   return (
     <Modal
       open={Boolean(detail)}
       title={title}
-      description="View details and update this record without leaving the page."
+      description="Shared team conversation — every update and resolution note is visible to all staff with Team Log access."
       onClose={onClose}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
@@ -1429,7 +1449,7 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             className="admin-btn-secondary"
             type="button"
             disabled={busy}
-            onClick={() => void saveAndClose("Unable to mark in progress.", { action: updateAction, id: item.id, status: "In Progress" }, "Marked in progress.")}
+            onClick={() => void saveStatus("Unable to mark in progress.", "In Progress", "Marked in progress.")}
           >
             Mark In Progress
           </button>
@@ -1437,7 +1457,7 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             className="admin-btn-secondary"
             type="button"
             disabled={busy}
-            onClick={() => void saveAndClose("Unable to mark pending review.", { action: updateAction, id: item.id, status: "Pending Review" }, "Marked pending review.")}
+            onClick={() => void saveStatus("Unable to mark pending review.", "Pending Review", "Marked pending review.")}
           >
             Pending Review
           </button>
@@ -1487,39 +1507,66 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
             <RichText value={description} empty="No notes provided." />
           </div>
         </div>
-        {existingResolutionNotes ? (
-          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-300">Resolution notes</h4>
-            <div className="text-sm text-white">
-              <RichText value={existingResolutionNotes} empty="No resolution notes." />
-            </div>
-          </div>
-        ) : null}
         {"assigned_to" in item ? (
           <SelectField
             label="Assign / Reassign"
             value={item.assigned_to ?? ""}
             options={["", ...staffOptions]}
-            onChange={(value) => void saveAndClose("Unable to assign.", { action: updateAction, id: item.id, assigned_to: value }, "Assignment updated.")}
+            onChange={(value) => void onMutate("Unable to assign.", { action: updateAction, id: item.id, assigned_to: value }, "Assignment updated.")}
           />
         ) : null}
         <PrioritySelect
           value={item.priority}
-          onChange={(priority) => void saveAndClose("Unable to change priority.", { action: updateAction, id: item.id, priority }, "Priority updated.")}
+          onChange={(priority) => void onMutate("Unable to change priority.", { action: updateAction, id: item.id, priority }, "Priority updated.")}
         />
         {detail.type === "crossover" ? (
           <div className="grid gap-3">
-            <h4 className="font-bold text-white">Updates / Internal Notes</h4>
-            {replies.map((entry) => (
-              <div key={entry.id} className="rounded-xl border border-admin-border p-3 text-sm text-admin-muted">
-                <p className="text-xs font-semibold uppercase tracking-wide text-fitdog-orange">{entry.update_type ?? "Internal Note"}</p>
-                <p className="mt-1 text-white">{entry.message}</p>
-                <p className="mt-1 text-xs">{entry.created_by ?? "Staff"} • {formatDateTime(entry.created_at)}</p>
-              </div>
-            ))}
+            <div>
+              <h4 className="font-bold text-white">Team conversation</h4>
+              <p className="mt-1 text-xs text-admin-muted">
+                Visible to every staff member with Team Log access. Add updates so the next person has the full story.
+              </p>
+            </div>
+            <div className="max-h-[22rem] space-y-2 overflow-y-auto rounded-2xl border border-admin-border bg-black/20 p-3">
+              <article className="rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-200">Original entry</p>
+                <div className="mt-1 text-white">
+                  <RichText value={description} empty="No notes provided." />
+                </div>
+                <p className="mt-2 text-xs text-admin-muted">
+                  {shiftLogSubmittedByLabel(item as CrossoverMessage, data?.staff_directory)} • {formatDateTime(item.created_at)}
+                </p>
+              </article>
+              {replies.length ? (
+                replies.map((entry) => (
+                  <article
+                    key={entry.id}
+                    className={`rounded-xl border p-3 text-sm ${
+                      entry.update_type === "Resolution"
+                        ? "border-emerald-400/30 bg-emerald-500/10"
+                        : "border-admin-border bg-white/[0.03]"
+                    }`}
+                  >
+                    <p
+                      className={`text-[11px] font-semibold uppercase tracking-wide ${
+                        entry.update_type === "Resolution" ? "text-emerald-300" : "text-fitdog-orange"
+                      }`}
+                    >
+                      {entry.update_type === "Internal Note" ? "Team Update" : entry.update_type ?? "Team Update"}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-white">{entry.message}</p>
+                    <p className="mt-2 text-xs text-admin-muted">
+                      {entry.created_by ?? "Staff"} • {formatDateTime(entry.created_at)}
+                    </p>
+                  </article>
+                ))
+              ) : (
+                <p className="px-1 text-xs text-admin-muted">No updates yet. Be the first to add one.</p>
+              )}
+            </div>
             <textarea
               className="admin-input min-h-[80px]"
-              placeholder="Add an update or internal note..."
+              placeholder="Add a shared update for the team…"
               value={reply}
               onChange={(event) => setReply(event.target.value)}
             />
@@ -1531,38 +1578,45 @@ function DetailModal({ data, detail, busy, staffOptions, onMutate, onClose }: { 
                 void (async () => {
                   const ok = await onMutate(
                     "Unable to add update.",
-                    { action: "reply_crossover", id: item.id, message: reply, update_type: "Internal Note" },
-                    "Update added."
+                    { action: "reply_crossover", id: item.id, message: reply, update_type: "Team Update" },
+                    "Update posted for the whole team."
                   );
-                  if (ok) {
-                    setReply("");
-                    onClose();
-                  }
+                  if (ok) setReply("");
                 })()
               }
             >
-              Add Update
+              Post update
             </button>
           </div>
         ) : null}
         <Field label="Resolution notes">
           <textarea
             className="admin-input min-h-[80px]"
-            placeholder="Visible to everyone with Team Log / Follow Up / Active Issues access."
+            placeholder="What was done / outcome. Visible to all Team Log users."
             value={resolution}
             onChange={(event) => setResolution(event.target.value)}
           />
-          <p className="text-xs text-admin-muted">Saved when you Resolve. Shown to all staff who can open this log.</p>
+          <p className="text-xs text-admin-muted">
+            Saved for everyone. Also appears in the team conversation when you save or resolve.
+          </p>
         </Field>
+        {existingResolutionNotes ? (
+          <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 p-4">
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-emerald-300">Current resolution notes</h4>
+            <div className="text-sm text-white">
+              <RichText value={existingResolutionNotes} empty="No resolution notes." />
+            </div>
+          </div>
+        ) : null}
         <button
           className="admin-btn-secondary justify-self-start"
           type="button"
           disabled={busy || resolution.trim() === existingResolutionNotes}
           onClick={() =>
-            void saveAndClose(
+            void onMutate(
               "Unable to save resolution notes.",
               { action: updateAction, id: item.id, resolution_notes: resolution.trim() || null },
-              "Resolution notes saved."
+              "Resolution notes saved for the whole team."
             )
           }
         >
