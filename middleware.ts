@@ -184,12 +184,12 @@ async function runMiddleware(request: NextRequest) {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) {
     if (!session) {
       const loginUrl = new URL("/admin/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
     if (session.mustChangePassword) {
       const loginUrl = new URL("/admin/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
 
@@ -305,12 +305,12 @@ async function runMiddleware(request: NextRequest) {
   if (pathname === "/gingr" || pathname.startsWith("/gingr/")) {
     if (!session) {
       const loginUrl = new URL("/admin/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
     if (session.mustChangePassword) {
       const loginUrl = new URL("/admin/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
   }
@@ -327,12 +327,12 @@ async function runMiddleware(request: NextRequest) {
   ) {
     if (!session) {
       const loginUrl = new URL("/admin/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
     if (session.mustChangePassword) {
       const loginUrl = new URL("/admin/login", request.url);
-      loginUrl.searchParams.set("next", pathname);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
       return NextResponse.redirect(loginUrl);
     }
   }
