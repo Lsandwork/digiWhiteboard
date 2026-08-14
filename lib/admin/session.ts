@@ -83,13 +83,20 @@ export function verifyAdminSessionToken(token: string | undefined | null): Admin
   }
 }
 
+function normalizeRequestHost(requestHost?: string | null) {
+  return (requestHost ?? "").trim().toLowerCase().split(":", 1)[0];
+}
+
+function isRuffopsHost(requestHost?: string | null) {
+  const host = normalizeRequestHost(requestHost);
+  return host === "ruffops.com" || host.endsWith(".ruffops.com");
+}
+
 function shouldShareAcrossRuffops(requestHost?: string | null) {
-  const host = (requestHost ?? "").trim().toLowerCase().split(":", 1)[0];
-  return (
-    host === "ruffops.com" ||
-    host.endsWith(".ruffops.com") ||
-    process.env.ADMIN_COOKIE_DOMAIN === ".ruffops.com"
-  );
+  // Only the actual request host decides cookie domain — never an env var alone.
+  // ADMIN_COOKIE_DOMAIN on localhost used to set Secure + .ruffops.com, so the
+  // browser dropped the cookie and sign-in looked broken.
+  return isRuffopsHost(requestHost);
 }
 
 export function getAdminSessionCookieOptions(
@@ -101,7 +108,7 @@ export function getAdminSessionCookieOptions(
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production" || shareAcrossRuffops,
+    secure: process.env.NODE_ENV === "production" || isRuffopsHost(requestHost),
     path: "/",
     maxAge: maxAgeSeconds,
     ...(shareAcrossRuffops ? { domain: ".ruffops.com" as const } : {})
@@ -112,7 +119,7 @@ function hostOnlyCookieOptions(maxAgeSeconds: number, requestHost?: string | nul
   return {
     httpOnly: true,
     sameSite: "lax" as const,
-    secure: process.env.NODE_ENV === "production" || shouldShareAcrossRuffops(requestHost),
+    secure: process.env.NODE_ENV === "production" || isRuffopsHost(requestHost),
     path: "/",
     maxAge: maxAgeSeconds
   };

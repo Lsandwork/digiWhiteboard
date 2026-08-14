@@ -58,10 +58,15 @@ export async function POST(request: Request) {
     email: session.email,
     adminUserId: session.adminUserId,
     role: existing.role,
-    mustChangePassword: false
+    mustChangePassword: false,
+    isDemo: session.isDemo,
+    demoRole: session.demoRole,
+    impersonatorEmail: session.impersonatorEmail,
+    impersonatorAdminId: session.impersonatorAdminId,
+    impersonatorRole: session.impersonatorRole
   });
 
-  const response = NextResponse.json({ ok: true, role: existing.role });
+  const response = NextResponse.json({ ok: true, role: existing.role, isDemo: session.isDemo ?? false });
   setAdminSessionCookie(response, token, request.headers.get("host"));
   return response;
 }

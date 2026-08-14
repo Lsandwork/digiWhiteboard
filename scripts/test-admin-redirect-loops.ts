@@ -32,6 +32,9 @@ function adminRedirectStep(
   }
 
   if (pathname === "/admin") {
+    if (tab === "users" && board !== "lobby") {
+      return { pathname, board: "lobby", tab: "users" };
+    }
     if (!tab && board !== "marketing" && board !== "lobby") {
       return { pathname, board: "staff", tab: firstAccessibleAdminTab(null, role, "staff") };
     }
@@ -162,6 +165,13 @@ for (const host of ["fitdog.ruffops.com", "staff.ruffops.com"]) {
     "owner_admin"
   );
   assert.equal(settled.board, "lobby", "admins can still open the lobby board on fitdog host");
+}
+
+// Users admin lives on the lobby board — never staff+users.
+{
+  const { settled } = walk("fitdog.ruffops.com", { pathname: "/admin", board: "staff", tab: "users" }, "owner_admin");
+  assert.equal(settled.board, "lobby", "users tab canonicalizes to lobby board");
+  assert.equal(settled.tab, "users");
 }
 
 console.log("admin redirect loop tests passed");
