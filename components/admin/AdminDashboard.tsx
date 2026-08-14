@@ -151,10 +151,13 @@ export function AdminDashboard() {
     if (!silent) setBusy(true);
     else setRefreshing(true);
     setError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 25_000);
     try {
       const response = await fetch(`/api/admin/dashboard?board=${board}`, {
         cache: "no-store",
-        credentials: "same-origin"
+        credentials: "same-origin",
+        signal: controller.signal
       });
       if (response.status === 401) {
         window.location.assign("/admin/login");
@@ -164,8 +167,14 @@ export function AdminDashboard() {
       if (!response.ok) throw new Error(body.error ?? "Unable to load admin dashboard.");
       setData(body as DashboardPayload);
     } catch (loadError) {
-      setError(humanizeUnknownError(loadError, "Unable to load admin dashboard. Reload and try again."));
+      const aborted = loadError instanceof DOMException && loadError.name === "AbortError";
+      setError(
+        aborted
+          ? "The dashboard is taking too long to load. Check your connection and tap Retry."
+          : humanizeUnknownError(loadError, "Unable to load admin dashboard. Reload and try again.")
+      );
     } finally {
+      window.clearTimeout(timeout);
       setBusy(false);
       setRefreshing(false);
     }
