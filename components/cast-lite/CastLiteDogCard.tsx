@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import { Dog } from "lucide-react";
-import { getRememberedDogPhoto, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
+import { toDisplayPhotoUrl } from "@/lib/gingr-photo-display";
 import type { CastLiteDog } from "@/lib/whiteboard/state";
 
 type CastLiteDogCardProps = {
@@ -11,19 +11,9 @@ type CastLiteDogCardProps = {
   lowMotion?: boolean;
 };
 
-function castDogPhotoKey(dog: CastLiteDog) {
-  if (dog.gingr_animal_id) return `animal:${dog.gingr_animal_id}`;
-  return `id:${dog.id}`;
-}
-
 export const CastLiteDogCard = memo(function CastLiteDogCard({ dog, mode, lowMotion = true }: CastLiteDogCardProps) {
   const [failed, setFailed] = useState(false);
-  const photoKey = castDogPhotoKey(dog);
-  const incomingUrl = dog.photo_url?.trim() || null;
-  if (incomingUrl) {
-    rememberStableDogPhoto(photoKey, incomingUrl);
-  }
-  const photoUrl = incomingUrl || getRememberedDogPhoto(photoKey);
+  const photoUrl = toDisplayPhotoUrl(dog.photo_url, dog.gingr_animal_id);
   const initial = dog.animal_name?.trim().charAt(0).toUpperCase() ?? "";
   const personLabel = mode === "in" ? "Owner" : "Pickup";
 
@@ -41,6 +31,7 @@ export const CastLiteDogCard = memo(function CastLiteDogCard({ dog, mode, lowMot
             height={96}
             loading="lazy"
             decoding="async"
+            referrerPolicy="no-referrer"
             onError={() => setFailed(true)}
           />
         ) : initial ? (

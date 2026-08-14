@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { extractPhotoUrl } from "../lib/board-utils";
+import { extractPhotoUrl, normalizePhotoUrl } from "../lib/board-utils";
 import { extractGingrAnimalPhotoFromData } from "../lib/gingr-animal-photo";
+import { toDisplayPhotoUrl } from "../lib/gingr-photo-display";
 
 assert.equal(
   extractPhotoUrl({ a_image: "/uploads/animals/beau.jpg" }),
@@ -72,5 +73,15 @@ assert.equal(
 );
 
 assert.equal(extractGingrAnimalPhotoFromData({ id: "1", a_first: "No Photo" }), null);
+
+assert.equal(normalizePhotoUrl("beau.jpg"), "https://fitdog.gingrapp.com/uploads/beau.jpg");
+assert.equal(normalizePhotoUrl("uploads/animals/beau.jpg"), "https://fitdog.gingrapp.com/uploads/animals/beau.jpg");
+
+assert.equal(
+  toDisplayPhotoUrl("https://fitdog.gingrapp.com/uploads/animals/beau.jpg", "115"),
+  "/api/gingr/animal-photo/image?animalId=115&src=https%3A%2F%2Ffitdog.gingrapp.com%2Fuploads%2Fanimals%2Fbeau.jpg"
+);
+assert.equal(toDisplayPhotoUrl(null, "115"), "/api/gingr/animal-photo/image?animalId=115");
+assert.equal(toDisplayPhotoUrl("/assets/lobby-whiteboard/light-v2/branding/fitdog-dog-logo-exact.png", "115"), "/assets/lobby-whiteboard/light-v2/branding/fitdog-dog-logo-exact.png");
 
 console.log("gingr animal photo extraction tests passed");

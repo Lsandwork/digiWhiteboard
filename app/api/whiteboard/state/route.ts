@@ -5,6 +5,7 @@ import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { debugBoardLog, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { CastBoardType } from "@/lib/whiteboard/cast-options";
+import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { loadWhiteboardState, persistWhiteboardState, type WhiteboardStateResponse } from "@/lib/whiteboard/state";
 
 export const dynamic = "force-dynamic";
@@ -53,9 +54,20 @@ export async function GET(request: Request) {
     // Cast TVs are often the only client polling, so they must keep the Gingr
     // board cache warm too. Runs after the response, never blocking the TV.
     after(async () => {
+      const payload = state.payload;
+      const missingIds =
+        payload.boardType === "staff"
+          ? collectMissingPhotoAnimalIds([...payload.checkingInDogs, ...payload.checkingOutDogs])
+          : collectMissingPhotoAnimalIds(
+              [payload.featured, ...payload.queue].filter(Boolean) as Array<{
+                gingr_animal_id?: string | null;
+                dog_photo_url?: string | null;
+              }>
+            );
       await Promise.all([
         refreshGingrBoardCache().catch(() => null),
-        refreshRetiredTransitionKeys(supabase).catch(() => null)
+        refreshRetiredTransitionKeys(supabase).catch(() => null),
+        fillAndPersistMissingAnimalPhotos(supabase, missingIds).catch(() => 0)
       ]);
     });
 

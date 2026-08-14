@@ -3,7 +3,6 @@ import { debugBoardLog } from "@/lib/server-ttl-cache";
 import { safeMediaUrl, safeUrl } from "@/lib/safe-url";
 import type { LobbyScheduleDay } from "@/lib/lobby/class-schedule";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
-import { lobbyAssets } from "@/lib/lobby/assets";
 import type { LobbyCheckoutDog, LobbySettings } from "@/lib/lobby/types";
 
 const DEFAULT_LOBBY_SETTINGS: LobbySettings = {
@@ -109,8 +108,7 @@ export function sanitizeLobbyCheckoutDog(raw: unknown, debugBoard = false): Lobb
     return null;
   }
 
-  const photoFallback = lobbyAssets.dogProfileFallback;
-  const photo = safeMediaUrl(dog.dog_photo_url, photoFallback) || null;
+  const photo = safeMediaUrl(dog.dog_photo_url, "") || null;
 
   return {
     id,

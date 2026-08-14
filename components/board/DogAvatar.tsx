@@ -5,15 +5,14 @@ import clsx from "clsx";
 import { Dog } from "lucide-react";
 import type { LiveDog } from "@/lib/types";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
+import { toDisplayPhotoUrl } from "@/lib/gingr-photo-display";
 import {
-  buildCastOptimizedDogPhotoUrl,
   getStableDogPhotoKey,
   hasLoadedDogPhoto,
   markDogPhotoLoaded,
   rememberStableDogPhoto,
   resolveStableDogPhotoUrl
 } from "@/lib/dog-photo-display-cache";
-import { useDogPhotoFallback } from "@/hooks/useDogPhotoFallback";
 
 type DogAvatarProps = {
   dog: LiveDog;
@@ -108,6 +107,7 @@ function DogAvatarContent({
         loading="lazy"
         decoding="async"
         draggable={false}
+        referrerPolicy="no-referrer"
         onLoad={() => {
           markDogPhotoLoaded(stableKey);
           setLoaded(true);
@@ -121,20 +121,8 @@ function DogAvatarContent({
 export function DogAvatar({ dog, mode, size = "default", isAlerting = false, isNew = false }: DogAvatarProps) {
   const stableKey = getStableDogPhotoKey(dog);
   const serverPhotoUrl = resolveStableDogPhotoUrl(dog, resolveDogPhotoUrl);
-  const photoUrl = useDogPhotoFallback(dog.gingr_animal_id, serverPhotoUrl);
-  const [castOptimized, setCastOptimized] = useState(false);
+  const displayPhotoUrl = toDisplayPhotoUrl(serverPhotoUrl, dog.gingr_animal_id);
   const initial = dog.animal_name.trim().slice(0, 1).toUpperCase();
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setCastOptimized(document.documentElement.classList.contains("fitdog-cast-mode"));
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  const displayPhotoUrl = photoUrl && castOptimized
-    ? buildCastOptimizedDogPhotoUrl(photoUrl, size === "solo" ? 640 : 256)
-    : photoUrl;
 
   return (
     <div

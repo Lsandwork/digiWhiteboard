@@ -37,6 +37,24 @@ export async function loadStoredAnimalPhotoUrl(supabase: SupabaseClient, animalI
   return photoMap.get(animalId.trim()) ?? null;
 }
 
+export async function persistAnimalPhotoUrl(
+  supabase: SupabaseClient,
+  animalId: string,
+  photoUrl: string
+) {
+  const trimmedId = animalId.trim();
+  const trimmedUrl = photoUrl.trim();
+  if (!trimmedId || !trimmedUrl) return;
+
+  const { error } = await supabase
+    .from("live_transition_dogs")
+    .update({ photo_url: trimmedUrl, updated_at: new Date().toISOString() })
+    .eq("gingr_animal_id", trimmedId)
+    .is("photo_url", null);
+
+  if (error) throw error;
+}
+
 export async function applyStoredAnimalPhotos(supabase: SupabaseClient, dogs: LiveDog[]) {
   const photoMap = await loadStoredAnimalPhotoMap(
     supabase,

@@ -16,7 +16,7 @@ type CachedPhoto = {
 };
 
 const ANIMAL_PHOTO_MISS_COOLDOWN_MS = 5 * 60 * 1000;
-const GLOBAL_MIN_INTERVAL_MS = Number(process.env.GINGR_GLOBAL_MIN_INTERVAL_MS ?? 2000);
+const PHOTO_FETCH_SPACING_MS = 200;
 
 const animalPhotoCache = new Map<string, CachedPhoto>();
 
@@ -196,8 +196,10 @@ type GingrAnimalPhotoOptions = {
 };
 
 async function waitForGingrAnimalPhotoSlot() {
+  const startedAt = Date.now();
   while (!canCallGingrEndpoint("animal_photo")) {
-    await sleep(250);
+    if (Date.now() - startedAt >= 400) return;
+    await sleep(50);
   }
 }
 
@@ -236,7 +238,7 @@ export async function getGingrAnimalPhotoUrl(
     const data = await fetchGingrAnimalRecords(trimmedAnimalId, subdomain, apiKey, controller.signal);
     const photoUrl = readPhotoFromGingrData(data, trimmedAnimalId);
     rememberAnimalPhoto(trimmedAnimalId, photoUrl);
-    if (!options?.bypassFetchGate) {
+    if (photoUrl && !options?.bypassFetchGate) {
       markAnimalPhotoFetch(trimmedAnimalId);
     }
     return photoUrl;
@@ -270,7 +272,7 @@ export async function getGingrAnimalPhotoUrlMap(
     map.set(animalId, photoUrl);
 
     if (index < uniqueIds.length - 1) {
-      await sleep(GLOBAL_MIN_INTERVAL_MS);
+      await sleep(PHOTO_FETCH_SPACING_MS);
     }
   }
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { reconcileCachedBasketClears, sweepExpiredTransitionRows } from "@/lib/board-fast-checkout";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
+import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import { sanitizeLobbyCheckouts } from "@/lib/lobby/validate";
@@ -76,7 +77,16 @@ export async function GET(request: Request) {
         const [, cleared, swept] = await Promise.all([
           refreshGingrBoardCache().catch(() => null),
           reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 })),
-          sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 }))
+          sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 })),
+          fillAndPersistMissingAnimalPhotos(
+            supabase,
+            collectMissingPhotoAnimalIds(
+              [checkout.featured, ...checkout.queue].filter(Boolean) as Array<{
+                gingr_animal_id?: string | null;
+                dog_photo_url?: string | null;
+              }>
+            )
+          ).catch(() => 0)
         ]);
         if (cleared.hidden_count > 0 || swept.hidden_count > 0) {
           invalidateBoardTransitionCaches();

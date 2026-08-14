@@ -7,6 +7,7 @@ import {
   sweepExpiredTransitionRows
 } from "@/lib/board-fast-checkout";
 import { FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
+import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
@@ -71,7 +72,11 @@ export async function GET(request: Request) {
         refreshGingrBoardCache().catch(() => null),
         refreshRetiredTransitionKeys(supabase, now).catch(() => null),
         reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 })),
-        sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 }))
+        sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 })),
+        fillAndPersistMissingAnimalPhotos(
+          supabase,
+          collectMissingPhotoAnimalIds([...result.checking_in, ...result.checking_out])
+        ).catch(() => 0)
       ]);
       if (cleared.hidden_count > 0 || swept.hidden_count > 0) {
         invalidateBoardTransitionCaches();

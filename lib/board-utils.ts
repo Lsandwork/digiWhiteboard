@@ -51,13 +51,34 @@ function firstString(source: UnknownRecord, keys: string[]) {
   return null;
 }
 
+export function gingrPublicOrigin() {
+  const subdomain = process.env.GINGR_SUBDOMAIN ?? "fitdog";
+  return `https://${subdomain}.gingrapp.com`;
+}
+
 export function normalizePhotoUrl(url: string) {
-  if (url.startsWith("//")) return `https:${url}`;
-  if (url.startsWith("/")) {
-    const subdomain = process.env.GINGR_SUBDOMAIN ?? "fitdog";
-    return `https://${subdomain}.gingrapp.com${url}`;
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+
+  const origin = gingrPublicOrigin();
+  if (trimmed.startsWith("/")) return `${origin}${trimmed}`;
+
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    if (
+      trimmed.startsWith("uploads/") ||
+      trimmed.startsWith("files/") ||
+      trimmed.startsWith("img/") ||
+      trimmed.startsWith("images/")
+    ) {
+      return `${origin}/${trimmed}`;
+    }
+    if (/\.(jpe?g|png|gif|webp|avif|bmp)(\?.*)?$/i.test(trimmed) && !trimmed.includes("/")) {
+      return `${origin}/uploads/${trimmed}`;
+    }
   }
-  return url;
+
+  return trimmed;
 }
 
 export function extractPhotoUrl(...sources: UnknownRecord[]) {

@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { enrichStaffBoardAnimalPhotos } from "@/lib/board-animal-photos";
+import { enrichStaffBoardAnimalPhotos, fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { applyStoredAnimalPhotos } from "@/lib/animal-photo-store";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import {
@@ -340,16 +340,14 @@ export async function GET(request: Request) {
 
     if (checkingIn.length || checkingOut.length) {
       after(async () => {
-        await Promise.all(
-          [
-            ...checkingIn.map((dog) =>
-              triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(dog))
-            ),
-            ...checkingOut.map((dog) =>
-              triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(dog))
-            )
-          ]
-        );
+        await Promise.all([
+          fillAndPersistMissingAnimalPhotos(
+            supabase,
+            collectMissingPhotoAnimalIds([...checkingIn, ...checkingOut])
+          ).catch(() => 0),
+          ...checkingIn.map((dog) => triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(dog))),
+          ...checkingOut.map((dog) => triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(dog)))
+        ]);
       });
     }
 

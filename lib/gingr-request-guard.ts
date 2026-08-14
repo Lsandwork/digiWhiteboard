@@ -46,6 +46,11 @@ export function canCallGingrEndpoint(endpoint: GingrEndpoint, now = Date.now()) 
     return false;
   }
 
+  // Animal photos must not wait behind back-of-house polling or boards stay letter-only.
+  if (endpoint === "animal_photo") {
+    return now - lastEndpointCall >= 200;
+  }
+
   if (now - lastGlobalCallAt < GLOBAL_MIN_INTERVAL_MS) {
     return false;
   }
@@ -55,7 +60,9 @@ export function canCallGingrEndpoint(endpoint: GingrEndpoint, now = Date.now()) 
 
 export function markGingrEndpointCalled(endpoint: GingrEndpoint, now = Date.now()) {
   lastCallByEndpoint.set(endpoint, now);
-  lastGlobalCallAt = now;
+  if (endpoint !== "animal_photo") {
+    lastGlobalCallAt = now;
+  }
 }
 
 export function getCachedBackOfHouseBoard(now = Date.now(), allowStale = false) {

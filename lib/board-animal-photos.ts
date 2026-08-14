@@ -1,4 +1,4 @@
-import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
+import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl, persistAnimalPhotoUrl } from "@/lib/animal-photo-store";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { getGingrAnimalPhotoUrlMap } from "@/lib/gingr-animal-photo";
@@ -34,7 +34,7 @@ export async function enrichStaffBoardAnimalPhotos(supabase: SupabaseClient, dog
     timeoutMs: 3000
   });
 
-  return Promise.all(
+  const enriched = await Promise.all(
     withCachedBackOfHousePhotos.map(async (dog) => {
       if (dog.photo_url) return dog;
 
@@ -53,4 +53,36 @@ export async function enrichStaffBoardAnimalPhotos(supabase: SupabaseClient, dog
       return dog;
     })
   );
+
+  return enriched;
+}
+
+/** Background fill so the next TV/lobby poll already has Gingr photos stored. */
+export async function fillAndPersistMissingAnimalPhotos(
+  supabase: SupabaseClient,
+  animalIds: Array<string | null | undefined>
+) {
+  const missing = [...new Set(animalIds.map((id) => id?.trim()).filter(Boolean) as string[])];
+  if (!missing.length) return 0;
+
+  const photoMap = await getGingrAnimalPhotoUrlMap(missing, { timeoutMs: 4000 });
+  let saved = 0;
+  for (const [animalId, photoUrl] of photoMap) {
+    if (!photoUrl) continue;
+    try {
+      await persistAnimalPhotoUrl(supabase, animalId, photoUrl);
+      saved += 1;
+    } catch {
+      // Persistence is best-effort — boards can still proxy the live Gingr photo.
+    }
+  }
+  return saved;
+}
+
+export function collectMissingPhotoAnimalIds(
+  dogs: Array<{ gingr_animal_id?: string | null; photo_url?: string | null; dog_photo_url?: string | null }>
+) {
+  return dogs
+    .filter((dog) => !(dog.photo_url?.trim() || dog.dog_photo_url?.trim()) && dog.gingr_animal_id?.trim())
+    .map((dog) => dog.gingr_animal_id as string);
 }

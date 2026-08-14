@@ -337,14 +337,16 @@ export async function POST(request: Request) {
       if (dog.gingr_animal_id || dog.gingr_reservation_id) {
         const existing = await findExistingDog(supabase, dog.gingr_reservation_id, dog.gingr_animal_id);
         const now = new Date().toISOString();
-        const photoPatch = {
-          photo_url: dog.photo_url,
+        const photoPatch: Record<string, unknown> = {
           animal_name: dog.animal_name,
           owner_name: dog.owner_name,
           last_seen_from_gingr_at: now,
           raw_payload: payload,
           updated_at: now
         };
+        if (dog.photo_url) {
+          photoPatch.photo_url = dog.photo_url;
+        }
 
         if (existing) {
           await supabase
