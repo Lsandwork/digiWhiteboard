@@ -17,14 +17,17 @@ function fetchWithTimeout(timeoutMs: number): typeof fetch {
   return async (input, init) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const signal =
-      init?.signal && typeof AbortSignal.any === "function"
-        ? AbortSignal.any([init.signal, controller.signal])
-        : controller.signal;
+    const parent = init?.signal;
+    const onParentAbort = () => controller.abort();
+    if (parent) {
+      if (parent.aborted) controller.abort();
+      else parent.addEventListener("abort", onParentAbort, { once: true });
+    }
     try {
-      return await fetch(input, { ...init, signal });
+      return await fetch(input, { ...init, signal: controller.signal });
     } finally {
       clearTimeout(timer);
+      parent?.removeEventListener("abort", onParentAbort);
     }
   };
 }

@@ -418,20 +418,27 @@ export function sanitizeAdminUser(row: AdminUserRecord): AdminUserPublic {
 }
 
 export async function findAdminUserByEmail(supabase: SupabaseClient, email: string) {
-  const normalized = email.trim().toLowerCase();
-  const { data, error } = await supabase
-    .from("admin_users")
-    .select("*")
-    .eq("email", normalized)
-    .maybeSingle();
+  const users = await findAdminUsersByEmails(supabase, [email]);
+  return users[0] ?? null;
+}
+
+export async function findAdminUsersByEmails(supabase: SupabaseClient, emails: string[]) {
+  const normalized = [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  if (!normalized.length) return [] as AdminUserRecord[];
+
+  const { data, error } = await supabase.from("admin_users").select("*").in("email", normalized);
   if (error) {
     if (isMissingAdminUsersTable(error)) {
-      return loadFallbackAdminUserByEmail(supabase, normalized);
+      const fallback: AdminUserRecord[] = [];
+      for (const email of normalized) {
+        const user = await loadFallbackAdminUserByEmail(supabase, email);
+        if (user) fallback.push(user);
+      }
+      return fallback;
     }
     throwAdminUserError(error);
   }
-  if (data) return data as AdminUserRecord;
-  return null;
+  return (data ?? []) as AdminUserRecord[];
 }
 
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
