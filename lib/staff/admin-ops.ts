@@ -733,8 +733,11 @@ export async function createCrossoverMessage(
   const priority = normalizePriority(input.priority);
   const status = normalizeStatus(input.status, needsReview ? "Needs Management Review" : "Open");
   const urgent = Boolean(input.urgent);
-  const from = optionalString(input.from_department) ?? "Front Desk";
-  const to = optionalString(input.to_department) ?? optionalString(input.assigned_team) ?? assignedTo ?? "Front Desk Team";
+  const from =
+    optionalString(input.from_department) ??
+    optionalString(input.department_area) ??
+    "Front Desk";
+  const to = optionalString(input.to_department) ?? optionalString(input.assigned_team) ?? assignedTo ?? from;
   const details = rawDetails;
   const submitterLabel = cleanString(displayName) || actor;
   const record: CrossoverMessage = {
@@ -767,7 +770,7 @@ export async function createCrossoverMessage(
     assigned_to: assignedTo,
     assigned_team: optionalString(input.assigned_team) ?? (assignedTo && assignedTo.includes("Team") ? assignedTo : null),
     reported_to: assignedTo ?? to,
-    department_area: optionalString(input.department_area),
+    department_area: optionalString(input.department_area) ?? from,
     due_at: normalizeDate(input.due_at),
     reminder_at: normalizeDate(input.reminder_at),
     needs_management_review: needsReview,
