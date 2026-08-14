@@ -11,6 +11,7 @@ import { parseAdminBoardType } from "../lib/admin/types";
 
 assert.equal(normalizeHostname("Fitdog.RuffOps.com:443"), FITDOG_HOSTNAME);
 assert.equal(isFitdogHostname("fitdog.ruffops.com"), true);
+assert.equal(isFitdogHostname("www.fitdog.ruffops.com"), true);
 assert.equal(isFitdogHostname("staff.ruffops.com"), false);
 assert.equal(shouldRedirectFitdogRootToLogin("fitdog.ruffops.com", "/"), true);
 assert.equal(shouldRedirectFitdogRootToLogin("fitdog.ruffops.com", "/admin/login"), false);

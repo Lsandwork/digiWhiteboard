@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { isSafeRelativePath, humanizeUnknownError } from "@/lib/safe-url";
@@ -39,8 +38,7 @@ const FEATURES = [
   }
 ] as const;
 
-export function AdminLogin() {
-  const searchParams = useSearchParams();
+export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -129,7 +127,7 @@ export function AdminLogin() {
         return;
       }
 
-      const next = resolvePostLoginRoute(searchParams.get("next"), body.role, body.isDemo);
+      const next = resolvePostLoginRoute(nextPath, body.role, body.isDemo);
       // Hard navigation so middleware/session cookie is applied (soft router.replace can bounce back to login).
       window.location.assign(next);
     } catch (loginError) {
@@ -166,7 +164,7 @@ export function AdminLogin() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to update password.");
 
-      const next = resolvePostLoginRoute(searchParams.get("next"), body.role);
+      const next = resolvePostLoginRoute(nextPath, body.role);
       window.location.assign(next);
     } catch (changeError) {
       setError(humanizeUnknownError(changeError, "Unable to update password."));

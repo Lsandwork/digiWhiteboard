@@ -155,7 +155,14 @@ export function AdminDashboard() {
     else setRefreshing(true);
     setError(null);
     try {
-      const response = await fetch(`/api/admin/dashboard?board=${board}`, { cache: "no-store" });
+      const response = await fetch(`/api/admin/dashboard?board=${board}`, {
+        cache: "no-store",
+        credentials: "same-origin"
+      });
+      if (response.status === 401) {
+        window.location.assign("/admin/login");
+        return;
+      }
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load admin dashboard.");
       setData(body as DashboardPayload);

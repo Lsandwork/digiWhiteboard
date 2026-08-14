@@ -16,7 +16,8 @@ export function normalizeHostname(host: string | null | undefined): string {
 }
 
 export function isFitdogHostname(host: string | null | undefined): boolean {
-  return normalizeHostname(host) === FITDOG_HOSTNAME;
+  const hostname = normalizeHostname(host);
+  return hostname === FITDOG_HOSTNAME || hostname === `www.${FITDOG_HOSTNAME}`;
 }
 
 /**

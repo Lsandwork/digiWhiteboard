@@ -47,6 +47,10 @@ const nextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=0, must-revalidate" }]
       },
       {
+        source: "/admin/login",
+        headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" }]
+      },
+      {
         source: "/gingr",
         headers: [
           {
