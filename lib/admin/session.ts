@@ -157,14 +157,6 @@ function serializeSetCookie(
   return parts.join("; ");
 }
 
-function collectSetCookies(response: NextResponse) {
-  return typeof response.headers.getSetCookie === "function"
-    ? response.headers.getSetCookie()
-    : [...response.headers.entries()]
-        .filter(([key]) => key.toLowerCase() === "set-cookie")
-        .map(([, value]) => value);
-}
-
 /**
  * Logout only. Never call this in the same response as setAdminSessionCookie —
  * Safari drops the new session when Max-Age=0 and a new value share one name.
@@ -185,8 +177,14 @@ export function clearAdminSessionCookies(response: NextResponse, requestHost?: s
 
 /**
  * Write the session with Next.js cookies.set() (host-only). That is the path
- * that actually sticks in Safari. Optionally add a shared Domain=.ruffops.com
- * copy without expiring anything in this response.
+ * that actually sticks in Safari.
+ *
+ * Do NOT append a Domain=.ruffops.com copy in this response. Safari treats two
+ * Set-Cookie headers for the same name (host-only + domain) as conflicting and
+ * drops both, so sign-in returns 200 but the session never persists — the user
+ * lands back on the login page forever.
+ *
+ * Logout still clears both host-only and domain copies via clearAdminSessionCookies.
  */
 export function setAdminSessionCookie(
   response: NextResponse,
@@ -195,24 +193,6 @@ export function setAdminSessionCookie(
 ) {
   const hostOnly = hostOnlyCookieOptions(SESSION_TTL_MS / 1000, requestHost);
   response.cookies.set(ADMIN_SESSION_COOKIE, token, hostOnly);
-
-  if (!shouldShareAcrossRuffops(requestHost)) return;
-
-  const alreadyHasDomain = collectSetCookies(response).some(
-    (value) =>
-      value.startsWith(`${ADMIN_SESSION_COOKIE}=`) &&
-      value.includes("Domain=.ruffops.com") &&
-      !/Max-Age=0(?:;|$)/.test(value)
-  );
-  if (alreadyHasDomain) return;
-
-  response.headers.append(
-    "Set-Cookie",
-    serializeSetCookie(ADMIN_SESSION_COOKIE, token, {
-      ...hostOnly,
-      domain: ".ruffops.com"
-    })
-  );
 }
 
 function decodeCookieValue(value: string) {

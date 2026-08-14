@@ -34,13 +34,10 @@ function setCookies(res: NextResponse) {
   setAdminSessionCookie(res, "token.sig", "fitdog.ruffops.com");
   const cookies = setCookies(res);
   const sessionCookies = cookies.filter((value) => value.startsWith(`${ADMIN_SESSION_COOKIE}=`));
+  assert.equal(sessionCookies.length, 1, `login sets exactly one host-only cookie: ${JSON.stringify(sessionCookies)}`);
   assert.ok(
-    sessionCookies.some((value) => value.startsWith(`${ADMIN_SESSION_COOKIE}=token.sig`) && !value.includes("Domain=")),
+    sessionCookies[0]?.startsWith(`${ADMIN_SESSION_COOKIE}=token.sig`) && !sessionCookies[0]?.includes("Domain="),
     `expected host-only session cookie, got ${JSON.stringify(sessionCookies)}`
-  );
-  assert.ok(
-    sessionCookies.some((value) => value.includes("Domain=.ruffops.com") && value.includes("token.sig")),
-    "sets shared domain session cookie"
   );
   assert.ok(
     !sessionCookies.some((value) => /Max-Age=0(?:;|$)/.test(value) || /Max-Age=0$/.test(value)),

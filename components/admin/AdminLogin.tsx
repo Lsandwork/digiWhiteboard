@@ -74,10 +74,6 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
           setMustChangePassword(true);
           setAdminUserId(body.adminUserId);
           if (body.username) setUsername(body.username);
-          return;
-        }
-        if (body.authenticated) {
-          window.location.assign(resolvePostLoginRoute(nextPath, body.role, body.isDemo));
         }
       } catch {
         // ignore
