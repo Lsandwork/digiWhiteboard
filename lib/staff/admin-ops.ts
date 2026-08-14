@@ -959,11 +959,13 @@ export async function replyToCrossoverMessage(
     id: newId(),
     crossover_message_id: id,
     message: text,
-    update_type: cleanString(updateType, "Internal Note") || "Internal Note",
+    update_type: cleanString(updateType, "Team Update") || "Team Update",
     created_by: authorLabel,
     created_at: nowIso()
   };
-  const next = createActivityLog({ ...state, crossover_message_replies: sortNewest([reply, ...state.crossover_message_replies]) }, {
+  // Never drop conversation history — keep a generous shared reply trail for every log.
+  const replies = sortNewest([reply, ...state.crossover_message_replies]).slice(0, 5_000);
+  const next = createActivityLog({ ...state, crossover_message_replies: replies }, {
     activity_type: "shift_log.update_added",
     title: "Update added to shift log",
     description: `${authorLabel ?? "Staff"}: ${text}`,
@@ -1128,10 +1130,39 @@ function applyCrossoverMessagePatch(
   return { state: next, updated: updatedRecord };
 }
 
-export async function updateCrossoverMessage(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
+export async function updateCrossoverMessage(
+  supabase: SupabaseClient,
+  id: string,
+  patch: Record<string, unknown>,
+  actor: string | null
+): Promise<{ record: CrossoverMessage; reply: CrossoverReply | null }> {
   const state = await loadState(supabase);
   const previous = state.crossover_messages.find((item) => item.id === id);
-  const { state: next, updated } = applyCrossoverMessagePatch(state, id, patch, actor);
+  const { state: patched, updated } = applyCrossoverMessagePatch(state, id, patch, actor);
+  let next = patched;
+  let reply: CrossoverReply | null = null;
+
+  const previousResolution = String(previous?.resolution_notes ?? "").trim();
+  const nextResolution = String(updated.resolution_notes ?? "").trim();
+  const resolutionChanged = Boolean(nextResolution && nextResolution !== previousResolution);
+  const statusChanged = Boolean(previous && previous.status !== updated.status);
+  if (resolutionChanged || (statusChanged && nextResolution)) {
+    reply = {
+      id: newId(),
+      crossover_message_id: id,
+      message: resolutionChanged
+        ? nextResolution
+        : `${updated.status}${nextResolution ? ` — ${nextResolution}` : ""}`,
+      update_type: resolutionChanged ? "Resolution" : "Status Update",
+      created_by: actor,
+      created_at: nowIso()
+    };
+    next = {
+      ...next,
+      crossover_message_replies: sortNewest([reply, ...next.crossover_message_replies]).slice(0, 5_000)
+    };
+  }
+
   await saveState(supabase, next);
   const wasAlert = previous ? staffContentNeedsSuperAdminSms(previous) : false;
   const nowAlert = staffContentNeedsSuperAdminSms(updated);
@@ -1150,7 +1181,7 @@ export async function updateCrossoverMessage(supabase: SupabaseClient, id: strin
       supabase
     );
   }
-  return updated;
+  return { record: updated, reply };
 }
 
 export async function moveCrossoverMessages(

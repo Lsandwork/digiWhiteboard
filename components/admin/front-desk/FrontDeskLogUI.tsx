@@ -306,7 +306,8 @@ export function ActiveShiftLogCard({
   showRefresh = true,
   logBucket = "open",
   showAll = false,
-  onToggleShowAll
+  onToggleShowAll,
+  replies = []
 }: {
   rows: CrossoverMessage[];
   total: number;
@@ -337,6 +338,7 @@ export function ActiveShiftLogCard({
   logBucket?: FrontDeskLogBucket;
   showAll?: boolean;
   onToggleShowAll?: () => void;
+  replies?: CrossoverReply[];
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [moveOpen, setMoveOpen] = useState(false);
@@ -345,6 +347,21 @@ export function ActiveShiftLogCard({
   const { sortedRows, sortKey, sortDir, toggleSort } = useClientSort(rows, SHIFT_LOG_SORT_ACCESSORS, "created_at", "desc");
   const sortedTotal = sortedRows.length;
   const sortedMaxPage = Math.max(1, Math.ceil(sortedTotal / Math.max(1, pageSize)));
+  const repliesById = useMemo(() => {
+    const map = new Map<string, CrossoverReply[]>();
+    for (const reply of replies) {
+      const list = map.get(reply.crossover_message_id) ?? [];
+      list.push(reply);
+      map.set(reply.crossover_message_id, list);
+    }
+    for (const [id, list] of map) {
+      map.set(
+        id,
+        [...list].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      );
+    }
+    return map;
+  }, [replies]);
   const safePage = Math.min(Math.max(1, page), sortedMaxPage);
   const displayRows = showAll
     ? sortedRows
@@ -591,6 +608,15 @@ export function ActiveShiftLogCard({
                         Resolution: {htmlToPlainText(item.resolution_notes)}
                       </p>
                     ) : null}
+                    {(repliesById.get(item.id)?.length ?? 0) > 0 ? (
+                      <p className="crossover-table__subject-preview mt-1 text-sky-200">
+                        {repliesById.get(item.id)!.length} team{" "}
+                        {repliesById.get(item.id)!.length === 1 ? "update" : "updates"}
+                        {repliesById.get(item.id)!.at(-1)?.message
+                          ? ` · latest: ${htmlToPlainText(repliesById.get(item.id)!.at(-1)!.message).slice(0, 80)}`
+                          : ""}
+                      </p>
+                    ) : null}
                     <ShiftLogTypeBadge logType={type} />
                   </td>
                   <td>
@@ -667,6 +693,12 @@ export function ActiveShiftLogCard({
             {item.resolution_notes?.trim() ? (
               <p className="crossover-mobile-card__preview text-emerald-300">
                 Resolution: {htmlToPlainText(item.resolution_notes)}
+              </p>
+            ) : null}
+            {(repliesById.get(item.id)?.length ?? 0) > 0 ? (
+              <p className="crossover-mobile-card__preview text-sky-200">
+                {repliesById.get(item.id)!.length} team{" "}
+                {repliesById.get(item.id)!.length === 1 ? "update" : "updates"}
               </p>
             ) : null}
             <div className="crossover-mobile-card__footer">
