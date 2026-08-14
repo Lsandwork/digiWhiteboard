@@ -22,7 +22,9 @@ import {
   assignedGroomerActiveIssues,
   assignedGroomerOpenLogMessages,
   assignedOpenLogMessages,
+  actorHomeDepartment,
   directoryMemberForUser,
+  previousDepartmentShiftNotes,
   previousFrontDeskShiftNotes,
   previousTeamLeadShiftNotes,
   type TeamLeadShiftNote
@@ -91,6 +93,15 @@ export type OpsCommandCenterSnapshot = {
     detail: string | null;
   };
   tools: Array<{ tab: string; label: string }>;
+  /** Staff-directory department for My Shift entry + peer handoff (not RBAC role). */
+  homeDepartment: string | null;
+  /** Same-department peer notes for every My Shift login. */
+  departmentHandoff: {
+    department: string | null;
+    previousName: string | null;
+    shiftNotes: TeamLeadShiftNote[];
+    assignOptions: string[];
+  };
   /** Team Lead dashboard My Shift: previous TL Team Log notes + assigned Open Log / Active Issues. */
   teamLeadView?: {
     enabled: boolean;
@@ -379,6 +390,29 @@ export async function buildOpsCommandCenterSnapshot(input: {
   const previousFrontDeskNotes = coordinatorDashboard
     ? previousFrontDeskShiftNotes(staffFeed.crossoverMessages || [], shiftActor, staffFeed.staffDirectory || [])
     : { previousLeadName: null as string | null, notes: [] as TeamLeadShiftNote[] };
+  const homeDepartment = actorHomeDepartment(shiftActor, staffFeed.staffDirectory || [], directoryMember?.department);
+  const departmentHandoffNotes = previousDepartmentShiftNotes(
+    staffFeed.crossoverMessages || [],
+    shiftActor,
+    staffFeed.staffDirectory || [],
+    homeDepartment
+  );
+  const departmentAssignOptions = [
+    ...new Set(
+      (staffFeed.staffDirectory || [])
+        .filter((member) => {
+          if (String(member.status || "Active").toLowerCase() === "inactive") return false;
+          if (!homeDepartment) return true;
+          return actorHomeDepartment(
+            { name: member.name, email: member.email, adminUserId: member.admin_user_id },
+            staffFeed.staffDirectory || [],
+            member.department
+          ) === homeDepartment;
+        })
+        .map((member) => member.name)
+        .filter(Boolean)
+    )
+  ].sort((a, b) => a.localeCompare(b));
   const roleWorkQueue = yardTeamLead || groomerDashboard;
 
   const openWork = (
@@ -517,6 +551,13 @@ export async function buildOpsCommandCenterSnapshot(input: {
       detail: gingrHealth.detail
     },
     tools: toolsForRole(input.roleKey),
+    homeDepartment,
+    departmentHandoff: {
+      department: departmentHandoffNotes.department,
+      previousName: departmentHandoffNotes.previousLeadName,
+      shiftNotes: departmentHandoffNotes.notes,
+      assignOptions: departmentAssignOptions
+    },
     teamLeadView: {
       enabled: yardTeamLead,
       previousLeadName: previousNotes.previousLeadName,

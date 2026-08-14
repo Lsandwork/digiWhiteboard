@@ -55,9 +55,11 @@ export function toCrossoverBulkPayload(
     priority: string;
     assigned_to: string;
     department_area: string;
+    from_department?: string;
     status?: string;
   }
 ) {
+  const department = defaults.department_area || defaults.from_department || null;
   return entries.map((entry) => ({
     log_type: defaults.log_type,
     subject: entry.subject,
@@ -68,6 +70,7 @@ export function toCrossoverBulkPayload(
     assigned_to: defaults.assigned_to || null,
     assigned_team: defaults.assigned_to || null,
     related_dog_name: entry.related_dog_name,
-    department_area: defaults.department_area || null
+    department_area: department,
+    from_department: defaults.from_department || department
   }));
 }

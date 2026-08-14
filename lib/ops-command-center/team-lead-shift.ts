@@ -142,6 +142,88 @@ export function isFrontDeskSubmitter(message: CrossoverMessage, directory: Staff
   );
 }
 
+/** Canonical staff-directory department for handoff scoping (not RBAC dashboard role). */
+export function normalizeStaffDepartmentLabel(value?: string | null) {
+  const token = String(value || "").trim();
+  if (!token) return null;
+  if (isTeamLeadDepartmentLabel(token)) return "Team Lead";
+  if (isFrontDeskDepartmentLabel(token)) return "Front Desk";
+  const lower = token.toLowerCase();
+  if (lower.includes("groom")) return "Grooming";
+  if (lower.includes("train")) return "Training";
+  if (lower.includes("hiker") || lower.includes("hiking")) return "Hikers";
+  if (lower.includes("transport") || lower.includes("driver")) return "Transportation";
+  if (lower.includes("day care") || lower.includes("daycare") || lower.includes("yard") || lower.includes("handler")) {
+    return "Daycare";
+  }
+  if (lower.includes("market")) return "Marketing";
+  if (lower.includes("maint")) return "Maintenance";
+  if (lower.includes("management") || lower.includes("admin")) return "Management";
+  return token;
+}
+
+export function messageDepartmentLabel(message: CrossoverMessage, directory: StaffDirectoryMember[]): string | null {
+  const fromDept = normalizeStaffDepartmentLabel(message.from_department);
+  if (fromDept) return fromDept;
+  const area = normalizeStaffDepartmentLabel(message.department_area);
+  if (area) return area;
+  const submitter = normalizeToken(message.submitted_by || message.created_by);
+  if (!submitter) return null;
+  const member =
+    directory.find((entry) => normalizeToken(entry.name) === submitter) ||
+    directory.find((entry) => normalizeToken(entry.email) === submitter) ||
+    directory.find((entry) => normalizeToken(entry.admin_user_id) === submitter);
+  return normalizeStaffDepartmentLabel(member?.department);
+}
+
+export function actorHomeDepartment(
+  actor: ShiftActor,
+  directory: StaffDirectoryMember[],
+  fallback?: string | null
+): string | null {
+  const member = directoryMemberForUser(directory, actor);
+  return (
+    normalizeStaffDepartmentLabel(member?.department) ||
+    normalizeStaffDepartmentLabel(fallback) ||
+    null
+  );
+}
+
+/**
+ * Peer handoff notes for the actor's staff-directory department only.
+ * Front Desk sees Front Desk peers (not Team Lead); Team Lead sees Team Lead; etc.
+ */
+export function previousDepartmentShiftNotes(
+  messages: CrossoverMessage[],
+  actor: ShiftActor,
+  directory: StaffDirectoryMember[],
+  department: string | null,
+  limit = 10
+): { department: string | null; previousLeadName: string | null; notes: TeamLeadShiftNote[] } {
+  const home = normalizeStaffDepartmentLabel(department);
+  if (!home) return { department: null, previousLeadName: null, notes: [] };
+
+  const peerNotes = messages
+    .filter((message) => messageDepartmentLabel(message, directory) === home)
+    .filter((message) => !isCurrentUserSubmitter(message, actor))
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  if (!peerNotes.length) return { department: home, previousLeadName: null, notes: [] };
+
+  const previousLeadName = shiftLogSubmittedBy(peerNotes[0]);
+  const notes = peerNotes.slice(0, limit).map((message) => ({
+    id: message.id,
+    title: message.subject || message.log_type || "Shift note",
+    detail: String(message.details || message.message || "").trim() || null,
+    submittedBy: shiftLogSubmittedBy(message),
+    createdAt: message.created_at,
+    dogName: message.related_dog_name,
+    status: message.status
+  }));
+
+  return { department: home, previousLeadName, notes };
+}
+
 export function previousFrontDeskShiftNotes(
   messages: CrossoverMessage[],
   actor: ShiftActor,

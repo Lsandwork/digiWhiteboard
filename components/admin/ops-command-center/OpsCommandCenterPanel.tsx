@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw, Search, ShieldAlert } from "lucide-react";
+import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
+import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
@@ -10,6 +12,8 @@ import {
   workItemActionLabel,
   type WorkItemAction
 } from "@/lib/ops-command-center/work-item-actions";
+import { toCrossoverBulkPayload } from "@/lib/staff/bulk-shift-log";
+import type { ShiftLogType } from "@/lib/staff/front-desk-log";
 
 type Mode = "my_shift" | "ops_command_center";
 
@@ -56,6 +60,8 @@ export function OpsCommandCenterPanel({
   const [dogProfile, setDogProfile] = useState<Record<string, unknown> | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [logBusy, setLogBusy] = useState(false);
+  const { showToast } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,6 +143,47 @@ export function OpsCommandCenterPanel({
     }
   }
 
+  async function submitShiftEntries(
+    entries: Parameters<typeof toCrossoverBulkPayload>[0],
+    defaults: Parameters<typeof toCrossoverBulkPayload>[1]
+  ) {
+    if (!data) return;
+    const department = defaults.department_area || data.homeDepartment || "Front Desk";
+    setLogBusy(true);
+    try {
+      const response = await fetch("/api/admin/staff-operations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "create_crossover_bulk",
+          entries: toCrossoverBulkPayload(entries, {
+            ...defaults,
+            department_area: department,
+            from_department: department
+          })
+        })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entries.");
+      const saved = Number(body.result?.saved ?? entries.length);
+      const failed = Number(body.result?.failed ?? 0);
+      showToast(
+        failed
+          ? `Saved ${saved} ${saved === 1 ? "entry" : "entries"} to Team Log. ${failed} could not be saved.`
+          : saved === 1
+            ? "Shift entry saved to Team Log. Same-department peers will see it on My Shift."
+            : `${saved} shift entries saved to Team Log.`,
+        failed && !saved ? "error" : "success"
+      );
+      await load();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to save shift log entries.", "error");
+      throw error;
+    } finally {
+      setLogBusy(false);
+    }
+  }
+
   if (loading && !data) {
     return (
       <section className="space-y-4 p-1">
@@ -182,6 +229,18 @@ export function OpsCommandCenterPanel({
         completable: false
       }));
 
+  const homeDepartment = data.homeDepartment || data.departmentHandoff?.department || "Front Desk";
+  const assignOptions = data.departmentHandoff?.assignOptions?.length
+    ? data.departmentHandoff.assignOptions
+    : [homeDepartment];
+  const defaultLogType = defaultLogTypeForDepartment(homeDepartment);
+  const handoffTitle =
+    homeDepartment === "Front Desk"
+      ? "Front Desk handoff notes"
+      : homeDepartment === "Team Lead"
+        ? "Team Lead handoff notes"
+        : `${homeDepartment} handoff notes`;
+
   return (
     <section className="space-y-5">
       <header className="flex flex-col gap-3 rounded-2xl border border-admin-border bg-gradient-to-br from-[#132033] via-[#101826] to-[#0b1220] p-4 sm:flex-row sm:items-end sm:justify-between">
@@ -192,6 +251,7 @@ export function OpsCommandCenterPanel({
           </h2>
           <p className="mt-1 text-sm text-admin-muted">
             {clock} · {data.roleLabel}
+            {homeDepartment ? ` · ${homeDepartment}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -222,6 +282,20 @@ export function OpsCommandCenterPanel({
               "Gingr-dependent information may be stale. Gingr remains the business system of record."}
           </p>
         </div>
+      ) : null}
+
+      {mode === "my_shift" ? (
+        <BulkShiftLogComposer
+          key={homeDepartment}
+          title="Shift Entry Log"
+          subtitle="Add notes for your department handoff. They appear on Team Log today, then move to Archived Log after midnight (Pacific). Peers in your department see them here — not other departments."
+          busy={logBusy}
+          assignOptions={assignOptions}
+          defaultLogType={defaultLogType}
+          defaultDepartment={homeDepartment}
+          submitLabel="Post to Team Log"
+          onSubmit={submitShiftEntries}
+        />
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -315,73 +389,44 @@ export function OpsCommandCenterPanel({
           )}
         </section>
 
-        {mode === "my_shift" && data.teamLeadView?.enabled ? (
+        <div className="space-y-4">
+        {mode === "my_shift" ? (
           <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-white">Previous team lead notes</h3>
+              <h3 className="text-sm font-semibold text-white">{handoffTitle}</h3>
               {onNavigate ? (
                 <button type="button" className="text-xs text-sky-300 underline" onClick={() => onNavigate("crossover_communication")}>
                   Team Log
                 </button>
               ) : null}
             </div>
-            {data.teamLeadView.previousLeadName ? (
-              <p className="mb-3 text-xs text-admin-muted">
-                From {data.teamLeadView.previousLeadName} · Team Log
-              </p>
+            <p className="mb-3 text-xs text-admin-muted">
+              Same department only ({homeDepartment}). Front Desk notes stay with Front Desk; Team Lead and other departments do not see them here.
+            </p>
+            {data.departmentHandoff?.previousName ? (
+              <p className="mb-3 text-xs text-admin-muted">Latest from {data.departmentHandoff.previousName}</p>
             ) : null}
-            {data.teamLeadView.shiftNotes.length ? (
+            {data.departmentHandoff?.shiftNotes?.length ? (
               <ul className="space-y-2">
-                {data.teamLeadView.shiftNotes.map((note) => (
+                {data.departmentHandoff.shiftNotes.map((note) => (
                   <li key={note.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
                     <p className="text-sm font-medium text-white">{note.title}</p>
                     {note.detail ? <p className="mt-0.5 text-xs text-admin-muted">{note.detail}</p> : null}
                     {note.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{note.dogName}</p> : null}
                     <p className="mt-1 text-[11px] text-admin-muted">
-                      {formatDue(note.createdAt)}
+                      {note.submittedBy} · {formatDue(note.createdAt)}
                       {note.status ? ` · ${note.status}` : ""}
                     </p>
                   </li>
                 ))}
               </ul>
             ) : (
-              <EmptyState text="No previous Team Lead shift notes in the Team Log yet." />
+              <EmptyState text={`No ${homeDepartment} peer notes in Team Log yet. Post one above for the next person on your shift.`} />
             )}
           </section>
-        ) : mode === "my_shift" && data.coordinatorView?.enabled ? (
-          <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-white">Previous Front Desk Notes</h3>
-              {onNavigate ? (
-                <button type="button" className="text-xs text-sky-300 underline" onClick={() => onNavigate("crossover_communication")}>
-                  Team Log
-                </button>
-              ) : null}
-            </div>
-            {data.coordinatorView.previousName ? (
-              <p className="mb-3 text-xs text-admin-muted">
-                From {data.coordinatorView.previousName} · Team Log
-              </p>
-            ) : null}
-            {data.coordinatorView.shiftNotes.length ? (
-              <ul className="space-y-2">
-                {data.coordinatorView.shiftNotes.map((note) => (
-                  <li key={note.id} className="rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2.5">
-                    <p className="text-sm font-medium text-white">{note.title}</p>
-                    {note.detail ? <p className="mt-0.5 text-xs text-admin-muted">{note.detail}</p> : null}
-                    {note.dogName ? <p className="mt-0.5 text-xs text-sky-200/80">{note.dogName}</p> : null}
-                    <p className="mt-1 text-[11px] text-admin-muted">
-                      {formatDue(note.createdAt)}
-                      {note.status ? ` · ${note.status}` : ""}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState text="No previous Front Desk notes in the Team Log yet." />
-            )}
-          </section>
-        ) : mode === "my_shift" && data.groomerView?.enabled ? (
+        ) : null}
+
+        {mode === "my_shift" && data.groomerView?.enabled ? (
           <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h3 className="text-sm font-semibold text-white">Today’s additional services</h3>
@@ -408,7 +453,7 @@ export function OpsCommandCenterPanel({
               <EmptyState text="No additional services on today’s Gingr facility calendar (walks, taxi, food, enrichment, and training add-ons excluded)." />
             )}
           </section>
-        ) : (
+        ) : mode === "ops_command_center" || !(mode === "my_shift" && data.groomerView?.enabled) ? (
           <section className="rounded-2xl border border-admin-border bg-black/20 p-4">
             <h3 className="mb-3 text-sm font-semibold text-white">Live board right now</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -435,7 +480,8 @@ export function OpsCommandCenterPanel({
               />
             </div>
           </section>
-        )}
+        ) : null}
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
@@ -740,6 +786,23 @@ function greetingBucket() {
   if (hour < 12) return "morning";
   if (hour < 17) return "afternoon";
   return "evening";
+}
+
+function defaultLogTypeForDepartment(department: string | null): ShiftLogType {
+  switch (department) {
+    case "Training":
+      return "Training Note";
+    case "Grooming":
+      return "Grooming Note";
+    case "Daycare":
+      return "Daycare Note";
+    case "Transportation":
+      return "Transportation Note";
+    case "Front Desk":
+    case "Team Lead":
+    default:
+      return "General Shift Note";
+  }
 }
 
 function SummaryCard({
