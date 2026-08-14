@@ -159,28 +159,50 @@ function newestCheckoutTimestamp(dogs: LiveDog[]) {
   return newest;
 }
 
+const FAST_CHECKOUT_EMPTY: FastCheckoutLoadResult = {
+  checking_out: [],
+  newest_checkout_at: null,
+  prompted_count: 0,
+  raw_checkout_rows: 0,
+  filtered_unprompted_rows: 0,
+  expired_checkout_rows: 0,
+  basket_filtered: false,
+  basket_cleared_rows: 0,
+  data_source: "supabase_live_transition_dogs"
+};
+
 /** Supabase/webhook only — never calls Gingr. Hard-timeout so board polls never hang. */
 export async function loadFastPromptedCheckouts(
   supabase: SupabaseClient,
   now = new Date()
 ): Promise<FastCheckoutLoadResult> {
-  const { data, error } = await withTimeoutOrThrow(
-    Promise.resolve(
-      supabase
-        .from("live_transition_dogs")
-        .select(
-          "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at"
-        )
-        .eq("hidden", false)
-        .eq("display_status", "checking_out")
-        // Newest first, nulls last: a row limit must never hide the dog that just checked out.
-        .order("status_started_at", { ascending: false, nullsFirst: false })
-        .limit(40)
-    ),
-    FAST_CHECKOUT_QUERY_TIMEOUT_MS,
-    "fast-checkout live_transition_dogs"
-  );
+  let queryResult: { data: unknown[] | null; error: unknown } | null = null;
+  try {
+    queryResult = await withTimeoutOrThrow(
+      Promise.resolve(
+        supabase
+          .from("live_transition_dogs")
+          .select(
+            "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at"
+          )
+          .eq("hidden", false)
+          .eq("display_status", "checking_out")
+          // Newest first, nulls last: a row limit must never hide the dog that just checked out.
+          .order("status_started_at", { ascending: false, nullsFirst: false })
+          .limit(40)
+      ),
+      FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+      "fast-checkout live_transition_dogs"
+    );
+  } catch (err) {
+    // Supabase is unavailable (504, timeout, etc.) — return empty degraded result
+    // so callers always resolve and the board shows a degraded state rather than
+    // propagating an unhandled error.
+    console.error("[fast-checkout] live_transition_dogs query failed:", err);
+    return { ...FAST_CHECKOUT_EMPTY };
+  }
 
+  const { data, error } = queryResult;
   if (error) throw error;
 
   const rows = enrichDogs((data ?? []) as LiveDog[]);
