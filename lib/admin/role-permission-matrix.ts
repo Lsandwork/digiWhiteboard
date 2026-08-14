@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import {
   ALL_CATALOG_PERMISSION_KEYS,
   SUPER_ADMIN_ONLY_PERMISSIONS
@@ -64,26 +65,24 @@ function mergeMatrix(base: RolePermissionMatrix, stored: RolePermissionMatrix): 
 }
 
 export async function loadRolePermissionMatrix(supabase: SupabaseClient): Promise<RolePermissionMatrix> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return buildDefaultRolePermissionMatrix();
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const stored = settings[SETTINGS_STORE_KEY];
-  if (!stored || typeof stored !== "object") return buildDefaultRolePermissionMatrix();
-  return mergeMatrix(buildDefaultRolePermissionMatrix(), stored as RolePermissionMatrix);
+  const defaultMatrix = buildDefaultRolePermissionMatrix();
+  const loaded = await loadAdminSettingsJsonKey(
+    supabase,
+    SETTINGS_STORE_KEY,
+    (raw) => {
+      if (!raw || typeof raw !== "object") return defaultMatrix;
+      return mergeMatrix(defaultMatrix, raw as RolePermissionMatrix);
+    },
+    defaultMatrix
+  );
+  if (loaded === null) return defaultMatrix;
+  return loaded;
 }
 
 export async function saveRolePermissionMatrix(supabase: SupabaseClient, matrix: RolePermissionMatrix) {
   const sanitized = mergeMatrix(buildDefaultRolePermissionMatrix(), matrix);
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) throw error;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: sanitized
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, sanitized);
+  if (!ok) throw new Error("Unable to save role permission matrix.");
   return sanitized;
 }
 

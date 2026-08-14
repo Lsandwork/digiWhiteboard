@@ -1,6 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 import { displayActorLabel, loadActorNameLookup, looksLikeEmail } from "@/lib/admin/actor-display";
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import { normalizeHtmlDateValue, pacificHtmlDate } from "@/lib/dates/html-date";
 import type { OwnerComplaintCategory } from "@/lib/staff/push-notices";
 import { getOwnerComplaintCategoryLabel } from "@/lib/staff/push-notices";
@@ -262,33 +263,13 @@ function parseState(value: unknown): ManagementReportState {
 }
 
 async function loadStateFromAdminSettings(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return null;
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseState(settings[SETTINGS_STORE_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, emptyState());
+  if (loaded === null) return null;
+  return loaded;
 }
 
 async function saveStateToAdminSettings(supabase: SupabaseClient, state: ManagementReportState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return false;
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: { reports: sortNewest(state.reports) }
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) {
-    if (isMissingRelation(saveError)) return false;
-    throw saveError;
-  }
-  return true;
+  return saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, { reports: sortNewest(state.reports) });
 }
 
 async function loadState(supabase: SupabaseClient) {

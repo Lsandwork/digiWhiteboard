@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+
 export type StaffPushNoticePriority = "normal" | "important" | "urgent";
 export type StaffPushNoticeDisplayMode = "normal" | "urgent";
 export type StaffPushNoticeRecurrence = "none" | "day" | "week" | "month";
@@ -362,33 +364,13 @@ function parseNoticeState(value: unknown): StaffPushNoticeState {
 }
 
 async function loadNoticeStateFromAdminSettings(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return null;
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseNoticeState(settings[SETTINGS_STORE_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseNoticeState, emptyNoticeState());
+  if (loaded === null) return null;
+  return loaded;
 }
 
 async function saveNoticeStateToAdminSettings(supabase: SupabaseClient, state: StaffPushNoticeState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return false;
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: { notices: sortNotices(state.notices) }
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) {
-    if (isMissingRelation(saveError)) return false;
-    throw saveError;
-  }
-  return true;
+  return saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, { notices: sortNotices(state.notices) });
 }
 
 async function loadNoticeStateFromStaffSettings(supabase: SupabaseClient) {

@@ -15,6 +15,7 @@ import {
   loadRolePermissionMatrix,
   permissionsForRolesFromMatrix
 } from "@/lib/admin/role-permission-matrix";
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -70,10 +71,8 @@ function parseState(value: unknown): UserAccessState {
 }
 
 async function loadState(supabase: SupabaseClient): Promise<UserAccessState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return { assignments: {} };
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseState(settings[SETTINGS_STORE_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, { assignments: {} });
+  return loaded ?? { assignments: {} };
 }
 
 function resolveUserPermissions(
@@ -90,16 +89,8 @@ function resolveUserPermissions(
 }
 
 async function saveState(supabase: SupabaseClient, state: UserAccessState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) throw error;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: state
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, state);
+  if (!ok) throw new Error("Unable to save user access settings.");
 }
 
 export async function getUserAccess(

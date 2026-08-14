@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+
 export type PipStatus = "Active" | "On Hold" | "Completed" | "Cancelled";
 
 export type PipStage =
@@ -227,34 +229,15 @@ function parseState(value: unknown): PipState {
   };
 }
 
-function isMissingRelation(error: { code?: string; message?: string } | null) {
-  return error?.code === "42P01" || /does not exist|relation/i.test(error?.message ?? "");
-}
-
 async function loadState(supabase: SupabaseClient): Promise<PipState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return emptyState();
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseState(settings[SETTINGS_STORE_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, emptyState());
+  if (loaded === null) return emptyState();
+  return loaded;
 }
 
 async function saveState(supabase: SupabaseClient, state: PipState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) throw new Error("PIP storage is not available.");
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: { plans: state.plans }
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, { plans: state.plans });
+  if (!ok) throw new Error("PIP storage is not available.");
 }
 
 export type PipPlanInput = {

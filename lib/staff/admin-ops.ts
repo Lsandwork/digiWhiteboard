@@ -1,6 +1,7 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
-import { displayActorLabel, loadActorNameLookup } from "@/lib/admin/actor-display";
+import { displayActorLabel, buildActorNameLookup } from "@/lib/admin/actor-display";
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import {
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
@@ -196,6 +197,9 @@ const SETTINGS_STORE_KEY = "staff_admin_ops";
 const ACTIVITY_LOG_ACTION = "staff_admin_ops_state";
 const ACTIVITY_LOG_SOURCE = "staff_admin_ops";
 const MAX_TEXT = 1200;
+/** Keep recent Team Log rows only — unbounded history bloats the shared settings blob. */
+const MAX_CROSSOVER_MESSAGES = 500;
+const MAX_NOTIFICATIONS = 150;
 
 export const STAFF_DEPARTMENTS = [
   "Front Desk",
@@ -424,42 +428,27 @@ function parseState(value: unknown): StaffOpsState {
   const state = value as Partial<StaffOpsState>;
   const directory = Array.isArray(state.staff_directory) ? state.staff_directory : DEFAULT_STAFF_DIRECTORY;
   return {
-    crossover_messages: sortNewest(Array.isArray(state.crossover_messages) ? state.crossover_messages : []),
+    crossover_messages: sortNewest(Array.isArray(state.crossover_messages) ? state.crossover_messages : []).slice(
+      0,
+      MAX_CROSSOVER_MESSAGES
+    ),
     crossover_message_replies: sortNewest(Array.isArray(state.crossover_message_replies) ? state.crossover_message_replies : []),
     owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
     active_issues: sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
     activity_logs: sortNewest(Array.isArray(state.activity_logs) ? state.activity_logs : []).slice(0, 100),
     staff_directory: directory.map(normalizeStaffDirectoryMember),
-    notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : [])
+    notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : []).slice(0, MAX_NOTIFICATIONS)
   };
 }
 
 async function loadStateFromAdminSettings(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return null;
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return parseState(settings[SETTINGS_STORE_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, emptyState());
+  if (loaded === null) return null;
+  return loaded;
 }
 
 async function saveStateToAdminSettings(supabase: SupabaseClient, state: StaffOpsState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return false;
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: parseState(state)
-  };
-  const { error: saveError } = await supabase.from("admin_settings").upsert({ id: "default", settings, updated_at: nowIso() });
-  if (saveError) {
-    if (isMissingRelation(saveError)) return false;
-    throw saveError;
-  }
-  return true;
+  return saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState(state));
 }
 
 async function loadStateFromActivityLog(supabase: SupabaseClient) {
@@ -511,21 +500,14 @@ export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsSt
 
 /** Rewrite display fields so emails never appear as the submitter/author label. Ownership identity stays on created_by. */
 export async function enrichStaffOpsActorLabels(supabase: SupabaseClient, state: StaffOpsState): Promise<StaffOpsState> {
-  const values: Array<string | null | undefined> = [];
-  for (const item of state.crossover_messages) {
-    values.push(item.submitted_by, item.created_by);
-  }
-  for (const reply of state.crossover_message_replies) {
-    values.push(reply.created_by);
-  }
-  for (const log of state.activity_logs) {
-    values.push(log.created_by);
-  }
-  for (const notice of state.notifications) {
-    values.push(notice.created_by);
-  }
-
-  const lookup = await loadActorNameLookup(supabase, values, state.staff_directory);
+  void supabase;
+  const lookup = buildActorNameLookup(
+    state.staff_directory.map((member) => ({
+      name: member.name,
+      email: member.email,
+      admin_user_id: member.admin_user_id
+    }))
+  );
 
   return {
     ...state,

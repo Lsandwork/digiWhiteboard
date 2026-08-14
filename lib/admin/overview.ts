@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import { listDisplayDevices } from "@/lib/display-keeper-server";
 import { activePipPlans, listPipPlans, pipReviewsDueThisWeek, type PipPlan } from "@/lib/hr/pip";
 import { buildHrHubStats, isHrRecord, toHrRecord, formatHrReportType } from "@/lib/hr/records";
@@ -123,10 +124,6 @@ export type OverviewPayload = {
 };
 
 const BOARD_NOTES_KEY = "overview_board_notes";
-
-function isMissingRelation(error: { code?: string; message?: string } | null) {
-  return error?.code === "42P01" || /does not exist|relation/i.test(error?.message ?? "");
-}
 
 function newId(prefix: string) {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -295,14 +292,7 @@ function pushToAlert(notice: StaffPushNotice): OverviewAlert {
   };
 }
 
-async function loadBoardNotes(supabase: SupabaseClient): Promise<OverviewBoardNote[]> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return [];
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const raw = settings[BOARD_NOTES_KEY];
+function parseBoardNotes(raw: unknown): OverviewBoardNote[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .map((row) => {
@@ -322,6 +312,12 @@ async function loadBoardNotes(supabase: SupabaseClient): Promise<OverviewBoardNo
     .slice(0, 20);
 }
 
+async function loadBoardNotes(supabase: SupabaseClient): Promise<OverviewBoardNote[]> {
+  const loaded = await loadAdminSettingsJsonKey(supabase, BOARD_NOTES_KEY, parseBoardNotes, []);
+  if (loaded === null) return [];
+  return loaded;
+}
+
 export async function saveOverviewBoardNote(
   supabase: SupabaseClient,
   input: { text: string; author?: string | null },
@@ -337,16 +333,8 @@ export async function saveOverviewBoardNote(
     created_at: new Date().toISOString()
   };
   const next = [note, ...notes].slice(0, 20);
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) throw error;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [BOARD_NOTES_KEY]: next
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, BOARD_NOTES_KEY, next);
+  if (!ok) throw new Error("Unable to save board note.");
   return note;
 }
 

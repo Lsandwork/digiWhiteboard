@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+
 export type CastVideoPriority = "normal" | "important" | "urgent" | "emergency";
 export type CastVideoStatus = "draft" | "scheduled" | "active" | "cleared" | "expired" | "deleted";
 export type CastVideoAutoClearMode = "manual" | "30s" | "1m" | "2m" | "5m" | "10m";
@@ -282,26 +284,22 @@ function sortActiveNotices(notices: CastVideoNotice[]) {
 
 type CastVideoState = { notices: CastVideoNotice[] };
 
-async function loadFallbackState(supabase: SupabaseClient): Promise<CastVideoState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return { notices: [] };
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const raw = settings[SETTINGS_STORE_KEY];
-  if (!raw || typeof raw !== "object") return { notices: [] };
-  const notices = Array.isArray((raw as { notices?: unknown }).notices)
-    ? ((raw as { notices: CastVideoNotice[] }).notices)
+function parseFallbackState(value: unknown): CastVideoState {
+  if (!value || typeof value !== "object") return { notices: [] };
+  const notices = Array.isArray((value as { notices?: unknown }).notices)
+    ? ((value as { notices: CastVideoNotice[] }).notices)
     : [];
   return { notices };
 }
 
+async function loadFallbackState(supabase: SupabaseClient): Promise<CastVideoState> {
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseFallbackState, { notices: [] });
+  if (loaded === null) return { notices: [] };
+  return loaded;
+}
+
 async function saveFallbackState(supabase: SupabaseClient, state: CastVideoState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: state
-  };
-  await supabase.from("admin_settings").upsert({ id: "default", settings, updated_at: new Date().toISOString() });
+  await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, state);
 }
 
 export function normalizeCastVideoNoticeInput(input: CastVideoNoticeInput) {

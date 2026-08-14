@@ -1,6 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 import { loadAdminSettings } from "@/lib/admin/settings";
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import { loadGroomingPushBoardState } from "@/lib/staff/grooming-push-notices";
 import {
   createAndPushStaffNotice,
@@ -347,26 +348,19 @@ export function buildDailyReminderPushNoticeInput(
 }
 
 export async function loadSwingHandlerPresent(supabase: SupabaseClient) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return false;
-    throw error;
-  }
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  return Boolean(settings[SWING_HANDLER_SETTINGS_KEY]);
+  const loaded = await loadAdminSettingsJsonKey(
+    supabase,
+    SWING_HANDLER_SETTINGS_KEY,
+    (raw) => Boolean(raw),
+    false
+  );
+  if (loaded === null) return false;
+  return loaded;
 }
 
 export async function setSwingHandlerPresent(supabase: SupabaseClient, present: boolean) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) throw error;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SWING_HANDLER_SETTINGS_KEY]: present
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) throw saveError;
+  const ok = await saveAdminSettingsJsonKey(supabase, SWING_HANDLER_SETTINGS_KEY, present);
+  if (!ok) throw new Error("Unable to save swing handler state.");
   return present;
 }
 

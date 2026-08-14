@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+
 export type TrainerPushNoticeStatus = "active" | "cleared" | "expired";
 
 export type TrainerPushNotice = {
@@ -107,26 +109,22 @@ function sortActiveNotices(notices: TrainerPushNotice[]) {
 
 type TrainerNoticeState = { notices: TrainerPushNotice[] };
 
-async function loadState(supabase: SupabaseClient): Promise<TrainerNoticeState> {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return { notices: [] };
-  const settings = (data?.settings ?? {}) as Record<string, unknown>;
-  const raw = settings[SETTINGS_STORE_KEY];
-  if (!raw || typeof raw !== "object") return { notices: [] };
-  const notices = Array.isArray((raw as { notices?: unknown }).notices)
-    ? ((raw as { notices: TrainerPushNotice[] }).notices)
+function parseState(value: unknown): TrainerNoticeState {
+  if (!value || typeof value !== "object") return { notices: [] };
+  const notices = Array.isArray((value as { notices?: unknown }).notices)
+    ? ((value as { notices: TrainerPushNotice[] }).notices)
     : [];
   return { notices };
 }
 
+async function loadState(supabase: SupabaseClient): Promise<TrainerNoticeState> {
+  const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, { notices: [] });
+  if (loaded === null) return { notices: [] };
+  return loaded;
+}
+
 async function saveState(supabase: SupabaseClient, state: TrainerNoticeState) {
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) return;
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [SETTINGS_STORE_KEY]: state
-  };
-  await supabase.from("admin_settings").upsert({ id: "default", settings, updated_at: new Date().toISOString() });
+  await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, state);
 }
 
 export function normalizeTrainerPushNoticeInput(input: TrainerPushNoticeInput) {

@@ -68,15 +68,37 @@ export const DEFAULT_ADMIN_SETTINGS: AdminGlobalSettings = {
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+const ADMIN_SETTING_KEYS = Object.keys(DEFAULT_ADMIN_SETTINGS) as (keyof AdminGlobalSettings)[];
+
+function adminSettingsSelectList() {
+  return ADMIN_SETTING_KEYS.map((key) => `settings->${key}`).join(",");
+}
+
+function readAdminSettingsRow(data: Record<string, unknown> | null | undefined): Partial<AdminGlobalSettings> {
+  if (!data) return {};
+  const stored: Partial<AdminGlobalSettings> = {};
+  for (const key of ADMIN_SETTING_KEYS) {
+    if (key in data && data[key] !== undefined && data[key] !== null) {
+      (stored as Record<string, AdminGlobalSettings[keyof AdminGlobalSettings]>)[key] = data[
+        key
+      ] as AdminGlobalSettings[typeof key];
+    }
+  }
+  return stored;
+}
+
 export async function loadAdminSettings(supabase: SupabaseClient): Promise<AdminGlobalSettings> {
   try {
-    const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
+    const { data, error } = await supabase
+      .from("admin_settings")
+      .select(adminSettingsSelectList())
+      .eq("id", "default")
+      .maybeSingle();
     if (error) {
       if (error.code === "42P01") return DEFAULT_ADMIN_SETTINGS;
       throw error;
     }
-    const stored = (data?.settings ?? {}) as Partial<AdminGlobalSettings>;
-    return { ...DEFAULT_ADMIN_SETTINGS, ...stored };
+    return { ...DEFAULT_ADMIN_SETTINGS, ...readAdminSettingsRow(data as Record<string, unknown> | null) };
   } catch {
     return DEFAULT_ADMIN_SETTINGS;
   }
@@ -88,10 +110,11 @@ export async function updateAdminSettings(
 ): Promise<AdminGlobalSettings> {
   const current = await loadAdminSettings(supabase);
   const next = { ...current, ...patch };
-  const { error } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings: next, updated_at: new Date().toISOString() });
-  if (error) throw error;
+  const { saveAdminSettingsJsonKey } = await import("@/lib/admin/settings-json-store");
+  for (const [key, value] of Object.entries(patch)) {
+    if (!(key in DEFAULT_ADMIN_SETTINGS)) continue;
+    await saveAdminSettingsJsonKey(supabase, key, value);
+  }
   try {
     const { invalidateBoardSettingsCaches } = await import("@/lib/board-settings-cache");
     invalidateBoardSettingsCaches();
