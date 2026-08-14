@@ -21,6 +21,7 @@
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
     "test:fitdog-domain": "tsx scripts/test-fitdog-domain-routing.ts",
     "test:admin-session-cookies": "tsx scripts/test-admin-session-cookies.ts",
+    "test:admin-redirect-loops": "tsx scripts/test-admin-redirect-loops.ts",
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",

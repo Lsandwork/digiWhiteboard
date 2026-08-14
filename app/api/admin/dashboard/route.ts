@@ -23,6 +23,30 @@ function parseBoardType(value: string | null): AdminBoardType {
   return "lobby";
 }
 
+/**
+ * Board widgets must never lock staff out of the admin. A single slow Supabase
+ * read (the checkout query hard-times-out at 1.5s) used to reject the whole
+ * Promise.all and 500 the dashboard, which reads as "login is broken".
+ */
+async function optional<T>(work: Promise<T>, fallback: T, label: string): Promise<T> {
+  try {
+    return await work;
+  } catch (error) {
+    console.error(`[admin-dashboard] ${label} unavailable:`, error);
+    return fallback;
+  }
+}
+
+/** Same guard for raw Supabase reads, flattened to plain rows. */
+async function optionalRows<T>(work: PromiseLike<{ data: T[] | null }>, label: string): Promise<T[]> {
+  try {
+    return (await work).data ?? [];
+  } catch (error) {
+    console.error(`[admin-dashboard] ${label} unavailable:`, error);
+    return [];
+  }
+}
+
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
@@ -35,25 +59,34 @@ export async function GET(request: Request) {
     loadLobbySettings(supabase),
     loadStaffBoardSettings(supabase),
     loadAdminSettings(supabase),
-    loadAllPromotions(supabase),
-    loadFastPromptedCheckouts(supabase),
-    supabase
-      .from("live_transition_dogs")
-      .select("*")
-      .eq("hidden", false)
-      .in("display_status", ["checking_in", "checking_out"])
-      .order("updated_at", { ascending: false }),
-    supabase
-      .from("gingr_webhook_events")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("gingr_webhook_events")
-      .select("*")
-      .eq("processed", false)
-      .order("created_at", { ascending: false })
-      .limit(20)
+    optional(loadAllPromotions(supabase), [], "promotions"),
+    optional(loadFastPromptedCheckouts(supabase), null, "fast checkouts"),
+    optionalRows(
+      supabase
+        .from("live_transition_dogs")
+        .select("*")
+        .eq("hidden", false)
+        .in("display_status", ["checking_in", "checking_out"])
+        .order("updated_at", { ascending: false }),
+      "transition dogs"
+    ),
+    optionalRows(
+      supabase
+        .from("gingr_webhook_events")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      "webhook events"
+    ),
+    optionalRows(
+      supabase
+        .from("gingr_webhook_events")
+        .select("*")
+        .eq("processed", false)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      "failed webhook events"
+    )
   ]);
 
   const siteUrl = publicOrigin(request);
@@ -104,15 +137,15 @@ export async function GET(request: Request) {
     lobby_settings: lobbySettings,
     staff_settings: staffSettings,
     promotions: promotions ?? [],
-    active_checkouts: checkouts.checking_out.length,
-    lobby_checkouts_count: checkouts.checking_out.length,
-    sync_status: checkouts.checking_out.length >= 0 ? "healthy" : "degraded",
-    last_synced_at: checkouts.newest_checkout_at,
+    active_checkouts: checkouts?.checking_out.length ?? 0,
+    lobby_checkouts_count: checkouts?.checking_out.length ?? 0,
+    sync_status: checkouts ? "healthy" : "degraded",
+    last_synced_at: checkouts?.newest_checkout_at ?? null,
     data_source: "Supabase (Cached)",
     webhook_url: webhookUrl,
-    events: events.data ?? [],
-    failed_events: failedEvents.data ?? [],
-    staff_dogs: dogs.data ?? [],
+    events,
+    failed_events: failedEvents,
+    staff_dogs: dogs,
     env: getBoardEnvCheck()
   });
   } catch (error) {
