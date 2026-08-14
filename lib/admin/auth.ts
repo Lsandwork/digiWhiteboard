@@ -39,10 +39,13 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(aBuf, bBuf);
 }
 
-/**
- * Login must stay usable even when Supabase is slow/degraded. Bound each DB
- * call so a stalled query falls back to env/demo auth instead of hanging ~40s.
- */
+/** Bound each DB call so a stalled query falls back to env/demo auth. */
+const AUTH_QUERY_TIMEOUT_MS = 4_000;
+
+function authSupabase() {
+  return getServiceSupabase({ timeoutMs: AUTH_QUERY_TIMEOUT_MS });
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
     promise,
@@ -65,8 +68,12 @@ export type AdminAuthResult = {
 
 async function resolveSuperAdminRecord(): Promise<AdminUserRecord | null> {
   try {
-    const supabase = getServiceSupabase();
-    const user = await withTimeout(findAdminUserByEmail(supabase, SUPER_ADMIN_EMAIL), 8000, "super admin lookup");
+    const supabase = authSupabase();
+    const user = await withTimeout(
+      findAdminUserByEmail(supabase, SUPER_ADMIN_EMAIL),
+      AUTH_QUERY_TIMEOUT_MS,
+      "super admin lookup"
+    );
     if (user && user.status === "active") return user;
   } catch {
     // ignore
@@ -91,9 +98,13 @@ export async function verifyAdminCredentials(username: string, password: string)
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = authSupabase();
     for (const email of loginLookupEmails(normalized)) {
-      const dbUser = await withTimeout(findAdminUserByEmail(supabase, email), 8000, "admin user lookup");
+      const dbUser = await withTimeout(
+        findAdminUserByEmail(supabase, email),
+        AUTH_QUERY_TIMEOUT_MS,
+        "admin user lookup"
+      );
       if (!dbUser || dbUser.status !== "active") continue;
       const valid = await verifyAdminUserPassword(dbUser, password);
       if (!valid) continue;
@@ -113,8 +124,11 @@ export async function verifyAdminCredentials(username: string, password: string)
     // Fall through to env auth if DB unavailable.
   }
 
-  const settings = await withTimeout(loadAdminSettings(getServiceSupabase()), 8000, "admin settings")
-    .catch(() => null);
+  const settings = await withTimeout(
+    loadAdminSettings(authSupabase()),
+    AUTH_QUERY_TIMEOUT_MS,
+    "admin settings"
+  ).catch(() => null);
   if (settings && !settings.allow_env_admin_login) {
     return { ok: false, email: normalized, source: "env" };
   }

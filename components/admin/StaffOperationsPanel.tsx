@@ -336,12 +336,25 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
   const load = useCallback(async (options?: { quiet?: boolean }) => {
     if (!options?.quiet) setLoading(true);
     try {
-      const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 12_000);
+      const response = await fetch("/api/admin/staff-operations", {
+        cache: "no-store",
+        signal: controller.signal
+      }).finally(() => window.clearTimeout(timeout));
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Unable to load Staff Admin records.");
       setData(body as StaffOpsPayload);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load Staff Admin records.", "error");
+      const aborted = error instanceof DOMException && error.name === "AbortError";
+      showToast(
+        aborted
+          ? "Team Log is taking too long to load. Tap Retry."
+          : error instanceof Error
+            ? error.message
+            : "Unable to load Staff Admin records.",
+        "error"
+      );
     } finally {
       if (!options?.quiet) setLoading(false);
     }

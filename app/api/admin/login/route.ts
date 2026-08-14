@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { verifyAdminCredentials } from "@/lib/admin/auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { checkLoginRateLimit, clearLoginAttempts, recordFailedLogin } from "@/lib/admin/rate-limit";
@@ -8,8 +8,12 @@ import {
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
+
+const LOGIN_VERIFY_TIMEOUT_MS = 8_000;
 
 export async function POST(request: Request) {
   try {
@@ -31,7 +35,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
     }
 
-    const auth = await verifyAdminCredentials(username, password);
+    const auth = await withTimeoutOrThrow(
+      verifyAdminCredentials(username, password),
+      LOGIN_VERIFY_TIMEOUT_MS,
+      "login verify"
+    );
     if (!auth.ok) {
       recordFailedLogin(`${clientKey}:${username.toLowerCase()}`);
       return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
@@ -39,15 +47,20 @@ export async function POST(request: Request) {
 
     clearLoginAttempts(`${clientKey}:${username.toLowerCase()}`);
 
-    if (auth.adminUserId) {
-      await touchAdminUserLogin(getServiceSupabase(), auth.adminUserId);
+    const adminUserId = auth.adminUserId;
+    if (adminUserId) {
+      after(() => {
+        void touchAdminUserLogin(getServiceSupabase({ timeoutMs: 4_000 }), adminUserId).catch(() => undefined);
+      });
     }
 
-    await writeAdminAuditLog({
-      actorAdminId: auth.adminUserId,
-      actorEmail: auth.email,
-      action: "admin.login",
-      details: { source: auth.source }
+    after(() => {
+      void writeAdminAuditLog({
+        actorAdminId: auth.adminUserId,
+        actorEmail: auth.email,
+        action: "admin.login",
+        details: { source: auth.source }
+      }).catch(() => undefined);
     });
 
     const token = createAdminSessionToken({

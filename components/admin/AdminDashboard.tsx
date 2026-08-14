@@ -152,7 +152,7 @@ export function AdminDashboard() {
     else setRefreshing(true);
     setError(null);
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 25_000);
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
       const response = await fetch(`/api/admin/dashboard?board=${board}&tab=${tab}`, {
         cache: "no-store",

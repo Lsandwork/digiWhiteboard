@@ -37,8 +37,12 @@ import {
 } from "@/lib/staff/admin-ops";
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
+
+const STAFF_OPS_LOAD_TIMEOUT_MS = 8_000;
 
 function crossoverForbiddenResponse() {
   return NextResponse.json({ error: "You do not have permission to access Crossover Communication." }, { status: 403 });
@@ -110,7 +114,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const state = await listStaffOps(getServiceSupabase());
+    const state = await withTimeoutOrThrow(
+      listStaffOps(getServiceSupabase({ timeoutMs: STAFF_OPS_LOAD_TIMEOUT_MS })),
+      STAFF_OPS_LOAD_TIMEOUT_MS,
+      "staff operations"
+    );
     const readerSession = {
       email: session?.email ?? null,
       adminUserId: session?.adminUserId ?? null,
@@ -132,8 +140,11 @@ export async function GET(request: Request) {
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load Staff Admin records.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const timedOut = error instanceof Error && /timed out/i.test(error.message);
+    return NextResponse.json(
+      { error: timedOut ? "Team Log is taking too long to load. Retry in a moment." : error instanceof Error ? error.message : "Unable to load Staff Admin records." },
+      { status: timedOut ? 503 : 500 }
+    );
   }
 }
 

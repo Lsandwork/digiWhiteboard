@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import type { AdminBoardType } from "@/lib/admin/types";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
@@ -19,7 +19,7 @@ import { isDemoSession } from "@/lib/demo/session";
 import { demoSandboxToBoard, getDemoSandbox } from "@/lib/demo/store";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 15;
 
 /** Never block sign-in on a hung Supabase read — the UI shows "Loading admin dashboard…" forever. */
 const DASHBOARD_QUERY_TIMEOUT_MS = 5_000;
@@ -77,79 +77,72 @@ export async function GET(request: Request) {
     const board = parseBoardType(url.searchParams.get("board"));
     const tab = url.searchParams.get("tab");
     const lightLoad = skipHeavyBoardWidgets(board, tab);
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: DASHBOARD_QUERY_TIMEOUT_MS });
 
-    // One-time migration — must not sit on the hot path and stall every dashboard load.
-    void migrateLegacyUserAccess(supabase).catch(() => undefined);
+    after(() => {
+      void migrateLegacyUserAccess(supabase).catch(() => undefined);
+    });
 
-    const settingsBundle = await timed(
-      "settings bundle",
-      DEFAULT_SETTINGS_BUNDLE,
-      cachedLoadSettingsBundle(supabase)
-    );
+    const fallbackAccess = session?.adminUserId
+      ? accessFromLegacyRole(session.adminUserId, session.email, session.role)
+      : null;
 
-    const [promotions, checkouts, dogs, events, failedEvents] = lightLoad
-      ? [[], null, [], [], []] as const
-      : await Promise.all([
-          timed("promotions", [], loadAllPromotions(supabase)),
-          timed(
-            "fast checkouts",
-            null,
-            getOrLoadTtlCache(`board-checkouts:admin`, FAST_CHECKOUT_CACHE_TTL_MS, () =>
-              loadFastPromptedCheckouts(supabase)
+    const emptyWidgets = [[], null, [], [], []] as const;
+
+    const [settingsBundle, widgetResults, access, profileUser] = await Promise.all([
+      timed("settings bundle", DEFAULT_SETTINGS_BUNDLE, cachedLoadSettingsBundle(supabase)),
+      lightLoad
+        ? Promise.resolve(emptyWidgets)
+        : Promise.all([
+            timed("promotions", [], loadAllPromotions(supabase)),
+            timed(
+              "fast checkouts",
+              null,
+              getOrLoadTtlCache(`board-checkouts:admin`, FAST_CHECKOUT_CACHE_TTL_MS, () =>
+                loadFastPromptedCheckouts(supabase)
+              )
+            ),
+            timedRows(
+              "transition dogs",
+              supabase
+                .from("live_transition_dogs")
+                .select("*")
+                .eq("hidden", false)
+                .in("display_status", ["checking_in", "checking_out"])
+                .order("updated_at", { ascending: false })
+                .limit(120)
+            ),
+            timedRows(
+              "webhook events",
+              supabase
+                .from("gingr_webhook_events")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .limit(50)
+            ),
+            timedRows(
+              "failed webhook events",
+              supabase
+                .from("gingr_webhook_events")
+                .select("*")
+                .eq("processed", false)
+                .order("created_at", { ascending: false })
+                .limit(20)
             )
-          ),
-          timedRows(
-            "transition dogs",
-            supabase
-              .from("live_transition_dogs")
-              .select("*")
-              .eq("hidden", false)
-              .in("display_status", ["checking_in", "checking_out"])
-              .order("updated_at", { ascending: false })
-              .limit(120)
-          ),
-          timedRows(
-            "webhook events",
-            supabase
-              .from("gingr_webhook_events")
-              .select("*")
-              .order("created_at", { ascending: false })
-              .limit(50)
-          ),
-          timedRows(
-            "failed webhook events",
-            supabase
-              .from("gingr_webhook_events")
-              .select("*")
-              .eq("processed", false)
-              .order("created_at", { ascending: false })
-              .limit(20)
-          )
-        ]);
+          ]),
+      session?.adminUserId
+        ? timed("user access", fallbackAccess, getUserAccess(supabase, session.adminUserId, session.role, session.email))
+        : Promise.resolve(null),
+      session?.adminUserId
+        ? timed("admin profile", null, getAdminUserById(supabase, session.adminUserId))
+        : Promise.resolve(null)
+    ]);
 
+    const [promotions, checkouts, dogs, events, failedEvents] = widgetResults;
     const { admin: adminSettings, lobby: lobbySettings, staff: staffSettings } = settingsBundle;
 
     const siteUrl = publicOrigin(request);
     const webhookUrl = `${siteUrl}/api/gingr/webhook`;
-
-    let access = null;
-    if (session?.adminUserId) {
-      try {
-        access = await withTimeoutOrThrow(
-          getUserAccess(supabase, session.adminUserId, session.role, session.email),
-          DASHBOARD_QUERY_TIMEOUT_MS,
-          "user access"
-        );
-      } catch (error) {
-        console.error("[admin-dashboard] user access unavailable:", error);
-        access = accessFromLegacyRole(session.adminUserId, session.email, session.role);
-      }
-    }
-
-    const profileUser = session?.adminUserId
-      ? await timed("admin profile", null, getAdminUserById(supabase, session.adminUserId))
-      : null;
     const fullName = profileUser?.full_name?.trim() || null;
 
     if (isDemoSession(session)) {

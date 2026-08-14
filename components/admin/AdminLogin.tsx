@@ -65,8 +65,14 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
   useEffect(() => {
     let cancelled = false;
     async function checkSession() {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 5_000);
       try {
-        const response = await fetch("/api/admin/session", { cache: "no-store" });
+        const response = await fetch("/api/admin/session", {
+          cache: "no-store",
+          credentials: "same-origin",
+          signal: controller.signal
+        });
         if (!response.ok) return;
         const body = await response.json();
         if (cancelled) return;
@@ -77,6 +83,8 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
         }
       } catch {
         // ignore
+      } finally {
+        window.clearTimeout(timeout);
       }
     }
     void checkSession();
@@ -98,7 +106,7 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
     setError(null);
 
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 45_000);
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
       const response = await fetch("/api/admin/login", {
         method: "POST",
