@@ -33,6 +33,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Login hang and session cookie guards
+        run: npm run test:login-hang-timeout && npm run test:admin-session-cookies
+
       - name: Route Generator and SMS guard tests
         run: npm run test:route-generator-all
 
