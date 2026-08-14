@@ -8,8 +8,11 @@ import {
 } from "@/lib/admin/session";
 import { touchAdminUserLogin } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
+
+const POST_AUTH_SIDE_EFFECT_MS = 1_500;
 
 export async function POST(request: Request) {
   try {
@@ -39,16 +42,28 @@ export async function POST(request: Request) {
 
     clearLoginAttempts(`${clientKey}:${username.toLowerCase()}`);
 
-    if (auth.adminUserId) {
-      await touchAdminUserLogin(getServiceSupabase(), auth.adminUserId);
-    }
-
-    await writeAdminAuditLog({
-      actorAdminId: auth.adminUserId,
-      actorEmail: auth.email,
-      action: "admin.login",
-      details: { source: auth.source }
-    });
+    // Never let audit/last-login DB writes hang the sign-in response. Production
+    // Supabase stalls were leaving the browser on "Signing in..." forever even
+    // after credentials already validated.
+    await Promise.allSettled([
+      auth.adminUserId
+        ? withTimeoutFallback(
+            touchAdminUserLogin(getServiceSupabase(), auth.adminUserId),
+            POST_AUTH_SIDE_EFFECT_MS,
+            undefined
+          )
+        : Promise.resolve(),
+      withTimeoutFallback(
+        writeAdminAuditLog({
+          actorAdminId: auth.adminUserId,
+          actorEmail: auth.email,
+          action: "admin.login",
+          details: { source: auth.source }
+        }),
+        POST_AUTH_SIDE_EFFECT_MS,
+        undefined
+      )
+    ]);
 
     const token = createAdminSessionToken({
       email: auth.email,
