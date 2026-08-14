@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
+import { accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
 import { ensureSuperAdminUsers } from "@/lib/admin/role-permission-matrix";
 import { getAdminUserById } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
+
+const SESSION_QUERY_TIMEOUT_MS = 4_000;
 
 export async function GET(request: Request) {
   const session = getAdminSessionFromRequest(request);
@@ -14,14 +18,36 @@ export async function GET(request: Request) {
   }
 
   const supabase = getServiceSupabase();
-  await migrateLegacyUserAccess(supabase).catch(() => undefined);
-  await ensureSuperAdminUsers(supabase).catch(() => undefined);
+  void migrateLegacyUserAccess(supabase).catch(() => undefined);
+  void ensureSuperAdminUsers(supabase).catch(() => undefined);
 
-  const dbUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
+  let dbUser = null;
+  if (session.adminUserId) {
+    try {
+      dbUser = await withTimeoutOrThrow(
+        getAdminUserById(supabase, session.adminUserId),
+        SESSION_QUERY_TIMEOUT_MS,
+        "session profile"
+      );
+    } catch {
+      dbUser = null;
+    }
+  }
+
   const mustChangePassword = session.mustChangePassword || dbUser?.force_password_change || false;
-  const access = session.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role ?? dbUser?.role, session.email)
-    : null;
+
+  let access = null;
+  if (session.adminUserId) {
+    try {
+      access = await withTimeoutOrThrow(
+        getUserAccess(supabase, session.adminUserId, session.role ?? dbUser?.role, session.email),
+        SESSION_QUERY_TIMEOUT_MS,
+        "session access"
+      );
+    } catch {
+      access = accessFromLegacyRole(session.adminUserId, session.email, session.role ?? dbUser?.role);
+    }
+  }
 
   return NextResponse.json({
     authenticated: true,

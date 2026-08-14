@@ -154,7 +154,7 @@ export function AdminDashboard() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 25_000);
     try {
-      const response = await fetch(`/api/admin/dashboard?board=${board}`, {
+      const response = await fetch(`/api/admin/dashboard?board=${board}&tab=${tab}`, {
         cache: "no-store",
         credentials: "same-origin",
         signal: controller.signal
@@ -178,7 +178,7 @@ export function AdminDashboard() {
       setBusy(false);
       setRefreshing(false);
     }
-  }, [board]);
+  }, [board, tab]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
