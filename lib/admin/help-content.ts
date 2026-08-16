@@ -411,7 +411,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Owners still use private /track links — never Live Fleet."
     ],
     tips: [
-      "If GPS is unavailable, check SAMSARA_API_TOKEN on the server — never in the browser.",
+      "If GPS is unavailable, confirm the server-side Samsara API token is configured — never in the browser.",
       "Stale vans keep their last position but are labeled so they do not look actively moving."
     ],
     adminTab: "live_fleet",
