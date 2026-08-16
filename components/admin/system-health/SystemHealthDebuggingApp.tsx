@@ -155,7 +155,7 @@ function serviceTargetTab(serviceId: string): SectionId {
   if (["gingr", "samsara", "twilio", "maps", "email", "realtime"].includes(serviceId)) {
     return "integrations";
   }
-  if (serviceId === "ruffops") return "errors";
+  if (serviceId === "ruffops") return "overview";
   return "overview";
 }
 
@@ -648,43 +648,67 @@ export function SystemHealthDebuggingApp() {
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {services.map((svc) => (
-              <button
-                key={String(svc.id)}
-                type="button"
-                onClick={() => go(serviceTargetTab(String(svc.id)))}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-white/20"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold text-white">{String(svc.label)}</p>
-                  <StatusBadge value={String(svc.status || "UNKNOWN")} />
-                </div>
-                <p className="mt-2 text-sm text-admin-muted">{String(svc.detail || "")}</p>
-                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-admin-muted">
-                  <div>
-                    <dt>Response</dt>
-                    <dd className="text-white">{svc.responseTimeMs != null ? `${svc.responseTimeMs} ms` : "—"}</dd>
-                  </div>
-                  <div>
-                    <dt>Errors 24h</dt>
-                    <dd className="text-white">{Number(svc.errorsLast24h || 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>Last success</dt>
-                    <dd className="text-white">
-                      {svc.lastSuccessAt ? new Date(String(svc.lastSuccessAt)).toLocaleString() : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Success rate</dt>
-                    <dd className="text-white">{svc.successRate24h != null ? `${svc.successRate24h}%` : "—"}</dd>
-                  </div>
-                </dl>
-                {svc.lastError ? (
-                  <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p>
-                ) : null}
-              </button>
-            ))}
+            {services.map((svc) => {
+              const id = String(svc.id);
+              const status = String(svc.status || "UNKNOWN").toUpperCase();
+              const needsAuditFix = id === "ruffops" && (status === "WARNING" || status === "DEGRADED");
+              const needsRouteView = id === "route_generator" && (status === "WARNING" || status === "DEGRADED");
+              return (
+                <article
+                  key={id}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-white/20"
+                >
+                  <button
+                    type="button"
+                    onClick={() => go(serviceTargetTab(id))}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-white">{String(svc.label)}</p>
+                      <StatusBadge value={String(svc.status || "UNKNOWN")} />
+                    </div>
+                    <p className="mt-2 text-sm text-admin-muted">{String(svc.detail || "")}</p>
+                    <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-admin-muted">
+                      <div>
+                        <dt>Response</dt>
+                        <dd className="text-white">{svc.responseTimeMs != null ? `${svc.responseTimeMs} ms` : "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Errors 24h</dt>
+                        <dd className="text-white">{Number(svc.errorsLast24h || 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Last success</dt>
+                        <dd className="text-white">
+                          {svc.lastSuccessAt ? new Date(String(svc.lastSuccessAt)).toLocaleString() : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Success rate</dt>
+                        <dd className="text-white">{svc.successRate24h != null ? `${svc.successRate24h}%` : "—"}</dd>
+                      </div>
+                    </dl>
+                    {svc.lastError ? (
+                      <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p>
+                    ) : null}
+                  </button>
+                  {needsAuditFix || needsRouteView || liveDebug.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                      {needsAuditFix ? (
+                        <ToolButton label="Fix audit issues" tone="accent" onClick={() => void runWhiteboardAudit()} />
+                      ) : null}
+                      {needsRouteView ? (
+                        <ToolButton label="Open route audits" onClick={() => go("route_audits")} />
+                      ) : null}
+                      {id === "route_generator" && liveDebug.length ? (
+                        <ToolButton label="End live debug" onClick={() => void endLiveDebug()} />
+                      ) : null}
+                      <ToolButton label="Details" onClick={() => go(serviceTargetTab(id))} />
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </div>
       ) : null}
