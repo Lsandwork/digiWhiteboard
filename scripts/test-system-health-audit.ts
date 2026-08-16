@@ -11,6 +11,8 @@ assert.match(auditSrc, /clear_unsupported_webhook_noise/);
 assert.match(auditSrc, /acknowledge_cast_tv_unused/);
 assert.match(auditSrc, /acknowledge_cast_tv_missing/);
 assert.match(auditSrc, /acknowledge_cast_tv_offline/);
+assert.match(auditSrc, /acknowledge_displays_offline/);
+assert.match(auditSrc, /acknowledgeOpenAuditIssues/);
 assert.match(auditSrc, /prune_offline_display_registry|prune_stale_display_devices/);
 assert.match(webhookSrc, /ignoredWebhookTypes/);
 assert.match(webhookSrc, /ignored: true/);
@@ -39,5 +41,15 @@ assert.match(settingsSrc, /endLiveDebugSessions/);
 const apiSrc = readFileSync(resolve(__dirname, "../app/api/admin/system-health/route.ts"), "utf8");
 assert.match(apiSrc, /end_live_debug/);
 assert.match(apiSrc, /run_whiteboard_audit/);
+assert.match(apiSrc, /acknowledge_audit_issue/);
+assert.match(apiSrc, /audit_issues/);
+
+const uiSrc = readFileSync(
+  resolve(__dirname, "../components/admin/system-health/SystemHealthDebuggingApp.tsx"),
+  "utf8"
+);
+assert.match(uiSrc, /id: "audit_issues"/);
+assert.match(uiSrc, /openAuditDetails/);
+assert.match(uiSrc, /acknowledgeAuditIssue/);
 
 console.log("system health audit tests passed");

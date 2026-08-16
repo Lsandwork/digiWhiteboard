@@ -18,7 +18,8 @@ import {
   loadApiLogs,
   loadBackgroundJobs,
   loadStorageHealth,
-  loadUserActivity
+  loadUserActivity,
+  loadWhiteboardAuditIssues
 } from "@/lib/system-health/dashboard";
 import {
   saveSystemHealthSettings,
@@ -26,7 +27,7 @@ import {
   endLiveDebugSessions,
   loadSystemHealthSettings
 } from "@/lib/system-health/settings";
-import { runSystemHealthAudit } from "@/lib/admin/system-health-audit";
+import { acknowledgeOpenAuditIssues, runSystemHealthAudit } from "@/lib/admin/system-health-audit";
 import { updateErrorStatus } from "@/lib/system-health/errors";
 import {
   debugSearch,
@@ -121,6 +122,9 @@ export async function GET(request: Request) {
             limit: Number(url.searchParams.get("limit") || 50)
           })
         };
+        break;
+      case "audit_issues":
+        payload = { data: await loadWhiteboardAuditIssues() };
         break;
       case "route_audit": {
         const correlationId = url.searchParams.get("correlationId");
@@ -221,9 +225,10 @@ export async function POST(request: Request) {
     action === "save_settings" ||
     action === "start_live_debug" ||
     action === "end_live_debug" ||
-    action === "apply_migration_072" ||
-    action === "run_whiteboard_audit"
+    action === "apply_migration_072"
       ? "system_health.configure"
+      : action === "run_whiteboard_audit" || action === "acknowledge_audit_issue"
+        ? "system_health.view"
       : action === "bug_context" || action === "search" || action === "context"
         ? "system_health.developer"
         : action.startsWith("error")
@@ -287,7 +292,23 @@ export async function POST(request: Request) {
           ok: true,
           overall_status: state.overall_status,
           open_issues: state.open_issues.length,
+          open_issue_rows: state.open_issues,
+          recent_rows: state.recent_rows,
           summary: latest?.summary ?? null
+        });
+      }
+      case "acknowledge_audit_issue": {
+        const state = await acknowledgeOpenAuditIssues(getServiceSupabase(), {
+          issueId: body.issueId ? String(body.issueId) : null,
+          note: body.note ? String(body.note) : null
+        });
+        return NextResponse.json({
+          ok: true,
+          overall_status: state.overall_status,
+          open_issues: state.open_issues.length,
+          open_issue_rows: state.open_issues,
+          recent_rows: state.recent_rows,
+          summary: state.runs[0]?.summary ?? null
         });
       }
       case "apply_migration_072": {
