@@ -18,7 +18,7 @@ export function FleetVehiclePanel({ vehicle, samsaraDashboardUrl, onClose }: Pro
       : "Unavailable";
 
   return (
-    <aside className="flex h-full w-full flex-col border-l border-admin-border bg-[#0b1220]/95 shadow-2xl backdrop-blur md:w-[380px]">
+    <aside className="flex h-full w-full flex-col bg-[#0b1220]/92 backdrop-blur-md">
       <div className="flex items-start justify-between gap-3 border-b border-admin-border px-4 py-3">
         <div>
           <div className="text-lg font-semibold text-white">{vehicle.displayName}</div>
