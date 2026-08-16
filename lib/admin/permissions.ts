@@ -1293,6 +1293,16 @@ export function isMarketingLegacyRole(legacyRole?: string | null) {
 
 const ROUTE_GENERATOR_ROLE_KEYS: RoleKey[] = ["super_admin", "admin", "management", "driver", "hiker"];
 
+/** Live Fleet viewers — includes Front Desk Coordinators (Route Generator stays transportation-only). */
+const LIVE_FLEET_ROLE_KEYS: RoleKey[] = [
+  "super_admin",
+  "admin",
+  "management",
+  "front_desk_coordinator",
+  "driver",
+  "hiker"
+];
+
 /**
  * Route Generator — Super Admin, Admin, Management, and Transportation only.
  * Transportation = Driver/Hiker login or the Transportation department checkbox.
@@ -1316,6 +1326,27 @@ export function canAccessRouteGenerator(
   if (access?.departments.includes("transportation")) return true;
   const roleKey = legacyRoleToRoleKey(legacyRole);
   return ROUTE_GENERATOR_ROLE_KEYS.includes(roleKey);
+}
+
+/**
+ * Live Fleet — Admin, Management, Front Desk Coordinators, and Transportation.
+ * Broader than Route Generator so ops staff can monitor vans without generating routes.
+ */
+export function canAccessLiveFleet(
+  access?: UserAccess | null,
+  legacyRole?: string | null
+): boolean {
+  if (canAccessRouteGenerator(access, legacyRole)) return true;
+  if (
+    isFrontDeskCoordinatorLegacyRole(legacyRole) ||
+    legacyRole === "front_desk_coordinator" ||
+    legacyRole === "front_desk"
+  ) {
+    return true;
+  }
+  if (hasAnyRole(access, LIVE_FLEET_ROLE_KEYS)) return true;
+  const roleKey = legacyRoleToRoleKey(legacyRole);
+  return LIVE_FLEET_ROLE_KEYS.includes(roleKey);
 }
 
 /**
@@ -1421,9 +1452,13 @@ export function canAccessAdminTab(
 
   // Route Generator / Live Fleet are staff-board only — check before the full-admin early return
   // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
-  if (tab === "route_generator" || tab === "live_fleet") {
+  if (tab === "route_generator") {
     if (board !== "staff") return false;
     return canAccessRouteGenerator(access, legacyRole);
+  }
+  if (tab === "live_fleet") {
+    if (board !== "staff") return false;
+    return canAccessLiveFleet(access, legacyRole);
   }
 
   // Same staff-board gate as Route Generator for walks / checklist / Fitdog alerts.
