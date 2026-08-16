@@ -7,6 +7,7 @@ type SectionId =
   | "live"
   | "errors"
   | "route_audits"
+  | "audit_issues"
   | "integrations"
   | "storage"
   | "api_logs"
@@ -22,6 +23,7 @@ const SECTIONS: Array<{ id: SectionId; label: string }> = [
   { id: "live", label: "Live Activity" },
   { id: "errors", label: "Errors" },
   { id: "route_audits", label: "Route Audits" },
+  { id: "audit_issues", label: "Audit Issues" },
   { id: "integrations", label: "Integrations" },
   { id: "storage", label: "Cloud Storage" },
   { id: "api_logs", label: "API Logs" },
@@ -117,12 +119,14 @@ function ToolButton({
   label,
   onClick,
   active,
-  tone = "default"
+  tone = "default",
+  disabled = false
 }: {
   label: string;
   onClick: () => void;
   active?: boolean;
   tone?: "default" | "accent" | "danger";
+  disabled?: boolean;
 }) {
   const toneClass =
     tone === "accent"
@@ -133,7 +137,17 @@ function ToolButton({
           ? "border-white/30 bg-white/15 text-white"
           : "border-white/15 bg-white/5 text-white hover:bg-white/10";
   return (
-    <button type="button" onClick={onClick} className={`rounded-xl border px-3 py-1.5 text-xs font-medium ${toneClass}`}>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (disabled) return;
+        onClick();
+      }}
+      className={`rounded-xl border px-3 py-1.5 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ${toneClass}`}
+    >
       {label}
     </button>
   );
@@ -155,7 +169,7 @@ function serviceTargetTab(serviceId: string): SectionId {
   if (["gingr", "samsara", "twilio", "maps", "email", "realtime"].includes(serviceId)) {
     return "integrations";
   }
-  if (serviceId === "ruffops") return "overview";
+  if (serviceId === "ruffops") return "audit_issues";
   return "overview";
 }
 
@@ -177,12 +191,17 @@ export function SystemHealthDebuggingApp() {
   const [errorFilter, setErrorFilter] = useState<string>("all");
   const [integrationFilter, setIntegrationFilter] = useState<string>("all");
   const [schemaBusy, setSchemaBusy] = useState(false);
+  const [auditBusy, setAuditBusy] = useState(false);
+  const [auditIssues, setAuditIssues] = useState<Record<string, unknown> | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/admin/system-health?view=dashboard", { cache: "no-store" });
+      const res = await fetch("/api/admin/system-health?view=dashboard", {
+        cache: "no-store",
+        credentials: "same-origin"
+      });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error || "Failed to load System Health");
       setBundle(body);
@@ -194,8 +213,28 @@ export function SystemHealthDebuggingApp() {
     }
   }, []);
 
+  const loadAuditIssues = useCallback(async () => {
+    const res = await fetch("/api/admin/system-health?view=audit_issues", {
+      cache: "no-store",
+      credentials: "same-origin"
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error || "Failed to load audit issues");
+      return null;
+    }
+    const data = (body.data as Record<string, unknown>) || null;
+    setAuditIssues(data);
+    setSectionData(data);
+    return data;
+  }, []);
+
   const loadSection = useCallback(
     async (id: SectionId, opts?: { jobStatus?: string }) => {
+      if (id === "audit_issues") {
+        await loadAuditIssues();
+        return;
+      }
       const view =
         id === "api_logs"
           ? "api_logs"
@@ -218,12 +257,15 @@ export function SystemHealthDebuggingApp() {
         params.set("status", opts.jobStatus);
       }
       if (id === "live" && liveSeverity !== "all") params.set("severity", liveSeverity);
-      const res = await fetch(`/api/admin/system-health?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(`/api/admin/system-health?${params.toString()}`, {
+        cache: "no-store",
+        credentials: "same-origin"
+      });
       const body = await res.json();
       if (res.ok) setSectionData(body.data ?? body);
       else setError(body.error || "Failed to load section");
     },
-    [liveSeverity]
+    [liveSeverity, loadAuditIssues]
   );
 
   useEffect(() => {
@@ -403,23 +445,89 @@ export function SystemHealthDebuggingApp() {
   };
 
   const runWhiteboardAudit = async () => {
+    setAuditBusy(true);
+    setError(null);
     setCopyNote("Running whiteboard audit + auto-fix…");
-    const res = await fetch("/api/admin/system-health", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "run_whiteboard_audit", auto_fix: true })
-    });
-    const body = await res.json();
-    if (!res.ok) {
-      setError(body.error || "Unable to run whiteboard audit");
-      return;
+    setSection("audit_issues");
+    try {
+      const res = await fetch("/api/admin/system-health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ action: "run_whiteboard_audit", auto_fix: true })
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(String(body.error || `Unable to run whiteboard audit (${res.status})`));
+        setCopyNote(null);
+        return;
+      }
+      const open = Number(body.open_issues || 0);
+      const fixed = Number(body.summary?.fixed || 0);
+      setAuditIssues({
+        last_run_at: new Date().toISOString(),
+        overall_status: body.overall_status,
+        open_issues: body.open_issue_rows || [],
+        recent_rows: body.recent_rows || [],
+        summary: body.summary || null
+      });
+      setSectionData({
+        last_run_at: new Date().toISOString(),
+        overall_status: body.overall_status,
+        open_issues: body.open_issue_rows || [],
+        recent_rows: body.recent_rows || [],
+        summary: body.summary || null
+      });
+      setCopyNote(
+        open ? `Audit done · ${fixed} fixed · ${open} still open` : `Audit done · ${fixed} fixed · all clear`
+      );
+      await refresh();
+      await loadAuditIssues();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to run whiteboard audit");
+      setCopyNote(null);
+    } finally {
+      setAuditBusy(false);
     }
-    const open = Number(body.open_issues || 0);
-    const fixed = Number(body.summary?.fixed || 0);
-    setCopyNote(
-      open ? `Audit done · ${fixed} fixed · ${open} still open` : `Audit done · ${fixed} fixed · all clear`
-    );
-    void refresh();
+  };
+
+  const acknowledgeAuditIssue = async (issueId?: string | null) => {
+    setAuditBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/system-health", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          action: "acknowledge_audit_issue",
+          issueId: issueId || null,
+          note: issueId ? "Acknowledged from Audit Issues." : "Acknowledged all remaining open audit issues."
+        })
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(String(body.error || `Unable to acknowledge issue (${res.status})`));
+        return;
+      }
+      setCopyNote(
+        Number(body.open_issues || 0)
+          ? `Acknowledged · ${body.open_issues} still open`
+          : "Acknowledged · all clear"
+      );
+      await refresh();
+      await loadAuditIssues();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to acknowledge issue");
+    } finally {
+      setAuditBusy(false);
+    }
+  };
+
+  const openAuditDetails = () => {
+    setError(null);
+    setSection("audit_issues");
+    void loadAuditIssues();
   };
 
   const copyDebugContext = async (correlationId: string) => {
@@ -506,7 +614,11 @@ export function SystemHealthDebuggingApp() {
             <p className="mt-1 max-w-3xl text-sm text-admin-muted">{headerSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <ToolButton label="Run audit + auto-fix" onClick={() => void runWhiteboardAudit()} />
+            <ToolButton
+              label={auditBusy ? "Auditing…" : "Run audit + auto-fix"}
+              disabled={auditBusy}
+              onClick={() => void runWhiteboardAudit()}
+            />
             <ToolButton label="Refresh probes" onClick={() => void refresh()} tone="accent" />
             {copyNote ? <span className="self-center text-xs text-emerald-300">{copyNote}</span> : null}
           </div>
@@ -692,18 +804,29 @@ export function SystemHealthDebuggingApp() {
                       <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p>
                     ) : null}
                   </button>
-                  {needsAuditFix || needsRouteView || liveDebug.length ? (
+                  {needsAuditFix || needsRouteView || liveDebug.length || id === "ruffops" ? (
                     <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
                       {needsAuditFix ? (
-                        <ToolButton label="Fix audit issues" tone="accent" onClick={() => void runWhiteboardAudit()} />
+                        <ToolButton
+                          label={auditBusy ? "Fixing…" : "Fix audit issues"}
+                          tone="accent"
+                          disabled={auditBusy}
+                          onClick={() => void runWhiteboardAudit()}
+                        />
                       ) : null}
                       {needsRouteView ? (
                         <ToolButton label="Open route audits" onClick={() => go("route_audits")} />
                       ) : null}
                       {id === "route_generator" && liveDebug.length ? (
-                        <ToolButton label="End live debug" onClick={() => void endLiveDebug()} />
+                        <ToolButton label="End live debug" disabled={auditBusy} onClick={() => void endLiveDebug()} />
                       ) : null}
-                      <ToolButton label="Details" onClick={() => go(serviceTargetTab(id))} />
+                      <ToolButton
+                        label="Details"
+                        onClick={() => {
+                          if (id === "ruffops") openAuditDetails();
+                          else go(serviceTargetTab(id));
+                        }}
+                      />
                     </div>
                   ) : null}
                 </article>
@@ -766,6 +889,108 @@ export function SystemHealthDebuggingApp() {
               ))}
             </ul>
           )}
+        </div>
+      ) : null}
+
+      {section === "audit_issues" ? (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-white">Whiteboard &amp; Gingr audit issues</h3>
+                <p className="mt-1 text-sm text-admin-muted">
+                  These are the open system-health audit findings that yellow the RuffOps Application card.
+                  Run auto-fix first; acknowledge anything that remains if it is expected (for example TVs powered off).
+                </p>
+                <p className="mt-2 text-xs text-admin-muted">
+                  Status{" "}
+                  <span className="font-semibold text-white">
+                    {String((auditIssues || (sectionData as Record<string, unknown> | null))?.overall_status || "—")}
+                  </span>
+                  {" · "}
+                  Last run{" "}
+                  {(auditIssues || (sectionData as Record<string, unknown> | null))?.last_run_at
+                    ? new Date(
+                        String((auditIssues || (sectionData as Record<string, unknown>))?.last_run_at)
+                      ).toLocaleString()
+                    : "never"}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <ToolButton
+                  label={auditBusy ? "Fixing…" : "Run audit + auto-fix"}
+                  tone="accent"
+                  disabled={auditBusy}
+                  onClick={() => void runWhiteboardAudit()}
+                />
+                <ToolButton
+                  label={auditBusy ? "Working…" : "Acknowledge all open"}
+                  disabled={auditBusy}
+                  onClick={() => void acknowledgeAuditIssue(null)}
+                />
+                <ToolButton label="Reload" onClick={() => void loadAuditIssues()} />
+              </div>
+            </div>
+          </div>
+
+          {(() => {
+            const payload = (auditIssues || (sectionData as Record<string, unknown> | null) || {}) as Record<
+              string,
+              unknown
+            >;
+            const openRows = Array.isArray(payload.open_issues)
+              ? (payload.open_issues as Array<Record<string, unknown>>)
+              : [];
+            const recentRows = Array.isArray(payload.recent_rows)
+              ? (payload.recent_rows as Array<Record<string, unknown>>)
+              : [];
+            const rows = openRows.length ? openRows : recentRows;
+            if (!rows.length) {
+              return <Empty text="No audit results yet. Click Run audit + auto-fix." />;
+            }
+            return (
+              <ul className="space-y-2">
+                {rows.map((row) => {
+                  const status = String(row.status || "open");
+                  const isOpen = status === "open" || status === "failed";
+                  return (
+                    <li key={String(row.id)} className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusBadge value={status} />
+                            <span className="text-xs uppercase tracking-wide text-admin-muted">
+                              {String(row.severity || "—")} · {String(row.check || "").replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          <p className="mt-2 font-medium text-white">{String(row.title || "Issue")}</p>
+                          <p className="mt-1 text-sm text-admin-muted">{String(row.detail || "")}</p>
+                          {row.auto_fix && typeof row.auto_fix === "object" ? (
+                            <p className="mt-2 text-xs text-admin-muted">
+                              Auto-fix:{" "}
+                              <span className="text-white">
+                                {String((row.auto_fix as Record<string, unknown>).result || "—")}
+                              </span>
+                              {(row.auto_fix as Record<string, unknown>).message
+                                ? ` · ${String((row.auto_fix as Record<string, unknown>).message)}`
+                                : ""}
+                            </p>
+                          ) : null}
+                        </div>
+                        {isOpen ? (
+                          <ToolButton
+                            label={auditBusy ? "Working…" : "Acknowledge"}
+                            disabled={auditBusy}
+                            onClick={() => void acknowledgeAuditIssue(String(row.id))}
+                          />
+                        ) : null}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            );
+          })()}
         </div>
       ) : null}
 

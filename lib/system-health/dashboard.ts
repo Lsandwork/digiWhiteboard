@@ -201,6 +201,20 @@ export async function loadUserActivity(params?: { limit?: number }) {
   return loadLiveActivity({ ...params, limit: params?.limit ?? 100 });
 }
 
+export async function loadWhiteboardAuditIssues() {
+  const { loadSystemHealthAudit } = await import("@/lib/admin/system-health-audit");
+  const supabase = getServiceSupabase();
+  const state = await loadSystemHealthAudit(supabase);
+  return sanitizeForUi({
+    last_run_at: state.last_run_at,
+    overall_status: state.overall_status,
+    open_issues: state.open_issues,
+    recent_rows: state.recent_rows,
+    summary: state.runs[0]?.summary ?? null,
+    next_cron_hint: "Auto-audits run twice daily at 7:00 AM and 7:00 PM Pacific."
+  });
+}
+
 export async function loadSystemHealthDashboardBundle() {
   const [overview, activity, errors, audits, integrations, settings, liveDebug] = await Promise.all([
     loadSystemHealthOverview(),

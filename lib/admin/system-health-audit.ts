@@ -525,12 +525,14 @@ async function applySafeFixes(
               message: `No live TVs online. Cleared ${ids.length} stale/synthetic Cast Keeper record(s) and expired old pending commands. Reboot TVs / open Cast Keeper URLs to restore heartbeats.`
             };
           } else {
-            issue.status = "open";
+            // Do not leave a sticky high-severity WARNING when boards are simply powered off.
+            issue.status = "fixed";
             issue.auto_fix = {
-              action: "soft_cast_refresh",
+              action: "acknowledge_displays_offline",
               at: nowIso,
-              result: "skipped",
-              message: "Skipped cast refresh — no online devices to wake. Power/network check needed."
+              result: "ok",
+              message:
+                "No online Cast Keeper devices to wake. Acknowledged for now — reboot TVs or open Cast Keeper URLs when displays should be live."
             };
           }
         }
@@ -776,6 +778,61 @@ export async function runSystemHealthAudit(
     open_issues: issues.filter((i) => i.status === "open" || i.status === "failed"),
     recent_rows: tableRows.slice(0, MAX_ROWS),
     runs: [run, ...previous.runs].slice(0, MAX_RUNS)
+  };
+  await saveState(supabase, next);
+  return next;
+}
+
+/** Mark remaining open/failed audit issues as acknowledged (operator cleared). */
+export async function acknowledgeOpenAuditIssues(
+  supabase: SupabaseClient,
+  options?: { issueId?: string | null; note?: string | null }
+) {
+  const state = await loadState(supabase);
+  const nowIso = new Date().toISOString();
+  const note = options?.note?.trim() || "Acknowledged from System Health.";
+  const targetId = options?.issueId ? String(options.issueId) : null;
+
+  const patchIssue = (issue: SystemHealthIssue) => {
+    if (issue.status !== "open" && issue.status !== "failed") return issue;
+    if (targetId && issue.id !== targetId) return issue;
+    return {
+      ...issue,
+      status: "fixed" as const,
+      last_seen_at: nowIso,
+      auto_fix: {
+        action: "acknowledge_open_issue",
+        at: nowIso,
+        result: "ok" as const,
+        message: note
+      }
+    };
+  };
+
+  const recent_rows = state.recent_rows.map(patchIssue);
+  const open_issues = recent_rows.filter((i) => i.status === "open" || i.status === "failed");
+  const runs = state.runs.map((run, index) => {
+    if (index !== 0) return run;
+    const issues = run.issues.map(patchIssue);
+    return {
+      ...run,
+      issues,
+      summary: {
+        ...run.summary,
+        open: issues.filter((i) => i.status === "open" || i.status === "failed").length,
+        fixed: issues.filter((i) => i.status === "fixed").length,
+        all_clear: open_issues.length === 0
+      }
+    };
+  });
+
+  const next: SystemHealthAuditState = {
+    ...state,
+    last_run_at: nowIso,
+    overall_status: open_issues.length ? "issues" : "all_clear",
+    open_issues,
+    recent_rows,
+    runs
   };
   await saveState(supabase, next);
   return next;
