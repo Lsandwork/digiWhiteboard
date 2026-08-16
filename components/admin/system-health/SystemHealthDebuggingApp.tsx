@@ -155,7 +155,7 @@ function serviceTargetTab(serviceId: string): SectionId {
   if (["gingr", "samsara", "twilio", "maps", "email", "realtime"].includes(serviceId)) {
     return "integrations";
   }
-  if (serviceId === "ruffops") return "errors";
+  if (serviceId === "ruffops") return "overview";
   return "overview";
 }
 
@@ -387,6 +387,41 @@ export function SystemHealthDebuggingApp() {
     void refresh();
   };
 
+  const endLiveDebug = async () => {
+    const res = await fetch("/api/admin/system-health", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "end_live_debug" })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error || "Unable to end live debug");
+      return;
+    }
+    setCopyNote(`Ended ${Number(body.ended || 0)} live debug session(s)`);
+    void refresh();
+  };
+
+  const runWhiteboardAudit = async () => {
+    setCopyNote("Running whiteboard audit + auto-fix…");
+    const res = await fetch("/api/admin/system-health", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "run_whiteboard_audit", auto_fix: true })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error || "Unable to run whiteboard audit");
+      return;
+    }
+    const open = Number(body.open_issues || 0);
+    const fixed = Number(body.summary?.fixed || 0);
+    setCopyNote(
+      open ? `Audit done · ${fixed} fixed · ${open} still open` : `Audit done · ${fixed} fixed · all clear`
+    );
+    void refresh();
+  };
+
   const copyDebugContext = async (correlationId: string) => {
     const res = await fetch("/api/admin/system-health", {
       method: "POST",
@@ -471,6 +506,7 @@ export function SystemHealthDebuggingApp() {
             <p className="mt-1 max-w-3xl text-sm text-admin-muted">{headerSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ToolButton label="Run audit + auto-fix" onClick={() => void runWhiteboardAudit()} />
             <ToolButton label="Refresh probes" onClick={() => void refresh()} tone="accent" />
             {copyNote ? <span className="self-center text-xs text-emerald-300">{copyNote}</span> : null}
           </div>
@@ -594,56 +630,85 @@ export function SystemHealthDebuggingApp() {
 
           {liveDebug.length ? (
             <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4">
-              <p className="text-sm font-semibold text-amber-100">LIVE DEBUGGING ACTIVE</p>
-              <ul className="mt-2 space-y-1 text-sm text-amber-50/90">
-                {liveDebug.map((row) => (
-                  <li key={String(row.id)}>
-                    {String(row.feature)} · expires{" "}
-                    {row.expires_at ? new Date(String(row.expires_at)).toLocaleString() : "—"}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-100">LIVE DEBUGGING ACTIVE</p>
+                  <ul className="mt-2 space-y-1 text-sm text-amber-50/90">
+                    {liveDebug.map((row) => (
+                      <li key={String(row.id)}>
+                        {String(row.feature)} · expires{" "}
+                        {row.expires_at ? new Date(String(row.expires_at)).toLocaleString() : "—"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <ToolButton label="End live debug" onClick={() => void endLiveDebug()} />
+              </div>
             </div>
           ) : null}
 
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {services.map((svc) => (
-              <button
-                key={String(svc.id)}
-                type="button"
-                onClick={() => go(serviceTargetTab(String(svc.id)))}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-white/20"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-semibold text-white">{String(svc.label)}</p>
-                  <StatusBadge value={String(svc.status || "UNKNOWN")} />
-                </div>
-                <p className="mt-2 text-sm text-admin-muted">{String(svc.detail || "")}</p>
-                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-admin-muted">
-                  <div>
-                    <dt>Response</dt>
-                    <dd className="text-white">{svc.responseTimeMs != null ? `${svc.responseTimeMs} ms` : "—"}</dd>
-                  </div>
-                  <div>
-                    <dt>Errors 24h</dt>
-                    <dd className="text-white">{Number(svc.errorsLast24h || 0)}</dd>
-                  </div>
-                  <div>
-                    <dt>Last success</dt>
-                    <dd className="text-white">
-                      {svc.lastSuccessAt ? new Date(String(svc.lastSuccessAt)).toLocaleString() : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Success rate</dt>
-                    <dd className="text-white">{svc.successRate24h != null ? `${svc.successRate24h}%` : "—"}</dd>
-                  </div>
-                </dl>
-                {svc.lastError ? (
-                  <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p>
-                ) : null}
-              </button>
-            ))}
+            {services.map((svc) => {
+              const id = String(svc.id);
+              const status = String(svc.status || "UNKNOWN").toUpperCase();
+              const needsAuditFix = id === "ruffops" && (status === "WARNING" || status === "DEGRADED");
+              const needsRouteView = id === "route_generator" && (status === "WARNING" || status === "DEGRADED");
+              return (
+                <article
+                  key={id}
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left transition hover:border-white/20"
+                >
+                  <button
+                    type="button"
+                    onClick={() => go(serviceTargetTab(id))}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-white">{String(svc.label)}</p>
+                      <StatusBadge value={String(svc.status || "UNKNOWN")} />
+                    </div>
+                    <p className="mt-2 text-sm text-admin-muted">{String(svc.detail || "")}</p>
+                    <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-admin-muted">
+                      <div>
+                        <dt>Response</dt>
+                        <dd className="text-white">{svc.responseTimeMs != null ? `${svc.responseTimeMs} ms` : "—"}</dd>
+                      </div>
+                      <div>
+                        <dt>Errors 24h</dt>
+                        <dd className="text-white">{Number(svc.errorsLast24h || 0)}</dd>
+                      </div>
+                      <div>
+                        <dt>Last success</dt>
+                        <dd className="text-white">
+                          {svc.lastSuccessAt ? new Date(String(svc.lastSuccessAt)).toLocaleString() : "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Success rate</dt>
+                        <dd className="text-white">{svc.successRate24h != null ? `${svc.successRate24h}%` : "—"}</dd>
+                      </div>
+                    </dl>
+                    {svc.lastError ? (
+                      <p className="mt-2 text-xs text-rose-200">Last error: {String(svc.lastError)}</p>
+                    ) : null}
+                  </button>
+                  {needsAuditFix || needsRouteView || liveDebug.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                      {needsAuditFix ? (
+                        <ToolButton label="Fix audit issues" tone="accent" onClick={() => void runWhiteboardAudit()} />
+                      ) : null}
+                      {needsRouteView ? (
+                        <ToolButton label="Open route audits" onClick={() => go("route_audits")} />
+                      ) : null}
+                      {id === "route_generator" && liveDebug.length ? (
+                        <ToolButton label="End live debug" onClick={() => void endLiveDebug()} />
+                      ) : null}
+                      <ToolButton label="Details" onClick={() => go(serviceTargetTab(id))} />
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -1205,6 +1270,7 @@ export function SystemHealthDebuggingApp() {
             tone="accent"
             onClick={() => void startLiveDebug()}
           />
+          <ToolButton label="End all live debug sessions" onClick={() => void endLiveDebug()} />
         </div>
       ) : null}
 

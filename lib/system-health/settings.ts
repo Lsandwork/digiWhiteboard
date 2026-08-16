@@ -148,6 +148,23 @@ export async function listActiveLiveDebugSessions() {
   return data ?? [];
 }
 
+export async function endLiveDebugSessions(params?: { feature?: string | null; sessionId?: string | null }) {
+  const supabase = getServiceSupabase();
+  const now = new Date().toISOString();
+  let query = supabase
+    .from("system_health_live_debug_sessions")
+    .update({ active: false, ended_at: now })
+    .eq("active", true);
+  if (params?.sessionId) {
+    query = query.eq("id", params.sessionId);
+  } else if (params?.feature) {
+    query = query.eq("feature", params.feature);
+  }
+  const { data, error } = await query.select("id, feature");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
 export async function recordDebugAccess(params: {
   actorAdminId?: string | null;
   actorEmail?: string | null;

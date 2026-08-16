@@ -23,8 +23,10 @@ import {
 import {
   saveSystemHealthSettings,
   startLiveDebugSession,
+  endLiveDebugSessions,
   loadSystemHealthSettings
 } from "@/lib/system-health/settings";
+import { runSystemHealthAudit } from "@/lib/admin/system-health-audit";
 import { updateErrorStatus } from "@/lib/system-health/errors";
 import {
   debugSearch,
@@ -216,7 +218,11 @@ export async function POST(request: Request) {
   const action = String(body.action || "");
 
   const permission: PermissionKey =
-    action === "save_settings" || action === "start_live_debug" || action === "apply_migration_072"
+    action === "save_settings" ||
+    action === "start_live_debug" ||
+    action === "end_live_debug" ||
+    action === "apply_migration_072" ||
+    action === "run_whiteboard_audit"
       ? "system_health.configure"
       : action === "bug_context" || action === "search" || action === "context"
         ? "system_health.developer"
@@ -263,6 +269,26 @@ export async function POST(request: Request) {
           scopeIntegration: body.integration ? String(body.integration) : null
         });
         return NextResponse.json({ ok: true, session });
+      }
+      case "end_live_debug": {
+        const ended = await endLiveDebugSessions({
+          feature: body.feature ? String(body.feature) : null,
+          sessionId: body.sessionId ? String(body.sessionId) : null
+        });
+        return NextResponse.json({ ok: true, ended: ended.length, sessions: ended });
+      }
+      case "run_whiteboard_audit": {
+        const state = await runSystemHealthAudit(getServiceSupabase(), {
+          trigger: "manual",
+          autoFix: body.auto_fix !== false
+        });
+        const latest = state.runs[0];
+        return NextResponse.json({
+          ok: true,
+          overall_status: state.overall_status,
+          open_issues: state.open_issues.length,
+          summary: latest?.summary ?? null
+        });
       }
       case "apply_migration_072": {
         const before = await checkSystemHealthSchema(getServiceSupabase());
