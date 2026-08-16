@@ -57,12 +57,16 @@ export function appendAuthenticatedGlobalRoutes(
   options?: {
     includeRuffly?: boolean;
     includeRouteGenerator?: boolean;
+    includeLiveFleet?: boolean;
     includeSystemHealth?: boolean;
   }
 ): NavEntry[] {
   const globalSection: NavEntry[] = [section("global_apps", "Applications")];
   if (options?.includeRouteGenerator) {
     globalSection.push(leaf("route_generator"));
+  }
+  if (options?.includeLiveFleet) {
+    globalSection.push(leaf("live_fleet"));
   }
   if (options?.includeSystemHealth) {
     globalSection.push(leaf("ops_system_health"));
@@ -165,6 +169,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board",
   route_generator: "Route Generator",
+  live_fleet: "Live Fleet",
   my_shift: "My Shift",
   ops_command_center: "Ops Command Center",
   front_desk_command: "Front Desk Command",
@@ -197,7 +202,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   sa_floor_hub: "Open floor command centers, operations tools, photos, and cameras from one place.",
   sa_whiteboard_hub: "Push notices, preview the board, and manage TV / cast setup.",
   sa_people_hub: "Staff directory, HR records, write-ups, and PIP tracking.",
-  sa_apps_hub: "Route Generator, System Health, Blog Generator, Gingr, and Ruffly.",
+  sa_apps_hub: "Live Fleet, Route Generator, System Health, Blog Generator, Gingr, and Ruffly.",
   sa_admin_hub: "Overview, analytics, settings, logs, integrations, and admin utilities.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
@@ -230,6 +235,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   notifications: "Internal staff notifications and replies.",
   walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
   route_generator: "Pull Fitdog reports, build van routes, export Samsara CSVs, and track owner SMS / live maps.",
+  live_fleet: "Real-time Fitdog van map powered by Samsara GPS, joined with today's Route Generator assignments.",
   staff_directory: "Edit staff names, roles, and contact info.",
   staff_create_user: "Create a new staff admin login.",
   users: "Manage admin users, roles, and permissions.",
@@ -745,6 +751,7 @@ export function buildStaffPanelNav(
   return appendAuthenticatedGlobalRoutes(entries, {
     includeRuffly: roleCanSeeRufflyNav(role),
     includeRouteGenerator: visibleTabs.includes("route_generator"),
+    includeLiveFleet: visibleTabs.includes("live_fleet"),
     includeSystemHealth: visibleTabs.includes("ops_system_health")
   });
 }

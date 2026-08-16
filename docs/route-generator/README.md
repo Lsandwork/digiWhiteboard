@@ -8,6 +8,7 @@ Operational route planning for Fitdog pickup and drop-off vans on staff.ruffops.
 3. Work is divided among **Van 1, Van 2, Van 3, Van 5, Van 6** (never Van 4) using club/outing eligibility + capacity.
 4. Routes are shown on a map for review and manual adjustment.
 5. Approved plans export a validated Samsara bulk-upload CSV using the active uploaded template.
+6. **Live Fleet** shows active vans on a live map using Samsara GPS joined with today's routes (see [live-fleet.md](./live-fleet.md)).
 
 ## Enablement
 All flags default to `false`. Complete the shadow-mode checklist before setting `ROUTE_GENERATOR_ENABLED=true`.

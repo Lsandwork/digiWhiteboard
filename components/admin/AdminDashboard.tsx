@@ -29,6 +29,7 @@ import { FitdogAlertsPanel } from "@/components/admin/FitdogAlertsPanel";
 import { VetVisitsPanel } from "@/components/admin/VetVisitsPanel";
 import { VipAutoBookPanel } from "@/components/admin/VipAutoBookPanel";
 import { RouteGeneratorPanel } from "@/components/admin/RouteGeneratorPanel";
+import { LiveFleetPanel } from "@/components/admin/live-fleet/LiveFleetPanel";
 import { OpsCommandCenterPanel } from "@/components/admin/ops-command-center/OpsCommandCenterPanel";
 import {
   DriverModePanel,
@@ -236,7 +237,7 @@ export function AdminDashboard() {
     }
 
     // Keep staff-only tabs on staff board instead of bouncing to an unrelated tab.
-    if ((tab === "route_generator" || tab === "package_commissions") && board !== "staff") {
+    if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions") && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
       router.replace(`/admin?board=staff&tab=${tab}`);
       return;
@@ -287,7 +288,7 @@ export function AdminDashboard() {
     }
     // These tabs only exist on the staff board — force board so the click
     // never lands on lobby/marketing where the tab is inaccessible / empty.
-    const forceStaffBoard = nextTab === "route_generator" || nextTab === "package_commissions";
+    const forceStaffBoard = nextTab === "route_generator" || nextTab === "live_fleet" || nextTab === "package_commissions";
     const nextBoard = forceStaffBoard ? "staff" : board;
     if (forceStaffBoard && typeof window !== "undefined") {
       window.localStorage.setItem("fitdog_admin_board", "staff");
@@ -424,7 +425,7 @@ export function AdminDashboard() {
     : isFrontDeskCoordinatorLoginEmail(data.username)
       ? "Front Desk Coordinator"
       : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
   const hubNavRole = currentRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
   // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
@@ -684,6 +685,7 @@ export function AdminDashboard() {
         {tab === "vet_visits" ? <VetVisitsPanel /> : null}
         {tab === "vip_auto_book" ? <VipAutoBookPanel /> : null}
         {tab === "route_generator" ? <RouteGeneratorPanel /> : null}
+        {tab === "live_fleet" ? <LiveFleetPanel /> : null}
         {tab === "my_shift" ? (
           <OpsCommandCenterPanel mode="my_shift" onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)} />
         ) : null}

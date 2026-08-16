@@ -398,6 +398,27 @@ export const HELP_ARTICLES: HelpArticle[] = [
     audiences: ["admin", "staff_ops"]
   },
   {
+    id: "live-fleet-ops",
+    title: "How do I monitor vans on Live Fleet?",
+    summary: "Live Fleet is the real-time Fitdog van map. Samsara GPS feeds RuffOps; you see routes, drivers, dogs, and next stops without leaving Digi.",
+    category: "Admin Dashboard",
+    keywords: ["live fleet", "samsara", "gps", "vans", "map", "telemetry"],
+    steps: [
+      "Open Admin → Live Fleet (staff board). Access matches Route Generator (Admin / Management / Driver / Hiker / Transportation).",
+      "Vans appear from active route_vehicle_configs joined to Samsara GPS (server-side only).",
+      "Click a van card or marker to see today's Route Generator timeline, dogs, progress, and next stop.",
+      "Use Fit all vans / Refresh / route line & stop toggles as needed. Open in Samsara only for deeper troubleshooting.",
+      "Owners still use private /track links — never Live Fleet."
+    ],
+    tips: [
+      "If GPS is unavailable, confirm the server-side Samsara API token is configured — never in the browser.",
+      "Stale vans keep their last position but are labeled so they do not look actively moving."
+    ],
+    adminTab: "live_fleet",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
+  },
+  {
     id: "how-data-flows",
     title: "Where does checkout data come from?",
     summary: "Gingr webhooks fill Supabase; TV boards read that cache. Some Digi tools also pull live Gingr/Fitdog data when you Sync or export.",

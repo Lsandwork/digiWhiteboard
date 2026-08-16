@@ -97,6 +97,7 @@ export type AdminTab =
   | "remote_cast"
   | "walks_board"
   | "route_generator"
+  | "live_fleet"
   | "my_shift"
   | "ops_command_center"
   | "front_desk_command"
@@ -168,6 +169,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "remote_cast",
   "walks_board",
   "route_generator",
+  "live_fleet",
   "my_shift",
   "ops_command_center",
   "front_desk_command",

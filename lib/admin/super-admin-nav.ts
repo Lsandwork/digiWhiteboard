@@ -187,6 +187,7 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         id: "ruffops_apps",
         title: "RuffOps apps",
         links: [
+          tabLink("live_fleet", "Live Fleet", "Real-time Fitdog vans on the map with Samsara GPS."),
           tabLink("route_generator", "Route Generator", "Build van routes and Samsara exports."),
           tabLink("ops_system_health", "System Health & Debugging", "System health, audits, and debug evidence."),
           routeLink(
