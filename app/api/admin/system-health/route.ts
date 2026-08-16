@@ -225,7 +225,8 @@ export async function POST(request: Request) {
     action === "save_settings" ||
     action === "start_live_debug" ||
     action === "end_live_debug" ||
-    action === "apply_migration_072"
+    action === "apply_migration_072" ||
+    action === "apply_migration_076"
       ? "system_health.configure"
       : action === "run_whiteboard_audit" || action === "acknowledge_audit_issue"
         ? "system_health.view"
@@ -324,6 +325,28 @@ export async function POST(request: Request) {
         }
         const result = await applySystemHealthMigration072();
         const after = await checkSystemHealthSchema(getServiceSupabase());
+        return NextResponse.json({
+          ...result,
+          ok: result.ok && after.ready,
+          schema: after
+        });
+      }
+      case "apply_migration_076": {
+        const { checkLiveFleetSchema, applyLiveFleetMigration076 } = await import(
+          "@/lib/live-fleet/ensure-schema"
+        );
+        const before = await checkLiveFleetSchema(getServiceSupabase());
+        if (before.ready) {
+          return NextResponse.json({
+            ok: true,
+            applied: false,
+            alreadyReady: true,
+            schema: before,
+            detail: "Migration 076 already applied — Live Fleet tables present."
+          });
+        }
+        const result = await applyLiveFleetMigration076();
+        const after = await checkLiveFleetSchema(getServiceSupabase());
         return NextResponse.json({
           ...result,
           ok: result.ok && after.ready,

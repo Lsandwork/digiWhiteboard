@@ -94,6 +94,22 @@ Same transportation gate as Route Generator:
 
 Staff board only.
 
+## Schema / migration 076
+
+Migration: `supabase/migrations/076_live_fleet_telemetry.sql`
+
+Creates:
+
+- `route_vehicle_configs.samsara_vehicle_id`
+- `route_fleet_sync_state` (feed cursor)
+- `route_fleet_vehicle_telemetry` (latest GPS cache)
+
+**Apply options**
+
+1. `npm run db:push -- 076_live_fleet_telemetry.sql` (requires `SUPABASE_DB_PASSWORD` or `DATABASE_URL`)
+2. Auto-apply on Live Fleet / live-fleet-sync cron when those Postgres credentials are set on the server
+3. System Health action `apply_migration_076` (`system_health.configure`)
+
 ## Troubleshooting
 
 | Symptom | Check |
@@ -102,6 +118,7 @@ Staff board only.
 | Van missing | `route_vehicle_configs.active`? Name/serial match Samsara? |
 | No route / dogs | Today’s plan approved/generated in Route Generator? |
 | Positions not updating | Shared sync cooldown; use Refresh; inspect `route_fleet_sync_state` |
+| Schema / table errors | Apply migration 076 (see above) |
 | Simulated banner | `LIVE_FLEET_SIMULATE_GPS` is enabled — disable in production |
 | Token in browser | Must never happen — Live Fleet responses are sanitized; secrets stay server-side |
 

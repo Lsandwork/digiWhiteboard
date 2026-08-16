@@ -18,6 +18,7 @@ import type {
   LiveVehicleTelemetry
 } from "@/lib/live-fleet/types";
 import { getLiveFleetSyncMeta, loadVehicleConfigs, syncLiveFleetTelemetry } from "@/lib/live-fleet/sync";
+import { ensureLiveFleetSchema } from "@/lib/live-fleet/ensure-schema";
 import { todayInLosAngeles } from "@/lib/route-generator/samsara-csv";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -324,10 +325,19 @@ export async function getLiveFleetSnapshot(options?: {
   forceSync?: boolean;
 }): Promise<LiveFleetSnapshot> {
   const operatingDate = todayInLosAngeles();
+  const supabase = getServiceSupabase();
+  const schema = await ensureLiveFleetSchema(supabase);
+  if (!schema.ready) {
+    console.warn(
+      JSON.stringify({
+        scope: "live_fleet",
+        event: "schema_not_ready",
+        detail: schema.detail
+      })
+    );
+  }
   const sync = await syncLiveFleetTelemetry({ force: options?.forceSync });
   const syncMeta = await getLiveFleetSyncMeta();
-
-  const supabase = getServiceSupabase();
   const configs = await loadVehicleConfigs();
   const activeConfigs = configs.filter((c) => c.active);
 
