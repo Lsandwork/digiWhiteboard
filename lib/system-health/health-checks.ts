@@ -598,10 +598,18 @@ export async function runFunctionalHealthChecks(): Promise<{
   }
 
   if (audit?.open_issues?.length) {
+    // Low-severity / acknowledged noise should not yellow the RuffOps Application card.
+    // Only medium/high open issues that still need operator attention escalate status.
+    const actionable = audit.open_issues.filter((issue) => {
+      const severity = String(issue.severity || "");
+      return severity === "medium" || severity === "high";
+    });
     const app = services.find((s) => s.id === "ruffops");
-    if (app && app.status === "HEALTHY") {
+    if (app && app.status === "HEALTHY" && actionable.length) {
       app.status = "WARNING";
-      app.detail = `${audit.open_issues.length} open system-health audit issue(s).`;
+      app.detail = `${actionable.length} open system-health audit issue(s).`;
+    } else if (app && app.status === "HEALTHY" && audit.open_issues.length) {
+      app.detail = `${audit.open_issues.length} low-severity audit note(s) — no operator action required.`;
     }
   }
 

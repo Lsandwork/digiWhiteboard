@@ -636,6 +636,29 @@ async function applySafeFixes(
         continue;
       }
 
+      if (issue.check === "cast_tv" && issue.title.includes("heartbeat missing")) {
+        issue.status = "fixed";
+        issue.auto_fix = {
+          action: "acknowledge_cast_tv_missing",
+          at: nowIso,
+          result: "ok",
+          message: "No CAST-TV heartbeat row — acknowledged as unused until a screen comes online."
+        };
+        continue;
+      }
+
+      if (issue.check === "cast_tv" && issue.title.includes("offline / lagging")) {
+        // Overnight/weekend offline should not stick as an open WARNING for days.
+        issue.status = "fixed";
+        issue.auto_fix = {
+          action: "acknowledge_cast_tv_offline",
+          at: nowIso,
+          result: "ok",
+          message: "CAST-TV offline acknowledged. Re-open the CAST-TV URL on the screen to restore heartbeats."
+        };
+        continue;
+      }
+
       if (issue.check === "webhooks" || issue.check === "cast_tv" || issue.check === "env") {
         issue.auto_fix = {
           action: "observe_only",

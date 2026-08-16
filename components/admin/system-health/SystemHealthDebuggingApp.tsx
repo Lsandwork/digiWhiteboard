@@ -387,6 +387,41 @@ export function SystemHealthDebuggingApp() {
     void refresh();
   };
 
+  const endLiveDebug = async () => {
+    const res = await fetch("/api/admin/system-health", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "end_live_debug" })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error || "Unable to end live debug");
+      return;
+    }
+    setCopyNote(`Ended ${Number(body.ended || 0)} live debug session(s)`);
+    void refresh();
+  };
+
+  const runWhiteboardAudit = async () => {
+    setCopyNote("Running whiteboard audit + auto-fix…");
+    const res = await fetch("/api/admin/system-health", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "run_whiteboard_audit", auto_fix: true })
+    });
+    const body = await res.json();
+    if (!res.ok) {
+      setError(body.error || "Unable to run whiteboard audit");
+      return;
+    }
+    const open = Number(body.open_issues || 0);
+    const fixed = Number(body.summary?.fixed || 0);
+    setCopyNote(
+      open ? `Audit done · ${fixed} fixed · ${open} still open` : `Audit done · ${fixed} fixed · all clear`
+    );
+    void refresh();
+  };
+
   const copyDebugContext = async (correlationId: string) => {
     const res = await fetch("/api/admin/system-health", {
       method: "POST",
@@ -471,6 +506,7 @@ export function SystemHealthDebuggingApp() {
             <p className="mt-1 max-w-3xl text-sm text-admin-muted">{headerSubtitle}</p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <ToolButton label="Run audit + auto-fix" onClick={() => void runWhiteboardAudit()} />
             <ToolButton label="Refresh probes" onClick={() => void refresh()} tone="accent" />
             {copyNote ? <span className="self-center text-xs text-emerald-300">{copyNote}</span> : null}
           </div>
@@ -594,15 +630,20 @@ export function SystemHealthDebuggingApp() {
 
           {liveDebug.length ? (
             <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4">
-              <p className="text-sm font-semibold text-amber-100">LIVE DEBUGGING ACTIVE</p>
-              <ul className="mt-2 space-y-1 text-sm text-amber-50/90">
-                {liveDebug.map((row) => (
-                  <li key={String(row.id)}>
-                    {String(row.feature)} · expires{" "}
-                    {row.expires_at ? new Date(String(row.expires_at)).toLocaleString() : "—"}
-                  </li>
-                ))}
-              </ul>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-amber-100">LIVE DEBUGGING ACTIVE</p>
+                  <ul className="mt-2 space-y-1 text-sm text-amber-50/90">
+                    {liveDebug.map((row) => (
+                      <li key={String(row.id)}>
+                        {String(row.feature)} · expires{" "}
+                        {row.expires_at ? new Date(String(row.expires_at)).toLocaleString() : "—"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <ToolButton label="End live debug" onClick={() => void endLiveDebug()} />
+              </div>
             </div>
           ) : null}
 
@@ -1205,6 +1246,7 @@ export function SystemHealthDebuggingApp() {
             tone="accent"
             onClick={() => void startLiveDebug()}
           />
+          <ToolButton label="End all live debug sessions" onClick={() => void endLiveDebug()} />
         </div>
       ) : null}
 

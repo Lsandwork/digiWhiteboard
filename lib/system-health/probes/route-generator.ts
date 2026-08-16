@@ -64,8 +64,10 @@ export async function probeRouteGenerator(
         lastFailureAt = at;
         lastError = detail;
       } else if (st === "warning") {
-        status = "WARNING";
-        detail = "Most recent route audit passed with warnings.";
+        // PASS_WITH_WARNINGS still means routes generated successfully — keep HEALTHY so
+        // expected geocode/club-van notes do not sticky-yellow the whole System Health card.
+        status = "HEALTHY";
+        detail = "Most recent route audit passed with warnings (generation succeeded).";
       } else if (st === "passed" || st === "running") {
         status = "HEALTHY";
         detail =

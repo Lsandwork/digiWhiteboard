@@ -9,6 +9,8 @@ assert.match(auditSrc, /isSyntheticDisplayDevice/);
 assert.match(auditSrc, /isUnsupportedWebhookNoise/);
 assert.match(auditSrc, /clear_unsupported_webhook_noise/);
 assert.match(auditSrc, /acknowledge_cast_tv_unused/);
+assert.match(auditSrc, /acknowledge_cast_tv_missing/);
+assert.match(auditSrc, /acknowledge_cast_tv_offline/);
 assert.match(auditSrc, /prune_offline_display_registry|prune_stale_display_devices/);
 assert.match(webhookSrc, /ignoredWebhookTypes/);
 assert.match(webhookSrc, /ignored: true/);
@@ -18,5 +20,24 @@ assert.doesNotMatch(
   /throw new Error\(`Unsupported webhook_type/,
   "unsupported webhook types must not 500"
 );
+
+const healthChecks = readFileSync(resolve(__dirname, "../lib/system-health/health-checks.ts"), "utf8");
+assert.match(healthChecks, /low-severity audit note/);
+assert.match(healthChecks, /severity === "medium" \|\| severity === "high"/);
+
+const routeProbe = readFileSync(resolve(__dirname, "../lib/system-health/probes/route-generator.ts"), "utf8");
+assert.match(routeProbe, /passed with warnings \(generation succeeded\)/);
+assert.doesNotMatch(
+  routeProbe,
+  /st === "warning"\) \{\s*status = "WARNING"/,
+  "PASS_WITH_WARNINGS must not sticky-yellow Route Generator"
+);
+
+const settingsSrc = readFileSync(resolve(__dirname, "../lib/system-health/settings.ts"), "utf8");
+assert.match(settingsSrc, /endLiveDebugSessions/);
+
+const apiSrc = readFileSync(resolve(__dirname, "../app/api/admin/system-health/route.ts"), "utf8");
+assert.match(apiSrc, /end_live_debug/);
+assert.match(apiSrc, /run_whiteboard_audit/);
 
 console.log("system health audit tests passed");
