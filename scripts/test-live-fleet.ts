@@ -333,6 +333,14 @@ assert.doesNotMatch(feedSrc, /NEXT_PUBLIC_SAMSARA/);
 const panelSrc = readFileSync(path.join(process.cwd(), "components/admin/live-fleet/LiveFleetPanel.tsx"), "utf8");
 assert.doesNotMatch(panelSrc, /SAMSARA_API_TOKEN|SAMSARA_API_KEY|SAMSARA_BEARER_TOKEN/);
 assert.match(panelSrc, /\/api\/admin\/live-fleet|useLiveFleet/);
+assert.match(panelSrc, /focusToken/);
+assert.match(panelSrc, /absolute inset-0/);
+
+const mapSrc = readFileSync(path.join(process.cwd(), "components/admin/live-fleet/LiveFleetMap.tsx"), "utf8");
+assert.match(mapSrc, /flyTo/);
+assert.match(mapSrc, /invalidateSize/);
+assert.match(mapSrc, /ResizeObserver/);
+assert.match(mapSrc, /dark_all/);
 
 const ownerTrackApi = readFileSync(path.join(process.cwd(), "app/api/track/[token]/route.ts"), "utf8");
 assert.doesNotMatch(ownerTrackApi, /live-fleet|getLiveFleetSnapshot/);
