@@ -20,6 +20,8 @@ import { classifyFreshness, classifyGpsStatus } from "../lib/live-fleet/status";
 import { feedUpdatesToLocations, normalizeSamsaraVanLabel } from "../lib/live-fleet/samsara-feed";
 import { matchVehicleByName } from "../lib/route-generator/samsara-live";
 import type { LiveFleetStop } from "../lib/live-fleet/types";
+import { SUPER_ADMIN_HUBS } from "../lib/admin/super-admin-nav";
+import { filterHubDefinition } from "../lib/admin/role-hub-nav";
 
 // --- Access ---
 assert.equal(
@@ -32,15 +34,52 @@ assert.equal(
   "Live Fleet must stay staff-board only"
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "manager_admin"), "live_fleet", "manager_admin", "staff"),
+  true,
+  "Admins can open Live Fleet"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "live_fleet", "assistant_manager", "staff"),
+  true,
+  "Management can open Live Fleet"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "live_fleet", "front_desk_coordinator", "staff"),
+  true,
+  "Front Desk Coordinators can open Live Fleet"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "route_generator", "front_desk_coordinator", "staff"),
+  false,
+  "Front Desk Coordinators still cannot open Route Generator"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "live_fleet", "driver", "staff"),
+  true
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "hiker"), "live_fleet", "hiker", "staff"),
   true
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "live_fleet", "daycare", "staff"),
   false
 );
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "live_fleet", "team_leader", "staff"),
+  false,
+  "Team Leads do not get Live Fleet"
+);
 assert.equal(canAccessLiveFleet(accessFromLegacyRole(null, null, "hiker"), "hiker"), true);
 assert.equal(canAccessLiveFleet(accessFromLegacyRole(null, null, "trainer"), "trainer"), false);
+assert.equal(canAccessLiveFleet(accessFromLegacyRole(null, null, "front_desk_coordinator"), "front_desk_coordinator"), true);
+
+// Apps hub must surface Live Fleet when the tab is visible for the role
+{
+  const apps = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, ["live_fleet", "route_generator", "ops_system_health"]);
+  const labels = apps.sections.flatMap((s) => s.links.map((l) => l.label));
+  assert.ok(labels.includes("Live Fleet"), "Apps hub includes Live Fleet link");
+}
 
 // --- GPS status / freshness ---
 const now = Date.parse("2026-08-15T18:00:00.000Z");

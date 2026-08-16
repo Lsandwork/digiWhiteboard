@@ -87,10 +87,14 @@ Owner pages remain token-scoped. Changing a dog id in a URL cannot reveal anothe
 
 ## Permissions
 
-Same transportation gate as Route Generator:
+Live Fleet is available on the staff **Apps** hub for:
 
-- Super Admin, Admin, Management, Driver, Hiker
-- Transportation department
+- Super Admin / Admin
+- Management
+- Front Desk Coordinators
+- Transportation (Driver / Hiker / Transportation department)
+
+Route Generator remains more restricted (no Front Desk Coordinators).
 
 Staff board only.
 

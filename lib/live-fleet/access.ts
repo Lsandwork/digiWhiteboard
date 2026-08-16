@@ -1,9 +1,9 @@
-import { canAccessRouteGenerator, type UserAccess } from "@/lib/admin/permissions";
+import { canAccessLiveFleet as canAccessLiveFleetPermission, type UserAccess } from "@/lib/admin/permissions";
 
-/** Live Fleet uses the same transportation access model as Route Generator. */
+/** Live Fleet API gate — Admin, Management, Front Desk Coordinators, Transportation. */
 export function canAccessLiveFleet(
   access: UserAccess | null | undefined,
   legacyRole?: string | null
 ): boolean {
-  return canAccessRouteGenerator(access, legacyRole);
+  return canAccessLiveFleetPermission(access, legacyRole);
 }

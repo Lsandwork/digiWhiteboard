@@ -404,7 +404,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "Admin Dashboard",
     keywords: ["live fleet", "samsara", "gps", "vans", "map", "telemetry"],
     steps: [
-      "Open Admin → Live Fleet (staff board). Access matches Route Generator (Admin / Management / Driver / Hiker / Transportation).",
+      "Open Admin → Live Fleet (staff board / Apps). Access: Admin, Management, Front Desk Coordinators, and Transportation (Driver / Hiker).",
       "Vans appear from active route_vehicle_configs joined to Samsara GPS (server-side only).",
       "Click a van card or marker to see today's Route Generator timeline, dogs, progress, and next stop.",
       "Use Fit all vans / Refresh / route line & stop toggles as needed. Open in Samsara only for deeper troubleshooting.",
