@@ -28,6 +28,7 @@ const QUICK_TABS: Array<{ tab: string; label: string; keywords: string }> = [
   { tab: "crossover_communication", label: "Team Log", keywords: "crossover notes" },
   { tab: "walks_board", label: "Walks Board", keywords: "walk overdue" },
   { tab: "grooming_push", label: "Grooming Push", keywords: "groomer ready" },
+  { tab: "live_fleet", label: "Live Fleet", keywords: "fleet vans gps samsara map" },
   { tab: "route_generator", label: "Route Generator", keywords: "routes vans" },
   { tab: "media_library", label: "Media Library", keywords: "photos videos" },
   { tab: "fitdog_alerts", label: "Fitdog Alerts", keywords: "payment" }

@@ -60,6 +60,10 @@
       "schedule": "*/2 * * * *"
     },
     {
+      "path": "/api/cron/live-fleet-sync",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/blog-jobs",
       "schedule": "*/15 * * * *"
     },

@@ -1044,6 +1044,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   vet_visits: "view_vet_visits",
   vip_auto_book: "view_vip_auto_book",
   route_generator: "route_generator.view",
+  live_fleet: "route_generator.view",
   my_shift: "view_my_shift",
   ops_command_center: "view_ops_command_center",
   front_desk_command: "view_my_shift",
@@ -1107,7 +1108,7 @@ export const PERMISSION_PREVIEW_LABELS: Partial<Record<PermissionKey, string>> =
   view_integration_status: "Integrations Status",
   manage_templates: "Templates",
   receive_admin_alerts: "Management Alerts",
-  "route_generator.view": "Route Generator"
+  "route_generator.view": "Route Generator / Live Fleet"
 };
 
 export function previewLabelsForAccess(access: UserAccess): string[] {
@@ -1418,9 +1419,9 @@ export function canAccessAdminTab(
     return false;
   }
 
-  // Route Generator is staff-board only — check before the full-admin early return
+  // Route Generator / Live Fleet are staff-board only — check before the full-admin early return
   // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
-  if (tab === "route_generator") {
+  if (tab === "route_generator" || tab === "live_fleet") {
     if (board !== "staff") return false;
     return canAccessRouteGenerator(access, legacyRole);
   }
