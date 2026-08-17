@@ -79,3 +79,11 @@ export type TlDigiBoardSnapshot = {
   medications: TlGingrMedicationRecord[];
   generatedAt: string;
 };
+
+/** Public TV payload — snapshot plus safe config fields (never secrets). */
+export type TlDigiBoardPublicPayload = TlDigiBoardSnapshot & {
+  config: {
+    displayTitle: string;
+    enabled: boolean;
+  };
+};

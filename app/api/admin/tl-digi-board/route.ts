@@ -10,10 +10,10 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getRequestUserAccess } from "@/lib/auth/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import {
-  getTlDigiBoardSnapshot,
   loadTlDigiBoardConfig,
-  updateTlDigiBoardConfig,
-  type TlDigiBoardConfigPatch
+  loadTlDigiBoardSnapshot,
+  toTlDigiBoardAdminConfigView,
+  updateTlDigiBoardConfig
 } from "@/lib/tl-digi-board/server";
 
 export const dynamic = "force-dynamic";
@@ -51,10 +51,10 @@ export async function GET(request: Request) {
     const supabase = getServiceSupabase();
     const [config, snapshot] = await Promise.all([
       loadTlDigiBoardConfig(supabase),
-      getTlDigiBoardSnapshot(supabase)
+      loadTlDigiBoardSnapshot(supabase)
     ]);
     return NextResponse.json({
-      config,
+      config: toTlDigiBoardAdminConfigView(config),
       snapshot,
       permissions: {
         canView: true,
@@ -81,30 +81,16 @@ async function mutateConfig(request: Request) {
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const patch: TlDigiBoardConfigPatch = {};
+  const patch: { displayTitle?: string; enabled?: boolean } = {};
 
-  if (body.lodging && typeof body.lodging === "object") {
-    patch.lodging = body.lodging as TlDigiBoardConfigPatch["lodging"];
+  if (typeof body.displayTitle === "string") {
+    patch.displayTitle = body.displayTitle.trim() || "Team Lead Alerts + Reminders";
   }
-  if (body.display && typeof body.display === "object") {
-    patch.display = body.display as TlDigiBoardConfigPatch["display"];
-  }
-  if (body.protected && typeof body.protected === "object") {
-    patch.protected = body.protected as TlDigiBoardConfigPatch["protected"];
+  if (typeof body.enabled === "boolean") {
+    patch.enabled = body.enabled;
   }
 
-  // Convenience flat fields from the simple admin panel.
-  if (typeof body.showOtherSpecial === "boolean" || typeof body.preferBackOfHouseLodging === "boolean") {
-    patch.display = {
-      ...(patch.display ?? {}),
-      ...(typeof body.showOtherSpecial === "boolean" ? { showOtherSpecial: body.showOtherSpecial } : {}),
-      ...(typeof body.preferBackOfHouseLodging === "boolean"
-        ? { preferBackOfHouseLodging: body.preferBackOfHouseLodging }
-        : {})
-    };
-  }
-
-  if (!patch.lodging && !patch.display && !patch.protected) {
+  if (!Object.keys(patch).length) {
     return NextResponse.json({ error: "No TL Digi Board config changes provided." }, { status: 400 });
   }
 
@@ -125,11 +111,10 @@ async function mutateConfig(request: Request) {
       details: { keys: Object.keys(patch), patch }
     });
 
-    return NextResponse.json({ ok: true, config });
+    return NextResponse.json({ ok: true, config: toTlDigiBoardAdminConfigView(config) });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to update TL Digi Board.";
-    const status = message.includes("full admin") || message.includes("Only full admins") ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

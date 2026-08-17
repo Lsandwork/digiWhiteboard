@@ -1,8 +1,10 @@
+import { getServiceSupabase } from "@/lib/supabase/server";
 import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import {
   canManageTlDigiBoardConfig,
   DEFAULT_TL_DIGI_BOARD_CONFIG,
   parseTlDigiBoardConfig,
+  toTlDigiBoardAdminConfigView,
   type TlDigiBoardConfig,
   type TlOvernightLodgingArea,
   type TlOvernightReservationTypeMapping
@@ -11,6 +13,7 @@ import { syncTlDigiBoardState } from "./sync";
 import type {
   TlBoardMedicationRow,
   TlBoardSyncMeta,
+  TlDigiBoardPublicPayload,
   TlDigiBoardSnapshot,
   TlGingrMedicationRecord,
   TlMedicationSummary
@@ -20,6 +23,10 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 export const TL_DIGI_BOARD_CONFIG_KEY = "tl_digi_board_config";
 export const TL_DIGI_BOARD_SNAPSHOT_KEY = "tl_digi_board_snapshot";
+
+function resolveSupabase(supabase?: SupabaseClient) {
+  return supabase ?? getServiceSupabase();
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -80,9 +87,10 @@ export function parseTlDigiBoardSnapshot(value: unknown): TlDigiBoardSnapshot | 
   };
 }
 
-export async function loadTlDigiBoardConfig(supabase: SupabaseClient): Promise<TlDigiBoardConfig> {
+export async function loadTlDigiBoardConfig(supabase?: SupabaseClient): Promise<TlDigiBoardConfig> {
+  const client = resolveSupabase(supabase);
   const loaded = await loadAdminSettingsJsonKey(
-    supabase,
+    client,
     TL_DIGI_BOARD_CONFIG_KEY,
     parseTlDigiBoardConfig,
     DEFAULT_TL_DIGI_BOARD_CONFIG
@@ -91,10 +99,11 @@ export async function loadTlDigiBoardConfig(supabase: SupabaseClient): Promise<T
 }
 
 export async function loadTlDigiBoardSnapshot(
-  supabase: SupabaseClient
+  supabase?: SupabaseClient
 ): Promise<TlDigiBoardSnapshot | null> {
+  const client = resolveSupabase(supabase);
   const loaded = await loadAdminSettingsJsonKey(
-    supabase,
+    client,
     TL_DIGI_BOARD_SNAPSHOT_KEY,
     parseTlDigiBoardSnapshot,
     null
@@ -116,6 +125,9 @@ export type UpdateTlDigiBoardConfigActor = {
 };
 
 export type TlDigiBoardConfigPatch = {
+  /** Flat admin-panel fields. */
+  displayTitle?: string;
+  enabled?: boolean;
   lodging?: {
     overnightReservationTypes?: TlOvernightReservationTypeMapping[];
     approvedAreaKeys?: TlOvernightLodgingArea[];
@@ -149,11 +161,28 @@ function validateOvernightMappings(
 }
 
 export async function updateTlDigiBoardConfig(
-  supabase: SupabaseClient,
-  patch: TlDigiBoardConfigPatch,
-  actor: UpdateTlDigiBoardConfigActor
+  supabaseOrOptions: SupabaseClient | { patch: TlDigiBoardConfigPatch; actorEmail?: string | null; role?: string | null },
+  patchArg?: TlDigiBoardConfigPatch,
+  actorArg?: UpdateTlDigiBoardConfigActor
 ): Promise<TlDigiBoardConfig> {
-  if (!canManageTlDigiBoardConfig(actor.role)) {
+  let supabase: SupabaseClient;
+  let patch: TlDigiBoardConfigPatch;
+  let actor: UpdateTlDigiBoardConfigActor;
+
+  if (supabaseOrOptions && typeof supabaseOrOptions === "object" && "patch" in supabaseOrOptions) {
+    supabase = getServiceSupabase();
+    patch = supabaseOrOptions.patch;
+    actor = {
+      email: supabaseOrOptions.actorEmail ?? null,
+      role: supabaseOrOptions.role ?? "owner_admin"
+    };
+  } else {
+    supabase = supabaseOrOptions as SupabaseClient;
+    patch = patchArg ?? {};
+    actor = actorArg ?? {};
+  }
+
+  if (actor.role != null && !canManageTlDigiBoardConfig(actor.role)) {
     throw new Error("Only full admins can update TL Digi Board config.");
   }
 
@@ -164,8 +193,17 @@ export async function updateTlDigiBoardConfig(
       approvedAreaKeys: current.lodging.approvedAreaKeys
     },
     display: { ...current.display },
-    protected: { ...current.protected }
+    protected: { ...current.protected },
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor.email ?? actor.userId ?? current.updatedBy
   };
+
+  if (typeof patch.displayTitle === "string") {
+    next.display.displayTitle = patch.displayTitle.trim() || DEFAULT_TL_DIGI_BOARD_CONFIG.display.displayTitle;
+  }
+  if (typeof patch.enabled === "boolean") {
+    next.display.enabled = patch.enabled;
+  }
 
   if (patch.lodging?.overnightReservationTypes) {
     next.lodging.overnightReservationTypes = validateOvernightMappings(
@@ -181,6 +219,13 @@ export async function updateTlDigiBoardConfig(
     next.lodging.approvedAreaKeys = [...new Set(keys)];
   }
   if (patch.display) {
+    if (typeof patch.display.displayTitle === "string") {
+      next.display.displayTitle =
+        patch.display.displayTitle.trim() || DEFAULT_TL_DIGI_BOARD_CONFIG.display.displayTitle;
+    }
+    if (typeof patch.display.enabled === "boolean") {
+      next.display.enabled = patch.display.enabled;
+    }
     if (typeof patch.display.showOtherSpecial === "boolean") {
       next.display.showOtherSpecial = patch.display.showOtherSpecial;
     }
@@ -192,7 +237,6 @@ export async function updateTlDigiBoardConfig(
     if (typeof patch.protected.lockOvernightTypeMappings === "boolean") {
       next.protected.lockOvernightTypeMappings = patch.protected.lockOvernightTypeMappings;
     }
-    // administrationStatusAvailable cannot be enabled — public API has no status fields.
     if (current.protected.lockAdministrationStatusUnavailable) {
       next.protected.lockAdministrationStatusUnavailable = true;
     } else if (typeof patch.protected.lockAdministrationStatusUnavailable === "boolean") {
@@ -210,22 +254,22 @@ export async function updateTlDigiBoardConfig(
 }
 
 export async function getTlDigiBoardSnapshot(
-  supabase: SupabaseClient,
+  supabase?: SupabaseClient,
   options?: { forceRefresh?: boolean }
 ): Promise<TlDigiBoardSnapshot> {
+  const client = resolveSupabase(supabase);
   const forceRefresh = Boolean(options?.forceRefresh);
   const [config, previous] = await Promise.all([
-    loadTlDigiBoardConfig(supabase),
-    loadTlDigiBoardSnapshot(supabase)
+    loadTlDigiBoardConfig(client),
+    loadTlDigiBoardSnapshot(client)
   ]);
 
-  const snapshot = await syncTlDigiBoardState(supabase, {
+  const snapshot = await syncTlDigiBoardState(client, {
     forceRefresh,
     previousSnapshot: previous,
     config
   });
 
-  // Persist when sync produced a newer attempt (success or failure with retained LKG).
   const shouldPersist =
     forceRefresh ||
     !previous ||
@@ -234,10 +278,31 @@ export async function getTlDigiBoardSnapshot(
     snapshot.meta.lastSuccessfulSyncAt !== previous.meta.lastSuccessfulSyncAt;
 
   if (shouldPersist) {
-    await saveTlDigiBoardSnapshot(supabase, snapshot).catch(() => {
+    await saveTlDigiBoardSnapshot(client, snapshot).catch(() => {
       // Read path should still return the in-memory snapshot if persist fails.
     });
   }
 
   return snapshot;
 }
+
+/** Public TV board payload — never includes API keys or secrets. */
+export async function loadTlDigiBoardPublicPayload(
+  supabase?: SupabaseClient
+): Promise<TlDigiBoardPublicPayload> {
+  const client = resolveSupabase(supabase);
+  const [config, snapshot] = await Promise.all([
+    loadTlDigiBoardConfig(client),
+    getTlDigiBoardSnapshot(client)
+  ]);
+
+  return {
+    ...snapshot,
+    config: {
+      displayTitle: config.display.displayTitle,
+      enabled: config.display.enabled
+    }
+  };
+}
+
+export { toTlDigiBoardAdminConfigView, canManageTlDigiBoardConfig };
