@@ -22,6 +22,9 @@ export type BuildTlBoardStateInput = {
   syncSucceeded: boolean;
   /** True when get_medication_report_history returned usable admin status for this sync. */
   administrationStatusAvailable?: boolean;
+  /** True when Gingr reservation services exposed completion fields this sync. */
+  servicesCompletionStatusAvailable?: boolean;
+  servicesCompletionAudit?: import("./types").TlAdditionalServicesCompletionAudit | null;
 };
 
 function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedicationRecord[] {
@@ -157,6 +160,8 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     allClear,
     nextPeriod: next?.period ?? null,
     nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
-    administrationStatusAvailable: Boolean(input.administrationStatusAvailable)
+    administrationStatusAvailable: Boolean(input.administrationStatusAvailable),
+    servicesCompletionStatusAvailable: Boolean(input.servicesCompletionStatusAvailable),
+    servicesCompletionAudit: input.servicesCompletionAudit ?? null
   };
 }

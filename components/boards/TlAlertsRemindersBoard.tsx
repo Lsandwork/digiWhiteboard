@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { CastKeeperProvider, useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { TlBoardClock } from "@/components/boards/TlBoardClock";
 import {
@@ -8,7 +9,11 @@ import {
   periodLabel
 } from "@/lib/tl-digi-board/medication-windows";
 import { tlBoardAnimalPhotoProxyUrl } from "@/lib/tl-digi-board/animal-photos";
-import type { TlBoardMedicationRow, TlDigiBoardSnapshot } from "@/lib/tl-digi-board/types";
+import type {
+  TlBoardAdditionalServiceRow,
+  TlBoardMedicationRow,
+  TlDigiBoardSnapshot
+} from "@/lib/tl-digi-board/types";
 import "./tl-alerts-reminders-board.css";
 
 type TlReminderCard = {
@@ -25,6 +30,7 @@ type BoardPayload = TlDigiBoardSnapshot & {
 };
 
 const POLL_MS = 12_000;
+const FITDOG_LOGO = "/assets/fitdog/fitdog-logo-white.svg";
 
 function scheduleBadge(row: TlBoardMedicationRow) {
   if (row.displayStatus === "overdue" && row.overdueSourcePeriod) {
@@ -39,7 +45,7 @@ function scheduleBadge(row: TlBoardMedicationRow) {
   return row.gingrScheduleLabel;
 }
 
-function statusLabel(row: TlBoardMedicationRow) {
+function medicationStatusLabel(row: TlBoardMedicationRow) {
   if (row.displayStatus === "overdue") return "NOT ADMINISTERED";
   if (row.displayStatus === "administered") return "ADMINISTERED";
   return "NEEDS MEDICATION";
@@ -54,21 +60,29 @@ function formatAdminTime(iso: string | null) {
   }
 }
 
-function DogPhoto({ row }: { row: TlBoardMedicationRow }) {
+function DogPhoto({
+  animalId,
+  dogName,
+  photoUrl
+}: {
+  animalId: string;
+  dogName: string;
+  photoUrl: string | null;
+}) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const candidates = useMemo(() => {
     const urls: string[] = [];
-    if (row.photoUrl?.trim()) urls.push(row.photoUrl.trim());
-    urls.push(tlBoardAnimalPhotoProxyUrl(row.gingrAnimalId));
+    if (photoUrl?.trim()) urls.push(photoUrl.trim());
+    urls.push(tlBoardAnimalPhotoProxyUrl(animalId));
     return urls;
-  }, [row.gingrAnimalId, row.photoUrl]);
+  }, [animalId, photoUrl]);
 
   const src = candidates.find((url) => url !== failedSrc) ?? null;
 
   if (!src) {
     return (
-      <div className="tl-med-row__photo tl-med-row__photo--placeholder" aria-hidden>
-        {row.dogName.slice(0, 1).toUpperCase()}
+      <div className="tl-table__photo tl-table__photo--placeholder" aria-hidden>
+        {dogName.slice(0, 1).toUpperCase()}
       </div>
     );
   }
@@ -78,44 +92,66 @@ function DogPhoto({ row }: { row: TlBoardMedicationRow }) {
     <img
       src={src}
       alt=""
-      className="tl-med-row__photo"
+      className="tl-table__photo"
       onError={() => setFailedSrc(src)}
     />
   );
 }
 
-function MedicationRow({ row }: { row: TlBoardMedicationRow }) {
+function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
   const tone =
     row.displayStatus === "overdue"
-      ? "tl-med-row--overdue"
+      ? "tl-table__row--overdue"
       : row.displayStatus === "needs_medication"
-        ? "tl-med-row--needs"
-        : "tl-med-row--done";
+        ? "tl-table__row--needs"
+        : "tl-table__row--done";
 
   return (
-    <article className={`tl-med-row ${tone}`}>
-      <div className="tl-med-row__dog">
-        <DogPhoto row={row} />
-        <div>
-          <h3 className="tl-med-row__name">{row.dogName}</h3>
-          <p className="tl-med-row__lodging">{row.lodgingLabel || "LODGING UNKNOWN"}</p>
+    <tr className={`tl-table__row ${tone}`}>
+      <td>
+        <div className="tl-table__dog">
+          <DogPhoto animalId={row.gingrAnimalId} dogName={row.dogName} photoUrl={row.photoUrl} />
+          <div>
+            <strong className="tl-table__dog-name">{row.dogName}</strong>
+          </div>
         </div>
-      </div>
-      <div className="tl-med-row__meta">
-        <span className="tl-med-row__schedule">{scheduleBadge(row)}</span>
-        <strong className="tl-med-row__med">{row.medicationName}</strong>
-        <span className="tl-med-row__dose">{row.dosage || "—"}</span>
-        <span className="tl-med-row__instructions">{row.instructions || row.notes || "—"}</span>
-      </div>
-      <div className={`tl-med-row__status tl-med-row__status--${row.displayStatus}`}>
-        <span className="tl-med-row__status-label">{statusLabel(row)}</span>
+      </td>
+      <td className="tl-table__lodging">{row.lodgingLabel || "—"}</td>
+      <td className="tl-table__schedule">{scheduleBadge(row)}</td>
+      <td className="tl-table__med">{row.medicationName}</td>
+      <td className="tl-table__dose">{row.dosage || "—"}</td>
+      <td className="tl-table__instructions">{row.instructions || row.notes || "—"}</td>
+      <td className="tl-table__status-cell">
+        <span className={`tl-badge tl-badge--${row.displayStatus}`}>{medicationStatusLabel(row)}</span>
         {row.displayStatus === "administered" ? (
-          <span className="tl-med-row__status-detail">
+          <span className="tl-table__status-detail">
             {[formatAdminTime(row.administeredAt), row.administeredBy || "Recorded in Gingr"].filter(Boolean).join(" · ")}
           </span>
         ) : null}
-      </div>
-    </article>
+      </td>
+    </tr>
+  );
+}
+
+function ServiceTableRow({ row }: { row: TlBoardAdditionalServiceRow }) {
+  const isUnknown = row.displayStatus === "completion_unknown";
+  return (
+    <tr className={`tl-table__row tl-table__row--service ${isUnknown ? "tl-table__row--unknown" : ""}`}>
+      <td>
+        <div className="tl-table__dog">
+          <DogPhoto animalId={row.gingrAnimalId} dogName={row.dogName} photoUrl={row.photoUrl} />
+          <div>
+            <strong className="tl-table__dog-name">{row.dogName}</strong>
+          </div>
+        </div>
+      </td>
+      <td className="tl-table__service">{row.serviceName}</td>
+      <td className="tl-table__status-cell">
+        <span className={`tl-badge ${isUnknown ? "tl-badge--completion_unknown" : "tl-badge--needs_completion"}`}>
+          {isUnknown ? "COMPLETION UNKNOWN" : "NEEDS COMPLETION"}
+        </span>
+      </td>
+    </tr>
   );
 }
 
@@ -152,8 +188,9 @@ function BoardInner() {
     };
   }, [load]);
 
-  const title = snapshot?.config?.displayTitle || "TL Alerts + Reminders";
+  const title = snapshot?.config?.displayTitle || "Team Lead Alerts + Reminders";
   const summary = snapshot?.summary;
+  const servicesSummary = snapshot?.servicesSummary;
   const meta = snapshot?.meta;
   const periodText = meta?.currentPeriod ? periodLabel(meta.currentPeriod) : "—";
 
@@ -166,7 +203,7 @@ function BoardInner() {
 
   const syncLabel =
     meta?.gingrSyncHealth === "live"
-      ? "GINGR ● LIVE"
+      ? "GINGR • LIVE"
       : meta?.gingrSyncHealth === "delayed"
         ? "GINGR ⚠ SYNC DELAYED"
         : "⚠ GINGR CONNECTION ISSUE";
@@ -180,11 +217,32 @@ function BoardInner() {
     }
   }, [meta?.lastSuccessfulSyncAt]);
 
+  const medicationRows = useMemo(() => {
+    if (!snapshot) return [];
+    const overdue = snapshot.overdue.filter((row) => row.displayStatus !== "administered");
+    const current = snapshot.current.filter(
+      (row) => row.displayStatus === "needs_medication" || row.displayStatus === "overdue"
+    );
+    return [...overdue, ...current];
+  }, [snapshot]);
+
+  const serviceRows = snapshot?.additionalServices ?? [];
+
   return (
     <main className="tl-board">
       <header className="tl-board__header">
         <div className="tl-board__brand">
-          <p className="tl-board__eyebrow">RUFFOPS</p>
+          <div className="tl-board__logo-row">
+            <Image
+              src={FITDOG_LOGO}
+              alt="Fitdog"
+              width={168}
+              height={40}
+              className="tl-board__logo"
+              priority
+            />
+            <p className="tl-board__eyebrow">DIGITAL WHITEBOARD</p>
+          </div>
           <h1 className="tl-board__title">{title}</h1>
         </div>
         <TlBoardClock />
@@ -194,6 +252,14 @@ function BoardInner() {
           <p className="tl-board__sync-meta">Period {periodText} · America/Los_Angeles</p>
         </div>
       </header>
+
+      {meta && !meta.servicesCompletionStatusAvailable ? (
+        <p className="tl-board__api-note" role="status">
+          One or more additional services could not read completion status from Gingr reservation rows (missing{" "}
+          <code>complete</code> field). Those rows show COMPLETION UNKNOWN and are not treated as incomplete. See{" "}
+          {meta.servicesCompletionAudit?.documentationPath || "docs/tl-digi-board/ADDITIONAL_SERVICES_GINGR.md"}.
+        </p>
+      ) : null}
 
       {meta && !meta.administrationStatusAvailable ? (
         <p className="tl-board__api-note" role="status">
@@ -205,7 +271,7 @@ function BoardInner() {
 
       {meta?.isStale ? (
         <p className="tl-board__stale" role="alert">
-          Showing last known medication data. Gingr sync may be out of date.
+          Showing last known data. Gingr sync may be out of date.
         </p>
       ) : null}
 
@@ -234,36 +300,73 @@ function BoardInner() {
 
       {!snapshot && !error ? <p className="tl-board__loading">Loading board…</p> : null}
 
-      {snapshot?.overdue.length ? (
-        <section className="tl-section tl-section--overdue">
-          <h2 className="tl-section__title">🚨 Overdue Medications</h2>
-          <div className="tl-section__list">
-            {snapshot.overdue.map((row) => (
-              <MedicationRow key={`${row.gingrMedicationId}-${row.gingrScheduleLabel}`} row={row} />
-            ))}
+      <section className="tl-board__split">
+        <div className="tl-panel">
+          <div className="tl-panel__head">
+            <h2 className="tl-panel__title">Medication Reminders</h2>
+            <p className="tl-panel__sub">Only shows items not yet completed in Gingr.</p>
           </div>
-        </section>
-      ) : null}
+          {medicationRows.length ? (
+            <div className="tl-table-wrap">
+              <table className="tl-table">
+                <thead>
+                  <tr>
+                    <th>Dog</th>
+                    <th>Lodging</th>
+                    <th>Schedule</th>
+                    <th>Medication</th>
+                    <th>Dosage</th>
+                    <th>Instructions</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {medicationRows.map((row) => (
+                    <MedicationTableRow key={`${row.gingrMedicationId}-${row.gingrScheduleLabel}`} row={row} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="tl-all-clear">
+              <p className="tl-all-clear__title">✓ All Clear</p>
+              <p>No medications currently due.</p>
+            </div>
+          )}
+        </div>
 
-      <section className="tl-section">
-        <h2 className="tl-section__title">
-          {meta?.currentPeriod ? `${periodLabel(meta.currentPeriod)} Medications` : "Current Medications"}
-        </h2>
-        {snapshot?.meta.allClear ? (
-          <div className="tl-all-clear">
-            <p className="tl-all-clear__title">✓ All Clear</p>
-            <p>No current medications due.</p>
-            {meta?.nextPeriodStartsAt ? <p>Next medication period: {meta.nextPeriodStartsAt}</p> : null}
+        <div className="tl-panel">
+          <div className="tl-panel__head">
+            <h2 className="tl-panel__title">Additional Services</h2>
+            <p className="tl-panel__sub">Only shows services not marked completed in Gingr.</p>
           </div>
-        ) : snapshot?.current.length ? (
-          <div className="tl-section__list">
-            {snapshot.current.map((row) => (
-              <MedicationRow key={`${row.gingrMedicationId}-${row.gingrScheduleLabel}`} row={row} />
-            ))}
-          </div>
-        ) : (
-          <p className="tl-section__empty">No medications in the current window.</p>
-        )}
+          {serviceRows.length ? (
+            <div className="tl-table-wrap">
+              <table className="tl-table tl-table--services">
+                <thead>
+                  <tr>
+                    <th>Dog</th>
+                    <th>Service</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {serviceRows.map((row) => (
+                    <ServiceTableRow key={row.id} row={row} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="tl-all-clear tl-all-clear--services">
+              <p className="tl-all-clear__title">✓ All Clear</p>
+              <p>No additional services need completion.</p>
+              {servicesSummary?.completed ? (
+                <p className="tl-panel__sub">{servicesSummary.completed} completed in Gingr today.</p>
+              ) : null}
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="tl-section">

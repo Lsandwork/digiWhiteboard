@@ -68,6 +68,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/tl-additional-services-reminder",
+      "schedule": "30 13,16,19,22,1 * * *"
+    },
+    {
       "path": "/api/cron/blog-jobs",
       "schedule": "*/15 * * * *"
     },

@@ -11,6 +11,26 @@ export function tlBoardAnimalPhotoProxyUrl(animalId: string): string {
  * Fill missing medication row photos from Gingr using TL_GINGR_KEY.
  * Best-effort — boards still proxy photos client-side when this returns null.
  */
+/** Best-effort Gingr profile photos for arbitrary animal ids (TL_GINGR_KEY). */
+export async function enrichTlBoardAnimalPhotoUrls(
+  rows: Array<{ gingrAnimalId: string; photoUrl: string | null }>
+): Promise<Map<string, string | null>> {
+  const apiKey = resolveTlGingrApiKey();
+  const missingIds = [
+    ...new Set(rows.filter((row) => !row.photoUrl?.trim()).map((row) => String(row.gingrAnimalId)))
+  ];
+  if (!apiKey || !missingIds.length) return new Map();
+
+  const { subdomain } = tlGingrClientConfig();
+  const photoMap = await getGingrAnimalPhotoUrlMap(missingIds, {
+    timeoutMs: 4000,
+    bypassFetchGate: true,
+    apiKey,
+    subdomain
+  });
+  return photoMap;
+}
+
 export async function enrichTlBoardMedicationPhotos(
   medications: TlGingrMedicationRecord[]
 ): Promise<TlGingrMedicationRecord[]> {
