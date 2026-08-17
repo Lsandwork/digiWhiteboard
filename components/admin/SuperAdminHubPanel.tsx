@@ -20,17 +20,20 @@ export function SuperAdminHubPanel({
   hubTab,
   onNavigate,
   visibleTabs = [],
-  role = null
+  role = null,
+  marketingAppsOnly = false
 }: {
   hubTab: AdminTab;
   onNavigate: (tab: AdminTab) => void;
   visibleTabs?: AdminTab[];
   role?: string | null;
+  marketingAppsOnly?: boolean;
 }) {
   if (!isSuperAdminHubTab(hubTab)) return null;
   const hub = hubDefinitionForTab(hubTab, visibleTabs.length ? visibleTabs : [hubTab], {
     includeRuffly: roleCanSeeRufflyNav(role),
-    includeBlog: roleCanSeeBlogNav(role)
+    includeBlog: roleCanSeeBlogNav(role),
+    marketingAppsOnly
   });
   if (!hub || !hub.sections.length) {
     return (

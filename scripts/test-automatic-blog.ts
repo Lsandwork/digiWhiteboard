@@ -32,10 +32,13 @@ import {
 } from "../lib/admin/nav-groups";
 import {
   accessFromLegacyRole,
+  canAccessAdminTab,
   canAccessBlogGenerator,
   hasPermission
 } from "../lib/admin/permissions";
 import type { AdminTab } from "../lib/admin/types";
+import { SUPER_ADMIN_HUBS } from "../lib/admin/super-admin-nav";
+import { filterHubDefinition } from "../lib/admin/role-hub-nav";
 
 assert.equal(DEFAULT_HUMAN_SCORE_THRESHOLD, 90);
 assert.equal(DEFAULT_TOPIC_SCORE_THRESHOLD, 85);
@@ -139,6 +142,8 @@ async function runAsyncChecks() {
 assert.equal(AUTOMATIC_BLOG_NAV_ROUTE.label, "Blog Generator");
 assert.equal(roleCanSeeBlogNav("owner_admin"), true);
 assert.equal(roleCanSeeBlogNav("manager_admin"), true);
+assert.equal(roleCanSeeBlogNav("super_admin"), true);
+assert.equal(roleCanSeeBlogNav("admin"), true);
 assert.equal(roleCanSeeBlogNav("marketing"), true);
 assert.equal(roleCanSeeBlogNav("assistant_manager"), false);
 assert.equal(roleCanSeeBlogNav("trainer"), false);
@@ -151,23 +156,42 @@ assert.equal(canAccessBlogGenerator(accessFromLegacyRole(null, null, "trainer"),
 assert.equal(hasPermission(accessFromLegacyRole(null, null, "trainer"), "blog.view"), false);
 assert.equal(hasPermission(accessFromLegacyRole(null, null, "marketing"), "blog.view"), true);
 
-const staffTabs = ["overview", "route_generator", "help"] as AdminTab[];
+{
+  const apps = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, ["live_fleet", "route_generator", "ops_system_health"], {
+    includeBlog: true,
+    includeRuffly: true
+  });
+  const labels = apps.sections.flatMap((section) => section.links.map((link) => link.label));
+  assert.ok(labels.includes("Blog Generator"), "Apps hub includes Blog Generator");
+  assert.ok(labels.includes("Social Media Generator"), "Apps hub includes Social Media Generator");
+
+  const hidden = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, ["live_fleet"], { includeBlog: false });
+  const hiddenLabels = hidden.sections.flatMap((section) => section.links.map((link) => link.label));
+  assert.equal(hiddenLabels.includes("Blog Generator"), false);
+  assert.equal(hiddenLabels.includes("Social Media Generator"), false);
+
+  const marketingApps = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, [], {
+    includeBlog: true,
+    includeRuffly: true,
+    marketingAppsOnly: true
+  });
+  const marketingLabels = marketingApps.sections.flatMap((section) => section.links.map((link) => link.label));
+  assert.ok(marketingLabels.includes("Blog Generator"));
+  assert.ok(marketingLabels.includes("Social Media Generator"));
+  assert.equal(marketingLabels.includes("Live Fleet"), false);
+  assert.equal(marketingLabels.includes("Route Generator"), false);
+}
+
+const staffTabs = ["overview", "route_generator", "sa_apps_hub", "help"] as AdminTab[];
 const adminNav = buildStaffPanelNav(staffTabs, "staff", "manager_admin");
-const dashboardIdx = adminNav.findIndex((entry) => entry.type === "section" && entry.id === "staff_dashboard");
-assert.ok(dashboardIdx >= 0, "staff panel should include Dashboard");
-const blogIdx = adminNav.findIndex((entry) => entry.type === "route" && entry.id === "automatic-blog");
-assert.ok(blogIdx > dashboardIdx, "Blog Generator should sit under Dashboard");
-const appsIdx = adminNav.findIndex((entry) => entry.type === "section" && entry.id === "global_apps");
-assert.ok(appsIdx >= 0, "Applications section should exist");
-const routeGenIdx = adminNav.findIndex((entry) => entry.type === "item" && entry.tab === "route_generator");
-assert.ok(routeGenIdx > appsIdx, "Route Generator should be under Applications");
-assert.ok(blogIdx < appsIdx, "Blog Generator should not live under Applications");
-const nextSectionAfterDashboard = adminNav.findIndex(
-  (entry, index) => index > dashboardIdx && entry.type === "section"
-);
 assert.ok(
-  nextSectionAfterDashboard < 0 || blogIdx < nextSectionAfterDashboard,
-  "Blog Generator must remain inside the Dashboard section"
+  adminNav.some((entry) => entry.type === "item" && entry.tab === "sa_apps_hub"),
+  "Admin hub sidebar includes Apps"
+);
+assert.equal(
+  adminNav.some((entry) => entry.type === "route" && entry.id === "automatic-blog"),
+  false,
+  "Hub sidebar keeps Blog Generator inside Apps, not as a primary tab"
 );
 
 const teamLeadNav = buildStaffPanelNav(staffTabs, "staff", "team_leader");
@@ -183,10 +207,24 @@ assert.equal(
   false
 );
 
-const marketingNav = buildStaffPanelNav(["cast_tv", "settings", "help"] as AdminTab[], "marketing", "marketing");
+const marketingNav = buildStaffPanelNav(
+  ["cast_tv", "sa_apps_hub", "settings", "help"] as AdminTab[],
+  "marketing",
+  "marketing"
+);
 assert.ok(
-  marketingNav.some((entry) => entry.type === "route" && entry.id === "automatic-blog"),
-  "marketing users should see Blog Generator in the panel"
+  marketingNav.some((entry) => entry.type === "item" && entry.tab === "sa_apps_hub"),
+  "marketing users should see Apps on the CAST-TV board"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "marketing"), "sa_apps_hub", "marketing", "marketing"),
+  true,
+  "marketing can open Apps"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "manager_admin"), "sa_apps_hub", "manager_admin", "staff"),
+  true,
+  "admins can open Apps"
 );
 
 void runAsyncChecks()

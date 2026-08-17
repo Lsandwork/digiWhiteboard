@@ -30,7 +30,10 @@ assert.equal(canAccessAdminTab(access, "integrations", "marketing", "lobby"), fa
 assert.equal(canAccessAdminTab(access, "remote_cast", "marketing", "lobby"), false);
 assert.equal(canAccessAdminTab(access, "lobby_slideshow", "marketing", "lobby"), true);
 
+assert.equal(canAccessAdminTab(access, "sa_apps_hub", "marketing", "marketing"), true);
+assert.equal(canAccessAdminTab(access, "sa_apps_hub", "marketing", "staff"), false);
 assert.equal(firstAccessibleAdminTab(access, "marketing", "lobby"), "content");
 assert.equal(firstAccessibleAdminTab(access, "marketing", "staff"), "crossover_communication");
+assert.equal(firstAccessibleAdminTab(access, "marketing", "marketing"), "cast_tv");
 
 console.log("Marketing account access tests passed.");

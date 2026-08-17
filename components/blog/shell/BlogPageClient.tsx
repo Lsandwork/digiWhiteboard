@@ -9,6 +9,7 @@ import { BlogMobileTabBar } from "@/components/blog/shell/BlogMobileTabBar";
 import { BlogWorkspace } from "@/components/blog/shell/BlogWorkspace";
 import {
   accessFromLegacyRole,
+  canAccessBlogGenerator,
   effectiveAccessLabel,
   hasPermission,
   type UserAccess
@@ -64,10 +65,14 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
 
   const canAccess = useCallback(
     (permission: string) => {
-      if (role === "owner_admin") return true;
+      if (role === "owner_admin" || role === "super_admin") return true;
+      if (canAccessBlogGenerator(effectiveAccess, role)) {
+        if (hasPermission(effectiveAccess, permission as never)) return true;
+        return hasPermission(accessFromLegacyRole(null, username, role), permission as never);
+      }
       return hasPermission(effectiveAccess, permission as never);
     },
-    [effectiveAccess, role]
+    [effectiveAccess, role, username]
   );
 
   async function logout() {

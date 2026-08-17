@@ -8,7 +8,8 @@ This is **not** a “set and forget” content spammer. Defaults favor human rev
 
 | Surface | URL |
 |---------|-----|
-| Staff admin (Blog Generator) | `/admin/automatic-blog` — listed under **Dashboard** for Super Admin, Admin, and Marketing |
+| Staff admin (Blog Generator) | `/admin/automatic-blog` — listed under **Apps** for Super Admin, Admin, and Marketing |
+| Staff admin (Social Media Generator) | `/admin/automatic-blog?page=social-generator` — listed under **Apps** for Super Admin, Admin, and Marketing |
 | Public blog | `/blog` (native adapter) |
 | Public article | `/blog/{slug}` |
 

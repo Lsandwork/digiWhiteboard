@@ -195,6 +195,12 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
             "/admin/automatic-blog",
             "Blog Generator",
             "Create and schedule Fitdog blog content."
+          ),
+          routeLink(
+            "social-generator",
+            "/admin/automatic-blog?page=social-generator",
+            "Social Media Generator",
+            "Create social posts from Fitdog blog content."
           )
         ]
       },

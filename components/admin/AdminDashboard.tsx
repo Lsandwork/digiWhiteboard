@@ -215,6 +215,11 @@ export function AdminDashboard() {
 
     if (marketingAccount && board === "staff") {
       if (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
+      if (tab === "sa_apps_hub") {
+        if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "marketing");
+        router.replace("/admin?board=marketing&tab=sa_apps_hub");
+        return;
+      }
       const fallbackBoard = accessibleAdminBoards(access, effectiveRole).includes("marketing") ? "marketing" : "lobby";
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
@@ -231,7 +236,7 @@ export function AdminDashboard() {
       return;
     }
 
-    if (board === "marketing" && !["cast_tv", "settings", "help"].includes(tab)) {
+    if (board === "marketing" && !["cast_tv", "sa_apps_hub", "settings", "help"].includes(tab)) {
       router.replace("/admin?board=marketing&tab=cast_tv");
       return;
     }
@@ -528,12 +533,13 @@ export function AdminDashboard() {
           <SuperAdminNestedReturnBar tab={tab} onNavigate={(nextTab) => setActiveTab(nextTab)} />
         ) : null}
 
-        {showRoleHubNav && isSuperAdminHubTab(tab) ? (
+        {(showRoleHubNav || (board === "marketing" && tab === "sa_apps_hub")) && isSuperAdminHubTab(tab) ? (
           <SuperAdminHubPanel
             hubTab={tab}
             onNavigate={(nextTab) => setActiveTab(nextTab)}
             visibleTabs={hubVisibleTabs}
             role={hubNavRole}
+            marketingAppsOnly={board === "marketing"}
           />
         ) : null}
 

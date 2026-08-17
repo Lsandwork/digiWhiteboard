@@ -10,8 +10,8 @@ export type NavLeaf = {
 
 export type NavRouteLeaf = {
   type: "route";
-  id: "gingr" | "ruffly" | "automatic-blog";
-  href: "/gingr" | "/ruffly" | "/admin/automatic-blog";
+  id: "gingr" | "ruffly" | "automatic-blog" | "social-generator";
+  href: "/gingr" | "/ruffly" | "/admin/automatic-blog" | "/admin/automatic-blog?page=social-generator";
   label: string;
 };
 
@@ -52,6 +52,13 @@ export const AUTOMATIC_BLOG_NAV_ROUTE: NavRouteLeaf = {
   label: "Blog Generator"
 };
 
+export const SOCIAL_GENERATOR_NAV_ROUTE: NavRouteLeaf = {
+  type: "route",
+  id: "social-generator",
+  href: "/admin/automatic-blog?page=social-generator",
+  label: "Social Media Generator"
+};
+
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
   options?: {
@@ -59,9 +66,10 @@ export function appendAuthenticatedGlobalRoutes(
     includeRouteGenerator?: boolean;
     includeLiveFleet?: boolean;
     includeSystemHealth?: boolean;
+    includeBlog?: boolean;
   }
 ): NavEntry[] {
-  const globalSection: NavEntry[] = [section("global_apps", "Applications")];
+  const globalSection: NavEntry[] = [section("global_apps", "Apps")];
   if (options?.includeRouteGenerator) {
     globalSection.push(leaf("route_generator"));
   }
@@ -70,6 +78,9 @@ export function appendAuthenticatedGlobalRoutes(
   }
   if (options?.includeSystemHealth) {
     globalSection.push(leaf("ops_system_health"));
+  }
+  if (options?.includeBlog) {
+    globalSection.push(AUTOMATIC_BLOG_NAV_ROUTE, SOCIAL_GENERATOR_NAV_ROUTE);
   }
   globalSection.push(GINGR_NAV_ROUTE);
   if (options?.includeRuffly !== false) {
@@ -82,35 +93,38 @@ export function appendAuthenticatedGlobalRoutes(
   return [...entries, ...globalSection];
 }
 
-/** Place Blog Generator under the Dashboard section (create the section when missing). */
-export function insertBlogGeneratorIntoDashboard(entries: NavEntry[], includeBlog: boolean): NavEntry[] {
+/** Place Blog Generator and Social Media Generator under Apps (create the section when missing). */
+export function insertBlogSuiteIntoApps(entries: NavEntry[], includeBlog: boolean): NavEntry[] {
   if (!includeBlog) return entries;
-  if (entries.some((entry) => entry.type === "route" && entry.id === "automatic-blog")) {
-    return entries;
-  }
+  const hasBlog = entries.some((entry) => entry.type === "route" && entry.id === "automatic-blog");
+  const hasSocial = entries.some((entry) => entry.type === "route" && entry.id === "social-generator");
+  if (hasBlog && hasSocial) return entries;
 
-  const dashboardIdx = entries.findIndex(
-    (entry) => entry.type === "section" && entry.id === "staff_dashboard"
-  );
-  if (dashboardIdx >= 0) {
-    // Keep Blog Generator near the top of Dashboard so it is not buried under the fold.
-    let sectionEnd = dashboardIdx + 1;
-    while (sectionEnd < entries.length && entries[sectionEnd].type !== "section") {
-      sectionEnd += 1;
+  const toInsert: NavEntry[] = [];
+  if (!hasBlog) toInsert.push(AUTOMATIC_BLOG_NAV_ROUTE);
+  if (!hasSocial) toInsert.push(SOCIAL_GENERATOR_NAV_ROUTE);
+  if (!toInsert.length) return entries;
+
+  const appsIdx = entries.findIndex((entry) => entry.type === "section" && entry.id === "global_apps");
+  if (appsIdx >= 0) {
+    let insertAt = appsIdx + 1;
+    while (insertAt < entries.length && entries[insertAt].type !== "section") {
+      insertAt += 1;
     }
-    const insertAt = sectionEnd > dashboardIdx + 1 ? Math.min(dashboardIdx + 1, sectionEnd) : dashboardIdx + 1;
-    return [...entries.slice(0, insertAt), AUTOMATIC_BLOG_NAV_ROUTE, ...entries.slice(insertAt)];
+    return [...entries.slice(0, insertAt), ...toInsert, ...entries.slice(insertAt)];
   }
 
-  const dashboardBlock: NavEntry[] = [section("staff_dashboard", "Dashboard"), AUTOMATIC_BLOG_NAV_ROUTE];
-  const anchorIdx = entries.findIndex(
-    (entry) =>
-      entry.type === "section" && (entry.id === "global_apps" || entry.id === "help" || entry.id === "marketing_board")
-  );
-  if (anchorIdx >= 0) {
-    return [...entries.slice(0, anchorIdx), ...dashboardBlock, ...entries.slice(anchorIdx)];
+  const appsBlock: NavEntry[] = [section("global_apps", "Apps"), ...toInsert];
+  const helpIdx = entries.findIndex((entry) => entry.type === "section" && entry.id === "help");
+  if (helpIdx >= 0) {
+    return [...entries.slice(0, helpIdx), ...appsBlock, ...entries.slice(helpIdx)];
   }
-  return [...dashboardBlock, ...entries];
+  return [...entries, ...appsBlock];
+}
+
+/** @deprecated use insertBlogSuiteIntoApps — Blog Generator now lives in Apps. */
+export function insertBlogGeneratorIntoDashboard(entries: NavEntry[], includeBlog: boolean): NavEntry[] {
+  return insertBlogSuiteIntoApps(entries, includeBlog);
 }
 
 const TAB_LABELS: Record<AdminTab, string> = {
@@ -202,7 +216,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   sa_floor_hub: "Open floor command centers, operations tools, photos, and cameras from one place.",
   sa_whiteboard_hub: "Push notices, preview the board, and manage TV / cast setup.",
   sa_people_hub: "Staff directory, HR records, write-ups, and PIP tracking.",
-  sa_apps_hub: "Live Fleet, Route Generator, System Health, Blog Generator, Gingr, and Ruffly.",
+  sa_apps_hub: "Live Fleet, Route Generator, System Health, Blog Generator, Social Media Generator, Gingr, and Ruffly.",
   sa_admin_hub: "Overview, analytics, settings, logs, integrations, and admin utilities.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
@@ -264,7 +278,7 @@ const LOBBY_BOARD_TABS: AdminTab[] = [
   "display",
   "whiteboard_preview"
 ];
-const MARKETING_BOARD_NAV_TABS: AdminTab[] = ["cast_tv", "settings", "help"];
+const MARKETING_BOARD_NAV_TABS: AdminTab[] = ["cast_tv", "sa_apps_hub", "settings", "help"];
 const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "push_notices",
   "grooming_push",
@@ -349,7 +363,7 @@ export function buildMarketingAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
     "marketing_board",
     "CAST-TV",
     compactEntries([
-      ...singles(["cast_tv"], visible),
+      ...singles(["cast_tv", "sa_apps_hub"], visible),
       group("marketing_settings", "Settings", ["settings", "help"], visible)
     ]),
     true
@@ -705,10 +719,16 @@ export function roleCanSeeRufflyNav(role?: string | null) {
   );
 }
 
-/** Blog Generator nav — Super Admin, Admin, and Marketing only. */
+/** Blog Generator + Social Media Generator nav — Super Admin, Admin, and Marketing only. */
 export function roleCanSeeBlogNav(role?: string | null) {
   if (!role) return false;
-  return role === "owner_admin" || role === "manager_admin" || role === "marketing";
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "super_admin" ||
+    role === "admin" ||
+    role === "marketing"
+  );
 }
 
 /**
@@ -742,17 +762,21 @@ export function buildStaffPanelNav(
     return buildRoleHubStaffNav(visibleTabs, role);
   }
 
+  if (board === "marketing") {
+    return buildMarketingAdminNav(visibleTabs);
+  }
+
   let entries: NavEntry[];
   if (role === "trainer") entries = buildTrainerNav(visibleTabs);
   else if (role === "team_leader") entries = buildTeamLeadNav(visibleTabs);
   else if (role === "groomer") entries = buildGroomerNav(visibleTabs);
   else entries = buildAdminNav(visibleTabs, board);
-  entries = insertBlogGeneratorIntoDashboard(entries, roleCanSeeBlogNav(role));
   return appendAuthenticatedGlobalRoutes(entries, {
     includeRuffly: roleCanSeeRufflyNav(role),
     includeRouteGenerator: visibleTabs.includes("route_generator"),
     includeLiveFleet: visibleTabs.includes("live_fleet"),
-    includeSystemHealth: visibleTabs.includes("ops_system_health")
+    includeSystemHealth: visibleTabs.includes("ops_system_health"),
+    includeBlog: roleCanSeeBlogNav(role)
   });
 }
 
@@ -768,6 +792,9 @@ export function getTabDescription(tab: AdminTab, board: AdminBoardType) {
   }
   if (board === "marketing" && tab === "cast_tv") {
     return "Manage the photo and video playlist shown on casttv.ruffops.com.";
+  }
+  if (board === "marketing" && tab === "sa_apps_hub") {
+    return "Open Blog Generator, Social Media Generator, Gingr, and Ruffly.";
   }
   return TAB_DESCRIPTIONS[tab] ?? "Manage this area of the Fitdog admin center.";
 }

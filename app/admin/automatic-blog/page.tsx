@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { ToastProvider } from "@/components/admin/ui/ToastProvider";
 import { BlogPageClient } from "@/components/blog/shell/BlogPageClient";
 import { getAdminSession } from "@/lib/admin/session";
-import { canAccessBlogGenerator, hasPermission } from "@/lib/admin/permissions";
+import { canAccessBlogGenerator } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { getAdminUserById } from "@/lib/admin/users";
 import { isBlogEnabled } from "@/lib/blog/flags";
@@ -24,11 +24,7 @@ export default async function AutomaticBlogPage() {
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
 
-  if (!canAccessBlogGenerator(access, session.role) && session.role !== "owner_admin") {
-    redirect("/admin?board=staff&tab=crossover_communication");
-  }
-
-  if (access && !hasPermission(access, "blog.view") && session.role !== "owner_admin") {
+  if (!canAccessBlogGenerator(access, session.role)) {
     redirect("/admin?board=staff&tab=crossover_communication");
   }
 

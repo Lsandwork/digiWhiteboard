@@ -851,7 +851,7 @@ export const MARKETING_TABS = [
 ] as const;
 
 /** CAST-TV digital signage board — upload and manage casttv.ruffops.com playlist. */
-export const MARKETING_BOARD_TABS = ["cast_tv", "settings", "help"] as const;
+export const MARKETING_BOARD_TABS = ["cast_tv", "sa_apps_hub", "settings", "help"] as const;
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: withoutStaffSubmissions([...ALL_PERMISSIONS]),
@@ -1516,6 +1516,15 @@ export function canAccessAdminTab(
     tab === "sa_apps_hub" ||
     tab === "sa_admin_hub"
   ) {
+    if (tab === "sa_apps_hub" && board === "marketing") {
+      const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+      return (
+        isMarketingLegacyRole(legacyRole) ||
+        hasAnyRole(effective, ["marketing"]) ||
+        isFullAdminLegacyRole(legacyRole) ||
+        isSuperAdminAccess(effective)
+      );
+    }
     if (board !== "staff") return false;
     if (isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     if (isFullAdminLegacyRole(legacyRole)) return true;

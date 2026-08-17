@@ -199,16 +199,26 @@ export function roleUsesHubTab(role: string | null | undefined, tab: string): bo
 export function filterHubDefinition(
   hub: SuperAdminHubDefinition,
   visibleTabs: Iterable<AdminTab>,
-  options?: { includeRuffly?: boolean; includeBlog?: boolean }
+  options?: { includeRuffly?: boolean; includeBlog?: boolean; marketingAppsOnly?: boolean }
 ): SuperAdminHubDefinition {
   const visible = new Set(visibleTabs);
   const sections = hub.sections
     .map((section) => ({
       ...section,
       links: section.links.filter((link) => {
+        if (options?.marketingAppsOnly) {
+          if (link.kind === "tab") return false;
+          if (link.id === "ruffly") return options?.includeRuffly !== false;
+          if (link.id === "automatic-blog" || link.id === "social-generator") {
+            return options?.includeBlog === true;
+          }
+          return link.id === "gingr";
+        }
         if (link.kind === "tab") return visible.has(link.tab);
         if (link.id === "ruffly") return options?.includeRuffly !== false;
-        if (link.id === "automatic-blog") return options?.includeBlog === true;
+        if (link.id === "automatic-blog" || link.id === "social-generator") {
+          return options?.includeBlog === true;
+        }
         return true;
       })
     }))
@@ -220,7 +230,7 @@ export function filterHubDefinition(
 export function hubDefinitionForTab(
   hubTab: AdminTab,
   visibleTabs: Iterable<AdminTab>,
-  options?: { includeRuffly?: boolean; includeBlog?: boolean }
+  options?: { includeRuffly?: boolean; includeBlog?: boolean; marketingAppsOnly?: boolean }
 ): SuperAdminHubDefinition | null {
   if (!isSuperAdminHubTab(hubTab)) return null;
   const key = hubTab as (typeof SUPER_ADMIN_HUB_TABS)[number];

@@ -1280,6 +1280,7 @@ const MARKETING_ARTICLE_IDS = new Set([
   "lobby-promotions",
   "lobby-schedule",
   "lobby-tv-cast",
+  "blog-generator-how-to",
   "troubleshoot-no-checkouts"
 ]);
 

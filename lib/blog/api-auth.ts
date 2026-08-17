@@ -1,6 +1,6 @@
 import { isAdminRequest, unauthorizedAdminResponse, getEffectiveAdminRole } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { canAccessBlogGenerator, hasPermission, type PermissionKey } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, canAccessBlogGenerator, hasPermission, type PermissionKey } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { isBlogEnabled } from "@/lib/blog/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -45,7 +45,11 @@ export async function requireBlogPermission(request: Request, permission: Permis
       )
     };
   }
-  if (!hasPermission(access, "blog.view") || !hasPermission(access, permission)) {
+  const roleDefaults = accessFromLegacyRole(session.adminUserId, session.email, role);
+  if (
+    (!hasPermission(access, "blog.view") && !hasPermission(roleDefaults, "blog.view")) ||
+    (!hasPermission(access, permission) && !hasPermission(roleDefaults, permission))
+  ) {
     return {
       ok: false as const,
       response: Response.json({ error: "You do not have permission for this Blog Generator action." }, { status: 403 })
