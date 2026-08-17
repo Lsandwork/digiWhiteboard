@@ -1,19 +1,21 @@
-import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
-import { createGingrClient, normalizeGingrReservationList } from "@/lib/integrations/gingr/client";
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { enrichTlBoardAnimalPhotoUrls } from "./animal-photos";
+import { auditTlAdditionalServicesFromReservations } from "./additional-services-audit";
 import {
-  isGingrServiceCompleted,
-  reservationServiceRows,
+  resolveGingrServiceCompletion,
   serviceCancelled,
   serviceDisplayName,
   serviceOnDate,
   serviceRowId
 } from "./gingr-service-completion";
-import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
+import { loadTlBoardReservationsForAdditionalServices } from "./gingr-reservation-services";
 import { lodgingLabelForArea, matchOvernightLodgingArea, parseRunName } from "./lodging";
 import { isTlBoardAdditionalService } from "./tl-service-names";
-import type { TlAdditionalServicesSummary, TlBoardAdditionalServiceRow } from "./types";
+import type {
+  TlAdditionalServicesCompletionAudit,
+  TlAdditionalServicesSummary,
+  TlBoardAdditionalServiceRow
+} from "./types";
 import type { TlDigiBoardConfig } from "./config";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -28,22 +30,6 @@ function pickString(...values: unknown[]): string | null {
     if (text) return text;
   }
   return null;
-}
-
-function reservationCancelled(reservation: GingrReservation): boolean {
-  const record = reservation as Record<string, unknown>;
-  if (record.cancelled_date || record.cancelled_at || record.cancelled) return true;
-  const status = pickString(record.status, record.state)?.toLowerCase() || "";
-  return status.includes("cancel") || status.includes("void");
-}
-
-function isCheckedInReservation(reservation: GingrReservation): boolean {
-  const record = reservation as Record<string, unknown>;
-  if (record.check_in_stamp || record.check_in_date || record.checked_in === true || record.checked_in === "1") {
-    return true;
-  }
-  const status = pickString(record.status, record.status_string, record.state)?.toLowerCase() || "";
-  return status.includes("checked in") || status === "checked_in";
 }
 
 function animalFromReservation(reservation: GingrReservation) {
@@ -83,31 +69,18 @@ function lodgingFromReservation(reservation: GingrReservation, config: TlDigiBoa
   return { lodgingLabel };
 }
 
-export async function loadTlBoardCheckedInReservations(): Promise<GingrReservation[]> {
-  const apiKey = requireTlGingrApiKey();
-  const { subdomain, locationId } = tlGingrClientConfig();
-  const client = createGingrClient({ apiKey, subdomain, locationId });
-  const body = new URLSearchParams({
-    key: client.config.apiKey,
-    location_id: client.config.locationId,
-    checked_in: "true"
-  });
-  const response = await fetch(`${client.config.baseUrl}/api/v1/reservations`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
-    },
-    body,
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Gingr checked-in reservations ${response.status}: ${text.slice(0, 180) || response.statusText}`);
+function reservationServiceRowsFromReservation(reservation: GingrReservation) {
+  const record = reservation as Record<string, unknown>;
+  const candidates = [record.services, record.additional_services, record.reservation_services, record.addons];
+  const rows: Array<Record<string, unknown>> = [];
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    for (const item of candidate) {
+      const row = asRecord(item);
+      if (row) rows.push(row);
+    }
   }
-  return normalizeGingrReservationList(await response.json()).filter(
-    (reservation) => !reservationCancelled(reservation) && isCheckedInReservation(reservation)
-  );
+  return rows;
 }
 
 export function additionalServicesFromReservation(
@@ -124,14 +97,14 @@ export function additionalServicesFromReservation(
   const { lodgingLabel } = lodgingFromReservation(reservation, config);
   const rows: TlBoardAdditionalServiceRow[] = [];
 
-  for (const service of reservationServiceRows(reservation)) {
+  for (const service of reservationServiceRowsFromReservation(reservation)) {
     if (serviceCancelled(service)) continue;
     const serviceName = serviceDisplayName(service);
     if (!serviceName || !isTlBoardAdditionalService(serviceName)) continue;
     if (!serviceOnDate(service, date)) continue;
 
-    const completed = isGingrServiceCompleted(service);
-    if (completed) continue;
+    const resolution = resolveGingrServiceCompletion(service);
+    if (resolution.state === "complete") continue;
 
     const scheduledAt = pickString(service.scheduled_at, service.start_date, service.date, service.service_date);
     const gingrServiceId =
@@ -147,7 +120,10 @@ export function additionalServicesFromReservation(
       lodgingLabel,
       serviceName,
       scheduledAt,
-      displayStatus: "needs_completion",
+      displayStatus: resolution.reliable ? "needs_completion" : "completion_unknown",
+      completionState: resolution.state === "unknown" ? "unknown" : "incomplete",
+      completionReliable: resolution.reliable,
+      completionSource: resolution.source,
       serviceDate: date
     });
   }
@@ -155,16 +131,20 @@ export function additionalServicesFromReservation(
   return rows;
 }
 
-export function buildTlAdditionalServicesSummary(
-  pending: TlBoardAdditionalServiceRow[],
-  completedHiddenCount = 0
-): TlAdditionalServicesSummary {
-  const remaining = pending.length;
-  const completed = completedHiddenCount;
+export function buildTlAdditionalServicesSummary(input: {
+  pending: TlBoardAdditionalServiceRow[];
+  completedHiddenCount: number;
+}): TlAdditionalServicesSummary {
+  const knownIncomplete = input.pending.filter((row) => row.displayStatus === "needs_completion").length;
+  const completionUnknown = input.pending.filter((row) => row.displayStatus === "completion_unknown").length;
+  const remaining = knownIncomplete + completionUnknown;
+  const completed = input.completedHiddenCount;
   return {
     due: remaining + completed,
     completed,
-    remaining
+    remaining,
+    knownIncomplete,
+    completionUnknown
   };
 }
 
@@ -175,23 +155,20 @@ export async function syncTlBoardAdditionalServices(options: {
   services: TlBoardAdditionalServiceRow[];
   summary: TlAdditionalServicesSummary;
   completionStatusAvailable: boolean;
+  audit: TlAdditionalServicesCompletionAudit;
 }> {
   const now = options.now ?? new Date();
-  const date = todayInLosAngeles(now);
-  const reservations = await loadTlBoardCheckedInReservations();
+  const { date, reservations } = await loadTlBoardReservationsForAdditionalServices(now);
+  const audit = auditTlAdditionalServicesFromReservations(reservations, date, now);
 
   let completedHiddenCount = 0;
-  let sawCompletionField = false;
-
   for (const reservation of reservations) {
-    for (const service of reservationServiceRows(reservation)) {
+    for (const service of reservationServiceRowsFromReservation(reservation)) {
       const name = serviceDisplayName(service);
       if (!name || !isTlBoardAdditionalService(name)) continue;
       if (!serviceOnDate(service, date) || serviceCancelled(service)) continue;
-      if ("complete" in service || "completed" in service || "completed_at" in service) {
-        sawCompletionField = true;
-      }
-      if (isGingrServiceCompleted(service)) completedHiddenCount += 1;
+      const resolution = resolveGingrServiceCompletion(service);
+      if (resolution.state === "complete") completedHiddenCount += 1;
     }
   }
 
@@ -216,7 +193,10 @@ export async function syncTlBoardAdditionalServices(options: {
 
   return {
     services,
-    summary: buildTlAdditionalServicesSummary(services, completedHiddenCount),
-    completionStatusAvailable: sawCompletionField || completedHiddenCount > 0 || services.length === 0
+    summary: buildTlAdditionalServicesSummary({ pending: services, completedHiddenCount }),
+    completionStatusAvailable: audit.allReliable,
+    audit
   };
 }
+
+export { loadTlBoardCheckedInReservations } from "./gingr-reservation-services";

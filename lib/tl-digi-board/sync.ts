@@ -282,6 +282,7 @@ function emptySnapshot(partial: {
   syncSucceeded: boolean;
   administrationStatusAvailable?: boolean;
   servicesCompletionStatusAvailable?: boolean;
+  servicesCompletionAudit?: TlDigiBoardSnapshot["meta"]["servicesCompletionAudit"];
   now?: Date;
 }): TlDigiBoardSnapshot {
   const now = partial.now ?? new Date();
@@ -304,7 +305,8 @@ function emptySnapshot(partial: {
       lastError: partial.lastError ?? null,
       syncSucceeded: partial.syncSucceeded,
       administrationStatusAvailable: partial.administrationStatusAvailable,
-      servicesCompletionStatusAvailable: partial.servicesCompletionStatusAvailable
+      servicesCompletionStatusAvailable: partial.servicesCompletionStatusAvailable,
+      servicesCompletionAudit: partial.servicesCompletionAudit
     },
     built.summary
   );
@@ -314,7 +316,13 @@ function emptySnapshot(partial: {
     current: built.current,
     summary: built.summary,
     additionalServices: partial.additionalServices ?? [],
-    servicesSummary: partial.servicesSummary ?? { due: 0, completed: 0, remaining: 0 },
+    servicesSummary: partial.servicesSummary ?? {
+      due: 0,
+      completed: 0,
+      remaining: 0,
+      knownIncomplete: 0,
+      completionUnknown: 0
+    },
     meta,
     medications,
     generatedAt: now.toISOString()
@@ -357,8 +365,15 @@ export async function syncTlDigiBoardState(
       loadOvernightCheckedInDogs(config),
       syncTlBoardAdditionalServices({ config, now }).catch((error) => ({
         services: previous?.additionalServices ?? [],
-        summary: previous?.servicesSummary ?? { due: 0, completed: 0, remaining: 0 },
+        summary: previous?.servicesSummary ?? {
+          due: 0,
+          completed: 0,
+          remaining: 0,
+          knownIncomplete: 0,
+          completionUnknown: 0
+        },
         completionStatusAvailable: previous?.meta.servicesCompletionStatusAvailable ?? false,
+        audit: previous?.meta.servicesCompletionAudit ?? null,
         error: error instanceof Error ? error.message : "additional_services_sync_failed"
       }))
     ]);
@@ -465,6 +480,8 @@ export async function syncTlDigiBoardState(
     const additionalServices = additionalServicesResult.services;
     const servicesSummary = additionalServicesResult.summary;
     const servicesCompletionStatusAvailable = additionalServicesResult.completionStatusAvailable;
+    const servicesCompletionAudit =
+      "audit" in additionalServicesResult ? additionalServicesResult.audit : null;
     const additionalServicesError =
       "error" in additionalServicesResult ? additionalServicesResult.error : null;
 
@@ -493,7 +510,8 @@ export async function syncTlDigiBoardState(
         lastError,
         syncSucceeded: true,
         administrationStatusAvailable,
-        servicesCompletionStatusAvailable
+        servicesCompletionStatusAvailable,
+        servicesCompletionAudit
       },
       built.summary
     );
@@ -523,6 +541,7 @@ export async function syncTlDigiBoardState(
         syncSucceeded: false,
         administrationStatusAvailable: previous.meta.administrationStatusAvailable,
         servicesCompletionStatusAvailable: previous.meta.servicesCompletionStatusAvailable,
+        servicesCompletionAudit: previous.meta.servicesCompletionAudit,
         now
       });
     }
@@ -531,7 +550,7 @@ export async function syncTlDigiBoardState(
     return emptySnapshot({
       medications: [],
       additionalServices: [],
-      servicesSummary: { due: 0, completed: 0, remaining: 0 },
+      servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
       lastSuccessfulSyncAt: null,
       lastAttemptAt: attemptedAt,
       lastError: message,

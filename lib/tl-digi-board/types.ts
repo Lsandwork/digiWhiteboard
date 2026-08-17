@@ -49,7 +49,7 @@ export type TlMedicationSummary = {
   overdue: number;
 };
 
-export type TlAdditionalServiceDisplayStatus = "needs_completion" | "completed";
+export type TlAdditionalServiceDisplayStatus = "needs_completion" | "completion_unknown";
 
 export type TlBoardAdditionalServiceRow = {
   id: string;
@@ -62,6 +62,10 @@ export type TlBoardAdditionalServiceRow = {
   serviceName: string;
   scheduledAt: string | null;
   displayStatus: TlAdditionalServiceDisplayStatus;
+  /** Gingr completion resolution metadata for audits. */
+  completionState: "complete" | "incomplete" | "unknown";
+  completionReliable: boolean;
+  completionSource: string;
   serviceDate: string;
 };
 
@@ -69,6 +73,33 @@ export type TlAdditionalServicesSummary = {
   due: number;
   completed: number;
   remaining: number;
+  /** Known incomplete (excludes completion_unknown). */
+  knownIncomplete: number;
+  completionUnknown: number;
+};
+
+export type TlServiceTypeAuditRow = {
+  serviceType: string;
+  status: "pass" | "not_scheduled_today" | "fail";
+  scheduledToday: number;
+  reliable: number;
+  unreliable: number;
+  complete: number;
+  incomplete: number;
+  unknown: number;
+  unknownSamples: string[];
+};
+
+export type TlAdditionalServicesCompletionAudit = {
+  auditedAt: string;
+  serviceDate: string;
+  reservationCount: number;
+  allReliable: boolean;
+  allRequiredTypesPass: boolean;
+  perType: TlServiceTypeAuditRow[];
+  issues: string[];
+  completionSource: string;
+  documentationPath: string;
 };
 
 export type TlGingrSyncHealth = "live" | "delayed" | "connection_issue" | "unknown";
@@ -89,8 +120,9 @@ export type TlBoardSyncMeta = {
    * GET /api/v1/get_medication_report_history (Gingr Medication Report).
    */
   administrationStatusAvailable: boolean;
-  /** True when Gingr reservation services exposed completion fields this sync. */
+  /** True when every scheduled TL service row exposed reliable Gingr completion fields. */
   servicesCompletionStatusAvailable: boolean;
+  servicesCompletionAudit: TlAdditionalServicesCompletionAudit | null;
 };
 
 /** Persisted / returned TL Digi Board state after a Gingr medication sync. */

@@ -18,7 +18,8 @@ import type {
   TlDigiBoardPublicPayload,
   TlDigiBoardSnapshot,
   TlGingrMedicationRecord,
-  TlMedicationSummary
+  TlMedicationSummary,
+  TlServiceTypeAuditRow
 } from "./types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -56,7 +57,52 @@ function parseServicesSummary(value: unknown): TlAdditionalServicesSummary {
   return {
     due: Number(row?.due ?? 0) || 0,
     completed: Number(row?.completed ?? 0) || 0,
-    remaining: Number(row?.remaining ?? 0) || 0
+    remaining: Number(row?.remaining ?? 0) || 0,
+    knownIncomplete: Number(row?.knownIncomplete ?? row?.remaining ?? 0) || 0,
+    completionUnknown: Number(row?.completionUnknown ?? 0) || 0
+  };
+}
+
+function parseServicesAudit(value: unknown): TlDigiBoardSnapshot["meta"]["servicesCompletionAudit"] {
+  const row = asRecord(value);
+  if (!row) return null;
+  const perType = Array.isArray(row.perType)
+    ? row.perType
+        .map((entry) => {
+          const typeRow = asRecord(entry);
+          if (!typeRow || typeof typeRow.serviceType !== "string") return null;
+          return {
+            serviceType: typeRow.serviceType,
+            status:
+              typeRow.status === "pass" || typeRow.status === "fail" || typeRow.status === "not_scheduled_today"
+                ? typeRow.status
+                : "not_scheduled_today",
+            scheduledToday: Number(typeRow.scheduledToday ?? 0) || 0,
+            reliable: Number(typeRow.reliable ?? 0) || 0,
+            unreliable: Number(typeRow.unreliable ?? 0) || 0,
+            complete: Number(typeRow.complete ?? 0) || 0,
+            incomplete: Number(typeRow.incomplete ?? 0) || 0,
+            unknown: Number(typeRow.unknown ?? 0) || 0,
+            unknownSamples: Array.isArray(typeRow.unknownSamples)
+              ? typeRow.unknownSamples.map(String)
+              : []
+          };
+        })
+        .filter(Boolean)
+    : [];
+  return {
+    auditedAt: typeof row.auditedAt === "string" ? row.auditedAt : new Date(0).toISOString(),
+    serviceDate: typeof row.serviceDate === "string" ? row.serviceDate : "",
+    reservationCount: Number(row.reservationCount ?? 0) || 0,
+    allReliable: Boolean(row.allReliable),
+    allRequiredTypesPass: Boolean(row.allRequiredTypesPass),
+    perType: perType as TlServiceTypeAuditRow[],
+    issues: Array.isArray(row.issues) ? row.issues.map(String) : [],
+    completionSource: typeof row.completionSource === "string" ? row.completionSource : "reservation.complete",
+    documentationPath:
+      typeof row.documentationPath === "string"
+        ? row.documentationPath
+        : "docs/tl-digi-board/ADDITIONAL_SERVICES_GINGR.md"
   };
 }
 
@@ -85,7 +131,8 @@ function parseMeta(value: unknown): TlBoardSyncMeta {
     nextPeriod: (row?.nextPeriod as TlBoardSyncMeta["nextPeriod"]) ?? null,
     nextPeriodStartsAt: typeof row?.nextPeriodStartsAt === "string" ? row.nextPeriodStartsAt : null,
     administrationStatusAvailable: Boolean(row?.administrationStatusAvailable),
-    servicesCompletionStatusAvailable: Boolean(row?.servicesCompletionStatusAvailable)
+    servicesCompletionStatusAvailable: Boolean(row?.servicesCompletionStatusAvailable),
+    servicesCompletionAudit: parseServicesAudit(row?.servicesCompletionAudit)
   };
 }
 

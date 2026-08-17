@@ -40,7 +40,9 @@ export async function GET(request: Request) {
     }
 
     const snapshot = await getTlDigiBoardSnapshot(supabase, { forceRefresh: true });
-    const pending = snapshot.additionalServices.filter((row) => row.displayStatus === "needs_completion");
+    const pending = snapshot.additionalServices.filter(
+      (row) => row.displayStatus === "needs_completion"
+    );
 
     if (!pending.length) {
       await saveAdminSettingsJsonKey(supabase, TL_SERVICES_EMAIL_STATE_KEY, {

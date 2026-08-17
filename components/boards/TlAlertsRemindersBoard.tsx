@@ -134,8 +134,9 @@ function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
 }
 
 function ServiceTableRow({ row }: { row: TlBoardAdditionalServiceRow }) {
+  const isUnknown = row.displayStatus === "completion_unknown";
   return (
-    <tr className="tl-table__row tl-table__row--service">
+    <tr className={`tl-table__row tl-table__row--service ${isUnknown ? "tl-table__row--unknown" : ""}`}>
       <td>
         <div className="tl-table__dog">
           <DogPhoto animalId={row.gingrAnimalId} dogName={row.dogName} photoUrl={row.photoUrl} />
@@ -146,7 +147,9 @@ function ServiceTableRow({ row }: { row: TlBoardAdditionalServiceRow }) {
       </td>
       <td className="tl-table__service">{row.serviceName}</td>
       <td className="tl-table__status-cell">
-        <span className="tl-badge tl-badge--needs_completion">NEEDS COMPLETION</span>
+        <span className={`tl-badge ${isUnknown ? "tl-badge--completion_unknown" : "tl-badge--needs_completion"}`}>
+          {isUnknown ? "COMPLETION UNKNOWN" : "NEEDS COMPLETION"}
+        </span>
       </td>
     </tr>
   );
@@ -249,6 +252,14 @@ function BoardInner() {
           <p className="tl-board__sync-meta">Period {periodText} · America/Los_Angeles</p>
         </div>
       </header>
+
+      {meta && !meta.servicesCompletionStatusAvailable ? (
+        <p className="tl-board__api-note" role="status">
+          One or more additional services could not read completion status from Gingr reservation rows (missing{" "}
+          <code>complete</code> field). Those rows show COMPLETION UNKNOWN and are not treated as incomplete. See{" "}
+          {meta.servicesCompletionAudit?.documentationPath || "docs/tl-digi-board/ADDITIONAL_SERVICES_GINGR.md"}.
+        </p>
+      ) : null}
 
       {meta && !meta.administrationStatusAvailable ? (
         <p className="tl-board__api-note" role="status">

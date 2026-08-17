@@ -24,6 +24,7 @@ export type BuildTlBoardStateInput = {
   administrationStatusAvailable?: boolean;
   /** True when Gingr reservation services exposed completion fields this sync. */
   servicesCompletionStatusAvailable?: boolean;
+  servicesCompletionAudit?: import("./types").TlAdditionalServicesCompletionAudit | null;
 };
 
 function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedicationRecord[] {
@@ -160,6 +161,7 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     nextPeriod: next?.period ?? null,
     nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
     administrationStatusAvailable: Boolean(input.administrationStatusAvailable),
-    servicesCompletionStatusAvailable: Boolean(input.servicesCompletionStatusAvailable)
+    servicesCompletionStatusAvailable: Boolean(input.servicesCompletionStatusAvailable),
+    servicesCompletionAudit: input.servicesCompletionAudit ?? null
   };
 }
