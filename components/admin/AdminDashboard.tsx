@@ -242,7 +242,7 @@ export function AdminDashboard() {
       return;
     }
 
-    if (board === "marketing" && !["cast_tv", "sa_apps_hub", "settings", "help"].includes(tab)) {
+    if (board === "marketing" && !["cast_tv", "sa_apps_hub", "bulk_photo_upload", "settings", "help"].includes(tab)) {
       router.replace("/admin?board=marketing&tab=cast_tv");
       return;
     }
@@ -542,6 +542,8 @@ export function AdminDashboard() {
             onNavigate={(nextTab) => setActiveTab(nextTab)}
             visibleTabs={hubVisibleTabs}
             role={hubNavRole}
+            email={data.username ?? null}
+            name={typeof data.fullName === "string" ? data.fullName : null}
             marketingAppsOnly={board === "marketing"}
           />
         ) : null}

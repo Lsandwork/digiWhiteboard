@@ -10,7 +10,8 @@ import {
   type RoleKey,
   type UserAccess
 } from "@/lib/admin/permissions";
-import type { AdminUserRole } from "@/lib/admin/users";
+import { getAdminUserById, type AdminUserRole } from "@/lib/admin/users";
+import { isBlogSuiteNamedUser } from "@/lib/admin/named-tool-access";
 import {
   loadRolePermissionMatrix,
   permissionsForRolesFromMatrix
@@ -103,6 +104,17 @@ export async function getUserAccess(
 
   if (!userId) return accessFromLegacyRole(null, email ?? null, legacyRole);
 
+  let name: string | null = null;
+  if (!isBlogSuiteNamedUser({ email })) {
+    try {
+      const record = await getAdminUserById(supabase, userId);
+      name = record?.full_name ?? null;
+      email = email ?? record?.email ?? null;
+    } catch {
+      name = null;
+    }
+  }
+
   const state = await loadState(supabase);
   const assignment = state.assignments[userId];
   if (!assignment) {
@@ -111,6 +123,7 @@ export async function getUserAccess(
     return buildUserAccess({
       userId,
       email,
+      name,
       primaryRole,
       roles,
       permissions: resolveUserPermissions(roles, matrix, legacyRole)
@@ -121,6 +134,7 @@ export async function getUserAccess(
   return buildUserAccess({
     userId,
     email,
+    name,
     primaryRole: assignment.primaryRole,
     roles: assignment.roles,
     departments: assignment.departments,

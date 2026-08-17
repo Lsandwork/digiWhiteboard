@@ -3,6 +3,9 @@ import { buildExportFileName, deriveItemStatus } from "../lib/photo-upload-queue
 import { suggestedBatchName } from "../lib/photo-upload-queue/types";
 import { sanitizePhotoFileName, sha256Hex } from "../lib/photo-upload-queue/storage";
 
+import { canAccessPhotoUploadQueue } from "../lib/photo-upload-queue/access";
+import { accessFromLegacyRole } from "../lib/admin/permissions";
+
 assert.equal(deriveItemStatus({ dogCount: 0, hasDuplicate: false, duplicateOverride: false, excluded: false }), "needs_dog_assignment");
 assert.equal(deriveItemStatus({ dogCount: 1, hasDuplicate: true, duplicateOverride: false, excluded: false }), "needs_review");
 assert.equal(deriveItemStatus({ dogCount: 1, hasDuplicate: true, duplicateOverride: true, excluded: false }), "ready_for_gingr");
@@ -25,5 +28,13 @@ const b = sha256Hex(Buffer.from("same-bytes"));
 const c = sha256Hex(Buffer.from("other-bytes"));
 assert.equal(a, b, "identical bytes must share a hash for duplicate skipping");
 assert.notEqual(a, c);
+
+for (const role of ["groomer", "trainer", "daycare", "viewer", "marketing", "team_leader"] as const) {
+  assert.equal(
+    canAccessPhotoUploadQueue(accessFromLegacyRole(`u-${role}`, `${role}@fitdog.test`, role), role),
+    true,
+    `${role} can use Bulk Photo Upload`
+  );
+}
 
 console.log("photo-upload-queue unit tests passed");

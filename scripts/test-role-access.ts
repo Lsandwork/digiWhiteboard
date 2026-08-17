@@ -110,6 +110,21 @@ assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "pac
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "package_commissions", "assistant_manager", "staff"), true);
 assert.equal(canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "grooming_push", "groomer", "staff"), true);
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "bulk_photo_upload", "groomer", "staff"),
+  true,
+  "groomers can open Bulk Photo Upload"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "trainer"), "bulk_photo_upload", "trainer", "staff"),
+  true,
+  "trainers can open Bulk Photo Upload"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "viewer"), "bulk_photo_upload", "viewer", "staff"),
+  true,
+  "every staff panel can open Bulk Photo Upload"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "handler_shift_entry", "daycare", "staff"),
   false,
   "handlers use Team Log instead of Handler Shift Entry Log"

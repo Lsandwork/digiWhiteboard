@@ -105,8 +105,8 @@ export function AdminShell({
   );
   const pageLabel = getTabLabel(tab);
   const navEntries = useMemo(
-    () => buildStaffPanelNav(visibleTabs, board, effectiveRole),
-    [visibleTabs, board, effectiveRole]
+    () => buildStaffPanelNav(visibleTabs, board, effectiveRole, { email: username, name: displayName }),
+    [visibleTabs, board, effectiveRole, username, displayName]
   );
   const sectionLabel = findNavSectionForTab(navEntries, tab);
   const pageDescription = getTabDescription(tab, board);

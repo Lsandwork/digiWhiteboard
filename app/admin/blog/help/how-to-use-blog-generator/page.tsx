@@ -28,11 +28,15 @@ export default async function BlogHelpGuidePage() {
   }
 
   const supabase = getServiceSupabase();
+  const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
   const access = session.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
 
-  if (!canAccessBlogGenerator(access, session.role) && session.role !== "owner_admin") {
+  if (
+    !canAccessBlogGenerator(access, session.role, session.email, adminUser?.full_name) &&
+    session.role !== "owner_admin"
+  ) {
     redirect("/admin?board=staff&tab=help");
   }
 
@@ -40,7 +44,6 @@ export default async function BlogHelpGuidePage() {
     redirect("/admin?board=staff&tab=help");
   }
 
-  const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
   const [settings, dashboard] = await Promise.all([getBlogSettings(), getBlogDashboardData("30d")]);
   const providerConfig =
     settings && typeof settings === "object" && "provider_config" in settings

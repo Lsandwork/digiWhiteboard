@@ -4,6 +4,7 @@
  */
 
 import type { AdminBoardType } from "@/lib/admin/types";
+import { BLOG_SUITE_NAMED_PERMISSIONS, isBlogSuiteNamedUser } from "@/lib/admin/named-tool-access";
 
 export type PermissionKey =
   | "view_admin_panel"
@@ -595,6 +596,7 @@ const TRAINER_PERMISSIONS: PermissionKey[] = [
   "view_own_trainer_submissions",
   "view_package_commissions",
   "comment_package_commissions",
+  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -618,6 +620,7 @@ const GROOMER_PERMISSIONS: PermissionKey[] = [
   "submit_groomer_complaint",
   "submit_groomer_request",
   "view_own_groomer_submissions",
+  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "ruffly.view",
@@ -633,6 +636,7 @@ const STAFF_VIEWER_PERMISSIONS: PermissionKey[] = [
   "view_admin_panel",
   "view_staff_whiteboard",
   "view_front_desk_log",
+  "manage_photo_upload_queue",
   ...STAFF_NOTIFICATION_PERMISSIONS,
   ...STAFF_VIDEO_AI_PERMISSIONS,
   "view_my_shift",
@@ -801,6 +805,7 @@ export const GROOMER_TABS = [
   "crossover_communication",
   "grooming_push",
   "whiteboard_preview",
+  "bulk_photo_upload",
   "yard_links",
   "walks_board",
   "notifications",
@@ -815,6 +820,7 @@ export const TRAINER_TABS = [
   "crossover_communication",
   "trainer_push",
   "package_commissions",
+  "bulk_photo_upload",
   "yard_links",
   "walks_board",
   "notifications",
@@ -851,7 +857,7 @@ export const MARKETING_TABS = [
 ] as const;
 
 /** CAST-TV digital signage board — upload and manage casttv.ruffops.com playlist. */
-export const MARKETING_BOARD_TABS = ["cast_tv", "sa_apps_hub", "settings", "help"] as const;
+export const MARKETING_BOARD_TABS = ["cast_tv", "sa_apps_hub", "bulk_photo_upload", "settings", "help"] as const;
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
   super_admin: withoutStaffSubmissions([...ALL_PERMISSIONS]),
@@ -974,6 +980,7 @@ export function buildDisplayLabel(roles: RoleKey[]): string {
 export function buildUserAccess(input: {
   userId?: string | null;
   email?: string | null;
+  name?: string | null;
   primaryRole: RoleKey;
   roles?: RoleKey[];
   departments?: DepartmentKey[];
@@ -981,13 +988,17 @@ export function buildUserAccess(input: {
 }): UserAccess {
   const roles = [...new Set([input.primaryRole, ...(input.roles ?? [])])];
   const departments = input.departments ?? [];
+  let permissions = input.permissions ?? permissionsForRoles(roles);
+  if (isBlogSuiteNamedUser({ email: input.email, name: input.name })) {
+    permissions = [...new Set([...permissions, ...(BLOG_SUITE_NAMED_PERMISSIONS as readonly PermissionKey[])])];
+  }
   return {
     userId: input.userId ?? null,
     email: input.email ?? null,
     primaryRole: input.primaryRole,
     roles,
     departments,
-    permissions: input.permissions ?? permissionsForRoles(roles),
+    permissions,
     displayLabel: buildDisplayLabel(roles)
   };
 }
@@ -1355,8 +1366,11 @@ export function canAccessLiveFleet(
  */
 export function canAccessBlogGenerator(
   access?: UserAccess | null,
-  legacyRole?: string | null
+  legacyRole?: string | null,
+  email?: string | null,
+  name?: string | null
 ): boolean {
+  if (isBlogSuiteNamedUser({ email: email ?? access?.email, name })) return true;
   if (
     legacyRole === "owner_admin" ||
     legacyRole === "manager_admin" ||
@@ -1459,6 +1473,16 @@ export function canAccessAdminTab(
   if (tab === "live_fleet") {
     if (board !== "staff") return false;
     return canAccessLiveFleet(access, legacyRole);
+  }
+
+  // Bulk Photo Upload is on every signed-in panel (staff + CAST-TV / marketing).
+  if (tab === "bulk_photo_upload" && board !== "lobby") {
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    return (
+      hasPermission(effective, "view_admin_panel") ||
+      hasPermission(effective, "manage_photo_upload_queue") ||
+      Boolean(legacyRole)
+    );
   }
 
   // Same staff-board gate as Route Generator for walks / checklist / Fitdog alerts.

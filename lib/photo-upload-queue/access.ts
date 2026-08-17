@@ -1,10 +1,8 @@
 import {
   accessFromLegacyRole,
   hasPermission,
-  isDogHandlerLegacyRole,
   isFrontDeskCoordinatorLegacyRole,
   isFullAdminLegacyRole,
-  isMarketingLegacyRole,
   isSuperAdminLegacyRole,
   isTeamLeaderLegacyRole,
   type UserAccess
@@ -21,18 +19,8 @@ export function canAccessPhotoUploadQueue(
 ) {
   const effective = access ?? accessFromLegacyRole(null, null, role);
   if (hasPermission(effective, "manage_photo_upload_queue")) return true;
-  if (hasPermission(effective, "view_admin_panel")) {
-    return (
-      isFullAdminLegacyRole(role) ||
-      isManagementLikeRole(role) ||
-      isMarketingLegacyRole(role) ||
-      isDogHandlerLegacyRole(role) ||
-      isTeamLeaderLegacyRole(role) ||
-      isFrontDeskCoordinatorLegacyRole(role) ||
-      isSuperAdminLegacyRole(role)
-    );
-  }
-  return false;
+  if (hasPermission(effective, "view_admin_panel")) return true;
+  return Boolean(role);
 }
 
 /**

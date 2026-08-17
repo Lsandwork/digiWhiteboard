@@ -1,6 +1,7 @@
 import type { AdminBoardType, AdminTab } from "@/lib/admin/types";
 import { ADMIN_HR_TABS } from "@/lib/admin/types";
 import { isHubNavRole, ROLE_HUB_NAV } from "@/lib/admin/role-hub-nav";
+import { isBlogSuiteNamedUser } from "@/lib/admin/named-tool-access";
 
 export type NavLeaf = {
   type: "item";
@@ -278,7 +279,7 @@ const LOBBY_BOARD_TABS: AdminTab[] = [
   "display",
   "whiteboard_preview"
 ];
-const MARKETING_BOARD_NAV_TABS: AdminTab[] = ["cast_tv", "sa_apps_hub", "settings", "help"];
+const MARKETING_BOARD_NAV_TABS: AdminTab[] = ["cast_tv", "sa_apps_hub", "bulk_photo_upload", "settings", "help"];
 const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "push_notices",
   "grooming_push",
@@ -363,7 +364,10 @@ export function buildMarketingAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
     "marketing_board",
     "CAST-TV",
     compactEntries([
-      ...singles(["cast_tv", "sa_apps_hub"], visible),
+      ...singles(
+        MARKETING_BOARD_NAV_TABS.filter((tab) => tab !== "settings" && tab !== "help"),
+        visible
+      ),
       group("marketing_settings", "Settings", ["settings", "help"], visible)
     ]),
     true
@@ -530,7 +534,10 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "trainer_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication"], visible),
+        ...singles(["bulk_photo_upload"], visible)
+      ])
     )
   );
 
@@ -669,7 +676,10 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
     ...sectionEntries(
       "groomer_operations",
       "Front Desk & Floor",
-      compactEntries([group("front_desk", "Operations", ["crossover_communication"], visible)])
+      compactEntries([
+        group("front_desk", "Operations", ["crossover_communication"], visible),
+        ...singles(["bulk_photo_upload"], visible)
+      ])
     )
   );
 
@@ -719,8 +729,9 @@ export function roleCanSeeRufflyNav(role?: string | null) {
   );
 }
 
-/** Blog Generator + Social Media Generator nav — Super Admin, Admin, and Marketing only. */
-export function roleCanSeeBlogNav(role?: string | null) {
+/** Blog Generator + Social Media Generator nav — Super Admin, Admin, Marketing, and Rebeca. */
+export function roleCanSeeBlogNav(role?: string | null, email?: string | null, name?: string | null) {
+  if (isBlogSuiteNamedUser({ email, name })) return true;
   if (!role) return false;
   return (
     role === "owner_admin" ||
@@ -755,7 +766,8 @@ export function buildSuperAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
 export function buildStaffPanelNav(
   visibleTabs: AdminTab[],
   board: AdminBoardType,
-  role?: string | null
+  role?: string | null,
+  identity?: { email?: string | null; name?: string | null }
 ): NavEntry[] {
   // Cleaned hub IA for staff roles (≤10 tabs). Lobby/marketing boards keep board-specific nav.
   if (board === "staff" && isHubNavRole(role)) {
@@ -776,7 +788,7 @@ export function buildStaffPanelNav(
     includeRouteGenerator: visibleTabs.includes("route_generator"),
     includeLiveFleet: visibleTabs.includes("live_fleet"),
     includeSystemHealth: visibleTabs.includes("ops_system_health"),
-    includeBlog: roleCanSeeBlogNav(role)
+    includeBlog: roleCanSeeBlogNav(role, identity?.email, identity?.name)
   });
 }
 

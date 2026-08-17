@@ -36,7 +36,7 @@ export async function requireBlogPermission(request: Request, permission: Permis
 
   const supabase = getServiceSupabase();
   const access = await getUserAccess(supabase, session.adminUserId, role, session.email);
-  if (!canAccessBlogGenerator(access, role)) {
+  if (!canAccessBlogGenerator(access, role, session.email)) {
     return {
       ok: false as const,
       response: Response.json(

@@ -66,7 +66,7 @@ function BlogPageInner({ username, role, access, displayName, avatarUrl }: Props
   const canAccess = useCallback(
     (permission: string) => {
       if (role === "owner_admin" || role === "super_admin") return true;
-      if (canAccessBlogGenerator(effectiveAccess, role)) {
+      if (canAccessBlogGenerator(effectiveAccess, role, username, displayName)) {
         if (hasPermission(effectiveAccess, permission as never)) return true;
         return hasPermission(accessFromLegacyRole(null, username, role), permission as never);
       }

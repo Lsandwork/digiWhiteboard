@@ -460,8 +460,8 @@ export function Sidebar({
   onToggleCollapsed
 }: SidebarProps) {
   const navEntries = useMemo(
-    () => buildStaffPanelNav(visibleTabs, board, role),
-    [visibleTabs, board, role]
+    () => buildStaffPanelNav(visibleTabs, board, role, { email: username, name: displayName }),
+    [visibleTabs, board, role, username, displayName]
   );
   const activeGroupId = useMemo(() => findNavGroupForTab(navEntries, activeTab), [navEntries, activeTab]);
   const activeSectionId = useMemo(() => {

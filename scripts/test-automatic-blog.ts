@@ -148,13 +148,25 @@ assert.equal(roleCanSeeBlogNav("marketing"), true);
 assert.equal(roleCanSeeBlogNav("assistant_manager"), false);
 assert.equal(roleCanSeeBlogNav("trainer"), false);
 assert.equal(roleCanSeeBlogNav("groomer"), false);
+assert.equal(roleCanSeeBlogNav("trainer", "rebeca@fitdog.com"), true);
+assert.equal(roleCanSeeBlogNav("groomer", "rebecca@fitdog.com"), true);
+assert.equal(roleCanSeeBlogNav("front_desk_coordinator", null, "Rebeca"), true);
 assert.equal(canAccessBlogGenerator(null, "owner_admin"), true);
 assert.equal(canAccessBlogGenerator(null, "manager_admin"), true);
 assert.equal(canAccessBlogGenerator(null, "marketing"), true);
 assert.equal(canAccessBlogGenerator(accessFromLegacyRole(null, null, "assistant_manager"), "assistant_manager"), false);
 assert.equal(canAccessBlogGenerator(accessFromLegacyRole(null, null, "trainer"), "trainer"), false);
+assert.equal(
+  canAccessBlogGenerator(accessFromLegacyRole("u-rebeca", "rebeca@fitdog.com", "trainer"), "trainer", "rebeca@fitdog.com"),
+  true
+);
+assert.equal(
+  canAccessBlogGenerator(accessFromLegacyRole(null, null, "groomer"), "groomer", null, "Rebecca Lopez"),
+  true
+);
 assert.equal(hasPermission(accessFromLegacyRole(null, null, "trainer"), "blog.view"), false);
 assert.equal(hasPermission(accessFromLegacyRole(null, null, "marketing"), "blog.view"), true);
+assert.equal(hasPermission(accessFromLegacyRole("u-rebeca", "rebeca@fitdog.com", "trainer"), "blog.create"), true);
 
 {
   const apps = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, ["live_fleet", "route_generator", "ops_system_health"], {
@@ -195,6 +207,14 @@ assert.equal(hasPermission(accessFromLegacyRole(null, null, "marketing"), "blog.
   assert.ok(marketingLabels.includes("Social Media Generator"));
   assert.equal(marketingLabels.includes("Live Fleet"), false);
   assert.equal(marketingLabels.includes("Route Generator"), false);
+
+  const rebecaApps = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, ["sa_apps_hub"], {
+    includeBlog: roleCanSeeBlogNav("trainer", "rebeca@fitdog.com"),
+    includeRuffly: true
+  });
+  const rebecaLabels = rebecaApps.sections.flatMap((section) => section.links.map((link) => link.label));
+  assert.ok(rebecaLabels.includes("Blog Generator"), "Rebeca sees Blog Generator in Apps");
+  assert.ok(rebecaLabels.includes("Social Media Generator"), "Rebeca sees Social Media Generator in Apps");
 }
 
 const staffTabs = ["overview", "route_generator", "sa_apps_hub", "help"] as AdminTab[];
@@ -223,13 +243,17 @@ assert.equal(
 );
 
 const marketingNav = buildStaffPanelNav(
-  ["cast_tv", "sa_apps_hub", "settings", "help"] as AdminTab[],
+  ["cast_tv", "sa_apps_hub", "bulk_photo_upload", "settings", "help"] as AdminTab[],
   "marketing",
   "marketing"
 );
 assert.ok(
   marketingNav.some((entry) => entry.type === "item" && entry.tab === "sa_apps_hub"),
   "marketing users should see Apps on the CAST-TV board"
+);
+assert.ok(
+  marketingNav.some((entry) => entry.type === "item" && entry.tab === "bulk_photo_upload"),
+  "marketing CAST-TV panel includes Bulk Photo Upload"
 );
 assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "marketing"), "sa_apps_hub", "marketing", "marketing"),

@@ -27,16 +27,15 @@ export default async function AutomaticBlogPage() {
   const access = session.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : null;
+  const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
 
-  if (!canAccessBlogGenerator(access, session.role)) {
+  if (!canAccessBlogGenerator(access, session.role, session.email, adminUser?.full_name)) {
     redirect(
       session.role === "marketing"
         ? "/admin?board=marketing&tab=sa_apps_hub"
         : "/admin?board=staff&tab=sa_apps_hub"
     );
   }
-
-  const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
 
   return (
     <ToastProvider>
