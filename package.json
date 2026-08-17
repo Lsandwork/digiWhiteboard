@@ -24,6 +24,7 @@
     "test:session-edge-node-parity": "tsx scripts/test-session-edge-node-parity.ts",
     "test:admin-redirect-loops": "tsx scripts/test-admin-redirect-loops.ts",
     "test:admin-dashboard-nav": "tsx scripts/test-admin-dashboard-nav.ts",
+    "test:tl-digi-board-windows": "tsx scripts/test-tl-digi-board-windows.ts",
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
