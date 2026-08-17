@@ -20,10 +20,10 @@ const PHOTO_FETCH_SPACING_MS = 200;
 
 const animalPhotoCache = new Map<string, CachedPhoto>();
 
-function getGingrConfig() {
+function getGingrConfig(options?: GingrAnimalPhotoOptions) {
   return {
-    subdomain: process.env.GINGR_SUBDOMAIN ?? "fitdog",
-    apiKey: process.env.GINGR_API_KEY
+    subdomain: options?.subdomain ?? process.env.GINGR_SUBDOMAIN ?? "fitdog",
+    apiKey: options?.apiKey ?? process.env.GINGR_API_KEY ?? process.env.TL_GINGR_KEY
   };
 }
 
@@ -193,6 +193,8 @@ function rememberAnimalPhoto(animalId: string, photoUrl: string | null) {
 
 type GingrAnimalPhotoOptions = {
   bypassFetchGate?: boolean;
+  apiKey?: string;
+  subdomain?: string;
 };
 
 async function waitForGingrAnimalPhotoSlot() {
@@ -224,7 +226,7 @@ export async function getGingrAnimalPhotoUrl(
 
   await waitForGingrAnimalPhotoSlot();
 
-  const { subdomain, apiKey } = getGingrConfig();
+  const { subdomain, apiKey } = getGingrConfig(options);
   if (!apiKey) {
     rememberAnimalPhoto(trimmedAnimalId, null);
     return null;

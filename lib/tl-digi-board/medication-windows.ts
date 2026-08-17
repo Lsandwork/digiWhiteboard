@@ -155,6 +155,16 @@ export function formatLaBoardClock(instant: Date): string {
   }).format(instant);
 }
 
+/** Header clock — includes seconds and updates every second on the TL TV board. */
+export function formatLaBoardLiveClock(instant: Date): string {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: TL_DIGI_BOARD_TIMEZONE
+  }).format(instant);
+}
+
 export function formatLaBoardDate(instant: Date): string {
   return new Intl.DateTimeFormat("en-US", {
     weekday: "long",

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CastKeeperProvider, useCastKeeperContext } from "@/hooks/useCastKeeper";
+import { TlBoardClock } from "@/components/boards/TlBoardClock";
 import {
   formatLaBoardClock,
-  formatLaBoardDate,
   periodLabel
 } from "@/lib/tl-digi-board/medication-windows";
+import { tlBoardAnimalPhotoProxyUrl } from "@/lib/tl-digi-board/animal-photos";
 import type { TlBoardMedicationRow, TlDigiBoardSnapshot } from "@/lib/tl-digi-board/types";
 import "./tl-alerts-reminders-board.css";
 
@@ -53,6 +54,36 @@ function formatAdminTime(iso: string | null) {
   }
 }
 
+function DogPhoto({ row }: { row: TlBoardMedicationRow }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const candidates = useMemo(() => {
+    const urls: string[] = [];
+    if (row.photoUrl?.trim()) urls.push(row.photoUrl.trim());
+    urls.push(tlBoardAnimalPhotoProxyUrl(row.gingrAnimalId));
+    return urls;
+  }, [row.gingrAnimalId, row.photoUrl]);
+
+  const src = candidates.find((url) => url !== failedSrc) ?? null;
+
+  if (!src) {
+    return (
+      <div className="tl-med-row__photo tl-med-row__photo--placeholder" aria-hidden>
+        {row.dogName.slice(0, 1).toUpperCase()}
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className="tl-med-row__photo"
+      onError={() => setFailedSrc(src)}
+    />
+  );
+}
+
 function MedicationRow({ row }: { row: TlBoardMedicationRow }) {
   const tone =
     row.displayStatus === "overdue"
@@ -64,14 +95,7 @@ function MedicationRow({ row }: { row: TlBoardMedicationRow }) {
   return (
     <article className={`tl-med-row ${tone}`}>
       <div className="tl-med-row__dog">
-        {row.photoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={row.photoUrl} alt="" className="tl-med-row__photo" />
-        ) : (
-          <div className="tl-med-row__photo tl-med-row__photo--placeholder" aria-hidden>
-            {row.dogName.slice(0, 1).toUpperCase()}
-          </div>
-        )}
+        <DogPhoto row={row} />
         <div>
           <h3 className="tl-med-row__name">{row.dogName}</h3>
           <p className="tl-med-row__lodging">{row.lodgingLabel || "LODGING UNKNOWN"}</p>
@@ -99,7 +123,6 @@ function BoardInner() {
   const castKeeper = useCastKeeperContext();
   const [snapshot, setSnapshot] = useState<BoardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => new Date());
 
   const load = useCallback(async () => {
     try {
@@ -117,7 +140,6 @@ function BoardInner() {
   useEffect(() => {
     void load();
     const poll = window.setInterval(() => void load(), POLL_MS);
-    const clock = window.setInterval(() => setNow(new Date()), 15_000);
 
     function onVisible() {
       if (document.visibilityState === "visible") void load();
@@ -126,7 +148,6 @@ function BoardInner() {
 
     return () => {
       window.clearInterval(poll);
-      window.clearInterval(clock);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [load]);
@@ -166,10 +187,7 @@ function BoardInner() {
           <p className="tl-board__eyebrow">RUFFOPS</p>
           <h1 className="tl-board__title">{title}</h1>
         </div>
-        <div className="tl-board__clock">
-          <p className="tl-board__date">{formatLaBoardDate(now)}</p>
-          <p className="tl-board__time">{formatLaBoardClock(now)}</p>
-        </div>
+        <TlBoardClock />
         <div className={`tl-board__sync ${syncClass}`}>
           <p className="tl-board__sync-label">{syncLabel}</p>
           <p className="tl-board__sync-meta">Last sync {lastSync}</p>

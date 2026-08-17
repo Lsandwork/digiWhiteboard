@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { persistAnimalPhotoUrl, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
 import { getCachedGingrAnimalPhotoUrl, getGingrAnimalPhotoUrl } from "@/lib/gingr-animal-photo";
 import { isAllowedGingrPhotoHost } from "@/lib/gingr-photo-display";
+import { resolveTlGingrApiKey } from "@/lib/tl-digi-board/gingr-auth";
 import { normalizePhotoUrl } from "@/lib/board-utils";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -76,6 +77,12 @@ export async function GET(request: Request) {
     }
     if (!photoUrl) {
       photoUrl = await getGingrAnimalPhotoUrl(animalId, 4000);
+    }
+    if (!photoUrl && resolveTlGingrApiKey()) {
+      photoUrl = await getGingrAnimalPhotoUrl(animalId, 4000, {
+        bypassFetchGate: true,
+        apiKey: resolveTlGingrApiKey()
+      });
     }
     if (photoUrl) {
       const persistUrl = photoUrl;

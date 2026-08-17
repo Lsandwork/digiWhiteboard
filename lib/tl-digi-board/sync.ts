@@ -25,6 +25,7 @@ import {
   parseRunName
 } from "./lodging";
 import { buildTlGingrMedicationRecords } from "./normalize";
+import { enrichTlBoardMedicationPhotos } from "./animal-photos";
 import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "./types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -448,8 +449,10 @@ export async function syncTlDigiBoardState(
     const lastErrorParts = [...medErrors.slice(0, 2), ...historyWarnings.slice(0, 1)];
     const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
 
+    const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
+
     const built = buildTlBoardMedicationRows({
-      medications,
+      medications: medicationsWithPhotos,
       now,
       lastSuccessfulSyncAt: attemptedAt,
       lastAttemptAt: attemptedAt,
@@ -459,7 +462,7 @@ export async function syncTlDigiBoardState(
     });
     const meta = buildTlBoardSyncMeta(
       {
-        medications,
+        medications: medicationsWithPhotos,
         now,
         lastSuccessfulSyncAt: attemptedAt,
         lastAttemptAt: attemptedAt,
@@ -475,7 +478,7 @@ export async function syncTlDigiBoardState(
       current: built.current,
       summary: built.summary,
       meta,
-      medications,
+      medications: medicationsWithPhotos,
       generatedAt: attemptedAt
     };
   } catch (error) {
