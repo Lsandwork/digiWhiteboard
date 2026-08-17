@@ -4,6 +4,7 @@
  */
 import type { ReconciliationReport } from "@/lib/route-generator/reconciliation";
 import { formatMissingLeg } from "@/lib/route-generator/reconciliation";
+import type { RouteCoverageReport } from "@/lib/route-generator/reconciliation";
 import { hasFiniteCoords } from "@/lib/route-generator/household-coords";
 import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
 
@@ -41,6 +42,7 @@ export function validateRoutePlan(params: {
   reconciliation: ReconciliationReport;
   stops: ValidatableStop[];
   requireCoordinates?: boolean;
+  coverage?: RouteCoverageReport | null;
 }): PlanValidationResult {
   const issues: PlanValidationIssue[] = [];
   const checks: PlanValidationResult["checks"] = [];
@@ -129,6 +131,24 @@ export function validateRoutePlan(params: {
     pass: params.reconciliation.unassignedCount === params.reconciliation.unassigned.length,
     detail: "Unassigned legs are explicitly listed."
   });
+
+  if (params.coverage) {
+    checks.push({
+      id: "route_coverage",
+      pass: params.coverage.ok,
+      detail: params.coverage.ok
+        ? `All ${params.coverage.eligibleCount} eligible legs are represented exactly once.`
+        : `${params.coverage.issues.length} coverage issue(s): eligible dog missing, duplicate, or class/service mutated.`
+    });
+    for (const issue of params.coverage.issues.slice(0, 40)) {
+      issues.push({
+        code: issue.code,
+        severity: "error",
+        message: issue.message,
+        dogName: issue.dogName
+      });
+    }
+  }
 
   const errorIssues = issues.filter((i) => i.severity === "error");
   return {
