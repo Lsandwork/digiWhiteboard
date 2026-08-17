@@ -738,6 +738,38 @@
   color: var(--fitdog-heading);
 }
 
+.blog-dash-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.blog-dash-chip {
+  border-radius: 999px;
+  border: 1px solid var(--fitdog-border, #e6e8eb);
+  background: #ffffff;
+  color: var(--fitdog-heading, #121417);
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.35;
+  cursor: pointer;
+  text-align: left;
+}
+
+.blog-dash-chip:hover {
+  border-color: var(--fitdog-orange, #ff6f26);
+}
+
+.blog-dash-chip--hook {
+  border-radius: 12px;
+  max-width: 100%;
+}
+
+.blog-dash-chip--active {
+  border-color: var(--fitdog-orange, #ff6f26);
+  background: var(--fitdog-orange-soft, #fff1e9);
+}
+
 .blog-dash .text-slate-600,
 .blog-dash .text-slate-500,
 .blog-dash .text-slate-700 {

@@ -278,8 +278,8 @@ function composeSmartCaption(
   return options[variant % options.length]!;
 }
 
-function formatFeedCaption(caption: SmartCaption, cta?: string): { hook: string; body: string } {
-  const hook = cleanMultiline(`${caption.opener}\n${caption.dialogue}`);
+function formatFeedCaption(caption: SmartCaption, cta?: string, spin?: string): { hook: string; body: string } {
+  const hook = cleanMultiline([caption.opener, caption.dialogue, spin].filter(Boolean).join("\n"));
   const bodyParts = [
     caption.threeBeat,
     "",
@@ -306,9 +306,10 @@ function buildItems(input: SocialGenerateInput): SocialPackItemInput[] {
   const cap0 = composeSmartCaption(input, img0, 0);
   const cap1 = composeSmartCaption(input, img1, 1);
   const cap2 = composeSmartCaption(input, img2, 0);
-  const feed0 = formatFeedCaption(cap0, input.blogUrl ? cta : undefined);
-  const feed1 = formatFeedCaption(cap1, undefined);
-  const fb = formatFeedCaption(cap0, cta);
+  const spin = cleanInline(input.angle || "");
+  const feed0 = formatFeedCaption(cap0, input.blogUrl ? cta : undefined, spin);
+  const feed1 = formatFeedCaption(cap1, undefined, spin);
+  const fb = formatFeedCaption(cap0, cta, spin);
 
   const items: SocialPackItemInput[] = [
     {
@@ -334,7 +335,7 @@ function buildItems(input: SocialGenerateInput): SocialPackItemInput[] {
     {
       platform: "instagram",
       format: "story",
-      hook: cap2.opener,
+      hook: spin || cap2.opener,
       body: cleanMultiline(`${cap2.dialogue}\n${cap2.threeBeat}`),
       cta: "Sticker → blog or booking",
       hashtags: [],
@@ -356,7 +357,7 @@ function buildItems(input: SocialGenerateInput): SocialPackItemInput[] {
     {
       platform: "instagram",
       format: "reel",
-      hook: cap0.dialogue,
+      hook: spin || cap0.dialogue,
       body: cleanMultiline(
         `${cap0.opener}\n${cap0.threeBeat}\nHook on dialogue → real play → cool-down → end on the question.`
       ),
@@ -392,7 +393,7 @@ function buildItems(input: SocialGenerateInput): SocialPackItemInput[] {
     {
       platform: "tiktok",
       format: "caption_script",
-      hook: cap0.dialogue,
+      hook: spin || cap0.dialogue,
       body: cleanMultiline(`${cap0.opener}\n${cap0.threeBeat}\n${cap0.lesson}`),
       cta: `${cta}`,
       hashtags: hashtags(["DogTok"]),
