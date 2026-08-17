@@ -20,9 +20,12 @@ export async function GET(request: Request) {
       ok: true,
       generatedAt: snapshot.generatedAt,
       summary: snapshot.summary,
+      servicesSummary: snapshot.servicesSummary,
       gingrSyncHealth: snapshot.meta.gingrSyncHealth,
       administrationStatusAvailable: snapshot.meta.administrationStatusAvailable,
-      medicationCount: snapshot.medications.length
+      servicesCompletionStatusAvailable: snapshot.meta.servicesCompletionStatusAvailable,
+      medicationCount: snapshot.medications.length,
+      additionalServiceCount: snapshot.additionalServices.length
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "TL Digi Board cron sync failed.";

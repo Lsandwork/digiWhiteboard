@@ -26,6 +26,7 @@ import {
 } from "./lodging";
 import { buildTlGingrMedicationRecords } from "./normalize";
 import { enrichTlBoardMedicationPhotos } from "./animal-photos";
+import { syncTlBoardAdditionalServices } from "./additional-services";
 import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "./types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -273,11 +274,14 @@ function resolveLodgingForDog(dog: OvernightDog, lodgingMap: Map<string, Lodging
 
 function emptySnapshot(partial: {
   medications?: TlGingrMedicationRecord[];
+  additionalServices?: TlDigiBoardSnapshot["additionalServices"];
+  servicesSummary?: TlDigiBoardSnapshot["servicesSummary"];
   lastSuccessfulSyncAt?: string | null;
   lastAttemptAt?: string | null;
   lastError?: string | null;
   syncSucceeded: boolean;
   administrationStatusAvailable?: boolean;
+  servicesCompletionStatusAvailable?: boolean;
   now?: Date;
 }): TlDigiBoardSnapshot {
   const now = partial.now ?? new Date();
@@ -299,7 +303,8 @@ function emptySnapshot(partial: {
       lastAttemptAt: partial.lastAttemptAt ?? now.toISOString(),
       lastError: partial.lastError ?? null,
       syncSucceeded: partial.syncSucceeded,
-      administrationStatusAvailable: partial.administrationStatusAvailable
+      administrationStatusAvailable: partial.administrationStatusAvailable,
+      servicesCompletionStatusAvailable: partial.servicesCompletionStatusAvailable
     },
     built.summary
   );
@@ -308,6 +313,8 @@ function emptySnapshot(partial: {
     overdue: built.overdue,
     current: built.current,
     summary: built.summary,
+    additionalServices: partial.additionalServices ?? [],
+    servicesSummary: partial.servicesSummary ?? { due: 0, completed: 0, remaining: 0 },
     meta,
     medications,
     generatedAt: now.toISOString()
@@ -346,7 +353,15 @@ export async function syncTlDigiBoardState(
   const attemptedAt = now.toISOString();
 
   try {
-    const overnightDogs = await loadOvernightCheckedInDogs(config);
+    const [overnightDogs, additionalServicesResult] = await Promise.all([
+      loadOvernightCheckedInDogs(config),
+      syncTlBoardAdditionalServices({ config, now }).catch((error) => ({
+        services: previous?.additionalServices ?? [],
+        summary: previous?.servicesSummary ?? { due: 0, completed: 0, remaining: 0 },
+        completionStatusAvailable: previous?.meta.servicesCompletionStatusAvailable ?? false,
+        error: error instanceof Error ? error.message : "additional_services_sync_failed"
+      }))
+    ]);
     const lodgingMap = await loadLodgingMapByAnimal();
     const serviceDate = todayInLosAngeles(now);
 
@@ -447,6 +462,15 @@ export async function syncTlDigiBoardState(
     }
 
     const lastErrorParts = [...medErrors.slice(0, 2), ...historyWarnings.slice(0, 1)];
+    const additionalServices = additionalServicesResult.services;
+    const servicesSummary = additionalServicesResult.summary;
+    const servicesCompletionStatusAvailable = additionalServicesResult.completionStatusAvailable;
+    const additionalServicesError =
+      "error" in additionalServicesResult ? additionalServicesResult.error : null;
+
+    if (additionalServicesError) {
+      lastErrorParts.push(additionalServicesError);
+    }
     const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
 
     const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
@@ -468,7 +492,8 @@ export async function syncTlDigiBoardState(
         lastAttemptAt: attemptedAt,
         lastError,
         syncSucceeded: true,
-        administrationStatusAvailable
+        administrationStatusAvailable,
+        servicesCompletionStatusAvailable
       },
       built.summary
     );
@@ -477,6 +502,8 @@ export async function syncTlDigiBoardState(
       overdue: built.overdue,
       current: built.current,
       summary: built.summary,
+      additionalServices,
+      servicesSummary,
       meta,
       medications: medicationsWithPhotos,
       generatedAt: attemptedAt
@@ -488,11 +515,14 @@ export async function syncTlDigiBoardState(
       // Keep last-known-good rows; mark stale / not all-clear.
       return emptySnapshot({
         medications: previous.medications,
+        additionalServices: previous.additionalServices,
+        servicesSummary: previous.servicesSummary,
         lastSuccessfulSyncAt: previous.meta.lastSuccessfulSyncAt,
         lastAttemptAt: attemptedAt,
         lastError: message,
         syncSucceeded: false,
         administrationStatusAvailable: previous.meta.administrationStatusAvailable,
+        servicesCompletionStatusAvailable: previous.meta.servicesCompletionStatusAvailable,
         now
       });
     }
@@ -500,6 +530,8 @@ export async function syncTlDigiBoardState(
     // No prior data — return empty rows but NEVER as ALL CLEAR (syncSucceeded false).
     return emptySnapshot({
       medications: [],
+      additionalServices: [],
+      servicesSummary: { due: 0, completed: 0, remaining: 0 },
       lastSuccessfulSyncAt: null,
       lastAttemptAt: attemptedAt,
       lastError: message,

@@ -164,6 +164,14 @@ export function TlDigiBoardPanel() {
             <Row label="Remaining" value={String(summary?.remaining ?? "—")} />
             <Row label="Overdue" value={String(summary?.overdue ?? "—")} />
             <Row
+              label="Additional services pending"
+              value={String(snapshot?.servicesSummary?.remaining ?? "—")}
+            />
+            <Row
+              label="Additional services completed (hidden)"
+              value={String(snapshot?.servicesSummary?.completed ?? "—")}
+            />
+            <Row
               label="Administration status from Gingr API"
               value={
                 meta?.administrationStatusAvailable

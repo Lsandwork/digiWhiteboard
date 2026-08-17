@@ -11,6 +11,8 @@ import {
 } from "./config";
 import { syncTlDigiBoardState } from "./sync";
 import type {
+  TlAdditionalServicesSummary,
+  TlBoardAdditionalServiceRow,
   TlBoardMedicationRow,
   TlBoardSyncMeta,
   TlDigiBoardPublicPayload,
@@ -49,6 +51,26 @@ function parseSummary(value: unknown): TlMedicationSummary {
   };
 }
 
+function parseServicesSummary(value: unknown): TlAdditionalServicesSummary {
+  const row = asRecord(value);
+  return {
+    due: Number(row?.due ?? 0) || 0,
+    completed: Number(row?.completed ?? 0) || 0,
+    remaining: Number(row?.remaining ?? 0) || 0
+  };
+}
+
+function isAdditionalServiceRow(value: unknown): value is TlBoardAdditionalServiceRow {
+  const row = asRecord(value);
+  if (!row) return false;
+  return Boolean(row.id && row.gingrServiceId && row.gingrAnimalId && row.dogName && row.serviceName);
+}
+
+function parseAdditionalServices(value: unknown): TlBoardAdditionalServiceRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isAdditionalServiceRow);
+}
+
 function parseMeta(value: unknown): TlBoardSyncMeta {
   const row = asRecord(value);
   return {
@@ -62,7 +84,8 @@ function parseMeta(value: unknown): TlBoardSyncMeta {
     allClear: Boolean(row?.allClear),
     nextPeriod: (row?.nextPeriod as TlBoardSyncMeta["nextPeriod"]) ?? null,
     nextPeriodStartsAt: typeof row?.nextPeriodStartsAt === "string" ? row.nextPeriodStartsAt : null,
-    administrationStatusAvailable: Boolean(row?.administrationStatusAvailable)
+    administrationStatusAvailable: Boolean(row?.administrationStatusAvailable),
+    servicesCompletionStatusAvailable: Boolean(row?.servicesCompletionStatusAvailable)
   };
 }
 
@@ -81,6 +104,8 @@ export function parseTlDigiBoardSnapshot(value: unknown): TlDigiBoardSnapshot | 
     overdue: parseRows(root.overdue),
     current: parseRows(root.current),
     summary: parseSummary(root.summary),
+    additionalServices: parseAdditionalServices(root.additionalServices),
+    servicesSummary: parseServicesSummary(root.servicesSummary),
     meta: parseMeta(root.meta),
     medications,
     generatedAt: typeof root.generatedAt === "string" ? root.generatedAt : new Date(0).toISOString()

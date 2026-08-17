@@ -49,6 +49,28 @@ export type TlMedicationSummary = {
   overdue: number;
 };
 
+export type TlAdditionalServiceDisplayStatus = "needs_completion" | "completed";
+
+export type TlBoardAdditionalServiceRow = {
+  id: string;
+  gingrServiceId: string;
+  gingrReservationId: string;
+  gingrAnimalId: string;
+  dogName: string;
+  photoUrl: string | null;
+  lodgingLabel: string | null;
+  serviceName: string;
+  scheduledAt: string | null;
+  displayStatus: TlAdditionalServiceDisplayStatus;
+  serviceDate: string;
+};
+
+export type TlAdditionalServicesSummary = {
+  due: number;
+  completed: number;
+  remaining: number;
+};
+
 export type TlGingrSyncHealth = "live" | "delayed" | "connection_issue" | "unknown";
 
 export type TlBoardSyncMeta = {
@@ -67,6 +89,8 @@ export type TlBoardSyncMeta = {
    * GET /api/v1/get_medication_report_history (Gingr Medication Report).
    */
   administrationStatusAvailable: boolean;
+  /** True when Gingr reservation services exposed completion fields this sync. */
+  servicesCompletionStatusAvailable: boolean;
 };
 
 /** Persisted / returned TL Digi Board state after a Gingr medication sync. */
@@ -74,6 +98,8 @@ export type TlDigiBoardSnapshot = {
   overdue: TlBoardMedicationRow[];
   current: TlBoardMedicationRow[];
   summary: TlMedicationSummary;
+  additionalServices: TlBoardAdditionalServiceRow[];
+  servicesSummary: TlAdditionalServicesSummary;
   meta: TlBoardSyncMeta;
   /** Last-known-good raw medication records — retained across failed syncs. */
   medications: TlGingrMedicationRecord[];
