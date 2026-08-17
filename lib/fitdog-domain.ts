@@ -2,9 +2,12 @@
  * Fitdog staff DigiBoard custom-domain routing (fitdog.ruffops.com).
  *
  * This host is the staff login + DigiBoard entry point. Root `/` redirects to
- * admin login. Authenticated `/admin` traffic is forced onto the staff board so
- * Route Generator / Operations panels are never hidden behind the lobby board.
+ * admin login. Authenticated `/admin` dashboard traffic is forced onto the staff
+ * board so Route Generator / Operations panels are never hidden behind lobby.
+ * Standalone apps under `/admin/*` (Blog Generator, etc.) are left alone.
  */
+
+import { isAdminDashboardPath } from "@/lib/admin/admin-paths";
 
 export const FITDOG_HOSTNAME = "fitdog.ruffops.com";
 export const FITDOG_LOGIN_REDIRECT_PATH = "/admin/login?next=%2Fadmin%3Fboard%3Dstaff%26tab%3Dcrossover_communication";
@@ -47,7 +50,8 @@ export function shouldForceFitdogStaffBoard(
   board: string | null
 ): boolean {
   if (!isFitdogHostname(host)) return false;
-  if (!(pathname === "/admin" || pathname.startsWith("/admin/"))) return false;
-  if (pathname.startsWith("/admin/login")) return false;
+  // Dashboard only — never rewrite /admin/automatic-blog (or other standalone apps)
+  // to /admin?tab=my_shift.
+  if (!isAdminDashboardPath(pathname)) return false;
   return !board || !board.trim();
 }

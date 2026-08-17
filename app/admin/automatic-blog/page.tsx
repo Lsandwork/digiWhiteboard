@@ -16,7 +16,11 @@ export default async function AutomaticBlogPage() {
   if (session.mustChangePassword) redirect("/admin/login?next=/admin/automatic-blog");
 
   if (!isBlogEnabled() && session.role !== "owner_admin") {
-    redirect("/admin?board=staff&tab=help");
+    redirect(
+      session.role === "marketing"
+        ? "/admin?board=marketing&tab=sa_apps_hub"
+        : "/admin?board=staff&tab=sa_apps_hub"
+    );
   }
 
   const supabase = getServiceSupabase();
@@ -25,7 +29,11 @@ export default async function AutomaticBlogPage() {
     : null;
 
   if (!canAccessBlogGenerator(access, session.role)) {
-    redirect("/admin?board=staff&tab=crossover_communication");
+    redirect(
+      session.role === "marketing"
+        ? "/admin?board=marketing&tab=sa_apps_hub"
+        : "/admin?board=staff&tab=sa_apps_hub"
+    );
   }
 
   const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;

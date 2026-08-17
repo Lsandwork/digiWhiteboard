@@ -276,6 +276,12 @@ export function hubLinkLabel(link: SuperAdminHubLink): string {
   return link.label;
 }
 
+/** Absolute in-app destination for an Apps / hub tile. */
+export function hubLinkHref(link: SuperAdminHubLink): string {
+  if (link.kind === "route") return link.href;
+  return `/admin?board=staff&tab=${link.tab}`;
+}
+
 /** Flatten every hub-linked tab for coverage checks. */
 export function allSuperAdminHubLinkedTabs(): AdminTab[] {
   const tabs = new Set<AdminTab>();

@@ -7,6 +7,7 @@ import {
   shouldForceFitdogStaffBoard,
   shouldRedirectFitdogRootToLogin
 } from "../lib/fitdog-domain";
+import { isAdminDashboardPath, isStandaloneAdminAppPath } from "../lib/admin/admin-paths";
 import { parseAdminBoardType } from "../lib/admin/types";
 
 assert.equal(normalizeHostname("Fitdog.RuffOps.com:443"), FITDOG_HOSTNAME);
@@ -27,6 +28,23 @@ assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "market
 assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin", "staff"), false);
 assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin/login", null), false);
 assert.equal(shouldForceFitdogStaffBoard("staff.ruffops.com", "/admin", null), false);
+assert.equal(shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin/automatic-blog", null), false);
+assert.equal(
+  shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin/automatic-blog", ""),
+  false,
+  "Blog Generator must not be rewritten to the staff dashboard"
+);
+assert.equal(
+  shouldForceFitdogStaffBoard("fitdog.ruffops.com", "/admin/blog/help/how-to-use-blog-generator", null),
+  false
+);
+assert.equal(isAdminDashboardPath("/admin"), true);
+assert.equal(isAdminDashboardPath("/admin/"), true);
+assert.equal(isAdminDashboardPath("/admin/automatic-blog"), false);
+assert.equal(isStandaloneAdminAppPath("/admin/automatic-blog"), true);
+assert.equal(isStandaloneAdminAppPath("/admin/automatic-blog?page=social-generator".split("?")[0]), true);
+assert.equal(isStandaloneAdminAppPath("/admin"), false);
+assert.equal(isStandaloneAdminAppPath("/admin/login"), false);
 
 assert.equal(parseAdminBoardType(null), "staff");
 assert.equal(parseAdminBoardType(undefined), "staff");

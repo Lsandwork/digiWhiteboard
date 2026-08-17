@@ -9,6 +9,7 @@ import {
   isLobbyDigiBoardOnlyLegacyRole,
   isStaffDigiBoardOnlyLegacyRole
 } from "../lib/admin/permissions";
+import { isAdminDashboardPath } from "../lib/admin/admin-paths";
 import { shouldForceFitdogStaffBoard } from "../lib/fitdog-domain";
 
 type Location = { pathname: string; board: string | null; tab: string | null };
@@ -43,7 +44,7 @@ function adminRedirectStep(
     }
   }
 
-  if (!isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
+  if (isAdminDashboardPath(pathname) && !isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
     if (board !== "staff" || !tab) {
       return {
         pathname: "/admin",
@@ -53,7 +54,7 @@ function adminRedirectStep(
     }
   }
 
-  if (!isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
+  if (isAdminDashboardPath(pathname) && !isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
     const marketingStaffTabs = ["crossover_communication", "bulk_photo_upload", "media_library", "help"];
     if (board === "staff" && (tab === null || marketingStaffTabs.includes(tab))) {
       if (!tab) {
@@ -172,6 +173,18 @@ for (const host of ["fitdog.ruffops.com", "staff.ruffops.com"]) {
   const { settled } = walk("fitdog.ruffops.com", { pathname: "/admin", board: "staff", tab: "users" }, "owner_admin");
   assert.equal(settled.board, "lobby", "users tab canonicalizes to lobby board");
   assert.equal(settled.tab, "users");
+}
+
+// Apps tiles must keep standalone URLs instead of collapsing to My Shift.
+for (const role of ["owner_admin", "manager_admin", "marketing"] as const) {
+  for (const host of ["fitdog.ruffops.com", "staff.ruffops.com"]) {
+    const { settled } = walk(host, { pathname: "/admin/automatic-blog", board: null, tab: null }, role);
+    assert.equal(
+      settled.pathname,
+      "/admin/automatic-blog",
+      `${role} on ${host} must keep /admin/automatic-blog (not redirect to My Shift)`
+    );
+  }
 }
 
 console.log("admin redirect loop tests passed");

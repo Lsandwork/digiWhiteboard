@@ -37,7 +37,7 @@ import {
   hasPermission
 } from "../lib/admin/permissions";
 import type { AdminTab } from "../lib/admin/types";
-import { SUPER_ADMIN_HUBS } from "../lib/admin/super-admin-nav";
+import { SUPER_ADMIN_HUBS, hubLinkHref, hubLinkLabel } from "../lib/admin/super-admin-nav";
 import { filterHubDefinition } from "../lib/admin/role-hub-nav";
 
 assert.equal(DEFAULT_HUMAN_SCORE_THRESHOLD, 90);
@@ -164,6 +164,21 @@ assert.equal(hasPermission(accessFromLegacyRole(null, null, "marketing"), "blog.
   const labels = apps.sections.flatMap((section) => section.links.map((link) => link.label));
   assert.ok(labels.includes("Blog Generator"), "Apps hub includes Blog Generator");
   assert.ok(labels.includes("Social Media Generator"), "Apps hub includes Social Media Generator");
+  const hrefs = Object.fromEntries(
+    apps.sections.flatMap((section) => section.links.map((link) => [hubLinkHref(link), hubLinkLabel(link)]))
+  );
+  assert.equal(hrefs["/admin/automatic-blog"], "Blog Generator");
+  assert.equal(hrefs["/admin/automatic-blog?page=social-generator"], "Social Media Generator");
+  assert.equal(hrefs["/admin?board=staff&tab=live_fleet"], "Live Fleet");
+  assert.equal(hrefs["/admin?board=staff&tab=route_generator"], "Route Generator");
+  assert.equal(hrefs["/admin?board=staff&tab=ops_system_health"], "System Health & Debugging");
+  assert.equal(hrefs["/gingr"], "Gingr");
+  assert.equal(hrefs["/ruffly"], "Ruffly");
+  assert.equal(
+    Object.keys(hrefs).some((href) => href.includes("tab=my_shift")),
+    false,
+    "Apps tiles must not point at My Shift"
+  );
 
   const hidden = filterHubDefinition(SUPER_ADMIN_HUBS.sa_apps_hub, ["live_fleet"], { includeBlog: false });
   const hiddenLabels = hidden.sections.flatMap((section) => section.links.map((link) => link.label));

@@ -23,6 +23,7 @@ import {
   legacyBlogRedirectUrl,
   rewriteBlogsPublicPath
 } from "@/lib/blogs-domain";
+import { isAdminDashboardPath } from "@/lib/admin/admin-paths";
 import { isSafeRelativePath } from "@/lib/safe-url";
 
 function sessionTokensFromRequest(request: NextRequest) {
@@ -197,11 +198,12 @@ async function runMiddleware(request: NextRequest) {
 
     const role = session.role ?? "";
 
-    // fitdog.ruffops.com is the staff DigiBoard host — never leave users on lobby/marketing
-    // boards where Route Generator + Operations panels are absent from the sidebar.
+    // fitdog.ruffops.com dashboard defaults to the staff board. Standalone apps
+    // under /admin/* (Blog Generator, Social Media Generator, help guides) keep
+    // their own URLs — rewriting them to /admin?tab=my_shift is a hard bug.
     if (shouldForceFitdogStaffBoard(request.headers.get("host"), pathname, request.nextUrl.searchParams.get("board"))) {
       const url = request.nextUrl.clone();
-      url.pathname = pathname === "/admin" || pathname.startsWith("/admin/") ? "/admin" : pathname;
+      url.pathname = "/admin";
       url.searchParams.set("board", "staff");
       if (!url.searchParams.get("tab")) {
         url.searchParams.set(
@@ -212,8 +214,8 @@ async function runMiddleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Bare /admin (or staff board with no tab) → Team Log for every account.
-    if (pathname === "/admin") {
+    // Bare /admin (or staff board with no tab) → first accessible staff tab.
+    if (isAdminDashboardPath(pathname)) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
       const tab = url.searchParams.get("tab");
@@ -232,7 +234,7 @@ async function runMiddleware(request: NextRequest) {
       }
     }
 
-    if (!session.isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
+    if (isAdminDashboardPath(pathname) && !session.isDemo && isStaffDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
       const tab = url.searchParams.get("tab");
@@ -246,7 +248,7 @@ async function runMiddleware(request: NextRequest) {
       }
     }
 
-    if (!session.isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
+    if (isAdminDashboardPath(pathname) && !session.isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
       const url = request.nextUrl.clone();
       const board = url.searchParams.get("board");
       const tab = url.searchParams.get("tab");

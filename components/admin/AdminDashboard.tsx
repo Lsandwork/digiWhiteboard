@@ -236,15 +236,14 @@ export function AdminDashboard() {
       return;
     }
 
-    if (board === "marketing" && !["cast_tv", "sa_apps_hub", "settings", "help"].includes(tab)) {
-      router.replace("/admin?board=marketing&tab=cast_tv");
+    if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions" || tab === "ops_system_health") && board !== "staff") {
+      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
+      router.replace(`/admin?board=staff&tab=${tab}`);
       return;
     }
 
-    // Keep staff-only tabs on staff board instead of bouncing to an unrelated tab.
-    if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions") && board !== "staff") {
-      if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
-      router.replace(`/admin?board=staff&tab=${tab}`);
+    if (board === "marketing" && !["cast_tv", "sa_apps_hub", "settings", "help"].includes(tab)) {
+      router.replace("/admin?board=marketing&tab=cast_tv");
       return;
     }
 
@@ -293,7 +292,11 @@ export function AdminDashboard() {
     }
     // These tabs only exist on the staff board — force board so the click
     // never lands on lobby/marketing where the tab is inaccessible / empty.
-    const forceStaffBoard = nextTab === "route_generator" || nextTab === "live_fleet" || nextTab === "package_commissions";
+    const forceStaffBoard =
+      nextTab === "route_generator" ||
+      nextTab === "live_fleet" ||
+      nextTab === "package_commissions" ||
+      nextTab === "ops_system_health";
     const nextBoard = forceStaffBoard ? "staff" : board;
     if (forceStaffBoard && typeof window !== "undefined") {
       window.localStorage.setItem("fitdog_admin_board", "staff");

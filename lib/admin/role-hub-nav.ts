@@ -9,6 +9,7 @@ import {
   SUPER_ADMIN_HUBS,
   SUPER_ADMIN_HUB_TABS,
   SUPER_ADMIN_PRIMARY_TABS,
+  hubLinkHref,
   hubLinkLabel,
   isSuperAdminHubTab,
   parentHubForTab,
@@ -16,7 +17,7 @@ import {
   type SuperAdminHubLink
 } from "@/lib/admin/super-admin-nav";
 
-export { hubLinkLabel };
+export { hubLinkHref, hubLinkLabel };
 
 export type RolePrimaryLeaf = {
   tab: AdminTab;
