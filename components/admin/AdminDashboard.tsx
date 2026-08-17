@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { StatusCards } from "@/components/admin/StatusCards";
 import { BoardSettings } from "@/components/admin/BoardSettings";
@@ -69,7 +68,8 @@ import { humanizeUnknownError } from "@/lib/safe-url";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
-import { ADMIN_TABS, parseAdminBoardType, parseAdminTab } from "@/lib/admin/types";
+import { ADMIN_TABS } from "@/lib/admin/types";
+import { navigateAdminDashboard, useAdminDashboardLocation } from "@/lib/admin/dashboard-nav";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
 import {
   accessFromLegacyRole,
@@ -114,8 +114,7 @@ const defaultStaff: StaffBoardSettings = {
 };
 
 export function AdminDashboard() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const location = useAdminDashboardLocation();
   const { showToast } = useToast();
 
   const [data, setData] = useState<DashboardPayload | null>(null);
@@ -128,25 +127,30 @@ export function AdminDashboard() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmResetBoard, setConfirmResetBoard] = useState(false);
+  const [navOverride, setNavOverride] = useState<{ board: AdminBoardType; tab: AdminTab } | null>(null);
 
-  const board = parseAdminBoardType(searchParams.get("board"));
-  const tab = parseAdminTab(searchParams.get("tab"));
-  const hrConsultRecordId = searchParams.get("record");
+  const board = navOverride?.board ?? location.board;
+  const tab = navOverride?.tab ?? location.tab ?? "my_shift";
+  const hrConsultRecordId = location.extra.record ?? null;
+
+  useEffect(() => {
+    if (!navOverride) return;
+    if (location.board === navOverride.board && location.tab === navOverride.tab) {
+      setNavOverride(null);
+    }
+  }, [location.board, location.tab, navOverride]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     // Only fill in a missing board. Rewriting an explicit board here fights the
     // role-based board redirects below and ping-pongs the router forever.
-    if (searchParams.get("board")) return;
-    // Users admin lives on the lobby board — never restore staff from storage here.
-    if (searchParams.get("tab") === "users") return;
+    if (location.rawBoard) return;
+    if (location.tab === "users") return;
     const stored = window.localStorage.getItem("fitdog_admin_board");
-    if (stored === "staff" || stored === "marketing") {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("board", stored);
-      router.replace(`/admin?${params.toString()}`);
+    if (stored === "staff" || stored === "lobby" || stored === "marketing") {
+      navigateAdminDashboard(stored, location.tab ?? "my_shift", location.extra);
     }
-  }, [router, searchParams]);
+  }, [location.rawBoard, location.tab]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);
@@ -155,7 +159,7 @@ export function AdminDashboard() {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const response = await fetch(`/api/admin/dashboard?board=${board}&tab=${tab}`, {
+      const response = await fetch(`/api/admin/dashboard?board=${board}`, {
         cache: "no-store",
         credentials: "same-origin",
         signal: controller.signal
@@ -179,7 +183,15 @@ export function AdminDashboard() {
       setBusy(false);
       setRefreshing(false);
     }
-  }, [board, tab]);
+  }, [board]);
+
+  function goToBoardTab(nextBoard: AdminBoardType, nextTab: AdminTab, extra?: Record<string, string>) {
+    setNavOverride({ board: nextBoard, tab: nextTab });
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("fitdog_admin_board", nextBoard);
+    }
+    navigateAdminDashboard(nextBoard, nextTab, extra ?? location.extra);
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -209,7 +221,7 @@ export function AdminDashboard() {
 
     if (staffOnly && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
-      router.replace(`/admin?board=staff&tab=${tab}`);
+      goToBoardTab("staff", tab);
       return;
     }
 
@@ -217,13 +229,13 @@ export function AdminDashboard() {
       if (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
       if (tab === "sa_apps_hub") {
         if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "marketing");
-        router.replace("/admin?board=marketing&tab=sa_apps_hub");
+        goToBoardTab("marketing", "sa_apps_hub");
         return;
       }
       const fallbackBoard = accessibleAdminBoards(access, effectiveRole).includes("marketing") ? "marketing" : "lobby";
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
-      router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
+      goToBoardTab(fallbackBoard, fallbackTab);
       return;
     }
 
@@ -232,41 +244,34 @@ export function AdminDashboard() {
       const fallbackBoard = allowedBoards[0] ?? "lobby";
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, fallbackBoard, { isDemo }) as AdminTab;
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
-      router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
+      goToBoardTab(fallbackBoard, fallbackTab);
       return;
     }
 
     if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions" || tab === "ops_system_health") && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
-      router.replace(`/admin?board=staff&tab=${tab}`);
+      goToBoardTab("staff", tab);
       return;
     }
 
     if (board === "marketing" && !["cast_tv", "sa_apps_hub", "bulk_photo_upload", "settings", "help"].includes(tab)) {
-      router.replace("/admin?board=marketing&tab=cast_tv");
+      goToBoardTab("marketing", "cast_tv");
       return;
     }
 
-    if (!canAccessAdminTab(access, tab, effectiveRole, effectiveBoard, { isDemo })) {
+    if (!location.tab && !navOverride) {
       const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
-      const fallbackBoard =
-        effectiveBoard === "staff" && fallbackTab === "users"
-          ? "lobby"
-          : staffOnly
-            ? "staff"
-            : effectiveBoard;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem("fitdog_admin_board", fallbackBoard);
-      }
-      router.replace(`/admin?board=${fallbackBoard}&tab=${fallbackTab}`);
+      goToBoardTab(effectiveBoard, fallbackTab);
     }
-  }, [board, data?.session, data?.username, router, tab]);
+    // Do not bounce known tabs to My Shift. A false-negative permission check
+    // was sending every role there after a click; forbidden tools fail at the API.
+  }, [board, data?.session, data?.username, location.tab, navOverride, tab]);
 
   useEffect(() => {
     if (board === "staff" && tab === "users") {
-      router.replace("/admin?board=lobby&tab=users");
+      goToBoardTab("lobby", "users");
     }
-  }, [board, router, tab]);
+  }, [board, tab]);
 
   const savedLabel = useMemo(() => {
     if (!lastSavedAt) return "All changes saved";
@@ -275,19 +280,18 @@ export function AdminDashboard() {
   }, [currentTimeMs, lastSavedAt]);
 
   function setBoard(nextBoard: AdminBoardType) {
-    if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", nextBoard);
     let nextTab: AdminTab = tab;
     if (nextBoard === "marketing") {
       nextTab = "cast_tv";
     } else if (tab === "cast_tv") {
       nextTab = nextBoard === "staff" ? "overview" : "content";
     }
-    router.replace(`/admin?board=${nextBoard}&tab=${nextTab}`);
+    goToBoardTab(nextBoard, nextTab);
   }
 
   function setActiveTab(nextTab: AdminTab, extraParams?: Record<string, string>) {
     if (nextTab === "users") {
-      router.replace("/admin?board=lobby&tab=users");
+      goToBoardTab("lobby", "users", extraParams);
       return;
     }
     // These tabs only exist on the staff board — force board so the click
@@ -298,16 +302,7 @@ export function AdminDashboard() {
       nextTab === "package_commissions" ||
       nextTab === "ops_system_health";
     const nextBoard = forceStaffBoard ? "staff" : board;
-    if (forceStaffBoard && typeof window !== "undefined") {
-      window.localStorage.setItem("fitdog_admin_board", "staff");
-    }
-    const params = new URLSearchParams({ board: nextBoard, tab: nextTab });
-    if (extraParams) {
-      for (const [key, value] of Object.entries(extraParams)) {
-        if (value) params.set(key, value);
-      }
-    }
-    router.replace(`/admin?${params.toString()}`);
+    goToBoardTab(nextBoard, nextTab, extraParams);
   }
 
   async function saveBoardSettings(patch: Record<string, unknown>) {
@@ -522,7 +517,6 @@ export function AdminDashboard() {
         onOpenHelp={() => setActiveTab("help")}
         onDemoRoleSwitched={() => {
           void load(true);
-          router.refresh();
         }}
         canSeeAdminUtilities={canSeeAdminUtilities}
         canUseBoardSwitcher={canUseBoardSwitcher}

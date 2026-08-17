@@ -23,6 +23,7 @@ import { RUFFLY_NAV_ICON } from "@/lib/ruffly/branding/assets";
 
 export function SuperAdminHubPanel({
   hubTab,
+  onNavigate,
   visibleTabs = [],
   role = null,
   email = null,
@@ -30,7 +31,7 @@ export function SuperAdminHubPanel({
   marketingAppsOnly = false
 }: {
   hubTab: AdminTab;
-  onNavigate?: (tab: AdminTab) => void;
+  onNavigate: (tab: AdminTab) => void;
   visibleTabs?: AdminTab[];
   role?: string | null;
   email?: string | null;
@@ -50,7 +51,7 @@ export function SuperAdminHubPanel({
       </section>
     );
   }
-  return <HubLauncher hub={hub} />;
+  return <HubLauncher hub={hub} onNavigate={onNavigate} />;
 }
 
 export function SuperAdminNestedReturnBar({
@@ -80,7 +81,13 @@ export function SuperAdminNestedReturnBar({
   );
 }
 
-function HubLauncher({ hub }: { hub: SuperAdminHubDefinition }) {
+function HubLauncher({
+  hub,
+  onNavigate
+}: {
+  hub: SuperAdminHubDefinition;
+  onNavigate: (tab: AdminTab) => void;
+}) {
   return (
     <section className="space-y-5">
       <header className="rounded-2xl border border-admin-border bg-gradient-to-br from-[#132033] via-[#101826] to-[#0b1220] p-5">
@@ -94,7 +101,11 @@ function HubLauncher({ hub }: { hub: SuperAdminHubDefinition }) {
           <h3 className="mb-3 text-sm font-semibold text-white">{section.title}</h3>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {section.links.map((link) => (
-              <HubButton key={link.kind === "tab" ? link.tab : link.id} link={link} />
+              <HubButton
+                key={link.kind === "tab" ? link.tab : link.id}
+                link={link}
+                onNavigate={onNavigate}
+              />
             ))}
           </div>
         </section>
@@ -138,34 +149,55 @@ function HubAppMark({ link }: { link: SuperAdminHubLink }) {
   );
 }
 
-function HubButton({ link }: { link: SuperAdminHubLink }) {
+function HubButton({
+  link,
+  onNavigate
+}: {
+  link: SuperAdminHubLink;
+  onNavigate: (tab: AdminTab) => void;
+}) {
   const label = hubLinkLabel(link);
   const href = hubLinkHref(link);
   const isRoute = link.kind === "route";
   const isGingr = isRoute && link.id === "gingr";
+  const inner = (
+    <span className="flex items-start gap-3">
+      <HubAppMark link={link} />
+      <span className="min-w-0">
+        <span className="flex items-center gap-1.5 text-sm font-medium text-white">
+          {label}
+          {isRoute ? (
+            <ExternalLink className="h-3.5 w-3.5 text-admin-muted" />
+          ) : (
+            <ArrowUpRight className="h-3.5 w-3.5 text-admin-muted" />
+          )}
+        </span>
+        <span className="mt-0.5 block text-xs text-admin-muted">{link.description}</span>
+      </span>
+    </span>
+  );
+
+  if (isRoute) {
+    return (
+      <Link
+        href={href}
+        className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition hover:border-sky-400/40 hover:bg-white/[0.05]"
+        onClick={() => {
+          if (isGingr) openGingrSecurely();
+        }}
+      >
+        {inner}
+      </Link>
+    );
+  }
 
   return (
-    <Link
-      href={href}
+    <button
+      type="button"
       className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-3 text-left transition hover:border-sky-400/40 hover:bg-white/[0.05]"
-      onClick={() => {
-        if (isGingr) openGingrSecurely();
-      }}
+      onClick={() => onNavigate(link.tab)}
     >
-      <span className="flex items-start gap-3">
-        <HubAppMark link={link} />
-        <span className="min-w-0">
-          <span className="flex items-center gap-1.5 text-sm font-medium text-white">
-            {label}
-            {isRoute ? (
-              <ExternalLink className="h-3.5 w-3.5 text-admin-muted" />
-            ) : (
-              <ArrowUpRight className="h-3.5 w-3.5 text-admin-muted" />
-            )}
-          </span>
-          <span className="mt-0.5 block text-xs text-admin-muted">{link.description}</span>
-        </span>
-      </span>
-    </Link>
+      {inner}
+    </button>
   );
 }
