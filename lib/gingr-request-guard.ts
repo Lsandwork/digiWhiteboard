@@ -1,4 +1,9 @@
-export type GingrEndpoint = "back_of_house" | "reservation_types" | "animal_photo" | "medication_info";
+export type GingrEndpoint =
+  | "back_of_house"
+  | "reservation_types"
+  | "animal_photo"
+  | "medication_info"
+  | "medication_report_history";
 
 type CachedBackOfHouseRecord = {
   animal_id?: string | number;
@@ -52,7 +57,7 @@ export function canCallGingrEndpoint(endpoint: GingrEndpoint, now = Date.now()) 
   }
 
   // Per-animal medication pulls during TL Digi Board sync — light spacing only.
-  if (endpoint === "medication_info") {
+  if (endpoint === "medication_info" || endpoint === "medication_report_history") {
     return now - lastEndpointCall >= 100;
   }
 
@@ -65,7 +70,7 @@ export function canCallGingrEndpoint(endpoint: GingrEndpoint, now = Date.now()) 
 
 export function markGingrEndpointCalled(endpoint: GingrEndpoint, now = Date.now()) {
   lastCallByEndpoint.set(endpoint, now);
-  if (endpoint !== "animal_photo" && endpoint !== "medication_info") {
+  if (endpoint !== "animal_photo" && endpoint !== "medication_info" && endpoint !== "medication_report_history") {
     lastGlobalCallAt = now;
   }
 }

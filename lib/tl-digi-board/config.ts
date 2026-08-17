@@ -25,7 +25,7 @@ export type TlDigiBoardDisplaySettings = {
 export type TlDigiBoardProtectedFlags = {
   /** When true, overnight type ids/labels cannot be cleared to empty via patch. */
   lockOvernightTypeMappings: boolean;
-  /** When true, administrationStatusAvailable stays false (API limitation). */
+  /** Legacy flag — no longer forces false; kept for config compatibility. */
   lockAdministrationStatusUnavailable: boolean;
 };
 
@@ -58,7 +58,7 @@ export const DEFAULT_TL_DIGI_BOARD_CONFIG: TlDigiBoardConfig = {
   },
   protected: {
     lockOvernightTypeMappings: true,
-    lockAdministrationStatusUnavailable: true
+    lockAdministrationStatusUnavailable: false
   },
   updatedAt: null,
   updatedBy: null

@@ -7,6 +7,7 @@ import {
   notesFromItem,
   type ResolvedGingrMedicationSchedule
 } from "./gingr-medication";
+import type { ResolvedMedicationAdministration } from "./gingr-medication-report";
 import type { TlGingrMedicationRecord } from "./types";
 
 export type TlMedicationNormalizeContext = {
@@ -19,14 +20,15 @@ export type TlMedicationNormalizeContext = {
   lodgingLabel?: string | null;
   serviceDate?: string;
   now?: Date;
+  /** Administration status from get_medication_report_history when available. */
+  administration?: ResolvedMedicationAdministration | null;
 };
 
 /**
  * Build a board medication record from a flattened Gingr schedule item + lodging context.
  *
- * Administration status: the public Gingr API does not expose administration /
- * medication_report fields (those endpoints 404). We always set
- * administrationStatus to "not_administered" and never invent administered_* values.
+ * Administration status comes from get_medication_report_history when provided.
+ * Without history data we keep not_administered (never invent ADMINISTERED).
  */
 export function buildTlGingrMedicationRecord(
   resolved: ResolvedGingrMedicationSchedule,
@@ -35,6 +37,7 @@ export function buildTlGingrMedicationRecord(
   const now = context.now ?? new Date();
   const dosage = dosageFromItem(resolved.item);
   const notes = notesFromItem(resolved.item);
+  const administration = context.administration ?? null;
 
   return {
     gingrMedicationId: String(resolved.item.id),
@@ -50,18 +53,23 @@ export function buildTlGingrMedicationRecord(
     medicationName: medicationNameFromItem(resolved.item),
     dosage,
     instructions: notes,
-    notes,
-    // API limitation — no administration status in get_medication_info.
-    administrationStatus: "not_administered",
-    administeredAt: null,
-    administeredBy: null,
+    notes: administration?.administrationNotes || notes,
+    administrationStatus: administration?.administrationStatus ?? "not_administered",
+    administeredAt: administration?.administeredAt ?? null,
+    administeredBy: administration?.administeredBy ?? null,
     serviceDate: context.serviceDate ?? laServiceDate(now)
   };
 }
 
 export function buildTlGingrMedicationRecords(
   resolvedSchedules: ResolvedGingrMedicationSchedule[],
-  context: TlMedicationNormalizeContext
+  context: TlMedicationNormalizeContext,
+  administrationByScheduleId?: Map<string, ResolvedMedicationAdministration>
 ): TlGingrMedicationRecord[] {
-  return resolvedSchedules.map((resolved) => buildTlGingrMedicationRecord(resolved, context));
+  return resolvedSchedules.map((resolved) =>
+    buildTlGingrMedicationRecord(resolved, {
+      ...context,
+      administration: administrationByScheduleId?.get(String(resolved.item.id)) ?? context.administration ?? null
+    })
+  );
 }

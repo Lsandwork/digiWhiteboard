@@ -15,11 +15,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const forceRefresh = url.searchParams.get("force") === "1";
     const supabase = getServiceSupabase();
-    const payload = await loadTlDigiBoardPublicPayload(supabase);
-    if (forceRefresh) {
-      // loadTlDigiBoardPublicPayload already syncs with cooldown; force via get snapshot path is enough on next poll.
-    }
-    void forceRefresh;
+    const payload = await loadTlDigiBoardPublicPayload(supabase, { forceRefresh });
     return NextResponse.json(payload, {
       headers: {
         "Cache-Control": "no-store"

@@ -27,6 +27,7 @@
     "test:tl-digi-board-windows": "tsx scripts/test-tl-digi-board-windows.ts",
     "test:tl-gingr-key": "tsx scripts/test-tl-gingr-key.ts",
     "test:tl-digi-board-normalize": "tsx scripts/test-tl-digi-board-normalize.ts",
+    "test:tl-digi-board-medication-report": "tsx scripts/test-tl-digi-board-medication-report.ts",
     "test:tl-digi-board-permissions": "tsx scripts/test-tl-digi-board-permissions.ts",
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",

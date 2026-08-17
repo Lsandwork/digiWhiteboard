@@ -14,6 +14,11 @@ import {
   flattenAndResolveMedicationSchedules
 } from "./gingr-medication";
 import {
+  extractAdministrationRecordsFromHistory,
+  fetchGingrMedicationReportHistory,
+  resolveAdministrationForSchedule
+} from "./gingr-medication-report";
+import {
   isApprovedOvernightLodging,
   lodgingLabelForArea,
   matchOvernightLodgingArea,
@@ -271,6 +276,7 @@ function emptySnapshot(partial: {
   lastAttemptAt?: string | null;
   lastError?: string | null;
   syncSucceeded: boolean;
+  administrationStatusAvailable?: boolean;
   now?: Date;
 }): TlDigiBoardSnapshot {
   const now = partial.now ?? new Date();
@@ -281,7 +287,8 @@ function emptySnapshot(partial: {
     lastSuccessfulSyncAt: partial.lastSuccessfulSyncAt ?? null,
     lastAttemptAt: partial.lastAttemptAt ?? now.toISOString(),
     lastError: partial.lastError ?? null,
-    syncSucceeded: partial.syncSucceeded
+    syncSucceeded: partial.syncSucceeded,
+    administrationStatusAvailable: partial.administrationStatusAvailable
   });
   const meta = buildTlBoardSyncMeta(
     {
@@ -290,7 +297,8 @@ function emptySnapshot(partial: {
       lastSuccessfulSyncAt: partial.lastSuccessfulSyncAt ?? null,
       lastAttemptAt: partial.lastAttemptAt ?? now.toISOString(),
       lastError: partial.lastError ?? null,
-      syncSucceeded: partial.syncSucceeded
+      syncSucceeded: partial.syncSucceeded,
+      administrationStatusAvailable: partial.administrationStatusAvailable
     },
     built.summary
   );
@@ -329,13 +337,7 @@ export async function syncTlDigiBoardState(
 
   if (!forceRefresh && lastSyncAt > 0 && nowMs - lastSyncAt < TL_GINGR_MEDICATION_SYNC_INTERVAL_MS) {
     if (previous) {
-      return {
-        ...previous,
-        meta: {
-          ...previous.meta,
-          administrationStatusAvailable: false
-        }
-      };
+      return previous;
     }
   }
 
@@ -349,24 +351,69 @@ export async function syncTlDigiBoardState(
 
     const perDogResults = await mapPool(overnightDogs, MEDICATION_FETCH_CONCURRENCY, async (dog) => {
       try {
-        const payload = await fetchGingrMedicationInfo(dog.animalId);
-        const resolved = flattenAndResolveMedicationSchedules(payload);
         const lodging = resolveLodgingForDog(dog, lodgingMap, config);
-        let records = buildTlGingrMedicationRecords(resolved, {
-          gingrAnimalId: dog.animalId,
-          gingrReservationId: lodging.reservationId,
-          dogName: dog.dogName,
-          photoUrl: lodging.photoUrl,
-          lodgingAreaKey: lodging.lodgingAreaKey,
-          lodgingRunName: lodging.lodgingRunName,
-          lodgingLabel: lodging.lodgingLabel,
-          serviceDate,
-          now
-        });
+        const reservationId = lodging.reservationId;
+
+        const [payload, historyResult] = await Promise.all([
+          fetchGingrMedicationInfo(dog.animalId),
+          reservationId
+            ? fetchGingrMedicationReportHistory(reservationId)
+                .then((history) => ({ ok: true as const, history }))
+                .catch((error) => ({
+                  ok: false as const,
+                  error: error instanceof Error ? error.message : "medication_report_history_failed"
+                }))
+            : Promise.resolve({ ok: false as const, error: "missing_reservation_id" })
+        ]);
+
+        const resolved = flattenAndResolveMedicationSchedules(payload);
+        const administrationByScheduleId = new Map<
+          string,
+          ReturnType<typeof resolveAdministrationForSchedule>
+        >();
+        let administrationStatusAvailable = false;
+
+        if (historyResult.ok) {
+          const adminRecords = extractAdministrationRecordsFromHistory(historyResult.history, {
+            reservationId
+          });
+          administrationStatusAvailable = true;
+          for (const schedule of resolved) {
+            administrationByScheduleId.set(
+              String(schedule.item.id),
+              resolveAdministrationForSchedule({
+                records: adminRecords,
+                animalMedicationScheduleId: String(schedule.item.id),
+                serviceDate
+              })
+            );
+          }
+        }
+
+        let records = buildTlGingrMedicationRecords(
+          resolved,
+          {
+            gingrAnimalId: dog.animalId,
+            gingrReservationId: reservationId,
+            dogName: dog.dogName,
+            photoUrl: lodging.photoUrl,
+            lodgingAreaKey: lodging.lodgingAreaKey,
+            lodgingRunName: lodging.lodgingRunName,
+            lodgingLabel: lodging.lodgingLabel,
+            serviceDate,
+            now
+          },
+          administrationByScheduleId
+        );
         if (!config.display.showOtherSpecial) {
           records = records.filter((row) => row.scheduleKind !== "other_special");
         }
-        return { ok: true as const, records };
+        return {
+          ok: true as const,
+          records,
+          administrationStatusAvailable,
+          historyError: historyResult.ok ? null : historyResult.error
+        };
       } catch (error) {
         return {
           ok: false as const,
@@ -376,24 +423,39 @@ export async function syncTlDigiBoardState(
     });
 
     const medications: TlGingrMedicationRecord[] = [];
-    const errors: string[] = [];
+    const medErrors: string[] = [];
+    const historyWarnings: string[] = [];
+    let administrationStatusAvailable = false;
+
     for (const result of perDogResults) {
-      if (result.ok) medications.push(...result.records);
-      else errors.push(result.error);
+      if (result.ok) {
+        medications.push(...result.records);
+        if (result.administrationStatusAvailable) {
+          administrationStatusAvailable = true;
+        } else if (result.historyError && result.historyError !== "missing_reservation_id") {
+          if (historyWarnings.length < 2) historyWarnings.push(result.historyError);
+        }
+      } else {
+        medErrors.push(result.error);
+      }
     }
 
     // If every medication pull failed and we had overnight dogs, treat as sync failure.
-    if (overnightDogs.length > 0 && medications.length === 0 && errors.length === overnightDogs.length) {
-      throw new Error(errors[0] || "All medication_info requests failed.");
+    if (overnightDogs.length > 0 && medications.length === 0 && medErrors.length === overnightDogs.length) {
+      throw new Error(medErrors[0] || "All medication_info requests failed.");
     }
+
+    const lastErrorParts = [...medErrors.slice(0, 2), ...historyWarnings.slice(0, 1)];
+    const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
 
     const built = buildTlBoardMedicationRows({
       medications,
       now,
       lastSuccessfulSyncAt: attemptedAt,
       lastAttemptAt: attemptedAt,
-      lastError: errors.length ? errors.slice(0, 3).join("; ") : null,
-      syncSucceeded: true
+      lastError,
+      syncSucceeded: true,
+      administrationStatusAvailable
     });
     const meta = buildTlBoardSyncMeta(
       {
@@ -401,8 +463,9 @@ export async function syncTlDigiBoardState(
         now,
         lastSuccessfulSyncAt: attemptedAt,
         lastAttemptAt: attemptedAt,
-        lastError: errors.length ? errors.slice(0, 3).join("; ") : null,
-        syncSucceeded: true
+        lastError,
+        syncSucceeded: true,
+        administrationStatusAvailable
       },
       built.summary
     );
@@ -411,10 +474,7 @@ export async function syncTlDigiBoardState(
       overdue: built.overdue,
       current: built.current,
       summary: built.summary,
-      meta: {
-        ...meta,
-        administrationStatusAvailable: false
-      },
+      meta,
       medications,
       generatedAt: attemptedAt
     };
@@ -429,6 +489,7 @@ export async function syncTlDigiBoardState(
         lastAttemptAt: attemptedAt,
         lastError: message,
         syncSucceeded: false,
+        administrationStatusAvailable: previous.meta.administrationStatusAvailable,
         now
       });
     }

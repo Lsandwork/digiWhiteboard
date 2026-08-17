@@ -62,7 +62,7 @@ function parseMeta(value: unknown): TlBoardSyncMeta {
     allClear: Boolean(row?.allClear),
     nextPeriod: (row?.nextPeriod as TlBoardSyncMeta["nextPeriod"]) ?? null,
     nextPeriodStartsAt: typeof row?.nextPeriodStartsAt === "string" ? row.nextPeriodStartsAt : null,
-    administrationStatusAvailable: false
+    administrationStatusAvailable: Boolean(row?.administrationStatusAvailable)
   };
 }
 
@@ -288,13 +288,14 @@ export async function getTlDigiBoardSnapshot(
 
 /** Public TV board payload — never includes API keys or secrets. */
 export async function loadTlDigiBoardPublicPayload(
-  supabase?: SupabaseClient
+  supabase?: SupabaseClient,
+  options?: { forceRefresh?: boolean }
 ): Promise<TlDigiBoardPublicPayload> {
   const client = resolveSupabase(supabase);
   const { loadTlBoardDailyReminders } = await import("./reminders");
   const [config, snapshot, reminders] = await Promise.all([
     loadTlDigiBoardConfig(client),
-    getTlDigiBoardSnapshot(client),
+    getTlDigiBoardSnapshot(client, { forceRefresh: options?.forceRefresh }),
     loadTlBoardDailyReminders(client)
   ]);
 

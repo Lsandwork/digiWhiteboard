@@ -165,7 +165,11 @@ export function TlDigiBoardPanel() {
             <Row label="Overdue" value={String(summary?.overdue ?? "—")} />
             <Row
               label="Administration status from Gingr API"
-              value={meta?.administrationStatusAvailable ? "Available" : "Not available (schedules only)"}
+              value={
+                meta?.administrationStatusAvailable
+                  ? "Live from Medication Report history"
+                  : "Not available (schedules only)"
+              }
             />
           </dl>
         </Card>
@@ -284,7 +288,11 @@ export function TlDigiBoardPanel() {
             <Row label="Last error" value={meta?.lastError ?? "none"} />
             <Row
               label="Administration API"
-              value="Unavailable — public Gingr API exposes schedules only (get_medication_info)"
+              value={
+                meta?.administrationStatusAvailable
+                  ? "Live — get_medication_report_history"
+                  : "Pending / unavailable — check TL_GINGR_KEY + reservation IDs"
+              }
             />
             <Row label="Overdue medications" value={String(summary?.overdue ?? 0)} />
             <Row label="Protected flags" value="Timezone LA · Overdue carry-forward · Stale warnings" />

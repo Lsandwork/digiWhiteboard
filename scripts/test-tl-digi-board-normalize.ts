@@ -137,7 +137,7 @@ import { normalizeScheduleLabel } from "../lib/tl-digi-board/medication-windows"
   assert.equal(resolved.gingrScheduleLabel, "Custom Special");
 }
 
-// --- normalize record (administration always not_administered) ---
+// --- normalize record (defaults to not_administered without history) ---
 {
   const item: GingrAnimalMedicationScheduleItem = {
     id: "4447",

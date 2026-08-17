@@ -63,8 +63,8 @@ export type TlBoardSyncMeta = {
   nextPeriod: TlMedicationPeriod | null;
   nextPeriodStartsAt: string | null;
   /**
-   * Public Gingr API does not expose medication administration status
-   * (medication_report endpoints 404). Always false for API-sourced data.
+   * True when this snapshot merged administration status from
+   * GET /api/v1/get_medication_report_history (Gingr Medication Report).
    */
   administrationStatusAvailable: boolean;
 };

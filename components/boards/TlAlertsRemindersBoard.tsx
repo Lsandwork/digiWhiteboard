@@ -179,8 +179,9 @@ function BoardInner() {
 
       {meta && !meta.administrationStatusAvailable ? (
         <p className="tl-board__api-note" role="status">
-          Medication schedules sync from Gingr. Administration status is not available via Gingr’s public API — record doses
-          in Gingr’s Medication Report. This board will not mark ADMINISTERED until Gingr exposes that data.
+          Medication schedules are syncing from Gingr, but administration status could not be loaded from Gingr’s
+          Medication Report yet. Doses still must be recorded in Gingr — this board will show ADMINISTERED once report
+          history syncs.
         </p>
       ) : null}
 

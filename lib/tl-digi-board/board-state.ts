@@ -20,6 +20,8 @@ export type BuildTlBoardStateInput = {
   lastAttemptAt?: string | null;
   lastError?: string | null;
   syncSucceeded: boolean;
+  /** True when get_medication_report_history returned usable admin status for this sync. */
+  administrationStatusAvailable?: boolean;
 };
 
 function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedicationRecord[] {
@@ -155,7 +157,6 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     allClear,
     nextPeriod: next?.period ?? null,
     nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
-    // Gingr public API has no administration status — never claim it is available.
-    administrationStatusAvailable: false
+    administrationStatusAvailable: Boolean(input.administrationStatusAvailable)
   };
 }

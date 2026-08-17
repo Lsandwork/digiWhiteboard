@@ -12,8 +12,8 @@ export type GingrMedicationScheduleDef = {
 };
 
 /**
- * Live Fitdog animal_medication_schedules item.
- * Note: public Gingr API exposes no administration status fields.
+ * Live Fitdog animal_medication_schedules item (schedule definition only).
+ * Administration status comes from get_medication_report_history, not this payload.
  */
 export type GingrAnimalMedicationScheduleItem = {
   id: string;
