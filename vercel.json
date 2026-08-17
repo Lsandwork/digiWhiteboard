@@ -64,6 +64,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/tl-digi-board-sync",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/blog-jobs",
       "schedule": "*/15 * * * *"
     },

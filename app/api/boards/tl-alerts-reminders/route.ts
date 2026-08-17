@@ -1,49 +1,26 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { buildTlBoardMedicationRows, buildTlBoardSyncMeta } from "@/lib/tl-digi-board/board-state";
-import { getTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
-import type { TlDigiBoardSnapshot } from "@/lib/tl-digi-board/types";
+import { loadTlDigiBoardPublicPayload } from "@/lib/tl-digi-board/server";
 
 export const dynamic = "force-dynamic";
-
-function emptySnapshot(): TlDigiBoardSnapshot {
-  const built = buildTlBoardMedicationRows({
-    medications: [],
-    lastSuccessfulSyncAt: null,
-    lastAttemptAt: null,
-    lastError: null,
-    syncSucceeded: false
-  });
-  const meta = buildTlBoardSyncMeta(
-    {
-      medications: [],
-      lastSuccessfulSyncAt: null,
-      lastAttemptAt: null,
-      lastError: "TL Digi Board sync not configured yet.",
-      syncSucceeded: false
-    },
-    built.summary
-  );
-  return {
-    overdue: built.overdue,
-    current: built.current,
-    summary: built.summary,
-    meta,
-    medications: [],
-    generatedAt: new Date().toISOString()
-  };
-}
+export const maxDuration = 60;
 
 /**
  * Public READ for the Team Lead Alerts + Reminders TV display.
  * No admin session required (same pattern as live-board / cast-tv).
  * Never exposes GINGR_API_KEY or other secrets.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url);
+    const forceRefresh = url.searchParams.get("force") === "1";
     const supabase = getServiceSupabase();
-    const snapshot = (await getTlDigiBoardSnapshot(supabase).catch(() => null)) ?? emptySnapshot();
-    return NextResponse.json(snapshot, {
+    const payload = await loadTlDigiBoardPublicPayload(supabase);
+    if (forceRefresh) {
+      // loadTlDigiBoardPublicPayload already syncs with cooldown; force via get snapshot path is enough on next poll.
+    }
+    void forceRefresh;
+    return NextResponse.json(payload, {
       headers: {
         "Cache-Control": "no-store"
       }

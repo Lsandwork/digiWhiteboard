@@ -86,4 +86,10 @@ export type TlDigiBoardPublicPayload = TlDigiBoardSnapshot & {
     displayTitle: string;
     enabled: boolean;
   };
+  reminders: Array<{
+    id: string;
+    title: string;
+    message: string;
+    scheduledTime: string;
+  }>;
 };

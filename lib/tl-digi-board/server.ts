@@ -291,9 +291,11 @@ export async function loadTlDigiBoardPublicPayload(
   supabase?: SupabaseClient
 ): Promise<TlDigiBoardPublicPayload> {
   const client = resolveSupabase(supabase);
-  const [config, snapshot] = await Promise.all([
+  const { loadTlBoardDailyReminders } = await import("./reminders");
+  const [config, snapshot, reminders] = await Promise.all([
     loadTlDigiBoardConfig(client),
-    getTlDigiBoardSnapshot(client)
+    getTlDigiBoardSnapshot(client),
+    loadTlBoardDailyReminders(client)
   ]);
 
   return {
@@ -301,7 +303,8 @@ export async function loadTlDigiBoardPublicPayload(
     config: {
       displayTitle: config.display.displayTitle,
       enabled: config.display.enabled
-    }
+    },
+    reminders
   };
 }
 

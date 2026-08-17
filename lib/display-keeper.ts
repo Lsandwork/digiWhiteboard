@@ -1,7 +1,7 @@
 import { getPublicBuildId } from "@/lib/build-id";
 import type { DisplaySyncState } from "@/lib/display-sync";
 
-export type DisplayType = "staff_whiteboard" | "lobby_whiteboard";
+export type DisplayType = "staff_whiteboard" | "lobby_whiteboard" | "tl_alerts_reminders";
 
 export type DisplayCommandType =
   | "hard_refresh"
@@ -85,7 +85,9 @@ export function getOrCreateDisplayDeviceId() {
 }
 
 export function buildCastDisplayPath(displayType: DisplayType) {
-  return displayType === "staff_whiteboard" ? "/" : "/lobby/checkouts";
+  if (displayType === "lobby_whiteboard") return "/lobby/checkouts";
+  if (displayType === "tl_alerts_reminders") return "/boards/tl-alerts-reminders";
+  return "/";
 }
 
 export function buildCastDisplayUrl(displayType: DisplayType, origin?: string) {
@@ -94,7 +96,9 @@ export function buildCastDisplayUrl(displayType: DisplayType, origin?: string) {
 }
 
 export function displayTypeLabel(displayType: DisplayType) {
-  return displayType === "staff_whiteboard" ? "Staff Digital Whiteboard" : "Lobby Whiteboard";
+  if (displayType === "lobby_whiteboard") return "Lobby Whiteboard";
+  if (displayType === "tl_alerts_reminders") return "TL Alerts + Reminders";
+  return "Staff Digital Whiteboard";
 }
 
 export function isDisplayDeviceOnline(lastSeenAt: string | null | undefined, now = Date.now()) {

@@ -81,7 +81,16 @@ async function mutateConfig(request: Request) {
   }
 
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-  const patch: { displayTitle?: string; enabled?: boolean } = {};
+  const patch: {
+    displayTitle?: string;
+    enabled?: boolean;
+    display?: {
+      displayTitle?: string;
+      enabled?: boolean;
+      showOtherSpecial?: boolean;
+      preferBackOfHouseLodging?: boolean;
+    };
+  } = {};
 
   if (typeof body.displayTitle === "string") {
     patch.displayTitle = body.displayTitle.trim() || "Team Lead Alerts + Reminders";
@@ -89,8 +98,21 @@ async function mutateConfig(request: Request) {
   if (typeof body.enabled === "boolean") {
     patch.enabled = body.enabled;
   }
+  if (body.display && typeof body.display === "object") {
+    const display = body.display as Record<string, unknown>;
+    patch.display = {};
+    if (typeof display.displayTitle === "string") patch.display.displayTitle = display.displayTitle;
+    if (typeof display.enabled === "boolean") patch.display.enabled = display.enabled;
+    if (typeof display.showOtherSpecial === "boolean") patch.display.showOtherSpecial = display.showOtherSpecial;
+    if (typeof display.preferBackOfHouseLodging === "boolean") {
+      patch.display.preferBackOfHouseLodging = display.preferBackOfHouseLodging;
+    }
+  }
 
-  if (!Object.keys(patch).length) {
+  if (!Object.keys(patch).length && !patch.display) {
+    return NextResponse.json({ error: "No TL Digi Board config changes provided." }, { status: 400 });
+  }
+  if (!patch.displayTitle && patch.enabled == null && !patch.display) {
     return NextResponse.json({ error: "No TL Digi Board config changes provided." }, { status: 400 });
   }
 
