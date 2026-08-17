@@ -25,7 +25,20 @@ export async function GET(request: Request) {
       administrationStatusAvailable: snapshot.meta.administrationStatusAvailable,
       servicesCompletionStatusAvailable: snapshot.meta.servicesCompletionStatusAvailable,
       medicationCount: snapshot.medications.length,
-      additionalServiceCount: snapshot.additionalServices.length
+      additionalServiceCount: snapshot.additionalServices.length,
+      servicesCompletionStatusAvailable: snapshot.meta.servicesCompletionStatusAvailable,
+      servicesCompletionAudit: snapshot.meta.servicesCompletionAudit
+        ? {
+            allRequiredTypesPass: snapshot.meta.servicesCompletionAudit.allRequiredTypesPass,
+            perType: snapshot.meta.servicesCompletionAudit.perType.map((row) => ({
+              serviceType: row.serviceType,
+              status: row.status,
+              scheduledToday: row.scheduledToday,
+              unreliable: row.unreliable
+            })),
+            issues: snapshot.meta.servicesCompletionAudit.issues.slice(0, 5)
+          }
+        : null
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "TL Digi Board cron sync failed.";

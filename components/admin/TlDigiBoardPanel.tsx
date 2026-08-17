@@ -168,8 +168,14 @@ export function TlDigiBoardPanel() {
               value={String(snapshot?.servicesSummary?.remaining ?? "—")}
             />
             <Row
-              label="Additional services completed (hidden)"
-              value={String(snapshot?.servicesSummary?.completed ?? "—")}
+              label="Additional services completion audit"
+              value={
+                meta?.servicesCompletionAudit?.allRequiredTypesPass
+                  ? "All scheduled types pass"
+                  : meta?.servicesCompletionAudit
+                    ? "Issues — see audit-services"
+                    : "Not run yet"
+              }
             />
             <Row
               label="Administration status from Gingr API"
