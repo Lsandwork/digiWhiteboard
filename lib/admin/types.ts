@@ -96,6 +96,7 @@ export type AdminTab =
   | "hr_pip"
   | "remote_cast"
   | "walks_board"
+  | "tl_digi_board"
   | "route_generator"
   | "live_fleet"
   | "my_shift"
@@ -168,6 +169,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "hr_pip",
   "remote_cast",
   "walks_board",
+  "tl_digi_board",
   "route_generator",
   "live_fleet",
   "my_shift",

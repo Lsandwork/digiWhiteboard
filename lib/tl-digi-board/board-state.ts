@@ -154,6 +154,8 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     isStale,
     allClear,
     nextPeriod: next?.period ?? null,
-    nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null
+    nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
+    // Gingr public API has no administration status — never claim it is available.
+    administrationStatusAvailable: false
   };
 }

@@ -18,13 +18,26 @@ export const TL_KNOWN_SCHEDULE_ALIASES: Record<string, TlMedicationPeriod | "oth
   morning: "am",
   "mid-day": "mid_day",
   midday: "mid_day",
+  MIDDAY: "mid_day",
   "mid day": "mid_day",
   noon: "mid_day",
   pm: "pm",
   "p.m.": "pm",
   "p.m": "pm",
   evening: "pm",
-  night: "pm"
+  night: "pm",
+  bedtime: "other_special",
+  BEDTIME: "other_special"
+};
+
+/**
+ * Optional Fitdog Gingr medicationSchedules.id → period map.
+ * Live Fitdog: "1"=AM, "2"=MIDDAY, "3"=PM. BEDTIME ("5") and other specials are not mapped.
+ */
+export const TL_FITDOG_SCHEDULE_ID_MAP: Record<string, TlMedicationPeriod> = {
+  "1": "am",
+  "2": "mid_day",
+  "3": "pm"
 };
 
 export const TL_LODGING_AREA_KEYS = ["den", "dens", "petite_suite", "petite_suites", "suite", "suites"] as const;

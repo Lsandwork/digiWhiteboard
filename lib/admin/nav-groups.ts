@@ -183,6 +183,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   hr_pip: "Track PIP",
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board",
+  tl_digi_board: "TL Digi Board",
   route_generator: "Route Generator",
   live_fleet: "Live Fleet",
   my_shift: "My Shift",
@@ -249,6 +250,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
   walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
+  tl_digi_board: "Configure the Team Lead Alerts + Reminders display",
   route_generator: "Pull Fitdog reports, build van routes, export Samsara CSVs, and track owner SMS / live maps.",
   live_fleet: "Real-time Fitdog van map powered by Samsara GPS, joined with today's Route Generator assignments.",
   staff_directory: "Edit staff names, roles, and contact info.",
@@ -302,7 +304,7 @@ const COMMISSIONS_TABS: AdminTab[] = ["package_commissions"];
 const SUPPORT_COMPLAINT_TABS: AdminTab[] = ["ms_groomer_complaints", "ms_trainer_complaints"];
 const SUPPORT_REQUEST_TABS: AdminTab[] = ["ms_trainer_requests", "ms_groomer_requests"];
 const COMMS_TABS: AdminTab[] = ["templates", "notifications"];
-const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations"];
+const ADMIN_SYSTEM_TABS: AdminTab[] = ["users", "settings", "logs", "integrations", "tl_digi_board"];
 const MANAGEMENT_FLOOR_TABS: AdminTab[] = ["track_incidents", "vet_visits", "vip_auto_book"];
 
 function compactEntries(items: Array<NavEntry | null | undefined | false>): NavEntry[] {

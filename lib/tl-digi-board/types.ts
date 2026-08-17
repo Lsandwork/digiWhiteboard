@@ -62,4 +62,20 @@ export type TlBoardSyncMeta = {
   allClear: boolean;
   nextPeriod: TlMedicationPeriod | null;
   nextPeriodStartsAt: string | null;
+  /**
+   * Public Gingr API does not expose medication administration status
+   * (medication_report endpoints 404). Always false for API-sourced data.
+   */
+  administrationStatusAvailable: boolean;
+};
+
+/** Persisted / returned TL Digi Board state after a Gingr medication sync. */
+export type TlDigiBoardSnapshot = {
+  overdue: TlBoardMedicationRow[];
+  current: TlBoardMedicationRow[];
+  summary: TlMedicationSummary;
+  meta: TlBoardSyncMeta;
+  /** Last-known-good raw medication records — retained across failed syncs. */
+  medications: TlGingrMedicationRecord[];
+  generatedAt: string;
 };

@@ -107,6 +107,8 @@ export type PermissionKey =
   | "view_ops_dog_profile"
   | "manage_ops_tasks"
   | "receive_walks_board_reminders"
+  | "view_tl_digi_board"
+  | "manage_tl_digi_board"
   | "manage_lobby_board"
   | "manage_cast_tv"
   | "manage_photo_upload_queue"
@@ -337,6 +339,8 @@ const ALL_PERMISSIONS = Object.freeze([
   "view_ops_dog_profile",
   "manage_ops_tasks",
   "receive_walks_board_reminders",
+  "view_tl_digi_board",
+  "manage_tl_digi_board",
   "manage_lobby_board",
   "manage_cast_tv",
   "manage_photo_upload_queue",
@@ -1086,6 +1090,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
+  tl_digi_board: "manage_tl_digi_board",
   settings: "view_admin_panel",
   help: "view_admin_panel",
   lobby_slideshow: "manage_lobby_board",
@@ -1493,6 +1498,14 @@ export function canAccessAdminTab(
     return true;
   }
 
+  // TL Digi Board admin config — Owner Admin / Manager Admin (full admin) only.
+  // Team Lead, Management (assistant_manager), Front Desk, trainers, etc. must not open this tab.
+  if (tab === "tl_digi_board") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    return false;
+  }
+
   if (tab === "checklist") {
     if (board !== "staff") return false;
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
@@ -1576,6 +1589,9 @@ export function canAccessAdminTab(
   // Remote Whiteboard Cast controls real building displays — full admins only
   // (owner/manager are handled by the early return above).
   if (tab === "remote_cast") return false;
+
+  // Defense-in-depth: TL Digi Board config stays full-admin only even if permissions are customized.
+  if (tab === "tl_digi_board") return false;
 
   if (tab === "cast_tv") {
     const effective = access ?? accessFromLegacyRole(null, null, legacyRole);

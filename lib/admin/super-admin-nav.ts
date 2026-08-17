@@ -233,7 +233,8 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         links: [
           tabLink("settings", "Global Settings", "Global admin and whiteboard behavior."),
           tabLink("logs", "Activity Logs", "Audit trail of admin and system actions."),
-          tabLink("integrations", "Integrations", "Gingr sync, webhooks, and connection status.")
+          tabLink("integrations", "Integrations", "Gingr sync, webhooks, and connection status."),
+          tabLink("tl_digi_board", "TL Digi Board", "Configure the Team Lead Alerts + Reminders display.")
         ]
       },
       {
