@@ -13,10 +13,13 @@ import {
   toTxt
 } from "../lib/blog/social/generate";
 import { SOCIAL_BANNED_PHRASES, scrubSocialAiSlop } from "../lib/blog/social/voice";
+import { funnyHooksForTopic, matchSocialTopic, SOCIAL_GENERATOR_TOPICS } from "../lib/blog/social/topics";
 import { PLATFORM_FORMATS, SOCIAL_PLATFORMS } from "../lib/blog/social/types";
 import { encryptBlogSecret, decryptBlogSecret, hasEncryptedSecret } from "../lib/blog/crypto";
 import { BLOG_NAV_PAGES } from "../lib/blog/constants";
 import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 {
   const settings = schedulerSettingsFromRow({
@@ -121,6 +124,39 @@ import { BLOG_DASHBOARD_NAV } from "../lib/blog/dashboard-nav";
   assert.ok(txt.includes("IMAGE_URL:"));
   assert.ok(txt.includes("INSTAGRAM"));
   assert.ok(/#Fitdog/.test(txt), "download includes hashtag marks");
+}
+
+{
+  assert.ok(SOCIAL_GENERATOR_TOPICS.length >= 12, "topic picker needs a real catalog");
+  const picked = funnyHooksForTopic("First daycare drop-off");
+  assert.ok(picked.length >= 4);
+  assert.ok(picked.some((hook) => /snack review/i.test(hook)));
+  assert.equal(matchSocialTopic("first day nerves at dropoff")?.id, "first-dropoff");
+  const typedMatch = funnyHooksForTopic("summer heat in santa monica ac");
+  assert.ok(typedMatch.some((hook) => /thermostat|ac up|climate control/i.test(hook)));
+  const custom = funnyHooksForTopic("tuxedo dinner party for corgis");
+  assert.ok(custom.length >= 3, "typed-in topics still get clickable hooks");
+  assert.ok(custom.some((hook) => /tuxedo dinner party/i.test(hook)));
+  assert.deepEqual(funnyHooksForTopic("   "), []);
+  assert.equal(funnyHooksForTopic("").length, 0);
+  assert.equal(funnyHooksForTopic(null).length, 0);
+
+  const spin = "The new kid: “I’ll allow this… pending snack review.”";
+  const packWithSpin = generateSocialPackDeterministic({
+    topic: "First daycare drop-off",
+    angle: spin
+  });
+  const feedWithSpin = packWithSpin.items.find((item) => item.platform === "instagram" && item.format === "feed");
+  assert.ok(/pending snack review/i.test(feedWithSpin?.hook || ""), "clicked hook must land in generated copy");
+
+  const panelSrc = readFileSync(
+    path.join("components/blog/panels/BlogSocialGeneratorPanel.tsx"),
+    "utf8"
+  );
+  assert.ok(panelSrc.includes("SOCIAL_GENERATOR_TOPICS"), "topic chips in the generator UI");
+  assert.ok(panelSrc.includes("Super funny optional spin"), "spin field appears after a topic");
+  assert.ok(panelSrc.includes("Optional hooks"), "clickable hooks in the generator UI");
+  assert.ok(panelSrc.includes("setAngle(hook)"), "clicking a hook loads the spin box");
 }
 
 {

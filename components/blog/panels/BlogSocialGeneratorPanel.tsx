@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { packItemToDownloadRow, toCsv, toTxt } from "@/lib/blog/social/generate";
+import { funnyHooksForTopic, matchSocialTopic, SOCIAL_GENERATOR_TOPICS } from "@/lib/blog/social/topics";
 import { PLATFORM_FORMATS, SOCIAL_PLATFORMS, type SocialPlatform } from "@/lib/blog/social/types";
 
 type Connection = {
@@ -92,6 +93,10 @@ export function BlogSocialGeneratorPanel() {
     }>
   >([]);
   const [replacementBusy, setReplacementBusy] = useState(false);
+
+  const topicMatched = useMemo(() => matchSocialTopic(topic), [topic]);
+  const funnyHooks = useMemo(() => funnyHooksForTopic(topic), [topic]);
+  const showSpinTools = topic.trim().length > 0;
 
   const reload = useCallback(async () => {
     const res = await fetch("/api/blog/social");
@@ -364,24 +369,77 @@ export function BlogSocialGeneratorPanel() {
       </div>
 
       <div className="blog-dash-form-panel">
+        <div className="space-y-2">
+          <span className="blog-dash-label">Topics</span>
+          <p className="text-xs text-[var(--fitdog-muted,#6b7280)]">
+            Pick a Fitdog topic or type your own. Super-funny optional spins unlock as soon as there is a topic.
+          </p>
+          <div className="blog-dash-chip-row">
+            {SOCIAL_GENERATOR_TOPICS.map((row) => {
+              const active = topicMatched?.id === row.id || topic.trim().toLowerCase() === row.label.toLowerCase();
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  className={`blog-dash-chip${active ? " blog-dash-chip--active" : ""}`}
+                  onClick={() => {
+                    setTopic(row.label);
+                    setAngle("");
+                  }}
+                >
+                  {row.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <label className="block">
           <span className="blog-dash-label">Topic / angle</span>
           <input
             className="blog-dash-input"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            placeholder="e.g. first daycare drop-off nerves"
+            placeholder="e.g. first daycare drop-off nerves — or type anything"
           />
         </label>
-        <label className="block">
-          <span className="blog-dash-label">Optional spin</span>
-          <input
-            className="blog-dash-input"
-            value={angle}
-            onChange={(e) => setAngle(e.target.value)}
-            placeholder="e.g. summer heat + short walks"
-          />
-        </label>
+        {showSpinTools ? (
+          <div className="space-y-3 rounded-xl border border-[var(--fitdog-border,#e6e8eb)] bg-[var(--fitdog-surface,#fff8f3)] p-3">
+            <label className="block">
+              <span className="blog-dash-label">Super funny optional spin</span>
+              <input
+                className="blog-dash-input"
+                value={angle}
+                onChange={(e) => setAngle(e.target.value)}
+                placeholder="Click a hook below, or type your own punchline"
+              />
+            </label>
+            <div className="space-y-2">
+              <span className="blog-dash-label">Optional hooks</span>
+              <p className="text-xs text-[var(--fitdog-muted,#6b7280)]">
+                Click one and it loads into the optional spin box. Works for picked topics and typed-in topics.
+              </p>
+              <div className="blog-dash-chip-row">
+                {funnyHooks.map((hook) => {
+                  const active = angle.trim() === hook;
+                  return (
+                    <button
+                      key={hook}
+                      type="button"
+                      className={`blog-dash-chip blog-dash-chip--hook${active ? " blog-dash-chip--active" : ""}`}
+                      onClick={() => setAngle(hook)}
+                    >
+                      {hook}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--fitdog-muted,#6b7280)]">
+            Choose or type a topic to reveal super-funny optional spins and clickable hooks.
+          </p>
+        )}
         <label className="block">
           <span className="blog-dash-label">Traffic URL (blog post or booking)</span>
           <input
