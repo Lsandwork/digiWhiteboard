@@ -1,21 +1,27 @@
 /**
  * Discover Gingr medication API response shape for Fitdog.
- * Requires GINGR_API_KEY (and optional GINGR_SUBDOMAIN, GINGR_LOCATION_ID).
+ * Requires TL_GINGR_KEY (and optional GINGR_SUBDOMAIN, GINGR_LOCATION_ID).
  *
  * Usage:
- *   GINGR_API_KEY=... npx tsx scripts/discover-gingr-medication-info.ts [animal_id]
+ *   TL_GINGR_KEY=... npx tsx scripts/discover-gingr-medication-info.ts [animal_id]
  */
 import { createGingrClient } from "../lib/integrations/gingr/client";
 import { fetchCurrentlyCheckedInDogsRobust } from "../lib/gingr-checked-in-dogs";
+import { requireTlGingrApiKey, tlGingrClientConfig } from "../lib/tl-digi-board/gingr-auth";
 
 async function main() {
   const animalIdArg = process.argv[2];
-  const client = createGingrClient();
+  const apiKey = requireTlGingrApiKey();
+  const { subdomain } = tlGingrClientConfig();
+  const client = createGingrClient({ apiKey, subdomain });
 
   let animalId = animalIdArg;
   if (!animalId) {
-    const { dogs } = await fetchCurrentlyCheckedInDogsRobust({ force: true });
-    animalId = dogs[0]?.animalId ?? null;
+    // Optional helper when GINGR_API_KEY is also present for checked-in discovery.
+    const { dogs } = await fetchCurrentlyCheckedInDogsRobust({ force: true }).catch(() => ({
+      dogs: [] as Array<{ animalId: string; dogName: string }>
+    }));
+    animalId = dogs[0]?.animalId ?? "";
     if (!animalId) {
       console.error("No checked-in animal found. Pass an animal_id argument.");
       process.exit(1);
@@ -23,15 +29,8 @@ async function main() {
     console.log(`Using first checked-in animal: ${dogs[0].dogName} (${animalId})`);
   }
 
-  const subdomain = process.env.GINGR_SUBDOMAIN?.trim() || "fitdog";
-  const key = process.env.GINGR_API_KEY?.trim();
-  if (!key) {
-    console.error("GINGR_API_KEY is required.");
-    process.exit(1);
-  }
-
   const url = `https://${subdomain}.gingrapp.com/api/v1/get_medication_info?${new URLSearchParams({
-    key,
+    key: apiKey,
     animal_id: String(animalId)
   }).toString()}`;
 
@@ -44,6 +43,7 @@ async function main() {
   } catch {
     console.log(text.slice(0, 4000));
   }
+  void client;
 }
 
 main().catch((error) => {

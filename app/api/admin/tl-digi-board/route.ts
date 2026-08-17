@@ -59,6 +59,10 @@ export async function GET(request: Request) {
       permissions: {
         canView: true,
         canManage: true
+      },
+      gingr: {
+        keyEnv: "TL_GINGR_KEY",
+        keyConfigured: Boolean(process.env.TL_GINGR_KEY?.trim())
       }
     });
   } catch (error) {

@@ -160,10 +160,13 @@ function photoUrlFromRecord(record: GingrBackOfHouseRecord) {
 export type FetchGingrBackOfHouseOptions = {
   /** Lobby board needs every reservation type in the checkout basket, not just active-only types. */
   allReservationTypes?: boolean;
+  /** Optional API key override (TL Digi Board uses TL_GINGR_KEY). */
+  apiKey?: string;
 };
 
 export async function fetchGingrBackOfHouse(options?: FetchGingrBackOfHouseOptions) {
-  const { subdomain, apiKey, locationId, configuredTypeIds } = getGingrConfig();
+  const { subdomain, apiKey: defaultApiKey, locationId, configuredTypeIds } = getGingrConfig();
+  const apiKey = options?.apiKey?.trim() || defaultApiKey;
   if (!apiKey) {
     return { checking_in: [] as GingrBackOfHouseRecord[], checking_out: [] as GingrBackOfHouseRecord[], source: "disabled" as const };
   }

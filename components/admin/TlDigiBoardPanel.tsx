@@ -15,6 +15,7 @@ type AdminPayload = {
   };
   snapshot?: TlDigiBoardSnapshot | null;
   permissions?: { canView?: boolean; canManage?: boolean };
+  gingr?: { keyEnv?: string; keyConfigured?: boolean };
   error?: string;
 };
 
@@ -40,6 +41,7 @@ export function TlDigiBoardPanel() {
   const [config, setConfig] = useState<AdminPayload["config"] | null>(null);
   const [snapshot, setSnapshot] = useState<TlDigiBoardSnapshot | null>(null);
   const [canManage, setCanManage] = useState(false);
+  const [tlGingrKeyConfigured, setTlGingrKeyConfigured] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -53,6 +55,7 @@ export function TlDigiBoardPanel() {
       setConfig(json.config);
       setSnapshot(json.snapshot ?? null);
       setCanManage(Boolean(json.permissions?.canManage));
+      setTlGingrKeyConfigured(Boolean(json.gingr?.keyConfigured));
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load TL Digi Board.");
@@ -109,6 +112,11 @@ export function TlDigiBoardPanel() {
             label="Gingr"
             value={meta?.gingrSyncHealth?.toUpperCase() ?? "UNKNOWN"}
             tone={meta?.gingrSyncHealth === "live" ? "good" : meta?.gingrSyncHealth === "delayed" ? "warn" : "bad"}
+          />
+          <HealthChip
+            label="TL_GINGR_KEY"
+            value={tlGingrKeyConfigured ? "Configured" : "Missing"}
+            tone={tlGingrKeyConfigured ? "good" : "bad"}
           />
           <HealthChip label="Current Period" value={meta?.currentPeriod?.toUpperCase() ?? "—"} />
           <HealthChip
@@ -268,6 +276,8 @@ export function TlDigiBoardPanel() {
         <Card title="System Health">
           <dl className="grid gap-3 sm:grid-cols-2">
             <Row label="Gingr connection" value={meta?.gingrSyncHealth ?? "unknown"} />
+            <Row label="TL Digi Board key env" value="TL_GINGR_KEY" />
+            <Row label="TL_GINGR_KEY configured" value={tlGingrKeyConfigured ? "Yes" : "No — add in Vercel"} />
             <Row label="Medication sync" value={meta?.isStale ? "stale" : meta?.gingrSyncHealth ?? "unknown"} />
             <Row label="Last Gingr sync" value={meta?.lastSuccessfulSyncAt ?? "—"} />
             <Row label="Last attempt" value={meta?.lastAttemptAt ?? "—"} />

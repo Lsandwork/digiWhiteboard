@@ -8,6 +8,7 @@ import {
   type TlOvernightLodgingArea
 } from "./config";
 import { TL_GINGR_MEDICATION_SYNC_INTERVAL_MS } from "./constants";
+import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
 import {
   fetchGingrMedicationInfo,
   flattenAndResolveMedicationSchedules
@@ -130,7 +131,9 @@ function mapReservationWithType(row: unknown): {
  * falls back to fetchCurrentlyCheckedInDogsRobust name-only matching.
  */
 async function loadOvernightCheckedInDogs(config: TlDigiBoardConfig): Promise<OvernightDog[]> {
-  const client = createGingrClient();
+  const apiKey = requireTlGingrApiKey();
+  const { subdomain, locationId } = tlGingrClientConfig();
+  const client = createGingrClient({ apiKey, subdomain, locationId });
   const overnight: OvernightDog[] = [];
   const seen = new Set<string>();
 
@@ -218,7 +221,10 @@ function lodgingFromBackOfHouseRecord(record: GingrBackOfHouseRecord): LodgingIn
 async function loadLodgingMapByAnimal(): Promise<Map<string, LodgingInfo>> {
   const map = new Map<string, LodgingInfo>();
   try {
-    const board = await fetchGingrBackOfHouse({ allReservationTypes: true });
+    const board = await fetchGingrBackOfHouse({
+      allReservationTypes: true,
+      apiKey: requireTlGingrApiKey()
+    });
     const records = [...(board.checking_in ?? []), ...(board.checking_out ?? [])] as GingrBackOfHouseRecord[];
     for (const record of records) {
       const animalId = pickString(record.animal_id);

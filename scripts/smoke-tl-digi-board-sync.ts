@@ -1,12 +1,12 @@
 /**
  * Live smoke test for TL Digi Board Gingr sync.
- * Requires GINGR_API_KEY. Does not print the key.
+ * Requires TL_GINGR_KEY. Does not print the key.
  */
 import { syncTlDigiBoardState } from "../lib/tl-digi-board/sync";
 
 async function main() {
-  if (!process.env.GINGR_API_KEY?.trim()) {
-    console.error("GINGR_API_KEY required");
+  if (!process.env.TL_GINGR_KEY?.trim()) {
+    console.error("TL_GINGR_KEY required");
     process.exit(1);
   }
   const snap = await syncTlDigiBoardState(null as never, { forceRefresh: true });

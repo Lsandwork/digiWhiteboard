@@ -1,6 +1,7 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
 import { canCallGingrEndpoint, markGingrEndpointCalled } from "@/lib/gingr-request-guard";
 import { TL_FITDOG_SCHEDULE_ID_MAP, type TlMedicationPeriod } from "./constants";
+import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
 import { normalizeScheduleLabel } from "./medication-windows";
 import type { TlMedicationScheduleKind } from "./types";
 
@@ -181,7 +182,7 @@ function unwrapMedicationPayload(payload: unknown): GingrMedicationInfoPayload {
 
 /**
  * GET /api/v1/get_medication_info?key=&animal_id=
- * Uses GINGR_API_KEY server-side. Never logs the API key.
+ * Uses TL_GINGR_KEY server-side (separate from GINGR_API_KEY). Never logs the API key.
  */
 export async function fetchGingrMedicationInfo(animalId: string): Promise<GingrMedicationInfoPayload> {
   const trimmedAnimalId = String(animalId ?? "").trim();
@@ -189,10 +190,9 @@ export async function fetchGingrMedicationInfo(animalId: string): Promise<GingrM
     throw new Error("animal_id is required for get_medication_info.");
   }
 
-  const client = createGingrClient();
-  if (!client.config.apiKey) {
-    throw new Error("GINGR_API_KEY is not configured on this environment.");
-  }
+  const apiKey = requireTlGingrApiKey();
+  const { subdomain } = tlGingrClientConfig();
+  const client = createGingrClient({ apiKey, subdomain });
 
   // Soft gate — sync owns concurrency; never punch through if another call is mid-flight spacing.
   if (!canCallGingrEndpoint("medication_info")) {
@@ -201,7 +201,7 @@ export async function fetchGingrMedicationInfo(animalId: string): Promise<GingrM
   markGingrEndpointCalled("medication_info");
 
   const url = new URL(`${client.config.baseUrl}/api/v1/get_medication_info`);
-  url.searchParams.set("key", client.config.apiKey);
+  url.searchParams.set("key", apiKey);
   url.searchParams.set("animal_id", trimmedAnimalId);
 
   const response = await fetch(url.toString(), {
