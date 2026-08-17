@@ -26,7 +26,6 @@ export async function GET(request: Request) {
       servicesCompletionStatusAvailable: snapshot.meta.servicesCompletionStatusAvailable,
       medicationCount: snapshot.medications.length,
       additionalServiceCount: snapshot.additionalServices.length,
-      servicesCompletionStatusAvailable: snapshot.meta.servicesCompletionStatusAvailable,
       servicesCompletionAudit: snapshot.meta.servicesCompletionAudit
         ? {
             allRequiredTypesPass: snapshot.meta.servicesCompletionAudit.allRequiredTypesPass,
