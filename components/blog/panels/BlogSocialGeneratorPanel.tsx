@@ -371,7 +371,7 @@ export function BlogSocialGeneratorPanel() {
       <div className="blog-dash-form-panel">
         <div className="space-y-2">
           <span className="blog-dash-label">Topics</span>
-          <p className="text-xs text-[var(--fitdog-muted,#6b7280)]">
+          <p className="blog-dash-help">
             Pick a Fitdog topic or type your own. Super-funny optional spins unlock as soon as there is a topic.
           </p>
           <div className="blog-dash-chip-row">
@@ -403,7 +403,7 @@ export function BlogSocialGeneratorPanel() {
           />
         </label>
         {showSpinTools ? (
-          <div className="space-y-3 rounded-xl border border-[var(--fitdog-border,#e6e8eb)] bg-[var(--fitdog-surface,#fff8f3)] p-3">
+          <div className="blog-dash-callout">
             <label className="block">
               <span className="blog-dash-label">Super funny optional spin</span>
               <input
@@ -415,7 +415,7 @@ export function BlogSocialGeneratorPanel() {
             </label>
             <div className="space-y-2">
               <span className="blog-dash-label">Optional hooks</span>
-              <p className="text-xs text-[var(--fitdog-muted,#6b7280)]">
+              <p className="blog-dash-help">
                 Click one and it loads into the optional spin box. Works for picked topics and typed-in topics.
               </p>
               <div className="blog-dash-chip-row">
@@ -436,7 +436,7 @@ export function BlogSocialGeneratorPanel() {
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[var(--fitdog-muted,#6b7280)]">
+          <p className="blog-dash-help">
             Choose or type a topic to reveal super-funny optional spins and clickable hooks.
           </p>
         )}
@@ -498,7 +498,7 @@ export function BlogSocialGeneratorPanel() {
               ))}
             </div>
             {replacingImageId ? (
-              <div className="rounded-xl border border-[var(--fitdog-border,#e6e8eb)] bg-[var(--fitdog-surface,#f8f9fa)] p-3 space-y-2">
+              <div className="blog-dash-callout">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold text-[var(--fitdog-heading,#121417)]">
                     Pick a better topic-matched photo

@@ -156,7 +156,8 @@ import path from "node:path";
   assert.ok(panelSrc.includes("SOCIAL_GENERATOR_TOPICS"), "topic chips in the generator UI");
   assert.ok(panelSrc.includes("Super funny optional spin"), "spin field appears after a topic");
   assert.ok(panelSrc.includes("Optional hooks"), "clickable hooks in the generator UI");
-  assert.ok(panelSrc.includes("setAngle(hook)"), "clicking a hook loads the spin box");
+  assert.ok(panelSrc.includes("blog-dash-callout"), "spin panel uses a light high-contrast callout");
+  assert.equal(panelSrc.includes("bg-[var(--fitdog-surface"), false, "must not use dark admin surface token");
 }
 
 {
