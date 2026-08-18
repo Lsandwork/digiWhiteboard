@@ -11,7 +11,7 @@ import { TL_GINGR_MEDICATION_SYNC_INTERVAL_MS } from "./constants";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
 import {
   fetchGingrMedicationInfo,
-  flattenAndResolveMedicationSchedules
+  resolveGingrMedicationInfo
 } from "./gingr-medication";
 import {
   extractAdministrationRecordsFromHistory,
@@ -397,7 +397,8 @@ export async function syncTlDigiBoardState(
             : Promise.resolve({ ok: false as const, error: "missing_reservation_id" })
         ]);
 
-        const resolved = flattenAndResolveMedicationSchedules(payload);
+        const resolvedInfo = resolveGingrMedicationInfo(payload);
+        const resolved = resolvedInfo.schedules;
         const administrationByScheduleId = new Map<
           string,
           ReturnType<typeof resolveAdministrationForSchedule>
@@ -432,12 +433,15 @@ export async function syncTlDigiBoardState(
             lodgingRunName: lodging.lodgingRunName,
             lodgingLabel: lodging.lodgingLabel,
             serviceDate,
-            now
+            now,
+            animalMedicationNotes: resolvedInfo.animalMedicationNotes
           },
           administrationByScheduleId
         );
         if (!config.display.showOtherSpecial) {
-          records = records.filter((row) => row.scheduleKind !== "other_special");
+          records = records.filter(
+            (row) => row.scheduleKind !== "other_special" || row.gingrScheduleLabel === "NOTES"
+          );
         }
         return {
           ok: true as const,

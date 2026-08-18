@@ -6,6 +6,7 @@ import {
   extraNotesFromItem,
   medicationNameFromItem,
   notesFromItem,
+  readGingrText,
   uniqueNoteParts,
   type ResolvedGingrMedicationSchedule
 } from "./gingr-medication";
@@ -24,6 +25,11 @@ export type TlMedicationNormalizeContext = {
   now?: Date;
   /** Administration status from get_medication_report_history when available. */
   administration?: ResolvedMedicationAdministration | null;
+  /**
+   * Animal-level Gingr medicationNotes (kennel/run card schedule-notes).
+   * Shown when staff cannot mark administered and Gingr still displays the note.
+   */
+  animalMedicationNotes?: string | null;
 };
 
 /**
@@ -45,9 +51,12 @@ export function buildTlGingrMedicationRecord(
   const noteworthyStatus =
     statusLabel && !/^(administered|not[\s_-]*administered|n\/?a)$/i.test(statusLabel) ? statusLabel : null;
   const instructions = uniqueNoteParts([scheduleNotes, extraScheduleNotes])[0] ?? extraScheduleNotes ?? scheduleNotes;
-  const noteParts = uniqueNoteParts([administration?.administrationNotes, extraScheduleNotes]).filter(
-    (part) => !instructions || part.toLowerCase() !== instructions.toLowerCase()
-  );
+  const animalNotes = readGingrText(context.animalMedicationNotes);
+  const noteParts = uniqueNoteParts([
+    administration?.administrationNotes,
+    extraScheduleNotes,
+    animalNotes
+  ]).filter((part) => !instructions || part.toLowerCase() !== instructions.toLowerCase());
   if (
     noteworthyStatus &&
     !noteParts.some((part) => part.toLowerCase().includes(noteworthyStatus.toLowerCase()))
@@ -83,10 +92,44 @@ export function buildTlGingrMedicationRecords(
   context: TlMedicationNormalizeContext,
   administrationByScheduleId?: Map<string, ResolvedMedicationAdministration>
 ): TlGingrMedicationRecord[] {
-  return resolvedSchedules.map((resolved) =>
+  const records = resolvedSchedules.map((resolved) =>
     buildTlGingrMedicationRecord(resolved, {
       ...context,
       administration: administrationByScheduleId?.get(String(resolved.item.id)) ?? context.administration ?? null
     })
   );
+  const animalNotes = String(context.animalMedicationNotes || "").trim();
+  if (!records.length && animalNotes) {
+    const stripped = readGingrText(animalNotes);
+    if (stripped) records.push(buildNoteOnlyMedicationRecord(context, stripped));
+  }
+  return records;
+}
+
+/** Gingr can show animal-level medication notes even when there is no dose to mark administered. */
+export function buildNoteOnlyMedicationRecord(
+  context: TlMedicationNormalizeContext,
+  notes: string
+): TlGingrMedicationRecord {
+  const now = context.now ?? new Date();
+  return {
+    gingrMedicationId: `notes:${context.gingrAnimalId}`,
+    gingrAnimalId: String(context.gingrAnimalId),
+    gingrReservationId: context.gingrReservationId ? String(context.gingrReservationId) : null,
+    dogName: context.dogName,
+    photoUrl: context.photoUrl ?? null,
+    lodgingLabel: context.lodgingLabel ?? null,
+    lodgingAreaKey: (context.lodgingAreaKey as TlLodgingAreaKey | null | undefined) ?? null,
+    lodgingRunName: context.lodgingRunName ?? null,
+    gingrScheduleLabel: "NOTES",
+    scheduleKind: "other_special",
+    medicationName: "Medication notes",
+    dosage: null,
+    instructions: null,
+    notes,
+    administrationStatus: "not_administered",
+    administeredAt: null,
+    administeredBy: null,
+    serviceDate: context.serviceDate ?? laServiceDate(now)
+  };
 }
