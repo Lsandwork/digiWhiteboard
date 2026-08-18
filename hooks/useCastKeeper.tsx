@@ -229,11 +229,13 @@ export function useCastKeeper({
       setConnection("online");
 
       if (syncRef.current) {
-        applyDisplaySyncUpdate(body.sync, syncRef.current, () => onContentUpdateRef.current?.());
+        const result = applyDisplaySyncUpdate(body.sync, syncRef.current, () => onContentUpdateRef.current?.());
+        if (result === "reloading") return;
       } else {
         const stored = readInitialDisplaySync();
         if (stored) {
-          applyDisplaySyncUpdate(body.sync, stored, () => onContentUpdateRef.current?.());
+          const result = applyDisplaySyncUpdate(body.sync, stored, () => onContentUpdateRef.current?.());
+          if (result === "reloading") return;
         } else {
           onContentUpdateRef.current?.();
         }

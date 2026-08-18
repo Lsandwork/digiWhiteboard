@@ -353,7 +353,7 @@ export function AdminDashboard() {
       if (!response.ok) throw new Error("Refresh failed.");
       await broadcastCastHardReload();
       await load(true);
-      showToast("Refresh complete. Staff whiteboard TVs were signaled to reload.", "success");
+      showToast("Refresh complete. Lobby and staff TVs were signaled to reload.", "success");
     } catch (refreshError) {
       showToast(humanizeUnknownError(refreshError, "Refresh failed."), "error");
     } finally {
@@ -365,7 +365,7 @@ export function AdminDashboard() {
     setCastRefreshing(true);
     try {
       const nonce = await requestCastHardRefreshAllDisplays();
-      showToast(`Cast displays will hard refresh now (signal #${nonce}).`, "success");
+      showToast(`Lobby and staff TVs will hard refresh now (signal #${nonce}).`, "success");
     } catch (castError) {
       showToast(humanizeUnknownError(castError, "Cast refresh failed."), "error");
     } finally {

@@ -60,6 +60,7 @@ assert.ok(DISPLAY_SYNC_POLL_MS <= 2_000, "staff TVs must poll remote refresh at 
   assert.match(signal, /staff_whiteboard/);
   assert.match(signal, /queueHardRefreshForKnownDisplays/);
   assert.match(signal, /bumpCastHardReloadNonce/);
+  assert.match(signal, /refreshPairedRemoteCastDisplays/);
 }
 
 {
@@ -74,7 +75,41 @@ assert.ok(DISPLAY_SYNC_POLL_MS <= 2_000, "staff TVs must poll remote refresh at 
 
 {
   const dashboard = readFileSync(join(process.cwd(), "components/admin/AdminDashboard.tsx"), "utf8");
-  assert.match(dashboard, /Staff whiteboard TVs were signaled to reload/);
+  assert.match(dashboard, /Lobby and staff TVs were signaled to reload/);
+}
+
+{
+  const receiver = readFileSync(join(process.cwd(), "components/remote-cast/RemoteCastReceiver.tsx"), "utf8");
+  assert.match(receiver, /reloadPinnedTvUrl/);
+  assert.match(receiver, /runtime.refreshNonce/);
+}
+
+{
+  const lobbyBoard = readFileSync(join(process.cwd(), "components/lobby/LobbyCheckoutBoard.tsx"), "utf8");
+  assert.match(lobbyBoard, /useDisplaySync\(\{\s*enabled: true,/);
+}
+
+{
+  const lobbyPage = readFileSync(join(process.cwd(), "components/LobbyBoardPageClient.tsx"), "utf8");
+  assert.match(lobbyPage, /useDisplaySync\(\{ enabled: true \}\)/);
+}
+
+{
+  const displaySync = readFileSync(join(process.cwd(), "lib/display-sync.ts"), "utf8");
+  assert.match(displaySync, /reloadPinnedTvUrl/);
+  assert.match(displaySync, /window\.location\.reload\(\)/);
+  assert.doesNotMatch(displaySync, /_tv_refresh/);
+}
+
+{
+  const remoteTypes = readFileSync(join(process.cwd(), "lib/remote-cast/types.ts"), "utf8");
+  assert.match(remoteTypes, /RECEIVER_STATE_POLL_MS = 2_000/);
+}
+
+{
+  const remoteServer = readFileSync(join(process.cwd(), "lib/remote-cast/server.ts"), "utf8");
+  assert.match(remoteServer, /export async function refreshPairedRemoteCastDisplays/);
+  assert.match(remoteServer, /command: "REFRESH"/);
 }
 
 console.log("display sync tests passed");

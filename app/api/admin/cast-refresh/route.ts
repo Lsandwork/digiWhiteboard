@@ -12,18 +12,22 @@ export async function POST(request: Request) {
 
   const session = getAdminSessionFromRequest(request);
   const supabase = getServiceSupabase();
-  const nonce = await signalCastDisplaysHardRefresh(supabase);
+  const result = await signalCastDisplaysHardRefresh(supabase);
 
   await writeAdminAuditLog({
     actorAdminId: session?.adminUserId,
     actorEmail: session?.email,
     action: "admin.cast_hard_refresh",
-    details: { cast_hard_reload_nonce: nonce }
+    details: {
+      cast_hard_reload_nonce: result.nonce,
+      remote_cast_refreshed: result.remoteCastRefreshed
+    }
   });
 
   return NextResponse.json({
     ok: true,
-    cast_hard_reload_nonce: nonce,
+    cast_hard_reload_nonce: result.nonce,
+    remote_cast_refreshed: result.remoteCastRefreshed,
     refreshed_at: new Date().toISOString()
   });
 }
