@@ -12,8 +12,7 @@ import {
 } from "react";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import {
-  applyDisplaySyncUpdate,
-  readInitialDisplaySync
+  applyDisplaySyncUpdate
 } from "@/lib/display-keeper-client";
 import {
   CAST_KEEPER_HEARTBEAT_FAILURE_THRESHOLD,
@@ -117,6 +116,7 @@ export function useCastKeeper({
   const lastHeartbeatOkRef = useRef<number>(0);
   const lastReloadAtRef = useRef<number>(0);
   const syncRef = useRef<HeartbeatResponse["sync"] | null>(null);
+  const firstSyncRef = useRef(true);
   const heartbeatFailuresRef = useRef(0);
   const deviceIdRef = useRef(getOrCreateDisplayDeviceId());
   const [connection, setConnection] = useState<CastKeeperConnection>("online");
@@ -228,20 +228,21 @@ export function useCastKeeper({
       connectionRef.current = "online";
       setConnection("online");
 
-      if (syncRef.current) {
-        const result = applyDisplaySyncUpdate(body.sync, syncRef.current, () => onContentUpdateRef.current?.());
-        if (result === "reloading") return;
+      if (firstSyncRef.current) {
+        firstSyncRef.current = false;
+        syncRef.current = body.sync;
+        writeStoredDisplaySync(body.sync);
       } else {
-        const stored = readInitialDisplaySync();
-        if (stored) {
-          const result = applyDisplaySyncUpdate(body.sync, stored, () => onContentUpdateRef.current?.());
+        const previous = syncRef.current;
+        if (previous) {
+          const result = applyDisplaySyncUpdate(body.sync, previous, () => onContentUpdateRef.current?.());
           if (result === "reloading") return;
         } else {
           onContentUpdateRef.current?.();
         }
+        syncRef.current = body.sync;
+        writeStoredDisplaySync(body.sync);
       }
-      syncRef.current = body.sync;
-      writeStoredDisplaySync(body.sync);
 
       await processCommands(body.commands);
     } catch {
@@ -272,7 +273,7 @@ export function useCastKeeper({
 
   useEffect(() => {
     if (!enabled) return;
-    syncRef.current = readInitialDisplaySync();
+    firstSyncRef.current = true;
   }, [enabled]);
 
   useEffect(() => {

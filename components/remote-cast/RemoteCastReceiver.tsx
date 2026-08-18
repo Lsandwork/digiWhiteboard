@@ -10,7 +10,7 @@ import { LobbyCheckoutBoard } from "@/components/lobby/LobbyCheckoutBoard";
 import { LobbyErrorBoundary } from "@/components/lobby/LobbyErrorBoundary";
 import { useRemoteCastReceiver } from "@/hooks/useRemoteCastReceiver";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
-import { reloadPinnedTvUrl } from "@/lib/display-sync";
+import { visitPageAsNewNavigation } from "@/lib/tv-hard-refresh";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
 
 function ReceiverFrame({ children }: { children: React.ReactNode }) {
@@ -68,7 +68,7 @@ export function RemoteCastReceiver() {
     }
     if (runtime.refreshNonce === appliedRefreshNonceRef.current) return;
     appliedRefreshNonceRef.current = runtime.refreshNonce;
-    reloadPinnedTvUrl();
+    visitPageAsNewNavigation();
   }, [runtime.paired, runtime.ready, runtime.refreshNonce]);
 
   if (!runtime.ready) {

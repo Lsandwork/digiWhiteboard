@@ -10,14 +10,6 @@ type UseDisplaySyncOptions = {
   pollIntervalMs?: number;
 };
 
-function sameDisplaySync(a: { build_id: string; cast_hard_reload_nonce: number; display_content_revision: number }, b: typeof a) {
-  return (
-    a.build_id === b.build_id &&
-    a.cast_hard_reload_nonce === b.cast_hard_reload_nonce &&
-    a.display_content_revision === b.display_content_revision
-  );
-}
-
 export function useDisplaySync({
   enabled = true,
   onContentUpdate,
@@ -40,18 +32,9 @@ export function useDisplaySync({
       const next = await fetchDisplaySyncState();
       if (!next || cancelled) return;
 
-      const stored = readStoredDisplaySync();
       if (!syncRef.current) {
-        const previous = stored ?? next;
-        syncRef.current = previous;
-        if (!stored || sameDisplaySync(stored, next)) {
-          writeStoredDisplaySync(next);
-          syncRef.current = next;
-          return;
-        }
-        const result = applyDisplaySyncUpdate(next, previous, () => onContentUpdateRef.current?.());
-        if (result === "reloading") return;
-        syncRef.current = readStoredDisplaySync() ?? next;
+        writeStoredDisplaySync(next);
+        syncRef.current = next;
         return;
       }
 
