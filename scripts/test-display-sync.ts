@@ -9,6 +9,8 @@ import {
   shouldReloadForBuild,
   shouldReloadForCastNonce
 } from "../lib/display-sync";
+import { isTvWhiteboardPath } from "../lib/tv-hard-refresh";
+import { TV_HARD_REFRESH_BOOT_SCRIPT } from "../lib/tv-hard-refresh-boot-script";
 
 const defaults = defaultDisplaySyncState();
 assert.equal(typeof defaults.display_content_revision, "number");
@@ -80,7 +82,7 @@ assert.ok(DISPLAY_SYNC_POLL_MS <= 2_000, "staff TVs must poll remote refresh at 
 
 {
   const receiver = readFileSync(join(process.cwd(), "components/remote-cast/RemoteCastReceiver.tsx"), "utf8");
-  assert.match(receiver, /reloadPinnedTvUrl/);
+  assert.match(receiver, /visitPageAsNewNavigation/);
   assert.match(receiver, /runtime.refreshNonce/);
 }
 
@@ -96,9 +98,34 @@ assert.ok(DISPLAY_SYNC_POLL_MS <= 2_000, "staff TVs must poll remote refresh at 
 
 {
   const displaySync = readFileSync(join(process.cwd(), "lib/display-sync.ts"), "utf8");
-  assert.match(displaySync, /reloadPinnedTvUrl/);
-  assert.match(displaySync, /window\.location\.reload\(\)/);
+  assert.match(displaySync, /visitPageAsNewNavigation/);
   assert.doesNotMatch(displaySync, /_tv_refresh/);
+}
+
+{
+  const layout = readFileSync(join(process.cwd(), "app/layout.tsx"), "utf8");
+  assert.match(layout, /TV_HARD_REFRESH_BOOT_SCRIPT/);
+}
+
+{
+  const bootSource = readFileSync(join(process.cwd(), "lib/tv-hard-refresh-boot-script.ts"), "utf8");
+  assert.match(bootSource, /TV_HARD_REFRESH_ENDPOINT/);
+  assert.match(bootSource, /location\.replace/);
+  assert.match(TV_HARD_REFRESH_BOOT_SCRIPT, /\/api\/display\/hard-refresh/);
+  assert.match(TV_HARD_REFRESH_BOOT_SCRIPT, /location\.replace/);
+}
+
+{
+  const hardRefreshRoute = readFileSync(join(process.cwd(), "app/api/display/hard-refresh/route.ts"), "utf8");
+  assert.match(hardRefreshRoute, /loadCastHardReloadNonce/);
+}
+
+{
+  assert.equal(isTvWhiteboardPath("/"), true);
+  assert.equal(isTvWhiteboardPath("/lobby/checkouts"), true);
+  assert.equal(isTvWhiteboardPath("/cast/receiver"), true);
+  assert.equal(isTvWhiteboardPath("/admin"), false);
+  assert.equal(isTvWhiteboardPath("/blog"), false);
 }
 
 {

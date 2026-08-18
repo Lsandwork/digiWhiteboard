@@ -1,3 +1,5 @@
+import { visitPageAsNewNavigation } from "@/lib/tv-hard-refresh";
+
 /** Fast enough that admin Refresh / Hard Refresh Cast TVs reaches a staff TV in a couple of seconds. */
 export const DISPLAY_SYNC_POLL_MS = 2_000;
 export const DISPLAY_SYNC_STORAGE_KEY = "fitdog-display-sync";
@@ -33,41 +35,23 @@ export function writeStoredDisplaySync(state: DisplaySyncState) {
 }
 
 export function reloadPinnedTvUrl() {
-  if (typeof window === "undefined") return;
-  try {
-    window.location.reload();
-    return;
-  } catch {
-    // Some TV kiosk shells block reload(); fall through.
-  }
-  try {
-    window.location.href = window.location.href;
-  } catch {
-    // Ignore locked-down TV browsers that reject navigation.
-  }
+  visitPageAsNewNavigation();
 }
 
-export function hardReloadDisplay(castReloadNonce: number) {
+export function hardReloadDisplay(_castReloadNonce: number) {
   if (typeof window === "undefined") return;
-  const nonce = Number(castReloadNonce);
-  if (!Number.isFinite(nonce)) return;
-  try {
-    window.sessionStorage.setItem(DISPLAY_CAST_RELOAD_APPLIED_KEY, String(nonce));
-  } catch {
-    // Ignore storage failures on locked-down TV browsers.
-  }
-  reloadPinnedTvUrl();
+  visitPageAsNewNavigation();
 }
 
-/** Admin hard_refresh commands must reload even when the nonce has not changed yet. */
+/** Admin hard_refresh commands reload the current page as a fresh visit. */
 export function forceReloadDisplay(_castReloadNonce?: number) {
   if (typeof window === "undefined") return;
-  reloadPinnedTvUrl();
+  visitPageAsNewNavigation();
 }
 
 export function softReloadDisplay() {
   if (typeof window === "undefined") return;
-  reloadPinnedTvUrl();
+  visitPageAsNewNavigation();
 }
 
 /** Reload at most once per deployed build — prevents TV refresh loops after deploys. */
@@ -85,18 +69,9 @@ export function shouldReloadForBuild(buildId: string) {
   }
 }
 
-/** Skip hard-reload if this nonce already triggered a reload on this TV. */
+/** Skip only if this nonce is already the current document visit. */
 export function shouldReloadForCastNonce(castReloadNonce: number) {
   const nonce = Number(castReloadNonce);
   if (!Number.isFinite(nonce)) return false;
-  if (typeof window === "undefined") return true;
-  try {
-    const applied = window.sessionStorage.getItem(DISPLAY_CAST_RELOAD_APPLIED_KEY);
-    if (applied === String(nonce)) return false;
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("_cast_reload") === String(nonce)) return false;
-  } catch {
-    return true;
-  }
   return true;
 }

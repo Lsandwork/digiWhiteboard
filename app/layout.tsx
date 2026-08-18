@@ -6,6 +6,7 @@ import { RuffOpsSourceSignature } from "@/components/branding/RuffOpsSourceSigna
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { RUFFOPS_META } from "@/lib/branding/ruffops-signature";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme/boot-script";
+import { TV_HARD_REFRESH_BOOT_SCRIPT } from "@/lib/tv-hard-refresh-boot-script";
 import "./globals.css";
 import "../lib/theme/tokens.css";
 import "../lib/fitdog-dashboard/theme.css";
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" data-platform="ruffops" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: TV_HARD_REFRESH_BOOT_SCRIPT }} />
         <RuffOpsSourceSignature />
       </head>
       <body data-ruffops="operations-platform">

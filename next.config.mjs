@@ -51,6 +51,34 @@ const nextConfig = {
         headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" }]
       },
       {
+        source: "/",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
+        source: "/lobby/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
+        source: "/cast/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
+        source: "/staff-cast",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
+        source: "/lobby-cast",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
+        source: "/display/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
+        source: "/boards/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, no-cache, must-revalidate, max-age=0" }]
+      },
+      {
         source: "/gingr",
         headers: [
           {
