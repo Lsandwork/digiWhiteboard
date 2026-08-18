@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ensureRuffopsChecklistSchema } from "@/lib/ruffops-checklist/ensure-schema";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
 
@@ -15,9 +16,11 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
+    const schema = await ensureRuffopsChecklistSchema(supabase);
     const snapshot = await getTlDigiBoardSnapshot(supabase, { forceRefresh: true });
     return NextResponse.json({
       ok: true,
+      checklistSchemaReady: schema.ready,
       generatedAt: snapshot.generatedAt,
       summary: snapshot.summary,
       servicesSummary: snapshot.servicesSummary,

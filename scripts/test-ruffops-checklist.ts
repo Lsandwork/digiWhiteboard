@@ -312,6 +312,17 @@ assert.match(api, /markWalkBoardCycleComplete/);
 assert.match(api, /upsertChecklistCompletion/);
 assert.match(api, /Walks Board alarms cannot be unchecked/);
 
+const server = readFileSync(join(root, "lib/ruffops-checklist/server.ts"), "utf8");
+assert.match(server, /ensureRuffopsChecklistSchema/);
+
+const ensure = readFileSync(join(root, "lib/ruffops-checklist/ensure-schema.ts"), "utf8");
+assert.match(ensure, /079_ruffops_checklist_completions\.sql/);
+assert.match(ensure, /ops_checklist_completions/);
+assert.match(ensure, /applyRuffopsChecklistMigration079/);
+
+const cron = readFileSync(join(root, "app/api/cron/tl-digi-board-sync/route.ts"), "utf8");
+assert.match(cron, /ensureRuffopsChecklistSchema/);
+
 const migration = readFileSync(join(root, "supabase/migrations/079_ruffops_checklist_completions.sql"), "utf8");
 assert.match(migration, /ops_checklist_completions/);
 assert.match(migration, /completed_by_name/);

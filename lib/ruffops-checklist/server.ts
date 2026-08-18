@@ -5,6 +5,7 @@ import { loadTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
 import { loadWalkBoardPublicState } from "@/lib/walks-board/server";
 import { assembleRuffopsChecklistItems, summarizeChecklist } from "./assemble";
 import { listChecklistCompletions } from "./completions";
+import { ensureRuffopsChecklistSchema } from "./ensure-schema";
 import type { RuffopsChecklistState } from "./types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -19,6 +20,7 @@ export async function loadRuffopsChecklistState(
   }
 ): Promise<RuffopsChecklistState> {
   const now = options?.now ?? new Date();
+  await ensureRuffopsChecklistSchema(supabase).catch(() => undefined);
   const settings = await loadAdminSettings(supabase);
   const timeZone = settings.timezone || "America/Los_Angeles";
   const shiftDate = getShiftDate(timeZone, now);
