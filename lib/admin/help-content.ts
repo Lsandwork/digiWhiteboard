@@ -312,9 +312,37 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Support — Support Command Center for complaints, PIPs, and urgent cases.",
       "People & HR — staff directory, users, HR records (including uploaded paper write-ups), write-ups, PIP, and HR Consult (Sam scans uploaded write-ups and recommends next steps).",
       "Apps — Route Generator, System Health, Blog Generator, Gingr, Ruffly.",
-      "Admin — Overview, analytics, settings, logs, integrations, templates, and notifications."
+      "Admin — Overview, Reports, analytics snapshot, settings, logs, integrations, templates, and notifications."
     ],
     adminTab: "sa_admin_hub",
+    adminBoard: "staff",
+    audiences: ["admin"]
+  },
+  {
+    id: "ruffops-reports",
+    title: "How do Admin Reports work?",
+    summary: "Admins and Management open Reports for shared checklist completions, photo uploads by person and date, logins per day and week, Walks Board, Team Log, and follow-up analytics.",
+    category: "Admin Dashboard",
+    keywords: [
+      "reports",
+      "analytics",
+      "checklist",
+      "photo uploads",
+      "logins",
+      "walks board",
+      "team log"
+    ],
+    steps: [
+      "Open Admin → Reports (Admins and Management only).",
+      "Set a From / To date range. Dates are Pacific.",
+      "Use the report buttons: Checklist completions, Photo uploads, Logins by day & week, Walks Board, Team Log, and Follow-ups / issues / support.",
+      "Each report shows totals plus a timestamped list. Download CSV when you need to share the table.",
+      "Photo counts use RuffOps uploads (who uploaded how many pictures on which service date). Login counts use RuffOps sign-ins going forward, plus historical admin.login audit rows after migration 080."
+    ],
+    tips: [
+      "Gingr remains the system of record for medications and additional services. Reports measure what happened inside RuffOps."
+    ],
+    adminTab: "reports",
     adminBoard: "staff",
     audiences: ["admin"]
   },
@@ -1241,6 +1269,7 @@ const MANAGEMENT_EXTRA_ARTICLE_IDS = new Set([
   "cleaned-menu-hubs",
   "need-help-card-dismiss",
   "role-menu-admin",
+  "ruffops-reports",
   "front-desk-log",
   "staff-ops-pages",
   "fitdog-alerts-help",

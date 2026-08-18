@@ -1054,6 +1054,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   users: "manage_staff_users",
   integrations: "view_integrations",
   analytics: "view_analytics",
+  reports: "view_analytics",
   logs: "view_admin_logs",
   management_support: "submit_write_up",
   package_commissions: "manage_package_commissions",
@@ -1523,6 +1524,15 @@ export function canAccessAdminTab(
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     if (isAdminOrManagementLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole)) return true;
     return isDogHandlerLegacyRole(legacyRole);
+  }
+
+  // Reports — Admin and Management only (staff board).
+  if (tab === "reports") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isAdminOrManagementLegacyRole(legacyRole)) return true;
+    const effective = access ?? accessFromLegacyRole(null, null, legacyRole);
+    return hasPermission(effective, "view_analytics") || hasPermission(effective, "export_reports");
   }
 
   if (tab === "fitdog_alerts") {

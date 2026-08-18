@@ -81,6 +81,7 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   display: FITDOG_UI.view,
   whiteboard_preview: FITDOG_SIDEBAR_ICONS.whiteboardPreview,
   analytics: FITDOG_SIDEBAR_ICONS.analytics,
+  reports: FITDOG_SIDEBAR_ICONS.analytics,
   templates: FITDOG_SIDEBAR_ICONS.templates,
   staff_directory: FITDOG_SIDEBAR_ICONS.staffDirectory,
   staff_create_user: FITDOG_UI.edit,
