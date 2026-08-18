@@ -58,6 +58,7 @@ function layout(
   assert.match(emptyStateSource, /No dogs are currently checking/);
   assert.match(emptyStateSource, /in \/ out\./);
   assert.match(emptyStateSource, /Arrivals and departures will appear here automatically\./);
+  assert.match(emptyStateSource, /\/api\/staff\/idle-slideshow/);
 }
 
 // 6. Empty opposite panel is not present in single-panel mode.
