@@ -102,7 +102,9 @@ function layout(
   const boardClientSource = readFileSync(join(process.cwd(), "components/BoardClient.tsx"), "utf8");
   assert.match(boardClientSource, /keepLastGood:\s*true/);
   assert.match(boardClientSource, /hasSuccessfulLoadRef\.current \? null : message/);
-  assert.match(boardClientSource, /isBoardDataLoaded = \(fetchStatus === "ok" && !fetchError\) \|\| hasVisibleDogs/);
+  assert.match(boardClientSource, /fullSyncCompleted/);
+  assert.match(boardClientSource, /isBoardDataLoaded =/);
+  assert.match(boardClientSource, /hasVisibleDogs \|\| \(fullSyncCompleted/);
 }
 
 // 12. Single-panel mode changes to dual-panel when opposite side gets a dog.

@@ -843,7 +843,7 @@ export function BoardClient({
     onFallbackRefresh: () => window.location.reload()
   });
   const isBoardDataLoaded =
-    hasVisibleDogs || (fullSyncCompleted && fetchStatus === "ok" && !fetchError);
+    hasVisibleDogs || (fullSyncCompleted && (fetchStatus === "ok" || fetchStatus === "error"));
   const staffBoardLayout = useMemo(
     () =>
       getStaffBoardLayoutState({
