@@ -26,7 +26,7 @@ const QUICK_TABS: Array<{ tab: string; label: string; keywords: string }> = [
   { tab: "ops_system_health", label: "System Health & Debugging", keywords: "gingr twilio samsara integrations cursor debug route audit errors" },
   { tab: "shift_handoff", label: "Shift Handoff", keywords: "handover overnight morning" },
   { tab: "crossover_communication", label: "Team Log", keywords: "crossover notes" },
-  { tab: "walks_board", label: "Walks Board", keywords: "walk overdue" },
+  { tab: "walks_board", label: "Walks Board", keywords: "walk overdue whiteboard alarm no plays grooming" },
   { tab: "grooming_push", label: "Grooming Push", keywords: "groomer ready" },
   { tab: "live_fleet", label: "Live Fleet", keywords: "fleet vans gps samsara map" },
   { tab: "route_generator", label: "Route Generator", keywords: "routes vans" },

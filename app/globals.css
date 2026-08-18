@@ -12502,8 +12502,30 @@ button.admin-notification-bell__item:focus-visible {
 }
 
 :is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-card__status--overdue,
-:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-card__status--walk_due {
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-card__status--walk_due,
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-card__status--alarm_due {
   color: #b91c1c;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-live-clock,
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-slot {
+  background: #fff;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-live-clock,
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-checklist li,
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-slot strong {
+  color: #12213a;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-no-snooze {
+  color: #475569;
+}
+
+:is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-card--complete {
+  background:
+    linear-gradient(180deg, rgba(209, 250, 229, 0.9), transparent 55%),
+    #fff;
 }
 
 :is(html[data-theme="light"], html[data-theme="clear"]) .walks-board-card__alert-icon {
@@ -12671,6 +12693,116 @@ button.admin-notification-bell__item:focus-visible {
 
 .walks-board-clear-btn {
   background: linear-gradient(145deg, #b45309, #92400e);
+}
+
+.walks-board-live-clock {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(8, 17, 28, 0.72);
+  padding: 0.45rem 0.85rem;
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.walks-board-checklist {
+  display: grid;
+  gap: 0.55rem;
+  margin: 1.1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.walks-board-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.walks-board-checklist svg {
+  margin-top: 0.15rem;
+  color: #ff9f1c;
+  flex-shrink: 0;
+}
+
+.walks-board-no-snooze {
+  margin-top: 0.85rem;
+  color: rgba(248, 250, 252, 0.72);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.walks-board-closed {
+  display: grid;
+  gap: 0.35rem;
+  color: #cbd5e1;
+}
+
+.walks-board-card--complete {
+  border-color: rgba(52, 211, 153, 0.45);
+  background:
+    linear-gradient(180deg, rgba(16, 185, 129, 0.12), transparent 55%),
+    rgba(8, 17, 28, 0.72);
+}
+
+.walks-board-card__status--alarm_due {
+  color: #fdba74;
+}
+
+.walks-board-slot-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 960px) {
+  .walks-board-slot-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+.walks-board-slot {
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 0.9rem;
+  background: rgba(8, 17, 28, 0.55);
+  padding: 0.75rem 0.8rem;
+}
+
+.walks-board-slot strong {
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.walks-board-slot span {
+  color: rgba(148, 163, 184, 0.95);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.walks-board-slot--current {
+  border-color: rgba(255, 159, 28, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(255, 159, 28, 0.14);
+}
+
+.walks-board-slot--completed {
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.walks-board-slot--missed {
+  border-color: rgba(248, 113, 113, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -499,6 +499,7 @@ const COORDINATOR_PERMISSIONS: PermissionKey[] = [
   "view_ops_command_center",
   "view_ops_dog_profile",
   "manage_ops_tasks",
+  "receive_walks_board_reminders",
 ];
 
 const MANAGEMENT_PERMISSIONS: PermissionKey[] = [
@@ -711,6 +712,7 @@ const DOG_HANDLER_PERMISSIONS: PermissionKey[] = [
   ...STAFF_NOTIFICATION_PERMISSIONS,
   "view_my_shift",
   "view_ops_dog_profile",
+  "receive_walks_board_reminders",
 ];
 
 /** Team Lead DigiBoard panel — push, grooming, team log, video links, notifications, write-ups, profile. */

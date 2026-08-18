@@ -100,7 +100,7 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
           tabLink("active_issues", "Active Issues", "Open floor issues and escalations."),
           tabLink("fitdog_alerts", "Fitdog Alerts", "Payment failures and Fitdog sync alerts."),
           tabLink("vip_auto_book", "VIP Auto Book", "VIP clients who always want auto-booking."),
-          tabLink("walks_board", "Walks Board", "Recurring walks board."),
+          tabLink("walks_board", "Walks Board", "Physical whiteboard walk-check alarm."),
           tabLink("track_incidents", "Track Incidents", "Incident tracking with Gingr sync."),
           tabLink("vet_visits", "Vet Visits", "Vet visits and required owner follow-up."),
           tabLink("checklist", "Check List", "Personal handler checklist."),
