@@ -2689,7 +2689,7 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice--fullscreen {
-  max-width: min(1180px, 100%);
+  max-width: min(1760px, 100%);
   min-height: min(680px, 100%);
   padding: clamp(2.5rem, 5vw, 5rem);
 }
@@ -2755,7 +2755,7 @@ html.lobby-tv-display .social-video-shell {
 }
 
 .staff-push-notice__message {
-  max-width: 820px;
+  max-width: min(72rem, 100%);
   margin: clamp(1rem, 2vw, 1.5rem) auto 0;
   color: rgba(255, 255, 255, 0.92);
   font-size: clamp(1.15rem, 1.8vw, 2rem);

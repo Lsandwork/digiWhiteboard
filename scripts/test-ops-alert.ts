@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseChecklistItems } from "../lib/ops-alert/checklist";
 import { opsAlertFromStaffPushNotice } from "../lib/ops-alert/from-staff-push";
 import { resolveOpsAlertAccent, resolveOpsAlertAction } from "../lib/ops-alert/status";
@@ -72,5 +74,15 @@ assert.equal(resolveOpsAlertAccent({ priority: "urgent" }), "red");
 assert.equal(resolveOpsAlertAccent({ status: "completed" }), "green");
 assert.equal(resolveOpsAlertAction({ accent: "red" }).actionLabel, "URGENT ACTION");
 assert.equal(resolveOpsAlertAction({ accent: "green", status: "completed" }).actionLabel, "COMPLETED");
+
+{
+  const css = readFileSync(join(process.cwd(), "components/ops-alert/OpsAlert.module.css"), "utf8");
+  assert.match(css, /\.cardFullscreen \{[\s\S]*?width:\s*100%/);
+  assert.match(css, /\.cardCompact \{[\s\S]*?width:\s*min\(100%, 28rem\)/);
+  assert.match(css, /place-items:\s*center stretch/);
+  assert.match(css, /@media \(min-width: 1100px\)/);
+  assert.match(css, /@media \(max-width: 720px\)/);
+  assert.doesNotMatch(css, /width:\s*min\(100%, 56rem\)/);
+}
 
 console.log("ops-alert checks passed");

@@ -202,8 +202,8 @@
   display: grid;
   min-height: 0;
   flex: 1;
-  place-items: center;
-  padding: clamp(0.75rem, 2vw, 1.5rem) clamp(0.85rem, 2.5vw, 2rem) clamp(0.65rem, 1.5vw, 1.1rem);
+  place-items: center stretch;
+  padding: clamp(0.75rem, 2vw, 1.5rem) clamp(0.55rem, 1.4vw, 1.1rem) clamp(0.65rem, 1.5vw, 1.1rem);
 }
 
 .boardFooter {
@@ -234,7 +234,7 @@
 
   position: relative;
   display: flex;
-  width: min(100%, 52rem);
+  width: min(100%, 72rem);
   max-height: 100%;
   flex-direction: column;
   overflow: hidden;
@@ -278,14 +278,29 @@
   --action-bg: #1f9d5f;
 }
 
-.cardCompact {
-  width: min(100%, 28rem);
-  max-height: none;
-  padding: 1rem 1.1rem;
+.cardFullscreen {
+  width: 100%;
+  max-width: none;
+  padding: clamp(1.15rem, 2.4vw, 1.85rem) clamp(1.35rem, 3.2vw, 2.75rem);
 }
 
-.cardFullscreen {
-  width: min(100%, 56rem);
+.cardFullscreen .title {
+  font-size: clamp(1.75rem, 4.1vw, 3.15rem);
+}
+
+.cardFullscreen .checklistItem {
+  font-size: clamp(1.08rem, 2vw, 1.5rem);
+}
+
+.cardFullscreen .metaValue {
+  font-size: clamp(1.05rem, 1.9vw, 1.4rem);
+}
+
+.cardCompact {
+  width: min(100%, 28rem);
+  max-width: 28rem;
+  max-height: none;
+  padding: 1rem 1.1rem;
 }
 
 .iconWrap {
@@ -525,6 +540,15 @@
   50% {
     opacity: 0.7;
     transform: scale(0.92);
+  }
+}
+
+@media (min-width: 1100px) {
+  .cardFullscreen .checklist {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: clamp(1.5rem, 3vw, 3rem);
+    max-height: min(48vh, 26rem);
   }
 }
 
