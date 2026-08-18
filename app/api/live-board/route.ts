@@ -19,7 +19,8 @@ import {
   mapGingrBoardToLiveDogs,
   syncGingrBoardState
 } from "@/lib/gingr-board-sync";
-import { canCallGingrEndpoint } from "@/lib/gingr-request-guard";
+import { canCallGingrEndpoint, getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
+import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { LIVE_BOARD_CACHE_TTL_MS } from "@/lib/board-settings-cache";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
@@ -193,12 +194,15 @@ export async function GET(request: Request) {
     const requestStartedAt = Date.now();
     const loadLiveBoard = async () => {
     const supabase = getServiceSupabase();
-    const usedCachedGingr = !canCallGingrEndpoint("back_of_house");
+    const cachedGingrBoard = getCachedBackOfHouseBoard(now.getTime(), true);
+    const usedCachedGingr = Boolean(cachedGingrBoard) || !canCallGingrEndpoint("back_of_house");
     let gingrBoard: Awaited<ReturnType<typeof fetchGingrBackOfHouse>> | null = null;
     let gingrError: string | null = null;
 
     const [gingrBoardResult, activeCheckinRows, promptedCheckoutRows] = await Promise.all([
-      fetchGingrBackOfHouse({ allReservationTypes: true }).catch((error) => {
+      cachedGingrBoard
+        ? Promise.resolve(cachedGingrBoard)
+        : fetchGingrBackOfHouse({ allReservationTypes: true }).catch((error) => {
         gingrError = error instanceof Error ? error.message : "Gingr fetch failed.";
         if (debugBoard) {
           console.error("[Fitdog Board API] Gingr fetch failed, using Supabase fallback:", gingrError);
@@ -277,6 +281,7 @@ export async function GET(request: Request) {
 
       after(async () => {
         try {
+          await refreshGingrBoardCache().catch(() => null);
           await syncGingrBoardState(supabase, gingrBoard);
         } catch (error) {
           if (debugBoard) {
@@ -403,7 +408,7 @@ export async function GET(request: Request) {
       checkingOut: response.checking_out.length
     });
     return NextResponse.json(response, {
-      headers: { "cache-control": "private, max-age=2, stale-while-revalidate=6" }
+      headers: { "cache-control": "private, no-store, max-age=0" }
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load live board.";

@@ -15,8 +15,8 @@ function source(relativePath: string) {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
 }
 
-assert.equal(STAFF_IDLE_SLIDESHOW_INTERVAL_MS, 8000);
-assert.equal(STAFF_IDLE_SLIDESHOW_LIMIT, 48);
+assert.equal(STAFF_IDLE_SLIDESHOW_INTERVAL_MS, 20000);
+assert.equal(STAFF_IDLE_SLIDESHOW_LIMIT, 24);
 
 {
   const shuffled = shuffleStaffIdleSlides(["a", "b", "c", "d"], () => 0);
@@ -46,7 +46,7 @@ assert.equal(STAFF_IDLE_SLIDESHOW_LIMIT, 48);
       thumbnail_storage_path: "thumb.jpg",
       original_storage_path: "orig.jpg"
     }),
-    "ready.jpg"
+    "thumb.jpg"
   );
   assert.equal(
     staffIdleSlideshowStoragePath({
@@ -99,11 +99,14 @@ assert.equal(
   assert.match(emptyState, /visibleStaffIdleSlideIndexes/);
   assert.match(emptyState, /No dogs are currently checking/);
   assert.match(emptyState, /prefers-reduced-motion/);
+  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
+  assert.match(emptyState, /fetchPriority="low"/);
   assert.match(emptyState, /useDisplaySync/);
   assert.doesNotMatch(emptyState, /\/api\/admin\/photo-upload-queue/);
   assert.doesNotMatch(emptyState, /\/api\/lobby\/slideshow/);
 
   const css = source("app/globals.css");
+  assert.match(css, /\.staff-idle-slideshow__image[\s\S]*?object-fit:\s*contain/);
   assert.match(css, /\.staff-idle-slideshow__image\.is-active/);
   assert.match(
     css,

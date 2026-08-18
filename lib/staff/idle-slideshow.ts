@@ -1,5 +1,6 @@
-export const STAFF_IDLE_SLIDESHOW_INTERVAL_MS = 8000;
-export const STAFF_IDLE_SLIDESHOW_LIMIT = 48;
+export const STAFF_IDLE_SLIDESHOW_INTERVAL_MS = 20000;
+export const STAFF_IDLE_SLIDESHOW_LIMIT = 24;
+export const STAFF_IDLE_SLIDESHOW_START_DELAY_MS = 2000;
 
 export type StaffIdleSlideshowSlide = {
   id: string;
@@ -39,7 +40,7 @@ export function staffIdleSlideshowStoragePath(row: {
   thumbnail_storage_path?: string | null;
   original_storage_path?: string | null;
 }) {
-  return row.gingr_ready_storage_path || row.thumbnail_storage_path || row.original_storage_path || null;
+  return row.thumbnail_storage_path || row.gingr_ready_storage_path || row.original_storage_path || null;
 }
 
 function slideAlt(filename: string | null | undefined) {

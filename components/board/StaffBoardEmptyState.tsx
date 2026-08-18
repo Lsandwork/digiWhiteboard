@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import {
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
+  STAFF_IDLE_SLIDESHOW_START_DELAY_MS,
   visibleStaffIdleSlideIndexes,
   type StaffIdleSlideshowSlide
 } from "@/lib/staff/idle-slideshow";
@@ -60,7 +61,6 @@ function FallbackEmptyCopy() {
 export function StaffBoardEmptyState() {
   const [slides, setSlides] = useState<StaffIdleSlideshowSlide[]>([]);
   const [index, setIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const loadSlides = useCallback(async () => {
@@ -71,13 +71,14 @@ export function StaffBoardEmptyState() {
       setSlides(next);
     } catch {
       setSlides([]);
-    } finally {
-      setLoaded(true);
     }
   }, []);
 
   useEffect(() => {
-    void loadSlides();
+    const timer = window.setTimeout(() => {
+      void loadSlides();
+    }, STAFF_IDLE_SLIDESHOW_START_DELAY_MS);
+    return () => window.clearTimeout(timer);
   }, [loadSlides]);
 
   useDisplaySync({
@@ -107,7 +108,7 @@ export function StaffBoardEmptyState() {
     return () => window.clearInterval(timer);
   }, [reduceMotion, slides.length]);
 
-  const hasSlideshow = loaded && slides.length > 0;
+  const hasSlideshow = slides.length > 0;
   const active = slides[index] ?? slides[0];
   const visibleIndexes = visibleStaffIdleSlideIndexes(index, slides.length);
 
@@ -132,6 +133,7 @@ export function StaffBoardEmptyState() {
                   alt=""
                   className={`staff-idle-slideshow__image ${slideIndex === index ? "is-active" : ""}`}
                   decoding="async"
+                  fetchPriority="low"
                 />
               );
             })}
@@ -141,14 +143,9 @@ export function StaffBoardEmptyState() {
       ) : (
         <>
           <div className="staff-board-empty-state__panel">
-            {!loaded ? (
-              <p className="staff-board-empty-state__support">Loading photos…</p>
-            ) : (
-              <FallbackEmptyCopy />
-            )}
+            <FallbackEmptyCopy />
           </div>
-          {loaded ? (
-            <div className="staff-board-empty-state__quiet" role="status">
+          <div className="staff-board-empty-state__quiet" role="status">
               <Image
                 src={`${ASSET_BASE}/fitdog-empty-quiet-heart.svg`}
                 alt=""
@@ -164,7 +161,6 @@ export function StaffBoardEmptyState() {
                 </p>
               </div>
             </div>
-          ) : null}
         </>
       )}
     </section>

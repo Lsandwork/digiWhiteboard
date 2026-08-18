@@ -4,10 +4,14 @@ import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
-export const BOARD_CHECKOUT_POLL_MIN_MS = 1000;
+export const BOARD_CHECKOUT_POLL_MIN_MS = 500;
 export const BOARD_CHECKOUT_POLL_MAX_MS = 12_000;
 /** Staff board fast poll — keep ≤1s so check-ins appear quickly when Realtime is down. */
 export const BOARD_CHECKOUT_POLL_MS = 1000;
+/** Empty board: poll twice as often and bypass TTL so the first dog is not waiting on a stale empty cache. */
+export const BOARD_CHECKOUT_POLL_EMPTY_MS = 500;
+/** Confirm Realtime paints quickly without racing a stale sibling instance. */
+export const BOARD_REALTIME_CONFIRM_MS = 200;
 export const BOARD_FULL_SYNC_POLL_MS = 20_000;
 /** Full board sync interval when Supabase Realtime is connected. */
 export const BOARD_FULL_SYNC_POLL_LIVE_MS = 60_000;

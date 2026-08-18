@@ -74,7 +74,7 @@ async function fetchGingrJson<T>(url: string, endpoint: "back_of_house" | "reser
   const timeout = setTimeout(() => controller.abort(), 8000);
   // Must not exceed the back-of-house cooldown or the data cache becomes the
   // bottleneck for how quickly a new dog can reach the board.
-  const revalidateSeconds = endpoint === "back_of_house" ? 3 : 600;
+  const revalidateSeconds = endpoint === "back_of_house" ? 1 : 600;
 
   try {
     markGingrEndpointCalled(endpoint);

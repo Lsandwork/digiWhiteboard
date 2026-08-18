@@ -18,8 +18,8 @@ type CachedBackOfHouseRecord = {
  * webhook, so it drives how fast those dogs reach the board. One request per
  * interval is shared by every board, so this stays cheap for Gingr.
  */
-const BACK_OF_HOUSE_COOLDOWN_MS = Number(process.env.GINGR_BACK_OF_HOUSE_COOLDOWN_MS ?? 4000);
-const GLOBAL_MIN_INTERVAL_MS = Number(process.env.GINGR_GLOBAL_MIN_INTERVAL_MS ?? 2000);
+const BACK_OF_HOUSE_COOLDOWN_MS = Number(process.env.GINGR_BACK_OF_HOUSE_COOLDOWN_MS ?? 2000);
+const GLOBAL_MIN_INTERVAL_MS = Number(process.env.GINGR_GLOBAL_MIN_INTERVAL_MS ?? 1500);
 const BACK_OF_HOUSE_STALE_MS = Number(process.env.GINGR_BACK_OF_HOUSE_STALE_MS ?? 60000);
 export const ANIMAL_PHOTO_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 

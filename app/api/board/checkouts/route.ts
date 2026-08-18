@@ -100,7 +100,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(payload, {
       headers: {
-        "cache-control": fresh ? "private, no-store, max-age=0" : "private, max-age=1, stale-while-revalidate=4"
+        "cache-control": "private, no-store, max-age=0"
       }
     });
   } catch (error) {
