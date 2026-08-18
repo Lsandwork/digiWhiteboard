@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
-import { useDisplaySync } from "@/hooks/useDisplaySync";
 import {
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
   STAFF_IDLE_SLIDESHOW_START_DELAY_MS,
@@ -80,13 +79,6 @@ export function StaffBoardEmptyState() {
     }, STAFF_IDLE_SLIDESHOW_START_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [loadSlides]);
-
-  useDisplaySync({
-    enabled: true,
-    onContentUpdate: () => {
-      void loadSlides();
-    }
-  });
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");

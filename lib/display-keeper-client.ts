@@ -1,23 +1,12 @@
 import type { DisplaySyncState } from "@/lib/display-sync";
 import {
-  DISPLAY_BUILD_RELOAD_KEY,
   hardReloadDisplay,
   readStoredDisplaySync,
+  shouldReloadForBuild,
+  shouldReloadForCastNonce,
   softReloadDisplay,
   writeStoredDisplaySync
 } from "@/lib/display-sync";
-
-function shouldReloadForBuild(buildId: string) {
-  if (typeof window === "undefined") return true;
-  try {
-    const last = window.sessionStorage.getItem(DISPLAY_BUILD_RELOAD_KEY);
-    if (last === buildId) return false;
-    window.sessionStorage.setItem(DISPLAY_BUILD_RELOAD_KEY, buildId);
-    return true;
-  } catch {
-    return true;
-  }
-}
 
 export async function fetchDisplaySyncState() {
   try {
@@ -36,7 +25,11 @@ export function applyDisplaySyncUpdate(
 ) {
   if (next.cast_hard_reload_nonce !== previous.cast_hard_reload_nonce) {
     writeStoredDisplaySync({ ...next });
-    hardReloadDisplay(next.cast_hard_reload_nonce);
+    if (shouldReloadForCastNonce(next.cast_hard_reload_nonce)) {
+      hardReloadDisplay(next.cast_hard_reload_nonce);
+    } else {
+      onContentUpdate?.();
+    }
     return;
   }
 

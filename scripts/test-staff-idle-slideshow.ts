@@ -101,7 +101,7 @@ assert.equal(
   assert.match(emptyState, /prefers-reduced-motion/);
   assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
   assert.match(emptyState, /fetchPriority="low"/);
-  assert.match(emptyState, /useDisplaySync/);
+  assert.doesNotMatch(emptyState, /useDisplaySync/);
   assert.doesNotMatch(emptyState, /\/api\/admin\/photo-upload-queue/);
   assert.doesNotMatch(emptyState, /\/api\/lobby\/slideshow/);
 

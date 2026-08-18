@@ -187,6 +187,7 @@ export function BoardClient({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(null);
   const [lastFetchAt, setLastFetchAt] = useState<string | null>(null);
+  const [fullSyncCompleted, setFullSyncCompleted] = useState(false);
   const [clock, setClock] = useState<Date | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [toast, setToast] = useState<string | null>(null);
@@ -511,7 +512,7 @@ export function BoardClient({
       setFetchError(null);
       setFetchStatus("ok");
       castKeeper?.markDataFresh();
-    }, { rerunIfBusy: true });
+    });
   }, [fastCheckoutEndpoint, castKeeper, debugBoard, runFastPoll]);
 
   const loadFastCheckoutsRef = useRef(loadFastCheckouts);
@@ -522,6 +523,7 @@ export function BoardClient({
   const loadBoard = useCallback(
     async (mode: ConnectionState = "polling", options: { silent?: boolean } = {}) => {
       await runFullPoll(async () => {
+      try {
       if (!options.silent) {
         setFetchStatus("loading");
       }
@@ -606,6 +608,9 @@ export function BoardClient({
         return mode;
       });
       castKeeper?.markDataFresh();
+      } finally {
+        setFullSyncCompleted(true);
+      }
       });
     },
     [apiEndpoint, castKeeper, castKeeperMode, debugBoard, runFullPoll]
@@ -837,7 +842,8 @@ export function BoardClient({
     health: castHealth,
     onFallbackRefresh: () => window.location.reload()
   });
-  const isBoardDataLoaded = (fetchStatus === "ok" && !fetchError) || hasVisibleDogs;
+  const isBoardDataLoaded =
+    hasVisibleDogs || (fullSyncCompleted && (fetchStatus === "ok" || fetchStatus === "error"));
   const staffBoardLayout = useMemo(
     () =>
       getStaffBoardLayoutState({
