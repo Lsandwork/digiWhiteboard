@@ -3,8 +3,10 @@ import type { TlOvernightLodgingArea } from "./config";
 import type { TlLodgingAreaKey } from "./constants";
 import {
   dosageFromItem,
+  extraNotesFromItem,
   medicationNameFromItem,
   notesFromItem,
+  uniqueNoteParts,
   type ResolvedGingrMedicationSchedule
 } from "./gingr-medication";
 import type { ResolvedMedicationAdministration } from "./gingr-medication-report";
@@ -36,8 +38,23 @@ export function buildTlGingrMedicationRecord(
 ): TlGingrMedicationRecord {
   const now = context.now ?? new Date();
   const dosage = dosageFromItem(resolved.item);
-  const notes = notesFromItem(resolved.item);
+  const scheduleNotes = notesFromItem(resolved.item);
+  const extraScheduleNotes = extraNotesFromItem(resolved.item);
   const administration = context.administration ?? null;
+  const statusLabel = administration?.statusLabel?.trim() || null;
+  const noteworthyStatus =
+    statusLabel && !/^(administered|not[\s_-]*administered|n\/?a)$/i.test(statusLabel) ? statusLabel : null;
+  const instructions = uniqueNoteParts([scheduleNotes, extraScheduleNotes])[0] ?? extraScheduleNotes ?? scheduleNotes;
+  const noteParts = uniqueNoteParts([administration?.administrationNotes, extraScheduleNotes]).filter(
+    (part) => !instructions || part.toLowerCase() !== instructions.toLowerCase()
+  );
+  if (
+    noteworthyStatus &&
+    !noteParts.some((part) => part.toLowerCase().includes(noteworthyStatus.toLowerCase()))
+  ) {
+    noteParts.push(noteworthyStatus);
+  }
+  const notes = noteParts.join(" · ") || null;
 
   return {
     gingrMedicationId: String(resolved.item.id),
@@ -52,8 +69,8 @@ export function buildTlGingrMedicationRecord(
     scheduleKind: resolved.scheduleKind,
     medicationName: medicationNameFromItem(resolved.item),
     dosage,
-    instructions: notes,
-    notes: administration?.administrationNotes || notes,
+    instructions,
+    notes,
     administrationStatus: administration?.administrationStatus ?? "not_administered",
     administeredAt: administration?.administeredAt ?? null,
     administeredBy: administration?.administeredBy ?? null,

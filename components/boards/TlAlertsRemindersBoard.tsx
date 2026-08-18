@@ -9,6 +9,7 @@ import {
   periodLabel
 } from "@/lib/tl-digi-board/medication-windows";
 import { tlBoardAnimalPhotoProxyUrl } from "@/lib/tl-digi-board/animal-photos";
+import { splitMedicationDisplayNotes } from "@/lib/tl-digi-board/medication-notes";
 import type {
   TlBoardAdditionalServiceRow,
   TlBoardMedicationRow,
@@ -49,6 +50,22 @@ function medicationStatusLabel(row: TlBoardMedicationRow) {
   if (row.displayStatus === "overdue") return "NOT ADMINISTERED";
   if (row.displayStatus === "administered") return "ADMINISTERED";
   return "NEEDS MEDICATION";
+}
+
+function MedicationNotesCell({ row }: { row: TlBoardMedicationRow }) {
+  const display = splitMedicationDisplayNotes(row);
+  if (!display.instructions && !display.notes) return <span className="tl-table__muted">—</span>;
+  return (
+    <div className="tl-table__notes-stack">
+      {display.instructions ? <p className="tl-table__instruction-text">{display.instructions}</p> : null}
+      {display.notes ? (
+        <p className="tl-table__notes">
+          <span className="tl-table__notes-label">Notes</span>
+          {display.notes}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function formatAdminTime(iso: string | null) {
@@ -120,7 +137,9 @@ function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
       <td className="tl-table__schedule">{scheduleBadge(row)}</td>
       <td className="tl-table__med">{row.medicationName}</td>
       <td className="tl-table__dose">{row.dosage || "—"}</td>
-      <td className="tl-table__instructions">{row.instructions || row.notes || "—"}</td>
+      <td className="tl-table__instructions">
+        <MedicationNotesCell row={row} />
+      </td>
       <td className="tl-table__status-cell">
         <span className={`tl-badge tl-badge--${row.displayStatus}`}>{medicationStatusLabel(row)}</span>
         {row.displayStatus === "administered" ? (
@@ -316,7 +335,7 @@ function BoardInner() {
                     <th>Schedule</th>
                     <th>Medication</th>
                     <th>Dosage</th>
-                    <th>Instructions</th>
+                    <th>Instructions / Notes</th>
                     <th>Status</th>
                   </tr>
                 </thead>

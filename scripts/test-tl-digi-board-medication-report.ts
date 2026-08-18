@@ -7,6 +7,7 @@ import {
   extractAdministrationRecordsFromHistory,
   flattenAdministrationData,
   isAdministeredReportStatus,
+  isUnableToAdministerReportStatus,
   resolveAdministrationForSchedule
 } from "../lib/tl-digi-board/gingr-medication-report";
 import { buildTlGingrMedicationRecord } from "../lib/tl-digi-board/normalize";
@@ -20,6 +21,8 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
   assert.equal(isAdministeredReportStatus("1", "Administered"), true);
   assert.equal(isAdministeredReportStatus("2", "Not Administered"), false);
   assert.equal(isAdministeredReportStatus("3", "N/A"), false);
+  assert.equal(isAdministeredReportStatus(null, "Unable to Administer"), false);
+  assert.equal(isUnableToAdministerReportStatus(null, "Unable to Administer"), true);
   assert.equal(isAdministeredReportStatus(null, null), false);
   assert.equal(isAdministeredReportStatus("administered", null), true);
   assert.equal(isAdministeredReportStatus("", "Given"), true);
@@ -140,6 +143,31 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
   });
   assert.equal(resolved.administrationStatus, "administered");
   assert.equal(resolved.administrationNotes, "ok");
+}
+
+{
+  const records = flattenAdministrationData(
+    [
+      {
+        date: "2026-08-17",
+        animal_medication_schedule_id: "dougal-eye",
+        status: "12",
+        notes: "Could not mark administered. Retry with two people."
+      }
+    ],
+    [
+      { value: "10", label: "Administered" },
+      { value: "12", label: "Unable to Administer" }
+    ]
+  );
+  const resolved = resolveAdministrationForSchedule({
+    records,
+    animalMedicationScheduleId: "dougal-eye",
+    serviceDate: "2026-08-17"
+  });
+  assert.equal(resolved.administrationStatus, "not_administered");
+  assert.equal(resolved.statusLabel, "Unable to Administer");
+  assert.match(resolved.administrationNotes ?? "", /Could not mark administered/);
 }
 
 // --- normalize merges administration ---
