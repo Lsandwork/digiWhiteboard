@@ -49,13 +49,15 @@ export function useDisplaySync({
           syncRef.current = next;
           return;
         }
-        applyDisplaySyncUpdate(next, previous, () => onContentUpdateRef.current?.());
+        const result = applyDisplaySyncUpdate(next, previous, () => onContentUpdateRef.current?.());
+        if (result === "reloading") return;
         syncRef.current = readStoredDisplaySync() ?? next;
         return;
       }
 
       const previous = syncRef.current;
-      applyDisplaySyncUpdate(next, previous, () => onContentUpdateRef.current?.());
+      const result = applyDisplaySyncUpdate(next, previous, () => onContentUpdateRef.current?.());
+      if (result === "reloading") return;
       syncRef.current = readStoredDisplaySync() ?? next;
     };
 

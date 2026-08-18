@@ -381,6 +381,34 @@ export async function issueCommand(
   return { ok: true, receiver: toPublicReceiver(updated as ReceiverRow) };
 }
 
+export async function refreshPairedRemoteCastDisplays(
+  supabase: SupabaseClient,
+  createdBy = "admin_cast_refresh"
+): Promise<{ refreshed: number }> {
+  let receivers: RemoteCastReceiverPublic[] = [];
+  try {
+    receivers = await listReceivers(supabase);
+  } catch (error) {
+    console.error("[remote-cast] list receivers for hard refresh failed:", error);
+    return { refreshed: 0 };
+  }
+
+  const targets = receivers.filter((receiver) => receiver.paired);
+  const results = await Promise.allSettled(
+    targets.map((receiver) =>
+      issueCommand(supabase, {
+        receiverId: receiver.id,
+        command: "REFRESH",
+        createdBy
+      })
+    )
+  );
+
+  return {
+    refreshed: results.filter((result) => result.status === "fulfilled" && result.value.ok).length
+  };
+}
+
 export async function removeReceiver(supabase: SupabaseClient, receiverId: string): Promise<boolean> {
   const { error } = await supabase.from(RECEIVERS_TABLE).delete().eq("id", receiverId);
   return !error;

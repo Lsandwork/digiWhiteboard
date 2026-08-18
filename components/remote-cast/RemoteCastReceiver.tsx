@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { BoardClient } from "@/components/BoardClient";
@@ -9,6 +10,7 @@ import { LobbyCheckoutBoard } from "@/components/lobby/LobbyCheckoutBoard";
 import { LobbyErrorBoundary } from "@/components/lobby/LobbyErrorBoundary";
 import { useRemoteCastReceiver } from "@/hooks/useRemoteCastReceiver";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
+import { reloadPinnedTvUrl } from "@/lib/display-sync";
 import { FITDOG_BRAND } from "@/lib/fitdog-dashboard/assets";
 
 function ReceiverFrame({ children }: { children: React.ReactNode }) {
@@ -52,10 +54,22 @@ export function RemoteCastReceiver() {
   const debugBoard = searchParams.get("debugBoard") === "1";
 
   const runtime = useRemoteCastReceiver(debugBoard);
+  const appliedRefreshNonceRef = useRef<number | null>(null);
 
   // Persistent, aggressive wake lock — this display stays on for hours.
   // Renews wake lock only; silent video is started once and kept alive.
   useScreenWakeLock({ enabled: true, persistent: true, aggressive: true, renewIntervalMs: 8_000 });
+
+  useEffect(() => {
+    if (!runtime.ready || !runtime.paired) return;
+    if (appliedRefreshNonceRef.current === null) {
+      appliedRefreshNonceRef.current = runtime.refreshNonce;
+      return;
+    }
+    if (runtime.refreshNonce === appliedRefreshNonceRef.current) return;
+    appliedRefreshNonceRef.current = runtime.refreshNonce;
+    reloadPinnedTvUrl();
+  }, [runtime.paired, runtime.ready, runtime.refreshNonce]);
 
   if (!runtime.ready) {
     return (

@@ -499,7 +499,7 @@ export function LobbyCheckoutBoard({
   }, [castKeeperMode, loadLobbyData]);
 
   useDisplaySync({
-    enabled: !castKeeperMode,
+    enabled: true,
     onContentUpdate: () => {
       void loadLobbyMeta();
       void loadLobbyCheckouts();

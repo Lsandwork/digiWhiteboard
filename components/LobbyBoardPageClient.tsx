@@ -7,6 +7,7 @@ import { DisplayBootstrap } from "@/components/display/DisplayBootstrap";
 import { LobbyCheckoutBoard } from "@/components/lobby/LobbyCheckoutBoard";
 import { LobbyErrorBoundary } from "@/components/lobby/LobbyErrorBoundary";
 import { CastKeeperProvider } from "@/hooks/useCastKeeper";
+import { useDisplaySync } from "@/hooks/useDisplaySync";
 
 /**
  * Lobby board — same rich layout everywhere (laptop, cast target, direct display URL).
@@ -21,6 +22,8 @@ export function LobbyBoardPageClient({ embeddedDisplayToken }: { embeddedDisplay
   const castDisplayMode = chromecastReceiver || tvDisplay || castMode;
 
   const debugBoard = searchParams.get("debugBoard") === "1";
+
+  useDisplaySync({ enabled: true });
 
   if (!castDisplayMode) {
     return (

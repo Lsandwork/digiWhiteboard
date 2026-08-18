@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
   const session = getAdminSessionFromRequest(request);
   const supabase = getServiceSupabase();
-  const [checkouts, nonce] = await Promise.all([
+  const [checkouts, castRefresh] = await Promise.all([
     loadFastPromptedCheckouts(supabase),
     signalCastDisplaysHardRefresh(supabase)
   ]);
@@ -24,7 +24,8 @@ export async function POST(request: Request) {
     action: "admin.refresh",
     details: {
       active_checkouts: checkouts.checking_out.length,
-      cast_hard_reload_nonce: nonce
+      cast_hard_reload_nonce: castRefresh.nonce,
+      remote_cast_refreshed: castRefresh.remoteCastRefreshed
     }
   });
 
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
     refreshed_at: new Date().toISOString(),
     active_checkouts: checkouts.checking_out.length,
     last_synced_at: checkouts.newest_checkout_at,
-    cast_hard_reload_nonce: nonce
+    cast_hard_reload_nonce: castRefresh.nonce,
+    remote_cast_refreshed: castRefresh.remoteCastRefreshed
   });
 }

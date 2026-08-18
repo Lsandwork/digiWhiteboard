@@ -8,6 +8,8 @@ import {
   writeStoredDisplaySync
 } from "@/lib/display-sync";
 
+export type DisplaySyncApplyResult = "noop" | "updated" | "reloading";
+
 export async function fetchDisplaySyncState() {
   try {
     const response = await fetch("/api/display/sync", { cache: "no-store" });
@@ -22,31 +24,31 @@ export function applyDisplaySyncUpdate(
   next: DisplaySyncState,
   previous: DisplaySyncState,
   onContentUpdate?: () => void
-) {
+): DisplaySyncApplyResult {
   if (next.cast_hard_reload_nonce !== previous.cast_hard_reload_nonce) {
-    writeStoredDisplaySync({ ...next });
     if (shouldReloadForCastNonce(next.cast_hard_reload_nonce)) {
       hardReloadDisplay(next.cast_hard_reload_nonce);
-    } else {
-      onContentUpdate?.();
+      return "reloading";
     }
-    return;
+    writeStoredDisplaySync({ ...next });
+    onContentUpdate?.();
+    return "updated";
   }
 
   if (next.build_id !== previous.build_id) {
     writeStoredDisplaySync({ ...next });
     if (shouldReloadForBuild(next.build_id)) {
       softReloadDisplay();
-    } else {
-      onContentUpdate?.();
+      return "reloading";
     }
-    return;
+    onContentUpdate?.();
+    return "updated";
   }
 
   if (next.display_content_revision !== previous.display_content_revision) {
     writeStoredDisplaySync({ ...next });
     onContentUpdate?.();
-    return;
+    return "updated";
   }
 
   if (
@@ -55,7 +57,10 @@ export function applyDisplaySyncUpdate(
   ) {
     writeStoredDisplaySync({ ...next });
     onContentUpdate?.();
+    return "updated";
   }
+
+  return "noop";
 }
 
 export function readInitialDisplaySync() {

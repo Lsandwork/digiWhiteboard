@@ -25,8 +25,8 @@ export const REMOTE_CAST_SCREENS: RemoteCastScreen[] = ["standby", "lobby", "sta
 
 /** Receiver → server heartbeat cadence. */
 export const RECEIVER_HEARTBEAT_MS = 20_000;
-/** Receiver desired-state poll cadence (fast path so commands land quickly). */
-export const RECEIVER_STATE_POLL_MS = 6_000;
+/** Receiver desired-state poll cadence (fast path so Hard Refresh lands quickly). */
+export const RECEIVER_STATE_POLL_MS = 2_000;
 /** Admin panel receiver-list refresh cadence. */
 export const ADMIN_RECEIVERS_POLL_MS = 10_000;
 /** A receiver is considered offline if not seen within this window. */
