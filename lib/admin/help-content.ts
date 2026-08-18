@@ -896,7 +896,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
       "Primary tabs: My Shift, Driver / Hiker Mode, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
       "Open Floor Ops → Check List for today’s dog-handler daily recurring push notices and mark each one completed.",
       "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders (including grooming catch notices).",
-      "Open Floor Ops → Walks Board to track dogs that need walks and mark walked or snooze when allowed.",
+      "Open Floor Ops → Walks Board when the 2-hour alarm sounds. Update the physical No Plays, Grooming, and Walks Board, check No Plays during the walk, take and upload pictures, then mark complete. This alarm cannot be snoozed.",
       "Open Floor Ops → Team Log → Crossover Log to add or review today’s handoff notes. You can delete only entries you created.",
       "Open Notifications for alerts assigned to you, and Help Center anytime you need a guide.",
       "Dog Handler / Driver / Hiker accounts do not manage Lobby content, admin users, integrations, or global settings."

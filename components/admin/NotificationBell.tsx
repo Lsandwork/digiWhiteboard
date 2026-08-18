@@ -1,21 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { AlarmClock, Bell, BellRing, ChevronRight, Footprints, X } from "lucide-react";
+import { Bell, BellRing, CheckCircle2, ChevronRight, X } from "lucide-react";
 import { ADMIN_TABS, type AdminTab } from "@/lib/admin/types";
 import { playStaffPushNoticeAlarm, unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 
 type BellWalkAlert = {
   id: string;
-  dogName: string;
-  walkType: string;
-  walkTypeLabel: string;
-  urgency: "walk_due" | "overdue";
+  title: string;
+  message: string;
+  hourLabel: string;
+  urgency: "alarm_due" | "overdue" | "due_soon";
   countdown: string;
-  nextDueAt: string;
-  snoozeUsed: boolean;
+  dueAt: string;
   version: number;
+  checklist: string[];
 };
 
 type BellNotificationItem = {
@@ -42,7 +42,6 @@ type BellPayload = {
   walkOverdueCount: number;
   badgeCount: number;
   hasUrgent: boolean;
-  canSnooze: boolean;
   recent: BellNotificationItem[];
   walkAlerts: BellWalkAlert[];
 };
@@ -72,7 +71,7 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
       setData(body);
 
       const signature = body.walkAlerts
-        .map((alert) => `${alert.id}:${alert.urgency}:${alert.nextDueAt}`)
+        .map((alert) => `${alert.id}:${alert.urgency}:${alert.dueAt}`)
         .sort()
         .join("|");
       if (signature && signature !== lastWalkSignatureRef.current) {
@@ -140,26 +139,21 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
     }
   }
 
-  async function postWalkAction(action: "snooze" | "mark_walked", alert: BellWalkAlert) {
-    setBusyId(`${action}:${alert.id}`);
+  async function markWalkComplete(alert: BellWalkAlert) {
+    setBusyId(alert.id);
     try {
       await unlockAudioOnce();
       const response = await fetch("/api/admin/walks-board", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, entryId: alert.id, version: alert.version })
+        body: JSON.stringify({ action: "complete", cycleId: alert.id, version: alert.version })
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "Walks Board action failed.");
-      showToast(
-        action === "snooze"
-          ? `${alert.dogName} snoozed for one hour (once only).`
-          : `${alert.dogName} marked walked.`,
-        "success"
-      );
+      showToast("Walk check marked complete.", "success");
       await load();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to update walk alert.", "error");
+      showToast(error instanceof Error ? error.message : "Unable to complete walk check.", "error");
     } finally {
       setBusyId(null);
     }
@@ -185,7 +179,7 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
         }
         aria-expanded={open}
         aria-controls={panelId}
-        title={hasUrgent ? "Walk alerts need attention" : "Notifications"}
+        title={hasUrgent ? "Walk check alarm needs attention" : "Notifications"}
         onClick={() => {
           void unlockAudioOnce();
           setOpen((current) => !current);
@@ -228,59 +222,39 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
             {walkAlerts.length > 0 ? (
               <section className="admin-notification-bell__section">
                 <div className="admin-notification-bell__section-head">
-                  <h3>Walks Board — dogs need walks</h3>
+                  <h3>Walks Board alarm</h3>
                   <span className="admin-notification-bell__chip admin-notification-bell__chip--urgent">
-                    {data?.walkOverdueCount ? `${data.walkOverdueCount} overdue` : null}
-                    {data?.walkOverdueCount && data?.walkDueCount ? " · " : null}
-                    {data?.walkDueCount ? `${data.walkDueCount} due now` : null}
+                    Cannot snooze
                   </span>
                 </div>
                 <ul className="admin-notification-bell__list">
-                  {walkAlerts.map((alert) => {
-                    const snoozeBusy = busyId === `snooze:${alert.id}`;
-                    const walkedBusy = busyId === `mark_walked:${alert.id}`;
-                    return (
-                      <li
-                        key={alert.id}
-                        className={`admin-notification-bell__walk-item admin-notification-bell__walk-item--${alert.urgency}`}
-                      >
-                        <div className="admin-notification-bell__walk-copy">
-                          <p className="admin-notification-bell__walk-name">{alert.dogName}</p>
-                          <p className="admin-notification-bell__walk-meta">
-                            {alert.walkTypeLabel} · {alert.countdown}
-                            {alert.snoozeUsed ? " · Snooze used" : ""}
-                          </p>
-                        </div>
-                        <div className="admin-notification-bell__walk-actions">
-                          <button
-                            type="button"
-                            className="crossover-btn crossover-btn--primary"
-                            disabled={Boolean(busyId)}
-                            onClick={() => void postWalkAction("mark_walked", alert)}
-                          >
-                            <Footprints className="h-3.5 w-3.5" />
-                            {walkedBusy ? "Saving…" : "Walked"}
-                          </button>
-                          {data?.canSnooze ? (
-                            <button
-                              type="button"
-                              className="crossover-btn crossover-btn--outline"
-                              disabled={Boolean(busyId) || alert.snoozeUsed}
-                              title={
-                                alert.snoozeUsed
-                                  ? "This reminder can only be snoozed once"
-                                  : "Snooze for 1 hour (once only)"
-                              }
-                              onClick={() => void postWalkAction("snooze", alert)}
-                            >
-                              <AlarmClock className="h-3.5 w-3.5" />
-                              {alert.snoozeUsed ? "Snooze Used" : snoozeBusy ? "Snoozing…" : "Snooze"}
-                            </button>
-                          ) : null}
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {walkAlerts.map((alert) => (
+                    <li
+                      key={alert.id}
+                      className={`admin-notification-bell__walk-item admin-notification-bell__walk-item--${
+                        alert.urgency === "overdue" ? "overdue" : "walk_due"
+                      }`}
+                    >
+                      <div className="admin-notification-bell__walk-copy">
+                        <p className="admin-notification-bell__walk-name">
+                          {alert.title} · {alert.hourLabel}
+                        </p>
+                        <p className="admin-notification-bell__walk-meta">{alert.countdown}</p>
+                        <p className="admin-notification-bell__walk-meta">{alert.message}</p>
+                      </div>
+                      <div className="admin-notification-bell__walk-actions">
+                        <button
+                          type="button"
+                          className="crossover-btn crossover-btn--primary"
+                          disabled={Boolean(busyId)}
+                          onClick={() => void markWalkComplete(alert)}
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {busyId === alert.id ? "Saving…" : "Complete"}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
                 </ul>
                 <button
                   type="button"

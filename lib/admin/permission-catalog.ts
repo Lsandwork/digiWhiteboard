@@ -104,7 +104,11 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("clear_trainer_request", "Clear Trainer Push", "Clear trainer push notices."),
       p("push_yard_notice", "Yard Camera Push", "Push yard camera feeds to the staff whiteboard."),
       p("receive_admin_alerts", "Receive Admin Alerts", "Receive high-priority management alerts."),
-      p("receive_walks_board_reminders", "Receive Walks Board Reminders", "Receive walk-due reminders for tracked dogs."),
+      p(
+        "receive_walks_board_reminders",
+        "Receive Walks Board Reminders",
+        "Receive the 2-hour physical whiteboard walk-check alarm (No Plays, Grooming, and Walks Board). Cannot be snoozed — mark complete after the physical board is updated."
+      ),
       p("view_tl_digi_board", "View TL Digi Board", "View TL Digi Board admin configuration (full admin)."),
       p("manage_tl_digi_board", "Manage TL Digi Board", "Configure the Team Lead Alerts + Reminders display (full admin only).")
     ]

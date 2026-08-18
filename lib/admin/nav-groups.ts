@@ -249,7 +249,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   ms_hub: "Command center for urgent alerts, PIPs, complaints, requests, compliance, and AI-assisted manager actions.",
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
-  walks_board: "Track recurring walks for No Plays, Groomed Dogs, and Break Dogs.",
+  walks_board: "2-hour alarm to update the physical No Plays, Grooming, and Walks Board. Cannot be snoozed.",
   tl_digi_board: "Configure the Team Lead Alerts + Reminders display",
   route_generator: "Pull Fitdog reports, build van routes, export Samsara CSVs, and track owner SMS / live maps.",
   live_fleet: "Real-time Fitdog van map powered by Samsara GPS, joined with today's Route Generator assignments.",

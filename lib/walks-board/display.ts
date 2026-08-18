@@ -1,46 +1,41 @@
 import { WALK_BOARD_DUE_SOON_MS } from "./constants";
-import { WALK_BOARD_TYPE_LABELS } from "./constants";
-import type { WalkBoardEntryRow, WalkBoardSummary, WalkBoardUrgency } from "./types";
+import { formatWalkBoardHourLabel } from "./schedule";
+import type { WalkBoardCycleRow, WalkBoardSummary, WalkBoardUrgency } from "./types";
 
-export function walkBoardTypeLabel(type: WalkBoardEntryRow["walk_type"]): string {
-  return WALK_BOARD_TYPE_LABELS[type].label;
-}
-
-export function getWalkBoardUrgency(entry: Pick<WalkBoardEntryRow, "next_due_at" | "snooze_used">, nowMs: number): WalkBoardUrgency {
-  const dueMs = new Date(entry.next_due_at).getTime();
+export function getWalkBoardUrgency(
+  cycle: Pick<WalkBoardCycleRow, "status" | "due_at">,
+  nowMs: number
+): WalkBoardUrgency {
+  if (cycle.status === "completed") return "completed";
+  if (cycle.status === "missed") return "closed";
+  const dueMs = new Date(cycle.due_at).getTime();
   const remainingMs = dueMs - nowMs;
-
-  if (entry.snooze_used && remainingMs > 0) {
-    return "snoozed";
-  }
-  if (remainingMs <= 0) {
-    return remainingMs === 0 ? "walk_due" : "overdue";
-  }
-  if (remainingMs <= WALK_BOARD_DUE_SOON_MS) {
-    return "due_soon";
-  }
-  return "on_track";
+  if (remainingMs > WALK_BOARD_DUE_SOON_MS) return "upcoming";
+  if (remainingMs > 0) return "due_soon";
+  if (nowMs - dueMs > 15 * 60 * 1000) return "overdue";
+  return "alarm_due";
 }
 
-export function formatWalkBoardCountdown(entry: Pick<WalkBoardEntryRow, "next_due_at" | "snooze_used">, nowMs: number): string {
-  const urgency = getWalkBoardUrgency(entry, nowMs);
-  const dueMs = new Date(entry.next_due_at).getTime();
-  const diffMs = Math.abs(dueMs - nowMs);
-  const minutes = Math.max(1, Math.round(diffMs / 60_000));
-
+export function formatWalkBoardCountdown(
+  cycle: Pick<WalkBoardCycleRow, "status" | "due_at" | "scheduled_hour">,
+  nowMs: number
+): string {
+  const urgency = getWalkBoardUrgency(cycle, nowMs);
+  const dueMs = new Date(cycle.due_at).getTime();
+  const minutes = Math.max(1, Math.round(Math.abs(dueMs - nowMs) / 60_000));
   switch (urgency) {
-    case "on_track":
-      return `Next walk in ${minutes} min`;
+    case "completed":
+      return "Marked complete";
+    case "closed":
+      return "Missed this cycle";
+    case "upcoming":
+      return `Next alarm in ${minutes} min`;
     case "due_soon":
       return `Due in ${minutes} min`;
-    case "walk_due":
-      return "Walk due now";
     case "overdue":
       return `Overdue by ${minutes} min`;
-    case "snoozed":
-      return `Snoozed once · Due at ${formatWalkBoardClock(entry.next_due_at)}`;
     default:
-      return "Walk due now";
+      return `Alarm due · ${formatWalkBoardHourLabel(cycle.scheduled_hour)}`;
   }
 }
 
@@ -62,65 +57,40 @@ export function formatWalkBoardDateTime(iso: string, timeZone = "America/Los_Ang
   }).format(new Date(iso));
 }
 
-export function urgencyRank(urgency: WalkBoardUrgency): number {
-  switch (urgency) {
-    case "overdue":
-      return 0;
-    case "walk_due":
-      return 1;
-    case "due_soon":
-      return 2;
-    case "snoozed":
-      return 3;
-    default:
-      return 4;
-  }
-}
-
-export function sortWalkBoardEntries<T extends Pick<WalkBoardEntryRow, "next_due_at" | "snooze_used">>(
-  entries: T[],
-  nowMs: number
-): T[] {
-  return [...entries].sort((a, b) => {
-    const rankDiff = urgencyRank(getWalkBoardUrgency(a, nowMs)) - urgencyRank(getWalkBoardUrgency(b, nowMs));
-    if (rankDiff !== 0) return rankDiff;
-    return new Date(a.next_due_at).getTime() - new Date(b.next_due_at).getTime();
-  });
-}
-
-export function summarizeWalkBoardEntries(
-  entries: Pick<WalkBoardEntryRow, "next_due_at" | "snooze_used">[],
+export function summarizeWalkBoardCycles(
+  cycles: Pick<WalkBoardCycleRow, "status" | "due_at">[],
   nowMs: number
 ): WalkBoardSummary {
-  let dueNowCount = 0;
+  let pendingCount = 0;
+  let completedCount = 0;
   let overdueCount = 0;
   let nextDueAt: string | null = null;
 
-  for (const entry of entries) {
-    const urgency = getWalkBoardUrgency(entry, nowMs);
-    if (urgency === "walk_due") dueNowCount += 1;
-    if (urgency === "overdue") overdueCount += 1;
-    if (!nextDueAt || new Date(entry.next_due_at).getTime() < new Date(nextDueAt).getTime()) {
-      nextDueAt = entry.next_due_at;
+  for (const cycle of cycles) {
+    if (cycle.status === "completed") completedCount += 1;
+    if (cycle.status === "pending") {
+      pendingCount += 1;
+      const urgency = getWalkBoardUrgency(cycle, nowMs);
+      if (urgency === "overdue" || urgency === "alarm_due") overdueCount += 1;
+      if (!nextDueAt || new Date(cycle.due_at).getTime() < new Date(nextDueAt).getTime()) {
+        nextDueAt = cycle.due_at;
+      }
     }
   }
 
   return {
-    activeCount: entries.length,
-    dueNowCount,
+    todayCount: cycles.length,
+    pendingCount,
+    completedCount,
     overdueCount,
     nextDueAt
   };
 }
 
-export function buildWalkDueNotificationMessage(
-  dogName: string,
-  walkType: WalkBoardEntryRow["walk_type"],
-  snoozeUsed: boolean
-): string {
-  const typeLabel = walkBoardTypeLabel(walkType);
-  if (snoozeUsed) {
-    return `ALERT: ${dogName} needs to be walked now (${typeLabel}). Snooze already used once — mark walked or clear.`;
-  }
-  return `ALERT: ${dogName} needs to be walked now (${typeLabel}). You can snooze once for 1 hour.`;
+export function buildWalkDueNotificationMessage(): string {
+  return "ALERT: Update the No Plays, Grooming, and Walks Board physical whiteboard. Check No Plays over during the walk, take pictures, and upload them. This alarm cannot be snoozed — mark complete when done.";
+}
+
+export function walkBoardTypeLabel(): string {
+  return "Physical whiteboard walk check";
 }

@@ -1,20 +1,44 @@
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
-import { WALK_BOARD_CYCLE_MS, WALK_BOARD_SNOOZE_MS } from "./constants";
+import {
+  WALK_BOARD_ALARM_CHECKLIST,
+  WALK_BOARD_ALARM_MESSAGE,
+  WALK_BOARD_ALARM_TITLE,
+  WALK_BOARD_TIMEZONE
+} from "./constants";
+import {
+  currentWalkBoardAlarmHour,
+  currentWalkBoardSlotKey,
+  isWalkBoardOperatingWindow,
+  nextWalkBoardAlarmAt,
+  walkBoardClockParts,
+  walkBoardSlotEndAt,
+  walkBoardSlotKey
+} from "./schedule";
 import type {
   WalkBoardActivityRow,
   WalkBoardActivityView,
-  WalkBoardEntryRow,
-  WalkBoardEntryView,
+  WalkBoardCycleRow,
+  WalkBoardCycleView,
+  WalkBoardPublicState,
+  WalkBoardSummary,
   WalkBoardUserRef
 } from "./types";
-import { normalizeWalkBoardDogName, validateWalkBoardDogName, parseWalkBoardType } from "./validation";
+import { getWalkBoardUrgency, summarizeWalkBoardCycles } from "./display";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function isMissingWalkBoardRelation(error: { code?: string; message?: string } | null | undefined) {
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    Boolean(error?.message?.includes("walk_board"))
+  );
 }
 
 async function loadUserRefs(
@@ -24,11 +48,7 @@ async function loadUserRefs(
   const unique = [...new Set(ids.filter(Boolean) as string[])];
   if (!unique.length) return new Map();
 
-  const { data, error } = await supabase
-    .from("admin_users")
-    .select("id, email, full_name")
-    .in("id", unique);
-
+  const { data, error } = await supabase.from("admin_users").select("id, email, full_name").in("id", unique);
   if (error) throw error;
 
   const map = new Map<string, WalkBoardUserRef>();
@@ -42,389 +62,245 @@ async function loadUserRefs(
   return map;
 }
 
-function decorateEntry(entry: WalkBoardEntryRow, users: Map<string, WalkBoardUserRef>): WalkBoardEntryView {
-  return {
-    ...entry,
-    created_by_user: entry.created_by ? users.get(entry.created_by) ?? null : null,
-    last_walked_by_user: entry.last_walked_by ? users.get(entry.last_walked_by) ?? null : null,
-    snoozed_by_user: entry.snoozed_by ? users.get(entry.snoozed_by) ?? null : null,
-    cleared_by_user: entry.cleared_by ? users.get(entry.cleared_by) ?? null : null
-  };
-}
-
-function decorateActivity(row: WalkBoardActivityRow, users: Map<string, WalkBoardUserRef>): WalkBoardActivityView {
+function decorateCycle(row: WalkBoardCycleRow, users: Map<string, WalkBoardUserRef>): WalkBoardCycleView {
   return {
     ...row,
-    actor_user: row.actor_user_id ? users.get(row.actor_user_id) ?? null : null
+    completed_by_user: row.completed_by ? users.get(row.completed_by) ?? null : null
   };
 }
 
 async function insertActivity(
   supabase: SupabaseClient,
   input: {
-    walkEntryId: string;
+    walkCycleId: string;
     action: WalkBoardActivityRow["action"];
     actorUserId?: string | null;
-    previousDueAt?: string | null;
-    newDueAt?: string | null;
     metadata?: Record<string, unknown>;
-    occurredAt?: string;
   }
 ) {
   const { error } = await supabase.from("walk_board_activity").insert({
-    walk_entry_id: input.walkEntryId,
+    walk_cycle_id: input.walkCycleId,
     action: input.action,
     actor_user_id: input.actorUserId ?? null,
-    occurred_at: input.occurredAt ?? nowIso(),
-    previous_due_at: input.previousDueAt ?? null,
-    new_due_at: input.newDueAt ?? null,
+    occurred_at: nowIso(),
     metadata: input.metadata ?? {}
   });
-  if (error) throw error;
+  if (error && !isMissingWalkBoardRelation(error)) throw error;
 }
 
 export function canReceiveWalkBoardReminders(access: UserAccess | null | undefined): boolean {
   return hasPermission(access, "receive_walks_board_reminders");
 }
 
-export function canSnoozeWalkBoard(access: UserAccess | null | undefined): boolean {
-  return canReceiveWalkBoardReminders(access);
+export function canCompleteWalkBoard(access: UserAccess | null | undefined): boolean {
+  return Boolean(access) && hasPermission(access, "view_admin_panel");
 }
 
-export class WalkBoardDuplicateError extends Error {
-  duplicate: WalkBoardEntryView;
-
-  constructor(duplicate: WalkBoardEntryView) {
-    super("An active dog with this name is already on the Walks Board.");
-    this.name = "WalkBoardDuplicateError";
-    this.duplicate = duplicate;
-  }
+/** @deprecated Snooze is not allowed on the physical whiteboard alarm. */
+export function canSnoozeWalkBoard(_access: UserAccess | null | undefined): boolean {
+  return false;
 }
 
-export async function findActiveWalkBoardDuplicate(
+export async function listWalkBoardCyclesForDate(
   supabase: SupabaseClient,
-  dogNameNormalized: string
-): Promise<WalkBoardEntryRow | null> {
+  shiftDate: string
+): Promise<WalkBoardCycleView[]> {
   const { data, error } = await supabase
-    .from("walk_board_entries")
+    .from("walk_board_cycles")
     .select("*")
-    .eq("status", "active")
-    .eq("dog_name_normalized", dogNameNormalized)
-    .maybeSingle();
-  if (error) throw error;
-  return (data as WalkBoardEntryRow | null) ?? null;
-}
-
-function isMissingWalkBoardRelation(error: { code?: string; message?: string } | null | undefined) {
-  return (
-    error?.code === "42P01" ||
-    error?.code === "PGRST205" ||
-    Boolean(error?.message?.includes("walk_board"))
-  );
-}
-
-export async function listActiveWalkBoardEntries(supabase: SupabaseClient): Promise<WalkBoardEntryView[]> {
-  const { data, error } = await supabase
-    .from("walk_board_entries")
-    .select("*")
-    .eq("status", "active")
-    .order("next_due_at", { ascending: true });
+    .eq("shift_date", shiftDate)
+    .order("scheduled_hour", { ascending: true });
   if (error) {
     if (isMissingWalkBoardRelation(error)) return [];
     throw error;
   }
-
-  const rows = (data ?? []) as WalkBoardEntryRow[];
+  const rows = (data ?? []) as WalkBoardCycleRow[];
   const users = await loadUserRefs(
     supabase,
-    rows.flatMap((row) => [row.created_by, row.last_walked_by, row.snoozed_by, row.cleared_by])
+    rows.map((row) => row.completed_by)
   );
-  return rows.map((row) => decorateEntry(row, users));
+  return rows.map((row) => decorateCycle(row, users));
 }
 
 export async function listWalkBoardActivity(
   supabase: SupabaseClient,
-  walkEntryId: string
+  walkCycleId: string
 ): Promise<WalkBoardActivityView[]> {
   const { data, error } = await supabase
     .from("walk_board_activity")
     .select("*")
-    .eq("walk_entry_id", walkEntryId)
+    .eq("walk_cycle_id", walkCycleId)
     .order("occurred_at", { ascending: false });
   if (error) {
     if (isMissingWalkBoardRelation(error)) return [];
     throw error;
   }
-
   const rows = (data ?? []) as WalkBoardActivityRow[];
   const users = await loadUserRefs(
     supabase,
     rows.map((row) => row.actor_user_id)
   );
-  return rows.map((row) => decorateActivity(row, users));
+  return rows.map((row) => ({
+    ...row,
+    actor_user: row.actor_user_id ? users.get(row.actor_user_id) ?? null : null
+  }));
 }
 
-export async function addWalkBoardEntry(
+export async function ensureCurrentWalkBoardCycle(
   supabase: SupabaseClient,
-  input: {
-    dogName: string;
-    walkType: unknown;
-    actorUserId: string | null;
-    actorEmail?: string | null;
-    forceDuplicate?: boolean;
-  }
-): Promise<{ entry: WalkBoardEntryView }> {
-  const validated = validateWalkBoardDogName(input.dogName);
-  if (!validated.ok) throw new Error(validated.error);
+  now = new Date()
+): Promise<WalkBoardCycleRow | null> {
+  const hour = currentWalkBoardAlarmHour(now);
+  const slotKey = currentWalkBoardSlotKey(now);
+  if (hour == null || !slotKey) return null;
 
-  const walkType = parseWalkBoardType(input.walkType);
-  if (!walkType) throw new Error("Select a walk type.");
+  const parts = walkBoardClockParts(now);
+  const dueAt = new Date(now);
+  dueAt.setTime(now.getTime());
 
-  const normalized = normalizeWalkBoardDogName(validated.value);
-  const duplicate = await findActiveWalkBoardDuplicate(supabase, normalized);
-  if (duplicate && !input.forceDuplicate) {
-    const users = await loadUserRefs(supabase, [duplicate.created_by]);
-    throw new WalkBoardDuplicateError(decorateEntry(duplicate, users));
-  }
-
-  const createdAt = nowIso();
-  const nextDueAt = new Date(Date.now() + WALK_BOARD_CYCLE_MS).toISOString();
+  const { data: existing, error: loadError } = await supabase
+    .from("walk_board_cycles")
+    .select("*")
+    .eq("slot_key", slotKey)
+    .maybeSingle();
+  if (loadError && !isMissingWalkBoardRelation(loadError)) throw loadError;
+  if (existing) return existing as WalkBoardCycleRow;
 
   const { data, error } = await supabase
-    .from("walk_board_entries")
+    .from("walk_board_cycles")
     .insert({
-      dog_name: validated.value,
-      dog_name_normalized: normalized,
-      walk_type: walkType,
-      status: "active",
-      created_by: input.actorUserId,
-      cycle_started_at: createdAt,
-      next_due_at: nextDueAt,
-      snooze_used: false
+      slot_key: slotKey,
+      shift_date: parts.dateKey,
+      scheduled_hour: hour,
+      status: "pending",
+      due_at: now.toISOString()
     })
     .select("*")
     .single();
 
-  if (error) throw error;
-  const entry = data as WalkBoardEntryRow;
-
-  await insertActivity(supabase, {
-    walkEntryId: entry.id,
-    action: "added",
-    actorUserId: input.actorUserId,
-    newDueAt: entry.next_due_at,
-    metadata: { walk_type: walkType, dog_name: entry.dog_name }
-  });
-
-  await writeAdminAuditLog({
-    actorAdminId: input.actorUserId,
-    actorEmail: input.actorEmail ?? null,
-    action: "walks_board.add",
-    targetType: "walk_board_entry",
-    targetId: entry.id,
-    details: { dog_name: entry.dog_name, walk_type: walkType }
-  });
-
-  const users = await loadUserRefs(supabase, [entry.created_by]);
-  return { entry: decorateEntry(entry, users) };
-}
-
-export async function markWalkBoardWalked(
-  supabase: SupabaseClient,
-  input: { entryId: string; actorUserId: string | null; actorEmail?: string | null; expectedVersion?: number }
-): Promise<WalkBoardEntryView> {
-  const { data: current, error: loadError } = await supabase
-    .from("walk_board_entries")
-    .select("*")
-    .eq("id", input.entryId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (loadError) throw loadError;
-  if (!current) throw new Error("This dog is no longer on the active Walks Board.");
-
-  const row = current as WalkBoardEntryRow;
-  if (input.expectedVersion != null && row.version !== input.expectedVersion) {
-    throw new Error("This entry was updated by someone else. Refresh and try again.");
+  if (error) {
+    if (error.code === "23505") {
+      const { data: raced } = await supabase.from("walk_board_cycles").select("*").eq("slot_key", slotKey).maybeSingle();
+      return (raced as WalkBoardCycleRow | null) ?? null;
+    }
+    if (isMissingWalkBoardRelation(error)) return null;
+    throw error;
   }
 
-  const walkedAt = nowIso();
-  const nextDueAt = new Date(Date.now() + WALK_BOARD_CYCLE_MS).toISOString();
-
-  let query = supabase
-    .from("walk_board_entries")
-    .update({
-      last_walked_at: walkedAt,
-      last_walked_by: input.actorUserId,
-      cycle_started_at: walkedAt,
-      next_due_at: nextDueAt,
-      snooze_used: false,
-      snoozed_at: null,
-      snoozed_by: null,
-      version: row.version + 1
-    })
-    .eq("id", input.entryId)
-    .eq("status", "active")
-    .eq("version", row.version);
-
-  const { data, error } = await query.select("*").maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("This entry was updated by someone else. Refresh and try again.");
-
-  const entry = data as WalkBoardEntryRow;
+  const cycle = data as WalkBoardCycleRow;
   await insertActivity(supabase, {
-    walkEntryId: entry.id,
-    action: "walked",
-    actorUserId: input.actorUserId,
-    previousDueAt: row.next_due_at,
-    newDueAt: entry.next_due_at,
-    metadata: { last_walked_at: walkedAt }
+    walkCycleId: cycle.id,
+    action: "alarm_due",
+    metadata: { slot_key: slotKey, automated: true }
   });
-
-  await writeAdminAuditLog({
-    actorAdminId: input.actorUserId,
-    actorEmail: input.actorEmail ?? null,
-    action: "walks_board.walked",
-    targetType: "walk_board_entry",
-    targetId: entry.id,
-    details: { dog_name: entry.dog_name, last_walked_at: walkedAt }
-  });
-
-  const users = await loadUserRefs(supabase, [entry.created_by, entry.last_walked_by]);
-  return decorateEntry(entry, users);
+  return cycle;
 }
 
-export async function snoozeWalkBoardEntry(
+export async function closeExpiredWalkBoardCycles(supabase: SupabaseClient, now = new Date()) {
+  const { data, error } = await supabase
+    .from("walk_board_cycles")
+    .select("*")
+    .eq("status", "pending");
+  if (error) {
+    if (isMissingWalkBoardRelation(error)) return 0;
+    throw error;
+  }
+
+  let closed = 0;
+  for (const raw of data ?? []) {
+    const row = raw as WalkBoardCycleRow;
+    const endAt = walkBoardSlotEndAt(row.slot_key);
+    if (now.getTime() < endAt.getTime()) continue;
+    const { error: updateError } = await supabase
+      .from("walk_board_cycles")
+      .update({
+        status: "missed",
+        missed_at: nowIso(),
+        version: row.version + 1
+      })
+      .eq("id", row.id)
+      .eq("status", "pending")
+      .eq("version", row.version);
+    if (updateError && !isMissingWalkBoardRelation(updateError)) throw updateError;
+    await insertActivity(supabase, {
+      walkCycleId: row.id,
+      action: "missed",
+      metadata: { slot_key: row.slot_key }
+    });
+    closed += 1;
+  }
+  return closed;
+}
+
+export async function markWalkBoardCycleComplete(
   supabase: SupabaseClient,
   input: {
-    entryId: string;
+    cycleId: string;
     actorUserId: string | null;
     actorEmail?: string | null;
     access: UserAccess;
     expectedVersion?: number;
   }
-): Promise<WalkBoardEntryView> {
-  if (!canSnoozeWalkBoard(input.access)) {
-    throw new Error("You do not have permission to snooze walk reminders.");
+): Promise<WalkBoardCycleView> {
+  if (!canCompleteWalkBoard(input.access)) {
+    throw new Error("You do not have permission to complete this Walks Board alarm.");
   }
 
   const { data: current, error: loadError } = await supabase
-    .from("walk_board_entries")
+    .from("walk_board_cycles")
     .select("*")
-    .eq("id", input.entryId)
-    .eq("status", "active")
+    .eq("id", input.cycleId)
     .maybeSingle();
   if (loadError) throw loadError;
-  if (!current) throw new Error("This dog is no longer on the active Walks Board.");
+  if (!current) throw new Error("This Walks Board alarm is no longer available.");
 
-  const row = current as WalkBoardEntryRow;
-  if (row.snooze_used) {
-    throw new Error("This walk reminder has already been snoozed once. Mark the dog walked or clear the entry.");
+  const row = current as WalkBoardCycleRow;
+  if (row.status === "completed") {
+    const users = await loadUserRefs(supabase, [row.completed_by]);
+    return decorateCycle(row, users);
+  }
+  if (row.status !== "pending") {
+    throw new Error("This Walks Board alarm can no longer be marked complete.");
   }
   if (input.expectedVersion != null && row.version !== input.expectedVersion) {
-    throw new Error("This entry was updated by someone else. Refresh and try again.");
+    throw new Error("This alarm was updated by someone else. Refresh and try again.");
   }
 
-  const snoozedAt = nowIso();
-  const nextDueAt = new Date(Date.now() + WALK_BOARD_SNOOZE_MS).toISOString();
-
+  const completedAt = nowIso();
   const { data, error } = await supabase
-    .from("walk_board_entries")
+    .from("walk_board_cycles")
     .update({
-      next_due_at: nextDueAt,
-      snooze_used: true,
-      snoozed_at: snoozedAt,
-      snoozed_by: input.actorUserId,
+      status: "completed",
+      completed_at: completedAt,
+      completed_by: input.actorUserId,
       version: row.version + 1
     })
-    .eq("id", input.entryId)
-    .eq("status", "active")
+    .eq("id", input.cycleId)
+    .eq("status", "pending")
     .eq("version", row.version)
-    .eq("snooze_used", false)
     .select("*")
     .maybeSingle();
-
   if (error) throw error;
-  if (!data) {
-    throw new Error("This walk reminder has already been snoozed once. Mark the dog walked or clear the entry.");
-  }
+  if (!data) throw new Error("This alarm was updated by someone else. Refresh and try again.");
 
-  const entry = data as WalkBoardEntryRow;
+  const cycle = data as WalkBoardCycleRow;
   await insertActivity(supabase, {
-    walkEntryId: entry.id,
-    action: "snoozed",
+    walkCycleId: cycle.id,
+    action: "completed",
     actorUserId: input.actorUserId,
-    previousDueAt: row.next_due_at,
-    newDueAt: entry.next_due_at,
-    metadata: { snoozed_at: snoozedAt }
+    metadata: { slot_key: cycle.slot_key }
   });
-
   await writeAdminAuditLog({
     actorAdminId: input.actorUserId,
     actorEmail: input.actorEmail ?? null,
-    action: "walks_board.snooze",
-    targetType: "walk_board_entry",
-    targetId: entry.id,
-    details: { dog_name: entry.dog_name, next_due_at: entry.next_due_at }
+    action: "walks_board.completed",
+    targetType: "walk_board_cycle",
+    targetId: cycle.id,
+    details: { slot_key: cycle.slot_key }
   });
 
-  const users = await loadUserRefs(supabase, [entry.created_by, entry.snoozed_by, entry.last_walked_by]);
-  return decorateEntry(entry, users);
-}
-
-export async function clearWalkBoardEntry(
-  supabase: SupabaseClient,
-  input: { entryId: string; actorUserId: string | null; actorEmail?: string | null; expectedVersion?: number }
-): Promise<{ ok: true }> {
-  const { data: current, error: loadError } = await supabase
-    .from("walk_board_entries")
-    .select("*")
-    .eq("id", input.entryId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (loadError) throw loadError;
-  if (!current) throw new Error("This dog is no longer on the active Walks Board.");
-
-  const row = current as WalkBoardEntryRow;
-  if (input.expectedVersion != null && row.version !== input.expectedVersion) {
-    throw new Error("This entry was updated by someone else. Refresh and try again.");
-  }
-
-  const clearedAt = nowIso();
-  const { data, error } = await supabase
-    .from("walk_board_entries")
-    .update({
-      status: "cleared",
-      cleared_at: clearedAt,
-      cleared_by: input.actorUserId,
-      version: row.version + 1
-    })
-    .eq("id", input.entryId)
-    .eq("status", "active")
-    .eq("version", row.version)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) throw new Error("This entry was updated by someone else. Refresh and try again.");
-
-  await insertActivity(supabase, {
-    walkEntryId: row.id,
-    action: "cleared",
-    actorUserId: input.actorUserId,
-    previousDueAt: row.next_due_at,
-    metadata: { cleared_at: clearedAt }
-  });
-
-  await writeAdminAuditLog({
-    actorAdminId: input.actorUserId,
-    actorEmail: input.actorEmail ?? null,
-    action: "walks_board.clear",
-    targetType: "walk_board_entry",
-    targetId: row.id,
-    details: { dog_name: row.dog_name }
-  });
-
-  return { ok: true };
+  const users = await loadUserRefs(supabase, [cycle.completed_by]);
+  return decorateCycle(cycle, users);
 }
 
 export async function resolveWalkBoardPermissions(
@@ -435,7 +311,59 @@ export async function resolveWalkBoardPermissions(
 ) {
   const access = await getUserAccess(supabase, userId, legacyRole, email);
   return {
-    canSnooze: canSnoozeWalkBoard(access),
-    canReceiveReminders: canReceiveWalkBoardReminders(access)
+    canComplete: canCompleteWalkBoard(access),
+    canReceiveReminders: canReceiveWalkBoardReminders(access),
+    canSnooze: false
   };
 }
+
+export async function loadWalkBoardPublicState(
+  supabase: SupabaseClient,
+  options?: {
+    userId?: string | null;
+    legacyRole?: string | null;
+    email?: string | null;
+    now?: Date;
+  }
+): Promise<WalkBoardPublicState> {
+  const now = options?.now ?? new Date();
+  await closeExpiredWalkBoardCycles(supabase, now).catch(() => 0);
+  await ensureCurrentWalkBoardCycle(supabase, now).catch(() => null);
+
+  const dateKey = walkBoardClockParts(now).dateKey;
+  const todayCycles = await listWalkBoardCyclesForDate(supabase, dateKey);
+  const slotKey = currentWalkBoardSlotKey(now);
+  const currentCycle = slotKey ? todayCycles.find((row) => row.slot_key === slotKey) ?? null : null;
+  const summary = summarizeWalkBoardCycles(todayCycles, now.getTime());
+  const permissions = await resolveWalkBoardPermissions(
+    supabase,
+    options?.userId,
+    options?.legacyRole,
+    options?.email
+  );
+
+  return {
+    timezone: WALK_BOARD_TIMEZONE,
+    operatingWindow: isWalkBoardOperatingWindow(now),
+    currentSlotKey: slotKey,
+    currentCycle,
+    todayCycles,
+    summary,
+    permissions: {
+      canComplete: permissions.canComplete,
+      canReceiveReminders: permissions.canReceiveReminders
+    },
+    serverTime: now.toISOString(),
+    nextAlarmAt: nextWalkBoardAlarmAt(now).toISOString(),
+    title: WALK_BOARD_ALARM_TITLE,
+    message: WALK_BOARD_ALARM_MESSAGE,
+    checklist: [...WALK_BOARD_ALARM_CHECKLIST]
+  };
+}
+
+export function walkBoardSlotKeyForHour(dateKey: string, hour: number) {
+  return walkBoardSlotKey(dateKey, hour);
+}
+
+export { getWalkBoardUrgency };
+export type { WalkBoardSummary };

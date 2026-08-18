@@ -189,7 +189,7 @@ export function YardCommandPanel({ onNavigate }: { onNavigate?: (tab: string) =>
         ))}
       </div>
       <button type="button" className="admin-btn-primary" onClick={() => onNavigate?.("walks_board")}>
-        Open Walks Board actions
+        Open Walks Board alarm
       </button>
     </section>
   );

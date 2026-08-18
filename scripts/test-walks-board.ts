@@ -1,13 +1,18 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { WALK_BOARD_CYCLE_MS, WALK_BOARD_SNOOZE_MS } from "../lib/walks-board/constants";
+import {
+  WALK_BOARD_ALARM_END_HOUR,
+  WALK_BOARD_ALARM_HOURS,
+  WALK_BOARD_ALARM_INTERVAL_HOURS,
+  WALK_BOARD_ALARM_START_HOUR,
+  WALK_BOARD_CYCLE_MS
+} from "../lib/walks-board/constants";
 import {
   buildWalkDueNotificationMessage,
   formatWalkBoardCountdown,
   getWalkBoardUrgency,
-  sortWalkBoardEntries,
-  summarizeWalkBoardEntries
+  summarizeWalkBoardCycles
 } from "../lib/walks-board/display";
 import {
   accessFromLegacyRole,
@@ -20,152 +25,162 @@ import {
   canSnoozeWalkBoard
 } from "../lib/walks-board/server";
 import {
-  normalizeWalkBoardDogName,
-  validateWalkBoardDogName
-} from "../lib/walks-board/validation";
-import type { WalkBoardEntryRow } from "../lib/walks-board/types";
+  currentWalkBoardAlarmHour,
+  isWalkBoardOperatingWindow,
+  nextWalkBoardAlarmAt,
+  walkBoardClockParts,
+  walkBoardExpectedSlots
+} from "../lib/walks-board/schedule";
+import type { WalkBoardCycleRow } from "../lib/walks-board/types";
 
-function entry(partial: Partial<WalkBoardEntryRow> & Pick<WalkBoardEntryRow, "dog_name" | "walk_type" | "next_due_at">): WalkBoardEntryRow {
+function cycle(partial: Partial<WalkBoardCycleRow> & Pick<WalkBoardCycleRow, "slot_key" | "due_at">): WalkBoardCycleRow {
   return {
-    id: partial.id ?? "entry-1",
-    dog_name: partial.dog_name,
-    dog_name_normalized: partial.dog_name_normalized ?? normalizeWalkBoardDogName(partial.dog_name),
-    walk_type: partial.walk_type,
-    status: partial.status ?? "active",
-    created_at: partial.created_at ?? "2026-07-10T10:00:00.000Z",
-    created_by: partial.created_by ?? "user-1",
-    cycle_started_at: partial.cycle_started_at ?? "2026-07-10T10:00:00.000Z",
-    next_due_at: partial.next_due_at,
-    last_walked_at: partial.last_walked_at ?? null,
-    last_walked_by: partial.last_walked_by ?? null,
-    snooze_used: partial.snooze_used ?? false,
-    snoozed_at: partial.snoozed_at ?? null,
-    snoozed_by: partial.snoozed_by ?? null,
-    cleared_at: partial.cleared_at ?? null,
-    cleared_by: partial.cleared_by ?? null,
+    id: partial.id ?? "cycle-1",
+    slot_key: partial.slot_key,
+    shift_date: partial.shift_date ?? "2026-08-18",
+    scheduled_hour: partial.scheduled_hour ?? 8,
+    status: partial.status ?? "pending",
+    due_at: partial.due_at,
+    completed_at: partial.completed_at ?? null,
+    completed_by: partial.completed_by ?? null,
+    missed_at: partial.missed_at ?? null,
+    push_notice_id: partial.push_notice_id ?? null,
     version: partial.version ?? 1,
-    updated_at: partial.updated_at ?? "2026-07-10T10:00:00.000Z"
+    created_at: partial.created_at ?? "2026-08-18T15:00:00.000Z",
+    updated_at: partial.updated_at ?? "2026-08-18T15:00:00.000Z"
   };
 }
 
-// 3–6. Validation and name storage
+assert.equal(WALK_BOARD_CYCLE_MS, 2 * 60 * 60 * 1000);
+assert.equal(WALK_BOARD_ALARM_START_HOUR, 8);
+assert.equal(WALK_BOARD_ALARM_END_HOUR, 19);
+assert.equal(WALK_BOARD_ALARM_INTERVAL_HOURS, 2);
+assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
+
 {
-  const rejected = validateWalkBoardDogName("   ");
-  assert.equal(rejected.ok, false);
-  const ok = validateWalkBoardDogName("  Ralphie  ");
-  assert.equal(ok.ok, true);
-  if (ok.ok) {
-    assert.equal(ok.value, "Ralphie");
-    assert.equal(normalizeWalkBoardDogName(ok.value), "ralphie");
-  }
-  const long = validateWalkBoardDogName("Sir Barkington Wellington");
-  assert.equal(long.ok, true);
+  // Tuesday 8:00 AM PDT = 15:00 UTC on Aug 18, 2026
+  const eightAm = new Date("2026-08-18T15:00:00.000Z");
+  assert.equal(walkBoardClockParts(eightAm).hour, 8);
+  assert.equal(isWalkBoardOperatingWindow(eightAm), true);
+  assert.equal(currentWalkBoardAlarmHour(eightAm), 8);
+
+  const nineAm = new Date("2026-08-18T16:00:00.000Z");
+  assert.equal(currentWalkBoardAlarmHour(nineAm), 8);
+
+  const sixPm = new Date("2026-08-19T01:00:00.000Z");
+  assert.equal(currentWalkBoardAlarmHour(sixPm), 18);
+  assert.equal(isWalkBoardOperatingWindow(sixPm), true);
+
+  const sevenPm = new Date("2026-08-19T02:00:00.000Z");
+  assert.equal(isWalkBoardOperatingWindow(sevenPm), false);
+  assert.equal(currentWalkBoardAlarmHour(sevenPm), null);
+
+  const sevenAm = new Date("2026-08-18T14:00:00.000Z");
+  assert.equal(isWalkBoardOperatingWindow(sevenAm), false);
+
+  const sundayEight = new Date("2026-08-16T15:00:00.000Z");
+  assert.equal(currentWalkBoardAlarmHour(sundayEight), 8);
+
+  const nextFromSevenThirty = nextWalkBoardAlarmAt(new Date("2026-08-18T14:30:00.000Z"));
+  assert.equal(walkBoardClockParts(nextFromSevenThirty).hour, 8);
+
+  const slots = walkBoardExpectedSlots("2026-08-18");
+  assert.equal(slots.length, 6);
+  assert.equal(slots[0]?.label, "8:00 AM");
+  assert.equal(slots[5]?.label, "6:00 PM");
 }
 
-// 7. One-hour cycle constant
-assert.equal(WALK_BOARD_CYCLE_MS, 60 * 60 * 1000);
-assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
-
-// 8–13. Urgency and countdown behavior with fake time
 {
-  const base = entry({
-    dog_name: "Ralphie",
-    walk_type: "no_plays",
-    next_due_at: "2026-07-10T11:00:00.000Z"
+  const pending = cycle({
+    slot_key: "2026-08-18T08:00",
+    due_at: "2026-08-18T15:00:00.000Z",
+    scheduled_hour: 8
   });
-  const onTrackMs = new Date("2026-07-10T10:30:00.000Z").getTime();
-  assert.equal(getWalkBoardUrgency(base, onTrackMs), "on_track");
-  assert.match(formatWalkBoardCountdown(base, onTrackMs), /Next walk in/);
+  assert.equal(getWalkBoardUrgency(pending, new Date("2026-08-18T15:00:00.000Z").getTime()), "alarm_due");
+  assert.match(formatWalkBoardCountdown(pending, new Date("2026-08-18T15:00:00.000Z").getTime()), /Alarm due/);
 
-  const dueSoonMs = new Date("2026-07-10T10:50:00.000Z").getTime();
-  assert.equal(getWalkBoardUrgency(base, dueSoonMs), "due_soon");
-
-  const dueMs = new Date("2026-07-10T11:00:00.000Z").getTime();
-  assert.equal(getWalkBoardUrgency(base, dueMs), "walk_due");
-
-  const overdueMs = new Date("2026-07-10T11:23:00.000Z").getTime();
-  assert.equal(getWalkBoardUrgency(base, overdueMs), "overdue");
-  assert.match(formatWalkBoardCountdown(base, overdueMs), /Overdue by/);
-  assert.doesNotMatch(formatWalkBoardCountdown(base, overdueMs), /^-/);
-
-  const snoozed = entry({
-    dog_name: "Ralphie",
-    walk_type: "groomed",
-    next_due_at: "2026-07-10T12:00:00.000Z",
-    snooze_used: true
+  const overdue = cycle({
+    slot_key: "2026-08-18T08:00",
+    due_at: "2026-08-18T15:00:00.000Z",
+    scheduled_hour: 8
   });
-  assert.equal(getWalkBoardUrgency(snoozed, new Date("2026-07-10T11:10:00.000Z").getTime()), "snoozed");
+  assert.equal(getWalkBoardUrgency(overdue, new Date("2026-08-18T15:20:00.000Z").getTime()), "overdue");
+  assert.match(formatWalkBoardCountdown(overdue, new Date("2026-08-18T15:20:00.000Z").getTime()), /Overdue by/);
+
+  const completed = cycle({
+    slot_key: "2026-08-18T08:00",
+    due_at: "2026-08-18T15:00:00.000Z",
+    status: "completed"
+  });
+  assert.equal(getWalkBoardUrgency(completed, Date.now()), "completed");
+
+  const summary = summarizeWalkBoardCycles([pending, completed], new Date("2026-08-18T15:00:00.000Z").getTime());
+  assert.equal(summary.todayCount, 2);
+  assert.equal(summary.pendingCount, 1);
+  assert.equal(summary.completedCount, 1);
 }
 
-// 15–19. Reminder recipient permissions by role
 {
   const teamLead = accessFromLegacyRole("u1", "lead@fitdog.com", "team_leader");
   const management = accessFromLegacyRole("u2", "mgr@fitdog.com", "assistant_manager");
   const admin = accessFromLegacyRole("u3", "admin@fitdog.com", "manager_admin");
   const superAdmin = accessFromLegacyRole("u4", "owner@fitdog.com", "owner_admin");
+  const coordinator = accessFromLegacyRole("u6", "fdc@fitdog.com", "front_desk_coordinator");
+  const dogHandler = accessFromLegacyRole("u7", "handler@fitdog.com", "daycare");
   const groomer = accessFromLegacyRole("u5", "groom@fitdog.com", "groomer");
 
   assert.equal(canReceiveWalkBoardReminders(teamLead), true);
   assert.equal(canReceiveWalkBoardReminders(management), true);
   assert.equal(canReceiveWalkBoardReminders(admin), true);
   assert.equal(canReceiveWalkBoardReminders(superAdmin), true);
+  assert.equal(canReceiveWalkBoardReminders(coordinator), true);
+  assert.equal(canReceiveWalkBoardReminders(dogHandler), true);
   assert.equal(canReceiveWalkBoardReminders(groomer), false);
   assert.equal(canSnoozeWalkBoard(groomer), false);
-  assert.equal(canSnoozeWalkBoard(teamLead), true);
+  assert.equal(canSnoozeWalkBoard(teamLead), false);
+  assert.equal(canSnoozeWalkBoard(dogHandler), false);
 }
 
-// 23–25. Multi-role permissions include reminder capability once
 {
   const perms = permissionsForRoles(["team_leader", "management"]);
   assert.equal(perms.filter((p) => p === "receive_walks_board_reminders").length, 1);
   assert.equal(hasPermission(accessFromLegacyRole("u1", "x@fitdog.com", "team_leader"), "view_admin_panel"), true);
 }
 
-// 26–27. Reminder idempotency table exists in migration
 {
-  const migration = readFileSync(join(process.cwd(), "supabase/migrations/030_walk_board.sql"), "utf8");
-  assert.match(migration, /walk_board_reminder_sends/);
-  assert.match(migration, /unique \(walk_entry_id, cycle_started_at, due_at\)/);
+  const migration = readFileSync(join(process.cwd(), "supabase/migrations/078_walk_board_alarm_cycles.sql"), "utf8");
+  assert.match(migration, /walk_board_cycles/);
+  assert.match(migration, /walks_board_alarm/);
+  assert.match(migration, /08:00:00/);
+  assert.match(migration, /18:00:00/);
+  assert.match(migration, /monday','tuesday','wednesday','thursday','friday','saturday','sunday/);
+  assert.match(migration, /dog_handler','team_lead/);
 }
 
-// 31–32. Search/sort helpers
-{
-  const nowMs = new Date("2026-07-10T11:30:00.000Z").getTime();
-  const sorted = sortWalkBoardEntries(
-    [
-      entry({ dog_name: "Later", walk_type: "break_dog", next_due_at: "2026-07-10T13:00:00.000Z" }),
-      entry({ dog_name: "Overdue", walk_type: "no_plays", next_due_at: "2026-07-10T10:30:00.000Z" })
-    ],
-    nowMs
-  );
-  assert.equal(sorted[0]?.dog_name, "Overdue");
-  const summary = summarizeWalkBoardEntries(sorted, nowMs);
-  assert.equal(summary.activeCount, 2);
-  assert.ok(summary.overdueCount >= 1);
-}
-
-// 33. Long names remain complete in UI source
 {
   const panel = readFileSync(join(process.cwd(), "components/admin/WalksBoardPanel.tsx"), "utf8");
-  assert.match(panel, /entry\.dog_name/);
-  assert.doesNotMatch(panel, /entry\.dog_name\.slice\(/);
+  assert.doesNotMatch(panel, /entry\.dog_name/);
+  assert.doesNotMatch(panel, /Add Dog/);
+  assert.doesNotMatch(panel, /\bSnooze\b/);
+  assert.match(panel, /Mark Complete/);
+  assert.match(panel, /cannot be snoozed/);
+  assert.match(panel, /physical whiteboard/);
+  assert.match(panel, /Upload pictures/);
   assert.match(readFileSync(join(process.cwd(), "app/globals.css"), "utf8"), /overflow-wrap:\s*anywhere/);
 }
 
-// 34–35. Responsive layout classes
 {
   const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
   assert.match(css, /minmax\(0, 1fr\)/);
   assert.match(css, /@media \(min-width: 960px\)/);
+  assert.match(css, /walks-board-slot-grid/);
 }
 
-// 1–2, 16, 36–38. Route and access wiring
 {
   const permissions = readFileSync(join(process.cwd(), "lib/admin/permissions.ts"), "utf8");
   assert.match(permissions, /walks_board/);
   assert.match(permissions, /receive_walks_board_reminders/);
   assert.match(permissions, /if \(tab === "walks_board"\) \{\s*if \(board !== "staff"\) return false;/);
-
 
   const nav = readFileSync(join(process.cwd(), "lib/admin/nav-groups.ts"), "utf8");
   assert.match(nav, /FRONT_DESK_TABS:[\s\S]*"walks_board"/);
@@ -176,7 +191,8 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
   assert.doesNotMatch(api, /view_admin_panel/);
   assert.doesNotMatch(api, /Signed-in staff account required/);
   assert.match(api, /resolveWalkBoardActor/);
-  assert.match(api, /canSnoozeWalkBoard|snoozeWalkBoardEntry/);
+  assert.match(api, /cannot be snoozed/);
+  assert.doesNotMatch(api, /snoozeWalkBoardEntry/);
 
   const actor = readFileSync(join(process.cwd(), "lib/walks-board/actor.ts"), "utf8");
   assert.match(actor, /findAdminUserByEmail/);
@@ -187,9 +203,18 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
 
   const cron = readFileSync(join(process.cwd(), "app/api/cron/walk-board-reminders/route.ts"), "utf8");
   assert.match(cron, /processWalkBoardReminders/);
+
+  const reminders = readFileSync(join(process.cwd(), "lib/walks-board/reminders.ts"), "utf8");
+  assert.match(reminders, /notice_type: "daily_reminder"/);
+  assert.match(reminders, /createAndPushStaffNotice/);
+  assert.match(reminders, /walks_board_alarm/);
+
+  const bell = readFileSync(join(process.cwd(), "components/admin/NotificationBell.tsx"), "utf8");
+  assert.doesNotMatch(bell, /\bSnooze\b/);
+  assert.match(bell, /Mark complete|Complete/);
+  assert.match(bell, /Cannot snooze/);
 }
 
-// Every staff role can open the Walks Board tab on the staff board.
 {
   const roles = ["groomer", "trainer", "daycare", "viewer", "owner_admin"] as const;
   for (const role of roles) {
@@ -212,8 +237,13 @@ assert.equal(WALK_BOARD_SNOOZE_MS, 60 * 60 * 1000);
   }
 }
 
-// Reminder message content
-assert.match(buildWalkDueNotificationMessage("Ralphie", "no_plays", false), /Ralphie needs to be walked now \(No Plays\)/);
-assert.match(buildWalkDueNotificationMessage("Ralphie", "no_plays", true), /Snooze already used/);
+assert.match(buildWalkDueNotificationMessage(), /physical whiteboard/);
+assert.match(buildWalkDueNotificationMessage(), /cannot be snoozed/);
+assert.doesNotMatch(buildWalkDueNotificationMessage(), /Ralphie/);
+
+const handlerPerms = permissionsForRoles(["daycare"]);
+assert.ok(handlerPerms.includes("receive_walks_board_reminders"));
+const coordinatorPerms = permissionsForRoles(["front_desk_coordinator"]);
+assert.ok(coordinatorPerms.includes("receive_walks_board_reminders"));
 
 console.log("test-walks-board: all assertions passed");

@@ -5,16 +5,10 @@ import { accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getRequestUserAccess } from "@/lib/auth/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { resolveWalkBoardActor } from "@/lib/walks-board/actor";
-import { summarizeWalkBoardEntries, sortWalkBoardEntries } from "@/lib/walks-board/display";
 import {
-  addWalkBoardEntry,
-  clearWalkBoardEntry,
-  listActiveWalkBoardEntries,
   listWalkBoardActivity,
-  markWalkBoardWalked,
-  resolveWalkBoardPermissions,
-  snoozeWalkBoardEntry,
-  WalkBoardDuplicateError
+  loadWalkBoardPublicState,
+  markWalkBoardCycleComplete
 } from "@/lib/walks-board/server";
 
 export const dynamic = "force-dynamic";
@@ -30,31 +24,20 @@ export async function GET(request: Request) {
   const supabase = getServiceSupabase();
   const actor = await resolveWalkBoardActor(supabase, session);
   const url = new URL(request.url);
-  const entryId = url.searchParams.get("entryId");
+  const cycleId = url.searchParams.get("cycleId") ?? url.searchParams.get("entryId");
 
-  if (entryId) {
-    const activity = await listWalkBoardActivity(supabase, entryId);
+  if (cycleId) {
+    const activity = await listWalkBoardActivity(supabase, cycleId);
     return NextResponse.json({ activity });
   }
 
-  const entries = await listActiveWalkBoardEntries(supabase);
-  const nowMs = Date.now();
-  const sorted = sortWalkBoardEntries(entries, nowMs);
-  const summary = summarizeWalkBoardEntries(entries, nowMs);
-  const permissions = await resolveWalkBoardPermissions(
-    supabase,
-    actor?.actorUserId ?? session.adminUserId,
-    session.role,
-    session.email
-  );
-
-  return NextResponse.json({
-    entries: sorted,
-    summary,
-    permissions,
-    serverTime: new Date().toISOString(),
-    timezone: "America/Los_Angeles"
+  const state = await loadWalkBoardPublicState(supabase, {
+    userId: actor?.actorUserId ?? session.adminUserId,
+    legacyRole: session.role,
+    email: session.email
   });
+
+  return NextResponse.json(state);
 }
 
 export async function POST(request: Request) {
@@ -71,77 +54,40 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const { actorUserId, actorEmail } = actor;
   const access =
     (await getRequestUserAccess(request)) ??
-    accessFromLegacyRole(actorUserId, actorEmail, session.role);
+    accessFromLegacyRole(actor.actorUserId, actor.actorEmail, session.role);
 
   const body = await request.json().catch(() => ({}));
   const action = String(body.action ?? "").trim();
 
+  if (action === "snooze" || action === "add" || action === "clear") {
+    return NextResponse.json(
+      { error: "Walks Board alarms cannot be snoozed or edited. Mark the current cycle complete." },
+      { status: 400 }
+    );
+  }
+
   try {
-    if (action === "add") {
-      const result = await addWalkBoardEntry(supabase, {
-        dogName: String(body.dogName ?? ""),
-        walkType: body.walkType,
-        actorUserId,
-        actorEmail,
-        forceDuplicate: body.forceDuplicate === true
-      });
-      return NextResponse.json({ ok: true, entry: result.entry });
-    }
-
-    const entryId = String(body.entryId ?? "").trim();
-    if (!entryId) {
-      return NextResponse.json({ error: "Missing walk board entry." }, { status: 400 });
-    }
-
-    const expectedVersion =
-      typeof body.version === "number" && Number.isFinite(body.version) ? body.version : undefined;
-
-    if (action === "mark_walked") {
-      const entry = await markWalkBoardWalked(supabase, {
-        entryId,
-        actorUserId,
-        actorEmail,
-        expectedVersion
-      });
-      return NextResponse.json({ ok: true, entry });
-    }
-
-    if (action === "snooze") {
-      const entry = await snoozeWalkBoardEntry(supabase, {
-        entryId,
-        actorUserId,
-        actorEmail,
+    if (action === "complete" || action === "mark_walked") {
+      const cycleId = String(body.cycleId ?? body.entryId ?? "").trim();
+      if (!cycleId) {
+        return NextResponse.json({ error: "Missing Walks Board alarm." }, { status: 400 });
+      }
+      const expectedVersion =
+        typeof body.version === "number" && Number.isFinite(body.version) ? body.version : undefined;
+      const cycle = await markWalkBoardCycleComplete(supabase, {
+        cycleId,
+        actorUserId: actor.actorUserId,
+        actorEmail: actor.actorEmail,
         access,
         expectedVersion
       });
-      return NextResponse.json({ ok: true, entry });
-    }
-
-    if (action === "clear") {
-      await clearWalkBoardEntry(supabase, {
-        entryId,
-        actorUserId,
-        actorEmail,
-        expectedVersion
-      });
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, cycle });
     }
 
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
   } catch (error) {
-    if (error instanceof WalkBoardDuplicateError) {
-      return NextResponse.json(
-        {
-          error: error.message,
-          duplicate: error.duplicate
-        },
-        { status: 409 }
-      );
-    }
-
     const message = error instanceof Error ? error.message : "Walks Board request failed.";
     const status =
       message.includes("permission") ? 403 : message.includes("updated by someone else") ? 409 : 400;

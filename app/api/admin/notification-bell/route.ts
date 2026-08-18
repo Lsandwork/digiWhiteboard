@@ -11,17 +11,10 @@ import {
 } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { resolveWalkBoardActor } from "@/lib/walks-board/actor";
-import {
-  formatWalkBoardCountdown,
-  getWalkBoardUrgency,
-  sortWalkBoardEntries,
-  summarizeWalkBoardEntries,
-  walkBoardTypeLabel
-} from "@/lib/walks-board/display";
-import {
-  listActiveWalkBoardEntries,
-  resolveWalkBoardPermissions
-} from "@/lib/walks-board/server";
+import { WALK_BOARD_ALARM_CHECKLIST, WALK_BOARD_ALARM_TITLE } from "@/lib/walks-board/constants";
+import { formatWalkBoardCountdown, getWalkBoardUrgency } from "@/lib/walks-board/display";
+import { formatWalkBoardHourLabel } from "@/lib/walks-board/schedule";
+import { loadWalkBoardPublicState } from "@/lib/walks-board/server";
 
 export const dynamic = "force-dynamic";
 
@@ -38,14 +31,14 @@ type BellNotificationItem = {
 
 type BellWalkAlert = {
   id: string;
-  dogName: string;
-  walkType: "no_plays" | "groomed" | "break_dog";
-  walkTypeLabel: string;
-  urgency: "walk_due" | "overdue";
+  title: string;
+  message: string;
+  hourLabel: string;
+  urgency: "alarm_due" | "overdue" | "due_soon";
   countdown: string;
-  nextDueAt: string;
-  snoozeUsed: boolean;
+  dueAt: string;
   version: number;
+  checklist: string[];
 };
 
 export async function GET(request: Request) {
@@ -93,44 +86,35 @@ export async function GET(request: Request) {
   let walkAlerts: BellWalkAlert[] = [];
   let walkDueCount = 0;
   let walkOverdueCount = 0;
-  let canSnooze = false;
 
   try {
     const actor = await resolveWalkBoardActor(supabase, session);
-    const permissions = await resolveWalkBoardPermissions(
-      supabase,
-      actor?.actorUserId ?? session.adminUserId,
-      session.role,
-      session.email
-    );
-    canSnooze = permissions.canSnooze;
+    const boardState = await loadWalkBoardPublicState(supabase, {
+      userId: actor?.actorUserId ?? session.adminUserId,
+      legacyRole: session.role,
+      email: session.email
+    });
 
-    // Only users who receive Walks Board reminders should see due/overdue dogs in the bell.
-    if (permissions.canReceiveReminders) {
-      const entries = await listActiveWalkBoardEntries(supabase);
+    if (boardState.permissions.canReceiveReminders && boardState.currentCycle?.status === "pending") {
       const nowMs = Date.now();
-      const summary = summarizeWalkBoardEntries(entries, nowMs);
-      walkDueCount = summary.dueNowCount;
-      walkOverdueCount = summary.overdueCount;
-
-      const nextAlerts: BellWalkAlert[] = [];
-      for (const entry of sortWalkBoardEntries(entries, nowMs)) {
-        const urgency = getWalkBoardUrgency(entry, nowMs);
-        if (urgency !== "walk_due" && urgency !== "overdue") continue;
-        nextAlerts.push({
-          id: entry.id,
-          dogName: entry.dog_name,
-          walkType: entry.walk_type,
-          walkTypeLabel: walkBoardTypeLabel(entry.walk_type),
-          urgency,
-          countdown: formatWalkBoardCountdown(entry, nowMs),
-          nextDueAt: entry.next_due_at,
-          snoozeUsed: entry.snooze_used,
-          version: entry.version
-        });
-        if (nextAlerts.length >= 12) break;
+      const urgency = getWalkBoardUrgency(boardState.currentCycle, nowMs);
+      if (urgency === "alarm_due" || urgency === "overdue" || urgency === "due_soon") {
+        if (urgency === "overdue") walkOverdueCount = 1;
+        else walkDueCount = 1;
+        walkAlerts = [
+          {
+            id: boardState.currentCycle.id,
+            title: WALK_BOARD_ALARM_TITLE,
+            message: boardState.message,
+            hourLabel: formatWalkBoardHourLabel(boardState.currentCycle.scheduled_hour),
+            urgency,
+            countdown: formatWalkBoardCountdown(boardState.currentCycle, nowMs),
+            dueAt: boardState.currentCycle.due_at,
+            version: boardState.currentCycle.version,
+            checklist: [...WALK_BOARD_ALARM_CHECKLIST]
+          }
+        ];
       }
-      walkAlerts = nextAlerts;
     }
   } catch {
     // Walk board may be unavailable for this session.
@@ -148,7 +132,7 @@ export async function GET(request: Request) {
     walkNotificationCount,
     badgeCount,
     hasUrgent,
-    canSnooze,
+    canSnooze: false,
     recent,
     walkAlerts,
     serverTime: new Date().toISOString()
