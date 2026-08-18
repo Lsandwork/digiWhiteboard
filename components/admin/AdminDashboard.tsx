@@ -98,6 +98,7 @@ import { BulkPhotoUploadPanel, HandlerChecklistPanel, HandlerShiftEntryPanel, Ha
 import { MediaLibraryPanel } from "@/components/admin/media-library/MediaLibrary";
 import { RemoteCastPanel } from "@/components/admin/RemoteCastPanel";
 import { WalksBoardPanel } from "@/components/admin/WalksBoardPanel";
+import { ReportsPanel } from "@/components/admin/ReportsPanel";
 import { TlDigiBoardPanel } from "@/components/admin/TlDigiBoardPanel";
 import { LobbySlideshowUploadPanel } from "@/components/admin/LobbySlideshowUploadPanel";
 import { CastTvPanel } from "@/components/admin/CastTvPanel";
@@ -431,7 +432,7 @@ export function AdminDashboard() {
     : isFrontDeskCoordinatorLoginEmail(data.username)
       ? "Front Desk Coordinator"
       : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
   const hubNavRole = currentRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
   // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
@@ -750,7 +751,8 @@ export function AdminDashboard() {
         {tab === "analytics" ? (
           <section className="admin-card p-5">
             <h2 className="admin-page-title">Analytics</h2>
-            <p className="admin-page-subtitle mb-5">Operational summary for the Staff Digital Whiteboard Admin.</p>
+            <p className="admin-page-subtitle mb-5">Live board snapshot. Open Reports for checklist, photos, logins, and other RuffOps analytics.</p>
+            <button type="button" className="admin-btn-primary mb-5" onClick={() => setActiveTab("reports")}>Open Reports</button>
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-2xl border border-admin-border p-4"><p className="text-2xl font-black text-white">{data.staff_dogs.length}</p><p className="text-sm text-admin-muted">Staff board dogs loaded</p></div>
               <div className="rounded-2xl border border-admin-border p-4"><p className="text-2xl font-black text-white">{data.active_checkouts}</p><p className="text-sm text-admin-muted">Active checkouts</p></div>
@@ -758,6 +760,8 @@ export function AdminDashboard() {
             </div>
           </section>
         ) : null}
+
+        {tab === "reports" ? <ReportsPanel /> : null}
 
         {tab === "templates" ? (
           <section className="admin-card p-5">

@@ -163,6 +163,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   vip_auto_book: "VIP Auto Book",
   demo_push: "Demo Push",
   analytics: "Analytics",
+  reports: "Reports",
   templates: "Message Templates",
   notifications: "Notifications",
   staff_directory: "Staff Directory",
@@ -261,6 +262,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   integrations: "Gingr sync, webhooks, and connection status.",
   help: "Setup guides and how-to articles.",
   analytics: "Operational metrics and board activity summary.",
+  reports: "Checklist completions, photo uploads, logins, Walks Board, Team Log, and support analytics.",
   demo_push: "Try push notices in demo mode.",
   bulk_photo_upload: "Upload, store, view, and download photos in Digi-Board.",
   media_library: "Browse all uploaded photos and videos in the RuffOps cloud archive.",
@@ -439,6 +441,7 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
             "remote_cast",
             "content",
             "analytics",
+            "reports",
             "checklist"
           ],
           visible
