@@ -12,6 +12,7 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
 import { canCallGingrEndpoint, markGingrEndpointCalled } from "@/lib/gingr-request-guard";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
+import { readGingrText } from "./gingr-medication";
 import type { TlGingrAdministrationStatus } from "./types";
 
 export type GingrMedicationReportStatusOption = {
@@ -80,10 +81,22 @@ function buildStatusLabelMap(options: GingrMedicationReportStatusOption[]): Map<
   return map;
 }
 
+/** True when Gingr recorded that staff could not mark the dose administered. */
+export function isUnableToAdministerReportStatus(statusValue: string | null, statusLabel: string | null): boolean {
+  const haystack = `${statusLabel ?? ""} ${statusValue ?? ""}`.toLowerCase();
+  if (!haystack.trim()) return false;
+  if (/\bunable[\s_-]+to[\s_-]+administ/.test(haystack)) return true;
+  if (/\bcannot[\s_-]+administ/.test(haystack)) return true;
+  if (/\bcan['’]?t[\s_-]+administ/.test(haystack)) return true;
+  if (/\brefused\b/.test(haystack)) return true;
+  return false;
+}
+
 /** True when a Gingr medication report status means the dose was given. */
 export function isAdministeredReportStatus(statusValue: string | null, statusLabel: string | null): boolean {
   const haystack = `${statusLabel ?? ""} ${statusValue ?? ""}`.toLowerCase();
   if (!haystack.trim()) return false;
+  if (isUnableToAdministerReportStatus(statusValue, statusLabel)) return false;
   // Positive match first.
   if (/\badminist/.test(haystack) || /\bgiven\b/.test(haystack) || /\bcompleted\b/.test(haystack)) {
     // Exclude explicit negatives that still contain "administ" (rare).
@@ -132,7 +145,14 @@ function normalizeAdministrationRow(
     animalMedicationScheduleId,
     statusValue,
     statusLabel,
-    notes: readString(row.notes) ?? readString(row.administration_notes),
+    notes:
+      readGingrText(row.notes) ??
+      readGingrText(row.note) ??
+      readGingrText(row.administration_notes) ??
+      readGingrText(row.medication_notes) ??
+      readGingrText(row.comment) ??
+      readGingrText(row.comments) ??
+      readGingrText(row.note_text),
     lastEditedAtUnix: readUnixSeconds(row.last_edited_at) ?? readUnixSeconds(row.lastEditedAt),
     lastEditedBy: readString(row.last_edited_by) ?? readString(row.lastEditedBy) ?? readString(row.employee_name)
   };

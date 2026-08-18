@@ -276,6 +276,44 @@
   color: var(--tl-muted);
 }
 
+.tl-table__instructions {
+  min-width: 12rem;
+  max-width: 26rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.tl-table__notes-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tl-table__instruction-text,
+.tl-table__notes {
+  margin: 0;
+}
+
+.tl-table__notes {
+  color: var(--tl-text);
+  font-weight: 600;
+}
+
+.tl-table__notes-label {
+  display: inline-block;
+  margin-right: 0.4rem;
+  color: var(--tl-amber);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tl-table__muted {
+  color: var(--tl-muted);
+}
+
 .tl-table__med,
 .tl-table__service {
   font-weight: 650;

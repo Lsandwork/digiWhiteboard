@@ -18,10 +18,12 @@ export type GingrMedicationScheduleDef = {
 export type GingrAnimalMedicationScheduleItem = {
   id: string;
   medication_schedule_id: string;
-  medication_notes?: { value?: string | null } | null;
+  medication_notes?: { value?: string | null; value_string?: string | null } | string | null;
   medication_amount?: { value?: string | null; value_string?: string | null } | null;
   medication_type?: { value?: string | null; value_string?: string | null } | null;
   medication_unit?: { value?: string | null; value_string?: string | null } | null;
+  /** Extra Gingr note fields that are not the primary medication_notes instruction. */
+  sourceNotes?: string | null;
 };
 
 export type GingrMedicationInfoPayload = {
@@ -51,9 +53,78 @@ function readString(value: unknown): string | null {
 }
 
 function readFieldValue(field: unknown): string | null {
-  const row = asRecord(field);
-  if (!row) return readString(field);
-  return readString(row.value_string) ?? readString(row.value);
+  return readGingrText(field);
+}
+
+/** Gingr custom fields may be a string, { value, value_string }, or nested HTML-ish text. */
+export function readGingrText(value: unknown, depth = 0): string | null {
+  if (value == null || depth > 4) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return null;
+  if (typeof value === "string") {
+    const stripped = value
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/\s+/g, " ")
+      .trim();
+    return stripped || null;
+  }
+  if (Array.isArray(value)) {
+    const parts = value.map((item) => readGingrText(item, depth + 1)).filter(Boolean) as string[];
+    return uniqueNoteParts(parts).join(" · ") || null;
+  }
+  const row = asRecord(value);
+  if (!row) return null;
+  return (
+    readGingrText(row.value_string, depth + 1) ??
+    readGingrText(row.value, depth + 1) ??
+    readGingrText(row.text, depth + 1) ??
+    readGingrText(row.html, depth + 1) ??
+    readGingrText(row.notes, depth + 1) ??
+    readGingrText(row.note, depth + 1)
+  );
+}
+
+const EXTRA_NOTE_KEYS = [
+  "notes",
+  "note",
+  "comments",
+  "comment",
+  "instructions",
+  "special_instructions",
+  "medication_instructions",
+  "administration_notes",
+  "note_text",
+  "medication_note"
+];
+
+export function uniqueNoteParts(parts: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of parts) {
+    const text = String(part || "").trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(text);
+  }
+  return out;
+}
+
+function extraNotesFromRow(row: Record<string, unknown>, skip?: string | null): string | null {
+  const skipKey = skip?.trim().toLowerCase() ?? "";
+  const parts: string[] = [];
+  for (const key of EXTRA_NOTE_KEYS) {
+    if (!(key in row)) continue;
+    const text = readGingrText(row[key]);
+    if (!text) continue;
+    if (skipKey && text.toLowerCase() === skipKey) continue;
+    parts.push(text);
+  }
+  return uniqueNoteParts(parts).join(" · ") || null;
 }
 
 /** Flatten animal_medication_schedules object (or array) into a list of schedule items. */
@@ -89,13 +160,20 @@ function normalizeScheduleItem(
   if (!id) return null;
   const medication_schedule_id =
     readString(row.medication_schedule_id) ?? readString(fallbackScheduleId) ?? "";
+  const notesObject = asRecord(row.medication_notes);
+  const notesText = readGingrText(row.medication_notes);
   return {
     id,
     medication_schedule_id,
-    medication_notes: asRecord(row.medication_notes) as GingrAnimalMedicationScheduleItem["medication_notes"],
+    medication_notes: notesObject
+      ? (notesObject as GingrAnimalMedicationScheduleItem["medication_notes"])
+      : notesText
+        ? { value: notesText, value_string: notesText }
+        : null,
     medication_amount: asRecord(row.medication_amount) as GingrAnimalMedicationScheduleItem["medication_amount"],
     medication_type: asRecord(row.medication_type) as GingrAnimalMedicationScheduleItem["medication_type"],
-    medication_unit: asRecord(row.medication_unit) as GingrAnimalMedicationScheduleItem["medication_unit"]
+    medication_unit: asRecord(row.medication_unit) as GingrAnimalMedicationScheduleItem["medication_unit"],
+    sourceNotes: extraNotesFromRow(row, notesText)
   };
 }
 
@@ -166,8 +244,11 @@ export function dosageFromItem(item: GingrAnimalMedicationScheduleItem): string 
 }
 
 export function notesFromItem(item: GingrAnimalMedicationScheduleItem): string | null {
-  const notes = asRecord(item.medication_notes);
-  return readString(notes?.value);
+  return readGingrText(item.medication_notes);
+}
+
+export function extraNotesFromItem(item: GingrAnimalMedicationScheduleItem): string | null {
+  return readGingrText(item.sourceNotes);
 }
 
 function unwrapMedicationPayload(payload: unknown): GingrMedicationInfoPayload {

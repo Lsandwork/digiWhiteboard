@@ -8,6 +8,7 @@ import {
   dosageFromItem,
   flattenAnimalMedicationSchedules,
   flattenAndResolveMedicationSchedules,
+  notesFromItem,
   resolveMedicationSchedule,
   type GingrAnimalMedicationScheduleItem,
   type GingrMedicationInfoPayload
@@ -18,6 +19,7 @@ import {
   parseRunName
 } from "../lib/tl-digi-board/lodging";
 import { buildTlGingrMedicationRecord } from "../lib/tl-digi-board/normalize";
+import { splitMedicationDisplayNotes } from "../lib/tl-digi-board/medication-notes";
 import { normalizeScheduleLabel } from "../lib/tl-digi-board/medication-windows";
 
 // --- lodging parse ---
@@ -166,6 +168,68 @@ import { normalizeScheduleLabel } from "../lib/tl-digi-board/medication-windows"
   assert.equal(record.administeredAt, null);
   assert.equal(record.administeredBy, null);
   assert.equal(record.lodgingLabel, "SUITE • 4");
+  assert.equal(record.instructions, "give with breakfast");
+}
+
+// --- notes from value_string, plain strings, extra Gingr fields, and report notes ---
+{
+  const valueStringItem: GingrAnimalMedicationScheduleItem = {
+    id: "dougal-1",
+    medication_schedule_id: "3",
+    medication_notes: { value: null, value_string: "Administer 1 drop into LEFT eye" },
+    medication_amount: { value: "1", value_string: "1" },
+    medication_type: { value: "tobra", value_string: "Tobramycin" },
+    medication_unit: { value: "Drops", value_string: "Drops" },
+    sourceNotes: "Could not mark administered in Gingr — see kennel card."
+  };
+  const dougal = buildTlGingrMedicationRecord(
+    resolveMedicationSchedule(valueStringItem, new Map([["3", "PM"]])),
+    {
+      gingrAnimalId: "dougal",
+      gingrReservationId: "res-dougal",
+      dogName: "Dougal",
+      lodgingLabel: "DEN",
+      serviceDate: "2026-08-17",
+      administration: {
+        administrationStatus: "not_administered",
+        administeredAt: null,
+        administeredBy: null,
+        administrationNotes: "Unable to administer — dog too wiggly, retry PM.",
+        statusLabel: "Unable to Administer"
+      }
+    }
+  );
+  assert.equal(dougal.instructions, "Administer 1 drop into LEFT eye");
+  assert.match(dougal.notes ?? "", /Unable to administer/);
+  assert.match(dougal.notes ?? "", /Could not mark administered/);
+  assert.equal(dougal.administrationStatus, "not_administered");
+
+  const stringNotesPayload: GingrMedicationInfoPayload = {
+    medicationSchedules: [{ id: "3", time: "PM" }],
+    animal_medication_schedules: {
+      "3": [
+        {
+          id: "plain-1",
+          medication_schedule_id: "3",
+          medication_notes: "Give with bread",
+          medication_amount: { value: "2", value_string: "2" },
+          medication_type: { value: "gaba", value_string: "Gabapentin" },
+          medication_unit: { value: "Pill", value_string: "Pill" }
+        } as GingrAnimalMedicationScheduleItem
+      ]
+    }
+  };
+  const flat = flattenAnimalMedicationSchedules(stringNotesPayload.animal_medication_schedules);
+  assert.equal(notesFromItem(flat[0]!), "Give with bread");
+}
+
+{
+  const split = splitMedicationDisplayNotes({
+    instructions: "Administer 1 drop into LEFT eye",
+    notes: "Could not mark administered in Gingr."
+  });
+  assert.equal(split.instructions, "Administer 1 drop into LEFT eye");
+  assert.equal(split.notes, "Could not mark administered in Gingr.");
 }
 
 console.log("test-tl-digi-board-normalize: ok");
