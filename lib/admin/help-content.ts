@@ -229,16 +229,47 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "Admin Dashboard",
     keywords: ["team lead", "team leader", "menu", "yard command", "floor ops"],
     steps: [
-      "Primary tabs: My Shift, Yard Command, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
+      "Primary tabs: My Shift, Yard Command, RuffOps Checklist, Floor Ops, Whiteboard, Apps, Submit Request, Settings, Help.",
       "My Shift Needs Attention shows Open Log and Active Issues assigned to you, plus today’s Gingr facility-calendar services (group walk, puzzle playtime, private training, daily enrichment, club food, taxi, bath/nails/grooming — Free Daily Walk excluded) and dogs scheduled or checked in with a birthday today.",
       "Fitdog Alerts (app.fitdog.com payments) are not on the Team Lead dashboard. Coordinator dashboards, including a coordinator who also has a Team Lead account, stay unchanged.",
-      "Floor Ops covers Ops Command Center, Team Log, follow-ups, active issues, walks, and photo upload.",
+      "Floor Ops covers Ops Command Center, Team Log, follow-ups, active issues, walks, the shared RuffOps Checklist, and photo upload.",
       "Whiteboard covers Standard Notices, Yard Camera Push, Grooming Push, and Live Preview.",
       "Apps covers Gingr and Ruffly. Route Generator is Super Admin, Admin, Management, and Transportation only."
     ],
     adminTab: "yard_command",
     adminBoard: "staff",
     audiences: ["staff_ops"]
+  },
+  {
+    id: "ruffops-checklist",
+    title: "How does the shared RuffOps Checklist work?",
+    summary: "Team Leads, Managers, and Admins share one Gingr-style checklist. Checking a box stamps a timestamp for everyone. Gingr stays the system of record; RuffOps is the final reminder.",
+    category: "Staff Board",
+    keywords: [
+      "ruffops checklist",
+      "todo",
+      "gingr checklist",
+      "daily reminders",
+      "medication",
+      "additional services",
+      "walks board",
+      "push alerts",
+      "team lead"
+    ],
+    steps: [
+      "Open RuffOps Checklist (Team Leads have it on the sidebar; Managers and Admins open Floor Ops → RuffOps Checklist).",
+      "The list combines today’s yard daily reminders, Walks Board alarms, Gingr medications, Gingr additional services, and live staff alerts into one time-ordered checklist.",
+      "Click a checkbox when the work is done. Everyone on the team sees the same completion, with your name and timestamp.",
+      "Medications and additional services still must be completed in Gingr. Use Open in Gingr, then the row follows Gingr. Checking in RuffOps only stamps the shared reminder.",
+      "Walk Check rows complete the Walks Board alarm for everyone. Those cannot be unchecked.",
+      "Dog Handler Check List stays personal and separate. This shared list is the Team Lead / Manager / Admin reminder that sits next to Gingr."
+    ],
+    tips: [
+      "Gingr tracks the operation. RuffOps Checklist is the shared final reminder so nothing is missed while staff work in both systems."
+    ],
+    adminTab: "ruffops_checklist",
+    adminBoard: "staff",
+    audiences: ["admin", "staff_ops"]
   },
   {
     id: "role-menu-trainer-groomer",
@@ -276,7 +307,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["admin", "management", "super admin", "menu", "hubs", "people", "support"],
     steps: [
       "Primary tabs: My Shift, Ops Command Center, Floor Ops, Whiteboard, Support, People & HR, Commissions, Apps, Admin, Help.",
-      "Floor Ops — command centers, floor operations, photos, and cameras.",
+      "Floor Ops — command centers, floor operations, the shared RuffOps Checklist, photos, and cameras.",
       "Whiteboard — all push-to-board and display/cast tools.",
       "Support — Support Command Center for complaints, PIPs, and urgent cases.",
       "People & HR — staff directory, users, HR records (including uploaded paper write-ups), write-ups, PIP, and HR Consult (Sam scans uploaded write-ups and recommends next steps).",

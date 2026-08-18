@@ -65,6 +65,7 @@
     "test:rich-text": "tsx scripts/test-rich-text.ts",
     "test:commissions-nav": "tsx scripts/test-commissions-nav.ts",
     "test:walks-board": "tsx scripts/test-walks-board.ts",
+    "test:ruffops-checklist": "tsx scripts/test-ruffops-checklist.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "test:cast-display-schedule": "tsx scripts/test-cast-display-schedule.ts",

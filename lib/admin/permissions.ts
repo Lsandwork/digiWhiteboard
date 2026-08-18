@@ -800,6 +800,7 @@ export const TEAM_LEADER_TABS = [
   "media_library",
   "yard_links",
   "walks_board",
+  "ruffops_checklist",
   "notifications",
   "management_support",
   "settings",
@@ -1092,6 +1093,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
+  ruffops_checklist: "view_admin_panel",
   tl_digi_board: "manage_tl_digi_board",
   settings: "view_admin_panel",
   help: "view_admin_panel",
@@ -1498,6 +1500,14 @@ export function canAccessAdminTab(
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     if (isMarketingLegacyRole(legacyRole)) return false;
     return true;
+  }
+
+  // Shared Gingr-style ops checklist — Team Leads, Managers, and Admins only.
+  if (tab === "ruffops_checklist") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isAdminOrManagementLegacyRole(legacyRole) || isTeamLeaderLegacyRole(legacyRole)) return true;
+    return false;
   }
 
   // TL Digi Board admin config — Owner Admin / Manager Admin (full admin) only.

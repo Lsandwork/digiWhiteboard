@@ -183,6 +183,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   hr_pip: "Track PIP",
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board",
+  ruffops_checklist: "RuffOps Checklist",
   tl_digi_board: "TL Digi Board",
   route_generator: "Route Generator",
   live_fleet: "Live Fleet",
@@ -250,6 +251,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   templates: "Reusable message templates for staff communications.",
   notifications: "Internal staff notifications and replies.",
   walks_board: "2-hour alarm to update the physical No Plays, Grooming, and Walks Board. Cannot be snoozed.",
+  ruffops_checklist:
+    "Shared Gingr-style checklist for yard reminders, walks, medications, additional services, and live alerts.",
   tl_digi_board: "Configure the Team Lead Alerts + Reminders display",
   route_generator: "Pull Fitdog reports, build van routes, export Samsara CSVs, and track owner SMS / live maps.",
   live_fleet: "Real-time Fitdog van map powered by Samsara GPS, joined with today's Route Generator assignments.",
@@ -296,7 +299,8 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "active_issues",
   "fitdog_alerts",
   "vip_auto_book",
-  "walks_board"
+  "walks_board",
+  "ruffops_checklist"
 ];
 
 const MEDIA_TABS: AdminTab[] = ["yard_links"];
@@ -612,7 +616,12 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
       "team_lead_operations",
       "Front Desk & Floor",
       compactEntries([
-        group("front_desk", "Operations", ["crossover_communication", "owner_follow_up", "active_issues"], visible),
+        group(
+          "front_desk",
+          "Operations",
+          ["crossover_communication", "owner_follow_up", "active_issues", "ruffops_checklist"],
+          visible
+        ),
         ...singles(["bulk_photo_upload", "media_library"], visible)
       ])
     )

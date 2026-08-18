@@ -123,6 +123,7 @@ export const FITDOG_TAB_ICONS: Partial<Record<AdminTab, string>> = {
   demo_push: FITDOG_UI.pushNotices,
   notifications: FITDOG_UI.notifications,
   walks_board: FITDOG_UI.frontDeskLog,
+  ruffops_checklist: FITDOG_UI_PACK.checklist,
   // Distinct from Track Incidents / Active Issues (same triangle icon was confusing in the collapsed rail).
   route_generator: FITDOG_UI_PACK.browserWorld,
   ops_system_health: FITDOG_SIDEBAR_ICONS.integrations,
