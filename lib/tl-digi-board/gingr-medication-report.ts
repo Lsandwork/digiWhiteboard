@@ -224,10 +224,10 @@ export function flattenAdministrationData(
       ) {
         continue;
       }
-      const dateKey = isIsoDateKey(key) ? key : dateHere;
+      const dateKey = isIsoDateKey(key) ? key : dateHere ?? undefined;
       const scheduleKey = !isIsoDateKey(key) && /^\d+$/.test(key) ? key : fallbackScheduleId;
       if (nested && typeof nested === "object") {
-        visit(nested, scheduleKey, dateKey, depth + 1);
+        visit(nested, scheduleKey ?? undefined, dateKey, depth + 1);
       }
     }
   };

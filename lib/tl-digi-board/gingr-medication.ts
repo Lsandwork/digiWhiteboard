@@ -334,10 +334,13 @@ export function flattenAndResolveMedicationSchedules(
   payload: GingrMedicationInfoPayload,
   scheduleIdMap: Record<string, TlMedicationPeriod> = TL_FITDOG_SCHEDULE_ID_MAP
 ): ResolvedGingrMedicationSchedule[] {
-  const defs = (payload.medicationSchedules ?? []).filter(
-    (row): row is GingrMedicationScheduleDef =>
-      Boolean(asRecord(row)?.id) && (typeof asRecord(row)?.time === "string" || typeof asRecord(row)?.time === "number")
-  );
+  const defs: GingrMedicationScheduleDef[] = [];
+  for (const row of payload.medicationSchedules ?? []) {
+    const rec = asRecord(row);
+    const id = readString(rec?.id);
+    const time = readString(rec?.time);
+    if (id && time) defs.push({ id, time });
+  }
   const labelMap = buildMedicationScheduleLabelMap(defs);
   const fromAnimal = flattenAnimalMedicationSchedules(payload.animal_medication_schedules);
   const fromNested = fromAnimal.length ? [] : flattenNestedMedicationScheduleLists(payload.medicationSchedules);
