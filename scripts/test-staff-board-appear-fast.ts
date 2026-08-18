@@ -26,9 +26,9 @@ assert.ok(getGingrBoardRefreshIntervalMs() <= 2000);
   assert.match(boardClient, /loadBoard\("connecting", \{ silent: true \}\)/);
   assert.match(boardClient, /BOARD_CHECKOUT_POLL_EMPTY_MS/);
   assert.match(boardClient, /BOARD_REALTIME_CONFIRM_MS/);
-  assert.match(boardClient, /rerunIfBusy:\s*true/);
   assert.match(boardClient, /waitingForDogRef/);
-  assert.doesNotMatch(boardClient, /setTimeout\(\(\) => \{\s*void loadBoard\("connecting"\);\s*void loadFastCheckouts\(\);/);
+  assert.match(boardClient, /fullSyncCompleted/);
+  assert.doesNotMatch(boardClient, /rerunIfBusy:\s*true/);
 }
 
 {
