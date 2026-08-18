@@ -279,6 +279,10 @@ export function targetsDogHandlers(reminder: Pick<DailyReminder, "audience">) {
   return reminder.audience.includes("dog_handler");
 }
 
+export function targetsTeamLeads(reminder: Pick<DailyReminder, "audience">) {
+  return reminder.audience.includes("team_lead");
+}
+
 export function isReminderDue(
   reminder: Pick<DailyReminder, "scheduled_time" | "audience">,
   timeZone: string,

@@ -198,6 +198,46 @@ assert.equal(
   "team leads can open checklist"
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "ruffops_checklist", "team_leader", "staff"),
+  true,
+  "team leads can open the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "ruffops_checklist", "assistant_manager", "staff"),
+  true,
+  "managers can open the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "manager_admin"), "ruffops_checklist", "manager_admin", "staff"),
+  true,
+  "admins can open the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "ruffops_checklist", "owner_admin", "staff"),
+  true,
+  "super admins can open the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "ruffops_checklist", "daycare", "staff"),
+  false,
+  "handlers use the personal Check List, not the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "groomer"), "ruffops_checklist", "groomer", "staff"),
+  false,
+  "groomers cannot open the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "ruffops_checklist", "front_desk_coordinator", "staff"),
+  false,
+  "front desk coordinators cannot open the shared RuffOps Checklist"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "ruffops_checklist", "team_leader", "lobby"),
+  false,
+  "RuffOps Checklist is staff-board only"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "reports", "owner_admin", "staff"),
   true,
   "super admin can open Reports"

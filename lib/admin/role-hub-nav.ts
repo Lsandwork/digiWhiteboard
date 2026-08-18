@@ -105,6 +105,7 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     primary: [
       { tab: "my_shift" },
       { tab: "yard_command" },
+      { tab: "ruffops_checklist" },
       { tab: "sa_floor_hub" },
       { tab: "sa_whiteboard_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
