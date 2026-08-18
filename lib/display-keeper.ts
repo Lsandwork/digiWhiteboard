@@ -39,13 +39,18 @@ export type DisplayDevice = {
 };
 
 export const CAST_KEEPER_DEVICE_STORAGE_KEY = "fitdog_display_device_id";
-export const CAST_KEEPER_HEARTBEAT_MS = 15_000;
-export const CAST_KEEPER_RECONNECT_HEARTBEAT_MS = 4_000;
+export const CAST_KEEPER_HEARTBEAT_MS = 5_000;
+export const CAST_KEEPER_RECONNECT_HEARTBEAT_MS = 2_000;
 export const CAST_KEEPER_STALE_MS = 12 * 60_000;
 export const CAST_KEEPER_RELOAD_COOLDOWN_MS = 2 * 60_000;
 export const CAST_KEEPER_OFFLINE_DEVICE_MS = 90_000;
 export const CAST_KEEPER_HEARTBEAT_FAILURE_THRESHOLD = 3;
 export const CAST_KEEPER_HEARTBEAT_GRACE_MS = 60_000;
+
+/** Stale-data auto-reload stays on a cooldown. Admin hard_refresh never does. */
+export function shouldHonorHardRefreshCommand() {
+  return true;
+}
 
 export type HeartbeatRequest = {
   deviceId: string;

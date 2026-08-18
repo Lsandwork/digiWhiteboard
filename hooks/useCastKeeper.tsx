@@ -23,10 +23,11 @@ import {
   CAST_KEEPER_RELOAD_COOLDOWN_MS,
   CAST_KEEPER_STALE_MS,
   getOrCreateDisplayDeviceId,
+  shouldHonorHardRefreshCommand,
   type DisplayType,
   type HeartbeatResponse
 } from "@/lib/display-keeper";
-import { writeStoredDisplaySync } from "@/lib/display-sync";
+import { forceReloadDisplay, shouldReloadForCastNonce, writeStoredDisplaySync } from "@/lib/display-sync";
 
 export type CastKeeperConnection = "online" | "reconnecting" | "offline";
 
@@ -189,15 +190,19 @@ export function useCastKeeper({
     const hardRefresh = commands.some((command) => command.command_type === "hard_refresh");
     const commandIds = commands.map((command) => command.id);
     if (commandIds.length) {
-      void ackDisplayCommands(commandIds);
+      await ackDisplayCommands(commandIds);
     }
-    if (hardRefresh) {
-      const now = Date.now();
-      if (now - lastReloadAtRef.current >= CAST_KEEPER_RELOAD_COOLDOWN_MS) {
-        lastReloadAtRef.current = now;
-        safeReload();
-      }
+    if (!hardRefresh || !shouldHonorHardRefreshCommand()) return;
+
+    const nonceFromCommand = commands
+      .map((command) => Number(command.payload?.cast_hard_reload_nonce))
+      .find((value) => Number.isFinite(value));
+    const nonce = nonceFromCommand ?? syncRef.current?.cast_hard_reload_nonce;
+    if (typeof nonce === "number" && Number.isFinite(nonce) && !shouldReloadForCastNonce(nonce)) {
+      return;
     }
+    lastReloadAtRef.current = Date.now();
+    forceReloadDisplay(nonce);
   }, []);
 
   const runHeartbeat = useCallback(async () => {

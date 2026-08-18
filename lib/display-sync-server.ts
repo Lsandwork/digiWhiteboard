@@ -10,8 +10,21 @@ import type { DisplaySyncState } from "@/lib/display-sync";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+function parseNonce(value: unknown) {
+  const nonce = Number(value);
+  if (!Number.isFinite(nonce)) return 0;
+  return Math.max(0, Math.trunc(nonce));
+}
+
+/** Always read from Postgres so other serverless instances see admin Refresh immediately. */
+export async function loadCastHardReloadNonce(supabase: SupabaseClient): Promise<number> {
+  const { loadAdminSettingsJsonKey } = await import("@/lib/admin/settings-json-store");
+  const nonce = await loadAdminSettingsJsonKey(supabase, "cast_hard_reload_nonce", parseNonce, 0);
+  return nonce ?? 0;
+}
+
 export async function loadDisplaySyncState(supabase: SupabaseClient): Promise<DisplaySyncState> {
-  return getOrLoadTtlCache("display-sync", DISPLAY_SYNC_CACHE_TTL_MS, async () => {
+  const cached = await getOrLoadTtlCache("display-sync", DISPLAY_SYNC_CACHE_TTL_MS, async () => {
     const { admin, lobby, staff } = await cachedLoadSettingsBundle(supabase);
     return {
       display_content_revision: admin.display_content_revision ?? 0,
@@ -21,6 +34,14 @@ export async function loadDisplaySyncState(supabase: SupabaseClient): Promise<Di
       staff_published_version: staff.published_version ?? "v1.0.0"
     };
   });
+
+  try {
+    const nonce = await loadCastHardReloadNonce(supabase);
+    return { ...cached, cast_hard_reload_nonce: nonce };
+  } catch (error) {
+    console.error("[display-sync] live nonce read failed:", error);
+    return cached;
+  }
 }
 
 export async function bumpDisplayContentRevision(supabase: SupabaseClient) {
@@ -31,8 +52,14 @@ export async function bumpDisplayContentRevision(supabase: SupabaseClient) {
 }
 
 export async function bumpCastHardReloadNonce(supabase: SupabaseClient) {
-  const { admin } = await cachedLoadSettingsBundle(supabase);
-  const nextNonce = (admin.cast_hard_reload_nonce ?? 0) + 1;
+  let current = 0;
+  try {
+    current = await loadCastHardReloadNonce(supabase);
+  } catch {
+    const { admin } = await cachedLoadSettingsBundle(supabase);
+    current = admin.cast_hard_reload_nonce ?? 0;
+  }
+  const nextNonce = current + 1;
   await cachedUpdateAdminSettings(supabase, { cast_hard_reload_nonce: nextNonce });
   return nextNonce;
 }

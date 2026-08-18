@@ -627,7 +627,7 @@ export function BoardClient({
   }, [castKeeperMode, loadBoard, loadFastCheckouts]);
 
   useDisplaySync({
-    enabled: !castKeeperMode,
+    enabled: true,
     onContentUpdate: () => {
       void loadBoard("polling", { silent: true });
     }
