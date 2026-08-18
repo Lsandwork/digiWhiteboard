@@ -51,7 +51,7 @@ export async function GET(_request: Request, context: RouteContext) {
         "Content-Type": contentType,
         "Content-Length": String(buffer.length),
         "Content-Disposition": `inline; filename="${fileName}"`,
-        "Cache-Control": "public, max-age=300, stale-while-revalidate=86400",
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
         "X-Content-Type-Options": "nosniff"
       }
     });

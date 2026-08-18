@@ -13,7 +13,7 @@ import { recordGingrBackOfHouseHeartbeat } from "@/lib/gingr-sync-heartbeat";
  * the Gingr fetch, so it is one shared request per interval no matter how many
  * boards, TVs, or tabs are polling.
  */
-const BOARD_REFRESH_INTERVAL_MS = Number(process.env.GINGR_BASKET_REFRESH_MS ?? 4000);
+const BOARD_REFRESH_INTERVAL_MS = Number(process.env.GINGR_BASKET_REFRESH_MS ?? 2000);
 
 let lastBoardRefreshAt = 0;
 let boardRefreshInFlight: Promise<void> | null = null;

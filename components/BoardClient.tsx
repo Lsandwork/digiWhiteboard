@@ -35,11 +35,13 @@ import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import { applyOptimisticLiveBoardTransition } from "@/lib/board-optimistic-transition";
 import {
+  BOARD_CHECKOUT_POLL_EMPTY_MS,
   BOARD_CHECKOUT_POLL_MS,
   BOARD_FAST_FETCH_TIMEOUT_MS,
   BOARD_FETCH_TIMEOUT_MS,
   BOARD_FULL_SYNC_POLL_LIVE_MS,
   BOARD_FULL_SYNC_POLL_MS,
+  BOARD_REALTIME_CONFIRM_MS,
   EMPTY_BASKET_CONFIRM_POLLS,
   areCheckoutListsEquivalent,
   getTransitionMatchKeys,
@@ -506,8 +508,10 @@ export function BoardClient({
       });
       setLastFetchAt(new Date().toISOString());
       hasSuccessfulLoadRef.current = true;
+      setFetchError(null);
+      setFetchStatus("ok");
       castKeeper?.markDataFresh();
-    }, { rerunIfBusy: Boolean(options.fresh) });
+    }, { rerunIfBusy: true });
   }, [fastCheckoutEndpoint, castKeeper, debugBoard, runFastPoll]);
 
   const loadFastCheckoutsRef = useRef(loadFastCheckouts);
@@ -650,25 +654,39 @@ export function BoardClient({
     effectiveTrainerNotice
   ]);
 
+  const waitingForDogRef = useRef(true);
+
   // Mount-only board clocks + fast poll. Do NOT restart when Realtime flips
   // connection → "live" (that was re-fetching and flickering dogs off).
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => {
-      void loadBoard("connecting");
-      void loadFastCheckouts();
+    const initialFast = window.setTimeout(() => {
+      void loadFastCheckouts({ fresh: true });
     }, 0);
+    const initialFull = window.setTimeout(() => {
+      void loadBoard("connecting", { silent: true });
+    }, 150);
     const initialClock = window.setTimeout(() => setClock(new Date()), 0);
 
     const clockIntervalMs = castKeeperMode ? 60_000 : 1000;
     const nowIntervalMs = castKeeperMode ? 5_000 : 1000;
-    const fastPollIntervalMs = BOARD_CHECKOUT_POLL_MS;
 
     const clockTimer = window.setInterval(() => setClock(new Date()), clockIntervalMs);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), nowIntervalMs);
-    const fastPollTimer = window.setInterval(() => void loadFastCheckouts(), fastPollIntervalMs);
+    let busyTicks = 0;
+    const fastPollTimer = window.setInterval(() => {
+      const empty = waitingForDogRef.current;
+      if (!empty) {
+        busyTicks += 1;
+        if (busyTicks % Math.round(BOARD_CHECKOUT_POLL_MS / BOARD_CHECKOUT_POLL_EMPTY_MS) !== 0) return;
+      } else {
+        busyTicks = 0;
+      }
+      void loadFastCheckouts({ fresh: empty });
+    }, BOARD_CHECKOUT_POLL_EMPTY_MS);
 
     return () => {
-      window.clearTimeout(initialLoad);
+      window.clearTimeout(initialFast);
+      window.clearTimeout(initialFull);
       window.clearTimeout(initialClock);
       window.clearInterval(clockTimer);
       window.clearInterval(nowTimer);
@@ -737,7 +755,7 @@ export function BoardClient({
             if (realtimeConfirmTimer) window.clearTimeout(realtimeConfirmTimer);
             realtimeConfirmTimer = window.setTimeout(() => {
               void loadFastCheckoutsRef.current({ fresh: true });
-            }, 750);
+            }, BOARD_REALTIME_CONFIRM_MS);
           }
         )
         .subscribe((status) => {
@@ -805,6 +823,7 @@ export function BoardClient({
 
   const hasBoardData = board.checking_in.length > 0 || board.checking_out.length > 0;
   const hasVisibleDogs = visibleCheckingInDogs.length > 0 || visibleCheckoutDogs.length > 0;
+  waitingForDogRef.current = !hasVisibleDogs;
   const castHealth: CastModeStatus =
     connection === "offline" || (fetchStatus === "error" && !hasBoardData)
       ? "offline"

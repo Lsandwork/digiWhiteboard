@@ -98,31 +98,40 @@ async function findExistingDog(
   supabase: ReturnType<typeof getServiceSupabase>,
   reservationId: string | null,
   animalId: string | null,
-  options: { preferVisible?: boolean } = {}
+  _options: { preferVisible?: boolean } = {}
 ) {
   if (reservationId) {
-    const { data } = await supabase
+    const reservationQuery = supabase
       .from("live_transition_dogs")
       .select("*")
       .eq("gingr_reservation_id", reservationId)
       .maybeSingle();
-    if (data) return data;
+    const visibleQuery = animalId
+      ? supabase
+          .from("live_transition_dogs")
+          .select("*")
+          .eq("gingr_animal_id", animalId)
+          .eq("hidden", false)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null });
+    const [byReservation, byVisibleAnimal] = await Promise.all([reservationQuery, visibleQuery]);
+    if (byReservation.data) return byReservation.data;
+    if (byVisibleAnimal.data) return byVisibleAnimal.data;
+  } else if (animalId) {
+    const { data: visible } = await supabase
+      .from("live_transition_dogs")
+      .select("*")
+      .eq("gingr_animal_id", animalId)
+      .eq("hidden", false)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (visible) return visible;
   }
 
   if (animalId) {
-    // Prefer a still-visible row so a retired twin for the same animal cannot steal the write.
-    if (options.preferVisible !== false) {
-      const { data: visible } = await supabase
-        .from("live_transition_dogs")
-        .select("*")
-        .eq("gingr_animal_id", animalId)
-        .eq("hidden", false)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (visible) return visible;
-    }
-
     const { data } = await supabase
       .from("live_transition_dogs")
       .select("*")

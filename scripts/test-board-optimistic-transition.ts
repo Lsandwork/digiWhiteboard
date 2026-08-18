@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
+  BOARD_CHECKOUT_POLL_EMPTY_MS,
   BOARD_CHECKOUT_POLL_MS,
+  BOARD_REALTIME_CONFIRM_MS,
   includePromptedCheckoutInBoard,
   mergeBoardResponse,
   mergeCheckinListsForDisplay,
@@ -10,6 +12,9 @@ import { applyOptimisticLiveBoardTransition } from "../lib/board-optimistic-tran
 import type { LiveBoardResponse, LiveDog } from "../lib/types";
 
 assert.equal(BOARD_CHECKOUT_POLL_MS, 1000);
+assert.equal(BOARD_CHECKOUT_POLL_EMPTY_MS, 500);
+assert.ok(BOARD_CHECKOUT_POLL_EMPTY_MS < BOARD_CHECKOUT_POLL_MS);
+assert.equal(BOARD_REALTIME_CONFIRM_MS, 200);
 
 function dog(overrides: Partial<LiveDog>): LiveDog {
   return {
