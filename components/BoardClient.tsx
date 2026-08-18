@@ -949,7 +949,12 @@ export function BoardClient({
                 data-staff-board-layout="loading"
               />
             ) : staffBoardLayout.showApprovedEmptyState ? (
-              <StaffBoardEmptyState />
+              <div
+                className="staff-board-content staff-board-content--empty min-h-0 h-full"
+                data-staff-board-layout="empty"
+              >
+                <StaffBoardEmptyState />
+              </div>
             ) : (
               <div
                 className={staffBoardLayoutClass(staffBoardLayout.variant)}

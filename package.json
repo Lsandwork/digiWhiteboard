@@ -34,6 +34,7 @@
     "audit:tl-additional-services-gingr": "tsx scripts/audit-tl-additional-services-gingr.ts",
     "test:tl-digi-board-permissions": "tsx scripts/test-tl-digi-board-permissions.ts",
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
+    "test:staff-idle-slideshow": "tsx scripts/test-staff-idle-slideshow.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
