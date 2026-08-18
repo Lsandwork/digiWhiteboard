@@ -1,6 +1,12 @@
 import { WALK_BOARD_DUE_SOON_MS } from "./constants";
 import { formatWalkBoardHourLabel } from "./schedule";
-import type { WalkBoardCycleRow, WalkBoardSummary, WalkBoardUrgency } from "./types";
+import type {
+  WalkBoardCycleRow,
+  WalkBoardCycleView,
+  WalkBoardPublicState,
+  WalkBoardSummary,
+  WalkBoardUrgency
+} from "./types";
 
 export function getWalkBoardUrgency(
   cycle: Pick<WalkBoardCycleRow, "status" | "due_at">,
@@ -93,4 +99,40 @@ export function buildWalkDueNotificationMessage(): string {
 
 export function walkBoardTypeLabel(): string {
   return "Physical whiteboard walk check";
+}
+
+export function withCompletedWalkBoardCycle(
+  state: WalkBoardPublicState,
+  cycle: WalkBoardCycleView,
+  nowMs = Date.now()
+): WalkBoardPublicState {
+  const todayCycles = state.todayCycles.some((row) => row.id === cycle.id)
+    ? state.todayCycles.map((row) => (row.id === cycle.id ? cycle : row))
+    : [...state.todayCycles, cycle];
+  return {
+    ...state,
+    currentCycle: state.currentCycle?.id === cycle.id ? cycle : state.currentCycle,
+    todayCycles,
+    summary: summarizeWalkBoardCycles(todayCycles, nowMs)
+  };
+}
+
+/** Keep a just-completed cycle when a stale poll still returns it as pending. */
+export function mergeWalkBoardState(
+  current: WalkBoardPublicState | null,
+  incoming: WalkBoardPublicState,
+  nowMs = Date.now()
+): WalkBoardPublicState {
+  if (!current?.currentCycle || !incoming.currentCycle) return incoming;
+  const local = current.currentCycle;
+  const remote = incoming.currentCycle;
+  if (
+    local.id === remote.id &&
+    local.status === "completed" &&
+    remote.status === "pending" &&
+    local.version >= remote.version
+  ) {
+    return withCompletedWalkBoardCycle(incoming, local, nowMs);
+  }
+  return incoming;
 }

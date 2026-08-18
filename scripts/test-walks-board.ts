@@ -12,7 +12,9 @@ import {
   buildWalkDueNotificationMessage,
   formatWalkBoardCountdown,
   getWalkBoardUrgency,
-  summarizeWalkBoardCycles
+  mergeWalkBoardState,
+  summarizeWalkBoardCycles,
+  withCompletedWalkBoardCycle
 } from "../lib/walks-board/display";
 import {
   accessFromLegacyRole,
@@ -29,9 +31,10 @@ import {
   isWalkBoardOperatingWindow,
   nextWalkBoardAlarmAt,
   walkBoardClockParts,
-  walkBoardExpectedSlots
+  walkBoardExpectedSlots,
+  walkBoardSlotEndAt
 } from "../lib/walks-board/schedule";
-import type { WalkBoardCycleRow } from "../lib/walks-board/types";
+import type { WalkBoardCycleRow, WalkBoardCycleView, WalkBoardPublicState } from "../lib/walks-board/types";
 
 function cycle(partial: Partial<WalkBoardCycleRow> & Pick<WalkBoardCycleRow, "slot_key" | "due_at">): WalkBoardCycleRow {
   return {
@@ -88,6 +91,9 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.equal(slots.length, 6);
   assert.equal(slots[0]?.label, "8:00 AM");
   assert.equal(slots[5]?.label, "6:00 PM");
+
+  assert.equal(walkBoardSlotEndAt("2026-08-18T08:00").toISOString(), "2026-08-18T17:00:00.000Z");
+  assert.equal(walkBoardSlotEndAt("2026-08-18T18:00").toISOString(), "2026-08-19T02:00:00.000Z");
 }
 
 {
@@ -118,6 +124,40 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.equal(summary.todayCount, 2);
   assert.equal(summary.pendingCount, 1);
   assert.equal(summary.completedCount, 1);
+}
+
+{
+  const pendingView: WalkBoardCycleView = {
+    ...cycle({
+      id: "cycle-open",
+      slot_key: "2026-08-18T08:00",
+      due_at: "2026-08-18T15:00:00.000Z",
+      scheduled_hour: 8
+    }),
+    completed_by_user: null
+  };
+  const state: WalkBoardPublicState = {
+    timezone: "America/Los_Angeles",
+    operatingWindow: true,
+    currentSlotKey: pendingView.slot_key,
+    currentCycle: pendingView,
+    todayCycles: [pendingView],
+    summary: summarizeWalkBoardCycles([pendingView], Date.now()),
+    permissions: { canComplete: true, canReceiveReminders: true },
+    serverTime: "2026-08-18T15:00:00.000Z",
+    nextAlarmAt: "2026-08-18T17:00:00.000Z",
+    title: "Physical Whiteboard Walk Check",
+    message: "Update the boards.",
+    checklist: ["Update the Walks Board"]
+  };
+  const done: WalkBoardCycleView = { ...pendingView, status: "completed", completed_at: "2026-08-18T15:05:00.000Z" };
+  const next = withCompletedWalkBoardCycle(state, done, new Date("2026-08-18T15:05:00.000Z").getTime());
+  assert.equal(next.currentCycle?.status, "completed");
+  assert.equal(next.summary.pendingCount, 0);
+  assert.equal(next.summary.completedCount, 1);
+
+  const stale = mergeWalkBoardState(next, state, new Date("2026-08-18T15:05:00.000Z").getTime());
+  assert.equal(stale.currentCycle?.status, "completed");
 }
 
 {
@@ -166,6 +206,13 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.match(panel, /cannot be snoozed/);
   assert.match(panel, /physical whiteboard/);
   assert.match(panel, /Upload pictures/);
+  assert.match(panel, /AbortController/);
+  assert.match(panel, /walk-board-cycles-live/);
+  assert.match(panel, /withCompletedWalkBoardCycle/);
+  assert.match(panel, /mergeWalkBoardState/);
+  assert.match(panel, /visibilitychange/);
+  assert.doesNotMatch(panel, /\[hasLoaded, showToast\]/);
+  assert.doesNotMatch(panel, /walk-board-cycles-\$\{Date\.now/);
   assert.match(readFileSync(join(process.cwd(), "app/globals.css"), "utf8"), /overflow-wrap:\s*anywhere/);
 }
 
@@ -174,6 +221,8 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.match(css, /minmax\(0, 1fr\)/);
   assert.match(css, /@media \(min-width: 960px\)/);
   assert.match(css, /walks-board-slot-grid/);
+  assert.doesNotMatch(css, /walks-board-card-urgent/);
+  assert.doesNotMatch(css, /\.walks-board-card--overdue \{[\s\S]{0,220}?animation:/);
 }
 
 {
@@ -193,6 +242,20 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.match(api, /resolveWalkBoardActor/);
   assert.match(api, /cannot be snoozed/);
   assert.doesNotMatch(api, /snoozeWalkBoardEntry/);
+  assert.match(api, /private, no-store, max-age=0/);
+
+  const server = readFileSync(join(process.cwd(), "lib/walks-board/server.ts"), "utf8");
+  assert.match(server, /includePermissions/);
+  assert.match(server, /closeExpired/);
+  assert.match(server, /Promise\.all/);
+  assert.match(server, /loadPendingWalkBoardCycle/);
+
+  const dashboard = readFileSync(join(process.cwd(), "components/admin/AdminDashboard.tsx"), "utf8");
+  assert.match(dashboard, /if \(!lastSavedAt\) return/);
+
+  const checklist = readFileSync(join(process.cwd(), "lib/ruffops-checklist/server.ts"), "utf8");
+  assert.match(checklist, /closeExpired:\s*false/);
+  assert.match(checklist, /includePermissions:\s*false/);
 
   const actor = readFileSync(join(process.cwd(), "lib/walks-board/actor.ts"), "utf8");
   assert.match(actor, /findAdminUserByEmail/);
@@ -213,6 +276,10 @@ assert.deepEqual([...WALK_BOARD_ALARM_HOURS], [8, 10, 12, 14, 16, 18]);
   assert.doesNotMatch(bell, /\bSnooze\b/);
   assert.match(bell, /Mark complete|Complete/);
   assert.match(bell, /Cannot snooze/);
+
+  const bellApi = readFileSync(join(process.cwd(), "app/api/admin/notification-bell/route.ts"), "utf8");
+  assert.match(bellApi, /loadPendingWalkBoardCycle/);
+  assert.doesNotMatch(bellApi, /loadWalkBoardPublicState/);
 }
 
 {

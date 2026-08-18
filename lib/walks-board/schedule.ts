@@ -88,7 +88,8 @@ export function walkBoardSlotEndAt(slotKey: string, timeZone = WALK_BOARD_TIMEZO
   const match = slotKey.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):00$/);
   if (!match) return new Date();
   const hour = Number(match[2]);
-  const endHour = hour + WALK_BOARD_ALARM_INTERVAL_HOURS;
+  // Last cycle is 6:00 PM and the operating window closes at 7:00 PM, not 8:00 PM.
+  const endHour = Math.min(hour + WALK_BOARD_ALARM_INTERVAL_HOURS, WALK_BOARD_ALARM_END_HOUR);
   if (endHour >= 24) {
     const nextDay = new Date(`${match[1]}T12:00:00Z`);
     nextDay.setUTCDate(nextDay.getUTCDate() + 1);

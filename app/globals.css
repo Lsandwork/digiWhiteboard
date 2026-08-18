@@ -12058,7 +12058,6 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   box-shadow:
     inset 0 0 0 1px rgba(248, 113, 113, 0.18),
     0 0 0 1px rgba(248, 113, 113, 0.12);
-  animation: walks-board-card-urgent 1.4s ease-in-out infinite;
 }
 
 .walks-board-card--due {
@@ -12069,7 +12068,6 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   box-shadow:
     inset 0 0 0 1px rgba(255, 159, 28, 0.16),
     0 0 0 1px rgba(255, 159, 28, 0.1);
-  animation: walks-board-card-urgent 1.8s ease-in-out infinite;
 }
 
 .walks-board-card--soon {
@@ -12096,20 +12094,10 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
 @keyframes walks-board-alert-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.18), 0 12px 32px rgba(248, 113, 113, 0.16);
+    opacity: 1;
   }
   50% {
-    box-shadow: 0 0 0 2px rgba(248, 113, 113, 0.35), 0 16px 40px rgba(248, 113, 113, 0.28);
-  }
-}
-
-@keyframes walks-board-card-urgent {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-1px);
+    opacity: 0.9;
   }
 }
 

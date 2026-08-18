@@ -9,12 +9,17 @@ import {
   notificationsForSession,
   type StaffNotification
 } from "@/lib/staff/notifications";
+import { accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { resolveWalkBoardActor } from "@/lib/walks-board/actor";
-import { WALK_BOARD_ALARM_CHECKLIST, WALK_BOARD_ALARM_TITLE } from "@/lib/walks-board/constants";
+import {
+  WALK_BOARD_ALARM_CHECKLIST,
+  WALK_BOARD_ALARM_MESSAGE,
+  WALK_BOARD_ALARM_TITLE
+} from "@/lib/walks-board/constants";
 import { formatWalkBoardCountdown, getWalkBoardUrgency } from "@/lib/walks-board/display";
 import { formatWalkBoardHourLabel } from "@/lib/walks-board/schedule";
-import { loadWalkBoardPublicState } from "@/lib/walks-board/server";
+import { canReceiveWalkBoardReminders, loadPendingWalkBoardCycle } from "@/lib/walks-board/server";
 
 export const dynamic = "force-dynamic";
 
@@ -89,31 +94,33 @@ export async function GET(request: Request) {
 
   try {
     const actor = await resolveWalkBoardActor(supabase, session);
-    const boardState = await loadWalkBoardPublicState(supabase, {
-      userId: actor?.actorUserId ?? session.adminUserId,
-      legacyRole: session.role,
-      email: session.email
-    });
-
-    if (boardState.permissions.canReceiveReminders && boardState.currentCycle?.status === "pending") {
-      const nowMs = Date.now();
-      const urgency = getWalkBoardUrgency(boardState.currentCycle, nowMs);
-      if (urgency === "alarm_due" || urgency === "overdue" || urgency === "due_soon") {
-        if (urgency === "overdue") walkOverdueCount = 1;
-        else walkDueCount = 1;
-        walkAlerts = [
-          {
-            id: boardState.currentCycle.id,
-            title: WALK_BOARD_ALARM_TITLE,
-            message: boardState.message,
-            hourLabel: formatWalkBoardHourLabel(boardState.currentCycle.scheduled_hour),
-            urgency,
-            countdown: formatWalkBoardCountdown(boardState.currentCycle, nowMs),
-            dueAt: boardState.currentCycle.due_at,
-            version: boardState.currentCycle.version,
-            checklist: [...WALK_BOARD_ALARM_CHECKLIST]
-          }
-        ];
+    const access = accessFromLegacyRole(
+      actor?.actorUserId ?? session.adminUserId ?? null,
+      session.email,
+      session.role
+    );
+    if (canReceiveWalkBoardReminders(access)) {
+      const cycle = await loadPendingWalkBoardCycle(supabase);
+      if (cycle) {
+        const nowMs = Date.now();
+        const urgency = getWalkBoardUrgency(cycle, nowMs);
+        if (urgency === "alarm_due" || urgency === "overdue" || urgency === "due_soon") {
+          if (urgency === "overdue") walkOverdueCount = 1;
+          else walkDueCount = 1;
+          walkAlerts = [
+            {
+              id: cycle.id,
+              title: WALK_BOARD_ALARM_TITLE,
+              message: WALK_BOARD_ALARM_MESSAGE,
+              hourLabel: formatWalkBoardHourLabel(cycle.scheduled_hour),
+              urgency,
+              countdown: formatWalkBoardCountdown(cycle, nowMs),
+              dueAt: cycle.due_at,
+              version: cycle.version,
+              checklist: [...WALK_BOARD_ALARM_CHECKLIST]
+            }
+          ];
+        }
       }
     }
   } catch {

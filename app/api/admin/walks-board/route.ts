@@ -25,10 +25,11 @@ export async function GET(request: Request) {
   const actor = await resolveWalkBoardActor(supabase, session);
   const url = new URL(request.url);
   const cycleId = url.searchParams.get("cycleId") ?? url.searchParams.get("entryId");
+  const noStore = { "Cache-Control": "private, no-store, max-age=0" };
 
   if (cycleId) {
     const activity = await listWalkBoardActivity(supabase, cycleId);
-    return NextResponse.json({ activity });
+    return NextResponse.json({ activity }, { headers: noStore });
   }
 
   const state = await loadWalkBoardPublicState(supabase, {
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
     email: session.email
   });
 
-  return NextResponse.json(state);
+  return NextResponse.json(state, { headers: noStore });
 }
 
 export async function POST(request: Request) {
