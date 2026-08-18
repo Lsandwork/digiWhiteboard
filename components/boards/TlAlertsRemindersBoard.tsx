@@ -55,15 +55,24 @@ function medicationStatusLabel(row: TlBoardMedicationRow) {
 function MedicationNotesCell({ row }: { row: TlBoardMedicationRow }) {
   const display = splitMedicationDisplayNotes(row);
   if (!display.instructions && !display.notes) return <span className="tl-table__muted">—</span>;
-  return (
-    <div className="tl-table__notes-stack">
-      {display.instructions ? <p className="tl-table__instruction-text">{display.instructions}</p> : null}
-      {display.notes ? (
+  if (display.instructions && display.notes) {
+    return (
+      <div className="tl-table__notes-stack">
+        <p className="tl-table__instruction-text">{display.instructions}</p>
         <p className="tl-table__notes">
           <span className="tl-table__notes-label">Notes</span>
           {display.notes}
         </p>
-      ) : null}
+      </div>
+    );
+  }
+  const text = display.notes || display.instructions;
+  return (
+    <div className="tl-table__notes-stack">
+      <p className="tl-table__notes">
+        <span className="tl-table__notes-label">Notes</span>
+        {text}
+      </p>
     </div>
   );
 }

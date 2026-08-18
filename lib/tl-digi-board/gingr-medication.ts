@@ -27,11 +27,17 @@ export type GingrAnimalMedicationScheduleItem = {
 };
 
 export type GingrMedicationInfoPayload = {
-  medicationSchedules?: GingrMedicationScheduleDef[];
+  medicationSchedules?: GingrMedicationScheduleDef[] | Array<Record<string, unknown>>;
   /** OBJECT keyed by schedule_id → array of items (Fitdog live shape). */
   animal_medication_schedules?:
     | Record<string, GingrAnimalMedicationScheduleItem[] | GingrAnimalMedicationScheduleItem>
     | GingrAnimalMedicationScheduleItem[];
+  /**
+   * Animal-level HTML notes Gingr renders as `.schedule-notes` on kennel / run cards.
+   * Distinct from per-dose `medication_notes`. Shown even when staff cannot mark administered.
+   */
+  medicationNotes?: unknown;
+  medication_notes?: unknown;
 };
 
 export type ResolvedGingrMedicationSchedule = {
@@ -97,8 +103,37 @@ const EXTRA_NOTE_KEYS = [
   "medication_instructions",
   "administration_notes",
   "note_text",
-  "medication_note"
+  "medication_note",
+  "medicationNotes",
+  "description",
+  "details",
+  "warning",
+  "warnings",
+  "reason",
+  "disabled_reason",
+  "rx_notes",
+  "report_notes"
 ];
+
+const SCHEDULE_ITEM_NON_NOTE_KEYS = new Set([
+  "id",
+  "medication_schedule_id",
+  "medication_amount",
+  "medication_type",
+  "medication_unit",
+  "medication_amount_id",
+  "medication_type_id",
+  "medication_unit_id",
+  "medication_notes",
+  "schedule_id",
+  "start_date",
+  "end_date",
+  "created_at",
+  "updated_at",
+  "animal_id",
+  "delete",
+  "sourceNotes"
+]);
 
 export function uniqueNoteParts(parts: Array<string | null | undefined>): string[] {
   const seen = new Set<string>();
@@ -114,17 +149,48 @@ export function uniqueNoteParts(parts: Array<string | null | undefined>): string
   return out;
 }
 
+function looksLikeIdText(text: string): boolean {
+  if (/^\d+$/.test(text)) return true;
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text)) return true;
+  return false;
+}
+
 function extraNotesFromRow(row: Record<string, unknown>, skip?: string | null): string | null {
   const skipKey = skip?.trim().toLowerCase() ?? "";
   const parts: string[] = [];
+  const seenKeys = new Set<string>();
+
+  const pushText = (text: string | null) => {
+    if (!text) return;
+    if (skipKey && text.toLowerCase() === skipKey) return;
+    if (looksLikeIdText(text)) return;
+    parts.push(text);
+  };
+
   for (const key of EXTRA_NOTE_KEYS) {
     if (!(key in row)) continue;
-    const text = readGingrText(row[key]);
-    if (!text) continue;
-    if (skipKey && text.toLowerCase() === skipKey) continue;
-    parts.push(text);
+    seenKeys.add(key);
+    pushText(readGingrText(row[key]));
+  }
+  for (const [key, value] of Object.entries(row)) {
+    if (seenKeys.has(key) || SCHEDULE_ITEM_NON_NOTE_KEYS.has(key)) continue;
+    if (!/note|comment|instruction|warning|reason|detail/i.test(key)) continue;
+    pushText(readGingrText(value));
   }
   return uniqueNoteParts(parts).join(" · ") || null;
+}
+
+/** Animal-level notes Gingr shows as schedule-notes when administer is locked / N/A. */
+export function animalMedicationNotesFromPayload(payload: GingrMedicationInfoPayload): string | null {
+  const row = payload as Record<string, unknown>;
+  return (
+    uniqueNoteParts([
+      readGingrText(row.medicationNotes),
+      readGingrText(row.medication_notes),
+      readGingrText(row.schedule_notes),
+      readGingrText(row.scheduleNotes)
+    ]).join(" · ") || null
+  );
 }
 
 /** Flatten animal_medication_schedules object (or array) into a list of schedule items. */
@@ -156,12 +222,35 @@ function normalizeScheduleItem(
 ): GingrAnimalMedicationScheduleItem | null {
   const row = asRecord(value);
   if (!row) return null;
-  const id = readString(row.id);
+  const notesObject = asRecord(row.medication_notes) ?? asRecord(row.medicationNotes);
+  const notesText =
+    readGingrText(row.medication_notes) ??
+    readGingrText(row.medicationNotes) ??
+    readGingrText(row.notes);
+  const extraNotes = extraNotesFromRow(row, notesText);
+  const id =
+    readString(row.id) ??
+    (notesText || extraNotes
+      ? `note:${fallbackScheduleId ?? "none"}:${(notesText || extraNotes || "").slice(0, 24)}`
+      : null);
   if (!id) return null;
   const medication_schedule_id =
-    readString(row.medication_schedule_id) ?? readString(fallbackScheduleId) ?? "";
-  const notesObject = asRecord(row.medication_notes);
-  const notesText = readGingrText(row.medication_notes);
+    readString(row.medication_schedule_id) ??
+    readString(row.schedule_id) ??
+    readString(fallbackScheduleId) ??
+    "";
+  const typeRecord =
+    asRecord(row.medication_type) ??
+    asRecord(row.medicationType) ??
+    (readGingrText(row.medicationType) ? { value_string: readGingrText(row.medicationType) } : null);
+  const amountRecord =
+    asRecord(row.medication_amount) ??
+    asRecord(row.medicationAmount) ??
+    (readGingrText(row.medicationAmount) ? { value_string: readGingrText(row.medicationAmount) } : null);
+  const unitRecord =
+    asRecord(row.medication_unit) ??
+    asRecord(row.medicationUnit) ??
+    (readGingrText(row.medicationUnit) ? { value_string: readGingrText(row.medicationUnit) } : null);
   return {
     id,
     medication_schedule_id,
@@ -170,10 +259,10 @@ function normalizeScheduleItem(
       : notesText
         ? { value: notesText, value_string: notesText }
         : null,
-    medication_amount: asRecord(row.medication_amount) as GingrAnimalMedicationScheduleItem["medication_amount"],
-    medication_type: asRecord(row.medication_type) as GingrAnimalMedicationScheduleItem["medication_type"],
-    medication_unit: asRecord(row.medication_unit) as GingrAnimalMedicationScheduleItem["medication_unit"],
-    sourceNotes: extraNotesFromRow(row, notesText)
+    medication_amount: amountRecord as GingrAnimalMedicationScheduleItem["medication_amount"],
+    medication_type: typeRecord as GingrAnimalMedicationScheduleItem["medication_type"],
+    medication_unit: unitRecord as GingrAnimalMedicationScheduleItem["medication_unit"],
+    sourceNotes: extraNotes
   };
 }
 
@@ -220,14 +309,57 @@ export function resolveMedicationSchedule(
   };
 }
 
+function flattenNestedMedicationScheduleLists(
+  medicationSchedules: GingrMedicationInfoPayload["medicationSchedules"]
+): GingrAnimalMedicationScheduleItem[] {
+  const out: GingrAnimalMedicationScheduleItem[] = [];
+  for (const row of medicationSchedules ?? []) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    const scheduleId =
+      readString(rec.id) ??
+      readString(asRecord(rec.medicationSchedule)?.id) ??
+      readString(asRecord(rec.medicationSchedule)?.value);
+    const medications = rec.medications ?? rec.animal_medication_schedules ?? rec.items;
+    const rows = Array.isArray(medications) ? medications : medications ? [medications] : [];
+    for (const item of rows) {
+      const normalized = normalizeScheduleItem(item, scheduleId ?? undefined);
+      if (normalized) out.push(normalized);
+    }
+  }
+  return out;
+}
+
 export function flattenAndResolveMedicationSchedules(
   payload: GingrMedicationInfoPayload,
   scheduleIdMap: Record<string, TlMedicationPeriod> = TL_FITDOG_SCHEDULE_ID_MAP
 ): ResolvedGingrMedicationSchedule[] {
-  const labelMap = buildMedicationScheduleLabelMap(payload.medicationSchedules);
-  return flattenAnimalMedicationSchedules(payload.animal_medication_schedules).map((item) =>
-    resolveMedicationSchedule(item, labelMap, scheduleIdMap)
-  );
+  const defs: GingrMedicationScheduleDef[] = [];
+  for (const row of payload.medicationSchedules ?? []) {
+    const rec = asRecord(row);
+    const id = readString(rec?.id);
+    const time = readString(rec?.time);
+    if (id && time) defs.push({ id, time });
+  }
+  const labelMap = buildMedicationScheduleLabelMap(defs);
+  const fromAnimal = flattenAnimalMedicationSchedules(payload.animal_medication_schedules);
+  const fromNested = fromAnimal.length ? [] : flattenNestedMedicationScheduleLists(payload.medicationSchedules);
+  return [...fromAnimal, ...fromNested].map((item) => resolveMedicationSchedule(item, labelMap, scheduleIdMap));
+}
+
+export type ResolvedGingrMedicationInfo = {
+  schedules: ResolvedGingrMedicationSchedule[];
+  animalMedicationNotes: string | null;
+};
+
+export function resolveGingrMedicationInfo(
+  payload: GingrMedicationInfoPayload,
+  scheduleIdMap: Record<string, TlMedicationPeriod> = TL_FITDOG_SCHEDULE_ID_MAP
+): ResolvedGingrMedicationInfo {
+  return {
+    schedules: flattenAndResolveMedicationSchedules(payload, scheduleIdMap),
+    animalMedicationNotes: animalMedicationNotesFromPayload(payload)
+  };
 }
 
 export function medicationNameFromItem(item: GingrAnimalMedicationScheduleItem): string {
@@ -254,9 +386,13 @@ export function extraNotesFromItem(item: GingrAnimalMedicationScheduleItem): str
 function unwrapMedicationPayload(payload: unknown): GingrMedicationInfoPayload {
   const root = asRecord(payload);
   if (!root) return {};
-  if ("data" in root && root.data && typeof root.data === "object") {
-    const data = asRecord(root.data);
-    if (data) return data as GingrMedicationInfoPayload;
+  const data = asRecord(root.data);
+  if (data) {
+    return {
+      ...data,
+      medicationNotes: data.medicationNotes ?? root.medicationNotes,
+      medication_notes: data.medication_notes ?? root.medication_notes
+    } as GingrMedicationInfoPayload;
   }
   return root as GingrMedicationInfoPayload;
 }

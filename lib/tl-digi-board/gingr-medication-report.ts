@@ -158,40 +158,81 @@ function normalizeAdministrationRow(
   };
 }
 
+function isIsoDateKey(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function looksLikeAdministrationRow(row: Record<string, unknown>): boolean {
+  return (
+    "animal_medication_schedule_id" in row ||
+    "animalMedicationScheduleId" in row ||
+    "medication_schedule_row_id" in row ||
+    "report_status_id" in row ||
+    "reportStatusId" in row ||
+    "last_edited_at" in row ||
+    "lastEditedAt" in row ||
+    "last_edited_by" in row ||
+    "status" in row ||
+    "notes" in row ||
+    "note" in row
+  );
+}
+
+function nestedDateFromRow(row: Record<string, unknown>, fallbackDate?: string): string | null {
+  return readString(row.date) ?? readString(row.report_date) ?? readString(row.service_date) ?? fallbackDate ?? null;
+}
+
 /**
  * Flatten administrationData from either:
  * - array of { date, animal_medication_schedule_id, status, ... }
  * - object keyed by schedule id → { report_status_id, notes, ... } (reservation panel shape)
+ * - nested date → schedule id (or schedule id → date) objects used by some Gingr report payloads
  */
 export function flattenAdministrationData(
   administrationData: unknown,
-  statusOptions: GingrMedicationReportStatusOption[] = []
+  statusOptions: GingrMedicationReportStatusOption[] = [],
+  fallbackDate?: string
 ): GingrMedicationAdministrationRecord[] {
   const labelByValue = buildStatusLabelMap(statusOptions);
   const out: GingrMedicationAdministrationRecord[] = [];
 
-  if (Array.isArray(administrationData)) {
-    for (const row of administrationData) {
-      const normalized = normalizeAdministrationRow(row, labelByValue);
-      if (normalized) out.push(normalized);
-    }
-    return out;
-  }
-
-  const asObj = asRecord(administrationData);
-  if (!asObj) return out;
-
-  for (const [scheduleId, value] of Object.entries(asObj)) {
+  const visit = (value: unknown, fallbackScheduleId?: string, nestedDate?: string, depth = 0) => {
+    if (value == null || depth > 6) return;
     if (Array.isArray(value)) {
-      for (const row of value) {
-        const normalized = normalizeAdministrationRow(row, labelByValue, scheduleId);
-        if (normalized) out.push(normalized);
-      }
-      continue;
+      for (const row of value) visit(row, fallbackScheduleId, nestedDate, depth + 1);
+      return;
     }
-    const normalized = normalizeAdministrationRow(value, labelByValue, scheduleId);
-    if (normalized) out.push(normalized);
-  }
+    const rec = asRecord(value);
+    if (!rec) return;
+
+    const dateHere = nestedDateFromRow(rec, nestedDate);
+    if (looksLikeAdministrationRow(rec) && (fallbackScheduleId || rec.animal_medication_schedule_id || rec.animalMedicationScheduleId)) {
+      const normalized = normalizeAdministrationRow(rec, labelByValue, fallbackScheduleId);
+      if (normalized) {
+        if (!normalized.date && dateHere) normalized.date = dateHere;
+        out.push(normalized);
+      }
+    }
+
+    for (const [key, nested] of Object.entries(rec)) {
+      if (
+        key === "statuses" ||
+        key === "statusOptions" ||
+        key === "status_options" ||
+        key === "medicationStatuses" ||
+        key === "report_statuses"
+      ) {
+        continue;
+      }
+      const dateKey = isIsoDateKey(key) ? key : dateHere ?? undefined;
+      const scheduleKey = !isIsoDateKey(key) && /^\d+$/.test(key) ? key : fallbackScheduleId;
+      if (nested && typeof nested === "object") {
+        visit(nested, scheduleKey ?? undefined, dateKey, depth + 1);
+      }
+    }
+  };
+
+  visit(administrationData, undefined, fallbackDate);
   return out;
 }
 
@@ -213,6 +254,8 @@ function collectAdministrationNodes(node: unknown): unknown[] {
   const nodes: unknown[] = [];
   if ("administrationData" in rec) nodes.push(rec.administrationData);
   if ("administration_data" in rec) nodes.push(rec.administration_data);
+  if ("medication_report" in rec) nodes.push(rec.medication_report);
+  if ("medicationReport" in rec) nodes.push(rec.medicationReport);
   return nodes;
 }
 

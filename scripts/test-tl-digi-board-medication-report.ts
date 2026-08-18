@@ -146,6 +146,29 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
 }
 
 {
+  const nestedByDate = flattenAdministrationData(
+    {
+      "2026-08-17": {
+        "4770": {
+          report_status_id: "12",
+          notes: "Hold — cannot mark administered in Gingr.",
+          last_edited_by: "Ivonne"
+        }
+      }
+    },
+    [{ value: "12", label: "Unable to Administer" }]
+  );
+  const dougalNested = resolveAdministrationForSchedule({
+    records: nestedByDate,
+    animalMedicationScheduleId: "4770",
+    serviceDate: "2026-08-17"
+  });
+  assert.equal(dougalNested.administrationStatus, "not_administered");
+  assert.equal(dougalNested.statusLabel, "Unable to Administer");
+  assert.match(dougalNested.administrationNotes ?? "", /cannot mark administered/);
+}
+
+{
   const records = flattenAdministrationData(
     [
       {

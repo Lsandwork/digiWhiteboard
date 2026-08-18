@@ -5,10 +5,12 @@
 import assert from "node:assert/strict";
 import { DEFAULT_TL_DIGI_BOARD_CONFIG } from "../lib/tl-digi-board/config";
 import {
+  animalMedicationNotesFromPayload,
   dosageFromItem,
   flattenAnimalMedicationSchedules,
   flattenAndResolveMedicationSchedules,
   notesFromItem,
+  resolveGingrMedicationInfo,
   resolveMedicationSchedule,
   type GingrAnimalMedicationScheduleItem,
   type GingrMedicationInfoPayload
@@ -18,7 +20,7 @@ import {
   matchOvernightLodgingArea,
   parseRunName
 } from "../lib/tl-digi-board/lodging";
-import { buildTlGingrMedicationRecord } from "../lib/tl-digi-board/normalize";
+import { buildTlGingrMedicationRecord, buildTlGingrMedicationRecords } from "../lib/tl-digi-board/normalize";
 import { splitMedicationDisplayNotes } from "../lib/tl-digi-board/medication-notes";
 import { normalizeScheduleLabel } from "../lib/tl-digi-board/medication-windows";
 
@@ -203,6 +205,50 @@ import { normalizeScheduleLabel } from "../lib/tl-digi-board/medication-windows"
   assert.match(dougal.notes ?? "", /Unable to administer/);
   assert.match(dougal.notes ?? "", /Could not mark administered/);
   assert.equal(dougal.administrationStatus, "not_administered");
+
+  const animalNotesItem: GingrAnimalMedicationScheduleItem = {
+    id: "dougal-2",
+    medication_schedule_id: "3",
+    medication_notes: { value_string: "Administer 1 drop into LEFT eye" },
+    medication_amount: { value: "1", value_string: "1" },
+    medication_type: { value_string: "Tobramycin" },
+    medication_unit: { value_string: "Drops" }
+  };
+  const dougalAnimalNotes = buildTlGingrMedicationRecord(
+    resolveMedicationSchedule(animalNotesItem, new Map([["3", "PM"]])),
+    {
+      gingrAnimalId: "5836",
+      gingrReservationId: "208148",
+      dogName: "Dougal",
+      lodgingLabel: "DEN",
+      serviceDate: "2026-08-17",
+      animalMedicationNotes: "<p>Do not mark administered — hold for vet, keep in den.</p>"
+    }
+  );
+  assert.equal(dougalAnimalNotes.instructions, "Administer 1 drop into LEFT eye");
+  assert.match(dougalAnimalNotes.notes ?? "", /hold for vet/);
+
+  const htmlPayload: GingrMedicationInfoPayload = {
+    medicationSchedules: [{ id: "3", time: "PM" }],
+    animal_medication_schedules: {},
+    medicationNotes: "<div>Use two people. Do not administer if squinting.</div>"
+  };
+  assert.match(animalMedicationNotesFromPayload(htmlPayload) ?? "", /Use two people/);
+  const resolvedEmpty = resolveGingrMedicationInfo(htmlPayload);
+  assert.equal(resolvedEmpty.schedules.length, 0);
+  assert.match(resolvedEmpty.animalMedicationNotes ?? "", /Do not administer if squinting/);
+
+  const noteOnly = buildTlGingrMedicationRecords([], {
+    gingrAnimalId: "5836",
+    gingrReservationId: "208148",
+    dogName: "Dougal",
+    lodgingLabel: "DEN",
+    serviceDate: "2026-08-17",
+    animalMedicationNotes: resolvedEmpty.animalMedicationNotes
+  });
+  assert.equal(noteOnly.length, 1);
+  assert.equal(noteOnly[0]?.medicationName, "Medication notes");
+  assert.match(noteOnly[0]?.notes ?? "", /Use two people/);
 
   const stringNotesPayload: GingrMedicationInfoPayload = {
     medicationSchedules: [{ id: "3", time: "PM" }],
