@@ -117,17 +117,59 @@ function parseAdditionalServices(value: unknown): TlBoardAdditionalServiceRow[] 
   return value.filter(isAdditionalServiceRow);
 }
 
+function parseSourceHealth(value: unknown): import("./types").TlGingrSourceHealth {
+  if (value === "ok" || value === "stale" || value === "error" || value === "unevaluated") return value;
+  return "unevaluated";
+}
+
+function parseBoardState(value: unknown): import("./types").TlBoardDisplayState {
+  if (
+    value === "INITIAL_LOADING" ||
+    value === "LIVE" ||
+    value === "STALE" ||
+    value === "CONNECTION_ERROR" ||
+    value === "EMPTY_VALID" ||
+    value === "PARTIAL_DATA_ERROR"
+  ) {
+    return value;
+  }
+  return "STALE";
+}
+
 function parseMeta(value: unknown): TlBoardSyncMeta {
   const row = asRecord(value);
+  const gingrSyncHealth = (row?.gingrSyncHealth as TlBoardSyncMeta["gingrSyncHealth"]) ?? "unknown";
+  const lastSuccessfulSyncAt = typeof row?.lastSuccessfulSyncAt === "string" ? row.lastSuccessfulSyncAt : null;
+  const isStale = Boolean(row?.isStale);
+  const allClear = Boolean(row?.allClear);
+  const medicationsHealth = parseSourceHealth(row?.medicationsHealth) === "unevaluated"
+    ? allClear
+      ? "ok"
+      : gingrSyncHealth === "live"
+        ? "ok"
+        : lastSuccessfulSyncAt
+          ? "stale"
+          : gingrSyncHealth === "unknown"
+            ? "unevaluated"
+            : "error"
+    : parseSourceHealth(row?.medicationsHealth);
+  const servicesHealth = parseSourceHealth(row?.servicesHealth) === "unevaluated"
+    ? medicationsHealth
+    : parseSourceHealth(row?.servicesHealth);
   return {
     timezone: "America/Los_Angeles",
     currentPeriod: (row?.currentPeriod as TlBoardSyncMeta["currentPeriod"]) ?? null,
-    gingrSyncHealth: (row?.gingrSyncHealth as TlBoardSyncMeta["gingrSyncHealth"]) ?? "unknown",
-    lastSuccessfulSyncAt: typeof row?.lastSuccessfulSyncAt === "string" ? row.lastSuccessfulSyncAt : null,
+    gingrSyncHealth,
+    lastSuccessfulSyncAt,
     lastAttemptAt: typeof row?.lastAttemptAt === "string" ? row.lastAttemptAt : null,
     lastError: typeof row?.lastError === "string" ? row.lastError : null,
-    isStale: Boolean(row?.isStale),
-    allClear: Boolean(row?.allClear),
+    isStale,
+    allClear,
+    medicationsHealth,
+    servicesHealth,
+    medicationsAllClear: typeof row?.medicationsAllClear === "boolean" ? row.medicationsAllClear : allClear,
+    servicesAllClear: typeof row?.servicesAllClear === "boolean" ? row.servicesAllClear : allClear,
+    boardState: row?.boardState ? parseBoardState(row.boardState) : allClear ? "EMPTY_VALID" : gingrSyncHealth === "live" ? "LIVE" : lastSuccessfulSyncAt ? "STALE" : "CONNECTION_ERROR",
     nextPeriod: (row?.nextPeriod as TlBoardSyncMeta["nextPeriod"]) ?? null,
     nextPeriodStartsAt: typeof row?.nextPeriodStartsAt === "string" ? row.nextPeriodStartsAt : null,
     administrationStatusAvailable: Boolean(row?.administrationStatusAvailable),
@@ -365,11 +407,54 @@ export async function loadTlDigiBoardPublicPayload(
 ): Promise<TlDigiBoardPublicPayload> {
   const client = resolveSupabase(supabase);
   const { loadTlBoardDailyReminders } = await import("./reminders");
-  const [config, snapshot, reminders] = await Promise.all([
+  const [configResult, snapshotResult, remindersResult] = await Promise.allSettled([
     loadTlDigiBoardConfig(client),
     getTlDigiBoardSnapshot(client, { forceRefresh: options?.forceRefresh }),
     loadTlBoardDailyReminders(client)
   ]);
+
+  const config =
+    configResult.status === "fulfilled"
+      ? configResult.value
+      : (await import("./config")).DEFAULT_TL_DIGI_BOARD_CONFIG;
+  const snapshot =
+    snapshotResult.status === "fulfilled"
+      ? snapshotResult.value
+      : {
+          overdue: [],
+          current: [],
+          summary: { due: 0, completed: 0, remaining: 0, overdue: 0 },
+          additionalServices: [],
+          servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
+          meta: {
+            timezone: "America/Los_Angeles" as const,
+            currentPeriod: null,
+            gingrSyncHealth: "connection_issue" as const,
+            lastSuccessfulSyncAt: null,
+            lastAttemptAt: new Date().toISOString(),
+            lastError:
+              snapshotResult.status === "rejected"
+                ? snapshotResult.reason instanceof Error
+                  ? snapshotResult.reason.message
+                  : "Unable to load TL Digi Board snapshot."
+                : "Unable to load TL Digi Board snapshot.",
+            isStale: true,
+            allClear: false,
+            medicationsHealth: "error" as const,
+            servicesHealth: "error" as const,
+            medicationsAllClear: false,
+            servicesAllClear: false,
+            boardState: "CONNECTION_ERROR" as const,
+            nextPeriod: null,
+            nextPeriodStartsAt: null,
+            administrationStatusAvailable: false,
+            servicesCompletionStatusAvailable: false,
+            servicesCompletionAudit: null
+          },
+          medications: [],
+          generatedAt: new Date().toISOString()
+        };
+  const reminders = remindersResult.status === "fulfilled" ? remindersResult.value : [];
 
   return {
     ...snapshot,

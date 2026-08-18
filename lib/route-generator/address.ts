@@ -67,3 +67,30 @@ export function householdKey(address: ParsedAddress): string {
     .filter(Boolean)
     .join("|");
 }
+
+/** True when a string is a usable postal address, not a UI label like "Baxter Drop Off". */
+export function looksLikePostalAddress(value: string | null | undefined): boolean {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (!/\d/.test(text)) return false;
+  if (/^[A-Za-z][A-Za-z\s'+.-]{1,40}$/.test(text)) return false;
+  return true;
+}
+
+export function formatCanonicalPostalAddress(parts: {
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  fallback?: string | null;
+}): string | null {
+  const street = String(parts.street || "").trim();
+  const city = String(parts.city || "").trim();
+  const state = String(parts.state || "").trim();
+  const postalCode = String(parts.postalCode || "").trim();
+  const locality = [city, [state, postalCode].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const formatted = [street || null, locality || null, street || locality ? "USA" : null].filter(Boolean).join(", ");
+  if (looksLikePostalAddress(formatted)) return formatted;
+  const fallback = String(parts.fallback || "").trim();
+  return looksLikePostalAddress(fallback) ? fallback : formatted || null;
+}

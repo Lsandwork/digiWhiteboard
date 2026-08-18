@@ -28,6 +28,7 @@ import { buildTlGingrMedicationRecords } from "./normalize";
 import { enrichTlBoardMedicationPhotos } from "./animal-photos";
 import { syncTlBoardAdditionalServices } from "./additional-services";
 import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "./types";
+import { logTlGingrSyncEvent } from "./observability";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -283,6 +284,8 @@ function emptySnapshot(partial: {
   administrationStatusAvailable?: boolean;
   servicesCompletionStatusAvailable?: boolean;
   servicesCompletionAudit?: TlDigiBoardSnapshot["meta"]["servicesCompletionAudit"];
+  medicationsHealth?: import("./types").TlGingrSourceHealth;
+  servicesHealth?: import("./types").TlGingrSourceHealth;
   now?: Date;
 }): TlDigiBoardSnapshot {
   const now = partial.now ?? new Date();
@@ -296,6 +299,8 @@ function emptySnapshot(partial: {
     syncSucceeded: partial.syncSucceeded,
     administrationStatusAvailable: partial.administrationStatusAvailable
   });
+  const servicesHealth = partial.servicesHealth;
+  const medicationsHealth = partial.medicationsHealth;
   const meta = buildTlBoardSyncMeta(
     {
       medications,
@@ -306,7 +311,10 @@ function emptySnapshot(partial: {
       syncSucceeded: partial.syncSucceeded,
       administrationStatusAvailable: partial.administrationStatusAvailable,
       servicesCompletionStatusAvailable: partial.servicesCompletionStatusAvailable,
-      servicesCompletionAudit: partial.servicesCompletionAudit
+      servicesCompletionAudit: partial.servicesCompletionAudit,
+      medicationsHealth,
+      servicesHealth,
+      servicesRemaining: (partial.servicesSummary ?? { remaining: 0 }).remaining
     },
     built.summary
   );
@@ -493,6 +501,12 @@ export async function syncTlDigiBoardState(
       lastErrorParts.push(additionalServicesError);
     }
     const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
+    const medicationsHealth = "ok" as const;
+    const servicesHealth = additionalServicesError
+      ? previous?.additionalServices?.length
+        ? ("stale" as const)
+        : ("error" as const)
+      : ("ok" as const);
 
     const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
 
@@ -515,9 +529,25 @@ export async function syncTlDigiBoardState(
         syncSucceeded: true,
         administrationStatusAvailable,
         servicesCompletionStatusAvailable,
-        servicesCompletionAudit
+        servicesCompletionAudit,
+        medicationsHealth,
+        servicesHealth,
+        servicesRemaining: servicesSummary.remaining
       },
       built.summary
+    );
+
+    logTlGingrSyncEvent(
+      previous && previous.meta.medicationsHealth !== "ok"
+        ? "GINGR_SYNC_RECOVERED"
+        : "GINGR_SYNC_SUCCESS",
+      {
+        medicationCount: medicationsWithPhotos.length,
+        servicesCount: additionalServices.length,
+        servicesHealth,
+        period: meta.currentPeriod,
+        lastError
+      }
     );
 
     return {
@@ -532,9 +562,13 @@ export async function syncTlDigiBoardState(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "TL Digi Board sync failed.";
+    logTlGingrSyncEvent(previous?.meta.lastSuccessfulSyncAt ? "GINGR_DATA_STALE" : "GINGR_SYNC_FAILURE", {
+      error: message,
+      hadPrevious: Boolean(previous),
+      lastSuccessfulSyncAt: previous?.meta.lastSuccessfulSyncAt ?? null
+    });
 
-    if (previous && previous.medications.length >= 0) {
-      // Keep last-known-good rows; mark stale / not all-clear.
+    if (previous) {
       return emptySnapshot({
         medications: previous.medications,
         additionalServices: previous.additionalServices,
@@ -546,11 +580,12 @@ export async function syncTlDigiBoardState(
         administrationStatusAvailable: previous.meta.administrationStatusAvailable,
         servicesCompletionStatusAvailable: previous.meta.servicesCompletionStatusAvailable,
         servicesCompletionAudit: previous.meta.servicesCompletionAudit,
+        medicationsHealth: previous.medications.length ? "stale" : "error",
+        servicesHealth: previous.additionalServices.length ? "stale" : "error",
         now
       });
     }
 
-    // No prior data — return empty rows but NEVER as ALL CLEAR (syncSucceeded false).
     return emptySnapshot({
       medications: [],
       additionalServices: [],
@@ -559,6 +594,8 @@ export async function syncTlDigiBoardState(
       lastAttemptAt: attemptedAt,
       lastError: message,
       syncSucceeded: false,
+      medicationsHealth: "error",
+      servicesHealth: "error",
       now
     });
   }

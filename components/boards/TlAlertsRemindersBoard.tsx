@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { CastKeeperProvider, useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { TlBoardClock } from "@/components/boards/TlBoardClock";
@@ -12,9 +12,19 @@ import { tlBoardAnimalPhotoProxyUrl } from "@/lib/tl-digi-board/animal-photos";
 import { splitMedicationDisplayNotes } from "@/lib/tl-digi-board/medication-notes";
 import type {
   TlBoardAdditionalServiceRow,
+  TlBoardDisplayState,
   TlBoardMedicationRow,
   TlDigiBoardSnapshot
 } from "@/lib/tl-digi-board/types";
+import {
+  didTlBoardRecover,
+  headerLabelForKind,
+  planTlBoardRefresh,
+  resolveTlCardKind,
+  resolveTlHeaderKind,
+  shouldResyncOnWake,
+  type TlCardKind
+} from "@/lib/tl-digi-board/display-state";
 import "./tl-alerts-reminders-board.css";
 
 type TlReminderCard = {
@@ -30,7 +40,6 @@ type BoardPayload = TlDigiBoardSnapshot & {
   error?: string;
 };
 
-const POLL_MS = 12_000;
 const FITDOG_LOGO = "/assets/fitdog/fitdog-logo-white.svg";
 
 function scheduleBadge(row: TlBoardMedicationRow) {
@@ -187,74 +196,207 @@ function BoardInner() {
   const castKeeper = useCastKeeperContext();
   const [snapshot, setSnapshot] = useState<BoardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasResolved, setHasResolved] = useState(false);
+  const [retryInSec, setRetryInSec] = useState<number | null>(null);
+  const snapshotRef = useRef<BoardPayload | null>(null);
+  const failCountRef = useRef(0);
+  const lastAttemptRef = useRef<number | null>(null);
+  const timerRef = useRef<number | null>(null);
+  const countdownRef = useRef<number | null>(null);
+  const loadRef = useRef<(force?: boolean) => Promise<void>>(async () => undefined);
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/boards/tl-alerts-reminders", { cache: "no-store" });
-      const json = (await res.json().catch(() => ({}))) as BoardPayload;
-      if (!res.ok) throw new Error(json.error || "Failed to load board.");
-      setSnapshot(json);
-      setError(null);
-      castKeeper?.markDataFresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load board.");
+  const clearTimers = useCallback(() => {
+    if (timerRef.current != null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-  }, [castKeeper]);
+    if (countdownRef.current != null) {
+      window.clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+  }, []);
+
+  const scheduleNext = useCallback(
+    (boardState: TlBoardDisplayState | null, consecutiveFailures: number) => {
+      clearTimers();
+      const plan = planTlBoardRefresh({ consecutiveFailures, boardState });
+      if (plan.delayMs <= 0) {
+        void loadRef.current(plan.force);
+        return;
+      }
+      const dueAt = Date.now() + plan.delayMs;
+      setRetryInSec(consecutiveFailures > 0 || boardState === "CONNECTION_ERROR" ? Math.ceil(plan.delayMs / 1000) : null);
+      if (consecutiveFailures > 0 || boardState === "CONNECTION_ERROR" || boardState === "STALE") {
+        countdownRef.current = window.setInterval(() => {
+          const remaining = Math.max(0, Math.ceil((dueAt - Date.now()) / 1000));
+          setRetryInSec(remaining);
+        }, 1000);
+      }
+      timerRef.current = window.setTimeout(() => {
+        void loadRef.current(plan.force);
+      }, plan.delayMs);
+    },
+    [clearTimers]
+  );
+
+  const load = useCallback(
+    async (force = false) => {
+      lastAttemptRef.current = Date.now();
+      try {
+        const url = force ? "/api/boards/tl-alerts-reminders?force=1" : "/api/boards/tl-alerts-reminders";
+        const res = await fetch(url, { cache: "no-store" });
+        const json = (await res.json().catch(() => ({}))) as BoardPayload;
+        const payload = json.meta ? json : null;
+        if (!payload) {
+          throw new Error(json.error || "Failed to load board.");
+        }
+        const previousState = snapshotRef.current?.meta.boardState ?? null;
+        const nextState = payload.meta.boardState;
+        const recovered = didTlBoardRecover({ previousState, nextState });
+        const syncFailed =
+          nextState === "CONNECTION_ERROR" ||
+          nextState === "PARTIAL_DATA_ERROR" ||
+          Boolean(payload.error) ||
+          !res.ok;
+
+        if (syncFailed && snapshotRef.current?.medications?.length && !payload.medications?.length) {
+          payload.overdue = snapshotRef.current.overdue;
+          payload.current = snapshotRef.current.current;
+          payload.summary = snapshotRef.current.summary;
+          payload.medications = snapshotRef.current.medications;
+          if (!payload.additionalServices?.length && snapshotRef.current.additionalServices?.length) {
+            payload.additionalServices = snapshotRef.current.additionalServices;
+            payload.servicesSummary = snapshotRef.current.servicesSummary;
+          }
+        }
+
+        snapshotRef.current = payload;
+        setSnapshot(payload);
+        setHasResolved(true);
+        if (syncFailed) {
+          failCountRef.current += 1;
+          setError(payload.meta.lastError || json.error || "Gingr is temporarily unavailable.");
+        } else {
+          failCountRef.current = 0;
+          setError(null);
+          if (recovered) {
+            setRetryInSec(null);
+          }
+          castKeeper?.markDataFresh();
+        }
+        scheduleNext(nextState, failCountRef.current);
+      } catch (err) {
+        failCountRef.current += 1;
+        setHasResolved(true);
+        setError(err instanceof Error ? err.message : "Failed to load board.");
+        scheduleNext(snapshotRef.current?.meta.boardState ?? "CONNECTION_ERROR", failCountRef.current);
+      }
+    },
+    [castKeeper, scheduleNext]
+  );
 
   useEffect(() => {
-    void load();
-    const poll = window.setInterval(() => void load(), POLL_MS);
-
-    function onVisible() {
-      if (document.visibilityState === "visible") void load();
-    }
-    document.addEventListener("visibilitychange", onVisible);
-
-    return () => {
-      window.clearInterval(poll);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
+    loadRef.current = load;
   }, [load]);
 
+  useEffect(() => {
+    // TV board: start the Gingr poller once on mount. Timers are cleaned up on unmount.
+    void loadRef.current(true);
+
+    function maybeWakeSync() {
+      if (
+        shouldResyncOnWake({
+          lastAttemptAtMs: lastAttemptRef.current,
+          nowMs: Date.now(),
+          boardState: snapshotRef.current?.meta.boardState ?? "INITIAL_LOADING"
+        })
+      ) {
+        void loadRef.current(true);
+      }
+    }
+
+    function onVisible() {
+      if (document.visibilityState === "visible") maybeWakeSync();
+    }
+    function onFocus() {
+      maybeWakeSync();
+    }
+    function onOnline() {
+      void loadRef.current(true);
+    }
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onOnline);
+
+    return () => {
+      clearTimers();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onOnline);
+    };
+    // Initial mount only — load/schedule live in refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const phase = hasResolved ? "resolved" : "initial";
   const title = snapshot?.config?.displayTitle || "Team Lead Alerts + Reminders";
   const summary = snapshot?.summary;
   const servicesSummary = snapshot?.servicesSummary;
   const meta = snapshot?.meta;
-  const periodText = meta?.currentPeriod ? periodLabel(meta.currentPeriod) : "—";
+  const periodText = meta?.currentPeriod ? periodLabel(meta.currentPeriod) : phase === "initial" ? "—" : meta?.currentPeriod === null ? "—" : "—";
 
+  const headerKind = resolveTlHeaderKind({
+    phase,
+    boardState: meta?.boardState,
+    gingrSyncHealth: meta?.gingrSyncHealth
+  });
   const syncClass =
-    meta?.gingrSyncHealth === "live"
+    headerKind === "live"
       ? "tl-sync--live"
-      : meta?.gingrSyncHealth === "delayed"
+      : headerKind === "delayed" || headerKind === "stale"
         ? "tl-sync--delayed"
-        : "tl-sync--issue";
+        : headerKind === "syncing"
+          ? "tl-sync--syncing"
+          : "tl-sync--issue";
+  const syncLabel = headerLabelForKind(headerKind);
 
-  const syncLabel =
-    meta?.gingrSyncHealth === "live"
-      ? "GINGR • LIVE"
-      : meta?.gingrSyncHealth === "delayed"
-        ? "GINGR ⚠ SYNC DELAYED"
-        : "⚠ GINGR CONNECTION ISSUE";
-
-  const lastSync = useMemo(() => {
-    if (!meta?.lastSuccessfulSyncAt) return "—";
+  const lastSync = (() => {
+    if (!meta?.lastSuccessfulSyncAt) return phase === "initial" ? "—" : null;
     try {
       return formatLaBoardClock(new Date(meta.lastSuccessfulSyncAt));
     } catch {
-      return "—";
+      return null;
     }
-  }, [meta?.lastSuccessfulSyncAt]);
+  })();
 
-  const medicationRows = useMemo(() => {
-    if (!snapshot) return [];
-    const overdue = snapshot.overdue.filter((row) => row.displayStatus !== "administered");
-    const current = snapshot.current.filter(
-      (row) => row.displayStatus === "needs_medication" || row.displayStatus === "overdue"
-    );
-    return [...overdue, ...current];
-  }, [snapshot]);
+  const medicationRows = snapshot
+    ? [
+        ...snapshot.overdue.filter((row) => row.displayStatus !== "administered"),
+        ...snapshot.current.filter(
+          (row) => row.displayStatus === "needs_medication" || row.displayStatus === "overdue"
+        )
+      ]
+    : [];
 
   const serviceRows = snapshot?.additionalServices ?? [];
+  const medCard = resolveTlCardKind({
+    phase,
+    health: meta?.medicationsHealth,
+    allClear: Boolean(meta?.medicationsAllClear),
+    hasRows: medicationRows.length > 0
+  });
+  const serviceCard = resolveTlCardKind({
+    phase,
+    health: meta?.servicesHealth,
+    allClear: Boolean(meta?.servicesAllClear),
+    hasRows: serviceRows.length > 0
+  });
+
+  const retryLabel =
+    retryInSec != null && (headerKind === "issue" || headerKind === "stale" || headerKind === "delayed")
+      ? `Retrying in ${retryInSec} second${retryInSec === 1 ? "" : "s"}…`
+      : null;
 
   return (
     <main className="tl-board">
@@ -276,12 +418,15 @@ function BoardInner() {
         <TlBoardClock />
         <div className={`tl-board__sync ${syncClass}`}>
           <p className="tl-board__sync-label">{syncLabel}</p>
-          <p className="tl-board__sync-meta">Last sync {lastSync}</p>
-          <p className="tl-board__sync-meta">Period {periodText} · America/Los_Angeles</p>
+          <p className="tl-board__sync-meta">Last synced: {lastSync || "—"}</p>
+          <p className="tl-board__sync-meta">
+            Period {phase === "initial" ? "—" : periodText} · America/Los_Angeles
+          </p>
+          {retryLabel ? <p className="tl-board__sync-meta tl-board__sync-retry">{retryLabel}</p> : null}
         </div>
       </header>
 
-      {meta && !meta.servicesCompletionStatusAvailable ? (
+      {meta && !meta.servicesCompletionStatusAvailable && serviceCard !== "checking" && serviceCard !== "error" ? (
         <p className="tl-board__api-note" role="status">
           One or more additional services could not read completion status from Gingr reservation rows (missing{" "}
           <code>complete</code> field). Those rows show COMPLETION UNKNOWN and are not treated as incomplete. See{" "}
@@ -289,7 +434,7 @@ function BoardInner() {
         </p>
       ) : null}
 
-      {meta && !meta.administrationStatusAvailable ? (
+      {meta && !meta.administrationStatusAvailable && medCard !== "checking" && medCard !== "error" ? (
         <p className="tl-board__api-note" role="status">
           Medication schedules are syncing from Gingr, but administration status could not be loaded from Gingr’s
           Medication Report yet. Doses still must be recorded in Gingr — this board will show ADMINISTERED once report
@@ -297,15 +442,15 @@ function BoardInner() {
         </p>
       ) : null}
 
-      {meta?.isStale ? (
+      {headerKind === "stale" && lastSync ? (
         <p className="tl-board__stale" role="alert">
-          Showing last known data. Gingr sync may be out of date.
+          Showing last synced data from {lastSync}
         </p>
       ) : null}
 
-      {error ? <p className="tl-board__error">{error}</p> : null}
+      {error && headerKind === "issue" ? <p className="tl-board__error">{error}</p> : null}
 
-      {summary ? (
+      {summary && medCard !== "checking" && medCard !== "error" ? (
         <section className="tl-board__stats" aria-label="Medication summary">
           <div className="tl-stat">
             <span className="tl-stat__label">Medications Due</span>
@@ -326,14 +471,15 @@ function BoardInner() {
         </section>
       ) : null}
 
-      {!snapshot && !error ? <p className="tl-board__loading">Loading board…</p> : null}
-
       <section className="tl-board__split">
-        <div className="tl-panel">
-          <div className="tl-panel__head">
-            <h2 className="tl-panel__title">Medication Reminders</h2>
-            <p className="tl-panel__sub">Only shows items not yet completed in Gingr.</p>
-          </div>
+        <GingrStatusCard
+          title="Medication Reminders"
+          subtitle="Only shows items not yet completed in Gingr."
+          kind={medCard}
+          lastSync={lastSync}
+          retryLabel={retryLabel}
+          errorNoun="medications"
+        >
           {medicationRows.length ? (
             <div className="tl-table-wrap">
               <table className="tl-table">
@@ -355,19 +501,20 @@ function BoardInner() {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="tl-all-clear">
-              <p className="tl-all-clear__title">✓ All Clear</p>
-              <p>No medications currently due.</p>
-            </div>
-          )}
-        </div>
+          ) : null}
+        </GingrStatusCard>
 
-        <div className="tl-panel">
-          <div className="tl-panel__head">
-            <h2 className="tl-panel__title">Additional Services</h2>
-            <p className="tl-panel__sub">Only shows services not marked completed in Gingr.</p>
-          </div>
+        <GingrStatusCard
+          title="Additional Services"
+          subtitle="Only shows services not marked completed in Gingr."
+          kind={serviceCard}
+          lastSync={lastSync}
+          retryLabel={retryLabel}
+          errorNoun="additional services"
+          allClearDetail={
+            servicesSummary?.completed ? `${servicesSummary.completed} completed in Gingr today.` : undefined
+          }
+        >
           {serviceRows.length ? (
             <div className="tl-table-wrap">
               <table className="tl-table tl-table--services">
@@ -385,16 +532,8 @@ function BoardInner() {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div className="tl-all-clear tl-all-clear--services">
-              <p className="tl-all-clear__title">✓ All Clear</p>
-              <p>No additional services need completion.</p>
-              {servicesSummary?.completed ? (
-                <p className="tl-panel__sub">{servicesSummary.completed} completed in Gingr today.</p>
-              ) : null}
-            </div>
-          )}
-        </div>
+          ) : null}
+        </GingrStatusCard>
       </section>
 
       <section className="tl-section">
@@ -409,11 +548,78 @@ function BoardInner() {
               </article>
             ))}
           </div>
-        ) : (
+        ) : hasResolved ? (
           <p className="tl-section__empty">No Team Lead daily reminders scheduled right now.</p>
+        ) : (
+          <p className="tl-section__empty">Loading reminders…</p>
         )}
       </section>
     </main>
+  );
+}
+
+function GingrStatusCard({
+  title,
+  subtitle,
+  kind,
+  lastSync,
+  retryLabel,
+  errorNoun,
+  allClearDetail,
+  children
+}: {
+  title: string;
+  subtitle: string;
+  kind: TlCardKind;
+  lastSync: string | null;
+  retryLabel: string | null;
+  errorNoun: string;
+  allClearDetail?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="tl-panel">
+      <div className="tl-panel__head">
+        <h2 className="tl-panel__title">{title}</h2>
+        <p className="tl-panel__sub">{subtitle}</p>
+      </div>
+      {kind === "checking" ? (
+        <div className="tl-card-state tl-card-state--checking" role="status">
+          <div className="tl-skeleton" aria-hidden />
+          <p className="tl-card-state__title">Checking Gingr…</p>
+          <p>Medication and service status is not confirmed yet.</p>
+        </div>
+      ) : null}
+      {kind === "error" ? (
+        <div className="tl-card-state tl-card-state--error" role="alert">
+          <p className="tl-card-state__title">⚠ Unable to verify {errorNoun}</p>
+          <p>Gingr is temporarily unavailable.</p>
+          <p>Last successful sync: {lastSync || "—"}</p>
+          {retryLabel ? <p className="tl-card-state__retry">{retryLabel}</p> : null}
+        </div>
+      ) : null}
+      {kind === "all_clear" ? (
+        <div className="tl-all-clear">
+          <p className="tl-all-clear__title">✓ All Clear</p>
+          <p>{errorNoun === "medications" ? "No medications currently due." : "No additional services need completion."}</p>
+          {allClearDetail ? <p className="tl-panel__sub">{allClearDetail}</p> : null}
+        </div>
+      ) : null}
+      {kind === "stale" || kind === "rows" ? (
+        <>
+          {kind === "stale" && lastSync ? (
+            <p className="tl-card-state__stale-note">Showing last synced data from {lastSync}</p>
+          ) : null}
+          {children}
+        </>
+      ) : null}
+      {kind === "stale" && !children ? (
+        <div className="tl-card-state tl-card-state--stale" role="status">
+          <p className="tl-card-state__title">Showing last synced data{lastSync ? ` from ${lastSync}` : ""}</p>
+          <p>Gingr has not confirmed the current {errorNoun} list.</p>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

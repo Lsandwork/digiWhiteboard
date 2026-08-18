@@ -1,4 +1,11 @@
-import type { TlBoardMedicationRow, TlBoardSyncMeta, TlGingrMedicationRecord, TlMedicationSummary } from "./types";
+import type {
+  TlBoardDisplayState,
+  TlBoardMedicationRow,
+  TlBoardSyncMeta,
+  TlGingrMedicationRecord,
+  TlGingrSourceHealth,
+  TlMedicationSummary
+} from "./types";
 import {
   completedMedicationVisibleInPeriod,
   currentMedicationPeriodAt,
@@ -25,6 +32,9 @@ export type BuildTlBoardStateInput = {
   /** True when Gingr reservation services exposed completion fields this sync. */
   servicesCompletionStatusAvailable?: boolean;
   servicesCompletionAudit?: import("./types").TlAdditionalServicesCompletionAudit | null;
+  medicationsHealth?: TlGingrSourceHealth;
+  servicesHealth?: TlGingrSourceHealth;
+  servicesRemaining?: number;
 };
 
 function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedicationRecord[] {
@@ -142,12 +152,28 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     }
   }
 
-  const allClear =
-    input.syncSucceeded &&
+  const medicationsHealth: TlGingrSourceHealth =
+    input.medicationsHealth ??
+    (input.syncSucceeded ? "ok" : input.lastSuccessfulSyncAt ? "stale" : "error");
+  const servicesHealth: TlGingrSourceHealth = input.servicesHealth ?? medicationsHealth;
+
+  const medicationsAllClear =
+    medicationsHealth === "ok" &&
     summary.due === 0 &&
     summary.remaining === 0 &&
     summary.overdue === 0 &&
     !isStale;
+  const servicesAllClear = servicesHealth === "ok" && (input.servicesRemaining ?? 0) === 0 && !isStale;
+  const allClear = medicationsAllClear && servicesAllClear;
+
+  const boardState = resolveTlBoardDisplayState({
+    medicationsHealth,
+    servicesHealth,
+    gingrSyncHealth,
+    isStale,
+    medicationsAllClear,
+    lastSuccessfulSyncAt: input.lastSuccessfulSyncAt
+  });
 
   return {
     timezone: TL_DIGI_BOARD_TIMEZONE,
@@ -158,10 +184,38 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     lastError: input.lastError ?? null,
     isStale,
     allClear,
+    medicationsHealth,
+    servicesHealth,
+    medicationsAllClear,
+    servicesAllClear,
+    boardState,
     nextPeriod: next?.period ?? null,
     nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
     administrationStatusAvailable: Boolean(input.administrationStatusAvailable),
     servicesCompletionStatusAvailable: Boolean(input.servicesCompletionStatusAvailable),
     servicesCompletionAudit: input.servicesCompletionAudit ?? null
   };
+}
+
+export function resolveTlBoardDisplayState(input: {
+  medicationsHealth: TlGingrSourceHealth;
+  servicesHealth: TlGingrSourceHealth;
+  gingrSyncHealth: TlBoardSyncMeta["gingrSyncHealth"];
+  isStale: boolean;
+  medicationsAllClear: boolean;
+  lastSuccessfulSyncAt: string | null;
+}): TlBoardDisplayState {
+  const meds = input.medicationsHealth;
+  const services = input.servicesHealth;
+  if (meds === "unevaluated" && services === "unevaluated") return "INITIAL_LOADING";
+  if (meds === "error" && services === "error" && !input.lastSuccessfulSyncAt) return "CONNECTION_ERROR";
+  if ((meds === "error" && services === "ok") || (meds === "ok" && services === "error")) {
+    return "PARTIAL_DATA_ERROR";
+  }
+  if (meds === "error" || services === "error") return "CONNECTION_ERROR";
+  if (meds === "stale" || services === "stale" || input.isStale || input.gingrSyncHealth === "connection_issue") {
+    return "STALE";
+  }
+  if (input.medicationsAllClear && services === "ok") return "EMPTY_VALID";
+  return "LIVE";
 }

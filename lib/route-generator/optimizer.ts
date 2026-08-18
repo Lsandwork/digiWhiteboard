@@ -36,6 +36,8 @@ import {
   remapClubVanLocks,
   resolveClubVanFleet
 } from "@/lib/route-generator/club-vans";
+import { formatPostalAddress, type LocationType } from "@/lib/route-generator/destination";
+import { looksLikePostalAddress, parseAddress } from "@/lib/route-generator/address";
 
 export type DepotConfig = {
   name: string;
@@ -69,6 +71,8 @@ export type OptimizedStop = {
   etaArrival?: string | null;
   etaDeparture?: string | null;
   dogIds?: string[];
+  locationType?: "HOME" | "FITDOG" | "HUB" | "OUTING" | "CUSTOM" | null;
+  formattedAddress?: string | null;
 };
 
 export type OptimizedRoute = {
@@ -125,6 +129,53 @@ function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: 
 }
 
 type StopCoord = { lat: number; lng: number };
+
+function resolveStopLocationFields(params: {
+  householdKey: string | null;
+  address: string;
+  items: HouseholdStopGroup["items"];
+  isFacility: boolean;
+}): { locationType: LocationType | null; formattedAddress: string | null } {
+  const first = params.items[0];
+  let locationType: LocationType | null = first?.locationType ?? null;
+  if (!locationType && params.isFacility) {
+    const key = String(params.householdKey || "");
+    if (key.includes(":hub")) locationType = "HUB";
+    else if (key.includes(":kenneth_hahn") || key.includes(":huntington")) locationType = "OUTING";
+    else locationType = "FITDOG";
+  }
+  if (!locationType) {
+    const raw = first?.raw as Record<string, unknown> | undefined;
+    const typed = String(raw?.location_type || raw?.locationType || "").toUpperCase();
+    if (typed === "HOME" || typed === "FITDOG" || typed === "HUB" || typed === "OUTING" || typed === "CUSTOM") {
+      locationType = typed;
+    } else {
+      locationType = "HOME";
+    }
+  }
+  const parsed = parseAddress(params.address);
+  const useFacilityAddress =
+    params.isFacility || locationType === "FITDOG" || locationType === "HUB" || locationType === "OUTING";
+  const formatted = useFacilityAddress
+    ? formatPostalAddress({
+        street1: parsed.street || params.address,
+        city: parsed.city,
+        state: parsed.state,
+        postalCode: parsed.zip,
+        country: "USA"
+      }) || params.address
+    : formatPostalAddress({
+        street1: first?.addressStreet || parsed.street || params.address,
+        city: first?.addressCity || parsed.city,
+        state: first?.addressState || parsed.state,
+        postalCode: first?.addressZip || parsed.zip,
+        country: "USA"
+      }) || params.address;
+  return {
+    locationType,
+    formattedAddress: looksLikePostalAddress(formatted) ? formatted : looksLikePostalAddress(params.address) ? params.address : formatted
+  };
+}
 
 function nearestNeighborOrder(
   stops: Array<HouseholdStopGroup & { coord: StopCoord | null; load: number; large: number }>,
@@ -384,27 +435,21 @@ export function optimizeRoutes(params: {
       );
     }
 
-    const fallback = rankCandidates(stop, service, { excludeVanKeys: new Set([lockedVan]) })[0];
-    if (fallback) {
-      placeOnBucket(fallback.bucket, stop);
-      placedKeys.add(stop.householdKey);
-      warnings.push(
-        `${stop.address}: moved from locked ${lockedVan.replace("van_", "Van ")} to ${fallback.bucket.vehicle.vanKey.replace("van_", "Van ")} (capacity/availability).`
-      );
-      continue;
-    }
-
-    // Last resort for locked pins: soft-overflow onto the locked van when it exists.
+    // Locked itineraries never silently move to another van. Overflow the same
+    // van or leave unassigned so the coordinator can create an explicit transfer.
     if (bucket && sharedDogTimingClashPenalty(bucket.stops, stop) < 500) {
       placeOnBucket(bucket, stop);
       placedKeys.add(stop.householdKey);
       warnings.push(
-        `${stop.address}: OVERFLOW onto locked ${lockedVan.replace("van_", "Van ")} over capacity — coordinator must rebalance.`
+        `${stop.address}: OVERFLOW onto locked ${lockedVan.replace("van_", "Van ")} over capacity — coordinator must rebalance or create an explicit transfer.`
       );
       continue;
     }
 
     unassigned.push(stop);
+    warnings.push(
+      `${stop.address}: locked on ${lockedVan.replace("van_", "Van ")} and was not moved to another van. Create an explicit transfer to change vehicles.`
+    );
   }
 
   const unlocked = enriched.filter((s) => !placedKeys.has(s.householdKey));
@@ -583,12 +628,20 @@ export function optimizeRoutes(params: {
         eta?.requestedWindowStart || eta?.requestedWindowEnd
           ? `Window ${eta.requestedWindowStart || "?"}–${eta.requestedWindowEnd || "?"}`
           : null;
+      const location = resolveStopLocationFields({
+        householdKey: stop.householdKey,
+        address: stop.address,
+        items: stop.items,
+        isFacility
+      });
       stops.push({
         sequence: index + 1,
         stopKind: "customer",
         householdKey: stop.householdKey,
         ownerName: stop.ownerName,
         address: stop.address,
+        formattedAddress: location.formattedAddress,
+        locationType: location.locationType,
         latitude: stop.coord?.lat ?? null,
         longitude: stop.coord?.lng ?? null,
         dogCount: stop.dogCount,
@@ -705,6 +758,16 @@ export function lockDropoffGroupsToPickupVans(params: {
   warnings: string[];
 } {
   const vanByReservation = vanByReservationFromPickupRoutes(params.pickupRoutes);
+  const vanByDogId = new Map<string, FitdogVanKey>();
+  for (const route of params.pickupRoutes) {
+    for (const stop of route.stops) {
+      if (stop.stopKind !== "customer") continue;
+      for (const dogId of stop.dogIds || []) {
+        const id = String(dogId || "").trim();
+        if (id) vanByDogId.set(id, route.vanKey);
+      }
+    }
+  }
   const lockedVanByHousehold: Record<string, FitdogVanKey> = { ...(params.existingLocks || {}) };
   const warnings: string[] = [];
   const nextGroups: HouseholdStopGroup[] = [];
@@ -718,7 +781,10 @@ export function lockDropoffGroupsToPickupVans(params: {
     const byVan = new Map<FitdogVanKey | "unassigned", typeof group.items>();
     for (const item of group.items) {
       const reservationId = String(item.reservationId || "").trim();
-      const van = reservationId ? vanByReservation.get(reservationId) : undefined;
+      const dogId = String(item.dogId || "").trim();
+      const van =
+        (reservationId ? vanByReservation.get(reservationId) : undefined) ||
+        (dogId ? vanByDogId.get(dogId) : undefined);
       const key = (van || "unassigned") as FitdogVanKey | "unassigned";
       const list = byVan.get(key) ?? [];
       list.push(item);

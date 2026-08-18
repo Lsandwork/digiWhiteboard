@@ -15,6 +15,9 @@ type MapStop = {
   latitude: number;
   longitude: number;
   color: string;
+  service?: string;
+  locationType?: string;
+  vanLabel?: string;
 };
 
 type MapRoute = {
@@ -171,7 +174,11 @@ export function RouteGeneratorMap({ routes, selectedRouteId, locations, onSelect
             fillColor: route.color,
             fillOpacity: opacity
           }).bindPopup(
-            `<strong>${title}</strong><br/>${stop.label}<br/>${stop.address || ""}<br/><span style="color:${route.color}">${route.vanKey.replace("van_", "Van ")} · ${route.direction}</span>`
+            `<strong>${title}</strong><br/>${stop.label}<br/>${stop.address || ""}<br/>${
+              stop.locationType ? `${stop.locationType} · ` : ""
+            }${stop.service ? `${stop.service}<br/>` : ""}<span style="color:${route.color}">${
+              stop.vanLabel || route.vanKey.replace("van_", "Van ")
+            } · ${route.direction} · stop ${stop.sequence}</span>`
           );
           marker.on("click", () => onSelectRoute?.(route.id));
           layer.addLayer(marker);
@@ -226,6 +233,17 @@ export function RouteGeneratorMap({ routes, selectedRouteId, locations, onSelect
           Show all routes
         </button>
       ) : null}
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-2">
+        {drawableRoutes.map((route) => (
+          <span
+            key={route.id}
+            className="rounded-full px-2 py-1 text-[11px] font-semibold text-white"
+            style={{ background: route.color }}
+          >
+            {route.vanKey.replace("van_", "Van ")} {route.direction}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

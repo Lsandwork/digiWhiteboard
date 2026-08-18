@@ -104,6 +104,21 @@ export type TlAdditionalServicesCompletionAudit = {
 
 export type TlGingrSyncHealth = "live" | "delayed" | "connection_issue" | "unknown";
 
+/** Independent Gingr source outcome — empty arrays are not proof of a successful zero-item response. */
+export type TlGingrSourceHealth = "unevaluated" | "ok" | "stale" | "error";
+
+/**
+ * Explicit TV board states. Never derive "all clear" from missing/failed data.
+ * INITIAL_LOADING is client-only (no payload yet).
+ */
+export type TlBoardDisplayState =
+  | "INITIAL_LOADING"
+  | "LIVE"
+  | "STALE"
+  | "CONNECTION_ERROR"
+  | "EMPTY_VALID"
+  | "PARTIAL_DATA_ERROR";
+
 export type TlBoardSyncMeta = {
   timezone: "America/Los_Angeles";
   currentPeriod: TlMedicationPeriod | null;
@@ -113,6 +128,11 @@ export type TlBoardSyncMeta = {
   lastError: string | null;
   isStale: boolean;
   allClear: boolean;
+  medicationsHealth: TlGingrSourceHealth;
+  servicesHealth: TlGingrSourceHealth;
+  medicationsAllClear: boolean;
+  servicesAllClear: boolean;
+  boardState: TlBoardDisplayState;
   nextPeriod: TlMedicationPeriod | null;
   nextPeriodStartsAt: string | null;
   /**
