@@ -9,7 +9,8 @@ export async function GET() {
     const sync = await loadDisplaySyncState(getServiceSupabase());
     return NextResponse.json(sync, {
       headers: {
-        "cache-control": "no-store, max-age=0"
+        "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+        pragma: "no-cache"
       }
     });
   } catch {
@@ -23,7 +24,8 @@ export async function GET() {
       },
       {
         headers: {
-          "cache-control": "no-store, max-age=0"
+          "cache-control": "no-store, no-cache, must-revalidate, max-age=0",
+          pragma: "no-cache"
         }
       }
     );

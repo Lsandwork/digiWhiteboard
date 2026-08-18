@@ -136,6 +136,54 @@ export async function queueDisplayCommand(
   return normalizeCommand(data as Record<string, unknown>);
 }
 
+/**
+ * Fan-out hard_refresh to every known TV of the given boards, plus a broadcast
+ * command for devices that heartbeated after this queue ran.
+ */
+export async function queueHardRefreshForKnownDisplays(
+  supabase: SupabaseClient,
+  displayTypes: DisplayType[],
+  payload: Record<string, unknown> = {}
+) {
+  let devices: DisplayDevice[] = [];
+  try {
+    devices = await listDisplayDevices(supabase);
+  } catch (error) {
+    console.error("[display-heartbeat] list devices for hard refresh failed:", error);
+  }
+
+  const uniqueTypes = [...new Set(displayTypes)];
+  const jobs: Array<Promise<unknown>> = [];
+
+  for (const displayType of uniqueTypes) {
+    jobs.push(
+      queueDisplayCommand(supabase, {
+        displayType,
+        commandType: "hard_refresh",
+        payload
+      })
+    );
+
+    const seenDeviceIds = new Set<string>();
+    for (const device of devices) {
+      if (device.display_type !== displayType) continue;
+      const deviceId = device.id.trim();
+      if (!deviceId || seenDeviceIds.has(deviceId)) continue;
+      seenDeviceIds.add(deviceId);
+      jobs.push(
+        queueDisplayCommand(supabase, {
+          displayType,
+          deviceId,
+          commandType: "hard_refresh",
+          payload
+        })
+      );
+    }
+  }
+
+  await Promise.allSettled(jobs);
+}
+
 export async function buildHeartbeatResponse(supabase: SupabaseClient, input: HeartbeatRequest) {
   await upsertDisplayHeartbeat(supabase, input);
 

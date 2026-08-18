@@ -1,4 +1,5 @@
-export const DISPLAY_SYNC_POLL_MS = 15_000;
+/** Fast enough that admin Refresh / Hard Refresh Cast TVs reaches a staff TV in a couple of seconds. */
+export const DISPLAY_SYNC_POLL_MS = 2_000;
 export const DISPLAY_SYNC_STORAGE_KEY = "fitdog-display-sync";
 export const DISPLAY_BUILD_RELOAD_KEY = "fitdog-display-build-reload";
 
@@ -37,6 +38,23 @@ export function hardReloadDisplay(castReloadNonce: number) {
   try {
     const url = new URL(window.location.href);
     url.searchParams.set("_cast_reload", String(nonce));
+    url.searchParams.set("_tv_refresh", String(Date.now()));
+    window.location.replace(url.toString());
+  } catch {
+    window.location.reload();
+  }
+}
+
+/** Admin hard_refresh commands must reload even when the nonce has not changed yet. */
+export function forceReloadDisplay(castReloadNonce?: number) {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    const nonce = Number(castReloadNonce);
+    if (Number.isFinite(nonce)) {
+      url.searchParams.set("_cast_reload", String(nonce));
+    }
+    url.searchParams.set("_tv_refresh", String(Date.now()));
     window.location.replace(url.toString());
   } catch {
     window.location.reload();

@@ -71,6 +71,7 @@ import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } f
 import { ADMIN_TABS } from "@/lib/admin/types";
 import { navigateAdminDashboard, useAdminDashboardLocation } from "@/lib/admin/dashboard-nav";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
+import { broadcastCastHardReload } from "@/lib/lobby/google-cast";
 import {
   accessFromLegacyRole,
   accessibleAdminBoards,
@@ -350,8 +351,9 @@ export function AdminDashboard() {
     try {
       const response = await fetch("/api/admin/refresh", { method: "POST" });
       if (!response.ok) throw new Error("Refresh failed.");
+      await broadcastCastHardReload();
       await load(true);
-      showToast("Refresh complete.", "success");
+      showToast("Refresh complete. Staff whiteboard TVs were signaled to reload.", "success");
     } catch (refreshError) {
       showToast(humanizeUnknownError(refreshError, "Refresh failed."), "error");
     } finally {

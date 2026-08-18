@@ -32,7 +32,7 @@ export async function cachedUpdateAdminSettings(
   patch: Partial<AdminGlobalSettings>
 ): Promise<AdminGlobalSettings> {
   const next = await updateAdminSettings(supabase, patch);
-  invalidateTtlCache("settings:admin");
+  invalidateTtlCache("settings:");
   invalidateTtlCache("display-sync");
   return next;
 }

@@ -7,6 +7,7 @@ import { DISPLAY_SYNC_POLL_MS, readStoredDisplaySync, writeStoredDisplaySync } f
 type UseDisplaySyncOptions = {
   enabled?: boolean;
   onContentUpdate?: () => void;
+  pollIntervalMs?: number;
 };
 
 function sameDisplaySync(a: { build_id: string; cast_hard_reload_nonce: number; display_content_revision: number }, b: typeof a) {
@@ -17,7 +18,11 @@ function sameDisplaySync(a: { build_id: string; cast_hard_reload_nonce: number; 
   );
 }
 
-export function useDisplaySync({ enabled = true, onContentUpdate }: UseDisplaySyncOptions = {}) {
+export function useDisplaySync({
+  enabled = true,
+  onContentUpdate,
+  pollIntervalMs = DISPLAY_SYNC_POLL_MS
+}: UseDisplaySyncOptions = {}) {
   const onContentUpdateRef = useRef(onContentUpdate);
   const syncRef = useRef<ReturnType<typeof readStoredDisplaySync>>(null);
 
@@ -29,6 +34,7 @@ export function useDisplaySync({ enabled = true, onContentUpdate }: UseDisplaySy
     if (!enabled) return;
 
     let cancelled = false;
+    const interval = Math.max(1_000, pollIntervalMs);
 
     const poll = async () => {
       const next = await fetchDisplaySyncState();
@@ -54,10 +60,15 @@ export function useDisplaySync({ enabled = true, onContentUpdate }: UseDisplaySy
     };
 
     void poll();
-    const timer = window.setInterval(() => void poll(), DISPLAY_SYNC_POLL_MS);
+    const timer = window.setInterval(() => void poll(), interval);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [enabled]);
+  }, [enabled, pollIntervalMs]);
 }
