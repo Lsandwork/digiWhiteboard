@@ -681,7 +681,7 @@ export async function deleteAdminUserByEmail(supabase: SupabaseClient, email: st
   }
 }
 
-export async function touchAdminUserLogin(supabase: SupabaseClient, id: string) {
+export async function touchAdminUserLogin(supabase: SupabaseClient, id: string, email?: string | null) {
   const now = new Date().toISOString();
   const { error } = await supabase.from("admin_users").update({ last_login_at: now }).eq("id", id);
   if (error && isMissingAdminUsersTable(error)) {
@@ -689,5 +689,14 @@ export async function touchAdminUserLogin(supabase: SupabaseClient, id: string) 
     await saveFallbackAdminUsersState(supabase, {
       users: state.users.map((user) => (user.id === id ? { ...user, last_login_at: now, updated_at: now } : user))
     });
+  }
+  const loginInsert = await supabase.from("admin_login_events").insert({
+    user_id: isAdminUserUuid(id) ? id : null,
+    email: email ?? null,
+    logged_in_at: now,
+    source: "login"
+  });
+  if (loginInsert.error && loginInsert.error.code !== "42P01" && loginInsert.error.code !== "PGRST205") {
+    // Login reporting must not block sign-in.
   }
 }

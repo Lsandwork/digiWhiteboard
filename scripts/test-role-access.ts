@@ -198,6 +198,41 @@ assert.equal(
   "team leads can open checklist"
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "reports", "owner_admin", "staff"),
+  true,
+  "super admin can open Reports"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "manager_admin"), "reports", "manager_admin", "staff"),
+  true,
+  "admin can open Reports"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "assistant_manager"), "reports", "assistant_manager", "staff"),
+  true,
+  "management can open Reports"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "team_leader"), "reports", "team_leader", "staff"),
+  false,
+  "team leads cannot open Reports"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "reports", "daycare", "staff"),
+  false,
+  "handlers cannot open Reports"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "front_desk_coordinator"), "reports", "front_desk_coordinator", "staff"),
+  false,
+  "front desk cannot open Reports"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "reports", "owner_admin", "lobby"),
+  false,
+  "Reports is staff-board only"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, null), "users", null, "staff"),
   false,
   "missing role must not open admin-only tabs"

@@ -75,6 +75,7 @@ export type AdminTab =
   | "vet_visits"
   | "vip_auto_book"
   | "analytics"
+  | "reports"
   | "templates"
   | "notifications"
   | "staff_directory"
@@ -148,6 +149,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "vet_visits",
   "vip_auto_book",
   "analytics",
+  "reports",
   "templates",
   "notifications",
   "staff_directory",

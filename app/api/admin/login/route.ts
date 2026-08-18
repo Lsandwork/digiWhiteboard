@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     const adminUserId = auth.adminUserId;
     if (adminUserId) {
       after(() => {
-        void touchAdminUserLogin(getServiceSupabase({ timeoutMs: 4_000 }), adminUserId).catch(() => undefined);
+        void touchAdminUserLogin(getServiceSupabase({ timeoutMs: 4_000 }), adminUserId, auth.email).catch(() => undefined);
       });
     }
 

@@ -224,6 +224,7 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         title: "Insights",
         links: [
           tabLink("overview", "Overview", "Alerts, HR, PIP, tasks, and board health snapshot."),
+          tabLink("reports", "Reports", "Checklist, photos, logins, Walks Board, Team Log, and support analytics."),
           tabLink("analytics", "Analytics", "Operational metrics summary.")
         ]
       },
