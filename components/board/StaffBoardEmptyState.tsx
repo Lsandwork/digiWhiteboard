@@ -2,14 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
+import { useDisplaySync } from "@/hooks/useDisplaySync";
 import {
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
-  STAFF_IDLE_SLIDESHOW_START_DELAY_MS,
+  STAFF_IDLE_SLIDESHOW_POLL_MS,
   visibleStaffIdleSlideIndexes,
   type StaffIdleSlideshowSlide
 } from "@/lib/staff/idle-slideshow";
 
 const ASSET_BASE = "/assets/fitdog/staff-empty-state";
+
+type SlideshowLoadState = "loading" | "ready" | "empty";
 
 function FallbackEmptyCopy() {
   return (
@@ -57,27 +60,47 @@ function FallbackEmptyCopy() {
   );
 }
 
-export function StaffBoardEmptyState() {
+export function StaffBoardEmptyState({ onSlideshowReady }: { onSlideshowReady?: () => void }) {
   const [slides, setSlides] = useState<StaffIdleSlideshowSlide[]>([]);
+  const [loadState, setLoadState] = useState<SlideshowLoadState>("loading");
   const [index, setIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const loadSlides = useCallback(async () => {
     try {
       const response = await fetch("/api/staff/idle-slideshow", { cache: "no-store" });
-      const body = (await response.json()) as { slides?: StaffIdleSlideshowSlide[] };
-      const next = Array.isArray(body.slides) ? body.slides.filter((slide) => slide?.src) : [];
+      const body = (await response.json()) as {
+        slides?: StaffIdleSlideshowSlide[];
+        error?: string;
+      };
+      const next = response.ok && Array.isArray(body.slides)
+        ? body.slides.filter((slide) => slide?.src)
+        : [];
       setSlides(next);
+      setLoadState(next.length ? "ready" : "empty");
+      if (next.length) onSlideshowReady?.();
     } catch {
       setSlides([]);
+      setLoadState("empty");
     }
-  }, []);
+  }, [onSlideshowReady]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    void loadSlides();
+  }, [loadSlides]);
+
+  useDisplaySync({
+    enabled: true,
+    onContentUpdate: () => {
       void loadSlides();
-    }, STAFF_IDLE_SLIDESHOW_START_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    }
+  });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      void loadSlides();
+    }, STAFF_IDLE_SLIDESHOW_POLL_MS);
+    return () => window.clearInterval(timer);
   }, [loadSlides]);
 
   useEffect(() => {
@@ -100,17 +123,28 @@ export function StaffBoardEmptyState() {
     return () => window.clearInterval(timer);
   }, [reduceMotion, slides.length]);
 
-  const hasSlideshow = slides.length > 0;
+  const hasSlideshow = loadState === "ready" && slides.length > 0;
   const active = slides[index] ?? slides[0];
   const visibleIndexes = visibleStaffIdleSlideIndexes(index, slides.length);
 
   return (
     <section
       className={`staff-board-empty-state ${hasSlideshow ? "staff-board-empty-state--slideshow" : ""}`}
-      aria-label={hasSlideshow ? "Media library slideshow" : "No active check-ins or check-outs"}
+      aria-label={
+        hasSlideshow
+          ? "Media library slideshow"
+          : loadState === "loading"
+            ? "Loading media library photos"
+            : "No active check-ins or check-outs"
+      }
       data-staff-board-layout="empty"
+      data-staff-idle-slideshow={hasSlideshow ? "active" : loadState === "loading" ? "loading" : "fallback"}
     >
-      {hasSlideshow ? (
+      {loadState === "loading" ? (
+        <div className="staff-board-empty-state__panel">
+          <p className="staff-board-empty-state__support">Loading media library photos…</p>
+        </div>
+      ) : hasSlideshow ? (
         <div className="staff-idle-slideshow" aria-live="off">
           <div className="staff-idle-slideshow__frame">
             {visibleIndexes.map((slideIndex) => {
@@ -125,7 +159,7 @@ export function StaffBoardEmptyState() {
                   alt=""
                   className={`staff-idle-slideshow__image ${slideIndex === index ? "is-active" : ""}`}
                   decoding="async"
-                  fetchPriority="low"
+                  fetchPriority={slideIndex === index ? "high" : "low"}
                 />
               );
             })}
@@ -138,21 +172,21 @@ export function StaffBoardEmptyState() {
             <FallbackEmptyCopy />
           </div>
           <div className="staff-board-empty-state__quiet" role="status">
-              <Image
-                src={`${ASSET_BASE}/fitdog-empty-quiet-heart.svg`}
-                alt=""
-                width={28}
-                height={28}
-                className="staff-board-empty-state__quiet-icon"
-                aria-hidden="true"
-              />
-              <div>
-                <p className="staff-board-empty-state__quiet-title">All quiet right now</p>
-                <p className="staff-board-empty-state__quiet-caption">
-                  No active arrivals or departures at the moment.
-                </p>
-              </div>
+            <Image
+              src={`${ASSET_BASE}/fitdog-empty-quiet-heart.svg`}
+              alt=""
+              width={28}
+              height={28}
+              className="staff-board-empty-state__quiet-icon"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="staff-board-empty-state__quiet-title">All quiet right now</p>
+              <p className="staff-board-empty-state__quiet-caption">
+                No active arrivals or departures at the moment.
+              </p>
             </div>
+          </div>
         </>
       )}
     </section>

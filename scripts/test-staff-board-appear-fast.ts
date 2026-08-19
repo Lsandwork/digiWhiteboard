@@ -43,8 +43,8 @@ assert.ok(getGingrBoardRefreshIntervalMs() <= 2000);
 
 {
   const emptyState = source("components/board/StaffBoardEmptyState.tsx");
-  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
-  assert.match(emptyState, /fetchPriority="low"/);
+  assert.doesNotMatch(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
+  assert.match(emptyState, /Loading media library photos/);
 }
 
 console.log("test-staff-board-appear-fast: all assertions passed");

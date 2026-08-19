@@ -1,6 +1,7 @@
-export const STAFF_IDLE_SLIDESHOW_INTERVAL_MS = 20000;
+export const STAFF_IDLE_SLIDESHOW_INTERVAL_MS = 20_000;
 export const STAFF_IDLE_SLIDESHOW_LIMIT = 24;
-export const STAFF_IDLE_SLIDESHOW_START_DELAY_MS = 2000;
+/** Poll for newly uploaded media library photos while the board is idle. */
+export const STAFF_IDLE_SLIDESHOW_POLL_MS = 60_000;
 
 export type StaffIdleSlideshowSlide = {
   id: string;
@@ -57,20 +58,31 @@ export async function loadStaffIdleSlideshowSlides(
   const select =
     "id, original_filename, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, media_kind, mime_type, duplicate_of_item_id";
 
-  const query = () =>
-    supabase
+  const query = (options?: { includeMediaKind?: boolean }) => {
+    let builder = supabase
       .from("photo_upload_items")
       .select(select)
-      .eq("media_kind", "photo")
       .neq("status", "failed")
       .neq("status", "excluded")
       .order("created_at", { ascending: false })
       .limit(STAFF_IDLE_SLIDESHOW_LIMIT);
+    if (options?.includeMediaKind !== false) {
+      builder = builder.eq("media_kind", "photo");
+    }
+    return builder;
+  };
 
   let { data, error } = await query().is("duplicate_of_item_id", null);
 
   if (error && /duplicate_of_item_id|42703|PGRST204/i.test(`${error.code || ""} ${error.message || ""}`)) {
     ({ data, error } = await query());
+  }
+
+  if (error && /media_kind|42703|PGRST204/i.test(`${error.code || ""} ${error.message || ""}`)) {
+    ({ data, error } = await query({ includeMediaKind: false }).is("duplicate_of_item_id", null));
+    if (error && /duplicate_of_item_id|42703|PGRST204/i.test(`${error.code || ""} ${error.message || ""}`)) {
+      ({ data, error } = await query({ includeMediaKind: false }));
+    }
   }
 
   if (error) {

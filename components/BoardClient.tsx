@@ -978,7 +978,7 @@ export function BoardClient({
                 className="staff-board-content staff-board-content--empty min-h-0 h-full"
                 data-staff-board-layout="empty"
               >
-                <StaffBoardEmptyState />
+                <StaffBoardEmptyState onSlideshowReady={() => castKeeper?.markDataFresh()} />
               </div>
             ) : (
               <div

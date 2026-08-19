@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { downloadPhotoBuffer } from "@/lib/photo-upload-queue/storage";
+import { createPhotoSignedUrl, downloadPhotoBuffer } from "@/lib/photo-upload-queue/storage";
 import { staffIdleSlideshowStoragePath } from "@/lib/staff/idle-slideshow";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Photo not found." }, { status: 404 });
     }
 
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: 8_000 });
     const { data: item, error } = await supabase
       .from("photo_upload_items")
       .select(
@@ -36,6 +36,11 @@ export async function GET(_request: Request, context: RouteContext) {
     const path = staffIdleSlideshowStoragePath(item);
     if (!path) {
       return NextResponse.json({ error: "Photo file is missing." }, { status: 404 });
+    }
+
+    const signedUrl = await createPhotoSignedUrl(supabase, path, 60 * 60);
+    if (signedUrl) {
+      return NextResponse.redirect(signedUrl, 307);
     }
 
     const buffer = await downloadPhotoBuffer(supabase, path);

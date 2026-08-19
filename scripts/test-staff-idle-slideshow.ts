@@ -79,16 +79,19 @@ assert.equal(
   const listRoute = source("app/api/staff/idle-slideshow/route.ts");
   assert.match(listRoute, /loadStaffIdleSlideshowSlides/);
   assert.match(listRoute, /slides:\s*\[\]/);
+  assert.match(listRoute, /no-store/);
   assert.doesNotMatch(listRoute, /status:\s*500/);
 
   const mediaRoute = source("app/api/staff/idle-slideshow/media/[itemId]/route.ts");
   assert.match(mediaRoute, /UUID_RE/);
   assert.match(mediaRoute, /staffIdleSlideshowStoragePath/);
+  assert.match(mediaRoute, /createPhotoSignedUrl/);
   assert.match(mediaRoute, /media_kind === "video"/);
   assert.match(mediaRoute, /status === "failed"/);
 
   const loader = source("lib/staff/idle-slideshow.ts");
   assert.match(loader, /media_kind", "photo"/);
+  assert.match(loader, /includeMediaKind: false/);
   assert.match(loader, /duplicate_of_item_id/);
   assert.doesNotMatch(loader, /photo_upload_batches!inner/);
 }
@@ -99,9 +102,11 @@ assert.equal(
   assert.match(emptyState, /visibleStaffIdleSlideIndexes/);
   assert.match(emptyState, /No dogs are currently checking/);
   assert.match(emptyState, /prefers-reduced-motion/);
-  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
-  assert.match(emptyState, /fetchPriority="low"/);
-  assert.doesNotMatch(emptyState, /useDisplaySync/);
+  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_POLL_MS/);
+  assert.match(emptyState, /Loading media library photos/);
+  assert.match(emptyState, /useDisplaySync/);
+  assert.match(emptyState, /loadState === "ready"/);
+  assert.doesNotMatch(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
   assert.doesNotMatch(emptyState, /\/api\/admin\/photo-upload-queue/);
   assert.doesNotMatch(emptyState, /\/api\/lobby\/slideshow/);
 
@@ -116,6 +121,7 @@ assert.equal(
   const boardClient = source("components/BoardClient.tsx");
   assert.match(boardClient, /staffBoardLayout\.showApprovedEmptyState/);
   assert.match(boardClient, /StaffBoardEmptyState/);
+  assert.match(boardClient, /onSlideshowReady/);
   assert.match(boardClient, /staff-board-content--empty/);
   assert.match(boardClient, /staffBoardLayout\.showCheckInPanel/);
   assert.match(boardClient, /staffBoardLayout\.showCheckOutPanel/);
