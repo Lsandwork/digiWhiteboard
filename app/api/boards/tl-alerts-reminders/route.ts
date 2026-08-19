@@ -8,7 +8,6 @@ import {
   TL_BOARD_PUBLIC_CACHE_TTL_MS,
   TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS
 } from "@/lib/tl-digi-board/constants";
-import { ensureTlDigiBoardSnapshotSchema } from "@/lib/tl-digi-board/ensure-snapshot-schema";
 import { logTlGingrSyncEvent } from "@/lib/tl-digi-board/observability";
 import type { TlDigiBoardPublicPayload } from "@/lib/tl-digi-board/types";
 
@@ -99,12 +98,10 @@ export async function GET(request: Request) {
         lastPublicBackgroundSyncAt = now;
         after(() => {
           const syncClient = getServiceSupabase({ timeoutMs: 20_000 });
-          void ensureTlDigiBoardSnapshotSchema(syncClient)
-            .then(() => getTlDigiBoardSnapshot(syncClient, { forceRefresh: true }))
-            .catch((error) => {
-              const message = error instanceof Error ? error.message : "TL Digi Board background sync failed.";
-              logTlGingrSyncEvent("GINGR_SYNC_FAILURE", { error: message, source: "public_api_after" });
-            });
+          void getTlDigiBoardSnapshot(syncClient, { forceRefresh: true }).catch((error) => {
+            const message = error instanceof Error ? error.message : "TL Digi Board background sync failed.";
+            logTlGingrSyncEvent("GINGR_SYNC_FAILURE", { error: message, source: "public_api_after" });
+          });
         });
       }
     }
