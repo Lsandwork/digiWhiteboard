@@ -47,19 +47,6 @@ async function loadFromIsolatedSettingsRow(supabase: SupabaseClient): Promise<Tl
   return parseTlDigiBoardSnapshot(settings);
 }
 
-async function loadFromDedicatedTable(supabase: SupabaseClient): Promise<TlDigiBoardSnapshot | null> {
-  const { data, error } = await supabase
-    .from(TL_DIGI_BOARD_SNAPSHOT_TABLE)
-    .select("snapshot")
-    .eq("id", "default")
-    .maybeSingle();
-  if (error) {
-    if (isMissingRelation(error)) return null;
-    throw error;
-  }
-  return parseTlDigiBoardSnapshot((data as { snapshot?: unknown } | null)?.snapshot);
-}
-
 export async function loadTlDigiBoardSnapshotFromStore(
   supabase: SupabaseClient
 ): Promise<TlDigiBoardSnapshot | null> {
@@ -67,21 +54,14 @@ export async function loadTlDigiBoardSnapshotFromStore(
     return memorySnapshot;
   }
 
-  // Isolated row first. Never read settings->key from the huge `default` blob —
-  // that is what made production GET hang for 8s+ with "Never synced".
+  // Public TV GET must only read this small isolated row. Querying the missing
+  // tl_digi_board_snapshots table (or the 7MiB default blob) hangs until abort.
   const isolated = await loadFromIsolatedSettingsRow(supabase);
   if (isolated && snapshotHasUsableGingrData(isolated)) {
     memorySnapshot = isolated;
     return isolated;
   }
-
-  const tableRow = await loadFromDedicatedTable(supabase);
-  if (tableRow && snapshotHasUsableGingrData(tableRow)) {
-    memorySnapshot = tableRow;
-    return tableRow;
-  }
-
-  return isolated ?? tableRow ?? null;
+  return isolated;
 }
 
 export async function saveTlDigiBoardSnapshotToStore(
@@ -95,14 +75,18 @@ export async function saveTlDigiBoardSnapshotToStore(
     settings: snapshot,
     updated_at: now
   });
-  const { error: tableError } = await supabase.from(TL_DIGI_BOARD_SNAPSHOT_TABLE).upsert({
-    id: "default",
-    snapshot,
-    updated_at: now
-  });
-  if (!isolatedError) return true;
-  if (tableError && !isMissingRelation(tableError) && !isMissingRelation(isolatedError)) {
-    throw isolatedError;
-  }
-  return !isolatedError || (!tableError && !isMissingRelation(tableError));
+  if (isolatedError) throw isolatedError;
+  void supabase
+    .from(TL_DIGI_BOARD_SNAPSHOT_TABLE)
+    .upsert({
+      id: "default",
+      snapshot,
+      updated_at: now
+    })
+    .then(({ error }) => {
+      if (error && !isMissingRelation(error)) {
+        console.warn("[tl-digi-board] dedicated snapshot table upsert failed:", error.message);
+      }
+    });
+  return true;
 }

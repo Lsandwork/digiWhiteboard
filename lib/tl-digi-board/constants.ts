@@ -73,7 +73,7 @@ export const TL_GINGR_FETCH_TIMEOUT_MS = 8_000;
 export const TL_GINGR_SYNC_BUDGET_MS = 45_000;
 
 /** Abort Supabase reads on the public TV GET so Vercel never waits unbounded. */
-export const TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS = 4_000;
+export const TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS = 2_500;
 
 /** Dedicated snapshot table reads should be well under this. */
 export const TL_BOARD_SNAPSHOT_READ_TIMEOUT_MS = 4_000;
