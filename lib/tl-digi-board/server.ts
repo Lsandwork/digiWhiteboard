@@ -402,10 +402,10 @@ export async function getTlDigiBoardSnapshot(
 ): Promise<TlDigiBoardSnapshot> {
   const client = resolveSupabase(supabase);
   const forceRefresh = Boolean(options?.forceRefresh);
-  const [config, previous] = await Promise.all([
-    loadTlDigiBoardConfig(client),
-    loadTlDigiBoardSnapshot(client)
-  ]);
+  // Do not read tl_digi_board_config from the 7MiB admin_settings default blob.
+  // That lookup starves the TV GET connection pool. Fitdog overnight mappings
+  // are already in DEFAULT_TL_DIGI_BOARD_CONFIG.
+  const previous = await loadTlDigiBoardSnapshot(client).catch(() => null);
 
   const persist = async (snapshot: TlDigiBoardSnapshot) => {
     const shouldPersist =
@@ -423,7 +423,7 @@ export async function getTlDigiBoardSnapshot(
   return syncTlDigiBoardState(client, {
     forceRefresh,
     previousSnapshot: previous,
-    config,
+    config: DEFAULT_TL_DIGI_BOARD_CONFIG,
     persist
   });
 }
@@ -465,8 +465,13 @@ export async function loadTlDigiBoardPublicPayload(
 ): Promise<{ payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean }> {
   const client = resolveSupabase(supabase);
   const { DEFAULT_TL_DIGI_BOARD_CONFIG } = await import("./config");
+  const { withTimeoutFallback } = await import("@/lib/server-ttl-cache");
 
-  const snapshot = await loadTlDigiBoardSnapshot(client).catch(() => null);
+  const snapshot = await withTimeoutFallback(
+    loadTlDigiBoardSnapshot(client).catch(() => null),
+    1_200,
+    null
+  );
 
   return assembleTlDigiBoardPublicPayload({
     config: DEFAULT_TL_DIGI_BOARD_CONFIG,
