@@ -61,3 +61,13 @@ export const TL_GINGR_SYNC_DELAYED_MS = 45_000;
 
 /** Stale sync threshold before TV shows CONNECTION ISSUE while keeping last-known-good rows. */
 export const TL_GINGR_SYNC_STALE_MS = 120_000;
+
+/** Per Gingr HTTP call — never wait unbounded. Do not put the request URL (it contains the API key) in errors. */
+export const TL_GINGR_FETCH_TIMEOUT_MS = 8_000;
+
+/**
+ * Hard cap for one TL Gingr sync attempt. Cron and background `after()` must not hang
+ * until the Vercel maxDuration. Last-known-good is returned; the in-flight work may
+ * still finish and persist.
+ */
+export const TL_GINGR_SYNC_BUDGET_MS = 45_000;

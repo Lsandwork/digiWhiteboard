@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatLaBoardDate, formatLaBoardLiveClock } from "@/lib/tl-digi-board/medication-windows";
 
-/** Live LA clock for the TL Alerts TV header — ticks every second. */
-export function TlBoardClock() {
+export function useLaBoardNow(): Date | null {
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -16,6 +15,11 @@ export function TlBoardClock() {
     };
   }, []);
 
+  return now;
+}
+
+/** Live LA clock for the TL Alerts TV header — ticks every second. */
+export function TlBoardClock({ now }: { now: Date | null }) {
   return (
     <div className="tl-board__clock">
       <p className="tl-board__date">{now ? formatLaBoardDate(now) : "LOADING"}</p>

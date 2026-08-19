@@ -2,6 +2,7 @@ import { createGingrClient } from "@/lib/integrations/gingr/client";
 import { canCallGingrEndpoint, markGingrEndpointCalled } from "@/lib/gingr-request-guard";
 import { TL_FITDOG_SCHEDULE_ID_MAP, type TlMedicationPeriod } from "./constants";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
+import { fetchTlGingrResponse } from "./gingr-http";
 import { normalizeScheduleLabel } from "./medication-windows";
 import type { TlMedicationScheduleKind } from "./types";
 
@@ -421,11 +422,15 @@ export async function fetchGingrMedicationInfo(animalId: string): Promise<GingrM
   url.searchParams.set("key", apiKey);
   url.searchParams.set("animal_id", trimmedAnimalId);
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store"
-  });
+  const response = await fetchTlGingrResponse(
+    url.toString(),
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store"
+    },
+    "Gingr get_medication_info"
+  );
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
