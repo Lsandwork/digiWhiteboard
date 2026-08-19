@@ -1,14 +1,15 @@
 import { fetchCurrentlyCheckedInDogsRobust, todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 import { fetchGingrBackOfHouse, type GingrBackOfHouseRecord } from "@/lib/gingr-board-sync";
 import { createGingrClient, normalizeGingrReservationList } from "@/lib/integrations/gingr/client";
-import { buildTlBoardMedicationRows, buildTlBoardSyncMeta } from "./board-state";
+import { buildTlBoardMedicationRows, buildTlBoardSyncMeta, rehydrateTlBoardSnapshot } from "./board-state";
 import {
   DEFAULT_TL_DIGI_BOARD_CONFIG,
   type TlDigiBoardConfig,
   type TlOvernightLodgingArea
 } from "./config";
-import { TL_GINGR_MEDICATION_SYNC_INTERVAL_MS } from "./constants";
+import { TL_GINGR_MEDICATION_SYNC_INTERVAL_MS, TL_GINGR_SYNC_BUDGET_MS } from "./constants";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
+import { fetchTlGingrResponse } from "./gingr-http";
 import {
   fetchGingrMedicationInfo,
   resolveGingrMedicationInfo
@@ -28,6 +29,7 @@ import { buildTlGingrMedicationRecords } from "./normalize";
 import { enrichTlBoardMedicationPhotos } from "./animal-photos";
 import { syncTlBoardAdditionalServices } from "./additional-services";
 import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "./types";
+import { logTlGingrSyncEvent } from "./observability";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -52,9 +54,11 @@ type LodgingInfo = {
 };
 
 let lastSyncAt = 0;
+let inFlightSync: Promise<TlDigiBoardSnapshot> | null = null;
 
 const MEDICATION_FETCH_CONCURRENCY = 3;
 const MEDICATION_FETCH_DELAY_MS = 80;
+const CHECKED_IN_FALLBACK_TIMEOUT_MS = 10_000;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -72,6 +76,20 @@ function pickString(...values: unknown[]): string | null {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withTimeout<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function mapPool<T, R>(items: T[], concurrency: number, mapper: (item: T, index: number) => Promise<R>): Promise<R[]> {
@@ -151,15 +169,19 @@ async function loadOvernightCheckedInDogs(config: TlDigiBoardConfig): Promise<Ov
         location_id: client.config.locationId,
         checked_in: "true"
       });
-      const response = await fetch(`${client.config.baseUrl}/api/v1/reservations`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+      const response = await fetchTlGingrResponse(
+        `${client.config.baseUrl}/api/v1/reservations`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+          },
+          body,
+          cache: "no-store"
         },
-        body,
-        cache: "no-store"
-      });
+        "Gingr overnight reservations"
+      );
       if (!response.ok) {
         const text = await response.text().catch(() => "");
         throw new Error(`Gingr reservations ${response.status}: ${text.slice(0, 180) || response.statusText}`);
@@ -188,11 +210,16 @@ async function loadOvernightCheckedInDogs(config: TlDigiBoardConfig): Promise<Ov
       }
       if (overnight.length) return overnight;
     } catch {
-      // Fall through to robust checked-in helper.
+      // Timed-out or failed TL reservations still fall through to the bounded
+      // GINGR_API_KEY checked-in helper so a hung dedicated key cannot blank Last sync forever.
     }
   }
 
-  const { dogs } = await fetchCurrentlyCheckedInDogsRobust({ force: true });
+  const { dogs } = await withTimeout(
+    fetchCurrentlyCheckedInDogsRobust({ force: true }),
+    CHECKED_IN_FALLBACK_TIMEOUT_MS,
+    "Gingr checked-in fallback"
+  );
   for (const dog of dogs) {
     const areaKey = matchOvernightLodgingArea(dog.reservationType ?? null, null, config);
     if (!areaKey || !isApprovedOvernightLodging(areaKey, config)) continue;
@@ -283,6 +310,8 @@ function emptySnapshot(partial: {
   administrationStatusAvailable?: boolean;
   servicesCompletionStatusAvailable?: boolean;
   servicesCompletionAudit?: TlDigiBoardSnapshot["meta"]["servicesCompletionAudit"];
+  medicationsHealth?: import("./types").TlGingrSourceHealth;
+  servicesHealth?: import("./types").TlGingrSourceHealth;
   now?: Date;
 }): TlDigiBoardSnapshot {
   const now = partial.now ?? new Date();
@@ -296,6 +325,8 @@ function emptySnapshot(partial: {
     syncSucceeded: partial.syncSucceeded,
     administrationStatusAvailable: partial.administrationStatusAvailable
   });
+  const servicesHealth = partial.servicesHealth;
+  const medicationsHealth = partial.medicationsHealth;
   const meta = buildTlBoardSyncMeta(
     {
       medications,
@@ -306,7 +337,10 @@ function emptySnapshot(partial: {
       syncSucceeded: partial.syncSucceeded,
       administrationStatusAvailable: partial.administrationStatusAvailable,
       servicesCompletionStatusAvailable: partial.servicesCompletionStatusAvailable,
-      servicesCompletionAudit: partial.servicesCompletionAudit
+      servicesCompletionAudit: partial.servicesCompletionAudit,
+      medicationsHealth,
+      servicesHealth,
+      servicesRemaining: (partial.servicesSummary ?? { remaining: 0 }).remaining
     },
     built.summary
   );
@@ -334,12 +368,72 @@ export type SyncTlDigiBoardStateOptions = {
   previousSnapshot?: TlDigiBoardSnapshot | null;
   config?: TlDigiBoardConfig;
   now?: Date;
+  persist?: (snapshot: TlDigiBoardSnapshot) => Promise<void>;
 };
+
+async function withSyncBudget(
+  work: Promise<TlDigiBoardSnapshot>,
+  previous: TlDigiBoardSnapshot | null,
+  now: Date
+): Promise<TlDigiBoardSnapshot> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const raced = await Promise.race([
+      work.then((snapshot) => ({ kind: "ok" as const, snapshot })),
+      new Promise<{ kind: "timeout" }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ kind: "timeout" }), TL_GINGR_SYNC_BUDGET_MS);
+      })
+    ]);
+    if (raced.kind === "ok") return raced.snapshot;
+
+    const message = `TL Gingr sync exceeded ${TL_GINGR_SYNC_BUDGET_MS}ms budget`;
+    logTlGingrSyncEvent(previous?.meta.lastSuccessfulSyncAt ? "GINGR_DATA_STALE" : "GINGR_SYNC_FAILURE", {
+      error: message,
+      hadPrevious: Boolean(previous),
+      lastSuccessfulSyncAt: previous?.meta.lastSuccessfulSyncAt ?? null
+    });
+    if (previous) {
+      return emptySnapshot({
+        medications: previous.medications,
+        additionalServices: previous.additionalServices,
+        servicesSummary: previous.servicesSummary,
+        lastSuccessfulSyncAt: previous.meta.lastSuccessfulSyncAt,
+        lastAttemptAt: now.toISOString(),
+        lastError: message,
+        syncSucceeded: false,
+        administrationStatusAvailable: previous.meta.administrationStatusAvailable,
+        servicesCompletionStatusAvailable: previous.meta.servicesCompletionStatusAvailable,
+        servicesCompletionAudit: previous.meta.servicesCompletionAudit,
+        medicationsHealth: previous.medications.length ? "stale" : "error",
+        servicesHealth: previous.additionalServices.length ? "stale" : "error",
+        now
+      });
+    }
+    return emptySnapshot({
+      medications: [],
+      additionalServices: [],
+      servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
+      lastSuccessfulSyncAt: null,
+      lastAttemptAt: now.toISOString(),
+      lastError: message,
+      syncSucceeded: false,
+      medicationsHealth: "error",
+      servicesHealth: "error",
+      now
+    });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Sync overnight medication board state from Gingr.
  * On Gingr failure: return previous last-known-good (if provided) marked stale —
  * never present an empty board as ALL CLEAR after a failed sync.
+ *
+ * Concurrent callers share one in-flight Gingr pull (TV `after()` + cron).
+ * Callers that hit the sync budget still return last-known-good; the in-flight
+ * work continues and `persist` writes the real result when it finishes.
  */
 export async function syncTlDigiBoardState(
   _supabase: SupabaseClient,
@@ -348,14 +442,43 @@ export async function syncTlDigiBoardState(
   const now = options?.now ?? new Date();
   const nowMs = now.getTime();
   const forceRefresh = Boolean(options?.forceRefresh);
-  const config = options?.config ?? DEFAULT_TL_DIGI_BOARD_CONFIG;
   const previous = options?.previousSnapshot ?? null;
 
-  if (!forceRefresh && lastSyncAt > 0 && nowMs - lastSyncAt < TL_GINGR_MEDICATION_SYNC_INTERVAL_MS) {
-    if (previous) {
-      return previous;
-    }
+  if (
+    !forceRefresh &&
+    previous?.meta.lastSuccessfulSyncAt &&
+    (previous.meta.medicationsHealth === "ok" ||
+      previous.meta.medicationsHealth === "stale" ||
+      previous.meta.gingrSyncHealth === "live") &&
+    (lastSyncAt > 0
+      ? nowMs - lastSyncAt < TL_GINGR_MEDICATION_SYNC_INTERVAL_MS
+      : nowMs - new Date(previous.meta.lastSuccessfulSyncAt).getTime() < TL_GINGR_MEDICATION_SYNC_INTERVAL_MS)
+  ) {
+    return rehydrateTlBoardSnapshot(previous, now);
   }
+
+  if (!inFlightSync) {
+    inFlightSync = runTlDigiBoardSync(_supabase, options).finally(() => {
+      inFlightSync = null;
+    });
+  }
+
+  if (options?.persist) {
+    const persist = options.persist;
+    void inFlightSync.then((snapshot) => persist(snapshot).catch(() => undefined));
+  }
+
+  return withSyncBudget(inFlightSync, previous, now);
+}
+
+async function runTlDigiBoardSync(
+  _supabase: SupabaseClient,
+  options?: SyncTlDigiBoardStateOptions
+): Promise<TlDigiBoardSnapshot> {
+  const now = options?.now ?? new Date();
+  const nowMs = now.getTime();
+  const config = options?.config ?? DEFAULT_TL_DIGI_BOARD_CONFIG;
+  const previous = options?.previousSnapshot ?? null;
 
   lastSyncAt = nowMs;
   const attemptedAt = now.toISOString();
@@ -493,6 +616,12 @@ export async function syncTlDigiBoardState(
       lastErrorParts.push(additionalServicesError);
     }
     const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
+    const medicationsHealth = "ok" as const;
+    const servicesHealth = additionalServicesError
+      ? previous?.additionalServices?.length
+        ? ("stale" as const)
+        : ("error" as const)
+      : ("ok" as const);
 
     const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
 
@@ -515,9 +644,25 @@ export async function syncTlDigiBoardState(
         syncSucceeded: true,
         administrationStatusAvailable,
         servicesCompletionStatusAvailable,
-        servicesCompletionAudit
+        servicesCompletionAudit,
+        medicationsHealth,
+        servicesHealth,
+        servicesRemaining: servicesSummary.remaining
       },
       built.summary
+    );
+
+    logTlGingrSyncEvent(
+      previous && previous.meta.medicationsHealth !== "ok"
+        ? "GINGR_SYNC_RECOVERED"
+        : "GINGR_SYNC_SUCCESS",
+      {
+        medicationCount: medicationsWithPhotos.length,
+        servicesCount: additionalServices.length,
+        servicesHealth,
+        period: meta.currentPeriod,
+        lastError
+      }
     );
 
     return {
@@ -532,9 +677,13 @@ export async function syncTlDigiBoardState(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "TL Digi Board sync failed.";
+    logTlGingrSyncEvent(previous?.meta.lastSuccessfulSyncAt ? "GINGR_DATA_STALE" : "GINGR_SYNC_FAILURE", {
+      error: message,
+      hadPrevious: Boolean(previous),
+      lastSuccessfulSyncAt: previous?.meta.lastSuccessfulSyncAt ?? null
+    });
 
-    if (previous && previous.medications.length >= 0) {
-      // Keep last-known-good rows; mark stale / not all-clear.
+    if (previous) {
       return emptySnapshot({
         medications: previous.medications,
         additionalServices: previous.additionalServices,
@@ -546,11 +695,12 @@ export async function syncTlDigiBoardState(
         administrationStatusAvailable: previous.meta.administrationStatusAvailable,
         servicesCompletionStatusAvailable: previous.meta.servicesCompletionStatusAvailable,
         servicesCompletionAudit: previous.meta.servicesCompletionAudit,
+        medicationsHealth: previous.medications.length ? "stale" : "error",
+        servicesHealth: previous.additionalServices.length ? "stale" : "error",
         now
       });
     }
 
-    // No prior data — return empty rows but NEVER as ALL CLEAR (syncSucceeded false).
     return emptySnapshot({
       medications: [],
       additionalServices: [],
@@ -559,12 +709,15 @@ export async function syncTlDigiBoardState(
       lastAttemptAt: attemptedAt,
       lastError: message,
       syncSucceeded: false,
+      medicationsHealth: "error",
+      servicesHealth: "error",
       now
     });
   }
 }
 
-/** Test helper — reset module cooldown. */
+/** Test helper — reset module cooldown and in-flight lock. */
 export function __resetTlDigiBoardSyncCooldownForTests() {
   lastSyncAt = 0;
+  inFlightSync = null;
 }

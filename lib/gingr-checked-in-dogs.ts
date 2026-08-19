@@ -117,20 +117,32 @@ async function postReservations(fields: Record<string, string>): Promise<unknown
     location_id: client.config.locationId,
     ...fields
   });
-  const response = await fetch(`${client.config.baseUrl}/api/v1/reservations`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
-    },
-    body,
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Gingr reservations ${response.status}: ${text.slice(0, 180) || response.statusText}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(`${client.config.baseUrl}/api/v1/reservations`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+      },
+      body,
+      cache: "no-store",
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`Gingr reservations ${response.status}: ${text.slice(0, 180) || response.statusText}`);
+    }
+    return normalizeGingrReservationList(await response.json()) as unknown[];
+  } catch (error) {
+    if (error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message))) {
+      throw new Error("Gingr reservations timed out after 8000ms");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return normalizeGingrReservationList(await response.json()) as unknown[];
 }
 
 /**
