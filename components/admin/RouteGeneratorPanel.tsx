@@ -28,6 +28,8 @@ const RouteGeneratorMap = dynamic(
   }
 );
 
+const PLAN_STORAGE_KEY = "ruffops.routeGenerator.planId";
+
 type TabId =
   | "overview"
   | "pickup"
@@ -134,6 +136,11 @@ export function RouteGeneratorPanel() {
         return null;
       }
       setBundle(next);
+      try {
+        window.localStorage.setItem(PLAN_STORAGE_KEY, String(next.plan.id));
+      } catch {
+        // ignore storage failures
+      }
       setGenerateAsOneBigRoute(
         String((next.plan?.summary as { routeGenerationMode?: string } | undefined)?.routeGenerationMode || "") ===
           "single_combined_route"
@@ -185,7 +192,21 @@ export function RouteGeneratorPanel() {
         for (const v of body.vehicles ?? []) vans[v.vanKey] = true;
         setVisibleVans(vans);
 
-        // Restore the latest saved plan so Generate/Approve/Export are usable after navigation.
+        // Restore the saved plan for this browser so approved routes do not regenerate on refresh.
+        const storedPlanId = (() => {
+          try {
+            return window.localStorage.getItem(PLAN_STORAGE_KEY);
+          } catch {
+            return null;
+          }
+        })();
+        if (hydrateLatestPlan && storedPlanId) {
+          const restored = await hydratePlan(storedPlanId, { quiet: true });
+          if (restored) {
+            setLoading(false);
+            return;
+          }
+        }
         if (hydrateLatestPlan && nextBootstrap.latestPlan?.id) {
           await hydratePlan(nextBootstrap.latestPlan.id, { quiet: true });
         } else if (hydrateLatestPlan && nextBootstrap.latestPlan?.report_run_id) {
@@ -577,10 +598,13 @@ export function RouteGeneratorPanel() {
               sequence: Number(stop.sequence ?? 0),
               stopKind,
               label,
-              address: String(stop.address || ""),
+              address: String(stop.formatted_address || stop.address || ""),
               latitude: Number(stop.latitude),
               longitude: Number(stop.longitude),
-              color: String(route.map_color || "#f15f2a")
+              color: String(route.map_color || "#f15f2a"),
+              service: Array.isArray(route.service_types) ? (route.service_types as string[]).join(", ") : "",
+              locationType: stop.location_type ? String(stop.location_type) : "",
+              vanLabel: String(route.van_key || "").replace("van_", "Van ")
             };
           })
           .filter((stop) => Number.isFinite(stop.latitude) && Number.isFinite(stop.longitude));
@@ -790,7 +814,7 @@ export function RouteGeneratorPanel() {
           </label>
           <label
             className="flex max-w-xl cursor-pointer items-start gap-2 rounded-xl border border-admin-border bg-black/25 px-3 py-2 text-left text-xs text-admin-muted"
-            title="Owner texts are independent of approval. You can change this before or after Approve."
+            title="Saves the owner-text preference only. Texts are never sent by this checkbox."
           >
             <input
               type="checkbox"
@@ -806,7 +830,10 @@ export function RouteGeneratorPanel() {
                 const status = bundle?.plan.status;
                 if (
                   bundle?.plan.id &&
-                  (status === "approved" || status === "exported" || status === "ready_for_approval")
+                  (status === "approved" ||
+                    status === "exported" ||
+                    status === "ready_for_approval" ||
+                    status === "needs_review")
                 ) {
                   void (async () => {
                     try {
@@ -814,7 +841,7 @@ export function RouteGeneratorPanel() {
                       await hydratePlan(String(bundle.plan.id), { quiet: true });
                       showToast(
                         enabled
-                          ? "Owner tracking texts enabled for this plan."
+                          ? "Owner tracking texts will send only when you Approve (or use the Tracking tab send). This checkbox does not text anyone."
                           : "Owner tracking texts disabled for this plan.",
                         "success"
                       );
@@ -831,7 +858,7 @@ export function RouteGeneratorPanel() {
               <span className="mt-0.5 block">
                 {bootstrap?.ownerSmsEnabled === false
                   ? "Owner SMS is OFF system-wide (ROUTE_OWNER_SMS_ENABLED). No owner will be texted until an admin turns that flag on in Vercel for live route days."
-                  : "Independent of approval — toggle before or after Approve. Does not regenerate routes or re-export to Samsara."}
+                  : "Saves the preference only — it never sends texts by itself. Approve still asks for confirmation before any owner SMS. Test mode and the kill switch stay in force."}
               </span>
             </span>
           </label>
@@ -1022,6 +1049,36 @@ export function RouteGeneratorPanel() {
                     ) : null}
                   </div>
                 ) : null}
+                {(() => {
+                  const health = summary.routeHealth as
+                    | {
+                        ok?: boolean;
+                        checks?: Array<{ id: string; ok: boolean; label: string; detail: string }>;
+                        warnings?: string[];
+                        errors?: string[];
+                      }
+                    | undefined;
+                  if (!health?.checks?.length) return null;
+                  return (
+                    <section className="rounded-2xl border border-admin-border bg-black/25 px-4 py-3 text-sm">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-admin-muted">Route Health</p>
+                      <ul className="mt-2 space-y-1">
+                        {health.checks.map((check) => (
+                          <li key={check.id} className={check.ok ? "text-emerald-200" : "text-rose-200"}>
+                            {check.ok ? "✓" : "✕"} {check.detail}
+                          </li>
+                        ))}
+                      </ul>
+                      {health.warnings?.length ? (
+                        <ul className="mt-2 space-y-1 text-amber-200">
+                          {health.warnings.slice(0, 8).map((warning) => (
+                            <li key={warning}>⚠ {warning}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </section>
+                  );
+                })()}
               </>
             );
           })()}

@@ -52,6 +52,11 @@ import {
 import { geocodeMany } from "@/lib/route-generator/geocode";
 import { reconcileTransportLegs, formatMissingLeg } from "@/lib/route-generator/reconciliation";
 import { formatPostalAddress } from "@/lib/route-generator/destination";
+import { looksLikePostalAddress, parseAddress } from "@/lib/route-generator/address";
+import { assignGeographicVanLocks, clusterOverlapWarnings } from "@/lib/route-generator/geo-cluster";
+import { buildDailyDogItineraries } from "@/lib/route-generator/itinerary";
+import { validateRoutePlan, type ValidatableStop } from "@/lib/route-generator/plan-validation";
+import { buildRouteHealthSummary, formatApprovalBlockMessage, pickPreferredRoutePlan } from "@/lib/route-generator/route-health";
 import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import {
@@ -423,14 +428,25 @@ export async function getRouteGeneratorBootstrap() {
     timezone: "America/Los_Angeles",
     verified: false
   });
-  const [locations, sizeLoads, checklist, vehicles, connection, latestPlan] = await Promise.all([
+  const [locations, sizeLoads, checklist, vehicles, connection, latestPlanRows] = await Promise.all([
     getLocations(depot),
     getSetting<SizeLoadConfig>("dog_size_loads", { configured: false }),
     getSetting<Record<string, unknown>>("feature_checklist", { shadow_mode: true, production_enabled: false }),
     listVehicles(),
     supabase.from("route_report_connections").select("*").eq("provider", "fitdog").maybeSingle(),
-    supabase.from("route_plans").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    supabase
+      .from("route_plans")
+      .select("*")
+      .eq("operating_date", todayInLosAngeles())
+      .order("created_at", { ascending: false })
+      .limit(25)
   ]);
+  const todayPlans = latestPlanRows.data ?? [];
+  const latestPlan =
+    pickPreferredRoutePlan(todayPlans) ??
+    (
+      await supabase.from("route_plans").select("*").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    ).data;
 
   return {
     depot,
@@ -439,7 +455,7 @@ export async function getRouteGeneratorBootstrap() {
     checklist,
     vehicles,
     connection: connection.data,
-    latestPlan: latestPlan.data,
+    latestPlan,
     vanKeys: FITDOG_VAN_KEYS,
     mapColors: VAN_COLORS,
     mapsProvider: process.env.MAPS_PROVIDER?.trim() || "google",
@@ -1157,6 +1173,16 @@ export async function generatePlanForRun(params: {
   };
 
   const operatingDate = String(run.operating_date).slice(0, 10);
+  const geoLocks =
+    routeGenerationMode === "single_combined_route"
+      ? { lockedVanByHousehold: {} as Record<string, FitdogVanKey>, clusters: [], diagnostics: [], warnings: [] as string[] }
+      : assignGeographicVanLocks({
+          households: pickupGroups,
+          vehicles: effectiveVehicles,
+          coordsByHousehold: coords,
+          existingLocks: lockedVanByHousehold
+        });
+  const pickupLocks = { ...geoLocks.lockedVanByHousehold, ...lockedVanByHousehold };
   const pickupOpt = optimizeRoutes({
     direction: "pickup",
     households: pickupGroups,
@@ -1166,7 +1192,7 @@ export async function generatePlanForRun(params: {
     sizeLoads,
     seed: `pickup:${run.operating_date}:${params.reportRunId}`,
     coordsByHousehold: coords,
-    lockedVanByHousehold,
+    lockedVanByHousehold: pickupLocks,
     operatingDate,
     routeGenerationMode
   });
@@ -1208,6 +1234,9 @@ export async function generatePlanForRun(params: {
   });
   if (dropoffLock.warnings.length) {
     dropoffOpt.warnings.push(...dropoffLock.warnings);
+  }
+  if (geoLocks.warnings.length) {
+    pickupOpt.warnings.push(...geoLocks.warnings);
   }
   if (sharedDogConflicts.length) {
     pickupOpt.warnings.push(
@@ -1265,12 +1294,77 @@ export async function generatePlanForRun(params: {
     items: annotatedAll,
     assignedStops: assignedStopRefs
   });
+  const itineraries = buildDailyDogItineraries({
+    items: annotatedAll,
+    assignedStops: assignedStopRefs.map((ref) => ({
+      direction: ref.direction,
+      vanKey: ref.routeVanKey,
+      householdKey: ref.householdKey,
+      reservationIds: ref.reservationIds,
+      dogIds: ref.dogIds,
+      dogNames: ref.dogNames,
+      stopId: ref.stopId
+    })),
+    coordsByHousehold: coords
+  });
+  const validatableStops: ValidatableStop[] = [...pickupOpt.routes, ...dropoffOpt.routes].flatMap((route) =>
+    route.stops.map((stop) => ({
+      id: `${route.vanKey}:${route.direction}:${stop.sequence}:${stop.householdKey || stop.ownerName}`,
+      stopKind: stop.stopKind,
+      ownerName: stop.ownerName,
+      address: stop.address,
+      formattedAddress: stop.formattedAddress || stop.address,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      householdKey: stop.householdKey,
+      locationType: stop.locationType,
+      dogNames: stop.dogNames,
+      dogIds: stop.dogIds,
+      reservationIds: stop.reservationIds,
+      direction: route.direction,
+      vanKey: route.vanKey
+    }))
+  );
+  const expectedDogKeys = annotatedAll
+    .filter((item) => item.validationStatus !== "error" || item.addressRaw || item.atFacility)
+    .map((item) => `${item.reservationId || item.dogId || item.dogName || ""}|${item.direction}`)
+    .filter((key) => !key.startsWith("|"));
+  const generatedValidation = validateRoutePlan({
+    reconciliation,
+    stops: validatableStops,
+    itineraries,
+    expectedDogKeys
+  });
+  const geographicWarnings = clusterOverlapWarnings({
+    routes: pickupOpt.routes.map((route) => ({
+      vanKey: route.vanKey,
+      stops: route.stops.map((stop) => ({
+        householdKey: stop.householdKey,
+        latitude: stop.latitude,
+        longitude: stop.longitude
+      }))
+    }))
+  });
+  const routeHealth = buildRouteHealthSummary({
+    validation: generatedValidation,
+    itineraries,
+    expectedDogCount: reconciliation.expectedCount,
+    assignedDogCount: reconciliation.assignedCount,
+    geographicWarnings,
+    vanContinuityBreaks: generatedValidation.issues
+      .filter((issue) => issue.code === "van_continuity")
+      .map((issue) => ({
+        dogName: issue.dogName || "Dog",
+        pickupVan: "pickup",
+        dropoffVan: "dropoff"
+      }))
+  });
   if (!reconciliation.ok) {
     // Force needs_review whenever any leg is missing — never approve a silent drop.
   }
 
   const planStatus =
-    reconciliation.ok && status === "ready_for_approval" && !usedSyntheticCustomerCoords
+    reconciliation.ok && status === "ready_for_approval" && !usedSyntheticCustomerCoords && generatedValidation.ok
       ? "ready_for_approval"
       : "needs_review";
 
@@ -1316,7 +1410,22 @@ export async function generatePlanForRun(params: {
           unassignedCount: reconciliation.unassignedCount,
           blockedCount: reconciliation.blockedCount,
           missing: reconciliation.missing.slice(0, 50).map(formatMissingLeg)
-        }
+        },
+        itineraries: itineraries.map((row) => ({
+          dogId: row.dogId,
+          dogName: row.dogName,
+          reservationId: row.reservationId,
+          serviceType: row.serviceType,
+          pickup: row.pickup,
+          dropoff: row.dropoff,
+          assignedVanId: row.assignedVanId,
+          assignmentLocked: row.assignmentLocked,
+          transferAllowed: row.transferAllowed,
+          diagnostics: row.diagnostics
+        })),
+        routeHealth,
+        geographicClusters: geoLocks.clusters,
+        assignmentDiagnostics: geoLocks.diagnostics.slice(0, 80)
       },
       created_by: params.actorAdminId ?? null,
       created_by_email: params.actorEmail ?? null
@@ -1331,7 +1440,10 @@ export async function generatePlanForRun(params: {
     needsReviewCount: needsReview.length,
     reconciliation,
     usedSyntheticCustomerCoords,
-    routeGenerationMode
+    routeGenerationMode,
+    itineraries,
+    routeHealth,
+    geographicClusters: geoLocks.clusters
   };
   await supabase.from("route_plan_versions").insert({
     plan_id: plan.id,
@@ -1399,7 +1511,9 @@ export async function generatePlanForRun(params: {
           eta_departure: stop.etaDeparture ?? null,
           validation_status: "ok",
           locked: stop.locked,
-          household_key: stop.householdKey
+          household_key: stop.householdKey,
+          location_type: stop.locationType ?? null,
+          formatted_address: stop.formattedAddress ?? null
         })
         .select("*")
         .single();
@@ -1532,44 +1646,145 @@ export async function approvePlan(params: {
   const sendOwnerSms = Boolean(params.sendOwnerSms);
   const bundle = await getPlanBundle(params.planId);
   const summary = (bundle.plan.summary ?? {}) as Record<string, unknown>;
-  const reconciliationSummary = (summary.reconciliation ?? null) as {
-    ok?: boolean;
-    missing?: string[];
-    expectedCount?: number;
-    assignedCount?: number;
-  } | null;
 
-  // Approval gate — never approve when transport legs are missing or addresses are broken.
-  if (reconciliationSummary && reconciliationSummary.ok === false) {
-    const missing = (reconciliationSummary.missing ?? []).slice(0, 8).join("; ");
-    throw new RouteGeneratorClientError(
-      `ROUTES NEED ATTENTION — ${reconciliationSummary.missing?.length ?? "some"} transportation leg(s) are unassigned or blocked. ${missing}`,
-      409,
-      "reconciliation_failed"
-    );
+  const stopIds = bundle.stops.map((stop) => String(stop.id));
+  const { data: stopItems } = stopIds.length
+    ? await supabase.from("route_plan_stop_items").select("*").in("stop_id", stopIds)
+    : { data: [] as Array<Record<string, unknown>> };
+  const itemsByStop = new Map<string, Array<Record<string, unknown>>>();
+  for (const item of stopItems ?? []) {
+    const key = String(item.stop_id);
+    const list = itemsByStop.get(key) ?? [];
+    list.push(item);
+    itemsByStop.set(key, list);
   }
-  const locationIssues = bundle.stops.filter((stop) => {
-    if (stop.stop_kind === "depot_start" || stop.stop_kind === "depot_end") {
-      return !String(stop.address || "").trim() || !hasFiniteCoords(stop.latitude, stop.longitude);
-    }
-    if (stop.stop_kind !== "customer") return false;
-    return !String(stop.address || "").trim() || !hasFiniteCoords(stop.latitude, stop.longitude);
+
+  const assignedStopRefs = bundle.routes.flatMap((route) =>
+    bundle.stops
+      .filter((stop) => String(stop.route_id) === String(route.id) && stop.stop_kind === "customer")
+      .map((stop) => {
+        const linked = itemsByStop.get(String(stop.id)) ?? [];
+        return {
+          stopId: String(stop.id),
+          routeVanKey: String(route.van_key),
+          routeName: String(route.wave_name || route.van_key),
+          direction: route.direction as "pickup" | "dropoff",
+          reservationIds: linked.map((row) => String(row.reservation_id || "")).filter(Boolean),
+          dogIds: linked.map((row) => String(row.dog_id || "")).filter(Boolean),
+          dogNames: linked.map((row) => String(row.dog_name || "")).filter(Boolean),
+          householdKey: stop.household_key ? String(stop.household_key) : null
+        };
+      })
+  );
+  const reportItems = (bundle.items ?? []) as Array<Record<string, unknown>>;
+  const normalizedItems: NormalizedReportItem[] = reportItems.map((row) => {
+    const raw = (row.raw ?? {}) as Record<string, unknown>;
+    const locationTypeRaw = String(raw.location_type || raw.locationType || row.location_type || "").toUpperCase();
+    return {
+      direction: row.direction as "pickup" | "dropoff",
+      reservationId: (row.reservation_id as string | null) ?? null,
+      customerId: (row.customer_id as string | null) ?? null,
+      ownerFirstName: (row.owner_first_name as string | null) ?? null,
+      ownerLastName: (row.owner_last_name as string | null) ?? null,
+      ownerFullName: (row.owner_full_name as string | null) ?? null,
+      dogId: (row.dog_id as string | null) ?? null,
+      dogName: (row.dog_name as string | null) ?? null,
+      serviceRaw: (row.service_raw as string | null) ?? null,
+      serviceCanonical: row.service_canonical as NormalizedReportItem["serviceCanonical"],
+      locationType:
+        locationTypeRaw === "HOME" ||
+        locationTypeRaw === "FITDOG" ||
+        locationTypeRaw === "HUB" ||
+        locationTypeRaw === "OUTING" ||
+        locationTypeRaw === "CUSTOM"
+          ? locationTypeRaw
+          : null,
+      addressRaw: (row.address_raw as string | null) ?? null,
+      addressStreet: (row.address_street as string | null) ?? null,
+      addressUnit: (row.address_unit as string | null) ?? null,
+      addressCity: (row.address_city as string | null) ?? null,
+      addressState: (row.address_state as string | null) ?? null,
+      addressZip: (row.address_zip as string | null) ?? null,
+      ownerPhoneMasked: (row.owner_phone_masked as string | null) ?? null,
+      timeWindowStart: null,
+      timeWindowEnd: null,
+      dogSize: (row.dog_size as string | null) ?? null,
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: (row.household_key as string | null) ?? null,
+      validationStatus: (row.validation_status as NormalizedReportItem["validationStatus"]) ?? "ok",
+      validationReasons: (row.validation_reasons as string[]) ?? [],
+      raw: raw as NormalizedReportItem["raw"]
+    };
   });
-  if (locationIssues.length) {
-    throw new RouteGeneratorClientError(
-      `${locationIssues.length} stop(s) need location review before this route can be approved/sent to Samsara: ${locationIssues
-        .slice(0, 5)
-        .map((s) => s.owner_name || s.id)
-        .join(", ")}`,
-      409,
-      "address_validation_failed"
-    );
+  const reconciliation = reconcileTransportLegs({
+    items: normalizedItems,
+    assignedStops: assignedStopRefs
+  });
+  const itineraries = buildDailyDogItineraries({
+    items: normalizedItems,
+    assignedStops: assignedStopRefs.map((ref) => ({
+      direction: ref.direction,
+      vanKey: ref.routeVanKey,
+      householdKey: ref.householdKey,
+      reservationIds: ref.reservationIds,
+      dogIds: ref.dogIds,
+      dogNames: ref.dogNames,
+      stopId: ref.stopId
+    }))
+  });
+  const validatableStops: ValidatableStop[] = bundle.stops.map((stop) => {
+    const route = bundle.routes.find((row) => String(row.id) === String(stop.route_id));
+    const linked = itemsByStop.get(String(stop.id)) ?? [];
+    return {
+      id: String(stop.id),
+      stopKind: String(stop.stop_kind || ""),
+      ownerName: stop.owner_name ? String(stop.owner_name) : null,
+      address: stop.address ? String(stop.address) : null,
+      formattedAddress: stop.formatted_address ? String(stop.formatted_address) : stop.address ? String(stop.address) : null,
+      latitude: stop.latitude == null ? null : Number(stop.latitude),
+      longitude: stop.longitude == null ? null : Number(stop.longitude),
+      householdKey: stop.household_key ? String(stop.household_key) : null,
+      locationType: stop.location_type ? String(stop.location_type) : null,
+      dogNames: linked.map((row) => String(row.dog_name || "")).filter(Boolean),
+      dogIds: linked.map((row) => String(row.dog_id || "")).filter(Boolean),
+      reservationIds: linked.map((row) => String(row.reservation_id || "")).filter(Boolean),
+      direction: route ? String(route.direction) : null,
+      vanKey: route ? String(route.van_key) : null
+    };
+  });
+  const expectedDogKeys = normalizedItems
+    .filter((item) => item.validationStatus !== "error" || item.addressRaw)
+    .map((item) => `${item.reservationId || item.dogId || item.dogName || ""}|${item.direction}`)
+    .filter((key) => !key.startsWith("|"));
+  const validation = validateRoutePlan({
+    reconciliation,
+    stops: validatableStops,
+    itineraries,
+    expectedDogKeys
+  });
+  const health = buildRouteHealthSummary({
+    validation,
+    itineraries,
+    expectedDogCount: reconciliation.expectedCount,
+    assignedDogCount: reconciliation.assignedCount
+  });
+  if (!health.ok) {
+    throw new RouteGeneratorClientError(formatApprovalBlockMessage(health), 409, "route_validation_failed");
   }
 
   const nextSummary = {
     ...summary,
     ownerTextsEnabled: sendOwnerSms,
-    vehicleAlreadyAtFirstStop: true
+    vehicleAlreadyAtFirstStop: true,
+    routeHealth: health,
+    approvedSnapshot: {
+      approvedAt: new Date().toISOString(),
+      assignedLegs: reconciliation.assignedCount,
+      expectedLegs: reconciliation.expectedCount,
+      itineraries
+    }
   };
 
   const { data: plan, error } = await supabase
@@ -1591,7 +1806,7 @@ export async function approvePlan(params: {
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
-    newValue: { sendOwnerSms, vehicleAlreadyAtFirstStop: true }
+    newValue: { sendOwnerSms, vehicleAlreadyAtFirstStop: true, routeHealth: health }
   });
 
   // Create owner tracking links. SMS only when sendOwnerSms is checked AND kill switch is on.
@@ -1667,18 +1882,7 @@ export async function setPlanOwnerTextsEnabled(params: {
     .single();
   if (error || !plan) throw new Error(error?.message || "Unable to update owner texts setting.");
 
-  // When enabling after approval, create/enable tracking without forcing link spam if quiet hours.
-  let tracking: Awaited<ReturnType<typeof createOwnerTrackingForPlan>> | null = null;
-  if (params.enabled && (status === "approved" || status === "exported")) {
-    if (!isRouteOwnerSmsEnabled()) {
-      throw new RouteGeneratorClientError(
-        "Owner SMS is disabled system-wide (ROUTE_OWNER_SMS_ENABLED). Turn it on in Vercel for live route days.",
-        409,
-        "route_owner_sms_disabled"
-      );
-    }
-    tracking = await createOwnerTrackingForPlan(params.planId, { sendSms: true });
-  }
+  // Checkbox never sends SMS. Approve (with explicit confirm) is the send step.
   if (!params.enabled) {
     // Disable future ETA alerts on all tracking rows for this plan — do not revoke links already sent.
     await supabase
@@ -1697,10 +1901,10 @@ export async function setPlanOwnerTextsEnabled(params: {
     actorAdminId: params.actorAdminId,
     actorEmail: params.actorEmail,
     actorRole: params.actorRole,
-    newValue: { ownerTextsEnabled: params.enabled, tracking }
+    newValue: { ownerTextsEnabled: params.enabled }
   });
 
-  return { plan, tracking, ownerTextsEnabled: Boolean(params.enabled) };
+  return { plan, tracking: null, ownerTextsEnabled: Boolean(params.enabled) };
 }
 
 export async function exportSamsaraCsv(params: {
@@ -1902,23 +2106,33 @@ export async function exportSamsaraCsv(params: {
           : stopNotes.trim() || `${route.wave_name || ""}`.trim();
       const safeRouteName = sanitizeSamsaraText(routeName);
       const baseStopName = sanitizeSamsaraText(String(stop.owner_name || stop.stop_kind || "Stop")) || "Stop";
-      // Unique stop labels within a route (depot start/end used to collide and confuse Samsara).
+      const directionLabel = direction === "dropoff" ? "Drop Off" : "Pickup";
+      const labeledStopName =
+        stop.stop_kind === "customer" && !/pickup|drop\s*off/i.test(baseStopName)
+          ? `${baseStopName} — ${directionLabel}`
+          : baseStopName;
       const sameNameCount = rows.filter(
         (r) =>
           r.routeName === safeRouteName &&
-          (r.stopName === baseStopName || r.stopName.startsWith(`${baseStopName} (`))
+          (r.stopName === labeledStopName || r.stopName.startsWith(`${labeledStopName} (`))
       ).length;
       const stopName =
         sameNameCount === 0
-          ? baseStopName
-          : sanitizeSamsaraText(`${baseStopName} (${sameNameCount + 1})`) || `${baseStopName} ${sameNameCount + 1}`;
+          ? sanitizeSamsaraText(labeledStopName) || "Stop"
+          : sanitizeSamsaraText(`${labeledStopName} (${sameNameCount + 1})`) || `${labeledStopName} ${sameNameCount + 1}`;
 
-      // Full Address must be a postal address — never a dog/owner nickname.
+      const parsedAddress = parseAddress(location.address || String(stop.address || ""));
+      const storedFormatted = String(stop.formatted_address || "").trim();
       const postal =
+        (looksLikePostalAddress(storedFormatted) ? storedFormatted : null) ||
         formatPostalAddress({
-          street1: location.address,
+          street1: parsedAddress.street || location.address,
+          city: parsedAddress.city,
+          state: parsedAddress.state,
+          postalCode: parsedAddress.zip,
           country: "USA"
-        }) || location.address || String(stop.address || "");
+        }) ||
+        (looksLikePostalAddress(location.address) ? location.address : "");
 
       rows.push({
         routeName: safeRouteName,
@@ -1927,7 +2141,6 @@ export async function exportSamsaraCsv(params: {
             ? `${route.wave_name} | not divided by van | vehicleAlreadyAtFirstStop=true`
             : `${route.wave_name} | ${route.vehicle_pool} | vehicleAlreadyAtFirstStop=true`
         ),
-        // Assign by vehicle only — Samsara rejects assigning both driver + vehicle.
         vehicleName: vanDisplay,
         driverName: "",
         stopName,
@@ -1956,7 +2169,16 @@ export async function exportSamsaraCsv(params: {
       .eq("id", patch.id);
   }
 
-  // Hard fail: vehicle names must be exact Samsara roster before building the file.
+  if (rows.some((row) => !looksLikePostalAddress(row.stopAddress))) {
+    const bad = rows.filter((row) => !looksLikePostalAddress(row.stopAddress)).slice(0, 5);
+    throw new RouteGeneratorClientError(
+      `CSV export blocked — ${bad.length} stop(s) are missing a real postal address (not a dog/stop label): ${bad
+        .map((row) => row.stopName)
+        .join(", ")}`,
+      422,
+      "address_validation_failed"
+    );
+  }
   for (const row of rows) {
     try {
       row.vehicleName = normalizeSamsaraVehicleName(row.vehicleName);

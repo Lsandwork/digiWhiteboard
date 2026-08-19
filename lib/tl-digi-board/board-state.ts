@@ -1,4 +1,12 @@
-import type { TlBoardMedicationRow, TlBoardSyncMeta, TlGingrMedicationRecord, TlMedicationSummary } from "./types";
+import type {
+  TlBoardDisplayState,
+  TlBoardMedicationRow,
+  TlBoardSyncMeta,
+  TlDigiBoardSnapshot,
+  TlGingrMedicationRecord,
+  TlGingrSourceHealth,
+  TlMedicationSummary
+} from "./types";
 import {
   completedMedicationVisibleInPeriod,
   currentMedicationPeriodAt,
@@ -25,6 +33,9 @@ export type BuildTlBoardStateInput = {
   /** True when Gingr reservation services exposed completion fields this sync. */
   servicesCompletionStatusAvailable?: boolean;
   servicesCompletionAudit?: import("./types").TlAdditionalServicesCompletionAudit | null;
+  medicationsHealth?: TlGingrSourceHealth;
+  servicesHealth?: TlGingrSourceHealth;
+  servicesRemaining?: number;
 };
 
 function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedicationRecord[] {
@@ -142,12 +153,28 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     }
   }
 
-  const allClear =
-    input.syncSucceeded &&
+  const medicationsHealth: TlGingrSourceHealth =
+    input.medicationsHealth ??
+    (input.syncSucceeded ? "ok" : input.lastSuccessfulSyncAt ? "stale" : "error");
+  const servicesHealth: TlGingrSourceHealth = input.servicesHealth ?? medicationsHealth;
+
+  const medicationsAllClear =
+    medicationsHealth === "ok" &&
     summary.due === 0 &&
     summary.remaining === 0 &&
     summary.overdue === 0 &&
     !isStale;
+  const servicesAllClear = servicesHealth === "ok" && (input.servicesRemaining ?? 0) === 0 && !isStale;
+  const allClear = medicationsAllClear && servicesAllClear;
+
+  const boardState = resolveTlBoardDisplayState({
+    medicationsHealth,
+    servicesHealth,
+    gingrSyncHealth,
+    isStale,
+    medicationsAllClear,
+    lastSuccessfulSyncAt: input.lastSuccessfulSyncAt
+  });
 
   return {
     timezone: TL_DIGI_BOARD_TIMEZONE,
@@ -158,10 +185,125 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     lastError: input.lastError ?? null,
     isStale,
     allClear,
+    medicationsHealth,
+    servicesHealth,
+    medicationsAllClear,
+    servicesAllClear,
+    boardState,
     nextPeriod: next?.period ?? null,
     nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
     administrationStatusAvailable: Boolean(input.administrationStatusAvailable),
     servicesCompletionStatusAvailable: Boolean(input.servicesCompletionStatusAvailable),
     servicesCompletionAudit: input.servicesCompletionAudit ?? null
   };
+}
+
+export function resolveTlBoardDisplayState(input: {
+  medicationsHealth: TlGingrSourceHealth;
+  servicesHealth: TlGingrSourceHealth;
+  gingrSyncHealth: TlBoardSyncMeta["gingrSyncHealth"];
+  isStale: boolean;
+  medicationsAllClear: boolean;
+  lastSuccessfulSyncAt: string | null;
+}): TlBoardDisplayState {
+  const meds = input.medicationsHealth;
+  const services = input.servicesHealth;
+  if (meds === "unevaluated" && services === "unevaluated") return "INITIAL_LOADING";
+  if (meds === "error" && services === "error" && !input.lastSuccessfulSyncAt) return "CONNECTION_ERROR";
+  if ((meds === "error" && services === "ok") || (meds === "ok" && services === "error")) {
+    return "PARTIAL_DATA_ERROR";
+  }
+  if (meds === "error" || services === "error") return "CONNECTION_ERROR";
+  if (meds === "stale" || services === "stale" || input.isStale || input.gingrSyncHealth === "connection_issue") {
+    return "STALE";
+  }
+  if (input.medicationsAllClear && services === "ok") return "EMPTY_VALID";
+  return "LIVE";
+}
+
+const EMPTY_SERVICES_SUMMARY = {
+  due: 0,
+  completed: 0,
+  remaining: 0,
+  knownIncomplete: 0,
+  completionUnknown: 0
+} as const;
+
+/** Rebuild current/overdue rows and period from stored medications at `now`. */
+export function rehydrateTlBoardSnapshot(snapshot: TlDigiBoardSnapshot, now: Date): TlDigiBoardSnapshot {
+  const syncSucceeded = snapshot.meta.medicationsHealth === "ok";
+  const input: BuildTlBoardStateInput = {
+    medications: snapshot.medications,
+    now,
+    lastSuccessfulSyncAt: snapshot.meta.lastSuccessfulSyncAt,
+    lastAttemptAt: snapshot.meta.lastAttemptAt,
+    lastError: snapshot.meta.lastError,
+    syncSucceeded,
+    administrationStatusAvailable: snapshot.meta.administrationStatusAvailable,
+    servicesCompletionStatusAvailable: snapshot.meta.servicesCompletionStatusAvailable,
+    servicesCompletionAudit: snapshot.meta.servicesCompletionAudit,
+    medicationsHealth: snapshot.meta.medicationsHealth,
+    servicesHealth: snapshot.meta.servicesHealth,
+    servicesRemaining: snapshot.servicesSummary.remaining
+  };
+  const built = buildTlBoardMedicationRows(input);
+  const meta = buildTlBoardSyncMeta(input, built.summary);
+  return {
+    overdue: built.overdue,
+    current: built.current,
+    summary: built.summary,
+    additionalServices: snapshot.additionalServices,
+    servicesSummary: snapshot.servicesSummary,
+    meta,
+    medications: snapshot.medications,
+    generatedAt: snapshot.generatedAt
+  };
+}
+
+/**
+ * First-sync / missing-snapshot payload. Period comes from the clock so the TV
+ * never shows a blank period. All Clear is never true.
+ */
+export function buildUnavailableTlBoardSnapshot(now: Date, lastError: string): TlDigiBoardSnapshot {
+  const attemptedAt = now.toISOString();
+  const input: BuildTlBoardStateInput = {
+    medications: [],
+    now,
+    lastSuccessfulSyncAt: null,
+    lastAttemptAt: attemptedAt,
+    lastError,
+    syncSucceeded: false,
+    medicationsHealth: "error",
+    servicesHealth: "error",
+    servicesRemaining: 0
+  };
+  const built = buildTlBoardMedicationRows(input);
+  const meta = buildTlBoardSyncMeta(input, built.summary);
+  return {
+    overdue: [],
+    current: [],
+    summary: built.summary,
+    additionalServices: [],
+    servicesSummary: { ...EMPTY_SERVICES_SUMMARY },
+    meta,
+    medications: [],
+    generatedAt: attemptedAt
+  };
+}
+
+export function tlBoardSnapshotNeedsBackgroundSync(
+  snapshot: TlDigiBoardSnapshot | null,
+  now: Date,
+  options?: { forceRefresh?: boolean }
+): boolean {
+  if (options?.forceRefresh) return true;
+  if (!snapshot) return true;
+  if (!snapshot.meta.lastSuccessfulSyncAt) return true;
+  if (snapshot.meta.medicationsHealth === "error" || snapshot.meta.servicesHealth === "error") return true;
+  if (snapshot.meta.boardState === "CONNECTION_ERROR" || snapshot.meta.boardState === "PARTIAL_DATA_ERROR") {
+    return true;
+  }
+  const ageMs = now.getTime() - new Date(snapshot.meta.lastSuccessfulSyncAt).getTime();
+  if (!Number.isFinite(ageMs) || ageMs < 0) return true;
+  return ageMs > TL_GINGR_SYNC_DELAYED_MS;
 }
