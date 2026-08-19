@@ -43,8 +43,11 @@
 
 .tl-board__logo {
   width: auto;
-  height: 2rem;
+  height: clamp(2rem, 3.2vw, 2.75rem);
+  max-width: min(18rem, 42vw);
   object-fit: contain;
+  object-position: left center;
+  background: transparent;
 }
 
 .tl-board__eyebrow {
@@ -257,11 +260,11 @@
   flex: 0 0 auto;
 }
 
-.tl-table__photo--placeholder {
-  display: grid;
-  place-items: center;
-  font-weight: 700;
-  color: var(--tl-cyan);
+.tl-table__photo--fallback {
+  object-fit: contain;
+  padding: 0.35rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .tl-table__dog-name {

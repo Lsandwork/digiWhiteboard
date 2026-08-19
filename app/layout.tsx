@@ -15,12 +15,19 @@ import "../lib/fitdog-dashboard/theme-clear.css";
 import "../lib/fitdog-dashboard/theme-readable-canvas.css";
 import "../lib/theme/button-states.css";
 
+const FITDOG_FAVICON = "/assets/fitdog-lobby-whiteboard/01-brand/logo/fitdog-app-icon-192.png";
+
 export const metadata: Metadata = {
   title: "Fitdog Health & Social Club",
   description: "Live Fitdog board for dogs actively checking in or checking out.",
   applicationName: RUFFOPS_META.applicationName,
   generator: RUFFOPS_META.generator,
-  manifest: "/manifest.json"
+  manifest: "/manifest.json",
+  icons: {
+    icon: FITDOG_FAVICON,
+    apple: FITDOG_FAVICON,
+    shortcut: FITDOG_FAVICON
+  }
 };
 
 export const viewport: Viewport = {
