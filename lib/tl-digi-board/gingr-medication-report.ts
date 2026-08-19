@@ -12,6 +12,7 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
 import { canCallGingrEndpoint, markGingrEndpointCalled } from "@/lib/gingr-request-guard";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
+import { fetchTlGingrResponse } from "./gingr-http";
 import { readGingrText } from "./gingr-medication";
 import type { TlGingrAdministrationStatus } from "./types";
 
@@ -394,11 +395,15 @@ export async function fetchGingrMedicationReportHistory(
   url.searchParams.set("key", apiKey);
   url.searchParams.set("reservation_id", trimmedReservationId);
 
-  const response = await fetch(url.toString(), {
-    method: "GET",
-    headers: { Accept: "application/json" },
-    cache: "no-store"
-  });
+  const response = await fetchTlGingrResponse(
+    url.toString(),
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store"
+    },
+    "Gingr get_medication_report_history"
+  );
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");

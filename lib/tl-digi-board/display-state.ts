@@ -13,6 +13,8 @@ import type {
 export const TL_RETRY_BACKOFF_MS = [10_000, 20_000, 30_000, 60_000] as const;
 export const TL_HEALTHY_POLL_MS = 12_000;
 export const TL_WAKE_RESYNC_MIN_MS = 15_000;
+/** TV client must not wait forever if the board API hangs. */
+export const TL_BOARD_CLIENT_FETCH_TIMEOUT_MS = 12_000;
 
 export type TlCardKind = "checking" | "all_clear" | "error" | "stale" | "rows";
 
@@ -65,8 +67,8 @@ export function resolveTlCardKind(params: {
   hasRows: boolean;
 }): TlCardKind {
   if (params.phase === "initial") return "checking";
-  const health = params.health ?? "unevaluated";
-  if (health === "unevaluated") return "checking";
+  const health = params.health ?? "error";
+  if (health === "unevaluated") return "error";
   if (health === "error") return "error";
   if (params.hasRows) return health === "stale" ? "stale" : "rows";
   if (health === "stale") return "stale";

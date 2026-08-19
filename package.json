@@ -26,6 +26,7 @@
     "test:admin-dashboard-nav": "tsx scripts/test-admin-dashboard-nav.ts",
     "test:tl-digi-board-windows": "tsx scripts/test-tl-digi-board-windows.ts",
     "test:tl-digi-board-states": "tsx scripts/test-tl-digi-board-states.ts",
+    "test:tl-gingr-http": "tsx scripts/test-tl-gingr-http.ts",
     "test:tl-gingr-key": "tsx scripts/test-tl-gingr-key.ts",
     "test:tl-digi-board-normalize": "tsx scripts/test-tl-digi-board-normalize.ts",
     "test:tl-digi-board-medication-report": "tsx scripts/test-tl-digi-board-medication-report.ts",

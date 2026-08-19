@@ -10,6 +10,11 @@ import {
   type TlOvernightReservationTypeMapping
 } from "./config";
 import { syncTlDigiBoardState } from "./sync";
+import {
+  buildUnavailableTlBoardSnapshot,
+  rehydrateTlBoardSnapshot,
+  tlBoardSnapshotNeedsBackgroundSync
+} from "./board-state";
 import type {
   TlAdditionalServicesSummary,
   TlBoardAdditionalServiceRow,
@@ -378,92 +383,84 @@ export async function getTlDigiBoardSnapshot(
     loadTlDigiBoardSnapshot(client)
   ]);
 
-  const snapshot = await syncTlDigiBoardState(client, {
+  const persist = async (snapshot: TlDigiBoardSnapshot) => {
+    const shouldPersist =
+      forceRefresh ||
+      !previous ||
+      snapshot.generatedAt !== previous.generatedAt ||
+      snapshot.meta.lastAttemptAt !== previous.meta.lastAttemptAt ||
+      snapshot.meta.lastSuccessfulSyncAt !== previous.meta.lastSuccessfulSyncAt;
+    if (!shouldPersist) return;
+    await saveTlDigiBoardSnapshot(client, snapshot).catch(() => {
+      // Sync result is still returned if persist fails.
+    });
+  };
+
+  return syncTlDigiBoardState(client, {
     forceRefresh,
     previousSnapshot: previous,
-    config
+    config,
+    persist
   });
-
-  const shouldPersist =
-    forceRefresh ||
-    !previous ||
-    snapshot.generatedAt !== previous.generatedAt ||
-    snapshot.meta.lastAttemptAt !== previous.meta.lastAttemptAt ||
-    snapshot.meta.lastSuccessfulSyncAt !== previous.meta.lastSuccessfulSyncAt;
-
-  if (shouldPersist) {
-    await saveTlDigiBoardSnapshot(client, snapshot).catch(() => {
-      // Read path should still return the in-memory snapshot if persist fails.
-    });
-  }
-
-  return snapshot;
 }
 
-/** Public TV board payload — never includes API keys or secrets. */
+export function assembleTlDigiBoardPublicPayload(options: {
+  config: TlDigiBoardConfig;
+  snapshot: TlDigiBoardSnapshot | null;
+  reminders: TlDigiBoardPublicPayload["reminders"];
+  now?: Date;
+  forceRefresh?: boolean;
+}): { payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean } {
+  const now = options.now ?? new Date();
+  const snapshot = options.snapshot
+    ? rehydrateTlBoardSnapshot(options.snapshot, now)
+    : buildUnavailableTlBoardSnapshot(
+        now,
+        "No Gingr snapshot is stored yet. Background sync will retry automatically."
+      );
+
+  return {
+    payload: {
+      ...snapshot,
+      config: {
+        displayTitle: options.config.display.displayTitle,
+        enabled: options.config.display.enabled
+      },
+      reminders: options.reminders
+    },
+    needsBackgroundSync: tlBoardSnapshotNeedsBackgroundSync(options.snapshot, now, {
+      forceRefresh: options.forceRefresh
+    })
+  };
+}
+
+/** Public TV board payload — never includes API keys or secrets. Never waits on Gingr. */
 export async function loadTlDigiBoardPublicPayload(
   supabase?: SupabaseClient,
-  options?: { forceRefresh?: boolean }
-): Promise<TlDigiBoardPublicPayload> {
+  options?: { forceRefresh?: boolean; now?: Date }
+): Promise<{ payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean }> {
   const client = resolveSupabase(supabase);
   const { loadTlBoardDailyReminders } = await import("./reminders");
   const [configResult, snapshotResult, remindersResult] = await Promise.allSettled([
     loadTlDigiBoardConfig(client),
-    getTlDigiBoardSnapshot(client, { forceRefresh: options?.forceRefresh }),
-    loadTlBoardDailyReminders(client)
+    loadTlDigiBoardSnapshot(client),
+    loadTlBoardDailyReminders(client, { now: options?.now })
   ]);
 
   const config =
     configResult.status === "fulfilled"
       ? configResult.value
       : (await import("./config")).DEFAULT_TL_DIGI_BOARD_CONFIG;
-  const snapshot =
-    snapshotResult.status === "fulfilled"
-      ? snapshotResult.value
-      : {
-          overdue: [],
-          current: [],
-          summary: { due: 0, completed: 0, remaining: 0, overdue: 0 },
-          additionalServices: [],
-          servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
-          meta: {
-            timezone: "America/Los_Angeles" as const,
-            currentPeriod: null,
-            gingrSyncHealth: "connection_issue" as const,
-            lastSuccessfulSyncAt: null,
-            lastAttemptAt: new Date().toISOString(),
-            lastError:
-              snapshotResult.status === "rejected"
-                ? snapshotResult.reason instanceof Error
-                  ? snapshotResult.reason.message
-                  : "Unable to load TL Digi Board snapshot."
-                : "Unable to load TL Digi Board snapshot.",
-            isStale: true,
-            allClear: false,
-            medicationsHealth: "error" as const,
-            servicesHealth: "error" as const,
-            medicationsAllClear: false,
-            servicesAllClear: false,
-            boardState: "CONNECTION_ERROR" as const,
-            nextPeriod: null,
-            nextPeriodStartsAt: null,
-            administrationStatusAvailable: false,
-            servicesCompletionStatusAvailable: false,
-            servicesCompletionAudit: null
-          },
-          medications: [],
-          generatedAt: new Date().toISOString()
-        };
+  const snapshot = snapshotResult.status === "fulfilled" ? snapshotResult.value : null;
   const reminders = remindersResult.status === "fulfilled" ? remindersResult.value : [];
 
-  return {
-    ...snapshot,
-    config: {
-      displayTitle: config.display.displayTitle,
-      enabled: config.display.enabled
-    },
-    reminders
-  };
+  return assembleTlDigiBoardPublicPayload({
+    config,
+    snapshot,
+    reminders,
+    now: options?.now,
+    forceRefresh: options?.forceRefresh
+  });
 }
 
 export { toTlDigiBoardAdminConfigView, canManageTlDigiBoardConfig };

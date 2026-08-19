@@ -24,6 +24,7 @@ import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 import { createGingrClient, normalizeGingrReservationList } from "@/lib/integrations/gingr/client";
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { requireTlGingrApiKey, tlGingrClientConfig } from "./gingr-auth";
+import { fetchTlGingrResponse } from "./gingr-http";
 import {
   mergeGingrServiceRows,
   reservationServiceRows,
@@ -71,15 +72,19 @@ async function postReservations(fields: Record<string, string>): Promise<GingrRe
   const { subdomain, locationId } = tlGingrClientConfig();
   const client = createGingrClient({ apiKey, subdomain, locationId });
   const body = new URLSearchParams({ key: client.config.apiKey, location_id: client.config.locationId, ...fields });
-  const response = await fetch(`${client.config.baseUrl}/api/v1/reservations`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+  const response = await fetchTlGingrResponse(
+    `${client.config.baseUrl}/api/v1/reservations`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8"
+      },
+      body,
+      cache: "no-store"
     },
-    body,
-    cache: "no-store"
-  });
+    "Gingr reservations"
+  );
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new Error(`Gingr reservations ${response.status}: ${text.slice(0, 180) || response.statusText}`);

@@ -23,6 +23,7 @@ import {
   resolveTlCardKind,
   resolveTlHeaderKind,
   shouldResyncOnWake,
+  TL_BOARD_CLIENT_FETCH_TIMEOUT_MS,
   type TlCardKind
 } from "@/lib/tl-digi-board/display-state";
 import "./tl-alerts-reminders-board.css";
@@ -203,6 +204,7 @@ function BoardInner() {
   const lastAttemptRef = useRef<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const countdownRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const loadRef = useRef<(force?: boolean) => Promise<void>>(async () => undefined);
 
   const clearTimers = useCallback(() => {
@@ -241,11 +243,16 @@ function BoardInner() {
 
   const load = useCallback(
     async (force = false) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const timeoutId = window.setTimeout(() => controller.abort(), TL_BOARD_CLIENT_FETCH_TIMEOUT_MS);
       lastAttemptRef.current = Date.now();
       try {
         const url = force ? "/api/boards/tl-alerts-reminders?force=1" : "/api/boards/tl-alerts-reminders";
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
         const json = (await res.json().catch(() => ({}))) as BoardPayload;
+        if (abortRef.current !== controller) return;
         const payload = json.meta ? json : null;
         if (!payload) {
           throw new Error(json.error || "Failed to load board.");
@@ -286,10 +293,22 @@ function BoardInner() {
         }
         scheduleNext(nextState, failCountRef.current);
       } catch (err) {
+        if (abortRef.current !== controller) return;
         failCountRef.current += 1;
         setHasResolved(true);
-        setError(err instanceof Error ? err.message : "Failed to load board.");
+        const timedOut =
+          (err instanceof DOMException && err.name === "AbortError") ||
+          (err instanceof Error && (err.name === "AbortError" || /aborted|timed out/i.test(err.message)));
+        setError(
+          timedOut
+            ? "Board request timed out waiting for Gingr status."
+            : err instanceof Error
+              ? err.message
+              : "Failed to load board."
+        );
         scheduleNext(snapshotRef.current?.meta.boardState ?? "CONNECTION_ERROR", failCountRef.current);
+      } finally {
+        window.clearTimeout(timeoutId);
       }
     },
     [castKeeper, scheduleNext]
@@ -300,8 +319,8 @@ function BoardInner() {
   }, [load]);
 
   useEffect(() => {
-    // TV board: start the Gingr poller once on mount. Timers are cleaned up on unmount.
-    void loadRef.current(true);
+    // First paint reads the stored snapshot (fast). force=1 only wakes a background Gingr refresh.
+    void loadRef.current(false);
 
     function maybeWakeSync() {
       if (
@@ -330,6 +349,8 @@ function BoardInner() {
     window.addEventListener("online", onOnline);
 
     return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
       clearTimers();
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onFocus);

@@ -1,5 +1,13 @@
 import assert from "node:assert/strict";
-import { buildTlBoardMedicationRows, buildTlBoardSyncMeta, resolveTlBoardDisplayState } from "../lib/tl-digi-board/board-state";
+import {
+  buildTlBoardMedicationRows,
+  buildTlBoardSyncMeta,
+  buildUnavailableTlBoardSnapshot,
+  rehydrateTlBoardSnapshot,
+  resolveTlBoardDisplayState,
+  tlBoardSnapshotNeedsBackgroundSync
+} from "../lib/tl-digi-board/board-state";
+import { DEFAULT_TL_DIGI_BOARD_CONFIG } from "../lib/tl-digi-board/config";
 import {
   didTlBoardRecover,
   nextTlRetryDelayMs,
@@ -7,6 +15,9 @@ import {
   resolveTlCardKind,
   resolveTlHeaderKind
 } from "../lib/tl-digi-board/display-state";
+import { dateAtLaLocal } from "../lib/tl-digi-board/medication-windows";
+import { assembleTlDigiBoardPublicPayload } from "../lib/tl-digi-board/server";
+import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
 
 function emptySummary() {
   return { due: 0, completed: 0, remaining: 0, overdue: 0 };
@@ -181,5 +192,140 @@ assert.equal(
   }),
   "PARTIAL_DATA_ERROR"
 );
+
+// Resolved fetch with no payload/health is an error, never All Clear.
+{
+  const card = resolveTlCardKind({
+    phase: "resolved",
+    health: undefined,
+    allClear: false,
+    hasRows: false
+  });
+  assert.equal(card, "error");
+  assert.notEqual(card, "all_clear");
+}
+
+function sampleMed(partial: Partial<TlGingrMedicationRecord> = {}): TlGingrMedicationRecord {
+  return {
+    gingrMedicationId: "med-1",
+    gingrAnimalId: "animal-1",
+    gingrReservationId: "res-1",
+    dogName: "Charlie",
+    photoUrl: null,
+    lodgingLabel: "SUITE • 4",
+    lodgingAreaKey: "suite",
+    lodgingRunName: "Suite 4",
+    gingrScheduleLabel: "PM",
+    scheduleKind: "pm",
+    medicationName: "Amoxicillin",
+    dosage: "1 tablet",
+    instructions: "Give with dinner",
+    notes: null,
+    administrationStatus: "not_administered",
+    administeredAt: null,
+    administeredBy: null,
+    serviceDate: "2026-08-18",
+    ...partial
+  };
+}
+
+function sampleSnapshot(nowIso: string, medications: TlGingrMedicationRecord[]): TlDigiBoardSnapshot {
+  const now = new Date(nowIso);
+  const built = buildTlBoardMedicationRows({
+    medications,
+    now,
+    lastSuccessfulSyncAt: nowIso,
+    lastAttemptAt: nowIso,
+    lastError: null,
+    syncSucceeded: true,
+    medicationsHealth: "ok",
+    servicesHealth: "ok",
+    servicesRemaining: 0
+  });
+  const meta = buildTlBoardSyncMeta(
+    {
+      medications,
+      now,
+      lastSuccessfulSyncAt: nowIso,
+      lastAttemptAt: nowIso,
+      lastError: null,
+      syncSucceeded: true,
+      medicationsHealth: "ok",
+      servicesHealth: "ok",
+      servicesRemaining: 0
+    },
+    built.summary
+  );
+  return {
+    overdue: built.overdue,
+    current: built.current,
+    summary: built.summary,
+    additionalServices: [],
+    servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
+    meta,
+    medications,
+    generatedAt: nowIso
+  };
+}
+
+// Missing snapshot: period is still computed, All Clear is never true, background sync required.
+{
+  const now = dateAtLaLocal({ year: 2026, month: 8, day: 18, hour: 17, minute: 0, second: 0 });
+  const unavailable = buildUnavailableTlBoardSnapshot(now, "No Gingr snapshot is stored yet.");
+  assert.equal(unavailable.meta.currentPeriod, "pm");
+  assert.equal(unavailable.meta.medicationsAllClear, false);
+  assert.equal(unavailable.meta.servicesAllClear, false);
+  assert.equal(unavailable.meta.allClear, false);
+  assert.equal(unavailable.meta.boardState, "CONNECTION_ERROR");
+  assert.equal(tlBoardSnapshotNeedsBackgroundSync(null, now), true);
+
+  const assembled = assembleTlDigiBoardPublicPayload({
+    config: DEFAULT_TL_DIGI_BOARD_CONFIG,
+    snapshot: null,
+    reminders: [{ id: "r1", title: "Close Dens", message: "Check dens", scheduledTime: "5:00 PM" }],
+    now
+  });
+  assert.equal(assembled.needsBackgroundSync, true);
+  assert.equal(assembled.payload.meta.allClear, false);
+  assert.equal(assembled.payload.meta.medicationsAllClear, false);
+  assert.equal(assembled.payload.meta.boardState, "CONNECTION_ERROR");
+  assert.equal(assembled.payload.meta.currentPeriod, "pm");
+  assert.equal(assembled.payload.reminders.length, 1);
+  assert.equal(assembled.payload.config.displayTitle, "Team Lead Alerts + Reminders");
+}
+
+// Cached snapshot rehydrates the current LA period from stored medications without calling Gingr.
+{
+  const morning = dateAtLaLocal({ year: 2026, month: 8, day: 18, hour: 8, minute: 0, second: 0 });
+  const evening = dateAtLaLocal({ year: 2026, month: 8, day: 18, hour: 17, minute: 0, second: 0 });
+  const snapshot = sampleSnapshot(morning.toISOString(), [
+    sampleMed({ gingrScheduleLabel: "AM", scheduleKind: "am" }),
+    sampleMed({ gingrMedicationId: "med-2", gingrScheduleLabel: "PM", scheduleKind: "pm" })
+  ]);
+  assert.equal(snapshot.meta.currentPeriod, "am");
+
+  const rehydrated = rehydrateTlBoardSnapshot(snapshot, evening);
+  assert.equal(rehydrated.meta.currentPeriod, "pm");
+  assert.equal(rehydrated.meta.lastSuccessfulSyncAt, snapshot.meta.lastSuccessfulSyncAt);
+  assert.ok(rehydrated.current.some((row) => row.scheduleKind === "pm"));
+
+  const assembled = assembleTlDigiBoardPublicPayload({
+    config: DEFAULT_TL_DIGI_BOARD_CONFIG,
+    snapshot,
+    reminders: [],
+    now: evening
+  });
+  assert.equal(assembled.payload.meta.currentPeriod, "pm");
+  assert.equal(assembled.needsBackgroundSync, true);
+}
+
+// Fresh successful snapshot does not need a background Gingr pull.
+{
+  const now = new Date("2026-08-18T20:00:10.000Z");
+  const snapshot = sampleSnapshot("2026-08-18T20:00:00.000Z", []);
+  assert.equal(tlBoardSnapshotNeedsBackgroundSync(snapshot, now), false);
+  const forced = tlBoardSnapshotNeedsBackgroundSync(snapshot, now, { forceRefresh: true });
+  assert.equal(forced, true);
+}
 
 console.log("test-tl-digi-board-states: ok");
