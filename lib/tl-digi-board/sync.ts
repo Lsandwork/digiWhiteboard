@@ -78,11 +78,6 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isTimeoutError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /timed out after/i.test(message);
-}
-
 async function withTimeout<T>(work: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -214,10 +209,9 @@ async function loadOvernightCheckedInDogs(config: TlDigiBoardConfig): Promise<Ov
         });
       }
       if (overnight.length) return overnight;
-    } catch (error) {
-      // A hung/timed-out Gingr call must not fall through to another unbounded reservations pull.
-      if (isTimeoutError(error)) throw error;
-      // Other failures still try the robust checked-in helper.
+    } catch {
+      // Timed-out or failed TL reservations still fall through to the bounded
+      // GINGR_API_KEY checked-in helper so a hung dedicated key cannot blank Last sync forever.
     }
   }
 

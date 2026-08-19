@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import { CastKeeperProvider, useCastKeeperContext } from "@/hooks/useCastKeeper";
-import { TlBoardClock } from "@/components/boards/TlBoardClock";
+import { TlBoardClock, useLaBoardNow } from "@/components/boards/TlBoardClock";
 import {
+  currentMedicationPeriodAt,
   formatLaBoardClock,
   periodLabel
 } from "@/lib/tl-digi-board/medication-windows";
@@ -19,6 +20,8 @@ import type {
 import {
   didTlBoardRecover,
   headerLabelForKind,
+  headerLastSyncText,
+  headerPeriodText,
   planTlBoardRefresh,
   resolveTlCardKind,
   resolveTlHeaderKind,
@@ -195,6 +198,7 @@ function ServiceTableRow({ row }: { row: TlBoardAdditionalServiceRow }) {
 
 function BoardInner() {
   const castKeeper = useCastKeeperContext();
+  const now = useLaBoardNow();
   const [snapshot, setSnapshot] = useState<BoardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasResolved, setHasResolved] = useState(false);
@@ -365,7 +369,7 @@ function BoardInner() {
   const summary = snapshot?.summary;
   const servicesSummary = snapshot?.servicesSummary;
   const meta = snapshot?.meta;
-  const periodText = meta?.currentPeriod ? periodLabel(meta.currentPeriod) : phase === "initial" ? "—" : meta?.currentPeriod === null ? "—" : "—";
+  const periodText = headerPeriodText(meta?.currentPeriod, now ? currentMedicationPeriodAt(now) : null);
 
   const headerKind = resolveTlHeaderKind({
     phase,
@@ -383,11 +387,14 @@ function BoardInner() {
   const syncLabel = headerLabelForKind(headerKind);
 
   const lastSync = (() => {
-    if (!meta?.lastSuccessfulSyncAt) return phase === "initial" ? "—" : null;
+    if (!meta?.lastSuccessfulSyncAt) return headerLastSyncText({ phase, formattedSuccess: null });
     try {
-      return formatLaBoardClock(new Date(meta.lastSuccessfulSyncAt));
+      return headerLastSyncText({
+        phase,
+        formattedSuccess: formatLaBoardClock(new Date(meta.lastSuccessfulSyncAt))
+      });
     } catch {
-      return null;
+      return headerLastSyncText({ phase, formattedSuccess: null });
     }
   })();
 
@@ -436,10 +443,10 @@ function BoardInner() {
           </div>
           <h1 className="tl-board__title">{title}</h1>
         </div>
-        <TlBoardClock />
+        <TlBoardClock now={now} />
         <div className={`tl-board__sync ${syncClass}`}>
           <p className="tl-board__sync-label">{syncLabel}</p>
-          <p className="tl-board__sync-meta">Last synced: {lastSync || "—"}</p>
+          <p className="tl-board__sync-meta">Last synced: {lastSync}</p>
           <p className="tl-board__sync-meta">
             Period {phase === "initial" ? "—" : periodText} · America/Los_Angeles
           </p>

@@ -4,6 +4,8 @@
  * Empty arrays are never treated as "All Clear". That status is only valid after
  * a successful, validated Gingr evaluation with zero outstanding items.
  */
+import { periodLabel } from "./medication-windows";
+import type { TlMedicationPeriod } from "./constants";
 import type {
   TlBoardDisplayState,
   TlBoardSyncMeta,
@@ -106,6 +108,25 @@ export function headerLabelForKind(kind: TlHeaderKind): string {
     case "issue":
       return "⚠ Gingr Sync Issue";
   }
+}
+
+/** Period is a clock fact in America/Los_Angeles — never wait on Gingr for this label. */
+export function headerPeriodText(
+  apiPeriod: TlMedicationPeriod | null | undefined,
+  clockPeriod: TlMedicationPeriod | null
+): string {
+  const period = apiPeriod ?? clockPeriod;
+  return period ? periodLabel(period) : "—";
+}
+
+/** Last successful Gingr sync. Blank em dashes are reserved for the first paint before the clock hydrates. */
+export function headerLastSyncText(params: {
+  phase: "initial" | "resolved";
+  formattedSuccess: string | null;
+}): string {
+  if (params.formattedSuccess) return params.formattedSuccess;
+  if (params.phase === "initial") return "Checking…";
+  return "Never";
 }
 
 /** True when a later successful payload should clear a previous Gingr outage without a page reload. */

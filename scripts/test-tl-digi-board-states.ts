@@ -10,6 +10,9 @@ import {
 import { DEFAULT_TL_DIGI_BOARD_CONFIG } from "../lib/tl-digi-board/config";
 import {
   didTlBoardRecover,
+  headerLabelForKind,
+  headerLastSyncText,
+  headerPeriodText,
   nextTlRetryDelayMs,
   planTlBoardRefresh,
   resolveTlCardKind,
@@ -326,6 +329,26 @@ function sampleSnapshot(nowIso: string, medications: TlGingrMedicationRecord[]):
   assert.equal(tlBoardSnapshotNeedsBackgroundSync(snapshot, now), false);
   const forced = tlBoardSnapshotNeedsBackgroundSync(snapshot, now, { forceRefresh: true });
   assert.equal(forced, true);
+}
+
+// Header: never treat a missing payload as CONNECTION ISSUE, and never blank Period at 5pm.
+{
+  assert.equal(
+    resolveTlHeaderKind({
+      phase: "initial",
+      boardState: undefined,
+      gingrSyncHealth: undefined
+    }),
+    "syncing"
+  );
+  assert.equal(headerLabelForKind("syncing"), "Syncing with Gingr…");
+  assert.notEqual(headerLabelForKind("syncing"), "⚠ GINGR CONNECTION ISSUE");
+  assert.equal(headerPeriodText(null, "pm"), "PM");
+  assert.equal(headerPeriodText(undefined, "pm"), "PM");
+  assert.equal(headerPeriodText("am", "pm"), "AM");
+  assert.equal(headerLastSyncText({ phase: "initial", formattedSuccess: null }), "Checking…");
+  assert.equal(headerLastSyncText({ phase: "resolved", formattedSuccess: null }), "Never");
+  assert.equal(headerLastSyncText({ phase: "resolved", formattedSuccess: "4:59 PM" }), "4:59 PM");
 }
 
 console.log("test-tl-digi-board-states: ok");
