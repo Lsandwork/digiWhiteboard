@@ -191,6 +191,12 @@ function rememberAnimalPhoto(animalId: string, photoUrl: string | null) {
   animalPhotoCache.set(animalId, { photoUrl, cachedAt: Date.now() });
 }
 
+/** Drop a cached photo URL that no longer downloads so the next lookup re-asks Gingr. */
+export function invalidateGingrAnimalPhoto(animalId: string) {
+  const trimmedAnimalId = animalId.trim();
+  if (trimmedAnimalId) animalPhotoCache.delete(trimmedAnimalId);
+}
+
 type GingrAnimalPhotoOptions = {
   bypassFetchGate?: boolean;
   apiKey?: string;
