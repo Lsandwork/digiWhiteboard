@@ -1,7 +1,7 @@
 import { fetchCurrentlyCheckedInDogsRobust, todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 import { fetchGingrBackOfHouse, type GingrBackOfHouseRecord } from "@/lib/gingr-board-sync";
 import { createGingrClient, normalizeGingrReservationList } from "@/lib/integrations/gingr/client";
-import { buildTlBoardMedicationRows, buildTlBoardSyncMeta } from "./board-state";
+import { buildTlBoardMedicationRows, buildTlBoardSyncMeta, rehydrateTlBoardSnapshot } from "./board-state";
 import {
   DEFAULT_TL_DIGI_BOARD_CONFIG,
   type TlDigiBoardConfig,
@@ -447,12 +447,14 @@ export async function syncTlDigiBoardState(
   if (
     !forceRefresh &&
     previous?.meta.lastSuccessfulSyncAt &&
-    previous.meta.medicationsHealth === "ok" &&
+    (previous.meta.medicationsHealth === "ok" ||
+      previous.meta.medicationsHealth === "stale" ||
+      previous.meta.gingrSyncHealth === "live") &&
     (lastSyncAt > 0
       ? nowMs - lastSyncAt < TL_GINGR_MEDICATION_SYNC_INTERVAL_MS
       : nowMs - new Date(previous.meta.lastSuccessfulSyncAt).getTime() < TL_GINGR_MEDICATION_SYNC_INTERVAL_MS)
   ) {
-    return previous;
+    return rehydrateTlBoardSnapshot(previous, now);
   }
 
   if (!inFlightSync) {

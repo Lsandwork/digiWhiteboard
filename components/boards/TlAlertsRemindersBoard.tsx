@@ -448,7 +448,7 @@ function BoardInner() {
           <p className="tl-board__sync-label">{syncLabel}</p>
           <p className="tl-board__sync-meta">Last synced: {lastSync}</p>
           <p className="tl-board__sync-meta">
-            Period {phase === "initial" ? "—" : periodText} · America/Los_Angeles
+            Period {periodText} · America/Los_Angeles
           </p>
           {retryLabel ? <p className="tl-board__sync-meta tl-board__sync-retry">{retryLabel}</p> : null}
         </div>
