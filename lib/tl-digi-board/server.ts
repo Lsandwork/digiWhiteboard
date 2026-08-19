@@ -464,29 +464,14 @@ export async function loadTlDigiBoardPublicPayload(
   options?: { forceRefresh?: boolean; now?: Date }
 ): Promise<{ payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean }> {
   const client = resolveSupabase(supabase);
-  const { loadTlBoardDailyReminders } = await import("./reminders");
-  const { withTimeoutFallback } = await import("@/lib/server-ttl-cache");
   const { DEFAULT_TL_DIGI_BOARD_CONFIG } = await import("./config");
 
   const snapshot = await loadTlDigiBoardSnapshot(client).catch(() => null);
 
-  const extras = await withTimeoutFallback(
-    Promise.allSettled([
-      loadTlDigiBoardConfig(client),
-      loadTlBoardDailyReminders(client, { now: options?.now })
-    ]),
-    800,
-    null
-  );
-
-  const config =
-    extras?.[0]?.status === "fulfilled" ? extras[0].value : DEFAULT_TL_DIGI_BOARD_CONFIG;
-  const reminders = extras?.[1]?.status === "fulfilled" ? extras[1].value : [];
-
   return assembleTlDigiBoardPublicPayload({
-    config,
+    config: DEFAULT_TL_DIGI_BOARD_CONFIG,
     snapshot,
-    reminders,
+    reminders: [],
     now: options?.now,
     forceRefresh: options?.forceRefresh
   });
