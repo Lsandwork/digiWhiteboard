@@ -53,20 +53,24 @@ function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedic
   return [...seen.values()];
 }
 
-function classifyMedication(row: TlGingrMedicationRecord, now: Date, currentPeriod: TlMedicationPeriod | null): TlBoardMedicationRow | null {
-  const administered = row.administrationStatus === "administered";
+function displayStatusForOpenRow(
+  status: TlGingrMedicationRecord["administrationStatus"]
+): TlBoardMedicationRow["displayStatus"] {
+  if (status === "prepared") return "prepared";
+  if (status === "partially_administered") return "partially_administered";
+  if (status === "refused" || status === "unable_to_administer") return "refused";
+  return "needs_medication";
+}
 
-  if (incompleteMedicationIsOverdue(row.scheduleKind, currentPeriod, now) && !administered) {
-    const overdueSourcePeriod = row.scheduleKind === "other_special" ? null : row.scheduleKind;
-    return {
-      ...row,
-      displayStatus: "overdue",
-      evaluatedPeriod: "overdue",
-      overdueSourcePeriod
-    };
+function classifyMedication(row: TlGingrMedicationRecord, now: Date, currentPeriod: TlMedicationPeriod | null): TlBoardMedicationRow | null {
+  if (row.administrationStatus === "n_a") {
+    return null;
   }
 
-  if (administered) {
+  const complete =
+    row.administrationStatus === "administered" || row.administrationStatus === "owner_administered";
+
+  if (complete) {
     if (!completedMedicationVisibleInPeriod(row.scheduleKind, currentPeriod)) {
       return null;
     }
@@ -78,10 +82,28 @@ function classifyMedication(row: TlGingrMedicationRecord, now: Date, currentPeri
     };
   }
 
-  if (row.scheduleKind === "other_special" || row.scheduleKind === currentPeriod) {
+  const recordedOutcome =
+    row.administrationStatus === "refused" || row.administrationStatus === "unable_to_administer";
+  const overdue = incompleteMedicationIsOverdue(row.scheduleKind, currentPeriod, now) && !recordedOutcome;
+
+  if (overdue) {
+    const overdueSourcePeriod = row.scheduleKind === "other_special" ? null : row.scheduleKind;
     return {
       ...row,
-      displayStatus: "needs_medication",
+      displayStatus: "overdue",
+      evaluatedPeriod: "overdue",
+      overdueSourcePeriod
+    };
+  }
+
+  if (
+    row.scheduleKind === "other_special" ||
+    row.scheduleKind === currentPeriod ||
+    recordedOutcome
+  ) {
+    return {
+      ...row,
+      displayStatus: displayStatusForOpenRow(row.administrationStatus),
       evaluatedPeriod: currentPeriod ?? "pm",
       overdueSourcePeriod: null
     };
@@ -115,7 +137,17 @@ export function buildTlBoardMedicationRows(input: BuildTlBoardStateInput): {
   const sortedOverdue = sortRows(overdue);
   const sortedCurrent = sortRows(current);
 
-  const actionable = [...sortedOverdue, ...sortedCurrent.filter((r) => r.displayStatus === "needs_medication")];
+  const actionable = [
+    ...sortedOverdue,
+    ...sortedCurrent.filter(
+      (r) =>
+        r.displayStatus === "needs_medication" ||
+        r.displayStatus === "prepared" ||
+        r.displayStatus === "partially_administered" ||
+        r.displayStatus === "refused" ||
+        r.displayStatus === "overdue"
+    )
+  ];
   const completed = sortedCurrent.filter((r) => r.displayStatus === "administered");
 
   return {

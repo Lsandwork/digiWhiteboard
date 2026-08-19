@@ -22,6 +22,7 @@ import {
   headerLabelForKind,
   headerLastSyncText,
   headerPeriodText,
+  mergeTlBoardClientPayload,
   planTlBoardRefresh,
   resolveTlCardKind,
   resolveTlHeaderKind,
@@ -45,6 +46,39 @@ type BoardPayload = TlDigiBoardSnapshot & {
 };
 
 const FITDOG_LOGO = "/assets/fitdog/fitdog-logo-white.svg";
+const TL_BOARD_LAST_GOOD_KEY = "fitdog-tl-board-last-good";
+
+function readStoredTlBoard(): BoardPayload | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(TL_BOARD_LAST_GOOD_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BoardPayload;
+    if (!parsed?.meta) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredTlBoard(payload: BoardPayload) {
+  try {
+    window.localStorage.setItem(TL_BOARD_LAST_GOOD_KEY, JSON.stringify(payload));
+  } catch {
+    // TV browsers can reject storage; in-memory last-good still holds.
+  }
+}
+
+function payloadHasRows(payload: BoardPayload | null) {
+  if (!payload) return false;
+  return Boolean(
+    payload.medications?.length ||
+      payload.overdue?.length ||
+      payload.current?.length ||
+      payload.additionalServices?.length ||
+      payload.meta?.lastSuccessfulSyncAt
+  );
+}
 
 function scheduleBadge(row: TlBoardMedicationRow) {
   if (row.displayStatus === "overdue" && row.overdueSourcePeriod) {
@@ -60,8 +94,17 @@ function scheduleBadge(row: TlBoardMedicationRow) {
 }
 
 function medicationStatusLabel(row: TlBoardMedicationRow) {
+  const gingrLabel = row.gingrReportStatusLabel?.trim();
+  if (gingrLabel) return gingrLabel.toUpperCase();
   if (row.displayStatus === "overdue") return "NOT ADMINISTERED";
-  if (row.displayStatus === "administered") return "ADMINISTERED";
+  if (row.displayStatus === "administered") {
+    return row.administrationStatus === "owner_administered" ? "OWNER ADMINISTERED" : "ADMINISTERED";
+  }
+  if (row.displayStatus === "prepared") return "PREPARED";
+  if (row.displayStatus === "refused") {
+    return row.administrationStatus === "unable_to_administer" ? "UNABLE TO ADMINISTER" : "REFUSED";
+  }
+  if (row.displayStatus === "partially_administered") return "PARTIALLY ADMINISTERED";
   return "NEEDS MEDICATION";
 }
 
@@ -141,9 +184,13 @@ function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
   const tone =
     row.displayStatus === "overdue"
       ? "tl-table__row--overdue"
-      : row.displayStatus === "needs_medication"
+      : row.displayStatus === "needs_medication" ||
+          row.displayStatus === "prepared" ||
+          row.displayStatus === "partially_administered"
         ? "tl-table__row--needs"
-        : "tl-table__row--done";
+        : row.displayStatus === "refused"
+          ? "tl-table__row--overdue"
+          : "tl-table__row--done";
 
   return (
     <tr className={`tl-table__row ${tone}`}>
@@ -164,7 +211,7 @@ function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
       </td>
       <td className="tl-table__status-cell">
         <span className={`tl-badge tl-badge--${row.displayStatus}`}>{medicationStatusLabel(row)}</span>
-        {row.displayStatus === "administered" ? (
+        {row.displayStatus === "administered" || row.administrationStatus === "owner_administered" ? (
           <span className="tl-table__status-detail">
             {[formatAdminTime(row.administeredAt), row.administeredBy || "Recorded in Gingr"].filter(Boolean).join(" · ")}
           </span>
@@ -231,8 +278,9 @@ function BoardInner() {
         return;
       }
       const dueAt = Date.now() + plan.delayMs;
-      setRetryInSec(consecutiveFailures > 0 || boardState === "CONNECTION_ERROR" ? Math.ceil(plan.delayMs / 1000) : null);
-      if (consecutiveFailures > 0 || boardState === "CONNECTION_ERROR" || boardState === "STALE") {
+      const showRetry = consecutiveFailures > 0 || boardState === "CONNECTION_ERROR";
+      setRetryInSec(showRetry ? Math.ceil(plan.delayMs / 1000) : null);
+      if (showRetry) {
         countdownRef.current = window.setInterval(() => {
           const remaining = Math.max(0, Math.ceil((dueAt - Date.now()) / 1000));
           setRetryInSec(remaining);
@@ -261,32 +309,25 @@ function BoardInner() {
         if (!payload) {
           throw new Error(json.error || "Failed to load board.");
         }
+        const merged = mergeTlBoardClientPayload(snapshotRef.current, payload) as BoardPayload;
         const previousState = snapshotRef.current?.meta.boardState ?? null;
-        const nextState = payload.meta.boardState;
+        const nextState = merged.meta.boardState;
         const recovered = didTlBoardRecover({ previousState, nextState });
+        const usable = payloadHasRows(merged);
         const syncFailed =
-          nextState === "CONNECTION_ERROR" ||
-          nextState === "PARTIAL_DATA_ERROR" ||
-          Boolean(payload.error) ||
-          !res.ok;
+          !usable &&
+          (nextState === "CONNECTION_ERROR" ||
+            nextState === "PARTIAL_DATA_ERROR" ||
+            Boolean(merged.error) ||
+            !res.ok);
 
-        if (syncFailed && snapshotRef.current?.medications?.length && !payload.medications?.length) {
-          payload.overdue = snapshotRef.current.overdue;
-          payload.current = snapshotRef.current.current;
-          payload.summary = snapshotRef.current.summary;
-          payload.medications = snapshotRef.current.medications;
-          if (!payload.additionalServices?.length && snapshotRef.current.additionalServices?.length) {
-            payload.additionalServices = snapshotRef.current.additionalServices;
-            payload.servicesSummary = snapshotRef.current.servicesSummary;
-          }
-        }
-
-        snapshotRef.current = payload;
-        setSnapshot(payload);
+        snapshotRef.current = merged;
+        setSnapshot(merged);
         setHasResolved(true);
+        if (usable) writeStoredTlBoard(merged);
         if (syncFailed) {
           failCountRef.current += 1;
-          setError(payload.meta.lastError || json.error || "Gingr is temporarily unavailable.");
+          setError(merged.meta.lastError || json.error || "Gingr is temporarily unavailable.");
         } else {
           failCountRef.current = 0;
           setError(null);
@@ -303,13 +344,18 @@ function BoardInner() {
         const timedOut =
           (err instanceof DOMException && err.name === "AbortError") ||
           (err instanceof Error && (err.name === "AbortError" || /aborted|timed out/i.test(err.message)));
-        setError(
-          timedOut
-            ? "Board request timed out waiting for Gingr status."
-            : err instanceof Error
-              ? err.message
-              : "Failed to load board."
-        );
+        if (!payloadHasRows(snapshotRef.current)) {
+          setError(
+            timedOut
+              ? "Board request timed out waiting for Gingr status."
+              : err instanceof Error
+                ? err.message
+                : "Failed to load board."
+          );
+        }
+        if (payloadHasRows(snapshotRef.current)) {
+          castKeeper?.markDataFresh();
+        }
         scheduleNext(snapshotRef.current?.meta.boardState ?? "CONNECTION_ERROR", failCountRef.current);
       } finally {
         window.clearTimeout(timeoutId);
@@ -323,7 +369,12 @@ function BoardInner() {
   }, [load]);
 
   useEffect(() => {
-    // First paint reads the stored snapshot (fast). force=1 only wakes a background Gingr refresh.
+    const stored = readStoredTlBoard();
+    if (stored && payloadHasRows(stored)) {
+      snapshotRef.current = stored;
+      setSnapshot(stored);
+      setHasResolved(true);
+    }
     void loadRef.current(false);
 
     function maybeWakeSync() {
@@ -402,7 +453,12 @@ function BoardInner() {
     ? [
         ...snapshot.overdue.filter((row) => row.displayStatus !== "administered"),
         ...snapshot.current.filter(
-          (row) => row.displayStatus === "needs_medication" || row.displayStatus === "overdue"
+          (row) =>
+            row.displayStatus === "needs_medication" ||
+            row.displayStatus === "overdue" ||
+            row.displayStatus === "prepared" ||
+            row.displayStatus === "refused" ||
+            row.displayStatus === "partially_administered"
         )
       ]
     : [];
@@ -653,7 +709,7 @@ function GingrStatusCard({
 
 export function TlAlertsRemindersBoard() {
   return (
-    <CastKeeperProvider displayType="tl_alerts_reminders" route="/boards/tl-alerts-reminders" enabled>
+    <CastKeeperProvider displayType="tl_alerts_reminders" route="/boards/tl-alerts-reminders" enabled allowStaleReload={false}>
       <BoardInner />
     </CastKeeperProvider>
   );

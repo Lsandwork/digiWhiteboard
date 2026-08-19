@@ -1,7 +1,19 @@
 import type { TlLodgingAreaKey, TlMedicationPeriod } from "./constants";
 
-/** Authoritative administration state from Gingr — never inferred locally. */
-export type TlGingrAdministrationStatus = "not_administered" | "administered";
+/**
+ * Authoritative Gingr Medication Report statuses.
+ * Labels come from Gingr’s report UI: Administered, N/A, Prepared, Refused,
+ * Partially Administered, Owner Administered, plus Not Administered / Unable.
+ */
+export type TlGingrAdministrationStatus =
+  | "not_administered"
+  | "administered"
+  | "owner_administered"
+  | "partially_administered"
+  | "prepared"
+  | "refused"
+  | "n_a"
+  | "unable_to_administer";
 
 export type TlMedicationScheduleKind = TlMedicationPeriod | "other_special";
 
@@ -9,7 +21,10 @@ export type TlMedicationDisplayStatus =
   | "needs_medication"
   | "administered"
   | "overdue"
-  | "not_current_period";
+  | "not_current_period"
+  | "prepared"
+  | "refused"
+  | "partially_administered";
 
 export type TlGingrMedicationRecord = {
   /** Stable Gingr medication record identifier when available. */
@@ -29,6 +44,8 @@ export type TlGingrMedicationRecord = {
   instructions: string | null;
   notes: string | null;
   administrationStatus: TlGingrAdministrationStatus;
+  /** Raw Gingr Medication Report status label when history synced. */
+  gingrReportStatusLabel?: string | null;
   administeredAt: string | null;
   administeredBy: string | null;
   /** LA calendar date this row applies to (YYYY-MM-DD). */

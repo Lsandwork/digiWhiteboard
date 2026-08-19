@@ -82,30 +82,52 @@ function buildStatusLabelMap(options: GingrMedicationReportStatusOption[]): Map<
   return map;
 }
 
+function statusHaystack(statusValue: string | null, statusLabel: string | null) {
+  return `${statusLabel ?? ""} ${statusValue ?? ""}`.toLowerCase().replace(/[_-]+/g, " ");
+}
+
 /** True when Gingr recorded that staff could not mark the dose administered. */
 export function isUnableToAdministerReportStatus(statusValue: string | null, statusLabel: string | null): boolean {
-  const haystack = `${statusLabel ?? ""} ${statusValue ?? ""}`.toLowerCase();
+  const haystack = statusHaystack(statusValue, statusLabel);
   if (!haystack.trim()) return false;
-  if (/\bunable[\s_-]+to[\s_-]+administ/.test(haystack)) return true;
-  if (/\bcannot[\s_-]+administ/.test(haystack)) return true;
-  if (/\bcan['’]?t[\s_-]+administ/.test(haystack)) return true;
-  if (/\brefused\b/.test(haystack)) return true;
+  if (/\bunable\s+to\s+administ/.test(haystack)) return true;
+  if (/\bcannot\s+administ/.test(haystack)) return true;
+  if (/\bcan['’]?t\s+administ/.test(haystack)) return true;
   return false;
+}
+
+/**
+ * Map Gingr Medication Report labels to board statuses.
+ * Fitdog report options include: Administered, N/A, Prepared, Refused,
+ * Partially Administered, Owner Administered (plus Not Administered / Unable).
+ */
+export function classifyGingrMedicationReportStatus(
+  statusValue: string | null,
+  statusLabel: string | null
+): TlGingrAdministrationStatus {
+  const haystack = statusHaystack(statusValue, statusLabel).trim();
+  if (!haystack) return "not_administered";
+
+  if (/\bn\s*\/\s*a\b/.test(haystack) || /\bnot applicable\b/.test(haystack) || haystack === "na") {
+    return "n_a";
+  }
+  if (/\brefused\b/.test(haystack)) return "refused";
+  if (isUnableToAdministerReportStatus(statusValue, statusLabel)) return "unable_to_administer";
+  if (/\bpartial/.test(haystack)) return "partially_administered";
+  if (/\bowner\b/.test(haystack) && /\badminist/.test(haystack)) return "owner_administered";
+  if (/\bprepared\b/.test(haystack) || /\bprepped\b/.test(haystack)) return "prepared";
+  if (/\badminist/.test(haystack) || /\bgiven\b/.test(haystack) || /\bcompleted\b/.test(haystack)) {
+    if (/\bnot\s*administ/.test(haystack)) return "not_administered";
+    if (/\bunadminist/.test(haystack)) return "not_administered";
+    return "administered";
+  }
+  return "not_administered";
 }
 
 /** True when a Gingr medication report status means the dose was given. */
 export function isAdministeredReportStatus(statusValue: string | null, statusLabel: string | null): boolean {
-  const haystack = `${statusLabel ?? ""} ${statusValue ?? ""}`.toLowerCase();
-  if (!haystack.trim()) return false;
-  if (isUnableToAdministerReportStatus(statusValue, statusLabel)) return false;
-  // Positive match first.
-  if (/\badminist/.test(haystack) || /\bgiven\b/.test(haystack) || /\bcompleted\b/.test(haystack)) {
-    // Exclude explicit negatives that still contain "administ" (rare).
-    if (/\bnot[\s_-]*administ/.test(haystack)) return false;
-    if (/\bunadminist/.test(haystack)) return false;
-    return true;
-  }
-  return false;
+  const classified = classifyGingrMedicationReportStatus(statusValue, statusLabel);
+  return classified === "administered" || classified === "owner_administered";
 }
 
 function resolveStatusLabel(
@@ -348,23 +370,25 @@ export function resolveAdministrationForSchedule(options: {
     if (rowTs >= bestTs) best = row;
   }
 
-  if (!best || !isAdministeredReportStatus(best.statusValue, best.statusLabel)) {
+  if (!best) {
     return {
       administrationStatus: "not_administered",
       administeredAt: null,
       administeredBy: null,
-      administrationNotes: best?.notes ?? null,
-      statusLabel: best?.statusLabel ?? best?.statusValue ?? null
+      administrationNotes: null,
+      statusLabel: null
     };
   }
 
+  const administrationStatus = classifyGingrMedicationReportStatus(best.statusValue, best.statusLabel);
+  const complete = administrationStatus === "administered" || administrationStatus === "owner_administered";
   const administeredAt =
-    best.lastEditedAtUnix != null ? new Date(best.lastEditedAtUnix * 1000).toISOString() : null;
+    complete && best.lastEditedAtUnix != null ? new Date(best.lastEditedAtUnix * 1000).toISOString() : null;
 
   return {
-    administrationStatus: "administered",
+    administrationStatus,
     administeredAt,
-    administeredBy: best.lastEditedBy,
+    administeredBy: complete ? best.lastEditedBy : best.lastEditedBy,
     administrationNotes: best.notes,
     statusLabel: best.statusLabel ?? best.statusValue
   };

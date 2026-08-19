@@ -35,13 +35,12 @@ export function planTlBoardRefresh(params: {
   const failed =
     params.consecutiveFailures > 0 ||
     params.boardState === "CONNECTION_ERROR" ||
-    params.boardState === "PARTIAL_DATA_ERROR" ||
-    params.boardState === "STALE";
+    params.boardState === "PARTIAL_DATA_ERROR";
   if (params.force) {
     return { delayMs: 0, force: true };
   }
   if (failed) {
-    return { delayMs: nextTlRetryDelayMs(Math.max(0, params.consecutiveFailures - 1)), force: true };
+    return { delayMs: nextTlRetryDelayMs(Math.max(0, params.consecutiveFailures - 1)), force: false };
   }
   return { delayMs: TL_HEALTHY_POLL_MS, force: false };
 }
@@ -69,10 +68,10 @@ export function resolveTlCardKind(params: {
   hasRows: boolean;
 }): TlCardKind {
   if (params.phase === "initial") return "checking";
+  if (params.hasRows) return params.health === "ok" ? "rows" : "stale";
   const health = params.health ?? "error";
   if (health === "unevaluated") return "error";
   if (health === "error") return "error";
-  if (params.hasRows) return health === "stale" ? "stale" : "rows";
   if (health === "stale") return "stale";
   if (params.allClear && health === "ok") return "all_clear";
   return "error";
@@ -140,4 +139,57 @@ export function didTlBoardRecover(params: {
     params.previousState === "STALE" ||
     params.previousState === "INITIAL_LOADING";
   return wasDown && (params.nextState === "LIVE" || params.nextState === "EMPTY_VALID");
+}
+
+type TlClientBoardPayload = {
+  medications?: unknown[];
+  overdue?: unknown[];
+  current?: unknown[];
+  additionalServices?: unknown[];
+  reminders?: unknown[];
+  config?: unknown;
+  meta?: {
+    lastSuccessfulSyncAt?: string | null;
+    lastAttemptAt?: string | null;
+    lastError?: string | null;
+    medicationsHealth?: string;
+    servicesHealth?: string;
+    boardState?: string;
+    isStale?: boolean;
+  };
+  error?: string;
+};
+
+function payloadHasUsableGingrData(payload: TlClientBoardPayload | null | undefined) {
+  if (!payload) return false;
+  return Boolean(
+    payload.meta?.lastSuccessfulSyncAt ||
+      (payload.medications && payload.medications.length) ||
+      (payload.overdue && payload.overdue.length) ||
+      (payload.current && payload.current.length)
+  );
+}
+
+/**
+ * TV board must never replace a known-good Gingr snapshot with an empty
+ * CONNECTION_ERROR payload. That is what caused "Never synced" + reboot loops.
+ */
+export function mergeTlBoardClientPayload<T extends TlClientBoardPayload>(previous: T | null, incoming: T): T {
+  if (payloadHasUsableGingrData(incoming)) return incoming;
+  if (!previous || !payloadHasUsableGingrData(previous)) return incoming;
+  return {
+    ...previous,
+    config: incoming.config ?? previous.config,
+    reminders: incoming.reminders ?? previous.reminders,
+    error: undefined,
+    meta: {
+      ...previous.meta,
+      lastAttemptAt: incoming.meta?.lastAttemptAt ?? previous.meta?.lastAttemptAt,
+      lastError: incoming.meta?.lastError ?? previous.meta?.lastError,
+      isStale: true,
+      medicationsHealth: previous.medications?.length ? "stale" : previous.meta?.medicationsHealth,
+      servicesHealth: previous.additionalServices?.length ? "stale" : previous.meta?.servicesHealth,
+      boardState: "STALE"
+    }
+  };
 }

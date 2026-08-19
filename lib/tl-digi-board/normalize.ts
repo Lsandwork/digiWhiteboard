@@ -81,6 +81,7 @@ export function buildTlGingrMedicationRecord(
     instructions,
     notes,
     administrationStatus: administration?.administrationStatus ?? "not_administered",
+    gingrReportStatusLabel: statusLabel,
     administeredAt: administration?.administeredAt ?? null,
     administeredBy: administration?.administeredBy ?? null,
     serviceDate: context.serviceDate ?? laServiceDate(now)
@@ -128,6 +129,7 @@ export function buildNoteOnlyMedicationRecord(
     instructions: null,
     notes,
     administrationStatus: "not_administered",
+    gingrReportStatusLabel: null,
     administeredAt: null,
     administeredBy: null,
     serviceDate: context.serviceDate ?? laServiceDate(now)
