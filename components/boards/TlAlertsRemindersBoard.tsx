@@ -9,7 +9,7 @@ import {
   formatLaBoardClock,
   periodLabel
 } from "@/lib/tl-digi-board/medication-windows";
-import { tlBoardAnimalPhotoProxyUrl } from "@/lib/tl-digi-board/animal-photos";
+import { tlDogPhotoCandidates } from "@/lib/tl-digi-board/animal-photos";
 import { splitMedicationDisplayNotes } from "@/lib/tl-digi-board/medication-notes";
 import type {
   TlBoardAdditionalServiceRow,
@@ -151,15 +151,17 @@ function DogPhoto({
   dogName: string;
   photoUrl: string | null;
 }) {
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const candidates = useMemo(() => {
-    const urls: string[] = [];
-    if (photoUrl?.trim()) urls.push(photoUrl.trim());
-    urls.push(tlBoardAnimalPhotoProxyUrl(animalId));
-    return urls;
-  }, [animalId, photoUrl]);
+  const candidates = useMemo(
+    () => tlDogPhotoCandidates(animalId, photoUrl),
+    [animalId, photoUrl]
+  );
+  const [failedSrcs, setFailedSrcs] = useState<string[]>([]);
 
-  const src = candidates.find((url) => url !== failedSrc) ?? null;
+  useEffect(() => {
+    setFailedSrcs([]);
+  }, [candidates]);
+
+  const src = candidates.find((url) => !failedSrcs.includes(url)) ?? null;
 
   if (!src) {
     return (
@@ -175,7 +177,9 @@ function DogPhoto({
       src={src}
       alt=""
       className="tl-table__photo"
-      onError={() => setFailedSrc(src)}
+      // Each candidate is retired permanently. Tracking only the last failure
+      // made the board alternate between two dead URLs forever.
+      onError={() => setFailedSrcs((previous) => (previous.includes(src) ? previous : [...previous, src]))}
     />
   );
 }

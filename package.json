@@ -32,6 +32,7 @@
     "test:tl-digi-board-normalize": "tsx scripts/test-tl-digi-board-normalize.ts",
     "test:tl-digi-board-medication-report": "tsx scripts/test-tl-digi-board-medication-report.ts",
     "test:tl-board-reminders-clock": "tsx scripts/test-tl-board-reminders-clock.ts",
+    "test:tl-board-dog-photos": "tsx scripts/test-tl-board-dog-photos.ts",
     "test:tl-additional-services": "tsx scripts/test-tl-additional-services.ts",
     "test:tl-additional-services-audit": "tsx scripts/test-tl-additional-services-audit.ts",
     "audit:tl-additional-services-gingr": "tsx scripts/audit-tl-additional-services-gingr.ts",
