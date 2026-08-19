@@ -475,7 +475,7 @@ export async function loadTlDigiBoardPublicPayload(
       loadTlDigiBoardConfig(client),
       loadTlBoardDailyReminders(client, { now: options?.now })
     ]),
-    2_000,
+    800,
     null
   );
 
