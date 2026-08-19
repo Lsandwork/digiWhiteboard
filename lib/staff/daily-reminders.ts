@@ -458,8 +458,7 @@ export async function listDailyRemindersWithState(
   supabase: SupabaseClient,
   options?: { canForceResend?: boolean; timeZone?: string }
 ) {
-  const settings = await loadAdminSettings(supabase);
-  const timeZone = options?.timeZone ?? settings.timezone;
+  const timeZone = options?.timeZone ?? (await loadAdminSettings(supabase)).timezone;
   const now = new Date();
   const shiftDate = getShiftDate(timeZone, now);
   const dayKey = getDayKey(timeZone, now);

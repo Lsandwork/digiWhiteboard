@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: 8_000 });
     const schema = await ensureRuffopsChecklistSchema(supabase);
     const snapshot = await getTlDigiBoardSnapshot(supabase, { forceRefresh: true });
     return NextResponse.json({
