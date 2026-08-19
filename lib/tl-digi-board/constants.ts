@@ -73,7 +73,7 @@ export const TL_GINGR_FETCH_TIMEOUT_MS = 8_000;
 export const TL_GINGR_SYNC_BUDGET_MS = 45_000;
 
 /** Abort Supabase reads on the public TV GET so Vercel never waits unbounded. */
-export const TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS = 5_000;
+export const TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS = 8_000;
 
 /** Short in-memory cache so concurrent TV polls share one Supabase read. */
 export const TL_BOARD_PUBLIC_CACHE_TTL_MS = 2_500;
