@@ -1,4 +1,6 @@
-import { normalizePhotoUrl } from "@/lib/board-utils";
+import { isLegacyGingrPhotoUrl, normalizePhotoUrl } from "@/lib/board-utils";
+
+export { isLegacyGingrPhotoUrl };
 
 const ALLOWED_PHOTO_HOST_SUFFIXES = [
   ".gingrapp.com",
@@ -17,13 +19,6 @@ const ALLOWED_PHOTO_HOSTS = new Set([
   "storage.googleapis.com"
 ]);
 
-/**
- * Gingr's legacy Rackspace CDN is dead — those URLs 404. Animal records created
- * before the Google Cloud Storage migration still carry them, so the board must
- * resolve a fresh photo through the proxy instead of rendering a broken image.
- */
-const LEGACY_PHOTO_HOST_SUFFIXES = [".rackcdn.com"];
-
 export function isAllowedGingrPhotoHost(hostname: string) {
   const host = hostname.trim().toLowerCase();
   if (!host) return false;
@@ -36,18 +31,6 @@ export function isGingrHostedPhotoUrl(url: string) {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
     return isAllowedGingrPhotoHost(parsed.hostname);
-  } catch {
-    return false;
-  }
-}
-
-/** True when the URL points at a Gingr CDN that no longer serves images. */
-export function isLegacyGingrPhotoUrl(url: string | null | undefined) {
-  const trimmed = url?.trim();
-  if (!trimmed) return false;
-  try {
-    const host = new URL(trimmed).hostname.trim().toLowerCase();
-    return LEGACY_PHOTO_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
   } catch {
     return false;
   }

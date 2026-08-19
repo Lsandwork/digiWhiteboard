@@ -1,4 +1,4 @@
-import { extractPhotoUrl } from "@/lib/board-utils";
+import { extractPhotoUrl, extractPhotoUrls, isLegacyGingrPhotoUrl } from "@/lib/board-utils";
 import {
   ANIMAL_PHOTO_COOLDOWN_MS,
   canFetchAnimalPhoto,
@@ -87,6 +87,54 @@ function readPhotoFromGingrData(data: unknown, animalId?: string) {
   }
 
   return null;
+}
+
+function readAllPhotosFromGingrData(data: unknown, animalId?: string): string[] {
+  if (!data) return [];
+
+  const targetId = animalId?.trim();
+  const candidates: Array<{ record: UnknownRecord; inheritedId: string }> = [];
+  const seen = new Set<object>();
+  const recordId = (record: UnknownRecord) =>
+    String(record.id ?? record.system_id ?? record.animal_id ?? record.a_id ?? "").trim();
+
+  function collect(value: unknown, depth = 0, inheritedId = "") {
+    if (!value || typeof value !== "object" || depth > 6 || seen.has(value as object)) return;
+    seen.add(value as object);
+
+    if (Array.isArray(value)) {
+      for (const item of value) collect(item, depth + 1, inheritedId);
+      return;
+    }
+
+    const record = value as UnknownRecord;
+    const currentId = recordId(record) || inheritedId;
+    candidates.push({ record, inheritedId: currentId });
+    for (const nested of Object.values(record)) {
+      if (nested && typeof nested === "object") collect(nested, depth + 1, currentId);
+    }
+  }
+
+  collect(data);
+
+  const scoped = targetId
+    ? candidates.filter((candidate) => candidate.inheritedId === targetId)
+    : candidates;
+  // Records without an ID are only trusted as a fallback so another animal's
+  // photo can never leak into this one.
+  const pools = targetId
+    ? [scoped, candidates.filter((candidate) => !candidate.inheritedId)]
+    : [scoped];
+
+  const urls: string[] = [];
+  for (const pool of pools) {
+    for (const candidate of pool) {
+      for (const url of extractPhotoUrls(candidate.record)) {
+        if (!urls.includes(url)) urls.push(url);
+      }
+    }
+  }
+  return urls;
 }
 
 function unwrapGingrBody(body: unknown) {
@@ -259,6 +307,38 @@ export async function getGingrAnimalPhotoUrl(
 
 export function extractGingrAnimalPhotoFromData(data: unknown, animalId?: string) {
   return readPhotoFromGingrData(data, animalId);
+}
+
+/**
+ * Every photo URL Gingr exposes for an animal, live URLs first.
+ * Some records (e.g. Sadie, animal 371) still carry a dead Rackspace link
+ * alongside a usable one, so callers can try each until the bytes download.
+ */
+export async function getGingrAnimalPhotoUrlCandidates(
+  animalId: string,
+  timeoutMs = 5000,
+  options?: GingrAnimalPhotoOptions
+): Promise<string[]> {
+  const trimmedAnimalId = animalId.trim();
+  if (!trimmedAnimalId) return [];
+
+  const { subdomain, apiKey } = getGingrConfig(options);
+  if (!apiKey) return [];
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    markGingrEndpointCalled("animal_photo");
+    const data = await fetchGingrAnimalRecords(trimmedAnimalId, subdomain, apiKey, controller.signal);
+    const urls = readAllPhotosFromGingrData(data, trimmedAnimalId);
+    const live = urls.filter((url) => !isLegacyGingrPhotoUrl(url));
+    const legacy = urls.filter((url) => isLegacyGingrPhotoUrl(url));
+    return [...live, ...legacy];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function getGingrAnimalPhotoUrlMap(

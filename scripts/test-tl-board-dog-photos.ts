@@ -16,6 +16,7 @@ import {
   isLegacyGingrPhotoUrl,
   toDisplayPhotoUrl
 } from "../lib/gingr-photo-display";
+import { extractPhotoUrl, extractPhotoUrls } from "../lib/board-utils";
 
 const SADIE_LEGACY_URL =
   "https://fb6d0a6d23a849d1c466-0438edc1f642564f2e91bb5ba16ae196.ssl.cf5.rackcdn.com/2018/01/06/a5a4f92e8783065d775ea79610cc8b03.12.18+sadie.jpeg";
@@ -80,6 +81,24 @@ const MINNIE_GCS_URL =
   assert.equal(tlPhotoNeedsRefresh(""), true);
   assert.equal(tlPhotoNeedsRefresh(SADIE_LEGACY_URL), true);
   assert.equal(tlPhotoNeedsRefresh(MINNIE_GCS_URL), false);
+}
+
+// A dead Rackspace URL in `image` must not shadow a live URL in another field.
+{
+  const record = {
+    id: "371",
+    image: SADIE_LEGACY_URL,
+    profile_photo: MINNIE_GCS_URL
+  };
+  assert.equal(extractPhotoUrl(record), MINNIE_GCS_URL, "live URL must win over the dead CDN");
+
+  const all = extractPhotoUrls(record);
+  assert.ok(all.includes(SADIE_LEGACY_URL) && all.includes(MINNIE_GCS_URL));
+
+  // Legacy is still returned when it is the only thing Gingr has, so the proxy
+  // can try it rather than giving up outright.
+  assert.equal(extractPhotoUrl({ id: "371", image: SADIE_LEGACY_URL }), SADIE_LEGACY_URL);
+  assert.equal(extractPhotoUrl({ id: "1" }), null);
 }
 
 // Shared display helper routes legacy URLs through the proxy without `src`.
