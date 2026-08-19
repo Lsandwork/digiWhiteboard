@@ -356,6 +356,17 @@
   color: #042816;
 }
 
+.tl-badge--prepared,
+.tl-badge--partially_administered {
+  color: #1a1405;
+  background: var(--tl-amber);
+}
+
+.tl-badge--refused {
+  color: #fff;
+  background: var(--tl-red);
+}
+
 .tl-badge--needs_completion {
   color: #031821;
   background: #6ec8ff;

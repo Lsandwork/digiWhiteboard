@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
+import { getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { getTlDigiBoardSnapshot, loadTlDigiBoardPublicPayload } from "@/lib/tl-digi-board/server";
 import { buildUnavailableTlBoardSnapshot, rehydrateTlBoardSnapshot } from "@/lib/tl-digi-board/board-state";
 import {
@@ -8,6 +8,7 @@ import {
   TL_BOARD_PUBLIC_CACHE_TTL_MS,
   TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS
 } from "@/lib/tl-digi-board/constants";
+import { ensureTlDigiBoardSnapshotSchema } from "@/lib/tl-digi-board/ensure-snapshot-schema";
 import { logTlGingrSyncEvent } from "@/lib/tl-digi-board/observability";
 import type { TlDigiBoardPublicPayload } from "@/lib/tl-digi-board/types";
 
@@ -23,9 +24,9 @@ let lastPublicBackgroundSyncAt = 0;
 function snapshotHasUsableData(payload: TlDigiBoardPublicPayload) {
   return Boolean(
     payload.meta.lastSuccessfulSyncAt ||
-    payload.medications.length ||
-    payload.overdue.length ||
-    payload.current.length
+      payload.medications.length ||
+      payload.overdue.length ||
+      payload.current.length
   );
 }
 
@@ -53,6 +54,7 @@ function payloadFromLastGood(lastGood: TlDigiBoardPublicPayload): TlDigiBoardPub
 function rememberLastGood(payload: TlDigiBoardPublicPayload) {
   if (snapshotHasUsableData(payload)) {
     setTtlCache(TL_BOARD_LAST_GOOD_KEY, payload, TL_BOARD_LAST_GOOD_TTL_MS);
+    setTtlCache(TL_BOARD_PUBLIC_CACHE_KEY, { payload, needsBackgroundSync: true }, TL_BOARD_PUBLIC_CACHE_TTL_MS);
   }
 }
 
@@ -70,12 +72,8 @@ function resolvePayload(payload: TlDigiBoardPublicPayload) {
 
 /**
  * Public READ for the Team Lead Alerts + Reminders TV display.
- * No admin session required (same pattern as live-board / cast-tv).
- * Never exposes GINGR_API_KEY or other secrets.
- *
- * This GET must not wait on Gingr. Production hung here because Supabase reads
- * had no fetch abort — Vercel waits on the underlying fetch before sending bytes.
- * Serve the stored snapshot immediately; refresh Gingr in `after()` (and the 1-minute cron).
+ * Snapshot lives in tl_digi_board_snapshots — not the huge admin_settings blob.
+ * Gingr refresh happens in after() / cron, never on the TV GET path.
  */
 export async function GET(request: Request) {
   const startedAt = Date.now();
@@ -84,24 +82,29 @@ export async function GET(request: Request) {
     const forceRefresh = url.searchParams.get("force") === "1";
     const supabase = getServiceSupabase({ timeoutMs: TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS });
 
-    const loadPayload = () => loadTlDigiBoardPublicPayload(supabase, { forceRefresh });
-
-    const loaded = forceRefresh
-      ? await loadPayload()
-      : await getOrLoadTtlCache(TL_BOARD_PUBLIC_CACHE_KEY, TL_BOARD_PUBLIC_CACHE_TTL_MS, loadPayload);
+    const cached = !forceRefresh
+      ? getTtlCache<{ payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean }>(TL_BOARD_PUBLIC_CACHE_KEY)
+      : null;
+    const loaded =
+      cached && snapshotHasUsableData(cached.payload)
+        ? cached
+        : await loadTlDigiBoardPublicPayload(supabase, { forceRefresh });
 
     const payload = resolvePayload(loaded.payload);
-    const needsBackgroundSync = loaded.needsBackgroundSync;
+    const needsBackgroundSync = loaded.needsBackgroundSync || !snapshotHasUsableData(payload);
 
     if (needsBackgroundSync) {
       const now = Date.now();
       if (now - lastPublicBackgroundSyncAt >= TL_BOARD_PUBLIC_BACKGROUND_SYNC_COOLDOWN_MS) {
         lastPublicBackgroundSyncAt = now;
         after(() => {
-          void getTlDigiBoardSnapshot(supabase, { forceRefresh: true }).catch((error) => {
-            const message = error instanceof Error ? error.message : "TL Digi Board background sync failed.";
-            logTlGingrSyncEvent("GINGR_SYNC_FAILURE", { error: message, source: "public_api_after" });
-          });
+          const syncClient = getServiceSupabase({ timeoutMs: 20_000 });
+          void ensureTlDigiBoardSnapshotSchema(syncClient)
+            .then(() => getTlDigiBoardSnapshot(syncClient, { forceRefresh: true }))
+            .catch((error) => {
+              const message = error instanceof Error ? error.message : "TL Digi Board background sync failed.";
+              logTlGingrSyncEvent("GINGR_SYNC_FAILURE", { error: message, source: "public_api_after" });
+            });
         });
       }
     }

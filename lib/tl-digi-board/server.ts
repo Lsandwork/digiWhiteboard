@@ -41,10 +41,38 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+function parseAdministrationStatus(value: unknown): import("./types").TlGingrAdministrationStatus {
+  if (
+    value === "not_administered" ||
+    value === "administered" ||
+    value === "owner_administered" ||
+    value === "partially_administered" ||
+    value === "prepared" ||
+    value === "refused" ||
+    value === "n_a" ||
+    value === "unable_to_administer"
+  ) {
+    return value;
+  }
+  return "not_administered";
+}
+
 function isMedicationRecord(value: unknown): value is TlGingrMedicationRecord {
   const row = asRecord(value);
   if (!row) return false;
   return Boolean(row.gingrMedicationId && row.gingrAnimalId && row.dogName && row.scheduleKind);
+}
+
+function parseMedicationRecord(value: unknown): TlGingrMedicationRecord | null {
+  if (!isMedicationRecord(value)) return null;
+  return {
+    ...value,
+    administrationStatus: parseAdministrationStatus(value.administrationStatus),
+    gingrReportStatusLabel:
+      typeof value.gingrReportStatusLabel === "string" && value.gingrReportStatusLabel.trim()
+        ? value.gingrReportStatusLabel
+        : null
+  };
 }
 
 function parseSummary(value: unknown): TlMedicationSummary {
@@ -185,14 +213,14 @@ function parseMeta(value: unknown): TlBoardSyncMeta {
 
 function parseRows(value: unknown): TlBoardMedicationRow[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isMedicationRecord) as TlBoardMedicationRow[];
+  return value.map(parseMedicationRecord).filter(Boolean) as TlBoardMedicationRow[];
 }
 
 export function parseTlDigiBoardSnapshot(value: unknown): TlDigiBoardSnapshot | null {
   const root = asRecord(value);
   if (!root) return null;
   const medications = Array.isArray(root.medications)
-    ? root.medications.filter(isMedicationRecord)
+    ? (root.medications.map(parseMedicationRecord).filter(Boolean) as TlGingrMedicationRecord[])
     : [];
   return {
     overdue: parseRows(root.overdue),
@@ -221,20 +249,16 @@ export async function loadTlDigiBoardSnapshot(
   supabase?: SupabaseClient
 ): Promise<TlDigiBoardSnapshot | null> {
   const client = resolveSupabase(supabase);
-  const loaded = await loadAdminSettingsJsonKey(
-    client,
-    TL_DIGI_BOARD_SNAPSHOT_KEY,
-    parseTlDigiBoardSnapshot,
-    null
-  );
-  return loaded ?? null;
+  const { loadTlDigiBoardSnapshotFromStore } = await import("./snapshot-store");
+  return loadTlDigiBoardSnapshotFromStore(client);
 }
 
 export async function saveTlDigiBoardSnapshot(
   supabase: SupabaseClient,
   snapshot: TlDigiBoardSnapshot
 ): Promise<boolean> {
-  return saveAdminSettingsJsonKey(supabase, TL_DIGI_BOARD_SNAPSHOT_KEY, snapshot);
+  const { saveTlDigiBoardSnapshotToStore } = await import("./snapshot-store");
+  return saveTlDigiBoardSnapshotToStore(supabase, snapshot);
 }
 
 export type UpdateTlDigiBoardConfigActor = {
@@ -441,18 +465,23 @@ export async function loadTlDigiBoardPublicPayload(
 ): Promise<{ payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean }> {
   const client = resolveSupabase(supabase);
   const { loadTlBoardDailyReminders } = await import("./reminders");
-  const [configResult, snapshotResult, remindersResult] = await Promise.allSettled([
-    loadTlDigiBoardConfig(client),
-    loadTlDigiBoardSnapshot(client),
-    loadTlBoardDailyReminders(client, { now: options?.now })
-  ]);
+  const { withTimeoutFallback } = await import("@/lib/server-ttl-cache");
+  const { DEFAULT_TL_DIGI_BOARD_CONFIG } = await import("./config");
+
+  const snapshot = await loadTlDigiBoardSnapshot(client).catch(() => null);
+
+  const extras = await withTimeoutFallback(
+    Promise.allSettled([
+      loadTlDigiBoardConfig(client),
+      loadTlBoardDailyReminders(client, { now: options?.now })
+    ]),
+    2_000,
+    null
+  );
 
   const config =
-    configResult.status === "fulfilled"
-      ? configResult.value
-      : (await import("./config")).DEFAULT_TL_DIGI_BOARD_CONFIG;
-  const snapshot = snapshotResult.status === "fulfilled" ? snapshotResult.value : null;
-  const reminders = remindersResult.status === "fulfilled" ? remindersResult.value : [];
+    extras?.[0]?.status === "fulfilled" ? extras[0].value : DEFAULT_TL_DIGI_BOARD_CONFIG;
+  const reminders = extras?.[1]?.status === "fulfilled" ? extras[1].value : [];
 
   return assembleTlDigiBoardPublicPayload({
     config,

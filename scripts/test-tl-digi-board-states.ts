@@ -13,6 +13,7 @@ import {
   headerLabelForKind,
   headerLastSyncText,
   headerPeriodText,
+  mergeTlBoardClientPayload,
   nextTlRetryDelayMs,
   planTlBoardRefresh,
   resolveTlCardKind,
@@ -125,7 +126,7 @@ function emptySummary() {
     "issue"
   );
   const retry = planTlBoardRefresh({ consecutiveFailures: 1, boardState: "CONNECTION_ERROR" });
-  assert.equal(retry.force, true);
+  assert.equal(retry.force, false);
   assert.equal(retry.delayMs, nextTlRetryDelayMs(0));
   assert.equal(nextTlRetryDelayMs(0), 10_000);
   assert.equal(nextTlRetryDelayMs(1), 20_000);
@@ -349,6 +350,49 @@ function sampleSnapshot(nowIso: string, medications: TlGingrMedicationRecord[]):
   assert.equal(headerLastSyncText({ phase: "initial", formattedSuccess: null }), "Checking…");
   assert.equal(headerLastSyncText({ phase: "resolved", formattedSuccess: null }), "Never");
   assert.equal(headerLastSyncText({ phase: "resolved", formattedSuccess: "4:59 PM" }), "4:59 PM");
+}
+
+// Rows beat an error health flag — never hide known medications behind "Unable to verify".
+{
+  assert.equal(
+    resolveTlCardKind({
+      phase: "resolved",
+      health: "error",
+      allClear: false,
+      hasRows: true
+    }),
+    "stale"
+  );
+}
+
+{
+  const previous = {
+    medications: [{ id: "1" }],
+    overdue: [{ id: "1" }],
+    current: [],
+    additionalServices: [],
+    meta: {
+      lastSuccessfulSyncAt: "2026-08-19T19:35:47.774Z",
+      boardState: "LIVE",
+      medicationsHealth: "ok"
+    }
+  };
+  const incoming = {
+    medications: [],
+    overdue: [],
+    current: [],
+    additionalServices: [],
+    meta: {
+      lastSuccessfulSyncAt: null,
+      lastError: "No Gingr snapshot is stored yet. Background sync will retry automatically.",
+      boardState: "CONNECTION_ERROR",
+      medicationsHealth: "error"
+    }
+  };
+  const merged = mergeTlBoardClientPayload(previous, incoming);
+  assert.equal(merged.meta?.boardState, "STALE");
+  assert.equal((merged.overdue as unknown[]).length, 1);
+  assert.equal(merged.meta?.lastSuccessfulSyncAt, "2026-08-19T19:35:47.774Z");
 }
 
 console.log("test-tl-digi-board-states: ok");

@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import {
+  classifyGingrMedicationReportStatus,
   extractAdministrationRecordsFromHistory,
   flattenAdministrationData,
   isAdministeredReportStatus,
@@ -26,6 +27,13 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
   assert.equal(isAdministeredReportStatus(null, null), false);
   assert.equal(isAdministeredReportStatus("administered", null), true);
   assert.equal(isAdministeredReportStatus("", "Given"), true);
+  assert.equal(classifyGingrMedicationReportStatus("3", "N/A"), "n_a");
+  assert.equal(classifyGingrMedicationReportStatus("4", "Prepared"), "prepared");
+  assert.equal(classifyGingrMedicationReportStatus("5", "Refused"), "refused");
+  assert.equal(classifyGingrMedicationReportStatus("6", "Partially Administered"), "partially_administered");
+  assert.equal(classifyGingrMedicationReportStatus("7", "Owner Administered"), "owner_administered");
+  assert.equal(isAdministeredReportStatus("7", "Owner Administered"), true);
+  assert.equal(isAdministeredReportStatus("6", "Partially Administered"), false);
 }
 
 // --- flatten array administrationData (Medication Report table shape) ---
@@ -163,7 +171,7 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
     animalMedicationScheduleId: "4770",
     serviceDate: "2026-08-17"
   });
-  assert.equal(dougalNested.administrationStatus, "not_administered");
+  assert.equal(dougalNested.administrationStatus, "unable_to_administer");
   assert.equal(dougalNested.statusLabel, "Unable to Administer");
   assert.match(dougalNested.administrationNotes ?? "", /cannot mark administered/);
 }
@@ -188,7 +196,7 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
     animalMedicationScheduleId: "dougal-eye",
     serviceDate: "2026-08-17"
   });
-  assert.equal(resolved.administrationStatus, "not_administered");
+  assert.equal(resolved.administrationStatus, "unable_to_administer");
   assert.equal(resolved.statusLabel, "Unable to Administer");
   assert.match(resolved.administrationNotes ?? "", /Could not mark administered/);
 }
@@ -277,6 +285,89 @@ import type { TlGingrMedicationRecord } from "../lib/tl-digi-board/types";
   assert.equal(rows.overdue.length, 0, "administered AM must not stay overdue");
   assert.equal(rows.summary.overdue, 0);
   assert.equal(rows.summary.completed, 0, "completed AM hidden outside AM window");
+}
+
+{
+  const now = dateAtLaLocal({ year: 2026, month: 8, day: 17, hour: 15, minute: 46 });
+  const base = (partial: Partial<TlGingrMedicationRecord>): TlGingrMedicationRecord => ({
+    gingrMedicationId: "1",
+    gingrAnimalId: "1",
+    gingrReservationId: "1",
+    dogName: "Dog",
+    photoUrl: null,
+    lodgingLabel: "DEN",
+    lodgingAreaKey: "den",
+    lodgingRunName: null,
+    gingrScheduleLabel: "AM",
+    scheduleKind: "am",
+    medicationName: "Med",
+    dosage: "1 Pill",
+    instructions: null,
+    notes: null,
+    administrationStatus: "not_administered",
+    administeredAt: null,
+    administeredBy: null,
+    serviceDate: "2026-08-17",
+    ...partial
+  });
+
+  const mixed = buildTlBoardMedicationRows({
+    medications: [
+      base({ gingrMedicationId: "na", dogName: "Nellie", administrationStatus: "n_a", gingrReportStatusLabel: "N/A" }),
+      base({
+        gingrMedicationId: "owner",
+        dogName: "Otto",
+        administrationStatus: "owner_administered",
+        gingrReportStatusLabel: "Owner Administered"
+      }),
+      base({
+        gingrMedicationId: "prep",
+        dogName: "Pip",
+        administrationStatus: "prepared",
+        gingrReportStatusLabel: "Prepared"
+      }),
+      base({
+        gingrMedicationId: "ref",
+        dogName: "Ruby",
+        administrationStatus: "refused",
+        gingrReportStatusLabel: "Refused"
+      }),
+      base({
+        gingrMedicationId: "part",
+        dogName: "Pax",
+        administrationStatus: "partially_administered",
+        gingrReportStatusLabel: "Partially Administered"
+      })
+    ],
+    now,
+    lastSuccessfulSyncAt: now.toISOString(),
+    syncSucceeded: true,
+    administrationStatusAvailable: true
+  });
+
+  assert.equal(mixed.overdue.some((row) => row.dogName === "Nellie"), false, "N/A must not appear as overdue");
+  assert.equal(mixed.current.some((row) => row.dogName === "Nellie"), false, "N/A must not appear as due");
+  assert.equal(mixed.overdue.some((row) => row.dogName === "Otto"), false, "Owner Administered is complete");
+  assert.equal(
+    mixed.overdue.find((row) => row.dogName === "Pip")?.displayStatus,
+    "overdue",
+    "Prepared AM is still due after the AM window"
+  );
+  assert.equal(mixed.current.find((row) => row.dogName === "Ruby")?.displayStatus, "refused");
+  assert.equal(mixed.overdue.find((row) => row.dogName === "Pax")?.displayStatus, "overdue");
+}
+
+{
+  const prepared = resolveAdministrationForSchedule({
+    records: flattenAdministrationData(
+      [{ date: "2026-08-17", animal_medication_schedule_id: "1", status: "4" }],
+      [{ value: "4", label: "Prepared" }]
+    ),
+    animalMedicationScheduleId: "1",
+    serviceDate: "2026-08-17"
+  });
+  assert.equal(prepared.administrationStatus, "prepared");
+  assert.equal(prepared.statusLabel, "Prepared");
 }
 
 console.log("test-tl-digi-board-medication-report: ok");

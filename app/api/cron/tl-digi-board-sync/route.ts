@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureRuffopsChecklistSchema } from "@/lib/ruffops-checklist/ensure-schema";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { ensureTlDigiBoardSnapshotSchema } from "@/lib/tl-digi-board/ensure-snapshot-schema";
 import { getTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
 
 export const dynamic = "force-dynamic";
@@ -15,12 +16,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase({ timeoutMs: 8_000 });
-    const schema = await ensureRuffopsChecklistSchema(supabase);
+    const supabase = getServiceSupabase({ timeoutMs: 20_000 });
+    const [schema, snapshotSchema] = await Promise.all([
+      ensureRuffopsChecklistSchema(supabase),
+      ensureTlDigiBoardSnapshotSchema(supabase)
+    ]);
     const snapshot = await getTlDigiBoardSnapshot(supabase, { forceRefresh: true });
     return NextResponse.json({
       ok: true,
       checklistSchemaReady: schema.ready,
+      snapshotTableReady: snapshotSchema,
       generatedAt: snapshot.generatedAt,
       summary: snapshot.summary,
       servicesSummary: snapshot.servicesSummary,
