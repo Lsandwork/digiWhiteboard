@@ -5,8 +5,11 @@ import { ANIMAL_PHOTO_COOLDOWN_MS, canFetchAnimalPhoto } from "@/lib/gingr-reque
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 const HIT_CACHE_SECONDS = Math.floor(ANIMAL_PHOTO_COOLDOWN_MS / 1000);
+/** Unbounded Supabase reads made this route hang until the gateway timed out. */
+const STORE_TIMEOUT_MS = 2_000;
 
 function cacheHeaders(photoUrl: string | null) {
   return {
@@ -32,7 +35,10 @@ export async function GET(request: Request) {
 
   if (cachedPhoto === undefined) {
     try {
-      photoUrl = await loadStoredAnimalPhotoUrl(getServiceSupabase(), animalId);
+      photoUrl = await loadStoredAnimalPhotoUrl(
+        getServiceSupabase({ timeoutMs: STORE_TIMEOUT_MS }),
+        animalId
+      );
     } catch {
       photoUrl = null;
     }
@@ -43,8 +49,13 @@ export async function GET(request: Request) {
   }
 
   if (photoUrl) {
+    const resolved = photoUrl;
     after(() => {
-      void persistAnimalPhotoUrl(getServiceSupabase(), animalId, photoUrl).catch(() => undefined);
+      void persistAnimalPhotoUrl(
+        getServiceSupabase({ timeoutMs: STORE_TIMEOUT_MS }),
+        animalId,
+        resolved
+      ).catch(() => undefined);
     });
   }
 

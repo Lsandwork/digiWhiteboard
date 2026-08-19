@@ -42,6 +42,24 @@ const photoKeys = [
   "icon_url"
 ] as const;
 
+/**
+ * Gingr's retired Rackspace CDN. Animal records created before the Google Cloud
+ * Storage migration still carry these URLs and they now return 404, so they must
+ * never win over a live URL stored in another field.
+ */
+const LEGACY_PHOTO_HOST_SUFFIXES = [".rackcdn.com"];
+
+export function isLegacyGingrPhotoUrl(url: string | null | undefined) {
+  const trimmed = url?.trim();
+  if (!trimmed) return false;
+  try {
+    const host = new URL(trimmed).hostname.trim().toLowerCase();
+    return LEGACY_PHOTO_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+  } catch {
+    return false;
+  }
+}
+
 function firstString(source: UnknownRecord, keys: string[]) {
   for (const key of keys) {
     const value = source[key];
@@ -81,23 +99,38 @@ export function normalizePhotoUrl(url: string) {
   return trimmed;
 }
 
-export function extractPhotoUrl(...sources: UnknownRecord[]) {
+/** Every photo URL a Gingr record exposes, in key order and deduped. */
+export function extractPhotoUrls(...sources: UnknownRecord[]) {
+  const urls: string[] = [];
+  const add = (value: string | null) => {
+    if (!value) return;
+    const normalized = normalizePhotoUrl(value);
+    if (normalized && !urls.includes(normalized)) urls.push(normalized);
+  };
+
   for (const source of sources) {
     for (const key of photoKeys) {
       const value = source[key];
       if (typeof value === "string" && value.trim()) {
-        return normalizePhotoUrl(value.trim());
+        add(value.trim());
+        continue;
       }
 
       if (value && typeof value === "object" && !Array.isArray(value)) {
         const nested = value as UnknownRecord;
-        const nestedUrl = firstString(nested, ["url", "href", "src", "path", "link", "original", "large", "medium", "small"]);
-        if (nestedUrl) return normalizePhotoUrl(nestedUrl);
+        add(firstString(nested, ["url", "href", "src", "path", "link", "original", "large", "medium", "small"]));
       }
     }
   }
 
-  return null;
+  return urls;
+}
+
+export function extractPhotoUrl(...sources: UnknownRecord[]) {
+  const urls = extractPhotoUrls(...sources);
+  if (!urls.length) return null;
+  // A dead Rackspace link in `image` must not shadow a live URL in another field.
+  return urls.find((url) => !isLegacyGingrPhotoUrl(url)) ?? urls[0];
 }
 
 export function resolveDogPhotoUrl(dog: LiveDog) {

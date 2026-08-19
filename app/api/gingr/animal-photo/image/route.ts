@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 import { persistAnimalPhotoUrl, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
 import {
   getCachedGingrAnimalPhotoUrl,
-  getGingrAnimalPhotoUrl,
+  getGingrAnimalPhotoUrlCandidates,
   invalidateGingrAnimalPhoto
 } from "@/lib/gingr-animal-photo";
 import { isAllowedGingrPhotoHost, isLegacyGingrPhotoUrl } from "@/lib/gingr-photo-display";
@@ -73,15 +73,15 @@ async function loadStoredUrl(animalId: string) {
   }
 }
 
-/** Ask Gingr for the animal's current photo, ignoring any cached/stale value. */
-async function lookupFreshGingrUrl(animalId: string) {
+/** Every photo URL Gingr currently reports, ignoring cached/stale values. */
+async function lookupFreshGingrUrls(animalId: string) {
   invalidateGingrAnimalPhoto(animalId);
+  const direct = await getGingrAnimalPhotoUrlCandidates(animalId, GINGR_LOOKUP_TIMEOUT_MS);
+  if (direct.length) return direct;
+
   const tlKey = resolveTlGingrApiKey();
-  const direct = await getGingrAnimalPhotoUrl(animalId, GINGR_LOOKUP_TIMEOUT_MS);
-  if (direct) return direct;
-  if (!tlKey) return null;
-  invalidateGingrAnimalPhoto(animalId);
-  return getGingrAnimalPhotoUrl(animalId, GINGR_LOOKUP_TIMEOUT_MS, {
+  if (!tlKey) return [];
+  return getGingrAnimalPhotoUrlCandidates(animalId, GINGR_LOOKUP_TIMEOUT_MS, {
     bypassFetchGate: true,
     apiKey: tlKey
   });
@@ -126,28 +126,28 @@ export async function GET(request: Request) {
     }
   }
 
-  // Everything known is stale or missing — re-resolve from Gingr and persist it.
+  // Everything known is stale or missing — re-resolve from Gingr and persist
+  // whichever URL actually downloads.
   if (animalId) {
-    const fresh = await lookupFreshGingrUrl(animalId);
-    if (fresh && !candidates.includes(fresh)) {
+    for (const fresh of await lookupFreshGingrUrls(animalId)) {
+      if (candidates.includes(fresh)) continue;
       const image = await fetchImageBytes(fresh);
-      if (image) {
-        after(() => {
-          void persistAnimalPhotoUrl(
-            getServiceSupabase({ timeoutMs: STORE_TIMEOUT_MS }),
-            animalId,
-            fresh
-          ).catch(() => undefined);
-        });
-        return new NextResponse(image.buffer, {
-          status: 200,
-          headers: {
-            "Content-Type": image.contentType,
-            "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-            "X-Content-Type-Options": "nosniff"
-          }
-        });
-      }
+      if (!image) continue;
+      after(() => {
+        void persistAnimalPhotoUrl(
+          getServiceSupabase({ timeoutMs: STORE_TIMEOUT_MS }),
+          animalId,
+          fresh
+        ).catch(() => undefined);
+      });
+      return new NextResponse(image.buffer, {
+        status: 200,
+        headers: {
+          "Content-Type": image.contentType,
+          "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
     }
   }
 
