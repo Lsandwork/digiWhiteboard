@@ -58,18 +58,25 @@ export function TlBoardPushTakeover() {
       : null;
   const effectivePushNotice = activePushNotice ?? null;
 
-  const activeNoticeAlertKey =
-    effectiveEmergencyCastVideo
-      ? `emergency-video:${effectiveEmergencyCastVideo.id}`
-      : effectiveCastVideo
-        ? `video:${effectiveCastVideo.id}`
-        : effectiveGroomingNotice
-          ? `grooming:${effectiveGroomingNotice.id}`
-          : effectiveTrainerNotice
-            ? `trainer:${effectiveTrainerNotice.id}`
-            : effectivePushNotice
-              ? `push:${effectivePushNotice.id}`
-              : null;
+  const activeNoticeAlertKey = useMemo(() => {
+    if (effectiveEmergencyCastVideo) return `emergency-video:${effectiveEmergencyCastVideo.id}`;
+    const isEmergencyStaffPush = Boolean(
+      effectivePushNotice &&
+        (effectivePushNotice.priority === "urgent" || effectivePushNotice.display_mode === "urgent")
+    );
+    if (isEmergencyStaffPush && effectivePushNotice) return `push:${effectivePushNotice.id}`;
+    if (effectiveGroomingNotice) return `grooming:${effectiveGroomingNotice.id}`;
+    if (effectiveTrainerNotice) return `trainer:${effectiveTrainerNotice.id}`;
+    if (effectiveCastVideo) return `video:${effectiveCastVideo.id}`;
+    if (effectivePushNotice) return `push:${effectivePushNotice.id}`;
+    return null;
+  }, [
+    effectiveCastVideo,
+    effectiveEmergencyCastVideo,
+    effectiveGroomingNotice,
+    effectivePushNotice,
+    effectiveTrainerNotice
+  ]);
 
   useFitdogAlertSound(activeNoticeAlertKey);
 
