@@ -31,6 +31,7 @@ import {
   TL_BOARD_CLIENT_FETCH_TIMEOUT_MS,
   type TlCardKind
 } from "@/lib/tl-digi-board/display-state";
+import { TL_BOARD_BRAND } from "@/lib/tl-digi-board/brand";
 import "./tl-alerts-reminders-board.css";
 import { TlBoardPushTakeover } from "@/components/boards/TlBoardPushTakeover";
 
@@ -47,7 +48,6 @@ type BoardPayload = TlDigiBoardSnapshot & {
   error?: string;
 };
 
-const FITDOG_LOGO = "/assets/fitdog/fitdog-logo-white.svg";
 const TL_BOARD_LAST_GOOD_KEY = "fitdog-tl-board-last-good";
 
 /**
@@ -173,9 +173,13 @@ function DogPhoto({
 
   if (!src) {
     return (
-      <div className="tl-table__photo tl-table__photo--placeholder" aria-hidden>
-        {dogName.slice(0, 1).toUpperCase()}
-      </div>
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={TL_BOARD_BRAND.dogPhotoFallback}
+        alt=""
+        className="tl-table__photo tl-table__photo--fallback"
+        draggable={false}
+      />
     );
   }
 
@@ -580,10 +584,10 @@ function BoardInner() {
         <div className="tl-board__brand">
           <div className="tl-board__logo-row">
             <Image
-              src={FITDOG_LOGO}
-              alt="Fitdog"
-              width={168}
-              height={40}
+              src={TL_BOARD_BRAND.logoLockup}
+              alt="Fitdog Health & Social Club"
+              width={320}
+              height={84}
               className="tl-board__logo"
               priority
             />
