@@ -71,6 +71,8 @@ export type CsvOwnerResolutionReport = {
 
 export type InternalResolvedGingrOwner = {
   gingrOwnerId: string;
+  firstName: string;
+  lastName: string;
   normalizedFirstName: string;
   normalizedLastName: string;
   normalizedFullName: string;
@@ -186,8 +188,10 @@ export function gingrOwnerFromRecord(
 ): InternalResolvedGingrOwner | null {
   const id = schema.stableIdField ? pickString(record[schema.stableIdField]) : null;
   if (!id) return null;
-  const first = schema.firstNameField ? normalizeOwnerName(pickString(record[schema.firstNameField])) : "";
-  const last = schema.lastNameField ? normalizeOwnerName(pickString(record[schema.lastNameField])) : "";
+  const firstRaw = schema.firstNameField ? pickString(record[schema.firstNameField]) ?? "" : "";
+  const lastRaw = schema.lastNameField ? pickString(record[schema.lastNameField]) ?? "" : "";
+  const first = normalizeOwnerName(firstRaw);
+  const last = normalizeOwnerName(lastRaw);
   const joined = [first, last].filter(Boolean).join(" ");
   const explicitFull = schema.fullNameField
     ? normalizeOwnerName(pickString(record[schema.fullNameField]))
@@ -196,6 +200,8 @@ export function gingrOwnerFromRecord(
   if (!normalizedFullName) return null;
   return {
     gingrOwnerId: id,
+    firstName: firstRaw,
+    lastName: lastRaw,
     normalizedFirstName: first,
     normalizedLastName: last,
     normalizedFullName,
@@ -263,6 +269,27 @@ export function matchCsvOwnersToDirectory(
   }
 
   return { byPackage, uniqueMatchOwnerIds, unresolvedCount, ambiguousCount };
+}
+
+export function directoryByNormalizedFullName(
+  directory: InternalResolvedGingrOwner[]
+): Map<string, InternalResolvedGingrOwner[]> {
+  const map = new Map<string, InternalResolvedGingrOwner[]>();
+  for (const owner of directory) {
+    if (!owner.normalizedFullName) continue;
+    const list = map.get(owner.normalizedFullName) ?? [];
+    list.push(owner);
+    map.set(owner.normalizedFullName, list);
+  }
+  return map;
+}
+
+export function publicOwnerCandidate(owner: InternalResolvedGingrOwner) {
+  return {
+    gingrOwnerId: owner.gingrOwnerId,
+    firstName: owner.firstName,
+    lastName: owner.lastName
+  };
 }
 
 export function reservationOwnerIds(reservations: GingrReservation[]): string[] {

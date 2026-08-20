@@ -122,7 +122,10 @@ export function GingrPageClient({ username, role, access, embedAllowed }: GingrP
             <MobileMenuButton onClick={() => setMobileOpen(true)} />
             <ThemeToggle />
           </div>
-          <GingrWorkspace embedAllowed={embedAllowed} />
+          <GingrWorkspace
+            embedAllowed={embedAllowed}
+            showPackageEligibility={canAccessAdminTab(effectiveAccess, "package_eligibility", role, "staff")}
+          />
         </div>
       </div>
     </div>

@@ -1097,6 +1097,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
   package_group_walks: "view_admin_panel",
+  package_eligibility: "view_admin_panel",
   ruffops_checklist: "view_admin_panel",
   tl_digi_board: "manage_tl_digi_board",
   settings: "view_admin_panel",
@@ -1503,6 +1504,14 @@ export function canAccessAdminTab(
       hasPermission(effective, "manage_photo_upload_queue") ||
       Boolean(legacyRole)
     );
+  }
+
+  // Outstanding Packages CSV import — Super Admin, Admin, Management only.
+  if (tab === "package_eligibility") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isAdminOrManagementLegacyRole(legacyRole)) return true;
+    return false;
   }
 
   // Every authenticated staff member can view and complete Package Group Walks.

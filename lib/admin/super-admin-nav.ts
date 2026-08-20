@@ -107,6 +107,11 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
             "Checked-in dogs whose package includes today's complimentary group walk."
           ),
           tabLink(
+            "package_eligibility",
+            "Package Eligibility",
+            "Upload Outstanding Packages reports and resolve ambiguous Gingr owners."
+          ),
+          tabLink(
             "ruffops_checklist",
             "RuffOps Checklist",
             "Shared Gingr-style checklist for yard reminders, walks, meds, services, and alerts."
@@ -219,6 +224,11 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         title: "Connected systems",
         links: [
           routeLink("gingr", "/gingr", "Gingr", "Open Gingr — business system of record."),
+          tabLink(
+            "package_eligibility",
+            "Package Eligibility",
+            "Upload Gingr Outstanding Packages reports for Package Group Walks."
+          ),
           routeLink("ruffly", "/ruffly", "Ruffly", "Open Ruffly AI / communications.")
         ]
       }

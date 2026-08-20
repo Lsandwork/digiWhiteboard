@@ -38,19 +38,13 @@ export const PACKAGE_GROUP_WALK_ELIGIBLE_PACKAGES: readonly EligiblePackageDefin
   {
     key: "monthly_unlimited",
     displayName: "Monthly Unlimited",
-    canonicalNames: ["Monthly Unlimited", "Unlimited Monthly", "Monthly Unlimited Package"],
+    canonicalNames: ["Monthly Unlimited"],
     priority: 1
   },
   {
     key: "twenty_day_plus",
     displayName: "20-Day PLUS Package",
-    canonicalNames: [
-      "20-Day PLUS Package",
-      "20 Day PLUS Package",
-      "20-Day PLUS",
-      "20 Day PLUS",
-      "20-Day PLUS Pkg"
-    ],
+    canonicalNames: ["20-Day PLUS Package"],
     priority: 2
   }
 ] as const;

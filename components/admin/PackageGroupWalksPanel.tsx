@@ -265,10 +265,11 @@ export function PackageGroupWalksPanel() {
         </div>
       </header>
 
-      {syncState === "STALE" ? (
+      {syncState === "STALE" || meta?.packageImportFreshness === "STALE" ? (
         <p className="pgw-notice pgw-notice--stale" role="status">
           <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-          Showing last synced data from {lastSync}. Gingr has not confirmed the current check-in list.
+          {meta?.packageImportWarning ||
+            `Showing last synced data from ${lastSync}. Gingr has not confirmed the current check-in list.`}
         </p>
       ) : null}
 
@@ -333,15 +334,23 @@ export function PackageGroupWalksPanel() {
               <p className="pgw-state__title">Checking Gingr…</p>
               <p>Package Group Walk eligibility is not confirmed yet.</p>
             </div>
-          ) : syncState === "ERROR" ? (
+          ) : syncState === "ERROR" || meta?.packageImportFreshness === "MISSING" ? (
             <div className="pgw-state pgw-state--error" role="alert">
               <AlertTriangle className="h-5 w-5" aria-hidden="true" />
               <p className="pgw-state__title">Unable to verify Package Group Walk eligibility</p>
               <p>
-                {meta?.gingrOk
-                  ? "Checked-in dogs were loaded from Gingr, but package/membership ownership could not be read. This is not All Clear."
-                  : `Gingr is temporarily unavailable. Last successful sync: ${lastSync}`}
+                {meta?.packageImportWarning ||
+                  (meta?.gingrOk
+                    ? "Package report has not been synced. This is not All Clear."
+                    : `Gingr is temporarily unavailable. Last successful sync: ${lastSync}`)}
               </p>
+            </div>
+          ) : pending.length === 0 && (syncState === "STALE" || meta?.packageImportFreshness === "STALE") ? (
+            <div className="pgw-state pgw-state--error" role="status">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              <p className="pgw-state__title">Package eligibility may be outdated</p>
+              <p>{meta?.packageImportWarning || `Last sync: ${meta?.lastPackageImportAt || lastSync}`}</p>
+              <p>This is not All Clear.</p>
             </div>
           ) : pending.length === 0 ? (
             <div className="pgw-state pgw-state--clear">
