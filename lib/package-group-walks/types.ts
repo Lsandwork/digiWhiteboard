@@ -59,6 +59,38 @@ export type PackageGroupWalkSyncState =
   | "ERROR"
   | "EMPTY_VALID";
 
+export type CsvOwnerResolutionLookup = {
+  httpStatus: number | null;
+  totalRows: number;
+  stableIdField: string | null;
+  firstNameField: string | null;
+  lastNameField: string | null;
+  activeDeletedField: string | null;
+  ownerIdNamespaceVerified: boolean;
+  sanitizedOwnerFieldNames: string[];
+  monthlyUnlimited: {
+    csvOwners: number;
+    uniqueExactMatches: number;
+    zeroMatches: number;
+    ambiguousMatches: number;
+  };
+  twentyDayPlus: {
+    csvOwners: number;
+    uniqueExactMatches: number;
+    zeroMatches: number;
+    ambiguousMatches: number;
+  };
+  today: {
+    checkedInReservations: number;
+    uniqueCheckedInOwners: number;
+    eligiblePackageOwnersCurrentlyCheckedIn: number;
+    eligibleDogsCurrentlyCheckedIn: number;
+    unresolvedPackageOwners: number;
+    ambiguousPackageOwners: number;
+  };
+  error: string | null;
+};
+
 export type PackageGroupWalkMeta = {
   timezone: "America/Los_Angeles";
   businessDate: string;
@@ -85,6 +117,8 @@ export type PackageGroupWalkMeta = {
   };
   attempts: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
   ownerFieldNames: string[];
+  /** TEMPORARY. Aggregates only — never names or raw owner records. */
+  csvOwnerResolution?: CsvOwnerResolutionLookup | null;
 };
 
 export type PackageGroupWalkState = {
@@ -124,5 +158,6 @@ export type TlBoardPackageGroupWalksSummary = {
     qualifying: number;
     attempts?: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
     ownerFieldNames?: string[];
+    csvOwnerResolution?: CsvOwnerResolutionLookup;
   };
 };
