@@ -15,6 +15,7 @@ import type {
   TlBoardAdditionalServiceRow,
   TlBoardDisplayState,
   TlBoardMedicationRow,
+  TlBoardPackageGroupWalkRow,
   TlDigiBoardSnapshot
 } from "@/lib/tl-digi-board/types";
 import {
@@ -47,6 +48,12 @@ type BoardPayload = TlDigiBoardSnapshot & {
 
 const FITDOG_LOGO = "/assets/fitdog/fitdog-logo-white.svg";
 const TL_BOARD_LAST_GOOD_KEY = "fitdog-tl-board-last-good";
+
+/**
+ * Completion pulse cadence. The full payload refreshes on the Gingr cycle; this
+ * much smaller poll drops a completed dog from the TV within a few seconds.
+ */
+const TL_PACKAGE_WALK_PULSE_MS = 5_000;
 
 function readStoredTlBoard(): BoardPayload | null {
   if (typeof window === "undefined") return null;
@@ -225,6 +232,23 @@ function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
   );
 }
 
+function PackageGroupWalkTableRow({ row }: { row: TlBoardPackageGroupWalkRow }) {
+  return (
+    <tr className="tl-table__row tl-table__row--walk">
+      <td>
+        <div className="tl-table__dog">
+          <DogPhoto animalId={row.gingrAnimalId} dogName={row.dogName} photoUrl={row.photoUrl} />
+          <span className="tl-table__dog-name">{row.dogName}</span>
+        </div>
+      </td>
+      <td className="tl-table__package">{row.packageName}</td>
+      <td>
+        <span className="tl-badge tl-badge--needs_group_walk">NEEDS GROUP WALK</span>
+      </td>
+    </tr>
+  );
+}
+
 function ServiceTableRow({ row }: { row: TlBoardAdditionalServiceRow }) {
   const isUnknown = row.displayStatus === "completion_unknown";
   return (
@@ -254,6 +278,7 @@ function BoardInner() {
   const [error, setError] = useState<string | null>(null);
   const [hasResolved, setHasResolved] = useState(false);
   const [retryInSec, setRetryInSec] = useState<number | null>(null);
+  const [completedWalkAnimalIds, setCompletedWalkAnimalIds] = useState<Set<string>>(() => new Set());
   const snapshotRef = useRef<BoardPayload | null>(null);
   const failCountRef = useRef(0);
   const lastAttemptRef = useRef<number | null>(null);
@@ -419,6 +444,56 @@ function BoardInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Fast removal path: a completed walk leaves the TV within one pulse instead of
+  // waiting for the next Gingr sync. Paused while the tab is hidden.
+  useEffect(() => {
+    let cancelled = false;
+    let timer: number | null = null;
+
+    async function pulse() {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/boards/tl-alerts-reminders/package-group-walks", {
+          cache: "no-store"
+        });
+        const body = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          completedAnimalIds?: string[];
+        } | null;
+        // A failed pulse must never read as "nothing completed".
+        if (cancelled || !body?.ok || !Array.isArray(body.completedAnimalIds)) return;
+        const next = new Set(body.completedAnimalIds.map(String));
+        setCompletedWalkAnimalIds((previous) => {
+          const unchanged = previous.size === next.size && [...next].every((id) => previous.has(id));
+          return unchanged ? previous : next;
+        });
+      } catch {
+        // Keep current rows; the next pulse or board poll reconciles.
+      }
+    }
+
+    function schedule() {
+      timer = window.setTimeout(async () => {
+        await pulse();
+        if (!cancelled) schedule();
+      }, TL_PACKAGE_WALK_PULSE_MS);
+    }
+
+    function onVisible() {
+      if (document.visibilityState === "visible") void pulse();
+    }
+
+    void pulse();
+    schedule();
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      if (timer != null) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
   const phase = hasResolved ? "resolved" : "initial";
   const title = snapshot?.config?.displayTitle || "Team Lead Alerts + Reminders";
   const summary = snapshot?.summary;
@@ -468,6 +543,11 @@ function BoardInner() {
     : [];
 
   const serviceRows = snapshot?.additionalServices ?? [];
+  const snapshotWalkRows = snapshot?.packageGroupWalks;
+  const packageWalkRows = useMemo(
+    () => (snapshotWalkRows ?? []).filter((row) => !completedWalkAnimalIds.has(String(row.gingrAnimalId))),
+    [snapshotWalkRows, completedWalkAnimalIds]
+  );
   const medCard = resolveTlCardKind({
     phase,
     health: meta?.medicationsHealth,
@@ -479,6 +559,12 @@ function BoardInner() {
     health: meta?.servicesHealth,
     allClear: Boolean(meta?.servicesAllClear),
     hasRows: serviceRows.length > 0
+  });
+  const packageWalkCard = resolveTlCardKind({
+    phase,
+    health: meta?.packageGroupWalksHealth,
+    allClear: Boolean(meta?.packageGroupWalksAllClear),
+    hasRows: packageWalkRows.length > 0
   });
 
   const retryLabel =
@@ -592,36 +678,73 @@ function BoardInner() {
           ) : null}
         </GingrStatusCard>
 
-        <GingrStatusCard
-          title="Additional Services"
-          subtitle="Only shows services not marked completed in Gingr."
-          kind={serviceCard}
-          lastSync={lastSync}
-          retryLabel={retryLabel}
-          errorNoun="additional services"
-          allClearDetail={
-            servicesSummary?.completed ? `${servicesSummary.completed} completed in Gingr today.` : undefined
-          }
-        >
-          {serviceRows.length ? (
-            <div className="tl-table-wrap">
-              <table className="tl-table tl-table--services">
-                <thead>
-                  <tr>
-                    <th>Dog</th>
-                    <th>Service</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {serviceRows.map((row) => (
-                    <ServiceTableRow key={row.id} row={row} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </GingrStatusCard>
+        <div className="tl-board__stack">
+          <GingrStatusCard
+            title="Additional Services"
+            subtitle="Only shows services not marked completed in Gingr."
+            kind={serviceCard}
+            lastSync={lastSync}
+            retryLabel={retryLabel}
+            errorNoun="additional services"
+            allClearDetail={
+              servicesSummary?.completed ? `${servicesSummary.completed} completed in Gingr today.` : undefined
+            }
+          >
+            {serviceRows.length ? (
+              <div className="tl-table-wrap">
+                <table className="tl-table tl-table--services">
+                  <thead>
+                    <tr>
+                      <th>Dog</th>
+                      <th>Service</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceRows.map((row) => (
+                      <ServiceTableRow key={row.id} row={row} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </GingrStatusCard>
+
+          <GingrStatusCard
+            title="Package Group Walks"
+            subtitle="Checked-in dogs with Monthly Unlimited or 20-Day PLUS Package that still need their complimentary group walk."
+            kind={packageWalkCard}
+            lastSync={lastSync}
+            retryLabel={retryLabel}
+            errorNoun="Package Group Walk eligibility"
+            errorDetail="Checked-in dogs were loaded from Gingr, but package/membership ownership could not be confirmed. This is not All Clear."
+            allClearText="No qualifying checked-in dogs currently need a group walk."
+            allClearDetail={
+              snapshot?.packageGroupWalksSummary?.completed
+                ? `${snapshot.packageGroupWalksSummary.completed} completed today.`
+                : undefined
+            }
+          >
+            {packageWalkRows.length ? (
+              <div className="tl-table-wrap">
+                <table className="tl-table tl-table--walks">
+                  <thead>
+                    <tr>
+                      <th>Dog</th>
+                      <th>Package</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {packageWalkRows.map((row) => (
+                      <PackageGroupWalkTableRow key={row.id} row={row} />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </GingrStatusCard>
+        </div>
       </section>
 
       <section className="tl-section">
@@ -653,6 +776,8 @@ function GingrStatusCard({
   lastSync,
   retryLabel,
   errorNoun,
+  errorDetail,
+  allClearText,
   allClearDetail,
   children
 }: {
@@ -662,6 +787,8 @@ function GingrStatusCard({
   lastSync: string | null;
   retryLabel: string | null;
   errorNoun: string;
+  errorDetail?: string;
+  allClearText?: string;
   allClearDetail?: string;
   children: ReactNode;
 }) {
@@ -681,7 +808,7 @@ function GingrStatusCard({
       {kind === "error" ? (
         <div className="tl-card-state tl-card-state--error" role="alert">
           <p className="tl-card-state__title">⚠ Unable to verify {errorNoun}</p>
-          <p>Gingr is temporarily unavailable.</p>
+          <p>{errorDetail ?? "Gingr is temporarily unavailable."}</p>
           <p>Last successful sync: {lastSync || "—"}</p>
           {retryLabel ? <p className="tl-card-state__retry">{retryLabel}</p> : null}
         </div>
@@ -689,7 +816,12 @@ function GingrStatusCard({
       {kind === "all_clear" ? (
         <div className="tl-all-clear">
           <p className="tl-all-clear__title">✓ All Clear</p>
-          <p>{errorNoun === "medications" ? "No medications currently due." : "No additional services need completion."}</p>
+          <p>
+            {allClearText ??
+              (errorNoun === "medications"
+                ? "No medications currently due."
+                : "No additional services need completion.")}
+          </p>
           {allClearDetail ? <p className="tl-panel__sub">{allClearDetail}</p> : null}
         </div>
       ) : null}

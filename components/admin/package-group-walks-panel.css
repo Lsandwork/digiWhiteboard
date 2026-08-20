@@ -1,0 +1,535 @@
+/* Package Group Walks — operations page. Mirrors the Team Lead whiteboard palette. */
+.pgw-page {
+  --pgw-bg: #0b1220;
+  --pgw-panel: rgba(18, 26, 43, 0.72);
+  --pgw-border: rgba(255, 255, 255, 0.08);
+  --pgw-text: #f4f7fb;
+  --pgw-muted: rgba(244, 247, 251, 0.62);
+  --pgw-green: #3ecf8e;
+  --pgw-cyan: #3fd0c9;
+  --pgw-amber: #f5b942;
+  --pgw-red: #ff5c5c;
+
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  color: var(--pgw-text);
+}
+
+/* ---------- Header ---------- */
+
+.pgw-header {
+  padding: 1.25rem 1.35rem;
+  background:
+    radial-gradient(900px 400px at 8% -30%, rgba(62, 207, 142, 0.12), transparent 60%),
+    linear-gradient(180deg, rgba(18, 26, 43, 0.9), rgba(11, 18, 32, 0.92));
+  border: 1px solid var(--pgw-border);
+}
+
+.pgw-header__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pgw-header__identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.pgw-header__icon {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  border-radius: 0.9rem;
+  color: #042816;
+  background: linear-gradient(180deg, var(--pgw-green), #2fae76);
+}
+
+.pgw-header__title {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.pgw-header__subtitle {
+  margin: 0.3rem 0 0;
+  max-width: 46rem;
+  color: var(--pgw-muted);
+  font-size: 0.92rem;
+}
+
+.pgw-sync {
+  text-align: right;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--pgw-border);
+  background: rgba(11, 18, 32, 0.6);
+}
+
+.pgw-sync__label {
+  display: block;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  font-size: 0.82rem;
+}
+
+.pgw-sync__meta {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--pgw-muted);
+  font-size: 0.78rem;
+}
+
+.pgw-sync--live .pgw-sync__label {
+  color: var(--pgw-green);
+}
+.pgw-sync--stale .pgw-sync__label,
+.pgw-sync--syncing .pgw-sync__label {
+  color: var(--pgw-amber);
+}
+.pgw-sync--error .pgw-sync__label {
+  color: var(--pgw-red);
+}
+
+/* Compact metric strip — reads left to right, never a wall of tall cards. */
+.pgw-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.pgw-metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--pgw-border);
+  background: var(--pgw-panel);
+}
+
+.pgw-metric__label {
+  color: var(--pgw-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pgw-metric__value {
+  font-size: clamp(1.2rem, 1.8vw, 1.6rem);
+  font-weight: 750;
+  line-height: 1.1;
+}
+
+.pgw-metric__value--text {
+  font-size: 0.95rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.pgw-metric--remaining .pgw-metric__value {
+  color: var(--pgw-amber);
+}
+
+.pgw-metric--completed .pgw-metric__value {
+  color: var(--pgw-green);
+}
+
+/* ---------- Notices ---------- */
+
+.pgw-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.7rem 0.95rem;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.pgw-notice--stale {
+  border: 1px solid rgba(245, 185, 66, 0.35);
+  background: rgba(245, 185, 66, 0.1);
+  color: #ffe6ad;
+}
+
+.pgw-notice--error {
+  border: 1px solid rgba(255, 92, 92, 0.4);
+  background: rgba(255, 92, 92, 0.12);
+  color: #ffd0d0;
+}
+
+/* ---------- Controls ---------- */
+
+.pgw-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pgw-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.pgw-filter {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--pgw-border);
+  background: var(--pgw-panel);
+  color: var(--pgw-muted);
+  font-size: 0.85rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pgw-filter:hover {
+  color: var(--pgw-text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.pgw-filter.is-active {
+  color: #042816;
+  background: var(--pgw-green);
+  border-color: var(--pgw-green);
+}
+
+.pgw-filter:focus-visible,
+.pgw-complete:focus-visible,
+.pgw-search:focus-within {
+  outline: 2px solid var(--pgw-cyan);
+  outline-offset: 2px;
+}
+
+.pgw-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--pgw-border);
+  background: var(--pgw-panel);
+  color: var(--pgw-muted);
+  min-width: min(18rem, 100%);
+}
+
+.pgw-search__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--pgw-text);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.pgw-search__input::placeholder {
+  color: var(--pgw-muted);
+}
+
+/* ---------- Cards + tables ---------- */
+
+.pgw-card {
+  padding: 1.1rem 1.15rem 1.2rem;
+  border: 1px solid var(--pgw-border);
+  background: linear-gradient(180deg, rgba(18, 26, 43, 0.85), rgba(11, 18, 32, 0.9));
+}
+
+.pgw-card__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+.pgw-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pgw-card__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--pgw-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--pgw-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+/* Long days scroll inside the card instead of growing the page forever. */
+.pgw-table-wrap {
+  overflow: auto;
+  max-height: min(60vh, 34rem);
+}
+
+.pgw-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.pgw-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  background: #101a2c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--pgw-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pgw-table tbody td {
+  padding: 0.7rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+}
+
+.pgw-table__action-col {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pgw-row {
+  background: linear-gradient(90deg, rgba(62, 207, 142, 0.08), transparent 55%);
+  transition: background 0.15s ease;
+}
+
+.pgw-row:hover {
+  background: linear-gradient(90deg, rgba(62, 207, 142, 0.14), transparent 60%);
+}
+
+.pgw-row--done {
+  background: transparent;
+}
+
+.pgw-row--done:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pgw-dog {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.pgw-dog__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.pgw-dog__name {
+  font-weight: 750;
+  font-size: 1rem;
+}
+
+.pgw-dog__owner {
+  color: var(--pgw-muted);
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fixed box so a broken image can never change row height. */
+.pgw-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  object-fit: cover;
+  background: #1c2740;
+}
+
+.pgw-avatar--placeholder {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--pgw-cyan);
+}
+
+.pgw-package {
+  display: inline-block;
+  padding: 0.28rem 0.6rem;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pgw-package--monthly_unlimited {
+  color: #031821;
+  background: #6ec8ff;
+  border: 1px solid rgba(110, 200, 255, 0.6);
+}
+
+.pgw-package--twenty_day_plus {
+  color: #1a1405;
+  background: var(--pgw-amber);
+  border: 1px solid rgba(245, 185, 66, 0.6);
+}
+
+.pgw-time {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--pgw-muted);
+  white-space: nowrap;
+}
+
+.pgw-completed-by {
+  font-weight: 650;
+}
+
+.pgw-status {
+  display: inline-block;
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.55rem;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.pgw-status--needs {
+  color: #042816;
+  background: var(--pgw-green);
+  border: 1px solid rgba(62, 207, 142, 0.6);
+}
+
+.pgw-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(62, 207, 142, 0.55);
+  background: linear-gradient(180deg, rgba(62, 207, 142, 0.22), rgba(62, 207, 142, 0.1));
+  color: var(--pgw-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pgw-complete:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(62, 207, 142, 0.34), rgba(62, 207, 142, 0.16));
+  border-color: var(--pgw-green);
+}
+
+.pgw-complete:disabled {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+/* ---------- States ---------- */
+
+.pgw-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 2rem 1rem;
+  border-radius: 0.85rem;
+  border: 1px dashed var(--pgw-border);
+  color: var(--pgw-muted);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.pgw-state__title {
+  margin: 0;
+  color: var(--pgw-text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pgw-state p {
+  margin: 0;
+}
+
+.pgw-state--clear {
+  border-color: rgba(62, 207, 142, 0.35);
+  background: rgba(62, 207, 142, 0.06);
+}
+
+.pgw-state--clear .pgw-state__title {
+  color: var(--pgw-green);
+}
+
+.pgw-state--error {
+  border-color: rgba(255, 92, 92, 0.4);
+  background: rgba(255, 92, 92, 0.08);
+}
+
+.pgw-state--error .pgw-state__title {
+  color: var(--pgw-red);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .pgw-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pgw-sync {
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  .pgw-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pgw-search {
+    width: 100%;
+  }
+
+  .pgw-table {
+    font-size: 0.85rem;
+  }
+
+  .pgw-dog__owner {
+    max-width: 9rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pgw-filter,
+  .pgw-row,
+  .pgw-complete {
+    transition: none;
+  }
+}

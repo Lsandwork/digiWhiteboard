@@ -888,8 +888,10 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
 export function legacyRoleToRoleKey(role?: string | null): RoleKey {
   switch (role) {
     case "owner_admin":
+    case "super_admin":
       return "super_admin";
     case "manager_admin":
+    case "admin":
       return "admin";
     case "assistant_manager":
     case "management":
@@ -1094,6 +1096,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   handler_shift_entry: "create_trainer_entry",
   hr_pip: "view_hr_hub",
   walks_board: "view_admin_panel",
+  package_group_walks: "view_admin_panel",
   ruffops_checklist: "view_admin_panel",
   tl_digi_board: "manage_tl_digi_board",
   settings: "view_admin_panel",
@@ -1183,13 +1186,20 @@ const ADMIN_SUPPORT_TAB_SET = new Set([
 const ADMIN_HR_TAB_SET = new Set(["hr_hub", "hr_consult"]);
 
 export function isSuperAdminLegacyRole(legacyRole?: string | null) {
-  return legacyRole === "owner_admin";
+  // Accept both the DB legacy value and the RBAC key if it ever appears in a session.
+  return legacyRole === "owner_admin" || legacyRole === "super_admin";
 }
 
 /** Owner Admin and Manager Admin — full sidebar and utilities (matches middleware / API guards). */
 export function isFullAdminLegacyRole(legacyRole?: string | null) {
   // Missing/blank roles must never elevate to full admin.
-  return legacyRole === "owner_admin" || legacyRole === "manager_admin";
+  // Also accept RBAC keys (super_admin / admin) when sessions carry them.
+  return (
+    legacyRole === "owner_admin" ||
+    legacyRole === "manager_admin" ||
+    legacyRole === "super_admin" ||
+    legacyRole === "admin"
+  );
 }
 
 /** Owner Admin, Manager Admin, or Assistant Manager. */
@@ -1493,6 +1503,14 @@ export function canAccessAdminTab(
       hasPermission(effective, "manage_photo_upload_queue") ||
       Boolean(legacyRole)
     );
+  }
+
+  // Every authenticated staff member can view and complete Package Group Walks.
+  if (tab === "package_group_walks") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isMarketingLegacyRole(legacyRole)) return false;
+    return true;
   }
 
   // Same staff-board gate as Route Generator for walks / checklist / Fitdog alerts.

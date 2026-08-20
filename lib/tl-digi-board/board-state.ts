@@ -35,7 +35,9 @@ export type BuildTlBoardStateInput = {
   servicesCompletionAudit?: import("./types").TlAdditionalServicesCompletionAudit | null;
   medicationsHealth?: TlGingrSourceHealth;
   servicesHealth?: TlGingrSourceHealth;
+  packageGroupWalksHealth?: TlGingrSourceHealth;
   servicesRemaining?: number;
+  packageGroupWalksRemaining?: number;
 };
 
 function dedupeMedications(medications: TlGingrMedicationRecord[]): TlGingrMedicationRecord[] {
@@ -189,6 +191,8 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     input.medicationsHealth ??
     (input.syncSucceeded ? "ok" : input.lastSuccessfulSyncAt ? "stale" : "error");
   const servicesHealth: TlGingrSourceHealth = input.servicesHealth ?? medicationsHealth;
+  const packageGroupWalksHealth: TlGingrSourceHealth =
+    input.packageGroupWalksHealth ?? "unevaluated";
 
   const medicationsAllClear =
     medicationsHealth === "ok" &&
@@ -197,6 +201,8 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     summary.overdue === 0 &&
     !isStale;
   const servicesAllClear = servicesHealth === "ok" && (input.servicesRemaining ?? 0) === 0 && !isStale;
+  const packageGroupWalksAllClear =
+    packageGroupWalksHealth === "ok" && (input.packageGroupWalksRemaining ?? 0) === 0 && !isStale;
   const allClear = medicationsAllClear && servicesAllClear;
 
   const boardState = resolveTlBoardDisplayState({
@@ -219,8 +225,10 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
     allClear,
     medicationsHealth,
     servicesHealth,
+    packageGroupWalksHealth,
     medicationsAllClear,
     servicesAllClear,
+    packageGroupWalksAllClear,
     boardState,
     nextPeriod: next?.period ?? null,
     nextPeriodStartsAt: next ? `${periodLabel(next.period)} • ${next.startsAtLa}` : null,
@@ -261,6 +269,12 @@ const EMPTY_SERVICES_SUMMARY = {
   completionUnknown: 0
 } as const;
 
+const EMPTY_PACKAGE_GROUP_WALKS_SUMMARY = {
+  eligible: 0,
+  remaining: 0,
+  completed: 0
+} as const;
+
 /** Rebuild current/overdue rows and period from stored medications at `now`. */
 export function rehydrateTlBoardSnapshot(snapshot: TlDigiBoardSnapshot, now: Date): TlDigiBoardSnapshot {
   const syncSucceeded = snapshot.meta.medicationsHealth === "ok";
@@ -276,7 +290,9 @@ export function rehydrateTlBoardSnapshot(snapshot: TlDigiBoardSnapshot, now: Dat
     servicesCompletionAudit: snapshot.meta.servicesCompletionAudit,
     medicationsHealth: snapshot.meta.medicationsHealth,
     servicesHealth: snapshot.meta.servicesHealth,
-    servicesRemaining: snapshot.servicesSummary.remaining
+    packageGroupWalksHealth: snapshot.meta.packageGroupWalksHealth,
+    servicesRemaining: snapshot.servicesSummary.remaining,
+    packageGroupWalksRemaining: snapshot.packageGroupWalksSummary?.remaining ?? 0
   };
   const built = buildTlBoardMedicationRows(input);
   const meta = buildTlBoardSyncMeta(input, built.summary);
@@ -286,6 +302,8 @@ export function rehydrateTlBoardSnapshot(snapshot: TlDigiBoardSnapshot, now: Dat
     summary: built.summary,
     additionalServices: snapshot.additionalServices,
     servicesSummary: snapshot.servicesSummary,
+    packageGroupWalks: snapshot.packageGroupWalks ?? [],
+    packageGroupWalksSummary: snapshot.packageGroupWalksSummary ?? { ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY },
     meta,
     medications: snapshot.medications,
     generatedAt: snapshot.generatedAt
@@ -307,7 +325,9 @@ export function buildUnavailableTlBoardSnapshot(now: Date, lastError: string): T
     syncSucceeded: false,
     medicationsHealth: "error",
     servicesHealth: "error",
-    servicesRemaining: 0
+    packageGroupWalksHealth: "error",
+    servicesRemaining: 0,
+    packageGroupWalksRemaining: 0
   };
   const built = buildTlBoardMedicationRows(input);
   const meta = buildTlBoardSyncMeta(input, built.summary);
@@ -317,6 +337,8 @@ export function buildUnavailableTlBoardSnapshot(now: Date, lastError: string): T
     summary: built.summary,
     additionalServices: [],
     servicesSummary: { ...EMPTY_SERVICES_SUMMARY },
+    packageGroupWalks: [],
+    packageGroupWalksSummary: { ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY },
     meta,
     medications: [],
     generatedAt: attemptedAt

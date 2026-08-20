@@ -6,7 +6,8 @@ import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { DailyRemindersSection } from "@/components/admin/DailyRemindersSection";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
-import { canAccessPushNotices, canViewManagementReports } from "@/lib/admin/users";
+import { canUseStandardOrEmergencyPush, type UserAccess } from "@/lib/admin/permissions";
+import { canViewManagementReports } from "@/lib/admin/users";
 import type { ManagementReport } from "@/lib/staff/management-reports";
 import {
   DOG_HANDLER_COMPLAINT_NOTICE_LABEL,
@@ -27,7 +28,12 @@ type PushNoticesPayload = {
   notices: StaffPushNotice[];
   defaultNotices: DefaultNotice[];
   managementReports?: ManagementReport[];
-  currentUser: { email: string | null; adminUserId: string | null; role: string };
+  currentUser: {
+    email: string | null;
+    adminUserId: string | null;
+    role: string | null;
+    access?: UserAccess | null;
+  };
 };
 
 type NoticeFormState = {
@@ -133,7 +139,10 @@ export function PushNoticesPanel() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const canManage = canAccessPushNotices(data?.currentUser.role);
+  const canManage = useMemo(() => {
+    if (!data) return false;
+    return canUseStandardOrEmergencyPush(data.currentUser.access ?? null, data.currentUser.role);
+  }, [data]);
   const canViewReports = canViewManagementReports(data?.currentUser.role);
   const history = useMemo(() => data?.notices ?? [], [data?.notices]);
   const managementReports = useMemo(() => data?.managementReports ?? [], [data?.managementReports]);

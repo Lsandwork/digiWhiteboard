@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
-import { canManagePushNotices, isAdminRequest, unauthorizedAdminResponse, getEffectiveAdminRole } from "@/lib/admin/api-auth";
+import {
+  getEffectiveAdminRole,
+  isAdminRequest,
+  unauthorizedAdminResponse
+} from "@/lib/admin/api-auth";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
+import { accessFromLegacyRole, canUseStandardOrEmergencyPush } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { getUserAccess } from "@/lib/admin/user-access";
 import { deleteStaffPushNotice, pushStaffNoticeById, updateStaffPushNotice } from "@/lib/staff/push-notices";
 import { getEffectiveDemoRole, isDemoSession } from "@/lib/demo/session";
 import { pushDemoStaffNoticeAgain, removeDemoStaffPushNotice, updateDemoStaffPushNotice } from "@/lib/demo/store";
@@ -21,12 +27,30 @@ function actorFromRequest(request: Request) {
   };
 }
 
+async function actorContext(request: Request) {
+  const { session, actor } = actorFromRequest(request);
+  const supabase = getServiceSupabase();
+  const effectiveRole = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
+  const access = session?.adminUserId
+    ? await getUserAccess(supabase, session.adminUserId, effectiveRole, session.email)
+    : effectiveRole
+      ? accessFromLegacyRole(null, null, effectiveRole)
+      : null;
+  return { session, actor, access, role: effectiveRole };
+}
+
+function canManagePushNotices(
+  access: Awaited<ReturnType<typeof actorContext>>["access"],
+  role?: string | null
+) {
+  return canUseStandardOrEmergencyPush(access, role);
+}
+
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, actor } = actorFromRequest(request);
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
-  if (!canManagePushNotices(role)) return forbiddenResponse();
+  const { session, actor, access, role } = await actorContext(request);
+  if (!canManagePushNotices(access, role)) return forbiddenResponse();
 
   const { id } = await context.params;
 
@@ -59,9 +83,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session, actor } = actorFromRequest(request);
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
-  if (!canManagePushNotices(role)) return forbiddenResponse();
+  const { session, actor, access, role } = await actorContext(request);
+  if (!canManagePushNotices(access, role)) return forbiddenResponse();
 
   const { id } = await context.params;
 
@@ -99,9 +122,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
-  const { session } = actorFromRequest(request);
-  const role = isDemoSession(session) ? getEffectiveDemoRole(session) : getEffectiveAdminRole(request);
-  if (!canManagePushNotices(role)) return forbiddenResponse();
+  const { session, access, role } = await actorContext(request);
+  if (!canManagePushNotices(access, role)) return forbiddenResponse();
 
   const { id } = await context.params;
 
