@@ -54,6 +54,8 @@ let lastGoodEligibility: {
   uniqueCheckedInOwners: number;
   packageRowsInspected: number;
   capturedIds: PackageGroupWalkMeta["capturedIds"];
+  attempts: PackageGroupWalkMeta["attempts"];
+  ownerFieldNames: string[];
 } | null = null;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -278,6 +280,8 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
   uniqueCheckedInOwners: number;
   packageRowsInspected: number;
   capturedIds: PackageGroupWalkMeta["capturedIds"];
+  attempts: PackageGroupWalkMeta["attempts"];
+  ownerFieldNames: string[];
   errors: string[];
 }> {
   const reservations = await loadTlBoardCheckedInReservations();
@@ -317,6 +321,8 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
     uniqueCheckedInOwners: packageIndex.uniqueCheckedInOwners,
     packageRowsInspected: packageIndex.packageRowsInspected,
     capturedIds: packageIndex.capturedIds,
+    attempts: packageIndex.attempts,
+    ownerFieldNames: packageIndex.ownerFieldNames,
     errors: packageIndex.errors
   };
 }
@@ -353,6 +359,8 @@ export async function loadPackageGroupWalkState(
     monthly_unlimited: null,
     twenty_day_plus: null
   };
+  let attempts: PackageGroupWalkMeta["attempts"] = {};
+  let ownerFieldNames: string[] = [];
   let lastSuccessfulSyncAt: string | null = lastGoodEligibility?.syncedAt ?? null;
 
   try {
@@ -373,6 +381,8 @@ export async function loadPackageGroupWalkState(
     uniqueCheckedInOwners = result.uniqueCheckedInOwners;
     packageRowsInspected = result.packageRowsInspected;
     capturedIds = result.capturedIds;
+    attempts = result.attempts;
+    ownerFieldNames = result.ownerFieldNames;
     lastError = result.errors.length ? result.errors.join("; ") : null;
     lastSuccessfulSyncAt = attemptedAt;
     lastGoodEligibility = {
@@ -382,7 +392,9 @@ export async function loadPackageGroupWalkState(
       checkedInDogCount,
       uniqueCheckedInOwners,
       packageRowsInspected,
-      capturedIds
+      capturedIds,
+      attempts,
+      ownerFieldNames
     };
 
     logPackageGroupWalkEvent("PACKAGE_GROUP_WALK_SYNC_SUCCESS", {
@@ -393,6 +405,7 @@ export async function loadPackageGroupWalkState(
       packageRowsInspected,
       packageSources,
       capturedIds,
+      attempts,
       packageSourceAvailable,
       warning: lastError
     });
@@ -412,6 +425,8 @@ export async function loadPackageGroupWalkState(
       uniqueCheckedInOwners = lastGoodEligibility.uniqueCheckedInOwners;
       packageRowsInspected = lastGoodEligibility.packageRowsInspected;
       capturedIds = lastGoodEligibility.capturedIds;
+      attempts = lastGoodEligibility.attempts;
+      ownerFieldNames = lastGoodEligibility.ownerFieldNames;
       lastSuccessfulSyncAt = lastGoodEligibility.syncedAt;
     }
   }
@@ -457,7 +472,9 @@ export async function loadPackageGroupWalkState(
     checkedInDogCount,
     uniqueCheckedInOwners,
     packageRowsInspected,
-    capturedIds
+    capturedIds,
+    attempts,
+    ownerFieldNames
   };
 
   return { pending, completed, summary, meta, generatedAt: attemptedAt };

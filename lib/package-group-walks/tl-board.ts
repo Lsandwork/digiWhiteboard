@@ -62,7 +62,9 @@ export async function syncTlBoardPackageGroupWalks(
         capturedIds: state.meta.capturedIds,
         uniqueCheckedInOwners: state.meta.uniqueCheckedInOwners,
         packageRowsInspected: state.meta.packageRowsInspected,
-        qualifying: state.summary.eligibleToday
+        qualifying: state.summary.eligibleToday,
+        attempts: state.meta.attempts,
+        ownerFieldNames: state.meta.ownerFieldNames
       }
     },
     ok: state.meta.gingrOk && state.meta.packageSourceAvailable && !state.meta.isStale,

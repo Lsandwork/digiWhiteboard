@@ -152,6 +152,8 @@ export async function GET(request: Request) {
       qualifyingCheckedInDogs: eligibility.length,
       packageSourceAvailable: packageIndex.available,
       packageIndexSources: packageIndex.sources,
+      attempts: packageIndex.attempts,
+      ownerFieldNames: packageIndex.ownerFieldNames,
       database: {
         packageGroupWalks: database.status,
         message: database.message
