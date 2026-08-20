@@ -69,13 +69,17 @@ export function staffIdleSlideshowLookbackSince(days = STAFF_IDLE_SLIDESHOW_LOOK
 }
 
 export function formatStaffIdleSlideshowLoadError(error: unknown) {
-  if (error instanceof Error && error.message) return error.message;
-  if (error && typeof error === "object") {
+  let message = "Unable to load media library slideshow.";
+  if (error instanceof Error && error.message) message = error.message;
+  else if (error && typeof error === "object") {
     const row = error as { message?: string; code?: string; details?: string; hint?: string };
     const parts = [row.message, row.details, row.hint, row.code].filter(Boolean);
-    if (parts.length) return parts.join(" — ");
+    if (parts.length) message = parts.join(" — ");
   }
-  return "Unable to load media library slideshow.";
+  if (/522|Connection timed out|supabase\.co/i.test(message) || message.includes("<!DOCTYPE html>")) {
+    return "Media library database is temporarily unavailable. Retrying…";
+  }
+  return message.length > 240 ? `${message.slice(0, 240)}…` : message;
 }
 
 export function invalidateStaffIdleSlideshowCache() {
