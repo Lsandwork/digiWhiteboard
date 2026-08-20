@@ -117,6 +117,8 @@ export type OwnerPackageIndex = {
     monthly_unlimited: string | null;
     twenty_day_plus: string | null;
   };
+  attempts: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
+  ownerFieldNames: string[];
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -478,6 +480,12 @@ function sourceAttempt(
     return { attempted: false, ok: false, httpStatus: null, rows: 0, ...extra };
   }
   const shape = payloadShape(read.payload);
+  const errorNote = read.error ? redactDiagnosticMessage(read.error) : null;
+  const extraNote = extra?.note;
+  const note = errorNote
+    ? `HTTP ${read.status ?? "none"}: ${errorNote}${extraNote ? ` (${extraNote})` : ""}`
+    : extraNote;
+  const { note: _ignored, ...rest } = extra ?? {};
   return {
     attempted: true,
     ok: read.ok,
@@ -485,8 +493,8 @@ function sourceAttempt(
     rows: shape.rowCount,
     dataKind: shape.dataKind,
     topLevelKeys: shape.topLevelKeys,
-    note: read.error ? redactDiagnosticMessage(read.error) : extra?.note,
-    ...extra
+    ...rest,
+    note
   };
 }
 
@@ -625,6 +633,7 @@ async function loadCheckedInOwnerPackages(ownerIds: string[]): Promise<{
   inspection: PackageInspectionRecord[];
   attempt: PackageSourceAttempt;
   uniqueOwners: number;
+  sampleFields: string[];
 }> {
   const unique = [...new Set(ownerIds.filter(Boolean))];
   const byOwnerId = new Map<string, ResolvedOwnerPackage[]>();
@@ -632,12 +641,14 @@ async function loadCheckedInOwnerPackages(ownerIds: string[]): Promise<{
   let ownersWithPackageRecords = 0;
   let lastError: string | null = null;
   let okCount = 0;
+  let sampleFields: string[] = [];
 
   await mapPool(unique, OWNER_FETCH_CONCURRENCY, async (ownerId) => {
     try {
       const loaded = await loadPackagesForOwnerId(ownerId);
       okCount += 1;
       if (loaded.inspection.length) ownersWithPackageRecords += 1;
+      if (!sampleFields.length && loaded.availableFields.length) sampleFields = loaded.availableFields;
       addPackages(byOwnerId, ownerId, loaded.packages);
       inspection.push(...loaded.inspection.map((entry) => ({ ...entry, ownerId })));
     } catch (error) {
@@ -649,11 +660,13 @@ async function loadCheckedInOwnerPackages(ownerIds: string[]): Promise<{
     byOwnerId,
     inspection,
     uniqueOwners: unique.length,
+    sampleFields,
     attempt: {
       attempted: unique.length > 0,
       ok: okCount > 0,
       httpStatus: okCount > 0 ? 200 : null,
       rows: inspection.length,
+      topLevelKeys: sampleFields,
       note: lastError
         ? redactDiagnosticMessage(lastError)
         : unique.length
@@ -774,6 +787,8 @@ export async function buildOwnerPackageIndex(
   const uniqueCheckedInOwners = new Set(ownerIds).size;
   let packageRowsInspected = 0;
   let partnerOk = false;
+  const attempts: Record<string, { ok: boolean; httpStatus: number | null; rows: number }> = {};
+  let ownerFieldNames: string[] = [];
 
   let reservationMatches = 0;
   let reservationTypeMatches = 0;
@@ -800,6 +815,26 @@ export async function buildOwnerPackageIndex(
       membershipTypes.attempt.ok ||
       parentPackages.attempt.ok ||
       parentMemberships.attempt.ok;
+    attempts.packageTypes = {
+      ok: packageTypes.attempt.ok,
+      httpStatus: packageTypes.attempt.httpStatus,
+      rows: packageTypes.attempt.rows
+    };
+    attempts.membershipTypes = {
+      ok: membershipTypes.attempt.ok,
+      httpStatus: membershipTypes.attempt.httpStatus,
+      rows: membershipTypes.attempt.rows
+    };
+    attempts.parentPackages = {
+      ok: parentPackages.attempt.ok,
+      httpStatus: parentPackages.attempt.httpStatus,
+      rows: parentPackages.attempt.rows
+    };
+    attempts.parentMemberships = {
+      ok: parentMemberships.attempt.ok,
+      httpStatus: parentMemberships.attempt.httpStatus,
+      rows: parentMemberships.attempt.rows
+    };
     captureId(capturedIds, "monthly_unlimited", packageTypes.capturedIds.monthly_unlimited ?? null);
     captureId(capturedIds, "twenty_day_plus", packageTypes.capturedIds.twenty_day_plus ?? null);
     captureId(capturedIds, "monthly_unlimited", membershipTypes.capturedIds.monthly_unlimited ?? null);
@@ -831,6 +866,11 @@ export async function buildOwnerPackageIndex(
   try {
     const subscriptions = await loadGingrSubscriptionIndex();
     if (subscriptions.attempt.note) errors.push(subscriptions.attempt.note);
+    attempts.subscriptions = {
+      ok: subscriptions.attempt.ok,
+      httpStatus: subscriptions.attempt.httpStatus,
+      rows: subscriptions.rowCount
+    };
     let subscriptionMatches = 0;
     for (const [ownerId, packages] of subscriptions.byOwnerId) {
       subscriptionMatches += packages.length;
@@ -851,6 +891,12 @@ export async function buildOwnerPackageIndex(
       }
       if (checkedInOwners.byOwnerId.size > 0) sources.push("owner");
       if (checkedInOwners.attempt.note) errors.push(checkedInOwners.attempt.note);
+      attempts.owner = {
+        ok: checkedInOwners.attempt.ok,
+        httpStatus: checkedInOwners.attempt.httpStatus,
+        rows: checkedInOwners.attempt.rows
+      };
+      ownerFieldNames = checkedInOwners.sampleFields.slice(0, 80);
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "Gingr owner package lookup failed.");
     }
@@ -865,7 +911,9 @@ export async function buildOwnerPackageIndex(
     errors,
     uniqueCheckedInOwners,
     packageRowsInspected,
-    capturedIds
+    capturedIds,
+    attempts,
+    ownerFieldNames
   };
 }
 

@@ -83,6 +83,8 @@ export type PackageGroupWalkMeta = {
     monthly_unlimited: string | null;
     twenty_day_plus: string | null;
   };
+  attempts: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
+  ownerFieldNames: string[];
 };
 
 export type PackageGroupWalkState = {
@@ -120,5 +122,7 @@ export type TlBoardPackageGroupWalksSummary = {
     uniqueCheckedInOwners: number;
     packageRowsInspected: number;
     qualifying: number;
+    attempts?: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
+    ownerFieldNames?: string[];
   };
 };

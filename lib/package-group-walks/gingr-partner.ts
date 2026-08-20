@@ -193,13 +193,19 @@ function attemptFromRead(
   rows: number,
   extra?: Partial<PartnerSourceAttempt>
 ): PartnerSourceAttempt {
+  const errorNote = read.error ? redactDiagnosticMessage(read.error) : null;
+  const extraNote = extra?.note;
+  const note = errorNote
+    ? `HTTP ${read.status ?? "none"}: ${errorNote}${extraNote ? ` (${extraNote})` : ""}`
+    : extraNote;
+  const { note: _ignored, ...rest } = extra ?? {};
   return {
     attempted: true,
     ok: read.ok,
     httpStatus: read.status,
     rows,
-    note: read.error ? redactDiagnosticMessage(read.error) : extra?.note,
-    ...extra
+    ...rest,
+    note
   };
 }
 

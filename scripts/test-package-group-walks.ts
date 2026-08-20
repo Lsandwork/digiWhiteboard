@@ -84,7 +84,9 @@ function emptyIndex(): OwnerPackageIndex {
     errors: [],
     uniqueCheckedInOwners: 0,
     packageRowsInspected: 0,
-    capturedIds: { monthly_unlimited: null, twenty_day_plus: null }
+    capturedIds: { monthly_unlimited: null, twenty_day_plus: null },
+    attempts: {},
+    ownerFieldNames: []
   };
 }
 
@@ -653,9 +655,12 @@ assert.equal(nameFromEmail(""), "Staff");
   assert.match(partner, /\/v1\/config\/package-types/);
   assert.match(partner, /PARENT_ID_BATCH/);
   assert.match(partner, /X-Api-Key/);
+  assert.match(partner, /HTTP \$\{read\.status/);
   assert.match(packages, /OWNER_PACKAGE_CACHE_TTL_MS/);
   assert.match(packages, /OWNER_FETCH_CONCURRENCY/);
   assert.match(packages, /new Set\(ownerIds/);
+  assert.match(packages, /HTTP \$\{read\.status/);
+  assert.match(packages, /attempts\.subscriptions/);
   assert.doesNotMatch(packages, /for \(const reservation of reservations\) \{\s+await gingrV1Request/);
   assert.doesNotMatch(partner, /for \(const reservation of reservations\)/);
 
@@ -806,6 +811,8 @@ assert.equal(
   assert.match(diagnostics, /eligibleDogs/);
   assert.match(diagnostics, /discoverGingrPackageSources/);
   assert.match(diagnostics, /qualifyingCheckedInDogs/);
+  assert.match(diagnostics, /attempts: packageIndex\.attempts/);
+  assert.match(diagnostics, /ownerFieldNames: packageIndex\.ownerFieldNames/);
   const packageLookup = source("lib/package-group-walks/gingr-packages.ts");
   assert.match(packageLookup, /parentPackages/);
 

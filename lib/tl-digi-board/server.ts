@@ -189,7 +189,26 @@ function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalks
           },
           uniqueCheckedInOwners: Number(lookupRow.uniqueCheckedInOwners ?? 0) || 0,
           packageRowsInspected: Number(lookupRow.packageRowsInspected ?? 0) || 0,
-          qualifying: Number(lookupRow.qualifying ?? 0) || 0
+          qualifying: Number(lookupRow.qualifying ?? 0) || 0,
+          attempts: asRecord(lookupRow.attempts)
+            ? Object.fromEntries(
+                Object.entries(asRecord(lookupRow.attempts)!).map(([name, value]) => {
+                  const attempt = asRecord(value);
+                  return [
+                    name,
+                    {
+                      ok: Boolean(attempt?.ok),
+                      httpStatus:
+                        attempt?.httpStatus == null ? null : Number(attempt.httpStatus) || null,
+                      rows: Number(attempt?.rows ?? 0) || 0
+                    }
+                  ];
+                })
+              )
+            : undefined,
+          ownerFieldNames: Array.isArray(lookupRow.ownerFieldNames)
+            ? lookupRow.ownerFieldNames.map(String).slice(0, 80)
+            : undefined
         }
       : undefined
   };
