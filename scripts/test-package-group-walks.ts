@@ -1059,6 +1059,7 @@ async function testOwnerPackageIndexResilience() {
   const csvRoute = source("app/api/admin/package-group-walks/csv-owner-resolution/route.ts");
   assert.match(csvRoute, /isSuperAdminLegacyRole/);
   assert.match(csvRoute, /toPublicCsvOwnerResolutionLookup/);
+  assert.match(csvRoute, /VERCEL_ENV === "preview"/);
   assert.doesNotMatch(csvRoute, /ownerDisplayName/);
   assert.doesNotMatch(csvRoute, /GINGR_API_KEY|TL_GINGR_KEY/);
 
