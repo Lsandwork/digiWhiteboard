@@ -888,8 +888,10 @@ export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[]> = {
 export function legacyRoleToRoleKey(role?: string | null): RoleKey {
   switch (role) {
     case "owner_admin":
+    case "super_admin":
       return "super_admin";
     case "manager_admin":
+    case "admin":
       return "admin";
     case "assistant_manager":
     case "management":
@@ -1184,13 +1186,20 @@ const ADMIN_SUPPORT_TAB_SET = new Set([
 const ADMIN_HR_TAB_SET = new Set(["hr_hub", "hr_consult"]);
 
 export function isSuperAdminLegacyRole(legacyRole?: string | null) {
-  return legacyRole === "owner_admin";
+  // Accept both the DB legacy value and the RBAC key if it ever appears in a session.
+  return legacyRole === "owner_admin" || legacyRole === "super_admin";
 }
 
 /** Owner Admin and Manager Admin — full sidebar and utilities (matches middleware / API guards). */
 export function isFullAdminLegacyRole(legacyRole?: string | null) {
   // Missing/blank roles must never elevate to full admin.
-  return legacyRole === "owner_admin" || legacyRole === "manager_admin";
+  // Also accept RBAC keys (super_admin / admin) when sessions carry them.
+  return (
+    legacyRole === "owner_admin" ||
+    legacyRole === "manager_admin" ||
+    legacyRole === "super_admin" ||
+    legacyRole === "admin"
+  );
 }
 
 /** Owner Admin, Manager Admin, or Assistant Manager. */
