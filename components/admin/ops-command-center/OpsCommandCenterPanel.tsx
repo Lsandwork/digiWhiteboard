@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
+import { SmsCostDashboardCard } from "@/components/admin/ops-command-center/SmsCostDashboardCard";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
@@ -283,6 +284,8 @@ export function OpsCommandCenterPanel({
           </p>
         </div>
       ) : null}
+
+      {mode === "ops_command_center" ? <SmsCostDashboardCard /> : null}
 
       {mode === "my_shift" ? (
         <BulkShiftLogComposer

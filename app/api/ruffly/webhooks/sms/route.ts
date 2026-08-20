@@ -72,7 +72,13 @@ export async function POST(request: Request) {
       rawBody: body
     });
     if (isRufflySmsSendingEnabled() && from) {
-      await getSmsProvider().send({ to: from, body: OPT_OUT_CONFIRMATION, purpose: "transactional" });
+      await getSmsProvider().send({
+        to: from,
+        body: OPT_OUT_CONFIRMATION,
+        purpose: "transactional",
+        idempotencyKey: `ruffly-opt-out-confirm:${contactId || from}`.slice(0, 64),
+        costMetadata: { category: "CLIENT_TRANSACTIONAL", templateKey: "ruffly_opt_out_confirm" }
+      });
     }
     return NextResponse.json({ ok: true, optOut: true });
   }

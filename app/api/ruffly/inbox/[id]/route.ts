@@ -101,6 +101,21 @@ export async function POST(request: Request, context: Ctx) {
     if (!conversation) return NextResponse.json({ error: "Conversation not found." }, { status: 404 });
 
     const channel = String(body.channel ?? conversation.channel ?? "sms");
+
+    const { data: message, error: insertError } = await supabase
+      .from("ruffly_messages")
+      .insert({
+        conversation_id: id,
+        direction: "outbound",
+        channel,
+        body: text,
+        sender_admin_id: auth.session?.adminUserId ?? null,
+        delivery_status: channel === "sms" ? "queued" : "queued"
+      })
+      .select("*")
+      .single();
+    if (insertError) throw insertError;
+
     if (channel === "sms" && conversation.contact_id) {
       const gate = await canSendToContact({
         contactId: conversation.contact_id,
@@ -108,6 +123,7 @@ export async function POST(request: Request, context: Ctx) {
         purpose: "transactional"
       });
       if (!gate.allowed) {
+        await supabase.from("ruffly_messages").delete().eq("id", message.id);
         return NextResponse.json({ error: gate.reason || "Send blocked by consent rules." }, { status: 403 });
       }
       const { data: contact } = await supabase
@@ -117,24 +133,23 @@ export async function POST(request: Request, context: Ctx) {
         .maybeSingle();
       if (isRufflySmsSendingEnabled() && contact?.phone) {
         const sms = getSmsProvider();
-        const sent = await sms.send({ to: contact.phone, body: text, purpose: "transactional" });
-        if (!sent.ok) return NextResponse.json({ error: sent.error || "SMS failed." }, { status: 502 });
+        const sent = await sms.send({
+          to: contact.phone,
+          body: text,
+          purpose: "transactional",
+          idempotencyKey: `ruffly-inbox:${message.id}`.slice(0, 64),
+          costMetadata: { category: "CLIENT_RUFFLY_REPLY", templateKey: "ruffly_inbox_reply" }
+        });
+        if (!sent.ok) {
+          await supabase.from("ruffly_messages").delete().eq("id", message.id);
+          return NextResponse.json({ error: sent.error || "SMS failed." }, { status: 502 });
+        }
+        await supabase
+          .from("ruffly_messages")
+          .update({ delivery_status: "sent", provider_message_id: sent.providerMessageId ?? null })
+          .eq("id", message.id);
       }
     }
-
-    const { data: message, error } = await supabase
-      .from("ruffly_messages")
-      .insert({
-        conversation_id: id,
-        direction: "outbound",
-        channel,
-        body: text,
-        sender_admin_id: auth.session?.adminUserId ?? null,
-        delivery_status: "queued"
-      })
-      .select("*")
-      .single();
-    if (error) throw error;
 
     await supabase
       .from("ruffly_conversations")
