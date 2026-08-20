@@ -716,7 +716,8 @@ function BoardInner() {
             kind={packageWalkCard}
             lastSync={lastSync}
             retryLabel={retryLabel}
-            errorNoun="Package Group Walks"
+            errorNoun="Package Group Walk eligibility"
+            errorDetail="Checked-in dogs were loaded from Gingr, but package/membership ownership could not be confirmed. This is not All Clear."
             allClearText="No qualifying checked-in dogs currently need a group walk."
             allClearDetail={
               snapshot?.packageGroupWalksSummary?.completed
@@ -775,6 +776,7 @@ function GingrStatusCard({
   lastSync,
   retryLabel,
   errorNoun,
+  errorDetail,
   allClearText,
   allClearDetail,
   children
@@ -785,6 +787,7 @@ function GingrStatusCard({
   lastSync: string | null;
   retryLabel: string | null;
   errorNoun: string;
+  errorDetail?: string;
   allClearText?: string;
   allClearDetail?: string;
   children: ReactNode;
@@ -805,7 +808,7 @@ function GingrStatusCard({
       {kind === "error" ? (
         <div className="tl-card-state tl-card-state--error" role="alert">
           <p className="tl-card-state__title">⚠ Unable to verify {errorNoun}</p>
-          <p>Gingr is temporarily unavailable.</p>
+          <p>{errorDetail ?? "Gingr is temporarily unavailable."}</p>
           <p>Last successful sync: {lastSync || "—"}</p>
           {retryLabel ? <p className="tl-card-state__retry">{retryLabel}</p> : null}
         </div>

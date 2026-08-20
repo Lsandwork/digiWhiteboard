@@ -72,16 +72,28 @@ id matching.
 
 ## Gingr data sources
 
-Two bulk reads. Never one request per dog or per owner.
+Prepaid Fitdog packages are **not** Gingr subscriptions. Official Gingr v1
+documents them as parent packages on `api.gingr.io`. That is why production
+`GET /api/v1/get_subscriptions` returned 0 rows while 28 dogs were checked in.
 
 | Source | Endpoint | Cost |
 |--------|----------|------|
 | Checked-in dogs | `POST /api/v1/reservations` (`checked_in=true`) | Shared with the TL board's existing pull |
-| Owner packages | `GET /api/v1/get_subscriptions` | One request per page, typically one page |
+| Package type catalog (stable ids) | `GET https://api.gingr.io/v1/config/package-types` | One paginated list, cached 30m |
+| Owner packages | `GET https://api.gingr.io/v1/parents/parent-packages` | Batched by unique checked-in owner ids, cached 10m |
+| Owner memberships | `GET https://api.gingr.io/v1/parents/parent-memberships` | Same owner-id batches, cached 10m |
+| Recurring subscriptions (legacy) | `GET /api/v1/get_subscriptions` | One request per page; expected empty for prepaid packages |
 | Reservation-embedded packages | — | Free; already on the reservation payload |
 
-`GET /api/v1/owner?id=` is deliberately unused: it is per-owner and would
-reintroduce the N+1 pattern.
+Fallback only if the Partner API does not answer: unique-owner
+`GET /api/v1/owner?id=` with a 10-minute TTL and concurrency 4. That is still
+one request per unique owner, never one per dog per refresh.
+
+Partner API auth uses the same facility key as the legacy subdomain API,
+sent as `X-Api-Key` plus a `subdomain` header. The URL never contains `key=`.
+
+Matching prefers a confirmed Gingr `packageTypeId` (from the catalog or env
+overrides) and falls back to exact normalized display name.
 
 Credentials resolve server-side via `TL_GINGR_KEY` (falling back to
 `GINGR_API_KEY`). No Gingr key ever reaches the browser.

@@ -79,7 +79,7 @@ function SyncPill({ state, lastSync }: { state: PackageGroupWalkState["meta"]["s
       : state === "STALE"
         ? "GINGR • STALE"
         : state === "ERROR"
-          ? "GINGR • UNAVAILABLE"
+          ? "ELIGIBILITY • UNVERIFIED"
           : "SYNCING…";
   const tone =
     state === "LIVE" || state === "EMPTY_VALID"
@@ -275,7 +275,7 @@ export function PackageGroupWalksPanel() {
       {syncState === "ERROR" ? (
         <p className="pgw-notice pgw-notice--error" role="alert">
           <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-          Unable to verify Package Group Walks. Gingr is temporarily unavailable. Last successful sync:{" "}
+          Unable to verify Package Group Walk eligibility. Gingr check-in is working, but owner package data could not be confirmed. Last successful sync:{" "}
           {lastSync}. Retrying automatically.
         </p>
       ) : null}
@@ -336,8 +336,12 @@ export function PackageGroupWalksPanel() {
           ) : syncState === "ERROR" ? (
             <div className="pgw-state pgw-state--error" role="alert">
               <AlertTriangle className="h-5 w-5" aria-hidden="true" />
-              <p className="pgw-state__title">Unable to verify Package Group Walks</p>
-              <p>Gingr is temporarily unavailable. Last successful sync: {lastSync}</p>
+              <p className="pgw-state__title">Unable to verify Package Group Walk eligibility</p>
+              <p>
+                {meta?.gingrOk
+                  ? "Checked-in dogs were loaded from Gingr, but package/membership ownership could not be read. This is not All Clear."
+                  : `Gingr is temporarily unavailable. Last successful sync: ${lastSync}`}
+              </p>
             </div>
           ) : pending.length === 0 ? (
             <div className="pgw-state pgw-state--clear">

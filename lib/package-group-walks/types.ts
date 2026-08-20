@@ -77,6 +77,12 @@ export type PackageGroupWalkMeta = {
   packageSourceAvailable: boolean;
   packageSources: string[];
   checkedInDogCount: number;
+  uniqueCheckedInOwners: number;
+  packageRowsInspected: number;
+  capturedIds: {
+    monthly_unlimited: string | null;
+    twenty_day_plus: string | null;
+  };
 };
 
 export type PackageGroupWalkState = {
@@ -103,4 +109,16 @@ export type TlBoardPackageGroupWalksSummary = {
   eligible: number;
   remaining: number;
   completed: number;
+  /** Compact non-PII lookup so production can be verified without admin cookies. */
+  lookup?: {
+    packageSourceAvailable: boolean;
+    sources: string[];
+    capturedIds: {
+      monthly_unlimited: string | null;
+      twenty_day_plus: string | null;
+    };
+    uniqueCheckedInOwners: number;
+    packageRowsInspected: number;
+    qualifying: number;
+  };
 };

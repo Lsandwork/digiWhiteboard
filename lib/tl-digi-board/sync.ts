@@ -524,7 +524,9 @@ async function runTlDigiBoardSync(
         rows: previous?.packageGroupWalks ?? [],
         summary: previous?.packageGroupWalksSummary ?? { ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY },
         ok: false,
-        error: error instanceof Error ? error.message : "package_group_walks_sync_failed"
+        error: error instanceof Error ? error.message : "package_group_walks_sync_failed",
+        packageSourceAvailable: false,
+        packageSources: []
       }))
     ]);
     const lodgingMap = await loadLodgingMapByAnimal();

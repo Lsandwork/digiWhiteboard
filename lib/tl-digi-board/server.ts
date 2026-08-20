@@ -171,10 +171,27 @@ function parsePackageGroupWalks(value: unknown): TlBoardPackageGroupWalkRow[] {
 
 function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalksSummary {
   const row = asRecord(value);
+  const lookupRow = asRecord(row?.lookup);
+  const captured = asRecord(lookupRow?.capturedIds);
   return {
     eligible: Number(row?.eligible ?? 0) || 0,
     remaining: Number(row?.remaining ?? 0) || 0,
-    completed: Number(row?.completed ?? 0) || 0
+    completed: Number(row?.completed ?? 0) || 0,
+    lookup: lookupRow
+      ? {
+          packageSourceAvailable: Boolean(lookupRow.packageSourceAvailable),
+          sources: Array.isArray(lookupRow.sources) ? lookupRow.sources.map(String) : [],
+          capturedIds: {
+            monthly_unlimited:
+              captured?.monthly_unlimited == null ? null : String(captured.monthly_unlimited),
+            twenty_day_plus:
+              captured?.twenty_day_plus == null ? null : String(captured.twenty_day_plus)
+          },
+          uniqueCheckedInOwners: Number(lookupRow.uniqueCheckedInOwners ?? 0) || 0,
+          packageRowsInspected: Number(lookupRow.packageRowsInspected ?? 0) || 0,
+          qualifying: Number(lookupRow.qualifying ?? 0) || 0
+        }
+      : undefined
   };
 }
 
