@@ -39,6 +39,18 @@ function testDepartmentTargeting() {
   assert(castVideoTargetsDepartment(notice, "grooming") === true, "grooming should match");
   assert(castVideoTargetsDepartment(notice, "drivers") === false, "drivers should not match");
   assert(castVideoTargetsDepartment({ departments: ["everyone"] }, "drivers") === true, "everyone should match all");
+  assert(
+    castVideoTargetsDepartment({ departments: ["staff_whiteboard"] }, "tl_alerts_reminders") === true,
+    "TL board should mirror staff whiteboard cast pushes"
+  );
+  assert(
+    castVideoTargetsDepartment({ departments: ["team_leads"] }, "tl_alerts_reminders") === true,
+    "TL board should show team-lead cast pushes"
+  );
+  assert(
+    castVideoTargetsDepartment({ departments: ["grooming"] }, "tl_alerts_reminders") === false,
+    "TL board should not show grooming-only cast pushes"
+  );
 }
 
 function testEmergencyDetection() {
