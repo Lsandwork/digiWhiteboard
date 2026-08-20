@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+import { TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS } from "./constants";
 import {
   canManageTlDigiBoardConfig,
   DEFAULT_TL_DIGI_BOARD_CONFIG,
@@ -537,7 +538,7 @@ export async function loadTlDigiBoardPublicPayload(
 
   const snapshot = await withTimeoutFallback(
     loadTlDigiBoardSnapshot(client).catch(() => null),
-    1_200,
+    TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS,
     null
   );
 
