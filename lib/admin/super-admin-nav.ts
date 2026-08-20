@@ -102,6 +102,11 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
           tabLink("vip_auto_book", "VIP Auto Book", "VIP clients who always want auto-booking."),
           tabLink("walks_board", "Walks Board", "Physical whiteboard walk-check alarm."),
           tabLink(
+            "package_group_walks",
+            "Package Group Walks",
+            "Checked-in dogs whose package includes today's complimentary group walk."
+          ),
+          tabLink(
             "ruffops_checklist",
             "RuffOps Checklist",
             "Shared Gingr-style checklist for yard reminders, walks, meds, services, and alerts."

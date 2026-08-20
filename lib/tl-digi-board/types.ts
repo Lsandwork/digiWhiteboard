@@ -1,4 +1,10 @@
 import type { TlLodgingAreaKey, TlMedicationPeriod } from "./constants";
+import type {
+  TlBoardPackageGroupWalkRow,
+  TlBoardPackageGroupWalksSummary
+} from "@/lib/package-group-walks/types";
+
+export type { TlBoardPackageGroupWalkRow, TlBoardPackageGroupWalksSummary };
 
 /**
  * Authoritative Gingr Medication Report statuses.
@@ -147,8 +153,11 @@ export type TlBoardSyncMeta = {
   allClear: boolean;
   medicationsHealth: TlGingrSourceHealth;
   servicesHealth: TlGingrSourceHealth;
+  /** Independent from meds/services so one failing card cannot blank the others. */
+  packageGroupWalksHealth: TlGingrSourceHealth;
   medicationsAllClear: boolean;
   servicesAllClear: boolean;
+  packageGroupWalksAllClear: boolean;
   boardState: TlBoardDisplayState;
   nextPeriod: TlMedicationPeriod | null;
   nextPeriodStartsAt: string | null;
@@ -169,6 +178,9 @@ export type TlDigiBoardSnapshot = {
   summary: TlMedicationSummary;
   additionalServices: TlBoardAdditionalServiceRow[];
   servicesSummary: TlAdditionalServicesSummary;
+  /** Checked-in dogs with an eligible package still owed today's group walk. */
+  packageGroupWalks: TlBoardPackageGroupWalkRow[];
+  packageGroupWalksSummary: TlBoardPackageGroupWalksSummary;
   meta: TlBoardSyncMeta;
   /** Last-known-good raw medication records — retained across failed syncs. */
   medications: TlGingrMedicationRecord[];
