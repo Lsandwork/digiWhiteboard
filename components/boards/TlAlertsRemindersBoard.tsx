@@ -32,6 +32,7 @@ import {
   type TlCardKind
 } from "@/lib/tl-digi-board/display-state";
 import "./tl-alerts-reminders-board.css";
+import { TlBoardPushTakeover } from "@/components/boards/TlBoardPushTakeover";
 
 type TlReminderCard = {
   id: string;
@@ -573,7 +574,8 @@ function BoardInner() {
       : null;
 
   return (
-    <main className="tl-board">
+    <>
+      <main className="tl-board">
       <header className="tl-board__header">
         <div className="tl-board__brand">
           <div className="tl-board__logo-row">
@@ -765,7 +767,9 @@ function BoardInner() {
           <p className="tl-section__empty">Loading reminders…</p>
         )}
       </section>
-    </main>
+      </main>
+      <TlBoardPushTakeover />
+    </>
   );
 }
 

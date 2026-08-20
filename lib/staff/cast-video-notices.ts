@@ -224,6 +224,12 @@ export function isYouTubeEmbedCastVideo(
 export function castVideoTargetsDepartment(notice: Pick<CastVideoNotice, "departments">, department: string | null | undefined) {
   if (!department || department === "everyone") return true;
   if (notice.departments.includes("everyone")) return true;
+  // TL board mirrors staff whiteboard cast pushes plus team-lead targeting.
+  if (department === "tl_alerts_reminders") {
+    return (
+      notice.departments.includes("staff_whiteboard") || notice.departments.includes("team_leads")
+    );
+  }
   return notice.departments.includes(department as CastVideoDepartment);
 }
 
