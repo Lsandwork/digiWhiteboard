@@ -8,6 +8,7 @@ import {
   canReviewManagementSupportForUser,
   canReviewWriteUpsForUser,
   canSubmitWriteUpForUser,
+  canUseStandardOrEmergencyPush,
   type UserAccess
 } from "@/lib/admin/permissions";
 import {
@@ -73,8 +74,9 @@ export function blockDemoWrite(request: Request) {
   return NextResponse.json({ ok: true, demo: true, message: demoWriteBlockedMessage() });
 }
 
-export function canManagePushNotices(role?: string | null) {
-  return canAccessPushNotices(role);
+export function canManagePushNotices(role?: string | null, access?: UserAccess | null) {
+  if (access) return canUseStandardOrEmergencyPush(access, role);
+  return canAccessPushNotices(role) || canUseStandardOrEmergencyPush(null, role);
 }
 
 export function canManageStaffOperations(role?: string | null) {

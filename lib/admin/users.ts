@@ -141,7 +141,12 @@ export function canPushCrossoverToWhiteboard(role?: string | null) {
 
 /** Push Notices tab — front desk coordinators, team leads, and admins. */
 export function canAccessPushNotices(role?: string | null) {
-  return isFullAdminRole(role) || hasCoordinatorAccess(role);
+  return (
+    isFullAdminRole(role) ||
+    hasCoordinatorAccess(role) ||
+    role === "super_admin" ||
+    role === "admin"
+  );
 }
 
 /** Owner complaint push notice — anyone with Push Notices access. */
@@ -263,7 +268,13 @@ export function isStaffPanelLimitedRole(role?: string | null) {
 
 export function isFullAdminRole(role?: string | null) {
   // Missing/blank roles must never elevate to full admin.
-  return role === "owner_admin" || role === "manager_admin";
+  // Accept RBAC keys too — Super Admin sessions may carry "super_admin".
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "super_admin" ||
+    role === "admin"
+  );
 }
 
 /** Assistant Manager — management tier (not full admin). */
