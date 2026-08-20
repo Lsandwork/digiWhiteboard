@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { assembleTlDigiBoardPublicPayload } from "../lib/tl-digi-board/server";
 import { DEFAULT_TL_DIGI_BOARD_CONFIG } from "../lib/tl-digi-board/config";
 import { dateAtLaLocal } from "../lib/tl-digi-board/medication-windows";
+import { TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS } from "../lib/tl-digi-board/constants";
+
+{
+  const source = readFileSync("lib/tl-digi-board/server.ts", "utf8");
+  assert.match(source, /withTimeoutFallback\(\s*loadTlDigiBoardSnapshot\(client\)\.catch\(\(\) => null\),\s*TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS/);
+  assert.ok(TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS >= 8_000);
+}
 
 {
   const source = readFileSync("lib/tl-digi-board/server.ts", "utf8");
