@@ -3,6 +3,7 @@ import {
   findSuperAdminSmsKeyword,
   isCriticalOrUrgentStaffNote,
   isUrgentPushAlert,
+  resolveSuperAdminPhones,
   staffContentNeedsSuperAdminSms,
   textTriggersSuperAdminSms
 } from "../lib/staff/super-admin-sms";
@@ -42,4 +43,12 @@ assert.equal(isUrgentPushAlert({ priority: "normal", display_mode: "urgent" }), 
 assert.equal(isUrgentPushAlert({ priority: "emergency" }), true);
 assert.equal(isUrgentPushAlert({ priority: "important", display_mode: "normal" }), false);
 
-console.log("super-admin-sms: ok");
+void (async () => {
+  const phones = await resolveSuperAdminPhones();
+  assert.equal(phones.length, 3);
+  assert.deepEqual(
+    phones.sort(),
+    ["+12139131391", "+14152509297", "+14044683303"].sort()
+  );
+  console.log("super-admin-sms: ok");
+})();
