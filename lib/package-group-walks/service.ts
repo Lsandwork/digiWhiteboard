@@ -51,6 +51,9 @@ let lastGoodEligibility: {
   syncedAt: string;
   packageSources: string[];
   checkedInDogCount: number;
+  uniqueCheckedInOwners: number;
+  packageRowsInspected: number;
+  capturedIds: PackageGroupWalkMeta["capturedIds"];
 } | null = null;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -272,6 +275,9 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
   packageSources: string[];
   packageSourceAvailable: boolean;
   checkedInDogCount: number;
+  uniqueCheckedInOwners: number;
+  packageRowsInspected: number;
+  capturedIds: PackageGroupWalkMeta["capturedIds"];
   errors: string[];
 }> {
   const reservations = await loadTlBoardCheckedInReservations();
@@ -308,6 +314,9 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
     packageSources: packageIndex.sources,
     packageSourceAvailable: packageIndex.available,
     checkedInDogCount: reservations.length,
+    uniqueCheckedInOwners: packageIndex.uniqueCheckedInOwners,
+    packageRowsInspected: packageIndex.packageRowsInspected,
+    capturedIds: packageIndex.capturedIds,
     errors: packageIndex.errors
   };
 }
@@ -338,6 +347,12 @@ export async function loadPackageGroupWalkState(
   let packageSources: string[] = [];
   let packageSourceAvailable = false;
   let checkedInDogCount = 0;
+  let uniqueCheckedInOwners = 0;
+  let packageRowsInspected = 0;
+  let capturedIds: PackageGroupWalkMeta["capturedIds"] = {
+    monthly_unlimited: null,
+    twenty_day_plus: null
+  };
   let lastSuccessfulSyncAt: string | null = lastGoodEligibility?.syncedAt ?? null;
 
   try {
@@ -355,20 +370,30 @@ export async function loadPackageGroupWalkState(
     packageSources = result.packageSources;
     packageSourceAvailable = result.packageSourceAvailable;
     checkedInDogCount = result.checkedInDogCount;
+    uniqueCheckedInOwners = result.uniqueCheckedInOwners;
+    packageRowsInspected = result.packageRowsInspected;
+    capturedIds = result.capturedIds;
     lastError = result.errors.length ? result.errors.join("; ") : null;
     lastSuccessfulSyncAt = attemptedAt;
     lastGoodEligibility = {
       eligibility,
       syncedAt: attemptedAt,
       packageSources,
-      checkedInDogCount
+      checkedInDogCount,
+      uniqueCheckedInOwners,
+      packageRowsInspected,
+      capturedIds
     };
 
     logPackageGroupWalkEvent("PACKAGE_GROUP_WALK_SYNC_SUCCESS", {
       businessDate,
       eligibleCount: eligibility.length,
       checkedInDogCount,
+      uniqueCheckedInOwners,
+      packageRowsInspected,
       packageSources,
+      capturedIds,
+      packageSourceAvailable,
       warning: lastError
     });
   } catch (error) {
@@ -384,6 +409,9 @@ export async function loadPackageGroupWalkState(
       packageSources = lastGoodEligibility.packageSources;
       packageSourceAvailable = true;
       checkedInDogCount = lastGoodEligibility.checkedInDogCount;
+      uniqueCheckedInOwners = lastGoodEligibility.uniqueCheckedInOwners;
+      packageRowsInspected = lastGoodEligibility.packageRowsInspected;
+      capturedIds = lastGoodEligibility.capturedIds;
       lastSuccessfulSyncAt = lastGoodEligibility.syncedAt;
     }
   }
@@ -426,7 +454,10 @@ export async function loadPackageGroupWalkState(
     isStale,
     packageSourceAvailable,
     packageSources,
-    checkedInDogCount
+    checkedInDogCount,
+    uniqueCheckedInOwners,
+    packageRowsInspected,
+    capturedIds
   };
 
   return { pending, completed, summary, meta, generatedAt: attemptedAt };

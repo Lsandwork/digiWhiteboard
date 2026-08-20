@@ -40,6 +40,8 @@ export type TlBoardPackageGroupWalksResult = {
   /** False when Gingr or the package source could not be evaluated this sync. */
   ok: boolean;
   error: string | null;
+  packageSourceAvailable: boolean;
+  packageSources: string[];
 };
 
 /** Build the whiteboard's Package Group Walks card from the canonical service. */
@@ -53,10 +55,20 @@ export async function syncTlBoardPackageGroupWalks(
     summary: {
       eligible: state.summary.eligibleToday,
       remaining: state.summary.remaining,
-      completed: state.summary.completed
+      completed: state.summary.completed,
+      lookup: {
+        packageSourceAvailable: state.meta.packageSourceAvailable,
+        sources: state.meta.packageSources,
+        capturedIds: state.meta.capturedIds,
+        uniqueCheckedInOwners: state.meta.uniqueCheckedInOwners,
+        packageRowsInspected: state.meta.packageRowsInspected,
+        qualifying: state.summary.eligibleToday
+      }
     },
     ok: state.meta.gingrOk && state.meta.packageSourceAvailable && !state.meta.isStale,
-    error: state.meta.lastError
+    error: state.meta.lastError,
+    packageSourceAvailable: state.meta.packageSourceAvailable,
+    packageSources: state.meta.packageSources
   };
 }
 

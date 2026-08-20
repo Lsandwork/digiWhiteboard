@@ -19,8 +19,11 @@ const PII_FIELD =
 const NAME_FIELDS = [
   "name",
   "package_name",
+  "packageName",
+  "packageType",
   "subscription_name",
   "membership_name",
+  "membershipType",
   "plan_name",
   "title",
   "label",
@@ -120,8 +123,10 @@ export function sanitizePackageRecord(
     ...(nested ? NAME_FIELDS.map((field) => nested[field]) : [])
   );
   const packageId = pickString(
+    record.packageTypeId,
     record.package_id,
     record.subscription_package_id,
+    record.membershipTypeId,
     record.membership_type_id,
     record.plan_id,
     nested?.package_id,

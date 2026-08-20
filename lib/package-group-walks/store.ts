@@ -50,32 +50,49 @@ export async function probePackageGroupWalksTable(
   supabase: SupabaseClient
 ): Promise<{ status: PackageGroupWalksTableStatus; message: string }> {
   try {
-    const { error } = await supabase.from(PACKAGE_GROUP_WALKS_TABLE).select("id").limit(1);
+    const { error, count } = await supabase
+      .from(PACKAGE_GROUP_WALKS_TABLE)
+      .select("id", { count: "exact", head: true });
     if (!error) {
-      return { status: "applied", message: "package_group_walks table is present." };
-    }
-    if (isMissingRelation(error)) {
       return {
-        status: "not_applied",
-        message: "package_group_walks table is missing. Apply supabase/migrations/082_package_group_walks.sql."
+        status: "applied",
+        message: `package_group_walks table is present (${count ?? 0} rows).`
       };
     }
+    if (isMissingRelation(error) || /schema cache|could not find the table/i.test(error.message ?? "")) {
+      return {
+        status: "not_applied",
+        message:
+          "package_group_walks table is missing. Apply supabase/migrations/082_package_group_walks.sql in the production Supabase SQL editor. Do not reset the database."
+      };
+    }
+    const code = String(error.code ?? "").trim();
     return {
       status: "unable_to_verify",
-      message: "Could not confirm package_group_walks without exposing database internals."
+      message: `package_group_walks probe failed (${code || "no_code"}).`
     };
-  } catch {
-    return {
-      status: "unable_to_verify",
-      message: "Could not confirm package_group_walks without exposing database internals."
-    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "probe failed";
+    if (/not configured/i.test(message)) {
+      return { status: "unable_to_verify", message: "Supabase environment variables are missing." };
+    }
+    if (/does not exist|schema cache|PGRST205|42P01/i.test(message)) {
+      return {
+        status: "not_applied",
+        message:
+          "package_group_walks table is missing. Apply supabase/migrations/082_package_group_walks.sql in the production Supabase SQL editor. Do not reset the database."
+      };
+    }
+    return { status: "unable_to_verify", message: "package_group_walks probe failed." };
   }
 }
 
 function isMissingRelation(error: { code?: string | null; message?: string | null } | null): boolean {
   if (!error) return false;
   if (error.code && MISSING_RELATION.has(error.code)) return true;
-  return /relation .*package_group_walks.* does not exist/i.test(error.message ?? "");
+  return /relation .*package_group_walks.* does not exist|schema cache|could not find the table|PGRST205/i.test(
+    error.message ?? ""
+  );
 }
 
 function mapRow(row: CompletionRow): PackageGroupWalkCompletion {

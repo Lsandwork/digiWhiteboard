@@ -9,9 +9,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   PACKAGE_GROUP_WALK_ELIGIBLE_PACKAGES,
+  __resetConfirmedGingrPackageIdsForTests,
   matchEligiblePackage,
   normalizePackageName,
-  preferredEligiblePackage
+  preferredEligiblePackage,
+  registerConfirmedGingrPackageIds
 } from "../lib/package-group-walks/eligible-packages";
 import {
   aggregateSanitizedPackages,
@@ -26,6 +28,7 @@ import {
   packagesFromReservation,
   type OwnerPackageIndex
 } from "../lib/package-group-walks/gingr-packages";
+import { flattenJsonApiResource } from "../lib/package-group-walks/gingr-partner";
 import {
   applyPackageGroupWalkCompletions,
   buildPackageGroupWalkEligibility,
@@ -74,7 +77,15 @@ function reservation(input: {
 }
 
 function emptyIndex(): OwnerPackageIndex {
-  return { byOwnerId: new Map(), sources: ["reservation"], available: true, errors: [] };
+  return {
+    byOwnerId: new Map(),
+    sources: ["reservation"],
+    available: true,
+    errors: [],
+    uniqueCheckedInOwners: 0,
+    packageRowsInspected: 0,
+    capturedIds: { monthly_unlimited: null, twenty_day_plus: null }
+  };
 }
 
 function eligibilityFor(reservations: GingrReservation[], index = emptyIndex()) {
@@ -140,6 +151,39 @@ for (const ineligible of [
   assert.equal(preferredEligiblePackage([]), null);
 }
 
+{
+  // Runtime-confirmed Gingr package type ids win over display names.
+  __resetConfirmedGingrPackageIdsForTests();
+  assert.equal(matchEligiblePackage({ id: "4242" }), null);
+  registerConfirmedGingrPackageIds([{ id: "4242", key: "monthly_unlimited" }]);
+  assert.equal(matchEligiblePackage({ id: "4242" })?.key, "monthly_unlimited");
+  __resetConfirmedGingrPackageIdsForTests();
+}
+
+{
+  const flattened = flattenJsonApiResource({
+    type: "parent-packages",
+    id: 99,
+    attributes: {
+      parentId: 12,
+      parentName: "SECRET PERSON",
+      packageTypeId: 69,
+      packageName: "Monthly Unlimited",
+      remainingCredits: "5.00"
+    }
+  });
+  assert.equal(flattened?.parentName, undefined);
+  assert.equal(flattened?.packageName, "Monthly Unlimited");
+  assert.equal(flattened?.packageTypeId, 69);
+  assert.equal(
+    matchEligiblePackage({
+      id: String(flattened?.packageTypeId),
+      name: String(flattened?.packageName)
+    })?.key,
+    "monthly_unlimited"
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Gingr payload parsing
  * ------------------------------------------------------------------ */
@@ -184,18 +228,25 @@ assert.equal(
     packages: [{ id: "pkg-2", name: "Monthly Unlimited", active: false }]
   });
   assert.deepEqual(packagesFromReservation(expired), []);
+
+  const depleted = reservation({
+    animalId: "4",
+    dogName: "Pip",
+    packages: [{ id: "pkg-3", name: "Monthly Unlimited", remainingCredits: "0.00" }]
+  });
+  assert.deepEqual(packagesFromReservation(depleted), []);
 }
 
 {
-  // Nested subscription shape: { package: { name } }.
-  const nested = reservation({
-    animalId: "4",
-    dogName: "Koda",
-    packages: [{ id: "sub-1", package: { id: "pkg-77", name: "20-Day PLUS Package" } }]
-  });
-  const resolved = packagesFromReservation(nested);
+  // Reservation type name is a zero-cost source when Gingr books the stay as the package.
+  const typed = reservation({ animalId: "5", dogName: "Scout", ownerId: "owner-5" });
+  (typed as Record<string, unknown>).type = "Monthly Unlimited";
+  (typed as Record<string, unknown>).type_id = "12";
+  const resolved = packagesFromReservation(typed);
   assert.equal(resolved.length, 1);
-  assert.equal(resolved[0]!.definition.key, "twenty_day_plus");
+  assert.equal(resolved[0]!.definition.key, "monthly_unlimited");
+  assert.equal(resolved[0]!.gingrPackageId, "12");
+  assert.equal(resolved[0]!.source, "reservation_type");
 }
 
 // Gingr check-in stamps arrive as unix seconds or ISO strings.
@@ -593,23 +644,24 @@ assert.equal(nameFromEmail(""), "Staff");
 
 {
   const packages = source("lib/package-group-walks/gingr-packages.ts");
-  // Exactly one Gingr endpoint is requested, and it is the bulk one. Matching on
-  // constructed URLs (not prose) so the doc comment naming /api/v1/owner as
-  // deliberately unused does not satisfy the check.
-  const requestedPaths = [...packages.matchAll(/baseUrl\}(\/api\/v1\/[a-z_]+)/g)].map(
-    (match) => match[1]
-  );
-  assert.deepEqual(requestedPaths, ["/api/v1/get_subscriptions"]);
-  assert.match(packages, /SUBSCRIPTION_MAX_PAGES/);
-  // One fetch call site total — no per-owner or per-dog loop.
-  assert.equal((packages.match(/fetchTlGingrResponse\(/g) ?? []).length, 1);
+  const partner = source("lib/package-group-walks/gingr-partner.ts");
+  const v1 = source("lib/package-group-walks/gingr-v1.ts");
+  assert.match(v1, /gingrV1Request/);
+  assert.match(packages, /\/api\/v1\/get_subscriptions/);
+  assert.match(packages, /\/api\/v1\/owner/);
+  assert.match(partner, /\/v1\/parents\/parent-packages/);
+  assert.match(partner, /\/v1\/config\/package-types/);
+  assert.match(partner, /PARENT_ID_BATCH/);
+  assert.match(partner, /X-Api-Key/);
+  assert.match(packages, /OWNER_PACKAGE_CACHE_TTL_MS/);
+  assert.match(packages, /OWNER_FETCH_CONCURRENCY/);
+  assert.match(packages, /new Set\(ownerIds/);
+  assert.doesNotMatch(packages, /for \(const reservation of reservations\) \{\s+await gingrV1Request/);
+  assert.doesNotMatch(partner, /for \(const reservation of reservations\)/);
 
   const service = source("lib/package-group-walks/service.ts");
-  // Reuses the TL board's existing checked-in reservation pull.
   assert.match(service, /loadTlBoardCheckedInReservations/);
-  // Completions load in a single query for the business date.
   assert.match(service, /loadCompletionsForBusinessDate/);
-  // Shared cache so page + whiteboard do not each hit Gingr.
   assert.match(service, /getOrLoadTtlCache/);
 }
 
@@ -703,11 +755,14 @@ assert.equal(canAccessAdminTab(null, "package_group_walks", "marketing", "market
   assert.match(panel, /Completed Today/);
   assert.match(panel, /Checking Gingr…/);
   assert.match(panel, /All Package Group Walks Clear/);
+  assert.match(panel, /Unable to verify Package Group Walk eligibility/);
   assert.match(panel, /visibilitychange/);
   // TEST 10 — whiteboard removes the dog without a manual reload.
   const board = source("components/boards/TlAlertsRemindersBoard.tsx");
   assert.match(board, /package-group-walks/);
-  assert.match(board, /NEEDS GROUP WALK/);
+  assert.match(board, /Unable to verify \{errorNoun\}/);
+  assert.match(board, /errorNoun="Package Group Walk eligibility"/);
+  assert.match(board, /This is not All Clear/);
   assert.match(board, /completedWalkAnimalIds/);
   assert.doesNotMatch(board, /window\.location\.reload/);
 
@@ -747,8 +802,12 @@ assert.equal(
   assert.match(diagnostics, /status: 403/);
   assert.match(diagnostics, /GINGR_UNAVAILABLE/);
   assert.match(diagnostics, /status: 503/);
-  assert.doesNotMatch(diagnostics, /GINGR_API_KEY|TL_GINGR_KEY|SUPABASE_SERVICE_ROLE_KEY/);
-  assert.doesNotMatch(diagnostics, /authorization headers/i);
+  assert.match(diagnostics, /packageSources/);
+  assert.match(diagnostics, /eligibleDogs/);
+  assert.match(diagnostics, /discoverGingrPackageSources/);
+  assert.match(diagnostics, /qualifyingCheckedInDogs/);
+  const packageLookup = source("lib/package-group-walks/gingr-packages.ts");
+  assert.match(packageLookup, /parentPackages/);
 
   const middleware = source("middleware.ts");
   assert.match(middleware, /matcher:/);

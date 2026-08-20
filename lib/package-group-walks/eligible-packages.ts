@@ -77,9 +77,34 @@ function envPackageIds(key: PackageGroupWalkPackageKey): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Package type / membership type ids discovered from Gingr at runtime
+ * (never invented). Env overrides still win so production can pin a confirmed id.
+ */
+const runtimeConfirmedIds = new Map<string, EligiblePackageDefinition>();
+
+export function registerConfirmedGingrPackageIds(
+  entries: Array<{ id: string | null | undefined; key: PackageGroupWalkPackageKey }>
+) {
+  for (const entry of entries) {
+    const id = String(entry.id ?? "").trim();
+    if (!id) continue;
+    const definition = eligiblePackageByKey(entry.key);
+    if (!definition) continue;
+    runtimeConfirmedIds.set(id, definition);
+  }
+}
+
+export function __resetConfirmedGingrPackageIdsForTests() {
+  runtimeConfirmedIds.clear();
+}
+
 /** Confirmed Gingr package ids per eligible package (empty until set in production). */
 export function eligiblePackageIdMap(): Map<string, EligiblePackageDefinition> {
   const map = new Map<string, EligiblePackageDefinition>();
+  for (const [id, definition] of runtimeConfirmedIds) {
+    map.set(id, definition);
+  }
   for (const definition of PACKAGE_GROUP_WALK_ELIGIBLE_PACKAGES) {
     for (const id of envPackageIds(definition.key)) {
       map.set(id, definition);
