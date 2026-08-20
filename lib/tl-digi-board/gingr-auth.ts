@@ -12,6 +12,19 @@ export function resolveTlGingrApiKey(): string {
   return process.env.TL_GINGR_KEY?.trim() || process.env.GINGR_API_KEY?.trim() || "";
 }
 
+/** Partner API (`api.gingr.io`) may require a Manage Account key, not the Users API key. */
+export function resolveGingrPartnerApiKey(): string {
+  return (
+    process.env.GINGR_PARTNER_API_KEY?.trim() ||
+    process.env.TL_GINGR_PARTNER_KEY?.trim() ||
+    resolveTlGingrApiKey()
+  );
+}
+
+export function isGingrPartnerApiKeyConfigured(): boolean {
+  return Boolean(resolveGingrPartnerApiKey());
+}
+
 export function isTlGingrKeyConfigured(): boolean {
   return Boolean(resolveTlGingrApiKey());
 }

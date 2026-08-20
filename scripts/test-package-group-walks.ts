@@ -23,6 +23,7 @@ import {
 } from "../lib/package-group-walks/diagnostics";
 import {
   buildOwnerPackageIndex,
+  deepCollectPackageCandidates,
   ownerIdFromReservation,
   ownerNameFromReservation,
   packagesFromReservation,
@@ -129,6 +130,16 @@ assert.equal(matchEligiblePackage({ name: "Monthly Unlimited" })?.key, "monthly_
 assert.equal(matchEligiblePackage({ name: "monthly unlimited" })?.key, "monthly_unlimited");
 assert.equal(matchEligiblePackage({ name: "20-Day PLUS Package" })?.key, "twenty_day_plus");
 assert.equal(matchEligiblePackage({ name: "20 Day Plus Package" })?.key, "twenty_day_plus");
+
+{
+  const nested = {
+    form_data: JSON.stringify({
+      current_packages: [{ name: "Monthly Unlimited", remainingCredits: "5" }]
+    })
+  };
+  const candidates = deepCollectPackageCandidates(nested);
+  assert.ok(candidates.some((candidate) => matchEligiblePackage(candidate)?.key === "monthly_unlimited"));
+}
 
 // TEST 3 — ineligible packages must never qualify, including near-miss names.
 for (const ineligible of [
@@ -650,6 +661,10 @@ assert.equal(nameFromEmail(""), "Staff");
   const v1 = source("lib/package-group-walks/gingr-v1.ts");
   assert.match(v1, /gingrV1Request/);
   assert.match(packages, /\/api\/v1\/get_subscriptions/);
+  assert.match(packages, /owner_id: ownerId/);
+  assert.match(packages, /loadOwnersListForCheckedInOwners/);
+  assert.match(packages, /deepCollectPackageCandidates/);
+  assert.match(partner, /resolveGingrPartnerApiKey/);
   assert.match(packages, /\/api\/v1\/owner/);
   assert.match(partner, /\/v1\/parents\/parent-packages/);
   assert.match(partner, /\/v1\/config\/package-types/);
