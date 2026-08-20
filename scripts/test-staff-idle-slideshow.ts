@@ -78,12 +78,12 @@ assert.equal(
 {
   const listRoute = source("app/api/staff/idle-slideshow/route.ts");
   assert.match(listRoute, /loadStaffIdleSlideshowSlides/);
-  assert.match(listRoute, /getOrLoadTtlCache/);
-  assert.match(listRoute, /STAFF_IDLE_SLIDESHOW_LAST_GOOD_KEY/);
+  assert.match(listRoute, /getOrLoadTtlCache|getTtlCache/);
+  assert.match(listRoute, /warmStaffIdleSlideshowCacheInBackground|after\(/);
   assert.match(listRoute, /formatStaffIdleSlideshowLoadError/);
   assert.match(listRoute, /slides:\s*\[\]/);
+  assert.match(listRoute, /retrying:\s*true/);
   assert.doesNotMatch(listRoute, /status:\s*500/);
-  assert.match(listRoute, /stale:\s*true/);
 
   const mediaRoute = source("app/api/staff/idle-slideshow/media/[itemId]/route.ts");
   assert.match(mediaRoute, /UUID_RE/);
@@ -97,6 +97,8 @@ assert.equal(
   assert.match(loader, /includeMediaKind: false/);
   assert.match(loader, /duplicate_of_item_id/);
   assert.match(loader, /STAFF_IDLE_SLIDESHOW_CACHE_KEY/);
+  assert.match(loader, /STAFF_IDLE_SLIDESHOW_LOOKBACK_DAYS/);
+  assert.match(loader, /gte\("created_at"/);
   assert.doesNotMatch(loader, /photo_upload_batches!inner/);
   assert.match(loader, /invalidateStaffIdleSlideshowCache/);
 }
@@ -108,6 +110,7 @@ assert.equal(
   assert.match(emptyState, /No dogs are currently checking/);
   assert.match(emptyState, /prefers-reduced-motion/);
   assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_POLL_MS/);
+  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS/);
   assert.match(emptyState, /Loading media library photos/);
   assert.match(emptyState, /useDisplaySync/);
   assert.match(emptyState, /loadState === "ready"/);
