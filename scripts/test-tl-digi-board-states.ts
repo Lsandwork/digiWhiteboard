@@ -395,4 +395,36 @@ function sampleSnapshot(nowIso: string, medications: TlGingrMedicationRecord[]):
   assert.equal(merged.meta?.lastSuccessfulSyncAt, "2026-08-19T19:35:47.774Z");
 }
 
+// All administered for the period: due > 0 but remaining = 0 must be All Clear, not an error card.
+{
+  const now = dateAtLaLocal({ year: 2026, month: 8, day: 20, hour: 9, minute: 17, second: 0 });
+  const snapshot = sampleSnapshot(now.toISOString(), [
+    sampleMed({
+      gingrScheduleLabel: "AM",
+      scheduleKind: "am",
+      administrationStatus: "administered"
+    }),
+    sampleMed({
+      gingrMedicationId: "med-2",
+      gingrAnimalId: "animal-2",
+      dogName: "Wilco",
+      gingrScheduleLabel: "AM",
+      scheduleKind: "am",
+      administrationStatus: "administered"
+    })
+  ]);
+  assert.equal(snapshot.summary.remaining, 0);
+  assert.ok(snapshot.summary.due > 0);
+  assert.equal(snapshot.meta.medicationsAllClear, true);
+  assert.equal(
+    resolveTlCardKind({
+      phase: "resolved",
+      health: snapshot.meta.medicationsHealth,
+      allClear: snapshot.meta.medicationsAllClear,
+      hasRows: false
+    }),
+    "all_clear"
+  );
+}
+
 console.log("test-tl-digi-board-states: ok");

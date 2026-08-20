@@ -74,6 +74,8 @@ export function resolveTlCardKind(params: {
   if (health === "error") return "error";
   if (health === "stale") return "stale";
   if (params.allClear && health === "ok") return "all_clear";
+  // Successful Gingr eval with zero actionable doses — not a verification failure.
+  if (health === "ok" && !params.hasRows) return "all_clear";
   return "error";
 }
 
