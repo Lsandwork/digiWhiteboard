@@ -196,7 +196,6 @@ export function buildTlBoardSyncMeta(input: BuildTlBoardStateInput, summary: TlM
 
   const medicationsAllClear =
     medicationsHealth === "ok" &&
-    summary.due === 0 &&
     summary.remaining === 0 &&
     summary.overdue === 0 &&
     !isStale;
