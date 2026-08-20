@@ -838,18 +838,25 @@ async function loadOwnersListForCheckedInOwners(ownerIds: string[]): Promise<{
   };
 }
 
+/** Shared cached GET /api/v1/owners read. */
+export async function loadGingrOwnersListRead() {
+  return getOrLoadTtlCache("pgw:owners-list-read", OWNER_PACKAGE_CACHE_TTL_MS, async () =>
+    gingrV1Request({
+      path: "/api/v1/owners",
+      method: "GET",
+      label: "Gingr owners list",
+      timeoutMs: 10_000
+    })
+  );
+}
+
 async function loadOwnersListPackages(): Promise<{
   byOwnerId: Map<string, ResolvedOwnerPackage[]>;
   inspection: PackageInspectionRecord[];
   attempt: PackageSourceAttempt;
 }> {
   return getOrLoadTtlCache("pgw:owners-list", OWNER_PACKAGE_CACHE_TTL_MS, async () => {
-    const read = await gingrV1Request({
-      path: "/api/v1/owners",
-      method: "GET",
-      label: "Gingr owners list",
-      timeoutMs: 10_000
-    });
+    const read = await loadGingrOwnersListRead();
     const attempt = sourceAttempt(true, read);
     if (!read.ok) return { byOwnerId: new Map(), inspection: [], attempt };
 

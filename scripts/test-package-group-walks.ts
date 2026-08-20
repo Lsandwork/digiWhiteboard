@@ -22,6 +22,15 @@ import {
   sanitizePackageRecord
 } from "../lib/package-group-walks/diagnostics";
 import {
+  buildCsvOwnerResolutionReport,
+  classifyCsvOwnerName,
+  gingrOwnerFromRecord,
+  inspectOwnerRecordSchema,
+  matchCsvOwnersToDirectory,
+  normalizeOwnerName,
+  toPublicCsvOwnerResolutionLookup
+} from "../lib/package-group-walks/csv-owner-resolution";
+import {
   buildOwnerPackageIndex,
   deepCollectPackageCandidates,
   ownerIdFromReservation,
@@ -806,6 +815,14 @@ assert.equal(
   true
 );
 assert.equal(
+  existsSync(join(process.cwd(), "app/api/admin/package-group-walks/csv-owner-resolution/route.ts")),
+  false
+);
+assert.equal(
+  existsSync(join(process.cwd(), "lib/package-group-walks/csv-owner-resolution-fixture.ts")),
+  false
+);
+assert.equal(
   existsSync(join(process.cwd(), "app/api/boards/tl-alerts-reminders/package-group-walks/route.ts")),
   true
 );
@@ -920,6 +937,140 @@ async function testOwnerPackageIndexResilience() {
   } finally {
     if (previousTl != null) process.env.TL_GINGR_KEY = previousTl;
     if (previousGingr != null) process.env.GINGR_API_KEY = previousGingr;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * CSV owner resolution — exact unique match only, no PII in reports
+ * ------------------------------------------------------------------ */
+
+{
+  assert.equal(normalizeOwnerName("  Ada   Lovelace  "), "ada lovelace");
+  assert.equal(normalizeOwnerName("ADA LOVELACE"), "ada lovelace");
+  assert.notEqual(normalizeOwnerName("Mary-Ann Smith"), normalizeOwnerName("Mary Ann Smith"));
+
+  const schema = inspectOwnerRecordSchema(
+    {
+      system_id: "1001",
+      first_name: "Ada",
+      last_name: "Lovelace",
+      email: "hidden@example.com",
+      deleted: "0",
+      password: "nope"
+    },
+    [
+      {
+        system_id: "1001",
+        first_name: "Ada",
+        last_name: "Lovelace",
+        email: "hidden@example.com",
+        deleted: "0",
+        password: "nope"
+      }
+    ]
+  );
+  assert.equal(schema.stableIdField, "system_id");
+  assert.equal(schema.firstNameField, "first_name");
+  assert.equal(schema.lastNameField, "last_name");
+  assert.equal(schema.activeDeletedField, "deleted");
+  assert.ok(schema.sanitizedOwnerFieldNames.includes("email"));
+  assert.equal(schema.sanitizedOwnerFieldNames.includes("password"), false);
+
+  const directory = [
+    gingrOwnerFromRecord(
+      { system_id: "1001", first_name: "Ada", last_name: "Lovelace", deleted: "0" },
+      schema
+    )!,
+    gingrOwnerFromRecord(
+      { system_id: "1002", first_name: "Ada", last_name: "Lovelace", deleted: "0" },
+      schema
+    )!,
+    gingrOwnerFromRecord(
+      { system_id: "1003", first_name: "Grace", last_name: "Hopper", deleted: "1" },
+      schema
+    )!,
+    gingrOwnerFromRecord(
+      { system_id: "1004", first_name: "Alan", last_name: "Turing", deleted: "0" },
+      schema
+    )!
+  ];
+  const byName = new Map<string, typeof directory>();
+  for (const owner of directory) {
+    const list = byName.get(owner.normalizedFullName) ?? [];
+    list.push(owner);
+    byName.set(owner.normalizedFullName, list);
+  }
+  assert.equal(classifyCsvOwnerName("Alan Turing", byName).classification, "UNIQUE_EXACT_MATCH");
+  assert.equal(classifyCsvOwnerName("Ada Lovelace", byName).classification, "MULTIPLE_EXACT_MATCH");
+  assert.equal(classifyCsvOwnerName("Grace Hopper", byName).classification, "ZERO_MATCH");
+  assert.equal(classifyCsvOwnerName("Nobody Here", byName).classification, "ZERO_MATCH");
+
+  const matched = matchCsvOwnersToDirectory(
+    [
+      {
+        ownerDisplayName: "Alan Turing",
+        packageKey: "monthly_unlimited",
+        packageType: "Monthly Unlimited"
+      },
+      {
+        ownerDisplayName: "Ada Lovelace",
+        packageKey: "twenty_day_plus",
+        packageType: "20-Day PLUS Package"
+      },
+      {
+        ownerDisplayName: "Grace Hopper",
+        packageKey: "twenty_day_plus",
+        packageType: "20-Day PLUS Package"
+      }
+    ],
+    directory
+  );
+  assert.equal(matched.byPackage.monthly_unlimited.uniqueExactMatches, 1);
+  assert.equal(matched.byPackage.twenty_day_plus.ambiguousMatches, 1);
+  assert.equal(matched.byPackage.twenty_day_plus.zeroMatches, 1);
+
+  const report = buildCsvOwnerResolutionReport({
+    httpStatus: 200,
+    rows: [
+      { system_id: "1004", first_name: "Alan", last_name: "Turing", deleted: "0" },
+      { system_id: "2001", first_name: "Checked", last_name: "In", deleted: "0" }
+    ],
+    reservations: [
+      reservation({ animalId: "dog-1", dogName: "Byte", ownerId: "1004" }),
+      reservation({ animalId: "dog-2", dogName: "Nibble", ownerId: "2001" })
+    ],
+    csvOwners: [
+      {
+        ownerDisplayName: "Alan Turing",
+        packageKey: "monthly_unlimited",
+        packageType: "Monthly Unlimited"
+      }
+    ]
+  });
+  assert.equal(report.directory.ownerIdNamespaceVerified, true);
+  assert.equal(report.today.eligiblePackageOwnersCurrentlyCheckedIn, 1);
+  assert.equal(report.today.eligibleDogsCurrentlyCheckedIn, 1);
+  const publicLookup = JSON.stringify(toPublicCsvOwnerResolutionLookup(report));
+  assert.doesNotMatch(publicLookup, /Alan|Turing|Byte|Nibble|hidden@/i);
+
+  assert.equal(
+    existsSync(join(process.cwd(), "app/api/admin/package-group-walks/csv-owner-resolution/route.ts")),
+    false
+  );
+  assert.doesNotMatch(
+    source("lib/package-group-walks/csv-owner-resolution.ts"),
+    /inspectOwnersCsvResolution/
+  );
+
+  for (const path of [
+    "components/admin/PackageGroupWalksPanel.tsx",
+    "components/boards/TlAlertsRemindersBoard.tsx",
+    "lib/package-group-walks/service.ts",
+    "lib/package-group-walks/tl-board.ts"
+  ]) {
+    const text = source(path);
+    assert.doesNotMatch(text, /csv-owner-resolution-fixture/, path);
+    assert.doesNotMatch(text, /csvOwnerResolution/, path);
   }
 }
 
