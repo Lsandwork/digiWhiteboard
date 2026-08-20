@@ -6,6 +6,7 @@ import { useDisplaySync } from "@/hooks/useDisplaySync";
 import {
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
   STAFF_IDLE_SLIDESHOW_POLL_MS,
+  STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS,
   visibleStaffIdleSlideIndexes,
   type StaffIdleSlideshowSlide
 } from "@/lib/staff/idle-slideshow";
@@ -71,17 +72,27 @@ export function StaffBoardEmptyState({ onSlideshowReady }: { onSlideshowReady?: 
       const response = await fetch("/api/staff/idle-slideshow", { cache: "no-store" });
       const body = (await response.json()) as {
         slides?: StaffIdleSlideshowSlide[];
+        healthy?: boolean;
+        retrying?: boolean;
         error?: string;
       };
       const next = response.ok && Array.isArray(body.slides)
         ? body.slides.filter((slide) => slide?.src)
         : [];
       setSlides(next);
-      setLoadState(next.length ? "ready" : "empty");
-      if (next.length) onSlideshowReady?.();
+      if (next.length) {
+        setLoadState("ready");
+        onSlideshowReady?.();
+        return;
+      }
+      if (body.healthy === false || body.retrying) {
+        setLoadState("loading");
+        return;
+      }
+      setLoadState("empty");
     } catch {
       setSlides([]);
-      setLoadState("empty");
+      setLoadState("loading");
     }
   }, [onSlideshowReady]);
 
@@ -97,11 +108,12 @@ export function StaffBoardEmptyState({ onSlideshowReady }: { onSlideshowReady?: 
   });
 
   useEffect(() => {
+    const pollMs = loadState === "loading" ? STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS : STAFF_IDLE_SLIDESHOW_POLL_MS;
     const timer = window.setInterval(() => {
       void loadSlides();
-    }, STAFF_IDLE_SLIDESHOW_POLL_MS);
+    }, pollMs);
     return () => window.clearInterval(timer);
-  }, [loadSlides]);
+  }, [loadSlides, loadState]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");

@@ -1,16 +1,18 @@
-import { invalidateTtlCache } from "@/lib/server-ttl-cache";
+import { invalidateTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 
 export const STAFF_IDLE_SLIDESHOW_INTERVAL_MS = 20_000;
 export const STAFF_IDLE_SLIDESHOW_LIMIT = 24;
 /** Poll for newly uploaded media library photos while the board is idle. */
 export const STAFF_IDLE_SLIDESHOW_POLL_MS = 60_000;
+/** Retry sooner while the API is still warming the slideshow cache. */
+export const STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS = 15_000;
 /** In-memory list cache — cuts Supabase REST load from board polling. */
 export const STAFF_IDLE_SLIDESHOW_CACHE_TTL_MS = 60_000;
 export const STAFF_IDLE_SLIDESHOW_LAST_GOOD_TTL_MS = 600_000;
 export const STAFF_IDLE_SLIDESHOW_CACHE_KEY = "staff-idle-slideshow:list";
 export const STAFF_IDLE_SLIDESHOW_LAST_GOOD_KEY = "staff-idle-slideshow:last-good";
-/** Cold loads can outlast the 8s board snapshot budget when the pool is busy. */
-export const STAFF_IDLE_SLIDESHOW_LOAD_TIMEOUT_MS = 25_000;
+/** Only scan recent uploads — full-table order-by was timing out in production. */
+export const STAFF_IDLE_SLIDESHOW_LOOKBACK_DAYS = 180;
 
 export type StaffIdleSlideshowSlide = {
   id: string;
@@ -23,6 +25,7 @@ export type StaffIdleSlideshowPayload = {
   intervalMs: number;
   healthy?: boolean;
   stale?: boolean;
+  retrying?: boolean;
   error?: string;
 };
 
@@ -61,6 +64,10 @@ export function staffIdleSlideshowStoragePath(row: {
   return row.thumbnail_storage_path || row.gingr_ready_storage_path || row.original_storage_path || null;
 }
 
+export function staffIdleSlideshowLookbackSince(days = STAFF_IDLE_SLIDESHOW_LOOKBACK_DAYS) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
 export function formatStaffIdleSlideshowLoadError(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
   if (error && typeof error === "object") {
@@ -93,14 +100,18 @@ export async function loadStaffIdleSlideshowSlides(
 ): Promise<StaffIdleSlideshowSlide[]> {
   const select =
     "id, original_filename, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, mime_type, media_kind, duplicate_of_item_id";
+  const since = staffIdleSlideshowLookbackSince();
 
-  const query = (options?: { includeMediaKind?: boolean }) => {
+  const query = (options?: { includeMediaKind?: boolean; includeLookback?: boolean }) => {
     let builder = supabase
       .from("photo_upload_items")
       .select(select)
-      .not("status", "in", '("failed","excluded")')
+      .not("status", "in", "(failed,excluded)")
       .order("created_at", { ascending: false })
       .limit(STAFF_IDLE_SLIDESHOW_LIMIT * 2);
+    if (options?.includeLookback !== false) {
+      builder = builder.gte("created_at", since);
+    }
     if (options?.includeMediaKind !== false) {
       builder = builder.eq("media_kind", "photo");
     }
@@ -111,6 +122,20 @@ export async function loadStaffIdleSlideshowSlides(
 
   if (error && isMissingColumnError(error) && /media_kind/i.test(`${error.message || ""}`)) {
     ({ data, error } = await query({ includeMediaKind: false }));
+  }
+
+  if (error && isMissingColumnError(error) && /created_at/i.test(`${error.message || ""}`)) {
+    ({ data, error } = await query({ includeLookback: false }));
+    if (error && isMissingColumnError(error) && /media_kind/i.test(`${error.message || ""}`)) {
+      ({ data, error } = await query({ includeLookback: false, includeMediaKind: false }));
+    }
+  }
+
+  if (!error && !(data ?? []).length) {
+    ({ data, error } = await query({ includeLookback: false }));
+    if (error && isMissingColumnError(error) && /media_kind/i.test(`${error.message || ""}`)) {
+      ({ data, error } = await query({ includeLookback: false, includeMediaKind: false }));
+    }
   }
 
   if (error) {
@@ -134,4 +159,15 @@ export async function loadStaffIdleSlideshowSlides(
     }));
 
   return shuffleStaffIdleSlides(slides);
+}
+
+export function storeStaffIdleSlideshowPayload(slides: StaffIdleSlideshowSlide[]): StaffIdleSlideshowPayload {
+  const payload: StaffIdleSlideshowPayload = {
+    slides,
+    intervalMs: STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
+    healthy: true
+  };
+  setTtlCache(STAFF_IDLE_SLIDESHOW_CACHE_KEY, slides, STAFF_IDLE_SLIDESHOW_CACHE_TTL_MS);
+  setTtlCache(STAFF_IDLE_SLIDESHOW_LAST_GOOD_KEY, payload, STAFF_IDLE_SLIDESHOW_LAST_GOOD_TTL_MS);
+  return payload;
 }
