@@ -47,6 +47,7 @@
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
     "test:route-generator": "tsx scripts/test-route-generator.ts",
     "test:live-fleet": "tsx scripts/test-live-fleet.ts",
+    "test:sms-cost": "tsx scripts/test-sms-cost-phase1.ts && tsx scripts/test-super-admin-sms.ts",
     "test:route-owner-sms": "tsx scripts/test-route-owner-sms-policy.ts",
     "test:route-owner-sms-kill-switch": "tsx scripts/test-route-owner-sms-kill-switch.ts",
     "test:jasper-demo-sms-guards": "tsx scripts/test-jasper-demo-sms-guards.ts",

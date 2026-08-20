@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SUPER_ADMIN_EMAIL } from "@/lib/admin/auth";
 import { getSmsProvider, normalizeSmsToE164 } from "@/lib/integrations/sms/provider";
+import type { SmsCostCategory } from "@/lib/integrations/sms/cost-events";
+import { buildAdminAlertSms } from "@/lib/integrations/sms/templates";
 import { getPublicSiteUrl } from "@/lib/site-url";
 
-/** Lonnie Sandoval — seeded in staff directory / used for demo SMS delivery. */
-const LONNIE_FALLBACK_PHONE = "213-913-1391";
+/** Default Super Admin SMS recipients when env/staff directory do not override. */
+const SUPER_ADMIN_SMS_FALLBACK_PHONES = ["213-913-1391", "415-250-9297", "404-468-3303"] as const;
 
 export type SuperAdminSmsKind =
   | "fitdog_alert"
@@ -20,6 +22,8 @@ export type SuperAdminSmsPayload = {
   detail?: string | null;
   idempotencyKey: string;
   adminPath?: string;
+  /** Critical safety alerts may include a short admin link in the SMS body. */
+  includeLink?: boolean;
 };
 
 /** Phrases that must SMS Lonnie regardless of priority. */
@@ -42,6 +46,14 @@ function staffAlertSmsEnabled() {
 
 function siteBase() {
   return getPublicSiteUrl().replace(/\/$/, "");
+}
+
+function smsCategoryForKind(kind: SuperAdminSmsKind): SmsCostCategory {
+  if (kind === "urgent_alert" || kind === "keyword_alert" || kind === "fitdog_alert") {
+    return "ADMIN_CRITICAL";
+  }
+  if (kind === "write_up") return "ADMIN_ROUTINE";
+  return "ADMIN_OPERATIONAL";
 }
 
 /** True for Critical / Urgent priority or the Urgent toggle — not High alone. */
@@ -98,7 +110,7 @@ export function isUrgentPushAlert(input: {
   return priority === "urgent" || priority === "emergency" || mode === "urgent" || mode === "emergency";
 }
 
-/** SMS Lonnie whenever an urgent/emergency alert is pushed live. */
+/** SMS Lonnie whenever an urgent/emergency alert is pushed live. Stable idempotency prevents retry duplicates. */
 export function sendUrgentAlertSmsFireAndForget(
   input: {
     id: string;
@@ -107,25 +119,47 @@ export function sendUrgentAlertSmsFireAndForget(
     priority?: string | null;
     display_mode?: string | null;
     source?: string | null;
+    /** Explicit staff resend — uses a separate idempotency key and audit trail. */
+    resendId?: string | null;
   },
   supabase?: SupabaseClient | null
 ) {
   if (!isUrgentPushAlert(input)) return;
+  const baseKey = `sa-sms:urgent:push:${input.id}`;
+  const idempotencyKey = input.resendId ? `${baseKey}:resend:${input.resendId}`.slice(0, 64) : baseKey.slice(0, 64);
   sendSuperAdminSmsAlertFireAndForget(
     {
       kind: "urgent_alert",
       title: `URGENT: ${input.title}`,
       detail: input.message,
-      idempotencyKey: `sa-sms:urgent:${input.source || "push"}:${input.id}:${Date.now()}`.slice(0, 64),
-      adminPath: "/admin?board=admin&tab=emergency_alerts"
+      idempotencyKey,
+      adminPath: "/admin?board=admin&tab=emergency_alerts",
+      includeLink: true
     },
     supabase
   );
 }
 
-async function resolveSuperAdminPhone(supabase?: SupabaseClient | null): Promise<string | null> {
+function parsePhoneList(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(/[,;\s]+/)) {
+    const normalized = normalizeSmsToE164(part.trim());
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
+}
+
+/** All E.164 phones that receive Super Admin / ops SMS alerts. */
+export async function resolveSuperAdminPhones(supabase?: SupabaseClient | null): Promise<string[]> {
+  const fromPluralEnv = parsePhoneList(process.env.SUPER_ADMIN_SMS_PHONES);
+  if (fromPluralEnv.length) return fromPluralEnv;
+
   const fromEnv = normalizeSmsToE164(process.env.SUPER_ADMIN_SMS_PHONE);
-  if (fromEnv) return fromEnv;
+  if (fromEnv) return [fromEnv];
 
   if (supabase) {
     try {
@@ -150,27 +184,23 @@ async function resolveSuperAdminPhone(supabase?: SupabaseClient | null): Promise
         return email === SUPER_ADMIN_EMAIL || name.includes("lonnie");
       });
       const fromDirectory = normalizeSmsToE164(lonnie?.phone);
-      if (fromDirectory) return fromDirectory;
+      if (fromDirectory) return [fromDirectory];
     } catch {
-      // Fall through to hardcoded Lonnie number.
+      // Fall through to hardcoded recipients.
     }
   }
 
-  return normalizeSmsToE164(LONNIE_FALLBACK_PHONE);
-}
-
-function truncate(text: string, max: number) {
-  const value = text.replace(/\s+/g, " ").trim();
-  if (value.length <= max) return value;
-  return `${value.slice(0, Math.max(0, max - 1)).trim()}…`;
+  return SUPER_ADMIN_SMS_FALLBACK_PHONES.map((phone) => normalizeSmsToE164(phone)).filter(Boolean) as string[];
 }
 
 function buildBody(payload: SuperAdminSmsPayload) {
-  const link = `${siteBase()}${payload.adminPath || "/admin?board=staff"}`;
-  const parts = [`Fitdog: ${truncate(payload.title, 90)}`, payload.detail ? truncate(payload.detail, 100) : null, link].filter(
-    Boolean
-  );
-  return truncate(parts.join(" — "), 320);
+  return buildAdminAlertSms({
+    title: payload.title,
+    detail: payload.detail,
+    adminPath: payload.adminPath,
+    includeLink: payload.includeLink,
+    siteBase: siteBase()
+  });
 }
 
 /**
@@ -189,19 +219,40 @@ export async function sendSuperAdminSmsAlert(
     return { ok: false, skipped: true, error: "Twilio SMS not configured." };
   }
 
-  const to = await resolveSuperAdminPhone(supabase);
-  if (!to) {
+  const phones = await resolveSuperAdminPhones(supabase);
+  if (!phones.length) {
     return { ok: false, error: "Super Admin phone not found." };
   }
 
+  const category = smsCategoryForKind(payload.kind);
+  const body = buildBody(payload);
+
   try {
-    const sent = await sms.send({
-      to,
-      body: buildBody(payload),
-      purpose: "transactional",
-      idempotencyKey: payload.idempotencyKey
-    });
-    if (!sent.ok) return { ok: false, error: sent.error || "Twilio send failed." };
+    const results = await Promise.all(
+      phones.map((to) =>
+        sms.send({
+          to,
+          body,
+          purpose: "transactional",
+          idempotencyKey: `${payload.idempotencyKey}:${to.slice(-4)}`.slice(0, 64),
+          costMetadata: {
+            category,
+            templateKey: `admin_${payload.kind}`,
+            multiSegmentFlag: category !== "ADMIN_CRITICAL"
+          }
+        })
+      )
+    );
+    const failed = results.filter((row) => !row.ok);
+    if (failed.length === results.length) {
+      return { ok: false, error: failed[0]?.error || "Twilio send failed." };
+    }
+    if (failed.length) {
+      return {
+        ok: true,
+        error: `Partial send: ${failed.length}/${results.length} failed (${failed.map((row) => row.error).filter(Boolean).join("; ")})`
+      };
+    }
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "SMS send failed." };

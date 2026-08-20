@@ -90,6 +90,7 @@ export function RouteGeneratorTrackingTab({ operatingDate, planId, busy, onBusy 
   const [status, setStatus] = useState("");
   const [sms, setSms] = useState<"all" | "enabled" | "disabled">("all");
   const [link, setLink] = useState<"all" | "sent" | "not_sent" | "missing_phone">("all");
+  const [resendingId, setResendingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,6 +149,36 @@ export function RouteGeneratorTrackingTab({ operatingDate, planId, busy, onBusy 
       throw error;
     } finally {
       onBusy?.(false);
+    }
+  }
+
+  async function resendTrackingLink(row: OwnerTrackingRow, forceQuietHours = false) {
+    if (
+      !window.confirm(
+        "Resend tracking text?\n\nThis will send another SMS to the client and may incur Twilio charges.\n\nContinue?"
+      )
+    ) {
+      return;
+    }
+    setResendingId(row.id);
+    try {
+      await postAction("tracking_resend_link", {
+        trackingId: row.id,
+        forceQuietHours
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (!forceQuietHours && /8:00 PM|quiet|overnight|6:00 AM/i.test(message)) {
+        if (
+          window.confirm(
+            `${message}\n\nForce-send anyway? This will bill another SMS. Only use in a real emergency.`
+          )
+        ) {
+          await resendTrackingLink(row, true);
+        }
+      }
+    } finally {
+      setResendingId(null);
     }
   }
 
@@ -372,34 +403,10 @@ export function RouteGeneratorTrackingTab({ operatingDate, planId, busy, onBusy 
                         <button
                           type="button"
                           className="admin-btn admin-btn--ghost !px-2 !py-1 text-[10px]"
-                          disabled={busy || !row.owner_phone_e164}
-                          onClick={() => {
-                            if (!window.confirm("Resend the tracking-link SMS to this owner now?")) return;
-                            void (async () => {
-                              try {
-                                await postAction("tracking_resend_link", {
-                                  trackingId: row.id,
-                                  forceQuietHours: false
-                                });
-                              } catch (error) {
-                                const message = error instanceof Error ? error.message : "";
-                                if (/8:00 PM|quiet|overnight|6:00 AM/i.test(message)) {
-                                  if (
-                                    window.confirm(
-                                      `${message}\n\nForce-send anyway? Only use in a real emergency.`
-                                    )
-                                  ) {
-                                    await postAction("tracking_resend_link", {
-                                      trackingId: row.id,
-                                      forceQuietHours: true
-                                    });
-                                  }
-                                }
-                              }
-                            })();
-                          }}
+                          disabled={busy || resendingId === row.id || !row.owner_phone_e164}
+                          onClick={() => void resendTrackingLink(row)}
                         >
-                          Resend
+                          {resendingId === row.id ? "Sending…" : "Resend SMS"}
                         </button>
                       </div>
                     </td>

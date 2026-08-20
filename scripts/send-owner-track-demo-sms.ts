@@ -21,12 +21,13 @@ async function main() {
   const drive = getDemoDriveState(startedAtMs, startedAtMs);
   const eta = drive.arrived ? 1 : drive.etaMinutes;
 
-  const body = `Fitdog: your driver is about ${eta} minutes away for Indy. Track live: ${trackUrl}`;
+  const body = `Fitdog: driver about ${eta} min away for Indy. Track: ${trackUrl}`;
   const sent = await sms.send({
     to: TO,
     body,
     purpose: "transactional",
-    idempotencyKey: `demo-track-indy:${TO}:${Math.floor(startedAtMs / 60_000)}`.slice(0, 64)
+    idempotencyKey: `demo-track-indy:${TO}:${Math.floor(startedAtMs / 60_000)}`.slice(0, 64),
+    costMetadata: { category: "TEST", templateKey: "demo_track_sms" }
   });
 
   console.log(

@@ -1,5 +1,6 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 import { dispatchStaffOpsNotificationEvent } from "@/lib/staff/admin-ops";
+import { resolveSuperAdminPhones } from "@/lib/staff/super-admin-sms";
 import { getEmailProvider } from "@/lib/integrations/email/provider";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { getPublicSiteUrl } from "@/lib/site-url";
@@ -12,7 +13,6 @@ import {
 } from "@/lib/staff/vip-auto-book/types";
 
 const REBOOK_ALERT_DAYS = 14;
-const REBOOK_SMS_TO = "2139131391";
 const REBOOK_EMAIL_TO = ["contact@fitdog.com", "lonnie@fitdog.com"] as const;
 
 function siteBase() {
@@ -150,12 +150,25 @@ async function sendRebookSms(client: VipAutoBookClient) {
   if (!sms.isConfigured()) {
     return { ok: false, error: "Twilio SMS not configured." };
   }
-  return sms.send({
-    to: REBOOK_SMS_TO,
-    body: buildVipRebookSms(client),
-    purpose: "transactional",
-    idempotencyKey: `vip-rebook:${client.id}:${client.needToRebookSetAt || "x"}`.slice(0, 64)
-  });
+  const phones = await resolveSuperAdminPhones();
+  if (!phones.length) {
+    return { ok: false, error: "No SMS alert recipients configured." };
+  }
+  const body = buildVipRebookSms(client);
+  const baseKey = `vip-rebook:${client.id}:${client.needToRebookSetAt || "x"}`;
+  const results = await Promise.all(
+    phones.map((to) =>
+      sms.send({
+        to,
+        body,
+        purpose: "transactional",
+        idempotencyKey: `${baseKey}:${to.slice(-4)}`.slice(0, 64),
+        costMetadata: { category: "VIP_REBOOK", templateKey: "vip_rebook_alert" }
+      })
+    )
+  );
+  const failed = results.find((row) => !row.ok);
+  return failed ? { ok: false, error: failed.error || "SMS send failed." } : { ok: true };
 }
 
 /** Fire Medium in-app alert + email + SMS for one VIP client. */

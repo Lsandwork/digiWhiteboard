@@ -96,13 +96,16 @@ export async function processRufflyJobs(limit = 20) {
           meta: { t: opaque.slice(0, 12) }
         });
         const link = rufflyReviewPath(signed);
+        const reservationId = job.payload?.reservationId ? String(job.payload.reservationId) : job.id;
         if (contact.phone_normalized || contact.phone) {
           const sms = getSmsProvider();
           if (sms.isConfigured() && isRufflySmsSendingEnabled()) {
             await sms.send({
               to: contact.phone || contact.phone_normalized!,
               purpose: "transactional",
-              body: `Fitdog: Thanks for visiting! Share feedback anytime: ${link}`
+              body: `Fitdog: Thanks for visiting! Share feedback anytime: ${link}`,
+              idempotencyKey: `ruffly-review:${reservationId}`.slice(0, 64),
+              costMetadata: { category: "CLIENT_RUFFLY_REVIEW", templateKey: "ruffly_review_request" }
             });
           }
         }
@@ -130,10 +133,13 @@ export async function processRufflyJobs(limit = 20) {
           continue;
         }
         const sms = getSmsProvider();
+        const jobIdempotency = job.idempotency_key ? String(job.idempotency_key) : `ruffly-job:${job.id}`;
         const sent = await sms.send({
           to: String(job.payload?.to || ""),
           body: String(job.payload?.body || ""),
-          purpose: (job.payload?.purpose as "transactional" | "marketing") || "transactional"
+          purpose: (job.payload?.purpose as "transactional" | "marketing") || "transactional",
+          idempotencyKey: jobIdempotency.slice(0, 64),
+          costMetadata: { category: "CLIENT_TRANSACTIONAL", templateKey: "ruffly_job_send_sms" }
         });
         if (!sent.ok) throw new Error(sent.error || "SMS send failed");
         await completeJob(job.id);

@@ -2,6 +2,12 @@ import { randomBytes } from "node:crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getSmsProvider, normalizeSmsToE164 } from "@/lib/integrations/sms/provider";
 import {
+  buildRouteEta15Sms,
+  buildRouteEta30Sms,
+  buildRoutePullupSms,
+  buildRouteTrackingLinkSms
+} from "@/lib/integrations/sms/templates";
+import {
   etaMinutesFromCoords,
   fetchSamsaraVehicleLocations,
   isSamsaraLiveConfigured,
@@ -501,12 +507,13 @@ export async function createOwnerTrackingForPlan(
         const url = `${publicSiteUrl()}/track/${token}`;
         const dogs = dogNames.slice(0, 3).join(" + ") || "your dog";
         const direction = route.direction === "pickup" ? "pickup" : "drop-off";
-        const body = `Fitdog: track ${dogs}'s ${direction} live — ${url}`;
+        const body = buildRouteTrackingLinkSms({ dogs, direction, url });
         const sent = await sms.send({
           to: phone,
           body,
           purpose: "transactional",
-          idempotencyKey: `route-track-link:${stop.id}`
+          idempotencyKey: `route-track-link:${stop.id}`,
+          costMetadata: { category: "CLIENT_ROUTE_TRACKING_LINK", templateKey: "route_tracking_link" }
         });
         await recordOwnerSmsEvent({
           trackingId,
@@ -779,12 +786,13 @@ export async function processOwnerEtaAlerts(): Promise<{
     if (canSendSms && etaMinutes <= 30 && !row.notified_30_at) {
       const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
       const url = `${publicSiteUrl()}/track/${row.token}`;
-      const body = `Fitdog: your driver is about ${etaMinutes} minutes away for ${dogs}. Track live: ${url}`;
+      const body = buildRouteEta30Sms({ dogs, etaMinutes, url });
       const sent = await sms.send({
         to: String(row.owner_phone_e164),
         body,
         purpose: "transactional",
-        idempotencyKey: `route-eta-30:${row.id}`
+        idempotencyKey: `route-eta-30:${row.id}`,
+        costMetadata: { category: "CLIENT_ROUTE_30", templateKey: "route_eta_30", multiSegmentFlag: true }
       });
       await recordOwnerSmsEvent({
         trackingId: String(row.id),
@@ -815,12 +823,13 @@ export async function processOwnerEtaAlerts(): Promise<{
       if (canSendSms && !row.notified_15_at) {
         const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
         const url = `${publicSiteUrl()}/track/${row.token}`;
-        const body = `Fitdog: your driver is ~${etaMinutes} minutes out for ${dogs}. Live map: ${url}`;
+        const body = buildRouteEta15Sms({ dogs, etaMinutes, url });
         const sent = await sms.send({
           to: String(row.owner_phone_e164),
           body,
           purpose: "transactional",
-          idempotencyKey: `route-eta-15:${row.id}`
+          idempotencyKey: `route-eta-15:${row.id}`,
+          costMetadata: { category: "CLIENT_ROUTE_15", templateKey: "route_eta_15", multiSegmentFlag: true }
         });
         await recordOwnerSmsEvent({
           trackingId: String(row.id),
@@ -848,13 +857,13 @@ export async function processOwnerEtaAlerts(): Promise<{
     if (canSendSms && etaMinutes <= 2 && !row.notified_pullup_at) {
       const dogs = ((row.dog_names as string[]) || []).slice(0, 3).join(" + ") || "your dog";
       const url = `${publicSiteUrl()}/track/${row.token}`;
-      const stop = row.stop_address ? ` at ${row.stop_address}` : "";
-      const body = `Fitdog: driver is pulling up for ${dogs}${stop} right now. ${url}`;
+      const body = buildRoutePullupSms({ dogs, url });
       const sent = await sms.send({
         to: String(row.owner_phone_e164),
         body,
         purpose: "transactional",
-        idempotencyKey: `route-eta-pullup:${row.id}`
+        idempotencyKey: `route-eta-pullup:${row.id}`,
+        costMetadata: { category: "CLIENT_ROUTE_PULLUP", templateKey: "route_pullup", multiSegmentFlag: true }
       });
       await recordOwnerSmsEvent({
         trackingId: String(row.id),

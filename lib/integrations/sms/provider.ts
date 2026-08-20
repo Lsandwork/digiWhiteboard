@@ -1,9 +1,16 @@
+import {
+  recordSmsCostEventBeforeSend,
+  updateSmsCostEventAfterSend,
+  type SmsCostMetadata
+} from "@/lib/integrations/sms/cost-events";
+
 export type SmsSendInput = {
   to: string;
   body: string;
   from?: string;
   purpose: "transactional" | "marketing";
   idempotencyKey?: string;
+  costMetadata?: SmsCostMetadata;
 };
 
 export type SmsProvider = {
@@ -18,8 +25,6 @@ export type SmsProvider = {
 export function normalizeSmsToE164(phone: string | null | undefined): string | null {
   const raw = String(phone ?? "").trim();
   if (!raw || /[•*]/.test(raw)) return null;
-  // Prefer an explicit phone-shaped chunk before we strip all non-digits
-  // (flattened notes often append gate codes after " · ").
   const chunk =
     raw.match(/\+?1?[\s.\-()]?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}/)?.[0] ||
     raw.split(/\s*[·|]\s*/)[0] ||
@@ -81,12 +86,24 @@ export function createTwilioSmsProvider(): SmsProvider {
       if (!to) {
         return { ok: false, error: `Invalid destination phone: ${String(input.to || "").slice(0, 40)}` };
       }
+
+      let costEventId: string | null = null;
+      if (input.costMetadata) {
+        const recorded = await recordSmsCostEventBeforeSend({
+          body: input.body,
+          category: input.costMetadata.category,
+          templateKey: input.costMetadata.templateKey,
+          idempotencyKey: input.idempotencyKey,
+          multiSegmentFlag: input.costMetadata.multiSegmentFlag
+        });
+        costEventId = recorded.eventId;
+      }
+
       const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
       const body = new URLSearchParams({
         To: to,
         Body: input.body
       });
-      // Prefer Messaging Service (A2P 10DLC) when configured; otherwise From number.
       if (messagingServiceSid) {
         body.set("MessagingServiceSid", messagingServiceSid);
       } else {
@@ -114,9 +131,15 @@ export function createTwilioSmsProvider(): SmsProvider {
       if (!response.ok) {
         const detail = [json.message, json.code ? `code ${json.code}` : null, json.more_info]
           .filter(Boolean)
-          .join(" — ");
+          .join(" - ");
+        await updateSmsCostEventAfterSend({ eventId: costEventId, ok: false, error: detail || `Twilio HTTP ${response.status}` });
         return { ok: false, error: detail || `Twilio HTTP ${response.status}` };
       }
+      await updateSmsCostEventAfterSend({
+        eventId: costEventId,
+        ok: true,
+        providerMessageId: json.sid
+      });
       return { ok: true, providerMessageId: json.sid };
     }
   };

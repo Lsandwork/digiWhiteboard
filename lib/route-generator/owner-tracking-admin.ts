@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
+import { buildRouteTrackingLinkSms } from "@/lib/integrations/sms/templates";
 import { getPublicSiteUrl } from "@/lib/site-url";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
 import { isRouteOwnerSmsEnabled } from "@/lib/route-generator/flags";
@@ -368,12 +369,14 @@ export async function resendOwnerTrackingLinkSms(input: {
   const url = `${siteBase()}/track/${token}`;
   const dogs = (Array.isArray(row.dog_names) ? (row.dog_names as string[]) : []).slice(0, 3).join(" + ") || "your dog";
   const direction = row.direction === "pickup" ? "pickup" : "drop-off";
-  const body = `Fitdog: track ${dogs}'s ${direction} live — ${url}`;
+  const body = buildRouteTrackingLinkSms({ dogs, direction, url });
+  const resendKey = `route-track-link-resend:${row.id}:${Date.now()}`.slice(0, 64);
   const sent = await sms.send({
     to: phone,
     body,
     purpose: "transactional",
-    idempotencyKey: `route-track-link-resend:${row.id}:${Date.now()}`.slice(0, 64)
+    idempotencyKey: resendKey,
+    costMetadata: { category: "CLIENT_ROUTE_TRACKING_LINK", templateKey: "route_tracking_link_resend" }
   });
 
   await recordOwnerSmsEvent({
