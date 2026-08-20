@@ -9,8 +9,11 @@
  *      GET https://api.gingr.io/v1/parents/parent-packages?filter[parentIds]
  *      GET https://api.gingr.io/v1/parents/parent-memberships?filter[parentIds]
  *    Unique checked-in owner ids are batched (not N+1) and cached 10 minutes.
- * 3. Legacy `GET /api/v1/get_subscriptions` — recurring subscriptions only
- * 4. Fallback: cached unique-owner `GET /api/v1/owner?id=` only if Partner API fails
+ * 3. Legacy `GET /api/v1/get_subscriptions` — facility-wide, then per checked-in owner
+ * 4. Fallback when Partner API fails:
+ *      GET /api/v1/owners (one bulk list, cached)
+ *      GET /api/v1/get_subscriptions?owner_id= (unique owners, cached, concurrency 4)
+ *      GET /api/v1/owner?id= (unique owners, cached, concurrency 4)
  *
  * Empty get_subscriptions is NOT treated as a working package source.
  */
@@ -207,6 +210,45 @@ function collectCandidates(record: Record<string, unknown>): PackageMatchCandida
   return candidates;
 }
 
+const DEEP_SCAN_SKIP_KEY =
+  /^(?:email|phone|password|token|secret|api_key|image|image_url|photo_url|address|notes|barcode|birthday|weight|stripe|vet|breed|species|feeding|temperment|created_at|gender|fixed|vip|medicines|allergies|first_name|last_name|full_name|o_first|o_last|animal_name|dog_name)$/i;
+
+/** Walk nested owner payloads (form_data, etc.) when Gingr hides packages off the top level. */
+export function deepCollectPackageCandidates(value: unknown, depth = 0, maxDepth = 6): PackageMatchCandidate[] {
+  if (depth > maxDepth || value == null) return [];
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return deepCollectPackageCandidates(JSON.parse(trimmed), depth + 1, maxDepth);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  const record = asRecord(value);
+  if (record) {
+    if (looksLikePackageRecord(record)) {
+      return [...candidateFromRecord(record), ...collectCandidates(record)];
+    }
+    const out: PackageMatchCandidate[] = [];
+    for (const [key, nested] of Object.entries(record)) {
+      if (DEEP_SCAN_SKIP_KEY.test(key)) continue;
+      out.push(...deepCollectPackageCandidates(nested, depth + 1, maxDepth));
+    }
+    return out;
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => deepCollectPackageCandidates(item, depth + 1, maxDepth));
+  }
+
+  return [];
+}
+
 function dedupePackages(packages: ResolvedOwnerPackage[]): ResolvedOwnerPackage[] {
   const seen = new Map<string, ResolvedOwnerPackage>();
   for (const entry of packages) {
@@ -400,7 +442,12 @@ const OWNER_FETCH_CONCURRENCY = 4;
 
 function resolvedFromRecord(record: Record<string, unknown>, source: string): ResolvedOwnerPackage[] {
   const resolved: ResolvedOwnerPackage[] = [];
-  for (const candidate of [...candidateFromRecord(record), ...collectCandidates(record)]) {
+  const candidates = [
+    ...candidateFromRecord(record),
+    ...collectCandidates(record),
+    ...deepCollectPackageCandidates(record)
+  ];
+  for (const candidate of candidates) {
     const definition = matchEligiblePackage(candidate);
     if (!definition) continue;
     resolved.push({
@@ -628,31 +675,95 @@ async function loadPackagesForOwnerId(ownerId: string): Promise<{
   });
 }
 
+async function loadSubscriptionsForOwnerId(ownerId: string): Promise<{
+  packages: ResolvedOwnerPackage[];
+  inspection: PackageInspectionRecord[];
+  rowCount: number;
+}> {
+  return getOrLoadTtlCache(`pgw:owner-subscriptions:${ownerId}`, OWNER_PACKAGE_CACHE_TTL_MS, async () => {
+    const { locationId } = tlGingrClientConfig();
+    const paramSets: Array<Record<string, string>> = [
+      {
+        owner_id: ownerId,
+        include_deleted: "false",
+        limit: String(SUBSCRIPTION_PAGE_SIZE),
+        offset: "0"
+      },
+      {
+        owner_id: ownerId,
+        include_deleted: "false",
+        limit: String(SUBSCRIPTION_PAGE_SIZE),
+        offset: "0",
+        location_id: locationId
+      }
+    ];
+    let rows: Array<Record<string, unknown>> = [];
+    for (const params of paramSets) {
+      const read = await gingrV1Request({
+        path: "/api/v1/get_subscriptions",
+        params,
+        timeoutMs: SUBSCRIPTION_FETCH_TIMEOUT_MS,
+        label: "Gingr owner subscriptions"
+      });
+      if (!read.ok) continue;
+      const pageRows = gingrRowsFromPayload(read.payload);
+      if (pageRows.length) {
+        rows = pageRows;
+        break;
+      }
+    }
+    const packages: ResolvedOwnerPackage[] = [];
+    const inspection: PackageInspectionRecord[] = [];
+    for (const row of rows) {
+      if (packageRecordInactive(row)) continue;
+      packages.push(...resolvedFromRecord(row, "owner_subscriptions"));
+      inspection.push(
+        ...collectPackageRecordsForInspection(row, "owner_subscriptions").map((entry) => ({
+          ...entry,
+          ownerId
+        }))
+      );
+    }
+    return { packages, inspection, rowCount: rows.length };
+  });
+}
+
 async function loadCheckedInOwnerPackages(ownerIds: string[]): Promise<{
   byOwnerId: Map<string, ResolvedOwnerPackage[]>;
   inspection: PackageInspectionRecord[];
   attempt: PackageSourceAttempt;
   uniqueOwners: number;
   sampleFields: string[];
+  subscriptionRows: number;
+  ownersWithSubscriptionRecords: number;
 }> {
   const unique = [...new Set(ownerIds.filter(Boolean))];
   const byOwnerId = new Map<string, ResolvedOwnerPackage[]>();
   const inspection: PackageInspectionRecord[] = [];
   let ownersWithPackageRecords = 0;
+  let ownersWithSubscriptionRecords = 0;
+  let subscriptionRows = 0;
   let lastError: string | null = null;
   let okCount = 0;
   let sampleFields: string[] = [];
 
   await mapPool(unique, OWNER_FETCH_CONCURRENCY, async (ownerId) => {
     try {
-      const loaded = await loadPackagesForOwnerId(ownerId);
+      const [ownerLoaded, subscriptionLoaded] = await Promise.all([
+        loadPackagesForOwnerId(ownerId),
+        loadSubscriptionsForOwnerId(ownerId)
+      ]);
       okCount += 1;
-      if (loaded.inspection.length) ownersWithPackageRecords += 1;
-      if (!sampleFields.length && loaded.availableFields.length) sampleFields = loaded.availableFields;
-      addPackages(byOwnerId, ownerId, loaded.packages);
-      inspection.push(...loaded.inspection.map((entry) => ({ ...entry, ownerId })));
+      if (ownerLoaded.inspection.length) ownersWithPackageRecords += 1;
+      if (subscriptionLoaded.inspection.length) ownersWithSubscriptionRecords += 1;
+      subscriptionRows += subscriptionLoaded.rowCount;
+      if (!sampleFields.length && ownerLoaded.availableFields.length) sampleFields = ownerLoaded.availableFields;
+      addPackages(byOwnerId, ownerId, ownerLoaded.packages);
+      addPackages(byOwnerId, ownerId, subscriptionLoaded.packages);
+      inspection.push(...ownerLoaded.inspection.map((entry) => ({ ...entry, ownerId })));
+      inspection.push(...subscriptionLoaded.inspection);
     } catch (error) {
-      lastError = error instanceof Error ? error.message : "Owner lookup failed.";
+      lastError = error instanceof Error ? error.message : "Owner package lookup failed.";
     }
   });
 
@@ -661,6 +772,8 @@ async function loadCheckedInOwnerPackages(ownerIds: string[]): Promise<{
     inspection,
     uniqueOwners: unique.length,
     sampleFields,
+    subscriptionRows,
+    ownersWithSubscriptionRecords,
     attempt: {
       attempted: unique.length > 0,
       ok: okCount > 0,
@@ -670,8 +783,57 @@ async function loadCheckedInOwnerPackages(ownerIds: string[]): Promise<{
       note: lastError
         ? redactDiagnosticMessage(lastError)
         : unique.length
-          ? `Fetched ${unique.length} unique checked-in owners (cached 10m, concurrency ${OWNER_FETCH_CONCURRENCY}). ${ownersWithPackageRecords} had package-like records.`
+          ? `Fetched ${unique.length} unique checked-in owners (cached 10m, concurrency ${OWNER_FETCH_CONCURRENCY}). ${ownersWithPackageRecords} had package-like owner fields; ${ownersWithSubscriptionRecords} had owner-scoped subscriptions (${subscriptionRows} rows).`
           : "No owner ids on checked-in reservations."
+    }
+  };
+}
+
+async function loadOwnersListForCheckedInOwners(ownerIds: string[]): Promise<{
+  byOwnerId: Map<string, ResolvedOwnerPackage[]>;
+  inspection: PackageInspectionRecord[];
+  attempt: PackageSourceAttempt;
+}> {
+  const unique = new Set(ownerIds.filter(Boolean));
+  if (!unique.size) {
+    return {
+      byOwnerId: new Map(),
+      inspection: [],
+      attempt: {
+        attempted: false,
+        ok: false,
+        httpStatus: null,
+        rows: 0,
+        note: "No owner ids on checked-in reservations."
+      }
+    };
+  }
+
+  const loaded = await loadOwnersListPackages();
+  const byOwnerId = new Map<string, ResolvedOwnerPackage[]>();
+  const inspection: PackageInspectionRecord[] = [];
+  let matchedOwners = 0;
+  for (const [ownerId, packages] of loaded.byOwnerId) {
+    if (!unique.has(ownerId)) continue;
+    matchedOwners += 1;
+    addPackages(byOwnerId, ownerId, packages);
+  }
+  for (const entry of loaded.inspection) {
+    if (!entry.ownerId || !unique.has(entry.ownerId)) continue;
+    inspection.push(entry);
+  }
+
+  return {
+    byOwnerId,
+    inspection,
+    attempt: {
+      ...loaded.attempt,
+      rows: inspection.length,
+      note: loaded.attempt.note
+        ? loaded.attempt.note
+        : matchedOwners
+          ? `Matched ${matchedOwners} checked-in owners from bulk owners list.`
+          : "Bulk owners list returned no package records for checked-in owners."
     }
   };
 }
@@ -884,17 +1046,36 @@ export async function buildOwnerPackageIndex(
 
   if (!partnerOk && ownerIds.length > 0) {
     try {
+      const ownersList = await loadOwnersListForCheckedInOwners(ownerIds);
+      packageRowsInspected += ownersList.inspection.length;
+      for (const [ownerId, packages] of ownersList.byOwnerId) {
+        addPackages(byOwnerId, ownerId, packages);
+      }
+      if (ownersList.byOwnerId.size > 0) sources.push("owners");
+      if (ownersList.attempt.note) errors.push(ownersList.attempt.note);
+      attempts.owners = {
+        ok: ownersList.attempt.ok,
+        httpStatus: ownersList.attempt.httpStatus,
+        rows: ownersList.attempt.rows
+      };
+
       const checkedInOwners = await loadCheckedInOwnerPackages(ownerIds);
       packageRowsInspected += checkedInOwners.inspection.length;
       for (const [ownerId, packages] of checkedInOwners.byOwnerId) {
         addPackages(byOwnerId, ownerId, packages);
       }
       if (checkedInOwners.byOwnerId.size > 0) sources.push("owner");
+      if (checkedInOwners.ownersWithSubscriptionRecords > 0) sources.push("owner_subscriptions");
       if (checkedInOwners.attempt.note) errors.push(checkedInOwners.attempt.note);
       attempts.owner = {
         ok: checkedInOwners.attempt.ok,
         httpStatus: checkedInOwners.attempt.httpStatus,
         rows: checkedInOwners.attempt.rows
+      };
+      attempts.ownerSubscriptions = {
+        ok: checkedInOwners.attempt.ok,
+        httpStatus: checkedInOwners.attempt.httpStatus,
+        rows: checkedInOwners.subscriptionRows
       };
       ownerFieldNames = checkedInOwners.sampleFields.slice(0, 80);
     } catch (error) {

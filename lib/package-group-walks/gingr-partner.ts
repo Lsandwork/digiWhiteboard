@@ -13,7 +13,7 @@
  *
  * These are bulk, paginated list endpoints — never one request per dog.
  */
-import { requireTlGingrApiKey, tlGingrClientConfig } from "@/lib/tl-digi-board/gingr-auth";
+import { resolveGingrPartnerApiKey, tlGingrClientConfig } from "@/lib/tl-digi-board/gingr-auth";
 import { fetchTlGingrResponse } from "@/lib/tl-digi-board/gingr-http";
 import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
 import { redactDiagnosticMessage } from "./diagnostics";
@@ -144,7 +144,15 @@ export async function gingrPartnerRequest(options: {
   label: string;
 }): Promise<GingrV1Read> {
   try {
-    const apiKey = requireTlGingrApiKey();
+    const apiKey = resolveGingrPartnerApiKey();
+    if (!apiKey) {
+      return {
+        ok: false,
+        status: null,
+        payload: null,
+        error: `${options.label} failed: GINGR_PARTNER_API_KEY (or TL_GINGR_KEY / GINGR_API_KEY) is not configured.`
+      };
+    }
     const { subdomain } = tlGingrClientConfig();
     const params = new URLSearchParams();
     appendJsonApiParams(params, { filter: options.filter, page: options.page });
