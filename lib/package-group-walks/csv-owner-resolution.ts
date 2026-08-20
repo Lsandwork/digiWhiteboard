@@ -340,7 +340,7 @@ export async function inspectOwnersCsvResolution(
     httpStatus: read.status,
     rows,
     reservations,
-    error: read.ok ? null : redactDiagnosticMessage(read.error)
+    error: read.ok ? null : redactDiagnosticMessage(read.error ?? "Gingr owners list failed.")
   });
 }
 
