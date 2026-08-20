@@ -43,6 +43,35 @@ export class PackageGroupWalksSchemaMissingError extends Error {
   }
 }
 
+export type PackageGroupWalksTableStatus = "applied" | "not_applied" | "unable_to_verify";
+
+/** Probe whether migration 082 created `package_group_walks`. Never returns row data. */
+export async function probePackageGroupWalksTable(
+  supabase: SupabaseClient
+): Promise<{ status: PackageGroupWalksTableStatus; message: string }> {
+  try {
+    const { error } = await supabase.from(PACKAGE_GROUP_WALKS_TABLE).select("id").limit(1);
+    if (!error) {
+      return { status: "applied", message: "package_group_walks table is present." };
+    }
+    if (isMissingRelation(error)) {
+      return {
+        status: "not_applied",
+        message: "package_group_walks table is missing. Apply supabase/migrations/082_package_group_walks.sql."
+      };
+    }
+    return {
+      status: "unable_to_verify",
+      message: "Could not confirm package_group_walks without exposing database internals."
+    };
+  } catch {
+    return {
+      status: "unable_to_verify",
+      message: "Could not confirm package_group_walks without exposing database internals."
+    };
+  }
+}
+
 function isMissingRelation(error: { code?: string | null; message?: string | null } | null): boolean {
   if (!error) return false;
   if (error.code && MISSING_RELATION.has(error.code)) return true;

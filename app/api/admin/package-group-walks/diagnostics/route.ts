@@ -6,37 +6,113 @@ import {
 } from "@/lib/admin/api-auth";
 import { isFullAdminRole } from "@/lib/admin/users";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isTlGingrKeyConfigured } from "@/lib/tl-digi-board/gingr-auth";
 import { loadTlBoardCheckedInReservations } from "@/lib/tl-digi-board/gingr-reservation-services";
 import {
   PACKAGE_GROUP_WALK_ELIGIBLE_PACKAGES,
   eligiblePackageIdMap,
-  matchEligiblePackage,
   normalizePackageName
 } from "@/lib/package-group-walks/eligible-packages";
 import {
-  loadGingrSubscriptionIndex,
-  ownerIdFromReservation
+  collectPackageRecordsForInspection,
+  collectReservationPackageRecordsForInspection,
+  loadAllGingrSubscriptionRows
 } from "@/lib/package-group-walks/gingr-packages";
-import { loadPackageGroupWalkState } from "@/lib/package-group-walks/service";
+import {
+  GINGR_UNAVAILABLE_BODY,
+  aggregateSanitizedPackages,
+  redactDiagnosticMessage,
+  sanitizePackageRecord,
+  type SanitizedGingrPackage
+} from "@/lib/package-group-walks/diagnostics";
+import { probePackageGroupWalksTable } from "@/lib/package-group-walks/store";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const NO_STORE = { "cache-control": "private, no-store, max-age=0" };
+
+function gingrUnavailable(details?: string[]) {
+  return NextResponse.json(
+    {
+      ...GINGR_UNAVAILABLE_BODY,
+      gingrConnected: false,
+      ...(details?.length ? { details } : {})
+    },
+    { status: 503, headers: NO_STORE }
+  );
+}
+
+async function probeDatabase() {
+  try {
+    const supabase = getServiceSupabase({ timeoutMs: 8_000 });
+    return await probePackageGroupWalksTable(supabase);
+  } catch {
+    return {
+      status: "unable_to_verify" as const,
+      message: "Supabase is not configured in this environment."
+    };
+  }
+}
+
 /**
- * Package Group Walk health + Gingr package discovery. Admin only.
+ * Package Group Walk Gingr package discovery. Full Admin only.
  *
- * Lists the distinct package/subscription labels Gingr actually returns so the
- * canonical names (and, once known, the stable Gingr package ids) can be
- * confirmed against production data instead of guessed. Never returns secrets.
+ * Returns sanitized package/subscription identifiers Gingr actually sends so
+ * Monthly Unlimited and 20-Day PLUS Package can be pinned by stable id.
+ * Never returns secrets, tokens, or owner PII.
  */
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   if (!isFullAdminRole(getEffectiveAdminRole(request))) {
-    return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+    return NextResponse.json(
+      { ok: false, error: "FORBIDDEN", message: "Admin access required." },
+      { status: 403, headers: NO_STORE }
+    );
   }
 
-  const supabase = getServiceSupabase({ timeoutMs: 10_000 });
-  const configured = PACKAGE_GROUP_WALK_ELIGIBLE_PACKAGES.map((definition) => ({
+  if (!isTlGingrKeyConfigured()) {
+    return gingrUnavailable();
+  }
+
+  const errors: string[] = [];
+  let reservations: Awaited<ReturnType<typeof loadTlBoardCheckedInReservations>> = [];
+  let reservationFailed = false;
+  try {
+    reservations = await loadTlBoardCheckedInReservations();
+  } catch (error) {
+    reservationFailed = true;
+    errors.push(
+      redactDiagnosticMessage(error instanceof Error ? error.message : "Reservation lookup failed.")
+    );
+  }
+
+  let subscriptionRows: Array<Record<string, unknown>> = [];
+  let subscriptionFailed = false;
+  try {
+    const loaded = await loadAllGingrSubscriptionRows();
+    subscriptionRows = loaded.rows;
+  } catch (error) {
+    subscriptionFailed = true;
+    errors.push(
+      redactDiagnosticMessage(error instanceof Error ? error.message : "Subscription lookup failed.")
+    );
+  }
+
+  const inspectionRecords = [
+    ...subscriptionRows.flatMap((row) => collectPackageRecordsForInspection(row, "subscriptions")),
+    ...reservations.flatMap((reservation) => collectReservationPackageRecordsForInspection(reservation))
+  ];
+  const packages: SanitizedGingrPackage[] = aggregateSanitizedPackages(
+    inspectionRecords.map((entry) => sanitizePackageRecord(entry.record, entry.source, entry.ownerId))
+  );
+
+  if ((reservationFailed && subscriptionFailed) || (subscriptionFailed && packages.length === 0)) {
+    return gingrUnavailable(errors);
+  }
+
+  const database = await probeDatabase();
+  const configuredPackages = PACKAGE_GROUP_WALK_ELIGIBLE_PACKAGES.map((definition) => ({
     key: definition.key,
     displayName: definition.displayName,
     canonicalNames: definition.canonicalNames,
@@ -46,80 +122,20 @@ export async function GET(request: Request) {
       .map(([id]) => id)
   }));
 
-  const observed = new Map<string, { label: string; id: string | null; count: number; matched: string | null }>();
-  const record = (label: string | null, id: string | null) => {
-    const name = String(label ?? "").trim();
-    if (!name && !id) return;
-    const key = `${id ?? ""}|${normalizePackageName(name)}`;
-    const existing = observed.get(key);
-    if (existing) {
-      existing.count += 1;
-      return;
-    }
-    observed.set(key, {
-      label: name,
-      id,
-      count: 1,
-      matched: matchEligiblePackage({ id, name })?.key ?? null
-    });
-  };
-
-  const errors: string[] = [];
-  let subscriptionRowCount = 0;
-  let reservationCount = 0;
-  let ownersWithReservations = 0;
-
-  try {
-    const reservations = await loadTlBoardCheckedInReservations();
-    reservationCount = reservations.length;
-    ownersWithReservations = new Set(
-      reservations.map((reservation) => ownerIdFromReservation(reservation)).filter(Boolean)
-    ).size;
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : "Reservation lookup failed.");
-  }
-
-  try {
-    const { byOwnerId, rowCount } = await loadGingrSubscriptionIndex();
-    subscriptionRowCount = rowCount;
-    for (const packages of byOwnerId.values()) {
-      for (const entry of packages) record(entry.rawName, entry.gingrPackageId);
-    }
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : "Subscription lookup failed.");
-  }
-
-  let state: Awaited<ReturnType<typeof loadPackageGroupWalkState>> | null = null;
-  try {
-    state = await loadPackageGroupWalkState(supabase);
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : "State load failed.");
-  }
-
   return NextResponse.json(
     {
-      configuredPackages: configured,
-      gingr: {
-        checkedInReservations: reservationCount,
-        distinctOwners: ownersWithReservations,
-        subscriptionRows: subscriptionRowCount,
-        observedEligiblePackages: [...observed.values()].sort((a, b) => b.count - a.count)
+      ok: true,
+      gingrConnected: !subscriptionFailed || !reservationFailed,
+      checkedInDogsEvaluated: reservations.length,
+      subscriptionRowsInspected: subscriptionRows.length,
+      packages,
+      configuredPackages,
+      database: {
+        packageGroupWalks: database.status,
+        message: database.message
       },
-      state: state
-        ? {
-            businessDate: state.meta.businessDate,
-            syncState: state.meta.syncState,
-            lastSuccessfulSyncAt: state.meta.lastSuccessfulSyncAt,
-            lastError: state.meta.lastError,
-            packageSources: state.meta.packageSources,
-            packageSourceAvailable: state.meta.packageSourceAvailable,
-            eligibleToday: state.summary.eligibleToday,
-            remaining: state.summary.remaining,
-            completed: state.summary.completed
-          }
-        : null,
-      errors
+      ...(errors.length ? { warnings: errors } : {})
     },
-    { headers: { "cache-control": "private, no-store, max-age=0" } }
+    { headers: NO_STORE }
   );
 }

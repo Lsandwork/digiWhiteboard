@@ -14,6 +14,12 @@ import {
   preferredEligiblePackage
 } from "../lib/package-group-walks/eligible-packages";
 import {
+  aggregateSanitizedPackages,
+  GINGR_UNAVAILABLE_BODY,
+  redactDiagnosticMessage,
+  sanitizePackageRecord
+} from "../lib/package-group-walks/diagnostics";
+import {
   buildOwnerPackageIndex,
   ownerIdFromReservation,
   ownerNameFromReservation,
@@ -728,6 +734,76 @@ assert.equal(
   existsSync(join(process.cwd(), "app/api/boards/tl-alerts-reminders/package-group-walks/route.ts")),
   true
 );
+
+/* ------------------------------------------------------------------ *
+ * Diagnostics route — auth, Gingr failure, sanitized package shape
+ * ------------------------------------------------------------------ */
+
+{
+  const diagnostics = source("app/api/admin/package-group-walks/diagnostics/route.ts");
+  assert.match(diagnostics, /export async function GET/);
+  assert.match(diagnostics, /if \(!isAdminRequest\(request\)\) return unauthorizedAdminResponse\(\);/);
+  assert.match(diagnostics, /isFullAdminRole\(getEffectiveAdminRole\(request\)\)/);
+  assert.match(diagnostics, /status: 403/);
+  assert.match(diagnostics, /GINGR_UNAVAILABLE/);
+  assert.match(diagnostics, /status: 503/);
+  assert.doesNotMatch(diagnostics, /GINGR_API_KEY|TL_GINGR_KEY|SUPABASE_SERVICE_ROLE_KEY/);
+  assert.doesNotMatch(diagnostics, /authorization headers/i);
+
+  const middleware = source("middleware.ts");
+  assert.match(middleware, /matcher:/);
+  assert.doesNotMatch(middleware, /"\/api"/);
+  assert.doesNotMatch(middleware, /"\/api\/:path\*"/);
+}
+
+{
+  const monthly = sanitizePackageRecord(
+    {
+      id: "sub-1",
+      owner_id: "owner-9",
+      package_id: "42",
+      product_id: "900",
+      subscription_id: "sub-1",
+      name: "Monthly Unlimited",
+      type: "package",
+      api_key: "should-never-leak",
+      email: "owner@example.com",
+      first_name: "Pat",
+      package: { id: "42", name: "Monthly Unlimited", code: "MU" }
+    },
+    "subscriptions",
+    "owner-9"
+  );
+  assert.equal(monthly?.eligible, true);
+  assert.equal(monthly?.matchReason, "name");
+  assert.equal(monthly?.matchedKey, "monthly_unlimited");
+  assert.equal(monthly?.packageId, "42");
+  assert.equal(monthly?.productId, "900");
+  assert.equal(monthly?.subscriptionId, "sub-1");
+  assert.equal(monthly?.normalizedName, "monthly unlimited");
+  assert.equal(monthly?.availableFields.includes("api_key"), false);
+  assert.equal(monthly?.availableFields.includes("email"), false);
+  assert.equal(monthly?.availableFields.includes("first_name"), false);
+  assert.ok(monthly?.availableFields.includes("package_id"));
+  assert.ok(monthly?.availableFields.includes("nested.code"));
+
+  const plus = sanitizePackageRecord(
+    { package_id: "77", name: "20-Day PLUS Package" },
+    "subscriptions",
+    "owner-2"
+  );
+  assert.equal(plus?.eligible, true);
+  assert.equal(plus?.matchedKey, "twenty_day_plus");
+
+  const nearMiss = sanitizePackageRecord({ name: "10-Day PLUS Package" }, "subscriptions", "owner-3");
+  assert.equal(nearMiss?.eligible, false);
+  assert.equal(nearMiss?.matchReason, null);
+
+  const aggregated = aggregateSanitizedPackages([monthly, monthly, plus]);
+  assert.equal(aggregated[0]?.count, 2);
+  assert.equal(GINGR_UNAVAILABLE_BODY.error, "GINGR_UNAVAILABLE");
+  assert.equal(redactDiagnosticMessage("Gingr 401 key=super-secret-value boom"), "Gingr 401 key=REDACTED boom");
+}
 
 /* ------------------------------------------------------------------ *
  * Bulk index construction stays resilient

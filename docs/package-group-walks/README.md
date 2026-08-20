@@ -41,15 +41,34 @@ PACKAGE_GROUP_WALK_MONTHLY_UNLIMITED_GINGR_IDS=123,456
 PACKAGE_GROUP_WALK_TWENTY_DAY_PLUS_GINGR_IDS=789
 ```
 
-To read the ids Gingr actually returns (full admin session required):
+To read the ids Gingr actually returns (Full Admin session required):
 
 ```
 GET /api/admin/package-group-walks/diagnostics
 ```
 
-It lists every distinct package/subscription label seen on checked-in owners,
-its Gingr id, how many owners hold it, and which eligible package it matched.
-Set the env vars from that output to move from name matching to id matching.
+Production URL:
+
+```
+https://fitdog.ruffops.com/api/admin/package-group-walks/diagnostics
+```
+
+Auth:
+
+- Full Admin (`owner_admin` / `manager_admin`) → sanitized JSON
+- Authenticated non-admin → `403` JSON (`FORBIDDEN`)
+- Unauthenticated → `401` JSON (`Unauthorized.`) — never the Next.js HTML 404 page
+
+If Gingr credentials are missing or Gingr cannot be reached the route returns
+HTTP `503` with `{ "ok": false, "error": "GINGR_UNAVAILABLE" }` rather than an
+empty successful package list.
+
+The payload lists distinct package/subscription ids and names, nested product /
+package / subscription identifiers when Gingr sends them, `availableFields` for
+the raw object shape, and whether each row matched Monthly Unlimited or
+20-Day PLUS Package by name or confirmed id. It never returns API keys, tokens,
+or owner PII. Set the env vars from that output to move from name matching to
+id matching.
 
 ## Gingr data sources
 

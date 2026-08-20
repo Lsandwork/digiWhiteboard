@@ -236,6 +236,94 @@ function normalizeSubscriptionList(payload: unknown): Array<Record<string, unkno
   return rows.map(asRecord).filter((row): row is Record<string, unknown> => Boolean(row));
 }
 
+export type PackageInspectionRecord = {
+  record: Record<string, unknown>;
+  source: string;
+  ownerId: string | null;
+};
+
+function looksLikePackageRecord(record: Record<string, unknown>): boolean {
+  return Boolean(
+    pickString(
+      ...PACKAGE_NAME_FIELDS.map((field) => record[field]),
+      record.package_id,
+      record.subscription_package_id,
+      record.membership_type_id,
+      record.plan_id,
+      record.product_id,
+      record.subscription_id,
+      record.package_type
+    ) ||
+      asRecord(record.package) ||
+      asRecord(record.membership) ||
+      asRecord(record.plan) ||
+      asRecord(record.product)
+  );
+}
+
+/**
+ * Collect raw package/subscription objects for diagnostics.
+ * Returns the records Gingr actually sent — callers must sanitize before responding.
+ */
+export function collectPackageRecordsForInspection(
+  record: Record<string, unknown>,
+  source: string
+): PackageInspectionRecord[] {
+  const ownerId = pickString(record.owner_id, record.ownerId, asRecord(record.owner)?.id);
+  const out: PackageInspectionRecord[] = [];
+  const seen = new Set<Record<string, unknown>>();
+  const push = (row: Record<string, unknown> | null, rowSource: string) => {
+    if (!row || seen.has(row) || !looksLikePackageRecord(row)) return;
+    seen.add(row);
+    out.push({ record: row, source: rowSource, ownerId });
+  };
+
+  push(record, source);
+  for (const field of PACKAGE_CONTAINER_FIELDS) {
+    const value = record[field];
+    if (!Array.isArray(value)) continue;
+    for (const item of value) {
+      const row = asRecord(item);
+      if (row) push(row, `${source}.${field}`);
+    }
+  }
+  for (const field of PACKAGE_SINGULAR_FIELDS) {
+    push(asRecord(record[field]), `${source}.${field}`);
+  }
+  for (const field of ["package", "membership", "plan", "product", "package_type"] as const) {
+    push(asRecord(record[field]), `${source}.${field}`);
+  }
+  return out;
+}
+
+export function collectReservationPackageRecordsForInspection(
+  reservation: GingrReservation
+): PackageInspectionRecord[] {
+  const record = reservation as Record<string, unknown>;
+  const owner = asRecord(record.owner) || asRecord(record.client) || asRecord(record.customer);
+  return [
+    ...collectPackageRecordsForInspection(record, "reservation"),
+    ...(owner ? collectPackageRecordsForInspection(owner, "reservation_owner") : [])
+  ];
+}
+
+/**
+ * Whole-facility subscription rows for diagnostics.
+ * Reuses the same bulk get_subscriptions fetch as eligibility — still one Gingr call site.
+ */
+export async function loadAllGingrSubscriptionRows(): Promise<{
+  rows: Array<Record<string, unknown>>;
+  rowCount: number;
+}> {
+  const rows: Array<Record<string, unknown>> = [];
+  for (let page = 0; page < SUBSCRIPTION_MAX_PAGES; page += 1) {
+    const pageRows = await fetchSubscriptionPage(page * SUBSCRIPTION_PAGE_SIZE);
+    rows.push(...pageRows);
+    if (pageRows.length < SUBSCRIPTION_PAGE_SIZE) break;
+  }
+  return { rows, rowCount: rows.length };
+}
+
 async function fetchSubscriptionPage(offset: number): Promise<Array<Record<string, unknown>>> {
   const apiKey = requireTlGingrApiKey();
   const { subdomain, locationId } = tlGingrClientConfig();
