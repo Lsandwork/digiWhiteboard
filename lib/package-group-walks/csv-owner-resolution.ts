@@ -1,19 +1,19 @@
 /**
- * TEMPORARY Outstanding Packages CSV → Gingr owner_id resolution.
+ * Outstanding Packages CSV → Gingr owner_id matching helpers.
  *
- * Runs server-side only. Never serialize the owner directory, CSV names, or
- * other PII to the client. Package Group Walk eligibility is unchanged.
+ * Callers pass CSV owner display names. Never serialize the owner directory,
+ * CSV names, or other PII to the client. Package Group Walk eligibility is
+ * unchanged — these helpers do not qualify dogs.
  */
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
-import { redactDiagnosticMessage } from "./diagnostics";
-import { loadGingrOwnersListRead, ownerIdFromReservation } from "./gingr-packages";
-import { gingrRowsFromPayload } from "./gingr-v1";
-import {
-  OUTSTANDING_PACKAGE_CSV_OWNERS,
-  OUTSTANDING_PACKAGE_CSV_SOURCE,
-  type OutstandingPackageCsvOwner
-} from "./csv-owner-resolution-fixture";
+import { ownerIdFromReservation } from "./gingr-packages";
 import type { PackageGroupWalkPackageKey } from "./eligible-packages";
+
+export type OutstandingPackageCsvOwner = {
+  ownerDisplayName: string;
+  packageKey: PackageGroupWalkPackageKey;
+  packageType: string;
+};
 
 const SECRET_FIELD = /(?:api[_-]?key|auth(?:orization)?|token|secret|password|credential|cookie|session)/i;
 const ID_FIELD_CANDIDATES = ["id", "owner_id", "system_id", "o_id"] as const;
@@ -278,10 +278,11 @@ export function buildCsvOwnerResolutionReport(input: {
   httpStatus: number | null;
   rows: Array<Record<string, unknown>>;
   reservations: GingrReservation[];
-  csvOwners?: readonly OutstandingPackageCsvOwner[];
+  csvOwners: readonly OutstandingPackageCsvOwner[];
+  source?: string;
   error?: string | null;
 }): CsvOwnerResolutionReport {
-  const csvOwners = input.csvOwners ?? OUTSTANDING_PACKAGE_CSV_OWNERS;
+  const csvOwners = input.csvOwners;
   const sample = input.rows.find((row) => row && Object.keys(row).length > 0) ?? null;
   const schema = inspectOwnerRecordSchema(sample, input.rows);
   const directory = input.rows
@@ -305,7 +306,7 @@ export function buildCsvOwnerResolutionReport(input: {
   }
 
   return {
-    source: OUTSTANDING_PACKAGE_CSV_SOURCE,
+    source: input.source ?? "outstanding-packages-csv",
     directory: {
       httpStatus: input.httpStatus,
       totalRows: input.rows.length,
@@ -329,19 +330,6 @@ export function buildCsvOwnerResolutionReport(input: {
     },
     error: input.error ?? null
   };
-}
-
-export async function inspectOwnersCsvResolution(
-  reservations: GingrReservation[]
-): Promise<CsvOwnerResolutionReport> {
-  const read = await loadGingrOwnersListRead();
-  const rows = read.ok ? gingrRowsFromPayload(read.payload) : [];
-  return buildCsvOwnerResolutionReport({
-    httpStatus: read.status,
-    rows,
-    reservations,
-    error: read.ok ? null : redactDiagnosticMessage(read.error ?? "Gingr owners list failed.")
-  });
 }
 
 /** Public lookup payload — aggregates and field names only. */

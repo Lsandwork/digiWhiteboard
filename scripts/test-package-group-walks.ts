@@ -30,7 +30,6 @@ import {
   normalizeOwnerName,
   toPublicCsvOwnerResolutionLookup
 } from "../lib/package-group-walks/csv-owner-resolution";
-import { OUTSTANDING_PACKAGE_CSV_OWNERS } from "../lib/package-group-walks/csv-owner-resolution-fixture";
 import {
   buildOwnerPackageIndex,
   deepCollectPackageCandidates,
@@ -817,7 +816,11 @@ assert.equal(
 );
 assert.equal(
   existsSync(join(process.cwd(), "app/api/admin/package-group-walks/csv-owner-resolution/route.ts")),
-  true
+  false
+);
+assert.equal(
+  existsSync(join(process.cwd(), "lib/package-group-walks/csv-owner-resolution-fixture.ts")),
+  false
 );
 assert.equal(
   existsSync(join(process.cwd(), "app/api/boards/tl-alerts-reminders/package-group-walks/route.ts")),
@@ -1050,26 +1053,24 @@ async function testOwnerPackageIndexResilience() {
   const publicLookup = JSON.stringify(toPublicCsvOwnerResolutionLookup(report));
   assert.doesNotMatch(publicLookup, /Alan|Turing|Byte|Nibble|hidden@/i);
 
-  const monthlyCsv = OUTSTANDING_PACKAGE_CSV_OWNERS.filter((row) => row.packageKey === "monthly_unlimited");
-  const plusCsv = OUTSTANDING_PACKAGE_CSV_OWNERS.filter((row) => row.packageKey === "twenty_day_plus");
-  assert.equal(monthlyCsv.length, 9);
-  assert.equal(plusCsv.length, 27);
-  assert.equal(OUTSTANDING_PACKAGE_CSV_OWNERS.length, 36);
-
-  const csvRoute = source("app/api/admin/package-group-walks/csv-owner-resolution/route.ts");
-  assert.match(csvRoute, /isSuperAdminLegacyRole/);
-  assert.match(csvRoute, /toPublicCsvOwnerResolutionLookup/);
-  assert.match(csvRoute, /VERCEL_ENV === "preview"/);
-  assert.doesNotMatch(csvRoute, /ownerDisplayName/);
-  assert.doesNotMatch(csvRoute, /GINGR_API_KEY|TL_GINGR_KEY/);
+  assert.equal(
+    existsSync(join(process.cwd(), "app/api/admin/package-group-walks/csv-owner-resolution/route.ts")),
+    false
+  );
+  assert.doesNotMatch(
+    source("lib/package-group-walks/csv-owner-resolution.ts"),
+    /inspectOwnersCsvResolution/
+  );
 
   for (const path of [
     "components/admin/PackageGroupWalksPanel.tsx",
-    "components/boards/TlAlertsRemindersBoard.tsx"
+    "components/boards/TlAlertsRemindersBoard.tsx",
+    "lib/package-group-walks/service.ts",
+    "lib/package-group-walks/tl-board.ts"
   ]) {
     const text = source(path);
     assert.doesNotMatch(text, /csv-owner-resolution-fixture/, path);
-    assert.doesNotMatch(text, /csv-owner-resolution/, path);
+    assert.doesNotMatch(text, /csvOwnerResolution/, path);
   }
 }
 

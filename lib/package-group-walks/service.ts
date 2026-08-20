@@ -13,10 +13,6 @@ import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { enrichTlBoardAnimalPhotoUrls } from "@/lib/tl-digi-board/animal-photos";
 import { loadTlBoardCheckedInReservations } from "@/lib/tl-digi-board/gingr-reservation-services";
-import {
-  inspectOwnersCsvResolution,
-  toPublicCsvOwnerResolutionLookup
-} from "./csv-owner-resolution";
 import { preferredEligiblePackage } from "./eligible-packages";
 import {
   buildOwnerPackageIndex,
@@ -27,7 +23,6 @@ import {
   type ResolvedOwnerPackage
 } from "./gingr-packages";
 import type {
-  CsvOwnerResolutionLookup,
   PackageGroupWalkCompletion,
   PackageGroupWalkEligibility,
   PackageGroupWalkMeta,
@@ -61,7 +56,6 @@ let lastGoodEligibility: {
   capturedIds: PackageGroupWalkMeta["capturedIds"];
   attempts: PackageGroupWalkMeta["attempts"];
   ownerFieldNames: string[];
-  csvOwnerResolution: CsvOwnerResolutionLookup | null;
 } | null = null;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -288,17 +282,10 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
   capturedIds: PackageGroupWalkMeta["capturedIds"];
   attempts: PackageGroupWalkMeta["attempts"];
   ownerFieldNames: string[];
-  csvOwnerResolution: CsvOwnerResolutionLookup | null;
   errors: string[];
 }> {
   const reservations = await loadTlBoardCheckedInReservations();
   const packageIndex = await buildOwnerPackageIndex(reservations);
-  let csvOwnerResolution: CsvOwnerResolutionLookup | null = null;
-  try {
-    csvOwnerResolution = toPublicCsvOwnerResolutionLookup(await inspectOwnersCsvResolution(reservations));
-  } catch {
-    csvOwnerResolution = null;
-  }
   const { eligibility, malformedCount } = buildPackageGroupWalkEligibility({
     reservations,
     packageIndex,
@@ -336,7 +323,6 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
     capturedIds: packageIndex.capturedIds,
     attempts: packageIndex.attempts,
     ownerFieldNames: packageIndex.ownerFieldNames,
-    csvOwnerResolution,
     errors: packageIndex.errors
   };
 }
@@ -375,7 +361,6 @@ export async function loadPackageGroupWalkState(
   };
   let attempts: PackageGroupWalkMeta["attempts"] = {};
   let ownerFieldNames: string[] = [];
-  let csvOwnerResolution: CsvOwnerResolutionLookup | null = lastGoodEligibility?.csvOwnerResolution ?? null;
   let lastSuccessfulSyncAt: string | null = lastGoodEligibility?.syncedAt ?? null;
 
   try {
@@ -398,7 +383,6 @@ export async function loadPackageGroupWalkState(
     capturedIds = result.capturedIds;
     attempts = result.attempts;
     ownerFieldNames = result.ownerFieldNames;
-    csvOwnerResolution = result.csvOwnerResolution;
     lastError = result.errors.length ? result.errors.join("; ") : null;
     lastSuccessfulSyncAt = attemptedAt;
     lastGoodEligibility = {
@@ -410,8 +394,7 @@ export async function loadPackageGroupWalkState(
       packageRowsInspected,
       capturedIds,
       attempts,
-      ownerFieldNames,
-      csvOwnerResolution
+      ownerFieldNames
     };
 
     logPackageGroupWalkEvent("PACKAGE_GROUP_WALK_SYNC_SUCCESS", {
@@ -444,7 +427,6 @@ export async function loadPackageGroupWalkState(
       capturedIds = lastGoodEligibility.capturedIds;
       attempts = lastGoodEligibility.attempts;
       ownerFieldNames = lastGoodEligibility.ownerFieldNames;
-      csvOwnerResolution = lastGoodEligibility.csvOwnerResolution;
       lastSuccessfulSyncAt = lastGoodEligibility.syncedAt;
     }
   }
@@ -492,8 +474,7 @@ export async function loadPackageGroupWalkState(
     packageRowsInspected,
     capturedIds,
     attempts,
-    ownerFieldNames,
-    csvOwnerResolution
+    ownerFieldNames
   };
 
   return { pending, completed, summary, meta, generatedAt: attemptedAt };

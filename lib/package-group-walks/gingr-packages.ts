@@ -838,7 +838,7 @@ async function loadOwnersListForCheckedInOwners(ownerIds: string[]): Promise<{
   };
 }
 
-/** Shared cached GET /api/v1/owners read — Package lookup and CSV resolution reuse this. */
+/** Shared cached GET /api/v1/owners read. */
 export async function loadGingrOwnersListRead() {
   return getOrLoadTtlCache("pgw:owners-list-read", OWNER_PACKAGE_CACHE_TTL_MS, async () =>
     gingrV1Request({

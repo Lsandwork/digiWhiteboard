@@ -170,48 +170,6 @@ function parsePackageGroupWalks(value: unknown): TlBoardPackageGroupWalkRow[] {
   return value.filter(isPackageGroupWalkRow);
 }
 
-function parseMatchCounts(value: unknown) {
-  const row = asRecord(value);
-  return {
-    csvOwners: Number(row?.csvOwners ?? 0) || 0,
-    uniqueExactMatches: Number(row?.uniqueExactMatches ?? 0) || 0,
-    zeroMatches: Number(row?.zeroMatches ?? 0) || 0,
-    ambiguousMatches: Number(row?.ambiguousMatches ?? 0) || 0
-  };
-}
-
-function parseCsvOwnerResolutionLookup(
-  value: unknown
-): NonNullable<TlBoardPackageGroupWalksSummary["lookup"]>["csvOwnerResolution"] {
-  const row = asRecord(value);
-  if (!row) return undefined;
-  const today = asRecord(row.today);
-  return {
-    httpStatus: row.httpStatus == null ? null : Number(row.httpStatus) || null,
-    totalRows: Number(row.totalRows ?? 0) || 0,
-    stableIdField: row.stableIdField == null ? null : String(row.stableIdField),
-    firstNameField: row.firstNameField == null ? null : String(row.firstNameField),
-    lastNameField: row.lastNameField == null ? null : String(row.lastNameField),
-    activeDeletedField: row.activeDeletedField == null ? null : String(row.activeDeletedField),
-    ownerIdNamespaceVerified: Boolean(row.ownerIdNamespaceVerified),
-    sanitizedOwnerFieldNames: Array.isArray(row.sanitizedOwnerFieldNames)
-      ? row.sanitizedOwnerFieldNames.map(String).slice(0, 80)
-      : [],
-    monthlyUnlimited: parseMatchCounts(row.monthlyUnlimited),
-    twentyDayPlus: parseMatchCounts(row.twentyDayPlus),
-    today: {
-      checkedInReservations: Number(today?.checkedInReservations ?? 0) || 0,
-      uniqueCheckedInOwners: Number(today?.uniqueCheckedInOwners ?? 0) || 0,
-      eligiblePackageOwnersCurrentlyCheckedIn:
-        Number(today?.eligiblePackageOwnersCurrentlyCheckedIn ?? 0) || 0,
-      eligibleDogsCurrentlyCheckedIn: Number(today?.eligibleDogsCurrentlyCheckedIn ?? 0) || 0,
-      unresolvedPackageOwners: Number(today?.unresolvedPackageOwners ?? 0) || 0,
-      ambiguousPackageOwners: Number(today?.ambiguousPackageOwners ?? 0) || 0
-    },
-    error: row.error == null ? null : String(row.error)
-  };
-}
-
 function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalksSummary {
   const row = asRecord(value);
   const lookupRow = asRecord(row?.lookup);
@@ -251,8 +209,7 @@ function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalks
             : undefined,
           ownerFieldNames: Array.isArray(lookupRow.ownerFieldNames)
             ? lookupRow.ownerFieldNames.map(String).slice(0, 80)
-            : undefined,
-          csvOwnerResolution: parseCsvOwnerResolutionLookup(lookupRow.csvOwnerResolution)
+            : undefined
         }
       : undefined
   };
