@@ -19,6 +19,8 @@ import type {
   TlAdditionalServicesSummary,
   TlBoardAdditionalServiceRow,
   TlBoardMedicationRow,
+  TlBoardPackageGroupWalkRow,
+  TlBoardPackageGroupWalksSummary,
   TlBoardSyncMeta,
   TlDigiBoardPublicPayload,
   TlDigiBoardSnapshot,
@@ -150,6 +152,32 @@ function parseAdditionalServices(value: unknown): TlBoardAdditionalServiceRow[] 
   return value.filter(isAdditionalServiceRow);
 }
 
+function isPackageGroupWalkRow(value: unknown): value is TlBoardPackageGroupWalkRow {
+  const row = asRecord(value);
+  if (!row) return false;
+  return Boolean(
+    row.id &&
+      row.gingrAnimalId &&
+      row.dogName &&
+      row.packageName &&
+      (row.packageKey === "monthly_unlimited" || row.packageKey === "twenty_day_plus")
+  );
+}
+
+function parsePackageGroupWalks(value: unknown): TlBoardPackageGroupWalkRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isPackageGroupWalkRow);
+}
+
+function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalksSummary {
+  const row = asRecord(value);
+  return {
+    eligible: Number(row?.eligible ?? 0) || 0,
+    remaining: Number(row?.remaining ?? 0) || 0,
+    completed: Number(row?.completed ?? 0) || 0
+  };
+}
+
 function parseSourceHealth(value: unknown): import("./types").TlGingrSourceHealth {
   if (value === "ok" || value === "stale" || value === "error" || value === "unevaluated") return value;
   return "unevaluated";
@@ -200,8 +228,10 @@ function parseMeta(value: unknown): TlBoardSyncMeta {
     allClear,
     medicationsHealth,
     servicesHealth,
+    packageGroupWalksHealth: parseSourceHealth(row?.packageGroupWalksHealth),
     medicationsAllClear: typeof row?.medicationsAllClear === "boolean" ? row.medicationsAllClear : allClear,
     servicesAllClear: typeof row?.servicesAllClear === "boolean" ? row.servicesAllClear : allClear,
+    packageGroupWalksAllClear: Boolean(row?.packageGroupWalksAllClear),
     boardState: row?.boardState ? parseBoardState(row.boardState) : allClear ? "EMPTY_VALID" : gingrSyncHealth === "live" ? "LIVE" : lastSuccessfulSyncAt ? "STALE" : "CONNECTION_ERROR",
     nextPeriod: (row?.nextPeriod as TlBoardSyncMeta["nextPeriod"]) ?? null,
     nextPeriodStartsAt: typeof row?.nextPeriodStartsAt === "string" ? row.nextPeriodStartsAt : null,
@@ -228,6 +258,8 @@ export function parseTlDigiBoardSnapshot(value: unknown): TlDigiBoardSnapshot | 
     summary: parseSummary(root.summary),
     additionalServices: parseAdditionalServices(root.additionalServices),
     servicesSummary: parseServicesSummary(root.servicesSummary),
+    packageGroupWalks: parsePackageGroupWalks(root.packageGroupWalks),
+    packageGroupWalksSummary: parsePackageGroupWalksSummary(root.packageGroupWalksSummary),
     meta: parseMeta(root.meta),
     medications,
     generatedAt: typeof root.generatedAt === "string" ? root.generatedAt : new Date(0).toISOString()
@@ -473,13 +505,38 @@ export async function loadTlDigiBoardPublicPayload(
     null
   );
 
-  return assembleTlDigiBoardPublicPayload({
+  const assembled = assembleTlDigiBoardPublicPayload({
     config: DEFAULT_TL_DIGI_BOARD_CONFIG,
     snapshot,
     reminders: [],
     now: options?.now,
     forceRefresh: options?.forceRefresh
   });
+
+  // Snapshots only refresh on the Gingr sync cadence, but a completion has to
+  // leave the TV promptly. Overlay stored completions here — bounded, and on
+  // failure the row simply stays until the next sync instead of the card blanking.
+  const walks = assembled.payload.packageGroupWalks;
+  if (walks.length) {
+    const { applyPackageGroupWalkCompletionsToRows } = await import(
+      "@/lib/package-group-walks/tl-board"
+    );
+    const overlay = await withTimeoutFallback(
+      applyPackageGroupWalkCompletionsToRows(client, walks, { now: options?.now }).catch(() => null),
+      900,
+      null
+    );
+    if (overlay && overlay.completedCount > 0) {
+      assembled.payload.packageGroupWalks = overlay.rows;
+      assembled.payload.packageGroupWalksSummary = {
+        ...assembled.payload.packageGroupWalksSummary,
+        remaining: overlay.rows.length,
+        completed: assembled.payload.packageGroupWalksSummary.completed + overlay.completedCount
+      };
+    }
+  }
+
+  return assembled;
 }
 
 export { toTlDigiBoardAdminConfigView, canManageTlDigiBoardConfig };

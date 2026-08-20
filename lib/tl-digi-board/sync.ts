@@ -28,6 +28,10 @@ import {
 import { buildTlGingrMedicationRecords } from "./normalize";
 import { enrichTlBoardMedicationPhotos } from "./animal-photos";
 import { syncTlBoardAdditionalServices } from "./additional-services";
+import {
+  EMPTY_PACKAGE_GROUP_WALKS_SUMMARY,
+  syncTlBoardPackageGroupWalks
+} from "@/lib/package-group-walks/tl-board";
 import type { TlDigiBoardSnapshot, TlGingrMedicationRecord } from "./types";
 import { logTlGingrSyncEvent } from "./observability";
 
@@ -303,6 +307,8 @@ function emptySnapshot(partial: {
   medications?: TlGingrMedicationRecord[];
   additionalServices?: TlDigiBoardSnapshot["additionalServices"];
   servicesSummary?: TlDigiBoardSnapshot["servicesSummary"];
+  packageGroupWalks?: TlDigiBoardSnapshot["packageGroupWalks"];
+  packageGroupWalksSummary?: TlDigiBoardSnapshot["packageGroupWalksSummary"];
   lastSuccessfulSyncAt?: string | null;
   lastAttemptAt?: string | null;
   lastError?: string | null;
@@ -312,6 +318,7 @@ function emptySnapshot(partial: {
   servicesCompletionAudit?: TlDigiBoardSnapshot["meta"]["servicesCompletionAudit"];
   medicationsHealth?: import("./types").TlGingrSourceHealth;
   servicesHealth?: import("./types").TlGingrSourceHealth;
+  packageGroupWalksHealth?: import("./types").TlGingrSourceHealth;
   now?: Date;
 }): TlDigiBoardSnapshot {
   const now = partial.now ?? new Date();
@@ -340,7 +347,9 @@ function emptySnapshot(partial: {
       servicesCompletionAudit: partial.servicesCompletionAudit,
       medicationsHealth,
       servicesHealth,
-      servicesRemaining: (partial.servicesSummary ?? { remaining: 0 }).remaining
+      packageGroupWalksHealth: partial.packageGroupWalksHealth,
+      servicesRemaining: (partial.servicesSummary ?? { remaining: 0 }).remaining,
+      packageGroupWalksRemaining: (partial.packageGroupWalksSummary ?? { remaining: 0 }).remaining
     },
     built.summary
   );
@@ -356,6 +365,10 @@ function emptySnapshot(partial: {
       remaining: 0,
       knownIncomplete: 0,
       completionUnknown: 0
+    },
+    packageGroupWalks: partial.packageGroupWalks ?? [],
+    packageGroupWalksSummary: partial.packageGroupWalksSummary ?? {
+      ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY
     },
     meta,
     medications,
@@ -397,6 +410,8 @@ async function withSyncBudget(
         medications: previous.medications,
         additionalServices: previous.additionalServices,
         servicesSummary: previous.servicesSummary,
+        packageGroupWalks: previous.packageGroupWalks,
+        packageGroupWalksSummary: previous.packageGroupWalksSummary,
         lastSuccessfulSyncAt: previous.meta.lastSuccessfulSyncAt,
         lastAttemptAt: now.toISOString(),
         lastError: message,
@@ -406,6 +421,7 @@ async function withSyncBudget(
         servicesCompletionAudit: previous.meta.servicesCompletionAudit,
         medicationsHealth: previous.medications.length ? "stale" : "error",
         servicesHealth: previous.additionalServices.length ? "stale" : "error",
+        packageGroupWalksHealth: previous.packageGroupWalks?.length ? "stale" : "error",
         now
       });
     }
@@ -413,12 +429,15 @@ async function withSyncBudget(
       medications: [],
       additionalServices: [],
       servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
+      packageGroupWalks: [],
+      packageGroupWalksSummary: { ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY },
       lastSuccessfulSyncAt: null,
       lastAttemptAt: now.toISOString(),
       lastError: message,
       syncSucceeded: false,
       medicationsHealth: "error",
       servicesHealth: "error",
+      packageGroupWalksHealth: "error",
       now
     });
   } finally {
@@ -484,7 +503,7 @@ async function runTlDigiBoardSync(
   const attemptedAt = now.toISOString();
 
   try {
-    const [overnightDogs, additionalServicesResult] = await Promise.all([
+    const [overnightDogs, additionalServicesResult, packageGroupWalksResult] = await Promise.all([
       loadOvernightCheckedInDogs(config),
       syncTlBoardAdditionalServices({ config, now }).catch((error) => ({
         services: previous?.additionalServices ?? [],
@@ -498,6 +517,14 @@ async function runTlDigiBoardSync(
         completionStatusAvailable: previous?.meta.servicesCompletionStatusAvailable ?? false,
         audit: previous?.meta.servicesCompletionAudit ?? null,
         error: error instanceof Error ? error.message : "additional_services_sync_failed"
+      })),
+      // Contained failure: a broken Package Group Walks card must never take down
+      // Medication Reminders or Additional Services.
+      syncTlBoardPackageGroupWalks(_supabase, { now }).catch((error) => ({
+        rows: previous?.packageGroupWalks ?? [],
+        summary: previous?.packageGroupWalksSummary ?? { ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY },
+        ok: false,
+        error: error instanceof Error ? error.message : "package_group_walks_sync_failed"
       }))
     ]);
     const lodgingMap = await loadLodgingMapByAnimal();
@@ -615,6 +642,11 @@ async function runTlDigiBoardSync(
     if (additionalServicesError) {
       lastErrorParts.push(additionalServicesError);
     }
+    const packageGroupWalks = packageGroupWalksResult.rows;
+    const packageGroupWalksSummary = packageGroupWalksResult.summary;
+    if (packageGroupWalksResult.error) {
+      lastErrorParts.push(packageGroupWalksResult.error);
+    }
     const lastError = lastErrorParts.length ? lastErrorParts.join("; ") : null;
     const medicationsHealth = "ok" as const;
     const servicesHealth = additionalServicesError
@@ -622,6 +654,11 @@ async function runTlDigiBoardSync(
         ? ("stale" as const)
         : ("error" as const)
       : ("ok" as const);
+    const packageGroupWalksHealth = packageGroupWalksResult.ok
+      ? ("ok" as const)
+      : packageGroupWalks.length
+        ? ("stale" as const)
+        : ("error" as const);
 
     const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
 
@@ -647,7 +684,9 @@ async function runTlDigiBoardSync(
         servicesCompletionAudit,
         medicationsHealth,
         servicesHealth,
-        servicesRemaining: servicesSummary.remaining
+        packageGroupWalksHealth,
+        servicesRemaining: servicesSummary.remaining,
+        packageGroupWalksRemaining: packageGroupWalksSummary.remaining
       },
       built.summary
     );
@@ -659,7 +698,9 @@ async function runTlDigiBoardSync(
       {
         medicationCount: medicationsWithPhotos.length,
         servicesCount: additionalServices.length,
+        packageGroupWalkCount: packageGroupWalks.length,
         servicesHealth,
+        packageGroupWalksHealth,
         period: meta.currentPeriod,
         lastError
       }
@@ -671,6 +712,8 @@ async function runTlDigiBoardSync(
       summary: built.summary,
       additionalServices,
       servicesSummary,
+      packageGroupWalks,
+      packageGroupWalksSummary,
       meta,
       medications: medicationsWithPhotos,
       generatedAt: attemptedAt
@@ -688,6 +731,8 @@ async function runTlDigiBoardSync(
         medications: previous.medications,
         additionalServices: previous.additionalServices,
         servicesSummary: previous.servicesSummary,
+        packageGroupWalks: previous.packageGroupWalks,
+        packageGroupWalksSummary: previous.packageGroupWalksSummary,
         lastSuccessfulSyncAt: previous.meta.lastSuccessfulSyncAt,
         lastAttemptAt: attemptedAt,
         lastError: message,
@@ -697,6 +742,7 @@ async function runTlDigiBoardSync(
         servicesCompletionAudit: previous.meta.servicesCompletionAudit,
         medicationsHealth: previous.medications.length ? "stale" : "error",
         servicesHealth: previous.additionalServices.length ? "stale" : "error",
+        packageGroupWalksHealth: previous.packageGroupWalks?.length ? "stale" : "error",
         now
       });
     }
@@ -705,12 +751,15 @@ async function runTlDigiBoardSync(
       medications: [],
       additionalServices: [],
       servicesSummary: { due: 0, completed: 0, remaining: 0, knownIncomplete: 0, completionUnknown: 0 },
+      packageGroupWalks: [],
+      packageGroupWalksSummary: { ...EMPTY_PACKAGE_GROUP_WALKS_SUMMARY },
       lastSuccessfulSyncAt: null,
       lastAttemptAt: attemptedAt,
       lastError: message,
       syncSucceeded: false,
       medicationsHealth: "error",
       servicesHealth: "error",
+      packageGroupWalksHealth: "error",
       now
     });
   }

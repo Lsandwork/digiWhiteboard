@@ -37,6 +37,12 @@ function payloadFromLastGood(lastGood: TlDigiBoardPublicPayload): TlDigiBoardPub
       summary: lastGood.summary,
       additionalServices: lastGood.additionalServices,
       servicesSummary: lastGood.servicesSummary,
+      packageGroupWalks: lastGood.packageGroupWalks ?? [],
+      packageGroupWalksSummary: lastGood.packageGroupWalksSummary ?? {
+        eligible: 0,
+        remaining: 0,
+        completed: 0
+      },
       meta: lastGood.meta,
       medications: lastGood.medications,
       generatedAt: lastGood.generatedAt
