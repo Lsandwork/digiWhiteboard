@@ -101,6 +101,7 @@ export type ResolvedOwnerPackage = {
   gingrPackageId: string | null;
   rawName: string | null;
   source: string;
+  creditsRemaining?: number | null;
 };
 
 export type OwnerPackageIndex = {
@@ -838,18 +839,25 @@ async function loadOwnersListForCheckedInOwners(ownerIds: string[]): Promise<{
   };
 }
 
+/** Shared cached GET /api/v1/owners read. */
+export async function loadGingrOwnersListRead() {
+  return getOrLoadTtlCache("pgw:owners-list-read", OWNER_PACKAGE_CACHE_TTL_MS, async () =>
+    gingrV1Request({
+      path: "/api/v1/owners",
+      method: "GET",
+      label: "Gingr owners list",
+      timeoutMs: 10_000
+    })
+  );
+}
+
 async function loadOwnersListPackages(): Promise<{
   byOwnerId: Map<string, ResolvedOwnerPackage[]>;
   inspection: PackageInspectionRecord[];
   attempt: PackageSourceAttempt;
 }> {
   return getOrLoadTtlCache("pgw:owners-list", OWNER_PACKAGE_CACHE_TTL_MS, async () => {
-    const read = await gingrV1Request({
-      path: "/api/v1/owners",
-      method: "GET",
-      label: "Gingr owners list",
-      timeoutMs: 10_000
-    });
+    const read = await loadGingrOwnersListRead();
     const attempt = sourceAttempt(true, read);
     if (!read.ok) return { byOwnerId: new Map(), inspection: [], attempt };
 
@@ -965,7 +973,11 @@ export async function buildOwnerPackageIndex(
   if (reservationMatches > 0) sources.push("reservation");
   if (reservationTypeMatches > 0) sources.push("reservation_type");
 
-  try {
+  const enablePartner = process.env.PACKAGE_GROUP_WALK_ENABLE_PARTNER_API === "1";
+  const enableSubscriptions = process.env.PACKAGE_GROUP_WALK_ENABLE_SUBSCRIPTIONS === "1";
+
+  if (enablePartner) {
+    try {
     const [packageTypes, membershipTypes, parentPackages, parentMemberships] = await Promise.all([
       loadPartnerPackageTypes(),
       loadPartnerMembershipTypes(),
@@ -1021,11 +1033,13 @@ export async function buildOwnerPackageIndex(
     if (!parentMemberships.attempt.ok && parentMemberships.attempt.note) {
       errors.push(parentMemberships.attempt.note);
     }
-  } catch (error) {
-    errors.push(error instanceof Error ? error.message : "Gingr Partner package lookup failed.");
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : "Gingr Partner package lookup failed.");
+    }
   }
 
-  try {
+  if (enableSubscriptions) {
+    try {
     const subscriptions = await loadGingrSubscriptionIndex();
     if (subscriptions.attempt.note) errors.push(subscriptions.attempt.note);
     attempts.subscriptions = {
@@ -1043,8 +1057,9 @@ export async function buildOwnerPackageIndex(
   } catch (error) {
     errors.push(error instanceof Error ? error.message : "Gingr subscriptions lookup failed.");
   }
+  }
 
-  if (!partnerOk && ownerIds.length > 0) {
+  if (enableSubscriptions && !partnerOk && ownerIds.length > 0) {
     try {
       const ownersList = await loadOwnersListForCheckedInOwners(ownerIds);
       packageRowsInspected += ownersList.inspection.length;

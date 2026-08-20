@@ -185,6 +185,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   remote_cast: "Remote Whiteboard Cast",
   walks_board: "Walks Board",
   package_group_walks: "Package Group Walks",
+  package_eligibility: "Package Eligibility",
   ruffops_checklist: "RuffOps Checklist",
   tl_digi_board: "TL Digi Board",
   route_generator: "Route Generator",
@@ -255,6 +256,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   walks_board: "2-hour alarm to update the physical No Plays, Grooming, and Walks Board. Cannot be snoozed.",
   package_group_walks:
     "Checked-in dogs with Monthly Unlimited or 20-Day PLUS Package that include today's complimentary group walk.",
+  package_eligibility:
+    "Upload Gingr Outstanding Packages reports and resolve ambiguous owner matches for Package Group Walks.",
   ruffops_checklist:
     "Shared Gingr-style checklist for yard reminders, walks, medications, additional services, and live alerts.",
   tl_digi_board: "Configure the Team Lead Alerts + Reminders display",
@@ -306,6 +309,7 @@ const FRONT_DESK_TABS: AdminTab[] = [
   "vip_auto_book",
   "walks_board",
   "package_group_walks",
+  "package_eligibility",
   "ruffops_checklist"
 ];
 

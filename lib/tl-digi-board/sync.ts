@@ -656,11 +656,17 @@ async function runTlDigiBoardSync(
         ? ("stale" as const)
         : ("error" as const)
       : ("ok" as const);
-    const packageGroupWalksHealth = packageGroupWalksResult.ok
-      ? ("ok" as const)
-      : packageGroupWalks.length
-        ? ("stale" as const)
-        : ("error" as const);
+    const packageImportFreshness = packageGroupWalksSummary.lookup?.packageImportFreshness;
+    const packageGroupWalksHealth =
+      packageImportFreshness === "MISSING"
+        ? ("error" as const)
+        : packageImportFreshness === "STALE"
+          ? ("stale" as const)
+          : packageGroupWalksResult.ok
+            ? ("ok" as const)
+            : packageGroupWalks.length
+              ? ("stale" as const)
+              : ("error" as const);
 
     const medicationsWithPhotos = await enrichTlBoardMedicationPhotos(medications);
 

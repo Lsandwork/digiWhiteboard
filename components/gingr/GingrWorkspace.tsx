@@ -2,15 +2,17 @@
 
 import { useCallback, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ExternalLink, LoaderCircle, RefreshCw } from "lucide-react";
 import { GINGR_EMPLOYEE_URL, GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 
 type GingrWorkspaceProps = {
   embedAllowed: boolean;
+  showPackageEligibility?: boolean;
 };
 
-export function GingrWorkspace({ embedAllowed }: GingrWorkspaceProps) {
+export function GingrWorkspace({ embedAllowed, showPackageEligibility = false }: GingrWorkspaceProps) {
   const [status, setStatus] = useState<"loading" | "loaded">("loading");
 
   const refreshIframe = useCallback(() => {
@@ -32,6 +34,14 @@ export function GingrWorkspace({ embedAllowed }: GingrWorkspaceProps) {
         </div>
 
         <div className="gingr-toolbar-actions">
+          {showPackageEligibility ? (
+            <Link
+              href="/admin?board=staff&tab=package_eligibility"
+              className="admin-btn-secondary inline-flex items-center gap-2"
+            >
+              Package Eligibility
+            </Link>
+          ) : null}
           {embedAllowed ? (
             <button type="button" className="admin-btn-secondary inline-flex items-center gap-2" onClick={refreshIframe}>
               <RefreshCw aria-hidden="true" className="h-4 w-4" />

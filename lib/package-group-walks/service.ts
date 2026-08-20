@@ -14,20 +14,19 @@ import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import { enrichTlBoardAnimalPhotoUrls } from "@/lib/tl-digi-board/animal-photos";
 import { loadTlBoardCheckedInReservations } from "@/lib/tl-digi-board/gingr-reservation-services";
 import { preferredEligiblePackage } from "./eligible-packages";
+import { ownerPackageIndexFromCsvRecords } from "./csv-package-index";
+import { packageImportFreshness, packageImportWarning } from "./freshness";
 import {
-  buildOwnerPackageIndex,
+  loadActiveEligibilityRecords,
+  loadLatestSuccessfulImport,
+  PackageEligibilitySchemaMissingError
+} from "./eligibility-store";
+import {
   ownerIdFromReservation,
   ownerNameFromReservation,
-  packagesFromReservation,
   type OwnerPackageIndex,
   type ResolvedOwnerPackage
 } from "./gingr-packages";
-import { logPackageGroupWalkEvent } from "./observability";
-import {
-  loadCompletionsForBusinessDate,
-  packageGroupWalkBusinessDate,
-  PackageGroupWalksSchemaMissingError
-} from "./store";
 import type {
   PackageGroupWalkCompletion,
   PackageGroupWalkEligibility,
@@ -36,6 +35,12 @@ import type {
   PackageGroupWalkState,
   PackageGroupWalkSummary
 } from "./types";
+import { logPackageGroupWalkEvent } from "./observability";
+import {
+  loadCompletionsForBusinessDate,
+  packageGroupWalkBusinessDate,
+  PackageGroupWalksSchemaMissingError
+} from "./store";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -56,6 +61,9 @@ let lastGoodEligibility: {
   capturedIds: PackageGroupWalkMeta["capturedIds"];
   attempts: PackageGroupWalkMeta["attempts"];
   ownerFieldNames: string[];
+  packageImportFreshness: PackageGroupWalkMeta["packageImportFreshness"];
+  lastPackageImportAt: string | null;
+  packageImportWarning: string | null;
 } | null = null;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -155,10 +163,9 @@ export function buildPackageGroupWalkEligibility(input: {
     }
 
     const ownerId = ownerIdFromReservation(reservation);
-    const matches: ResolvedOwnerPackage[] = [
-      ...packagesFromReservation(reservation),
-      ...(ownerId ? (input.packageIndex.byOwnerId.get(ownerId) ?? []) : [])
-    ];
+    const matches: ResolvedOwnerPackage[] = ownerId
+      ? (input.packageIndex.byOwnerId.get(ownerId) ?? [])
+      : [];
     if (!matches.length) continue;
 
     const preferred = preferredEligiblePackage(matches.map((entry) => entry.definition));
@@ -194,6 +201,7 @@ export function buildPackageGroupWalkEligibility(input: {
       packageName: preferred.displayName,
       gingrPackageId: chosen.gingrPackageId,
       packageSource: chosen.source,
+      creditsRemaining: chosen.creditsRemaining ?? null,
       businessDate: input.businessDate
     });
   }
@@ -261,18 +269,25 @@ export function resolvePackageGroupWalkSyncState(input: {
   packageSourceAvailable: boolean;
   hasRows: boolean;
   lastSuccessfulSyncAt: string | null;
+  packageImportFreshness?: PackageGroupWalkMeta["packageImportFreshness"];
 }): PackageGroupWalkMeta["syncState"] {
+  if (input.packageImportFreshness === "MISSING") return "ERROR";
   if (!input.gingrOk) {
     // Never claim ALL CLEAR from a failed read.
     return input.lastSuccessfulSyncAt ? "STALE" : "ERROR";
   }
+  if (input.packageImportFreshness === "STALE") return "STALE";
   if (input.isStale) return "STALE";
   // Zero rows is only meaningful when a package source actually answered.
   if (!input.packageSourceAvailable) return "ERROR";
   return input.hasRows ? "LIVE" : "EMPTY_VALID";
 }
 
-async function loadEligibilityFromGingr(businessDate: string): Promise<{
+async function loadEligibilityFromGingr(
+  supabase: SupabaseClient,
+  businessDate: string,
+  now: Date
+): Promise<{
   eligibility: PackageGroupWalkEligibility[];
   packageSources: string[];
   packageSourceAvailable: boolean;
@@ -282,10 +297,39 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
   capturedIds: PackageGroupWalkMeta["capturedIds"];
   attempts: PackageGroupWalkMeta["attempts"];
   ownerFieldNames: string[];
+  packageImportFreshness: PackageGroupWalkMeta["packageImportFreshness"];
+  lastPackageImportAt: string | null;
+  packageImportWarning: string | null;
   errors: string[];
 }> {
   const reservations = await loadTlBoardCheckedInReservations();
-  const packageIndex = await buildOwnerPackageIndex(reservations);
+  const uniqueCheckedInOwners = new Set(
+    reservations.map((reservation) => ownerIdFromReservation(reservation)).filter(Boolean)
+  ).size;
+
+  let latestImport = null;
+  let records: Awaited<ReturnType<typeof loadActiveEligibilityRecords>> = [];
+  const errors: string[] = [];
+  try {
+    latestImport = await loadLatestSuccessfulImport(supabase);
+    if (latestImport) {
+      records = await loadActiveEligibilityRecords(supabase, latestImport.id);
+    }
+  } catch (error) {
+    if (error instanceof PackageEligibilitySchemaMissingError) {
+      errors.push(error.message);
+    } else {
+      errors.push(error instanceof Error ? error.message : "Package eligibility import lookup failed.");
+    }
+  }
+
+  const freshness = packageImportFreshness(latestImport?.importedAt ?? null, now);
+  const warning = packageImportWarning({ freshness, importedAt: latestImport?.importedAt ?? null });
+  const packageIndex = ownerPackageIndexFromCsvRecords({
+    records,
+    uniqueCheckedInOwners,
+    freshness
+  });
   const { eligibility, malformedCount } = buildPackageGroupWalkEligibility({
     reservations,
     packageIndex,
@@ -316,14 +360,17 @@ async function loadEligibilityFromGingr(businessDate: string): Promise<{
   return {
     eligibility: withPhotos,
     packageSources: packageIndex.sources,
-    packageSourceAvailable: packageIndex.available,
+    packageSourceAvailable: freshness !== "MISSING",
     checkedInDogCount: reservations.length,
-    uniqueCheckedInOwners: packageIndex.uniqueCheckedInOwners,
+    uniqueCheckedInOwners,
     packageRowsInspected: packageIndex.packageRowsInspected,
     capturedIds: packageIndex.capturedIds,
     attempts: packageIndex.attempts,
     ownerFieldNames: packageIndex.ownerFieldNames,
-    errors: packageIndex.errors
+    packageImportFreshness: freshness,
+    lastPackageImportAt: latestImport?.importedAt ?? null,
+    packageImportWarning: warning,
+    errors: [...packageIndex.errors, ...errors, ...(warning && freshness !== "FRESH" ? [warning] : [])]
   };
 }
 
@@ -361,10 +408,14 @@ export async function loadPackageGroupWalkState(
   };
   let attempts: PackageGroupWalkMeta["attempts"] = {};
   let ownerFieldNames: string[] = [];
+  let packageImportFreshnessState: PackageGroupWalkMeta["packageImportFreshness"] =
+    lastGoodEligibility?.packageImportFreshness ?? "MISSING";
+  let lastPackageImportAt: string | null = lastGoodEligibility?.lastPackageImportAt ?? null;
+  let importWarning: string | null = lastGoodEligibility?.packageImportWarning ?? null;
   let lastSuccessfulSyncAt: string | null = lastGoodEligibility?.syncedAt ?? null;
 
   try {
-    const loader = () => loadEligibilityFromGingr(businessDate);
+    const loader = () => loadEligibilityFromGingr(supabase, businessDate, now);
     const result = options.forceRefresh
       ? await loader()
       : await getOrLoadTtlCache(
@@ -383,6 +434,9 @@ export async function loadPackageGroupWalkState(
     capturedIds = result.capturedIds;
     attempts = result.attempts;
     ownerFieldNames = result.ownerFieldNames;
+    packageImportFreshnessState = result.packageImportFreshness;
+    lastPackageImportAt = result.lastPackageImportAt;
+    importWarning = result.packageImportWarning;
     lastError = result.errors.length ? result.errors.join("; ") : null;
     lastSuccessfulSyncAt = attemptedAt;
     lastGoodEligibility = {
@@ -394,7 +448,10 @@ export async function loadPackageGroupWalkState(
       packageRowsInspected,
       capturedIds,
       attempts,
-      ownerFieldNames
+      ownerFieldNames,
+      packageImportFreshness: packageImportFreshnessState,
+      lastPackageImportAt,
+      packageImportWarning: importWarning
     };
 
     logPackageGroupWalkEvent("PACKAGE_GROUP_WALK_SYNC_SUCCESS", {
@@ -407,6 +464,7 @@ export async function loadPackageGroupWalkState(
       capturedIds,
       attempts,
       packageSourceAvailable,
+      packageImportFreshness: packageImportFreshnessState,
       warning: lastError
     });
   } catch (error) {
@@ -420,13 +478,16 @@ export async function loadPackageGroupWalkState(
     if (lastGoodEligibility) {
       eligibility = lastGoodEligibility.eligibility;
       packageSources = lastGoodEligibility.packageSources;
-      packageSourceAvailable = true;
+      packageSourceAvailable = lastGoodEligibility.packageImportFreshness !== "MISSING";
       checkedInDogCount = lastGoodEligibility.checkedInDogCount;
       uniqueCheckedInOwners = lastGoodEligibility.uniqueCheckedInOwners;
       packageRowsInspected = lastGoodEligibility.packageRowsInspected;
       capturedIds = lastGoodEligibility.capturedIds;
       attempts = lastGoodEligibility.attempts;
       ownerFieldNames = lastGoodEligibility.ownerFieldNames;
+      packageImportFreshnessState = lastGoodEligibility.packageImportFreshness;
+      lastPackageImportAt = lastGoodEligibility.lastPackageImportAt;
+      importWarning = lastGoodEligibility.packageImportWarning;
       lastSuccessfulSyncAt = lastGoodEligibility.syncedAt;
     }
   }
@@ -447,6 +508,7 @@ export async function loadPackageGroupWalkState(
   const summary = buildPackageGroupWalkSummary({ pending, completed });
 
   const isStale =
+    packageImportFreshnessState === "STALE" ||
     !gingrOk ||
     (lastSuccessfulSyncAt
       ? now.getTime() - new Date(lastSuccessfulSyncAt).getTime() > PACKAGE_GROUP_WALK_STALE_MS
@@ -460,7 +522,8 @@ export async function loadPackageGroupWalkState(
       isStale,
       packageSourceAvailable,
       hasRows: pending.length > 0 || completed.length > 0,
-      lastSuccessfulSyncAt
+      lastSuccessfulSyncAt,
+      packageImportFreshness: packageImportFreshnessState
     }),
     lastSuccessfulSyncAt,
     lastAttemptAt: attemptedAt,
@@ -474,7 +537,10 @@ export async function loadPackageGroupWalkState(
     packageRowsInspected,
     capturedIds,
     attempts,
-    ownerFieldNames
+    ownerFieldNames,
+    packageImportFreshness: packageImportFreshnessState,
+    lastPackageImportAt,
+    packageImportWarning: importWarning
   };
 
   return { pending, completed, summary, meta, generatedAt: attemptedAt };

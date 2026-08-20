@@ -195,6 +195,11 @@ export function canManagePackageCommissions(role?: string | null) {
   return userCanManagePackageCommissions(role);
 }
 
+/** Outstanding Packages CSV import and owner mapping — Super Admin, Admin, Management. */
+export function canManagePackageEligibility(role?: string | null) {
+  return isAdminOrManagementRole(role);
+}
+
 export function canViewPackageCommissions(role?: string | null) {
   return userCanViewPackageCommissions(role);
 }

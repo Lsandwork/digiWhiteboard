@@ -167,7 +167,27 @@ function isPackageGroupWalkRow(value: unknown): value is TlBoardPackageGroupWalk
 
 function parsePackageGroupWalks(value: unknown): TlBoardPackageGroupWalkRow[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isPackageGroupWalkRow);
+  return value.flatMap((entry) => {
+    const row = asRecord(entry);
+    if (!row || !isPackageGroupWalkRow(row)) return [];
+    const creditsRaw = row.creditsRemaining as unknown;
+    return [
+      {
+        id: String(row.id),
+        gingrAnimalId: String(row.gingrAnimalId),
+        dogName: String(row.dogName),
+        photoUrl: row.photoUrl == null ? null : String(row.photoUrl),
+        packageKey: row.packageKey as TlBoardPackageGroupWalkRow["packageKey"],
+        packageName: String(row.packageName),
+        creditsRemaining:
+          creditsRaw == null || creditsRaw === ""
+            ? null
+            : Number(creditsRaw) || 0,
+        checkedInAt: row.checkedInAt == null ? null : String(row.checkedInAt),
+        businessDate: String(row.businessDate ?? "")
+      }
+    ];
+  });
 }
 
 function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalksSummary {
@@ -209,7 +229,17 @@ function parsePackageGroupWalksSummary(value: unknown): TlBoardPackageGroupWalks
             : undefined,
           ownerFieldNames: Array.isArray(lookupRow.ownerFieldNames)
             ? lookupRow.ownerFieldNames.map(String).slice(0, 80)
-            : undefined
+            : undefined,
+          packageImportFreshness:
+            lookupRow.packageImportFreshness === "FRESH" ||
+            lookupRow.packageImportFreshness === "STALE" ||
+            lookupRow.packageImportFreshness === "MISSING"
+              ? lookupRow.packageImportFreshness
+              : undefined,
+          lastPackageImportAt:
+            lookupRow.lastPackageImportAt == null ? null : String(lookupRow.lastPackageImportAt),
+          packageImportWarning:
+            lookupRow.packageImportWarning == null ? null : String(lookupRow.packageImportWarning)
         }
       : undefined
   };

@@ -242,7 +242,10 @@ function PackageGroupWalkTableRow({ row }: { row: TlBoardPackageGroupWalkRow }) 
           <span className="tl-table__dog-name">{row.dogName}</span>
         </div>
       </td>
-      <td className="tl-table__package">{row.packageName}</td>
+      <td className="tl-table__package">
+        {row.packageName}
+        {row.creditsRemaining != null ? ` · ${row.creditsRemaining} left` : ""}
+      </td>
       <td>
         <span className="tl-badge tl-badge--needs_group_walk">NEEDS GROUP WALK</span>
       </td>
@@ -716,10 +719,20 @@ function BoardInner() {
             title="Package Group Walks"
             subtitle="Checked-in dogs with Monthly Unlimited or 20-Day PLUS Package that still need their complimentary group walk."
             kind={packageWalkCard}
-            lastSync={lastSync}
+            lastSync={
+              snapshot?.packageGroupWalksSummary?.lookup?.lastPackageImportAt
+                ? formatLaBoardClock(new Date(snapshot.packageGroupWalksSummary.lookup.lastPackageImportAt))
+                : lastSync
+            }
             retryLabel={retryLabel}
             errorNoun="Package Group Walk eligibility"
-            errorDetail="Checked-in dogs were loaded from Gingr, but package/membership ownership could not be confirmed. This is not All Clear."
+            errorDetail={
+              snapshot?.packageGroupWalksSummary?.lookup?.packageImportWarning ||
+              (snapshot?.packageGroupWalksSummary?.lookup?.packageImportFreshness === "MISSING"
+                ? "Unable to verify Package Group Walk eligibility. Package report has not been synced."
+                : "Checked-in dogs were loaded from Gingr, but package/membership ownership could not be confirmed. This is not All Clear.")
+            }
+            staleDetail={snapshot?.packageGroupWalksSummary?.lookup?.packageImportWarning ?? undefined}
             allClearText="No qualifying checked-in dogs currently need a group walk."
             allClearDetail={
               snapshot?.packageGroupWalksSummary?.completed
@@ -781,6 +794,7 @@ function GingrStatusCard({
   retryLabel,
   errorNoun,
   errorDetail,
+  staleDetail,
   allClearText,
   allClearDetail,
   children
@@ -792,6 +806,7 @@ function GingrStatusCard({
   retryLabel: string | null;
   errorNoun: string;
   errorDetail?: string;
+  staleDetail?: string;
   allClearText?: string;
   allClearDetail?: string;
   children: ReactNode;
@@ -832,15 +847,19 @@ function GingrStatusCard({
       {kind === "stale" || kind === "rows" ? (
         <>
           {kind === "stale" && lastSync ? (
-            <p className="tl-card-state__stale-note">Showing last synced data from {lastSync}</p>
+            <p className="tl-card-state__stale-note">
+              {staleDetail ?? `Showing last synced data from ${lastSync}`}
+            </p>
           ) : null}
           {children}
         </>
       ) : null}
       {kind === "stale" && !children ? (
         <div className="tl-card-state tl-card-state--stale" role="status">
-          <p className="tl-card-state__title">Showing last synced data{lastSync ? ` from ${lastSync}` : ""}</p>
-          <p>Gingr has not confirmed the current {errorNoun} list.</p>
+          <p className="tl-card-state__title">
+            {staleDetail ?? `Showing last synced data${lastSync ? ` from ${lastSync}` : ""}`}
+          </p>
+          <p>This is not All Clear.</p>
         </div>
       ) : null}
     </div>

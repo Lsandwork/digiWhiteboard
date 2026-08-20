@@ -29,6 +29,7 @@ export function toTlBoardPackageGroupWalkRow(row: PackageGroupWalkRow): TlBoardP
     photoUrl: row.photoUrl,
     packageKey: row.packageKey,
     packageName: row.packageName,
+    creditsRemaining: row.creditsRemaining ?? null,
     checkedInAt: row.checkedInAt,
     businessDate: row.businessDate
   };
@@ -64,11 +65,18 @@ export async function syncTlBoardPackageGroupWalks(
         packageRowsInspected: state.meta.packageRowsInspected,
         qualifying: state.summary.eligibleToday,
         attempts: state.meta.attempts,
-        ownerFieldNames: state.meta.ownerFieldNames
+        ownerFieldNames: state.meta.ownerFieldNames,
+        packageImportFreshness: state.meta.packageImportFreshness,
+        lastPackageImportAt: state.meta.lastPackageImportAt,
+        packageImportWarning: state.meta.packageImportWarning
       }
     },
-    ok: state.meta.gingrOk && state.meta.packageSourceAvailable && !state.meta.isStale,
-    error: state.meta.lastError,
+    ok:
+      state.meta.gingrOk &&
+      state.meta.packageSourceAvailable &&
+      !state.meta.isStale &&
+      state.meta.packageImportFreshness === "FRESH",
+    error: state.meta.packageImportWarning ?? state.meta.lastError,
     packageSourceAvailable: state.meta.packageSourceAvailable,
     packageSources: state.meta.packageSources
   };

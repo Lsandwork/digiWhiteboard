@@ -1,4 +1,5 @@
 import type { PackageGroupWalkPackageKey } from "./eligible-packages";
+import type { PackageImportFreshness } from "./freshness";
 
 export type PackageGroupWalkStatus = "pending" | "completed";
 
@@ -19,6 +20,7 @@ export type PackageGroupWalkEligibility = {
   gingrPackageId: string | null;
   /** Where the package came from — audit trail for eligibility disputes. */
   packageSource: string;
+  creditsRemaining: number | null;
   businessDate: string;
 };
 
@@ -85,6 +87,9 @@ export type PackageGroupWalkMeta = {
   };
   attempts: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
   ownerFieldNames: string[];
+  packageImportFreshness: PackageImportFreshness;
+  lastPackageImportAt: string | null;
+  packageImportWarning: string | null;
 };
 
 export type PackageGroupWalkState = {
@@ -103,6 +108,7 @@ export type TlBoardPackageGroupWalkRow = {
   photoUrl: string | null;
   packageKey: PackageGroupWalkPackageKey;
   packageName: string;
+  creditsRemaining: number | null;
   checkedInAt: string | null;
   businessDate: string;
 };
@@ -124,5 +130,8 @@ export type TlBoardPackageGroupWalksSummary = {
     qualifying: number;
     attempts?: Record<string, { ok: boolean; httpStatus: number | null; rows: number }>;
     ownerFieldNames?: string[];
+    packageImportFreshness?: PackageImportFreshness;
+    lastPackageImportAt?: string | null;
+    packageImportWarning?: string | null;
   };
 };
