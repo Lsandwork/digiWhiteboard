@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlarmClock,
   AlertTriangle,
@@ -18,7 +18,9 @@ import {
   formatWalkBoardClock,
   formatWalkBoardCountdown,
   formatWalkBoardDateTime,
-  getWalkBoardUrgency
+  getWalkBoardUrgency,
+  mergeWalkBoardState,
+  withCompletedWalkBoardCycle
 } from "@/lib/walks-board/display";
 import { formatWalkBoardHourLabel, walkBoardClockParts, walkBoardSlotKey } from "@/lib/walks-board/schedule";
 import type {
@@ -27,6 +29,10 @@ import type {
   WalkBoardPublicState,
   WalkBoardSummary
 } from "@/lib/walks-board/types";
+
+const POLL_MS = 20_000;
+const CLOCK_MS = 15_000;
+const REALTIME_DEBOUNCE_MS = 250;
 
 function displayUserName(user: { display_name?: string | null; email?: string | null } | null | undefined) {
   return user?.display_name ?? user?.email ?? "Staff";
@@ -47,18 +53,7 @@ function urgencyClass(urgency: ReturnType<typeof getWalkBoardUrgency>) {
   }
 }
 
-function pacificClockLabel(iso: string, timeZone: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone
-  }).format(new Date(iso));
-}
-
-export function WalksBoardPanel() {
+export const WalksBoardPanel = memo(function WalksBoardPanel() {
   const { showToast } = useToast();
   const [data, setData] = useState<WalkBoardPublicState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,41 +62,72 @@ export function WalksBoardPanel() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [hasLoaded, setHasLoaded] = useState(false);
   const lastAlertSignatureRef = useRef<string>("");
+  const hasLoadedRef = useRef(false);
+  const loadGenerationRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+  const showToastRef = useRef(showToast);
+  showToastRef.current = showToast;
 
-  const load = useCallback(
-    async (options: { silent?: boolean } = {}) => {
-      if (!options.silent) setLoading(!hasLoaded);
-      try {
-        const response = await fetch("/api/admin/walks-board", { cache: "no-store" });
-        const body = (await response.json()) as WalkBoardPublicState & { error?: string };
-        if (!response.ok) throw new Error(body.error ?? "Unable to load Walks Board.");
-        setData(body);
-        setHasLoaded(true);
-        setReconnecting(false);
-      } catch (error) {
-        if (!hasLoaded) {
-          showToast(error instanceof Error ? error.message : "Unable to load Walks Board.", "error");
-        } else {
-          setReconnecting(true);
-        }
-      } finally {
-        setLoading(false);
+  const load = useCallback(async (options: { silent?: boolean } = {}) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const generation = ++loadGenerationRef.current;
+    if (!options.silent && !hasLoadedRef.current) setLoading(true);
+    try {
+      const response = await fetch("/api/admin/walks-board", {
+        cache: "no-store",
+        signal: controller.signal
+      });
+      const body = (await response.json()) as WalkBoardPublicState & { error?: string };
+      if (generation !== loadGenerationRef.current) return;
+      if (!response.ok) throw new Error(body.error ?? "Unable to load Walks Board.");
+      setData((current) => mergeWalkBoardState(current, body));
+      hasLoadedRef.current = true;
+      setHasLoaded(true);
+      setReconnecting(false);
+    } catch (error) {
+      if (controller.signal.aborted || generation !== loadGenerationRef.current) return;
+      if (!hasLoadedRef.current) {
+        showToastRef.current(error instanceof Error ? error.message : "Unable to load Walks Board.", "error");
+      } else {
+        setReconnecting(true);
       }
-    },
-    [hasLoaded, showToast]
-  );
+    } finally {
+      if (generation === loadGenerationRef.current) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void load();
-    }, 0);
-    return () => window.clearTimeout(timer);
+    void load();
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [load]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 15_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") setNowMs(Date.now());
+    }, CLOCK_MS);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load({ silent: true });
+    }, POLL_MS);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        setNowMs(Date.now());
+        void load({ silent: true });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
 
   useEffect(() => {
     const unlock = () => {
@@ -130,10 +156,12 @@ export function WalksBoardPanel() {
     const supabase = getBrowserSupabase();
     if (!supabase) return;
 
+    let debounce: number | null = null;
     const channel = supabase
-      .channel(`walk-board-cycles-${Date.now()}`)
+      .channel("walk-board-cycles-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "walk_board_cycles" }, () => {
-        void load({ silent: true });
+        if (debounce) window.clearTimeout(debounce);
+        debounce = window.setTimeout(() => void load({ silent: true }), REALTIME_DEBOUNCE_MS);
       })
       .subscribe((status) => {
         if (status === "CHANNEL_ERROR") setReconnecting(true);
@@ -141,12 +169,22 @@ export function WalksBoardPanel() {
       });
 
     return () => {
+      if (debounce) window.clearTimeout(debounce);
       void supabase.removeChannel(channel);
     };
   }, [load]);
 
   async function handleComplete(cycle: WalkBoardCycleView) {
+    if (busy) return;
     setBusy(true);
+    const previous = data;
+    const optimistic: WalkBoardCycleView = {
+      ...cycle,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      version: cycle.version + 1
+    };
+    setData((current) => (current ? withCompletedWalkBoardCycle(current, optimistic, Date.now()) : current));
     try {
       const response = await fetch("/api/admin/walks-board", {
         method: "POST",
@@ -156,8 +194,13 @@ export function WalksBoardPanel() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Unable to mark complete.");
       showToast("Walk check marked complete. Thank you.", "success");
-      await load({ silent: true });
+      if (payload.cycle) {
+        setData((current) => (current ? withCompletedWalkBoardCycle(current, payload.cycle, Date.now()) : current));
+      } else {
+        await load({ silent: true });
+      }
     } catch (error) {
+      setData(previous);
       showToast(error instanceof Error ? error.message : "Unable to mark complete.", "error");
     } finally {
       setBusy(false);
@@ -172,6 +215,18 @@ export function WalksBoardPanel() {
   const alarmActive = cycle?.status === "pending";
   const parts = walkBoardClockParts(new Date(nowMs), timezone);
   const dateKey = cycle?.shift_date ?? data?.todayCycles[0]?.shift_date ?? parts.dateKey;
+  const liveClock = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: timezone
+      }).format(new Date(nowMs)),
+    [nowMs, timezone]
+  );
 
   const slots = useMemo(() => {
     return WALK_BOARD_ALARM_HOURS.map((hour) => {
@@ -223,7 +278,7 @@ export function WalksBoardPanel() {
             {reconnecting ? <span className="admin-badge admin-badge--amber">Reconnecting…</span> : null}
             <div className="walks-board-live-clock" aria-live="polite">
               <Clock3 className="h-4 w-4" aria-hidden="true" />
-              <span>{pacificClockLabel(new Date(nowMs).toISOString(), timezone)}</span>
+              <span>{liveClock}</span>
             </div>
           </div>
         </div>
@@ -345,4 +400,4 @@ export function WalksBoardPanel() {
       </section>
     </section>
   );
-}
+});

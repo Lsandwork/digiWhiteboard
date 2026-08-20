@@ -1,6 +1,6 @@
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { getUserAccess } from "@/lib/admin/user-access";
-import { hasPermission, type UserAccess } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, hasPermission, type UserAccess } from "@/lib/admin/permissions";
 import {
   WALK_BOARD_ALARM_CHECKLIST,
   WALK_BOARD_ALARM_MESSAGE,
@@ -197,39 +197,55 @@ export async function ensureCurrentWalkBoardCycle(
 }
 
 export async function closeExpiredWalkBoardCycles(supabase: SupabaseClient, now = new Date()) {
+  const dateKey = walkBoardClockParts(now).dateKey;
   const { data, error } = await supabase
     .from("walk_board_cycles")
-    .select("*")
-    .eq("status", "pending");
+    .select("id, slot_key, version")
+    .eq("status", "pending")
+    .lte("shift_date", dateKey);
   if (error) {
     if (isMissingWalkBoardRelation(error)) return 0;
     throw error;
   }
 
-  let closed = 0;
-  for (const raw of data ?? []) {
-    const row = raw as WalkBoardCycleRow;
-    const endAt = walkBoardSlotEndAt(row.slot_key);
-    if (now.getTime() < endAt.getTime()) continue;
-    const { error: updateError } = await supabase
-      .from("walk_board_cycles")
-      .update({
-        status: "missed",
-        missed_at: nowIso(),
-        version: row.version + 1
-      })
-      .eq("id", row.id)
-      .eq("status", "pending")
-      .eq("version", row.version);
-    if (updateError && !isMissingWalkBoardRelation(updateError)) throw updateError;
-    await insertActivity(supabase, {
-      walkCycleId: row.id,
-      action: "missed",
-      metadata: { slot_key: row.slot_key }
-    });
-    closed += 1;
+  const expired = ((data ?? []) as Array<Pick<WalkBoardCycleRow, "id" | "slot_key" | "version">>).filter(
+    (row) => now.getTime() >= walkBoardSlotEndAt(row.slot_key).getTime()
+  );
+  if (!expired.length) return 0;
+
+  const missedAt = nowIso();
+  const results = await Promise.all(
+    expired.map((row) =>
+      supabase
+        .from("walk_board_cycles")
+        .update({
+          status: "missed",
+          missed_at: missedAt,
+          version: row.version + 1
+        })
+        .eq("id", row.id)
+        .eq("status", "pending")
+        .eq("version", row.version)
+    )
+  );
+  for (const result of results) {
+    if (result.error && !isMissingWalkBoardRelation(result.error)) throw result.error;
   }
-  return closed;
+
+  const closed = expired.filter((_, index) => !results[index]?.error);
+  if (closed.length) {
+    const { error: activityError } = await supabase.from("walk_board_activity").insert(
+      closed.map((row) => ({
+        walk_cycle_id: row.id,
+        action: "missed",
+        actor_user_id: null,
+        occurred_at: missedAt,
+        metadata: { slot_key: row.slot_key }
+      }))
+    );
+    if (activityError && !isMissingWalkBoardRelation(activityError)) throw activityError;
+  }
+  return closed.length;
 }
 
 export async function markWalkBoardCycleComplete(
@@ -307,40 +323,57 @@ export async function resolveWalkBoardPermissions(
   supabase: SupabaseClient,
   userId: string | null | undefined,
   legacyRole?: string | null,
-  email?: string | null
+  email?: string | null,
+  access?: UserAccess | null
 ) {
-  const access = await getUserAccess(supabase, userId, legacyRole, email);
+  const resolved =
+    access ??
+    (userId || email || legacyRole
+      ? await getUserAccess(supabase, userId, legacyRole, email)
+      : accessFromLegacyRole(userId ?? null, email ?? null, legacyRole));
   return {
-    canComplete: canCompleteWalkBoard(access),
-    canReceiveReminders: canReceiveWalkBoardReminders(access),
+    canComplete: canCompleteWalkBoard(resolved),
+    canReceiveReminders: canReceiveWalkBoardReminders(resolved),
     canSnooze: false
   };
 }
 
+type LoadWalkBoardPublicStateOptions = {
+  userId?: string | null;
+  legacyRole?: string | null;
+  email?: string | null;
+  now?: Date;
+  access?: UserAccess | null;
+  /** Close missed slots before reading. Skip on high-frequency polls. */
+  closeExpired?: boolean;
+  /** Resolve canComplete / reminder permissions. Skip when the caller only needs cycles. */
+  includePermissions?: boolean;
+};
+
 export async function loadWalkBoardPublicState(
   supabase: SupabaseClient,
-  options?: {
-    userId?: string | null;
-    legacyRole?: string | null;
-    email?: string | null;
-    now?: Date;
-  }
+  options?: LoadWalkBoardPublicStateOptions
 ): Promise<WalkBoardPublicState> {
   const now = options?.now ?? new Date();
-  await closeExpiredWalkBoardCycles(supabase, now).catch(() => 0);
-  await ensureCurrentWalkBoardCycle(supabase, now).catch(() => null);
+  const closeExpired = options?.closeExpired !== false;
+  const includePermissions = options?.includePermissions !== false;
 
-  const dateKey = walkBoardClockParts(now).dateKey;
-  const todayCycles = await listWalkBoardCyclesForDate(supabase, dateKey);
+  const permissionsWork = includePermissions
+    ? resolveWalkBoardPermissions(supabase, options?.userId, options?.legacyRole, options?.email, options?.access)
+    : Promise.resolve({ canComplete: false, canReceiveReminders: false, canSnooze: false });
+
+  const cyclesWork = (async () => {
+    if (closeExpired) {
+      await closeExpiredWalkBoardCycles(supabase, now).catch(() => 0);
+    }
+    await ensureCurrentWalkBoardCycle(supabase, now).catch(() => null);
+    return listWalkBoardCyclesForDate(supabase, walkBoardClockParts(now).dateKey);
+  })();
+
+  const [todayCycles, permissions] = await Promise.all([cyclesWork, permissionsWork]);
   const slotKey = currentWalkBoardSlotKey(now);
   const currentCycle = slotKey ? todayCycles.find((row) => row.slot_key === slotKey) ?? null : null;
   const summary = summarizeWalkBoardCycles(todayCycles, now.getTime());
-  const permissions = await resolveWalkBoardPermissions(
-    supabase,
-    options?.userId,
-    options?.legacyRole,
-    options?.email
-  );
 
   return {
     timezone: WALK_BOARD_TIMEZONE,
@@ -363,6 +396,16 @@ export async function loadWalkBoardPublicState(
 
 export function walkBoardSlotKeyForHour(dateKey: string, hour: number) {
   return walkBoardSlotKey(dateKey, hour);
+}
+
+/** Cheap read of the current pending alarm for the notification bell. */
+export async function loadPendingWalkBoardCycle(
+  supabase: SupabaseClient,
+  now = new Date()
+): Promise<WalkBoardCycleRow | null> {
+  const cycle = await ensureCurrentWalkBoardCycle(supabase, now);
+  if (!cycle || cycle.status !== "pending") return null;
+  return cycle;
 }
 
 export { getWalkBoardUrgency };

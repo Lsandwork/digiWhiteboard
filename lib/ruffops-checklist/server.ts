@@ -33,7 +33,9 @@ export async function loadRuffopsChecklistState(
       userId: options?.userId,
       legacyRole: options?.legacyRole,
       email: options?.email,
-      now
+      now,
+      closeExpired: false,
+      includePermissions: false
     }).catch(() => null),
     listStaffPushNotices(supabase, 80),
     listChecklistCompletions(supabase, shiftDate)

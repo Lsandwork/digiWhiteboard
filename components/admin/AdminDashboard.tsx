@@ -204,13 +204,11 @@ export function AdminDashboard() {
   }, [load]);
 
   useEffect(() => {
-    const initial = window.setTimeout(() => setCurrentTimeMs(Date.now()), 0);
+    if (!lastSavedAt) return;
+    setCurrentTimeMs(Date.now());
     const timer = window.setInterval(() => setCurrentTimeMs(Date.now()), 1000);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
-    };
-  }, []);
+    return () => window.clearInterval(timer);
+  }, [lastSavedAt]);
 
   useEffect(() => {
     const session = data?.session as { role?: string; isDemo?: boolean; demoRole?: string; access?: UserAccess | null; adminUserId?: string } | undefined;
