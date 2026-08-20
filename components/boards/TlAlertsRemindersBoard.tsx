@@ -84,6 +84,7 @@ function payloadHasRows(payload: BoardPayload | null) {
       payload.overdue?.length ||
       payload.current?.length ||
       payload.additionalServices?.length ||
+      payload.packageGroupWalks?.length ||
       payload.meta?.lastSuccessfulSyncAt
   );
 }
@@ -280,6 +281,8 @@ function BoardInner() {
   const [hasResolved, setHasResolved] = useState(false);
   const [retryInSec, setRetryInSec] = useState<number | null>(null);
   const [completedWalkAnimalIds, setCompletedWalkAnimalIds] = useState<Set<string>>(() => new Set());
+  /** Pacific business date for the completion pulse — completions only apply to matching rows. */
+  const [walkPulseBusinessDate, setWalkPulseBusinessDate] = useState("");
   const snapshotRef = useRef<BoardPayload | null>(null);
   const failCountRef = useRef(0);
   const lastAttemptRef = useRef<number | null>(null);
@@ -459,11 +462,14 @@ function BoardInner() {
         });
         const body = (await res.json().catch(() => null)) as {
           ok?: boolean;
+          businessDate?: string;
           completedAnimalIds?: string[];
         } | null;
         // A failed pulse must never read as "nothing completed".
         if (cancelled || !body?.ok || !Array.isArray(body.completedAnimalIds)) return;
+        const businessDate = String(body.businessDate || "");
         const next = new Set(body.completedAnimalIds.map(String));
+        setWalkPulseBusinessDate(businessDate);
         setCompletedWalkAnimalIds((previous) => {
           const unchanged = previous.size === next.size && [...next].every((id) => previous.has(id));
           return unchanged ? previous : next;
@@ -546,8 +552,13 @@ function BoardInner() {
   const serviceRows = snapshot?.additionalServices ?? [];
   const snapshotWalkRows = snapshot?.packageGroupWalks;
   const packageWalkRows = useMemo(
-    () => (snapshotWalkRows ?? []).filter((row) => !completedWalkAnimalIds.has(String(row.gingrAnimalId))),
-    [snapshotWalkRows, completedWalkAnimalIds]
+    () =>
+      (snapshotWalkRows ?? []).filter((row) => {
+        const id = String(row.gingrAnimalId);
+        if (!walkPulseBusinessDate || row.businessDate !== walkPulseBusinessDate) return true;
+        return !completedWalkAnimalIds.has(id);
+      }),
+    [snapshotWalkRows, completedWalkAnimalIds, walkPulseBusinessDate]
   );
   const medCard = resolveTlCardKind({
     phase,
@@ -564,7 +575,9 @@ function BoardInner() {
   const packageWalkCard = resolveTlCardKind({
     phase,
     health: meta?.packageGroupWalksHealth,
-    allClear: Boolean(meta?.packageGroupWalksAllClear),
+    allClear:
+      Boolean(meta?.packageGroupWalksAllClear) ||
+      (meta?.packageGroupWalksHealth === "ok" && packageWalkRows.length === 0),
     hasRows: packageWalkRows.length > 0
   });
 

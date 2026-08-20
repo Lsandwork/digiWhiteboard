@@ -563,13 +563,21 @@ export async function loadTlDigiBoardPublicPayload(
       900,
       null
     );
-    if (overlay && overlay.completedCount > 0) {
+    if (overlay) {
       assembled.payload.packageGroupWalks = overlay.rows;
-      assembled.payload.packageGroupWalksSummary = {
-        ...assembled.payload.packageGroupWalksSummary,
-        remaining: overlay.rows.length,
-        completed: assembled.payload.packageGroupWalksSummary.completed + overlay.completedCount
-      };
+      if (overlay.completedCount > 0) {
+        const remaining = overlay.rows.length;
+        assembled.payload.packageGroupWalksSummary = {
+          ...assembled.payload.packageGroupWalksSummary,
+          remaining,
+          completed: assembled.payload.packageGroupWalksSummary.completed + overlay.completedCount
+        };
+        assembled.payload.meta = {
+          ...assembled.payload.meta,
+          packageGroupWalksAllClear:
+            assembled.payload.meta.packageGroupWalksHealth === "ok" && remaining === 0
+        };
+      }
     }
   }
 

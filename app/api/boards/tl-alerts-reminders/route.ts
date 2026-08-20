@@ -25,7 +25,9 @@ function snapshotHasUsableData(payload: TlDigiBoardPublicPayload) {
     payload.meta.lastSuccessfulSyncAt ||
       payload.medications.length ||
       payload.overdue.length ||
-      payload.current.length
+      payload.current.length ||
+      payload.additionalServices.length ||
+      payload.packageGroupWalks.length
   );
 }
 

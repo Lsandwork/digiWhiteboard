@@ -352,7 +352,13 @@ export function tlBoardSnapshotNeedsBackgroundSync(
   if (options?.forceRefresh) return true;
   if (!snapshot) return true;
   if (!snapshot.meta.lastSuccessfulSyncAt) return true;
-  if (snapshot.meta.medicationsHealth === "error" || snapshot.meta.servicesHealth === "error") return true;
+  if (
+    snapshot.meta.medicationsHealth === "error" ||
+    snapshot.meta.servicesHealth === "error" ||
+    snapshot.meta.packageGroupWalksHealth === "error"
+  ) {
+    return true;
+  }
   if (snapshot.meta.boardState === "CONNECTION_ERROR" || snapshot.meta.boardState === "PARTIAL_DATA_ERROR") {
     return true;
   }
