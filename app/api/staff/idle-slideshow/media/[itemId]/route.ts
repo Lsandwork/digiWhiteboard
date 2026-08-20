@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { createPhotoSignedUrl, downloadPhotoBuffer } from "@/lib/photo-upload-queue/storage";
-import { staffIdleSlideshowStoragePath } from "@/lib/staff/idle-slideshow";
+import { staffIdleSlideshowStoragePath, STAFF_IDLE_SLIDESHOW_LOAD_TIMEOUT_MS } from "@/lib/staff/idle-slideshow";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
       return NextResponse.json({ error: "Photo not found." }, { status: 404 });
     }
 
-    const supabase = getServiceSupabase({ timeoutMs: 8_000 });
+    const supabase = getServiceSupabase({ timeoutMs: STAFF_IDLE_SLIDESHOW_LOAD_TIMEOUT_MS });
     const { data: item, error } = await supabase
       .from("photo_upload_items")
       .select(

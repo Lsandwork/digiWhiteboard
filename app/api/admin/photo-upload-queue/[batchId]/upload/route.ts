@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { bumpDisplayContentRevision } from "@/lib/display-sync-server";
+import { invalidateStaffIdleSlideshowCache } from "@/lib/staff/idle-slideshow";
 import { processUploadedPhoto, storeProcessedPhoto } from "@/lib/photo-upload-queue/process";
 import { addPhotoItem, findDuplicateByHash } from "@/lib/photo-upload-queue/service";
 import {
@@ -165,6 +166,7 @@ export async function POST(request: Request, context: RouteContext) {
     const skipped = results.filter((r) => r.ok && "skipped" in r && r.skipped).length;
     const failed = results.filter((r) => !r.ok).length;
     if (uploaded > 0) {
+      invalidateStaffIdleSlideshowCache();
       await bumpDisplayContentRevision(auth.supabase).catch(() => undefined);
     }
     return NextResponse.json({

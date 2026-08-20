@@ -78,9 +78,12 @@ assert.equal(
 {
   const listRoute = source("app/api/staff/idle-slideshow/route.ts");
   assert.match(listRoute, /loadStaffIdleSlideshowSlides/);
+  assert.match(listRoute, /getOrLoadTtlCache/);
+  assert.match(listRoute, /STAFF_IDLE_SLIDESHOW_LAST_GOOD_KEY/);
+  assert.match(listRoute, /formatStaffIdleSlideshowLoadError/);
   assert.match(listRoute, /slides:\s*\[\]/);
-  assert.match(listRoute, /no-store/);
   assert.doesNotMatch(listRoute, /status:\s*500/);
+  assert.match(listRoute, /stale:\s*true/);
 
   const mediaRoute = source("app/api/staff/idle-slideshow/media/[itemId]/route.ts");
   assert.match(mediaRoute, /UUID_RE/);
@@ -93,7 +96,9 @@ assert.equal(
   assert.match(loader, /media_kind", "photo"/);
   assert.match(loader, /includeMediaKind: false/);
   assert.match(loader, /duplicate_of_item_id/);
+  assert.match(loader, /STAFF_IDLE_SLIDESHOW_CACHE_KEY/);
   assert.doesNotMatch(loader, /photo_upload_batches!inner/);
+  assert.match(loader, /invalidateStaffIdleSlideshowCache/);
 }
 
 {
