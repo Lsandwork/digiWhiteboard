@@ -148,6 +148,7 @@ type TlClientBoardPayload = {
   overdue?: unknown[];
   current?: unknown[];
   additionalServices?: unknown[];
+  packageGroupWalks?: unknown[];
   reminders?: unknown[];
   config?: unknown;
   meta?: {
@@ -156,6 +157,7 @@ type TlClientBoardPayload = {
     lastError?: string | null;
     medicationsHealth?: string;
     servicesHealth?: string;
+    packageGroupWalksHealth?: string;
     boardState?: string;
     isStale?: boolean;
   };
@@ -168,7 +170,9 @@ function payloadHasUsableGingrData(payload: TlClientBoardPayload | null | undefi
     payload.meta?.lastSuccessfulSyncAt ||
       (payload.medications && payload.medications.length) ||
       (payload.overdue && payload.overdue.length) ||
-      (payload.current && payload.current.length)
+      (payload.current && payload.current.length) ||
+      (payload.additionalServices && payload.additionalServices.length) ||
+      (payload.packageGroupWalks && payload.packageGroupWalks.length)
   );
 }
 
@@ -191,6 +195,9 @@ export function mergeTlBoardClientPayload<T extends TlClientBoardPayload>(previo
       isStale: true,
       medicationsHealth: previous.medications?.length ? "stale" : previous.meta?.medicationsHealth,
       servicesHealth: previous.additionalServices?.length ? "stale" : previous.meta?.servicesHealth,
+      packageGroupWalksHealth: previous.packageGroupWalks?.length
+        ? "stale"
+        : previous.meta?.packageGroupWalksHealth,
       boardState: "STALE"
     }
   };
