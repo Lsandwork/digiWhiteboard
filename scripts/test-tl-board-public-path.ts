@@ -7,13 +7,14 @@ import { TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS } from "../lib/tl-digi-board/constants"
 
 {
   const source = readFileSync("lib/tl-digi-board/server.ts", "utf8");
-  assert.match(source, /withTimeoutFallback\(\s*loadTlDigiBoardSnapshot\(client\)\.catch\(\(\) => null\),\s*TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS/);
+  assert.match(source, /TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS/);
+  assert.match(source, /Team Lead board snapshot timed out/);
   assert.ok(TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS >= 8_000);
 }
 
 {
   const source = readFileSync("lib/tl-digi-board/server.ts", "utf8");
-  assert.match(source, /withTimeoutFallback\(\s*loadTlDigiBoardSnapshot\(client\)\.catch\(\(\) => null\),\s*TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS/);
+  assert.match(source, /SNAPSHOT_READ_TIMEOUT/);
 }
 
 // Public TV payload assembly must never require a live Gingr sync.

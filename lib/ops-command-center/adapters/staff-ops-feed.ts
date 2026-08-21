@@ -157,9 +157,17 @@ export function alertToWorkItem(row: OperationsAlert): OpsWorkItem {
 
 export async function loadStaffOpsFeed() {
   const supabase = getServiceSupabase();
+  let opsFailed = false;
+  let alertsFailed = false;
   const [ops, alerts] = await Promise.all([
-    listStaffOps(supabase).catch(() => null),
-    listOpenAlerts(supabase).catch(() => [] as OperationsAlert[])
+    listStaffOps(supabase).catch(() => {
+      opsFailed = true;
+      return null;
+    }),
+    listOpenAlerts(supabase).catch(() => {
+      alertsFailed = true;
+      return [] as OperationsAlert[];
+    })
   ]);
 
   const followUps = openFollowUps(ops?.owner_follow_ups || []);
@@ -180,6 +188,9 @@ export async function loadStaffOpsFeed() {
     occurredAt: log.created_at
   }));
 
+  const feedHealth: "ok" | "degraded" | "error" =
+    opsFailed && alertsFailed ? "error" : opsFailed || alertsFailed ? "degraded" : "ok";
+
   return {
     followUps,
     issues,
@@ -192,7 +203,16 @@ export async function loadStaffOpsFeed() {
     activityEvents,
     ownerFollowUpCount: followUps.length,
     criticalPaymentCount: paymentAlerts.filter((a) => String(a.severity).toLowerCase() === "critical").length,
-    openIssueCount: issues.length
+    openIssueCount: issues.length,
+    feedHealth,
+    feedDetail:
+      feedHealth === "ok"
+        ? null
+        : opsFailed && alertsFailed
+          ? "Staff ops and payment alerts could not be loaded."
+          : opsFailed
+            ? "Staff ops feed could not be loaded."
+            : "Payment alerts could not be loaded."
   };
 }
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Bell, BellRing, CheckCircle2, ChevronRight, X } from "lucide-react";
 import { ADMIN_TABS, type AdminTab } from "@/lib/admin/types";
 import { playStaffPushNoticeAlarm, unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 
 type BellWalkAlert = {
@@ -90,10 +91,10 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
-    const poll = window.setInterval(() => void load(), POLL_MS);
+    const stop = startVisibilityAwareInterval(() => void load(), POLL_MS);
     return () => {
       window.clearTimeout(timer);
-      window.clearInterval(poll);
+      stop();
     };
   }, [load]);
 

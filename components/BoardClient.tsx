@@ -60,6 +60,7 @@ import {
   type StickyCheckoutState
 } from "@/lib/board-sticky-checkout";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { formatBoardDateTime, resolveDogPhotoUrl } from "@/lib/board-utils";
 import { isDailyReminderPushNotice } from "@/lib/staff/push-notices";
@@ -678,7 +679,7 @@ export function BoardClient({
     const clockTimer = window.setInterval(() => setClock(new Date()), clockIntervalMs);
     const nowTimer = window.setInterval(() => setNowMs(Date.now()), nowIntervalMs);
     let busyTicks = 0;
-    const fastPollTimer = window.setInterval(() => {
+    const fastPollTimer = startVisibilityAwareInterval(() => {
       const empty = waitingForDogRef.current;
       if (!empty) {
         busyTicks += 1;
@@ -695,7 +696,7 @@ export function BoardClient({
       window.clearTimeout(initialClock);
       window.clearInterval(clockTimer);
       window.clearInterval(nowTimer);
-      window.clearInterval(fastPollTimer);
+      fastPollTimer();
     };
   }, [castKeeperMode, loadBoard, loadFastCheckouts]);
 
@@ -706,11 +707,11 @@ export function BoardClient({
       : connection === "live"
         ? BOARD_FULL_SYNC_POLL_LIVE_MS
         : BOARD_FULL_SYNC_POLL_MS;
-    const fullPollTimer = window.setInterval(
+    const fullPollTimer = startVisibilityAwareInterval(
       () => void loadBoard("polling", { silent: true }),
       fullPollIntervalMs
     );
-    return () => window.clearInterval(fullPollTimer);
+    return () => fullPollTimer();
   }, [castKeeperMode, connection, loadBoard]);
 
   useEffect(() => {

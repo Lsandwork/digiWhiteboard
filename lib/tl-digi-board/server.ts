@@ -503,13 +503,15 @@ export function assembleTlDigiBoardPublicPayload(options: {
   reminders: TlDigiBoardPublicPayload["reminders"];
   now?: Date;
   forceRefresh?: boolean;
+  missingSnapshotReason?: string;
 }): { payload: TlDigiBoardPublicPayload; needsBackgroundSync: boolean } {
   const now = options.now ?? new Date();
   const snapshot = options.snapshot
     ? rehydrateTlBoardSnapshot(options.snapshot, now)
     : buildUnavailableTlBoardSnapshot(
         now,
-        "No Gingr snapshot is stored yet. Background sync will retry automatically."
+        options.missingSnapshotReason ??
+          "No Gingr snapshot is stored yet. Background sync will retry automatically."
       );
 
   return {
@@ -536,18 +538,24 @@ export async function loadTlDigiBoardPublicPayload(
   const { DEFAULT_TL_DIGI_BOARD_CONFIG } = await import("./config");
   const { withTimeoutFallback } = await import("@/lib/server-ttl-cache");
 
-  const snapshot = await withTimeoutFallback(
+  const SNAPSHOT_READ_TIMEOUT = Symbol("tl-snapshot-read-timeout");
+  const snapshotOrTimeout = await withTimeoutFallback<TlDigiBoardSnapshot | null | typeof SNAPSHOT_READ_TIMEOUT>(
     loadTlDigiBoardSnapshot(client).catch(() => null),
     TL_BOARD_PUBLIC_LOAD_TIMEOUT_MS,
-    null
+    SNAPSHOT_READ_TIMEOUT
   );
+  const timedOut = snapshotOrTimeout === SNAPSHOT_READ_TIMEOUT;
+  const snapshot = timedOut ? null : snapshotOrTimeout;
 
   const assembled = assembleTlDigiBoardPublicPayload({
     config: DEFAULT_TL_DIGI_BOARD_CONFIG,
     snapshot,
     reminders: [],
     now: options?.now,
-    forceRefresh: options?.forceRefresh
+    forceRefresh: options?.forceRefresh,
+    missingSnapshotReason: timedOut
+      ? "Team Lead board snapshot timed out. Retrying automatically."
+      : undefined
   });
 
   // Snapshots only refresh on the Gingr sync cadence, but a completion has to

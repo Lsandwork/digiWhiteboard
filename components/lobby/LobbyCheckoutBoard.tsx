@@ -25,6 +25,7 @@ import {
 } from "@/lib/board-checkout-merge";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import {
   areLobbyCheckoutsDisplayEqual,
   stabilizeLobbyCheckoutsResponse
@@ -264,7 +265,8 @@ export function LobbyCheckoutBoard({
             setRefreshMessage(null);
           }
           if (!hasVisibleCheckouts) {
-            setHealthy(true);
+            setHealthy(false);
+            setRefreshMessage(message || "Unable to verify lobby checkouts.");
           } else if (message) {
             setHealthy(false);
           }
@@ -278,13 +280,10 @@ export function LobbyCheckoutBoard({
         }
       } catch {
         const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
-        if (!hasVisibleCheckouts) {
-          setHealthy(true);
-          setRefreshMessage(null);
-        } else {
-          setHealthy(false);
-          setRefreshMessage("Live board temporarily refreshing");
-        }
+        setHealthy(false);
+        setRefreshMessage(
+          hasVisibleCheckouts ? "Live board temporarily refreshing" : "Unable to verify lobby checkouts."
+        );
       } finally {
         window.clearTimeout(timeout);
       }
@@ -327,7 +326,8 @@ export function LobbyCheckoutBoard({
 
       if (statusRes.ok) {
         const body = (await statusRes.json()) as LobbyStatusResponse;
-        setHealthy(body.healthy || (!checkoutsRef.current.featured && !checkoutsRef.current.queue.length));
+        // Empty checkout queue is not proof of a healthy board — only the status probe is.
+        setHealthy(Boolean(body.healthy));
         setSettings((current) => {
           const nextRefresh = clampCheckoutPollMs(body.refresh_interval_ms);
           if (current.refresh_interval_ms === nextRefresh) return current;
@@ -390,18 +390,18 @@ export function LobbyCheckoutBoard({
     // Realtime is unavailable. The API's short TTL still deduplicates callers.
     const fastPollIntervalMs = castKeeperMode ? BOARD_CHECKOUT_POLL_MS : checkoutPollMs;
     const fullPollIntervalMs = castKeeperMode ? 60_000 : BOARD_FULL_SYNC_POLL_MS;
-    const fastPollTimer = window.setInterval(() => void loadFastLobbyCheckouts(), fastPollIntervalMs);
-    const fullPollTimer = window.setInterval(() => void loadLobbyCheckouts(), fullPollIntervalMs);
+    const fastPollTimer = startVisibilityAwareInterval(() => void loadFastLobbyCheckouts(), fastPollIntervalMs);
+    const fullPollTimer = startVisibilityAwareInterval(() => void loadLobbyCheckouts(), fullPollIntervalMs);
     return () => {
-      window.clearInterval(fastPollTimer);
-      window.clearInterval(fullPollTimer);
+      fastPollTimer();
+      fullPollTimer();
     };
   }, [castKeeperMode, checkoutPollMs, loadFastLobbyCheckouts, loadLobbyCheckouts]);
 
   useEffect(() => {
     if (castKeeperMode) return;
-    const metaTimer = window.setInterval(() => void loadLobbyMeta(), BOARD_SETTINGS_POLL_MS);
-    return () => window.clearInterval(metaTimer);
+    const metaTimer = startVisibilityAwareInterval(() => void loadLobbyMeta(), BOARD_SETTINGS_POLL_MS);
+    return () => metaTimer();
   }, [castKeeperMode, loadLobbyMeta]);
 
   useEffect(() => {

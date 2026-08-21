@@ -175,8 +175,13 @@ export function RouteGeneratorPanel() {
     async (options?: { hydrateLatestPlan?: boolean }) => {
       const hydrateLatestPlan = options?.hydrateLatestPlan !== false;
       setLoading(true);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 20_000);
       try {
-        const response = await fetch("/api/admin/route-generator?view=bootstrap", { cache: "no-store" });
+        const response = await fetch("/api/admin/route-generator?view=bootstrap", {
+          cache: "no-store",
+          signal: controller.signal
+        });
         const body = await response.json();
         if (!response.ok) throw new Error(body.error || "Unable to load Route Generator.");
         const nextBootstrap = body as Bootstrap;
@@ -194,6 +199,7 @@ export function RouteGeneratorPanel() {
       } catch (error) {
         showToast(error instanceof Error ? error.message : "Unable to load Route Generator.", "error");
       } finally {
+        window.clearTimeout(timeout);
         setLoading(false);
       }
     },

@@ -5,6 +5,7 @@ export const TV_HARD_REFRESH_ENDPOINT = "/api/display/hard-refresh";
 const TV_WHITEBOARD_PREFIXES = [
   "/lobby",
   "/cast",
+  "/cast-tv",
   "/staff-cast",
   "/lobby-cast",
   "/display",

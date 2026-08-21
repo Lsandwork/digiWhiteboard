@@ -5,6 +5,7 @@ import { AlertTriangle, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
 import { SmsCostDashboardCard } from "@/components/admin/ops-command-center/SmsCostDashboardCard";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
@@ -65,7 +66,6 @@ export function OpsCommandCenterPanel({
   const { showToast } = useToast();
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/ops-command-center", { cache: "no-store" });
@@ -81,10 +81,10 @@ export function OpsCommandCenterPanel({
 
   useEffect(() => {
     const boot = window.setTimeout(() => void load(), 0);
-    const timer = window.setInterval(() => void load(), 45_000);
+    const stop = startVisibilityAwareInterval(() => void load(), 45_000);
     return () => {
       window.clearTimeout(boot);
-      window.clearInterval(timer);
+      stop();
     };
   }, [load]);
 
@@ -285,7 +285,21 @@ export function OpsCommandCenterPanel({
         </div>
       ) : null}
 
-      {mode === "ops_command_center" ? <SmsCostDashboardCard /> : null}
+      {data.staffOpsHealth && data.staffOpsHealth.status !== "ok" ? (
+        <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-50">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            {data.staffOpsHealth.detail ||
+              "Staff ops feed could not be verified. Empty queues here do not mean All Clear."}
+          </p>
+        </div>
+      ) : null}
+
+      {mode === "ops_command_center" ? (
+        <div className="space-y-2">
+          <SmsCostDashboardCard />
+        </div>
+      ) : null}
 
       {mode === "my_shift" ? (
         <BulkShiftLogComposer

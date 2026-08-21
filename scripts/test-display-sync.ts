@@ -124,6 +124,7 @@ assert.ok(DISPLAY_SYNC_POLL_MS <= 2_000, "staff TVs must poll remote refresh at 
   assert.equal(isTvWhiteboardPath("/"), true);
   assert.equal(isTvWhiteboardPath("/lobby/checkouts"), true);
   assert.equal(isTvWhiteboardPath("/cast/receiver"), true);
+  assert.equal(isTvWhiteboardPath("/cast-tv"), true);
   assert.equal(isTvWhiteboardPath("/admin"), false);
   assert.equal(isTvWhiteboardPath("/blog"), false);
 }

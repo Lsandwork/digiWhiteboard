@@ -61,6 +61,7 @@ export async function completeOvernightRound(input: {
       updated_at: now
     })
     .eq("id", input.roundId)
+    .neq("status", "completed")
     .select("*")
     .maybeSingle();
   if (error || !data) return null;
