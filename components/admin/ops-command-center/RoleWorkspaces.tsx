@@ -56,11 +56,27 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
   const [arriving, setArriving] = useState<BoardDog[]>([]);
   const [leaving, setLeaving] = useState<BoardDog[]>([]);
   const [selected, setSelected] = useState<OpsDogCardModel | null>(null);
+  const [feedError, setFeedError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const board = await fetchBoardDogs();
-    setArriving(board.checking_in);
-    setLeaving(board.checking_out);
+    const res = await fetch("/api/board/checkouts", { cache: "no-store" }).catch(() => null);
+    if (!res || !res.ok) {
+      setFeedError("Unable to refresh arriving/leaving dogs. Showing last known board state.");
+      return;
+    }
+    const body = await res.json().catch(() => null);
+    if (!body || body.error) {
+      setFeedError(
+        typeof body?.error === "string"
+          ? body.error
+          : "Unable to refresh arriving/leaving dogs. Showing last known board state."
+      );
+      if (!Array.isArray(body?.checking_in) && !Array.isArray(body?.checking_out)) return;
+    } else {
+      setFeedError(null);
+    }
+    if (Array.isArray(body.checking_in)) setArriving(body.checking_in as BoardDog[]);
+    if (Array.isArray(body.checking_out)) setLeaving(body.checking_out as BoardDog[]);
   }, []);
 
   useEffect(() => {
@@ -75,6 +91,7 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
         <p className="mt-1 text-sm text-admin-muted">
           Speed surface for arriving, ready for pickup, and checkout. Payments/packages stay in Gingr — use Open in Gingr.
         </p>
+        {feedError ? <p className="mt-2 text-xs text-amber-200">{feedError}</p> : null}
       </header>
       <div className="grid gap-4 lg:grid-cols-2">
         <Lane title="Arriving soon / checking in" dogs={arriving.map((d) => toCard(d, "arrived"))} onOpen={setSelected} />
@@ -284,6 +301,7 @@ export function DriverModePanel() {
 export function OvernightCommandPanel() {
   const [rounds, setRounds] = useState<Array<Record<string, unknown>>>([]);
   const [loading, setLoading] = useState(true);
+  const [busyRoundId, setBusyRoundId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -298,12 +316,18 @@ export function OvernightCommandPanel() {
   }, [load]);
 
   async function complete(roundId: string) {
-    await fetch("/api/admin/ops-command-center", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "complete_overnight_round", roundId })
-    });
-    await load();
+    if (busyRoundId) return;
+    setBusyRoundId(roundId);
+    try {
+      await fetch("/api/admin/ops-command-center", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete_overnight_round", roundId })
+      });
+      await load();
+    } finally {
+      setBusyRoundId(null);
+    }
   }
 
   return (
@@ -324,9 +348,10 @@ export function OvernightCommandPanel() {
               <button
                 type="button"
                 className="admin-btn-primary mt-3 w-full min-h-11"
+                disabled={busyRoundId === String(round.id)}
                 onClick={() => void complete(String(round.id))}
               >
-                Complete round
+                {busyRoundId === String(round.id) ? "Saving…" : "Complete round"}
               </button>
             ) : (
               <p className="mt-3 text-xs text-emerald-300">Completed</p>
@@ -342,6 +367,8 @@ export function TrainerOpsPanel({ onNavigate }: { onNavigate?: (tab: string) => 
   const draftKey = "trainer_session_notes";
   const saved = loadAutosave<{ value?: string }>(draftKey);
   const [notes, setNotes] = useState(typeof saved?.value === "string" ? saved.value : "");
+  const [busy, setBusy] = useState(false);
+  const { showToast } = useToast();
 
   return (
     <section className="space-y-4">
@@ -364,16 +391,28 @@ export function TrainerOpsPanel({ onNavigate }: { onNavigate?: (tab: string) => 
         <button
           type="button"
           className="admin-btn-primary"
+          disabled={busy}
           onClick={async () => {
-            await fetch("/api/admin/ops-command-center", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "trainer_session_complete", notes })
-            });
-            clearAutosave(draftKey);
+            if (busy) return;
+            setBusy(true);
+            try {
+              const res = await fetch("/api/admin/ops-command-center", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "trainer_session_complete", notes })
+              });
+              if (!res.ok) throw new Error("Unable to complete training session.");
+              clearAutosave(draftKey);
+              setNotes("");
+              showToast("Training session recorded.", "success");
+            } catch (error) {
+              showToast(error instanceof Error ? error.message : "Unable to complete training session.", "error");
+            } finally {
+              setBusy(false);
+            }
           }}
         >
-          Complete session + timeline event
+          {busy ? "Saving…" : "Complete session + timeline event"}
         </button>
         <button type="button" className="admin-btn-secondary" onClick={() => onNavigate?.("trainer_push")}>
           Trainer push

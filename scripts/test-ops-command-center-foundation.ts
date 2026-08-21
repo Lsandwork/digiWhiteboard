@@ -16,6 +16,14 @@ assert.deepEqual([...OPS_PRIORITIES], ["critical", "high", "attention", "informa
 assert.ok(OPS_TASK_STATUSES.includes("escalated"));
 assert.ok(OPS_TASK_STATUSES.includes("snoozed"));
 
+{
+  const feed = require("node:fs").readFileSync("lib/ops-command-center/adapters/staff-ops-feed.ts", "utf8");
+  assert.match(feed, /feedHealth/);
+  const lobby = require("node:fs").readFileSync("components/lobby/LobbyCheckoutBoard.tsx", "utf8");
+  assert.match(lobby, /Unable to verify lobby checkouts/);
+  assert.doesNotMatch(lobby, /setHealthy\(body\.healthy \|\|/);
+}
+
 // Board → ops status mapping (mirror adapter rules for unit coverage).
 function mapBoardDisplayToOpsStatus(
   displayStatus?: string | null,

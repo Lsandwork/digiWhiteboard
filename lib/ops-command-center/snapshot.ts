@@ -92,6 +92,11 @@ export type OpsCommandCenterSnapshot = {
     label: string;
     detail: string | null;
   };
+  /** Staff ops / payment-alert feed health — never treat a failed load as an empty quiet shift. */
+  staffOpsHealth: {
+    status: "ok" | "degraded" | "error";
+    detail: string | null;
+  };
   tools: Array<{ tab: string; label: string }>;
   /** Staff-directory department for My Shift entry + peer handoff (not RBAC role). */
   homeDepartment: string | null;
@@ -324,7 +329,9 @@ export async function buildOpsCommandCenterSnapshot(input: {
       }>,
       ownerFollowUpCount: 0,
       criticalPaymentCount: 0,
-      openIssueCount: 0
+      openIssueCount: 0,
+      feedHealth: "error" as const,
+      feedDetail: "Staff ops feed could not be loaded."
     })),
     loadBoardLaneSamples(8).catch(() => ({ arriving: [], leaving: [] })),
     groomerDashboard
@@ -549,6 +556,10 @@ export async function buildOpsCommandCenterSnapshot(input: {
       status: gingrHealth.status,
       label: gingrHealth.label,
       detail: gingrHealth.detail
+    },
+    staffOpsHealth: {
+      status: staffFeed.feedHealth ?? "ok",
+      detail: staffFeed.feedDetail ?? null
     },
     tools: toolsForRole(input.roleKey),
     homeDepartment,

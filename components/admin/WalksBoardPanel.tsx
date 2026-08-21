@@ -71,8 +71,13 @@ export function WalksBoardPanel() {
   const load = useCallback(
     async (options: { silent?: boolean } = {}) => {
       if (!options.silent) setLoading(!hasLoaded);
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 12_000);
       try {
-        const response = await fetch("/api/admin/walks-board", { cache: "no-store" });
+        const response = await fetch("/api/admin/walks-board", {
+          cache: "no-store",
+          signal: controller.signal
+        });
         const body = (await response.json()) as WalkBoardPublicState & { error?: string };
         if (!response.ok) throw new Error(body.error ?? "Unable to load Walks Board.");
         setData(body);
@@ -85,6 +90,7 @@ export function WalksBoardPanel() {
           setReconnecting(true);
         }
       } finally {
+        window.clearTimeout(timeout);
         setLoading(false);
       }
     },

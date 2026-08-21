@@ -285,6 +285,16 @@ export function OpsCommandCenterPanel({
         </div>
       ) : null}
 
+      {data.staffOpsHealth && data.staffOpsHealth.status !== "ok" ? (
+        <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-50">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            {data.staffOpsHealth.detail ||
+              "Staff ops feed could not be verified. Empty queues here do not mean All Clear."}
+          </p>
+        </div>
+      ) : null}
+
       {mode === "ops_command_center" ? (
         <div className="space-y-2">
           <SmsCostDashboardCard />
