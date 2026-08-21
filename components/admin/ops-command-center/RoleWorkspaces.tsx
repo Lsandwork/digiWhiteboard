@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { ClipboardList } from "lucide-react";
 import { OpsDogCard, type OpsDogCardModel } from "@/components/admin/ops-command-center/DogCard";
 import { OpsSidePanel } from "@/components/admin/ops-command-center/SidePanel";
@@ -30,7 +31,7 @@ type BoardDog = {
 };
 
 async function fetchBoardDogs() {
-  const res = await fetch("/api/board/live?mode=fast_internal", { cache: "no-store" }).catch(() => null);
+  const res = await fetch("/api/board/checkouts", { cache: "no-store" }).catch(() => null);
   if (!res || !res.ok) return { checking_in: [] as BoardDog[], checking_out: [] as BoardDog[] };
   const body = await res.json();
   return {
@@ -64,8 +65,7 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
 
   useEffect(() => {
     void load();
-    const id = window.setInterval(() => void load(), 15000);
-    return () => window.clearInterval(id);
+    return startVisibilityAwareInterval(() => void load(), 15_000);
   }, [load]);
 
   return (

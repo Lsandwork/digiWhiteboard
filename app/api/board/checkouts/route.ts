@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  FAST_CHECKOUT_QUERY_TIMEOUT_MS,
   loadFastBoardTransitions,
   reconcileCachedBasketClears,
   refreshRetiredTransitionKeys,
@@ -25,7 +26,8 @@ export async function GET(request: Request) {
   const now = new Date();
 
   try {
-    const loadCheckouts = () => loadFastBoardTransitions(getServiceSupabase(), now);
+    const loadCheckouts = () =>
+      loadFastBoardTransitions(getServiceSupabase({ timeoutMs: FAST_CHECKOUT_QUERY_TIMEOUT_MS }), now);
     const result = fresh
       ? await loadCheckouts()
       : await getOrLoadTtlCache("board-checkouts:fast", FAST_CHECKOUT_CACHE_TTL_MS, loadCheckouts);

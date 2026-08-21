@@ -5,6 +5,7 @@ import { AlertTriangle, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
 import { SmsCostDashboardCard } from "@/components/admin/ops-command-center/SmsCostDashboardCard";
 import { useToast } from "@/components/admin/ui/ToastProvider";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
@@ -65,7 +66,6 @@ export function OpsCommandCenterPanel({
   const { showToast } = useToast();
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/admin/ops-command-center", { cache: "no-store" });
@@ -81,10 +81,10 @@ export function OpsCommandCenterPanel({
 
   useEffect(() => {
     const boot = window.setTimeout(() => void load(), 0);
-    const timer = window.setInterval(() => void load(), 45_000);
+    const stop = startVisibilityAwareInterval(() => void load(), 45_000);
     return () => {
       window.clearTimeout(boot);
-      window.clearInterval(timer);
+      stop();
     };
   }, [load]);
 
@@ -285,7 +285,11 @@ export function OpsCommandCenterPanel({
         </div>
       ) : null}
 
-      {mode === "ops_command_center" ? <SmsCostDashboardCard /> : null}
+      {mode === "ops_command_center" ? (
+        <div className="space-y-2">
+          <SmsCostDashboardCard />
+        </div>
+      ) : null}
 
       {mode === "my_shift" ? (
         <BulkShiftLogComposer

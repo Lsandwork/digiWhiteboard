@@ -25,7 +25,8 @@ export function snapshotHasUsableGingrData(snapshot: TlDigiBoardSnapshot | null 
       snapshot.medications.length ||
       snapshot.overdue.length ||
       snapshot.current.length ||
-      snapshot.additionalServices.length
+      snapshot.additionalServices.length ||
+      snapshot.packageGroupWalks.length
   );
 }
 

@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { isTvWhiteboardPath } from "@/lib/tv-hard-refresh";
 
 export default function Error({
   error,
@@ -14,7 +15,9 @@ export default function Error({
     Sentry.captureException(error);
     console.error(error);
     if (typeof window === "undefined") return;
-    if (!window.location.pathname.startsWith("/display/")) return;
+    if (!isTvWhiteboardPath(window.location.pathname) && !window.location.pathname.startsWith("/display/")) {
+      return;
+    }
 
     const reloadTimer = window.setTimeout(() => {
       window.location.reload();

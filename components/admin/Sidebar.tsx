@@ -13,6 +13,7 @@ import { GINGR_NAV_ICON } from "@/lib/gingr/constants";
 import { openGingrSecurely } from "@/lib/gingr/open-gingr";
 import { RUFFLY_NAV_ICON } from "@/lib/ruffly/branding/assets";
 import { getAdminSidebarRoleLabel, isGroomerRole, isTeamLeaderRole, isTrainerRole } from "@/lib/admin/users";
+import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { isFrontDeskCoordinatorLoginEmail } from "@/lib/admin/team-lead-profile";
 import {
   bucketNavEntries,
@@ -501,10 +502,10 @@ export function Sidebar({
       }
     }
     void loadBadges();
-    const timer = window.setInterval(() => void loadBadges(), 30000);
+    const stop = startVisibilityAwareInterval(() => void loadBadges(), 30_000);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      stop();
     };
   }, [visibleTabs]);
 
