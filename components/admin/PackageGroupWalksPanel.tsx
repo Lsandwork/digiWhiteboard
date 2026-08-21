@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Clock3, Dog, Loader2, PawPrint, Search } f
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import { tlDogPhotoCandidates } from "@/lib/tl-digi-board/animal-photos";
+import { packageGroupWalkOwnershipErrorDetail } from "@/lib/package-group-walks/gingr-packages";
 import type {
   PackageGroupWalkCompletion,
   PackageGroupWalkRow,
@@ -275,8 +276,9 @@ export function PackageGroupWalksPanel() {
       {syncState === "ERROR" ? (
         <p className="pgw-notice pgw-notice--error" role="alert">
           <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-          Unable to verify Package Group Walk eligibility. Gingr check-in is working, but owner package data could not be confirmed. Last successful sync:{" "}
-          {lastSync}. Retrying automatically.
+          Unable to verify Package Group Walk eligibility.{" "}
+          {packageGroupWalkOwnershipErrorDetail(meta?.lastError)} Last successful sync: {lastSync}.
+          Retrying automatically.
         </p>
       ) : null}
 
@@ -339,7 +341,7 @@ export function PackageGroupWalksPanel() {
               <p className="pgw-state__title">Unable to verify Package Group Walk eligibility</p>
               <p>
                 {meta?.gingrOk
-                  ? "Checked-in dogs were loaded from Gingr, but package/membership ownership could not be read. This is not All Clear."
+                  ? packageGroupWalkOwnershipErrorDetail(meta?.lastError)
                   : `Gingr is temporarily unavailable. Last successful sync: ${lastSync}`}
               </p>
             </div>

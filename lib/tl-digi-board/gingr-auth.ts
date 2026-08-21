@@ -25,6 +25,19 @@ export function isGingrPartnerApiKeyConfigured(): boolean {
   return Boolean(resolveGingrPartnerApiKey());
 }
 
+/**
+ * True when `GINGR_PARTNER_API_KEY` (or `TL_GINGR_PARTNER_KEY`) is set to a value
+ * different from the Users/TL facility key. Partner parent-packages return HTTP 403
+ * when only the Users → API Keys key is used.
+ */
+export function isGingrPartnerApiKeyDistinctFromUsersKey(): boolean {
+  const partner =
+    process.env.GINGR_PARTNER_API_KEY?.trim() || process.env.TL_GINGR_PARTNER_KEY?.trim() || "";
+  if (!partner) return false;
+  const users = resolveTlGingrApiKey();
+  return Boolean(users) && partner !== users;
+}
+
 export function isTlGingrKeyConfigured(): boolean {
   return Boolean(resolveTlGingrApiKey());
 }

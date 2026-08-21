@@ -19,7 +19,10 @@
  */
 import { todayInLosAngeles } from "@/lib/gingr-checked-in-dogs";
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
-import { tlGingrClientConfig } from "@/lib/tl-digi-board/gingr-auth";
+import {
+  isGingrPartnerApiKeyDistinctFromUsersKey,
+  tlGingrClientConfig
+} from "@/lib/tl-digi-board/gingr-auth";
 import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
 import { redactDiagnosticMessage } from "./diagnostics";
 import {
@@ -930,6 +933,34 @@ function indexPartnerRows(rows: PartnerPackageRow[]): {
   return { byOwnerId, inspection };
 }
 
+/** Staff-facing copy when Gingr Partner parent-packages returns HTTP 403. */
+export const PARTNER_PACKAGE_FORBIDDEN_MESSAGE =
+  "Gingr Partner API returned HTTP 403 for parent-packages. Set GINGR_PARTNER_API_KEY to a Manage Account key — the Users API key cannot confirm package ownership.";
+
+export function partnerAttemptsForbidden(
+  attempts: Record<string, { ok: boolean; httpStatus: number | null; rows?: number }>
+): boolean {
+  const partnerKeys = ["packageTypes", "membershipTypes", "parentPackages", "parentMemberships"] as const;
+  let sawPartner = false;
+  for (const key of partnerKeys) {
+    const attempt = attempts[key];
+    if (!attempt) continue;
+    sawPartner = true;
+    if (attempt.ok) return false;
+    if (attempt.httpStatus !== 403 && attempt.httpStatus !== 401) return false;
+  }
+  return sawPartner;
+}
+
+/** TV / admin card copy for Package Group Walk verification failures. */
+export function packageGroupWalkOwnershipErrorDetail(lastError: string | null | undefined): string {
+  const text = lastError ?? "";
+  if (/403|401|Forbidden|Manage Account|GINGR_PARTNER_API_KEY/i.test(text)) {
+    return "Checked-in dogs were loaded from Gingr, but the Partner API denied package access (HTTP 403). Set GINGR_PARTNER_API_KEY to a Manage Account key. This is not All Clear.";
+  }
+  return "Checked-in dogs were loaded from Gingr, but package/membership ownership could not be confirmed. This is not All Clear.";
+}
+
 /**
  * Build the owner → eligible packages index for checked-in reservations.
  *
@@ -1025,9 +1056,20 @@ export async function buildOwnerPackageIndex(
     errors.push(error instanceof Error ? error.message : "Gingr Partner package lookup failed.");
   }
 
+  const partnerForbidden = partnerAttemptsForbidden(attempts);
+  if (partnerForbidden) {
+    errors.length = 0;
+    errors.push(PARTNER_PACKAGE_FORBIDDEN_MESSAGE);
+    if (!isGingrPartnerApiKeyDistinctFromUsersKey()) {
+      errors.push(
+        "GINGR_PARTNER_API_KEY is missing or identical to TL_GINGR_KEY / GINGR_API_KEY — replace it with a Gingr Manage Account key."
+      );
+    }
+  }
+
   try {
     const subscriptions = await loadGingrSubscriptionIndex();
-    if (subscriptions.attempt.note) errors.push(subscriptions.attempt.note);
+    if (subscriptions.attempt.note && !partnerForbidden) errors.push(subscriptions.attempt.note);
     attempts.subscriptions = {
       ok: subscriptions.attempt.ok,
       httpStatus: subscriptions.attempt.httpStatus,
@@ -1041,10 +1083,14 @@ export async function buildOwnerPackageIndex(
     if (subscriptionMatches > 0) sources.push("subscriptions");
     packageRowsInspected += subscriptions.rowCount;
   } catch (error) {
-    errors.push(error instanceof Error ? error.message : "Gingr subscriptions lookup failed.");
+    if (!partnerForbidden) {
+      errors.push(error instanceof Error ? error.message : "Gingr subscriptions lookup failed.");
+    }
   }
 
-  if (!partnerOk && ownerIds.length > 0) {
+  // Owner N+1 fallbacks cannot read Fitdog prepaid parent-packages. When Partner
+  // already returned 403, skipping them keeps the TL board sync under the 60s budget.
+  if (!partnerOk && !partnerForbidden && ownerIds.length > 0) {
     try {
       const ownersList = await loadOwnersListForCheckedInOwners(ownerIds);
       packageRowsInspected += ownersList.inspection.length;
