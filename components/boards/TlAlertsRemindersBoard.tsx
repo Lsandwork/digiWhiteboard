@@ -11,6 +11,7 @@ import {
 } from "@/lib/tl-digi-board/medication-windows";
 import { tlDogPhotoCandidates } from "@/lib/tl-digi-board/animal-photos";
 import { splitMedicationDisplayNotes } from "@/lib/tl-digi-board/medication-notes";
+import { packageGroupWalkOwnershipErrorDetail } from "@/lib/package-group-walks/gingr-packages";
 import type {
   TlBoardAdditionalServiceRow,
   TlBoardDisplayState,
@@ -732,7 +733,7 @@ function BoardInner() {
             lastSync={lastSync}
             retryLabel={retryLabel}
             errorNoun="Package Group Walk eligibility"
-            errorDetail="Checked-in dogs were loaded from Gingr, but package/membership ownership could not be confirmed. This is not All Clear."
+            errorDetail={packageGroupWalkOwnershipErrorDetail(meta?.lastError)}
             allClearText="No qualifying checked-in dogs currently need a group walk."
             allClearDetail={
               snapshot?.packageGroupWalksSummary?.completed

@@ -283,7 +283,11 @@ export async function loadPartnerPackageTypes(): Promise<{
         label: "Gingr package types"
       });
       lastRead = read;
-      if (!read.ok) continue;
+      // Auth failures will not change across name filters — stop wasting the sync budget.
+      if (!read.ok) {
+        if (read.status === 401 || read.status === 403) break;
+        continue;
+      }
       rows.push(...flattenJsonApiRecords(read.payload));
     }
 

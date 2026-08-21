@@ -26,9 +26,13 @@ import {
   deepCollectPackageCandidates,
   ownerIdFromReservation,
   ownerNameFromReservation,
+  packageGroupWalkOwnershipErrorDetail,
   packagesFromReservation,
+  partnerAttemptsForbidden,
+  PARTNER_PACKAGE_FORBIDDEN_MESSAGE,
   type OwnerPackageIndex
 } from "../lib/package-group-walks/gingr-packages";
+import { isGingrPartnerApiKeyDistinctFromUsersKey } from "../lib/tl-digi-board/gingr-auth";
 import { flattenJsonApiResource } from "../lib/package-group-walks/gingr-partner";
 import {
   applyPackageGroupWalkCompletions,
@@ -782,9 +786,54 @@ assert.equal(canAccessAdminTab(null, "package_group_walks", "marketing", "market
   assert.match(board, /package-group-walks/);
   assert.match(board, /Unable to verify \{errorNoun\}/);
   assert.match(board, /errorNoun="Package Group Walk eligibility"/);
-  assert.match(board, /This is not All Clear/);
+  assert.match(board, /packageGroupWalkOwnershipErrorDetail/);
   assert.match(board, /completedWalkAnimalIds/);
   assert.doesNotMatch(board, /window\.location\.reload/);
+
+  const gingrPackages = source("lib/package-group-walks/gingr-packages.ts");
+  assert.match(gingrPackages, /PARTNER_PACKAGE_FORBIDDEN_MESSAGE/);
+  assert.match(gingrPackages, /partnerAttemptsForbidden/);
+  assert.match(gingrPackages, /This is not All Clear/);
+  assert.match(source("lib/tl-digi-board/gingr-auth.ts"), /isGingrPartnerApiKeyDistinctFromUsersKey/);
+  assert.match(source("lib/package-group-walks/gingr-partner.ts"), /status === 401 \|\| read\.status === 403/);
+
+  assert.equal(
+    packageGroupWalkOwnershipErrorDetail("HTTP 403: Forbidden"),
+    "Checked-in dogs were loaded from Gingr, but the Partner API denied package access (HTTP 403). Set GINGR_PARTNER_API_KEY to a Manage Account key. This is not All Clear."
+  );
+  assert.ok(
+    partnerAttemptsForbidden({
+      packageTypes: { ok: false, httpStatus: 403, rows: 0 },
+      membershipTypes: { ok: false, httpStatus: 403, rows: 0 },
+      parentPackages: { ok: false, httpStatus: 403, rows: 0 },
+      parentMemberships: { ok: false, httpStatus: 403, rows: 0 }
+    })
+  );
+  assert.equal(
+    partnerAttemptsForbidden({
+      packageTypes: { ok: true, httpStatus: 200, rows: 1 },
+      parentPackages: { ok: false, httpStatus: 403, rows: 0 }
+    }),
+    false
+  );
+  assert.ok(PARTNER_PACKAGE_FORBIDDEN_MESSAGE.includes("Manage Account"));
+  {
+    const previousPartner = process.env.GINGR_PARTNER_API_KEY;
+    const previousTl = process.env.TL_GINGR_KEY;
+    const previousApi = process.env.GINGR_API_KEY;
+    process.env.TL_GINGR_KEY = "users-key";
+    process.env.GINGR_API_KEY = "users-key";
+    process.env.GINGR_PARTNER_API_KEY = "users-key";
+    assert.equal(isGingrPartnerApiKeyDistinctFromUsersKey(), false);
+    process.env.GINGR_PARTNER_API_KEY = "manage-account-key";
+    assert.equal(isGingrPartnerApiKeyDistinctFromUsersKey(), true);
+    if (previousPartner == null) delete process.env.GINGR_PARTNER_API_KEY;
+    else process.env.GINGR_PARTNER_API_KEY = previousPartner;
+    if (previousTl == null) delete process.env.TL_GINGR_KEY;
+    else process.env.TL_GINGR_KEY = previousTl;
+    if (previousApi == null) delete process.env.GINGR_API_KEY;
+    else process.env.GINGR_API_KEY = previousApi;
+  }
 
   // No privileged Gingr or Supabase material may reach the browser.
   for (const path of [
