@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureRuffopsChecklistSchema } from "@/lib/ruffops-checklist/ensure-schema";
+import { isCastDisplayOpenHours } from "@/lib/remote-cast/hours";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
 
@@ -12,6 +13,15 @@ export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret || auth !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Overnight standby: skip Gingr + Supabase sync while TVs are off (5:30 AM–10:00 PM PT).
+  if (!isCastDisplayOpenHours()) {
+    return NextResponse.json({
+      ok: true,
+      skipped: true,
+      reason: "Cast display hours closed (standby overnight)."
+    });
   }
 
   try {

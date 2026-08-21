@@ -203,7 +203,7 @@ export function RemoteCastPanel() {
         <h2 className="admin-page-title">Remote Whiteboard Cast</h2>
         <p className="admin-page-subtitle">Control Fitdog lobby and staff whiteboards from anywhere.</p>
         <p className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-sm text-emerald-100">
-          Schedule: displays auto-wake 5:00 AM–10:00 PM Pacific, 7 days a week, and go to standby overnight.
+          Schedule: displays auto-wake 5:30 AM–10:00 PM Pacific, 7 days a week, and go to standby overnight.
           No manual refresh is required for the morning power-on (receiver page must stay open on the TV).
         </p>
         <p className="mt-3 admin-surface-inset p-3 text-sm text-admin-muted">

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   getCastDisplaySchedulePhase,
   isCastDisplayMorningOpenWindow,
@@ -31,17 +33,21 @@ function atPacificParts(year: number, month: number, day: number, hour: number, 
   return guess;
 }
 
-const openMorning = atPacificParts(2026, 7, 13, 5, 0);
+const beforeOpen = atPacificParts(2026, 7, 13, 5, 0);
+const almostOpen = atPacificParts(2026, 7, 13, 5, 29);
+const openMorning = atPacificParts(2026, 7, 13, 5, 30);
 const openAfternoon = atPacificParts(2026, 7, 13, 14, 30);
 const nearClose = atPacificParts(2026, 7, 13, 21, 59);
 const closedNight = atPacificParts(2026, 7, 13, 22, 0);
 const closedLate = atPacificParts(2026, 7, 14, 2, 0);
 const sundayOpen = atPacificParts(2026, 7, 12, 9, 0); // Sunday
 
-assert.equal(isCastDisplayOpenHours(openMorning), true);
+assert.equal(isCastDisplayOpenHours(beforeOpen), false, "5:00 AM is still closed");
+assert.equal(isCastDisplayOpenHours(almostOpen), false, "5:29 AM is still closed");
+assert.equal(isCastDisplayOpenHours(openMorning), true, "5:30 AM opens");
 assert.equal(isCastDisplayOpenHours(openAfternoon), true);
 assert.equal(isCastDisplayOpenHours(nearClose), true);
-assert.equal(isCastDisplayOpenHours(closedNight), false);
+assert.equal(isCastDisplayOpenHours(closedNight), false, "10:00 PM closes");
 assert.equal(isCastDisplayOpenHours(closedLate), false);
 assert.equal(isCastDisplayOpenHours(sundayOpen), true, "runs 7 days a week");
 
@@ -49,8 +55,22 @@ assert.equal(getCastDisplaySchedulePhase(openAfternoon), "open");
 assert.equal(getCastDisplaySchedulePhase(closedNight), "closed");
 
 assert.equal(isCastDisplayMorningOpenWindow(openMorning), true);
-assert.equal(isCastDisplayMorningOpenWindow(atPacificParts(2026, 7, 13, 5, 14)), true);
-assert.equal(isCastDisplayMorningOpenWindow(atPacificParts(2026, 7, 13, 5, 15)), false);
+assert.equal(isCastDisplayMorningOpenWindow(atPacificParts(2026, 7, 13, 5, 44)), true);
+assert.equal(isCastDisplayMorningOpenWindow(atPacificParts(2026, 7, 13, 5, 45)), false);
+assert.equal(isCastDisplayMorningOpenWindow(beforeOpen), false);
 assert.equal(isCastDisplayMorningOpenWindow(openAfternoon), false);
+
+{
+  const cron = readFileSync(join(process.cwd(), "app/api/cron/tl-digi-board-sync/route.ts"), "utf8");
+  assert.match(cron, /isCastDisplayOpenHours/);
+  assert.match(cron, /skipped:\s*true/);
+
+  const schedule = readFileSync(join(process.cwd(), "lib/remote-cast/schedule.ts"), "utf8");
+  assert.match(schedule, /tl_alerts_reminders/);
+
+  const gate = readFileSync(join(process.cwd(), "components/display/DisplayClosedHoursGate.tsx"), "utf8");
+  assert.match(gate, /DisplayClosedHoursGate/);
+  assert.match(gate, /isCastDisplayOpenHours/);
+}
 
 console.log("cast display schedule hours: ok");
