@@ -14,6 +14,19 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 type RouteContext = { params: Promise<{ itemId: string }> };
 
+type PhotoItemRow = {
+  id: string;
+  original_filename: string | null;
+  original_storage_path: string | null;
+  thumbnail_storage_path: string | null;
+  gingr_ready_storage_path: string | null;
+  mime_type: string | null;
+  media_kind: string | null;
+  status: string | null;
+};
+
+type ItemLookup = { kind: "ok"; item: PhotoItemRow | null } | { kind: "timeout" };
+
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { itemId } = await context.params;
@@ -22,8 +35,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
 
     const supabase = getServiceSupabase({ timeoutMs: STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS });
-    const timedOut = Symbol("staff-idle-media-timeout");
-    const itemOrTimeout = await withTimeoutFallback(
+    const lookup = await withTimeoutFallback<ItemLookup>(
       Promise.resolve(
         supabase
           .from("photo_upload_items")
@@ -32,18 +44,18 @@ export async function GET(_request: Request, context: RouteContext) {
           )
           .eq("id", itemId)
           .maybeSingle()
-      ).then(({ data, error }) => {
+      ).then(({ data, error }): ItemLookup => {
         if (error) throw new Error(error.message || "Unable to load photo.");
-        return data;
+        return { kind: "ok", item: (data as PhotoItemRow | null) ?? null };
       }),
       STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS,
-      timedOut
+      { kind: "timeout" }
     );
 
-    if (itemOrTimeout === timedOut) {
+    if (lookup.kind === "timeout") {
       return NextResponse.json({ error: "Photo timed out." }, { status: 504 });
     }
-    const item = itemOrTimeout;
+    const item = lookup.item;
     if (!item) {
       return NextResponse.json({ error: "Photo not found." }, { status: 404 });
     }
