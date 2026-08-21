@@ -10,6 +10,8 @@
   min-height: 100vh;
   margin: 0;
   padding: 1.5rem 2rem 2.5rem;
+  display: flex;
+  flex-direction: column;
   background:
     radial-gradient(1200px 600px at 10% -10%, rgba(63, 208, 201, 0.12), transparent 60%),
     radial-gradient(900px 500px at 100% 0%, rgba(255, 92, 92, 0.08), transparent 55%),
@@ -183,19 +185,45 @@
   /* Medications carry more columns, so they get the wider track. */
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
   gap: 1rem;
-  align-items: start;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
-/* Right column: Additional Services above Package Group Walks. */
+.tl-board__split > .tl-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Right column: Additional Services, then Daily Team Reminders when shown. */
 .tl-board__stack {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .tl-board__stack .tl-panel {
   min-height: 0;
+}
+
+.tl-board__stack .tl-panel--services {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tl-board__stack--services-expanded .tl-panel--services {
+  flex: 1 1 auto;
+}
+
+.tl-board__stack .tl-panel--reminders {
+  flex: 0 0 auto;
 }
 
 .tl-panel {
@@ -204,6 +232,10 @@
   border-radius: 1rem;
   padding: 1rem 1rem 1.1rem;
   min-height: 12rem;
+}
+
+.tl-panel--reminders {
+  min-height: 0;
 }
 
 .tl-panel__head {
@@ -224,7 +256,17 @@
 }
 
 .tl-table-wrap {
-  overflow: auto;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.tl-services-page {
+  margin: 0 0 0.45rem;
+  color: var(--tl-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .tl-table {
@@ -250,6 +292,15 @@
   vertical-align: middle;
 }
 
+.tl-table--services-dense tbody td {
+  padding: 0.45rem 0.55rem;
+}
+
+.tl-table--services-dense .tl-table__photo {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
 .tl-table__row--needs {
   background: linear-gradient(90deg, rgba(245, 185, 66, 0.12), transparent 55%);
 }
@@ -260,16 +311,6 @@
 
 .tl-table__row--service {
   background: linear-gradient(90deg, rgba(63, 208, 201, 0.08), transparent 50%);
-}
-
-.tl-table__row--walk {
-  background: linear-gradient(90deg, rgba(62, 207, 142, 0.1), transparent 50%);
-}
-
-.tl-table__package {
-  color: var(--tl-text);
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .tl-table__dog {
@@ -647,42 +688,42 @@
   font-weight: 750;
 }
 
-.tl-reminders {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.tl-reminder {
-  background: var(--tl-panel);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 0.9rem;
-  padding: 0.9rem 1rem;
-}
-
-.tl-reminder__time {
+.tl-team-reminders {
+  list-style: none;
   margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.tl-team-reminders__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.45rem 0.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.tl-team-reminders__item:last-child {
+  border-bottom: none;
+}
+
+.tl-team-reminders__mark {
+  flex: 0 0 auto;
   color: var(--tl-cyan);
   font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.tl-reminder__title {
-  margin: 0.35rem 0 0.25rem;
-  font-size: 1rem;
-}
-
-.tl-reminder__message {
-  margin: 0;
-  color: var(--tl-muted);
-  font-size: 0.88rem;
   line-height: 1.35;
+}
+
+.tl-team-reminders__text {
+  font-size: 1.05rem;
+  line-height: 1.35;
+  font-weight: 600;
 }
 
 @media (max-width: 1200px) {
   .tl-board__header,
   .tl-board__stats,
-  .tl-reminders,
   .tl-board__split {
     grid-template-columns: 1fr 1fr;
   }
@@ -702,8 +743,7 @@
     padding: 1rem;
   }
   .tl-board__header,
-  .tl-board__stats,
-  .tl-reminders {
+  .tl-board__stats {
     grid-template-columns: 1fr;
   }
 }

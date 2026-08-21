@@ -781,14 +781,16 @@ assert.equal(canAccessAdminTab(null, "package_group_walks", "marketing", "market
   assert.match(panel, /All Package Group Walks Clear/);
   assert.match(panel, /Unable to verify Package Group Walk eligibility/);
   assert.match(panel, /visibilitychange/);
-  // TEST 10 — whiteboard removes the dog without a manual reload.
+  // TEST 10 — TL whiteboard no longer surfaces Package Group Walks (admin panel still does).
   const board = source("components/boards/TlAlertsRemindersBoard.tsx");
-  assert.match(board, /package-group-walks/);
-  assert.match(board, /Unable to verify \{errorNoun\}/);
-  assert.match(board, /errorNoun="Package Group Walk eligibility"/);
-  assert.match(board, /packageGroupWalkOwnershipErrorDetail/);
-  assert.match(board, /completedWalkAnimalIds/);
+  assert.doesNotMatch(board, /Package Group Walks/);
+  assert.doesNotMatch(board, /package-group-walks/);
+  assert.doesNotMatch(board, /errorNoun="Package Group Walk eligibility"/);
+  assert.doesNotMatch(board, /packageGroupWalkOwnershipErrorDetail/);
+  assert.doesNotMatch(board, /completedWalkAnimalIds/);
   assert.doesNotMatch(board, /window\.location\.reload/);
+  assert.match(board, /Unable to verify \{errorNoun\}/);
+  assert.match(board, /Daily Team Reminders/);
 
   const gingrPackages = source("lib/package-group-walks/gingr-packages.ts");
   assert.match(gingrPackages, /PARTNER_PACKAGE_FORBIDDEN_MESSAGE/);
