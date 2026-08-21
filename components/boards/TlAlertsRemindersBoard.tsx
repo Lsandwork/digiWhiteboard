@@ -53,7 +53,7 @@ const TL_BOARD_LAST_GOOD_KEY = "fitdog-tl-board-last-good";
 
 /** Passive TV pagination for unusually long Additional Services lists. */
 const TL_SERVICES_PAGE_INTERVAL_MS = 10_000;
-const TL_SERVICES_PAGE_SIZE_WITH_REMINDERS = 8;
+const TL_SERVICES_PAGE_SIZE_WITH_REMINDERS = 6;
 const TL_SERVICES_PAGE_SIZE_EXPANDED = 14;
 
 function readStoredTlBoard(): BoardPayload | null {
@@ -506,6 +506,9 @@ function BoardInner() {
     ? TL_SERVICES_PAGE_SIZE_WITH_REMINDERS
     : TL_SERVICES_PAGE_SIZE_EXPANDED;
   const servicePages = usePassiveServicePages(serviceRows, servicesPageSize, TL_SERVICES_PAGE_INTERVAL_MS);
+  const servicesDense =
+    (showDailyTeamReminders && serviceRows.length >= 4) ||
+    (!showDailyTeamReminders && serviceRows.length >= 8);
   const medCard = resolveTlCardKind({
     phase,
     health: meta?.medicationsHealth,
@@ -654,9 +657,7 @@ function BoardInner() {
                   </p>
                 ) : null}
                 <table
-                  className={`tl-table tl-table--services${
-                    !showDailyTeamReminders && serviceRows.length >= 8 ? " tl-table--services-dense" : ""
-                  }`}
+                  className={`tl-table tl-table--services${servicesDense ? " tl-table--services-dense" : ""}`}
                 >
                   <thead>
                     <tr>
