@@ -24,17 +24,18 @@ export async function GET(_request: Request, context: RouteContext) {
     const supabase = getServiceSupabase({ timeoutMs: STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS });
     const timedOut = Symbol("staff-idle-media-timeout");
     const itemOrTimeout = await withTimeoutFallback(
-      supabase
-        .from("photo_upload_items")
-        .select(
-          "id, original_filename, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, mime_type, media_kind, status"
-        )
-        .eq("id", itemId)
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (error) throw new Error(error.message || "Unable to load photo.");
-          return data;
-        }),
+      Promise.resolve(
+        supabase
+          .from("photo_upload_items")
+          .select(
+            "id, original_filename, original_storage_path, thumbnail_storage_path, gingr_ready_storage_path, mime_type, media_kind, status"
+          )
+          .eq("id", itemId)
+          .maybeSingle()
+      ).then(({ data, error }) => {
+        if (error) throw new Error(error.message || "Unable to load photo.");
+        return data;
+      }),
       STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS,
       timedOut
     );
