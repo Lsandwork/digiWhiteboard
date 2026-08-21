@@ -55,10 +55,16 @@ function layout(
     join(process.cwd(), "components/board/StaffBoardEmptyState.tsx"),
     "utf8"
   );
-  assert.match(emptyStateSource, /No dogs are currently checking/);
-  assert.match(emptyStateSource, /in \/ out\./);
-  assert.match(emptyStateSource, /Arrivals and departures will appear here automatically\./);
-  assert.match(emptyStateSource, /\/api\/staff\/idle-slideshow/);
+  assert.match(emptyStateSource, /All Clear,/);
+  assert.match(emptyStateSource, /Team\./);
+  assert.match(emptyStateSource, /No check-ins or check-outs right now\./);
+  assert.match(emptyStateSource, /Catch your breath, then go make some tails wag\./);
+  assert.match(emptyStateSource, /Hydrate\./);
+  assert.match(emptyStateSource, /The next pup is always plotting something\./);
+  assert.match(emptyStateSource, /all-clear-mockup\.jpg/);
+  assert.match(emptyStateSource, /staff-all-clear__exact-art/);
+  assert.doesNotMatch(emptyStateSource, /\/api\/staff\/idle-slideshow/);
+  assert.doesNotMatch(emptyStateSource, /Loading media library photos/);
 }
 
 // 6. Empty opposite panel is not present in single-panel mode.

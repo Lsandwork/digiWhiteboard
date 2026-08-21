@@ -1,214 +1,97 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import Image from "next/image";
-import { useDisplaySync } from "@/hooks/useDisplaySync";
-import {
-  STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS,
-  STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
-  STAFF_IDLE_SLIDESHOW_POLL_MS,
-  STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS,
-  visibleStaffIdleSlideIndexes,
-  type StaffIdleSlideshowSlide
-} from "@/lib/staff/idle-slideshow";
+import { RefreshCw } from "lucide-react";
+import { formatBoardTime } from "@/lib/board-utils";
 
-const ASSET_BASE = "/assets/fitdog/staff-empty-state";
+const EXACT_MOCKUP = "/assets/fitdog/staff-empty-state/all-clear-mockup.jpg";
 
-type SlideshowLoadState = "loading" | "ready" | "empty";
+type ConnectionState = "connecting" | "live" | "polling" | "offline";
 
-function FallbackEmptyCopy() {
-  return (
-    <>
-      <div className="staff-board-empty-state__icon-wrap" aria-hidden="true">
-        <Image
-          src={`${ASSET_BASE}/fitdog-empty-in-out-icon.svg`}
-          alt=""
-          width={112}
-          height={112}
-          className="staff-board-empty-state__icon"
-          priority
-        />
-      </div>
+type StaffBoardEmptyStateProps = {
+  connection?: ConnectionState;
+  clockTime?: string;
+  clockDate?: string;
+  lastUpdated?: string;
+  onSlideshowReady?: () => void;
+};
 
-      <h2 className="staff-board-empty-state__headline">
-        No dogs are currently checking{" "}
-        <span className="staff-board-empty-state__accent">in / out.</span>
-      </h2>
-
-      <p className="staff-board-empty-state__support">
-        Arrivals and departures will appear here automatically.
-      </p>
-
-      <div className="staff-board-empty-state__landscape" aria-hidden="true">
-        <Image
-          src={`${ASSET_BASE}/fitdog-empty-landscape-orange.svg`}
-          alt=""
-          width={960}
-          height={280}
-          className="staff-board-empty-state__landscape-art"
-        />
-      </div>
-
-      <div className="staff-board-empty-state__paw" aria-hidden="true">
-        <Image
-          src={`${ASSET_BASE}/fitdog-empty-paw-divider.svg`}
-          alt=""
-          width={48}
-          height={48}
-          className="staff-board-empty-state__paw-icon"
-        />
-      </div>
-    </>
-  );
+function splitClockTime(clockTime: string) {
+  const trimmed = clockTime.trim();
+  const match = trimmed.match(/^(.+?)\s*(AM|PM)$/i);
+  if (!match) return { time: trimmed, meridiem: "" };
+  return { time: match[1]!.trim(), meridiem: match[2]!.toUpperCase() };
 }
 
-export function StaffBoardEmptyState({ onSlideshowReady }: { onSlideshowReady?: () => void }) {
-  const [slides, setSlides] = useState<StaffIdleSlideshowSlide[]>([]);
-  const [loadState, setLoadState] = useState<SlideshowLoadState>("loading");
-  const [index, setIndex] = useState(0);
-  const [reduceMotion, setReduceMotion] = useState(false);
-  const inFlightRef = useRef(false);
+function liveLabel(connection: ConnectionState) {
+  if (connection === "offline") return "OFFLINE";
+  if (connection === "connecting") return "CONNECTING";
+  return "LIVE";
+}
 
-  const loadSlides = useCallback(async () => {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS);
-    try {
-      const response = await fetch("/api/staff/idle-slideshow", {
-        cache: "no-store",
-        signal: controller.signal
-      });
-      const body = (await response.json()) as {
-        slides?: StaffIdleSlideshowSlide[];
-        healthy?: boolean;
-        retrying?: boolean;
-        error?: string;
-      };
-      const next =
-        response.ok && Array.isArray(body.slides) ? body.slides.filter((slide) => slide?.src) : [];
-      setSlides(next);
-      if (next.length) {
-        setLoadState("ready");
-        onSlideshowReady?.();
-        return;
-      }
-      // Never leave the TV stuck on "Loading media library photos…" — empty is free.
-      setLoadState("empty");
-    } catch {
-      setSlides([]);
-      setLoadState("empty");
-    } finally {
-      window.clearTimeout(timer);
-      inFlightRef.current = false;
-    }
+/**
+ * Staff board empty state — the approved All Clear mockup, rendered exactly.
+ * Live clock / sync chip overlay the baked-in header so the TV stays current
+ * without drifting from the designed artwork. No media-library slideshow.
+ */
+export function StaffBoardEmptyState({
+  connection = "live",
+  clockTime = "--:--",
+  clockDate = "",
+  lastUpdated,
+  onSlideshowReady
+}: StaffBoardEmptyStateProps) {
+  const { time, meridiem } = useMemo(() => splitClockTime(clockTime), [clockTime]);
+  const isHealthy = connection === "live" || connection === "polling";
+
+  useEffect(() => {
+    onSlideshowReady?.();
   }, [onSlideshowReady]);
-
-  useEffect(() => {
-    void loadSlides();
-  }, [loadSlides]);
-
-  useDisplaySync({
-    enabled: true,
-    onContentUpdate: () => {
-      void loadSlides();
-    }
-  });
-
-  useEffect(() => {
-    const pollMs = loadState === "ready" ? STAFF_IDLE_SLIDESHOW_POLL_MS : STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS;
-    const timer = window.setInterval(() => {
-      void loadSlides();
-    }, pollMs);
-    return () => window.clearInterval(timer);
-  }, [loadSlides, loadState]);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduceMotion(media.matches);
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-
-  useEffect(() => {
-    setIndex((current) => (slides.length ? current % slides.length : 0));
-  }, [slides.length]);
-
-  useEffect(() => {
-    if (reduceMotion || slides.length < 2) return;
-    const timer = window.setInterval(() => {
-      setIndex((current) => (current + 1) % slides.length);
-    }, STAFF_IDLE_SLIDESHOW_INTERVAL_MS);
-    return () => window.clearInterval(timer);
-  }, [reduceMotion, slides.length]);
-
-  const hasSlideshow = loadState === "ready" && slides.length > 0;
-  const active = slides[index] ?? slides[0];
-  const visibleIndexes = visibleStaffIdleSlideIndexes(index, slides.length);
 
   return (
     <section
-      className={`staff-board-empty-state ${hasSlideshow ? "staff-board-empty-state--slideshow" : ""}`}
-      aria-label={
-        hasSlideshow
-          ? "Media library slideshow"
-          : loadState === "loading"
-            ? "Loading media library photos"
-            : "No active check-ins or check-outs"
-      }
+      className="staff-all-clear"
+      aria-label="All Clear — no active check-ins or check-outs"
       data-staff-board-layout="empty"
-      data-staff-idle-slideshow={hasSlideshow ? "active" : loadState === "loading" ? "loading" : "fallback"}
+      data-staff-idle-slideshow="fallback"
     >
-      {loadState === "loading" ? (
-        <div className="staff-board-empty-state__panel">
-          <p className="staff-board-empty-state__support">Loading media library photos…</p>
+      <Image
+        src={EXACT_MOCKUP}
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="staff-all-clear__exact-art"
+        aria-hidden="true"
+      />
+
+      <div className="staff-all-clear__exact-chrome">
+        <div className={`staff-all-clear__live ${isHealthy ? "is-live" : "is-down"}`}>
+          <span className="staff-all-clear__live-dot" />
+          <div className="staff-all-clear__live-copy">
+            <strong>{liveLabel(connection)}</strong>
+            <span>{isHealthy ? "Board is active" : connection === "connecting" ? "Connecting…" : "Sync unavailable"}</span>
+          </div>
         </div>
-      ) : hasSlideshow ? (
-        <div className="staff-idle-slideshow" aria-live="off">
-          <div className="staff-idle-slideshow__frame">
-            {visibleIndexes.map((slideIndex) => {
-              const slide = slides[slideIndex];
-              if (!slide) return null;
-              return (
-                // Same-origin media proxy — <img> avoids Next image optimizer on TV.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={slide.id}
-                  src={slide.src}
-                  alt=""
-                  className={`staff-idle-slideshow__image ${slideIndex === index ? "is-active" : ""}`}
-                  decoding="async"
-                  fetchPriority={slideIndex === index ? "high" : "low"}
-                />
-              );
-            })}
+
+        <div className="staff-all-clear__clock" aria-live="polite">
+          <div className="staff-all-clear__time">
+            <span className="staff-all-clear__time-digits">{time}</span>
+            {meridiem ? <span className="staff-all-clear__time-meridiem">{meridiem}</span> : null}
           </div>
-          {active ? <p className="sr-only">{active.alt}</p> : null}
+          <div className="staff-all-clear__date">{clockDate}</div>
         </div>
-      ) : (
-        <>
-          <div className="staff-board-empty-state__panel">
-            <FallbackEmptyCopy />
-          </div>
-          <div className="staff-board-empty-state__quiet" role="status">
-            <Image
-              src={`${ASSET_BASE}/fitdog-empty-quiet-heart.svg`}
-              alt=""
-              width={28}
-              height={28}
-              className="staff-board-empty-state__quiet-icon"
-              aria-hidden="true"
-            />
-            <div>
-              <p className="staff-board-empty-state__quiet-title">All quiet right now</p>
-              <p className="staff-board-empty-state__quiet-caption">
-                No active arrivals or departures at the moment.
-              </p>
-            </div>
-          </div>
-        </>
-      )}
+
+        <div className="staff-all-clear__updated">
+          <RefreshCw className="staff-all-clear__updated-icon" aria-hidden="true" />
+          <span>Last updated {formatBoardTime(lastUpdated)}</span>
+        </div>
+      </div>
+
+      <p className="sr-only">
+        All Clear, Team. No check-ins or check-outs right now. Catch your breath, then go make some tails wag. Hydrate. Reset. The next pup is always plotting something.
+      </p>
     </section>
   );
 }
