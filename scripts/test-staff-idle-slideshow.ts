@@ -121,32 +121,23 @@ assert.equal(
 }
 
 {
+  // Empty staff board uses the All Clear mockup composition — not media-library slideshow.
   const emptyState = source("components/board/StaffBoardEmptyState.tsx");
-  assert.match(emptyState, /\/api\/staff\/idle-slideshow/);
-  assert.match(emptyState, /visibleStaffIdleSlideIndexes/);
-  assert.match(emptyState, /No dogs are currently checking/);
-  assert.match(emptyState, /prefers-reduced-motion/);
-  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_POLL_MS/);
-  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS/);
-  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS/);
-  assert.match(emptyState, /AbortController/);
-  assert.match(emptyState, /Loading media library photos/);
-  assert.match(emptyState, /useDisplaySync/);
-  assert.match(emptyState, /loadState === "ready"/);
-  assert.match(emptyState, /setLoadState\("empty"\)/);
-  assert.doesNotMatch(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
+  assert.match(emptyState, /All Clear,/);
+  assert.match(emptyState, /staff-all-clear/);
+  assert.match(emptyState, /all-clear-mockup\.jpg/);
+  assert.match(emptyState, /Hydrate\./);
+  assert.match(emptyState, /onSlideshowReady/);
+  assert.doesNotMatch(emptyState, /\/api\/staff\/idle-slideshow/);
+  assert.doesNotMatch(emptyState, /Loading media library photos/);
+  assert.doesNotMatch(emptyState, /STAFF_IDLE_SLIDESHOW_POLL_MS/);
   assert.doesNotMatch(emptyState, /\/api\/admin\/photo-upload-queue/);
   assert.doesNotMatch(emptyState, /\/api\/lobby\/slideshow/);
-  // Failed/slow media library must not leave the board stuck in loading forever.
-  assert.doesNotMatch(emptyState, /setLoadState\("loading"\)[\s\S]*body\.retrying/);
 
   const css = source("app/globals.css");
-  assert.match(css, /\.staff-idle-slideshow__image[\s\S]*?object-fit:\s*contain/);
-  assert.match(css, /\.staff-idle-slideshow__image\.is-active/);
-  assert.match(
-    css,
-    /@media \(prefers-reduced-motion: reduce\) \{\s*\.staff-idle-slideshow__image \{\s*transition:\s*none;/
-  );
+  assert.match(css, /\.staff-all-clear\s*\{/);
+  assert.match(css, /\.staff-all-clear__exact-art/);
+  assert.match(css, /--all-clear-orange:\s*#ff6a00/);
 
   const boardClient = source("components/BoardClient.tsx");
   assert.match(boardClient, /staffBoardLayout\.showApprovedEmptyState/);
@@ -155,6 +146,7 @@ assert.equal(
   assert.match(boardClient, /staff-board-content--empty/);
   assert.match(boardClient, /staffBoardLayout\.showCheckInPanel/);
   assert.match(boardClient, /staffBoardLayout\.showCheckOutPanel/);
+  assert.match(boardClient, /clockTime=\{dateTime\.time\}/);
 
   const lobby = source("components/lobby/LobbyCheckoutBoard.tsx");
   assert.doesNotMatch(lobby, /StaffBoardEmptyState/);

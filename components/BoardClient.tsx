@@ -891,7 +891,8 @@ export function BoardClient({
           effectiveGroomingNotice ||
           effectiveTrainerNotice ||
           showCastFullscreen ||
-          showActivePushFullscreen
+          showActivePushFullscreen ||
+          staffBoardLayout.showApprovedEmptyState
         ) ? (
           <BoardHeader
             connection={connection}
@@ -979,7 +980,13 @@ export function BoardClient({
                 className="staff-board-content staff-board-content--empty min-h-0 h-full"
                 data-staff-board-layout="empty"
               >
-                <StaffBoardEmptyState onSlideshowReady={() => castKeeper?.markDataFresh()} />
+                <StaffBoardEmptyState
+                  connection={connection}
+                  clockTime={dateTime.time}
+                  clockDate={dateTime.date}
+                  lastUpdated={board.last_updated}
+                  onSlideshowReady={() => castKeeper?.markDataFresh()}
+                />
               </div>
             ) : (
               <div
@@ -1016,11 +1023,13 @@ export function BoardClient({
           </div>
         )}
 
-        <footer className="mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
-          <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
-          <span>Thank you for trusting us with your pups!</span>
-          <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
-        </footer>
+        {staffBoardLayout.showApprovedEmptyState ? null : (
+          <footer className="mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
+            <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
+            <span>Thank you for trusting us with your pups!</span>
+            <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
+          </footer>
+        )}
         </div>
       </TvLayoutCanvas>
 
