@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import {
+  STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS,
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
   STAFF_IDLE_SLIDESHOW_POLL_MS,
   STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS,
@@ -66,33 +67,40 @@ export function StaffBoardEmptyState({ onSlideshowReady }: { onSlideshowReady?: 
   const [loadState, setLoadState] = useState<SlideshowLoadState>("loading");
   const [index, setIndex] = useState(0);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const inFlightRef = useRef(false);
 
   const loadSlides = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS);
     try {
-      const response = await fetch("/api/staff/idle-slideshow", { cache: "no-store" });
+      const response = await fetch("/api/staff/idle-slideshow", {
+        cache: "no-store",
+        signal: controller.signal
+      });
       const body = (await response.json()) as {
         slides?: StaffIdleSlideshowSlide[];
         healthy?: boolean;
         retrying?: boolean;
         error?: string;
       };
-      const next = response.ok && Array.isArray(body.slides)
-        ? body.slides.filter((slide) => slide?.src)
-        : [];
+      const next =
+        response.ok && Array.isArray(body.slides) ? body.slides.filter((slide) => slide?.src) : [];
       setSlides(next);
       if (next.length) {
         setLoadState("ready");
         onSlideshowReady?.();
         return;
       }
-      if (body.healthy === false || body.retrying) {
-        setLoadState("loading");
-        return;
-      }
+      // Never leave the TV stuck on "Loading media library photos…" — empty is free.
       setLoadState("empty");
     } catch {
       setSlides([]);
-      setLoadState("loading");
+      setLoadState("empty");
+    } finally {
+      window.clearTimeout(timer);
+      inFlightRef.current = false;
     }
   }, [onSlideshowReady]);
 
@@ -108,7 +116,7 @@ export function StaffBoardEmptyState({ onSlideshowReady }: { onSlideshowReady?: 
   });
 
   useEffect(() => {
-    const pollMs = loadState === "loading" ? STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS : STAFF_IDLE_SLIDESHOW_POLL_MS;
+    const pollMs = loadState === "ready" ? STAFF_IDLE_SLIDESHOW_POLL_MS : STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS;
     const timer = window.setInterval(() => {
       void loadSlides();
     }, pollMs);

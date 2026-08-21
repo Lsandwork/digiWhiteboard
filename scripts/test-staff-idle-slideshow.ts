@@ -3,8 +3,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getStaffBoardLayoutState } from "../lib/staff/board-layout";
 import {
+  STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS,
+  STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS,
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
   STAFF_IDLE_SLIDESHOW_LIMIT,
+  STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS,
+  STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS,
+  STAFF_IDLE_SLIDESHOW_WARM_COOLDOWN_MS,
   shuffleStaffIdleSlides,
   staffIdleSlideshowMediaUrl,
   staffIdleSlideshowStoragePath,
@@ -17,6 +22,11 @@ function source(relativePath: string) {
 
 assert.equal(STAFF_IDLE_SLIDESHOW_INTERVAL_MS, 20000);
 assert.equal(STAFF_IDLE_SLIDESHOW_LIMIT, 24);
+assert.ok(STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS >= 60_000);
+assert.ok(STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS <= 5_000);
+assert.ok(STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS <= 8_000);
+assert.ok(STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS <= 8_000);
+assert.ok(STAFF_IDLE_SLIDESHOW_WARM_COOLDOWN_MS >= 60_000);
 
 {
   const shuffled = shuffleStaffIdleSlides(["a", "b", "c", "d"], () => 0);
@@ -81,16 +91,23 @@ assert.equal(
   assert.match(listRoute, /getOrLoadTtlCache|getTtlCache/);
   assert.match(listRoute, /warmStaffIdleSlideshowCacheInBackground|after\(/);
   assert.match(listRoute, /formatStaffIdleSlideshowLoadError/);
+  assert.match(listRoute, /withTimeoutFallback/);
+  assert.match(listRoute, /timeoutMs:\s*STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS/);
+  assert.match(listRoute, /STAFF_IDLE_SLIDESHOW_WARM_COOLDOWN_MS/);
   assert.match(listRoute, /slides:\s*\[\]/);
   assert.match(listRoute, /retrying:\s*true/);
   assert.doesNotMatch(listRoute, /status:\s*500/);
+  assert.match(listRoute, /maxDuration\s*=\s*15/);
 
   const mediaRoute = source("app/api/staff/idle-slideshow/media/[itemId]/route.ts");
   assert.match(mediaRoute, /UUID_RE/);
   assert.match(mediaRoute, /staffIdleSlideshowStoragePath/);
   assert.match(mediaRoute, /createPhotoSignedUrl/);
+  assert.match(mediaRoute, /withTimeoutFallback/);
+  assert.match(mediaRoute, /STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS/);
   assert.match(mediaRoute, /media_kind === "video"/);
   assert.match(mediaRoute, /status === "failed"/);
+  assert.match(mediaRoute, /maxDuration\s*=\s*15/);
 
   const loader = source("lib/staff/idle-slideshow.ts");
   assert.match(loader, /media_kind", "photo"/);
@@ -111,12 +128,17 @@ assert.equal(
   assert.match(emptyState, /prefers-reduced-motion/);
   assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_POLL_MS/);
   assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS/);
+  assert.match(emptyState, /STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS/);
+  assert.match(emptyState, /AbortController/);
   assert.match(emptyState, /Loading media library photos/);
   assert.match(emptyState, /useDisplaySync/);
   assert.match(emptyState, /loadState === "ready"/);
+  assert.match(emptyState, /setLoadState\("empty"\)/);
   assert.doesNotMatch(emptyState, /STAFF_IDLE_SLIDESHOW_START_DELAY_MS/);
   assert.doesNotMatch(emptyState, /\/api\/admin\/photo-upload-queue/);
   assert.doesNotMatch(emptyState, /\/api\/lobby\/slideshow/);
+  // Failed/slow media library must not leave the board stuck in loading forever.
+  assert.doesNotMatch(emptyState, /setLoadState\("loading"\)[\s\S]*body\.retrying/);
 
   const css = source("app/globals.css");
   assert.match(css, /\.staff-idle-slideshow__image[\s\S]*?object-fit:\s*contain/);

@@ -1,12 +1,14 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { getOrLoadTtlCache, getTtlCache } from "@/lib/server-ttl-cache";
+import { getOrLoadTtlCache, getTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import {
   STAFF_IDLE_SLIDESHOW_CACHE_KEY,
   STAFF_IDLE_SLIDESHOW_CACHE_TTL_MS,
+  STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS,
   STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
   STAFF_IDLE_SLIDESHOW_LAST_GOOD_KEY,
+  STAFF_IDLE_SLIDESHOW_WARM_COOLDOWN_MS,
   formatStaffIdleSlideshowLoadError,
   loadStaffIdleSlideshowSlides,
   storeStaffIdleSlideshowPayload,
@@ -14,7 +16,10 @@ import {
 } from "@/lib/staff/idle-slideshow";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+/** Keep well under a hung Supabase round-trip so idle boards cannot pin Vercel workers. */
+export const maxDuration = 15;
+
+let lastWarmAt = 0;
 
 function jsonHeaders(stale = false) {
   return {
@@ -25,14 +30,29 @@ function jsonHeaders(stale = false) {
 }
 
 function warmStaffIdleSlideshowCacheInBackground() {
+  const now = Date.now();
+  if (now - lastWarmAt < STAFF_IDLE_SLIDESHOW_WARM_COOLDOWN_MS) return;
+  lastWarmAt = now;
   after(async () => {
     try {
-      const slides = await loadStaffIdleSlideshowSlides(getServiceSupabase());
+      const slides = await loadStaffIdleSlideshowSlides(
+        getServiceSupabase({ timeoutMs: STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS })
+      );
       storeStaffIdleSlideshowPayload(slides);
     } catch (error) {
       console.error("[staff-idle-slideshow] background warm failed:", formatStaffIdleSlideshowLoadError(error));
     }
   });
+}
+
+function emptyRetryingPayload(error: string): StaffIdleSlideshowPayload {
+  return {
+    slides: [],
+    intervalMs: STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
+    healthy: false,
+    retrying: true,
+    error
+  };
 }
 
 export async function GET() {
@@ -54,24 +74,32 @@ export async function GET() {
   }
 
   try {
-    const slides = await getOrLoadTtlCache(STAFF_IDLE_SLIDESHOW_CACHE_KEY, STAFF_IDLE_SLIDESHOW_CACHE_TTL_MS, () =>
-      loadStaffIdleSlideshowSlides(getServiceSupabase())
+    const supabase = getServiceSupabase({ timeoutMs: STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS });
+    const slides = await withTimeoutFallback(
+      getOrLoadTtlCache(STAFF_IDLE_SLIDESHOW_CACHE_KEY, STAFF_IDLE_SLIDESHOW_CACHE_TTL_MS, () =>
+        loadStaffIdleSlideshowSlides(supabase)
+      ),
+      STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS + 500,
+      null
     );
+
+    if (!slides) {
+      warmStaffIdleSlideshowCacheInBackground();
+      return NextResponse.json(
+        emptyRetryingPayload("Media library slideshow timed out. Showing empty board until the next quiet retry."),
+        { status: 200, headers: jsonHeaders(true) }
+      );
+    }
+
     const payload = storeStaffIdleSlideshowPayload(slides);
     return NextResponse.json(payload, { headers: jsonHeaders() });
   } catch (error) {
     const message = formatStaffIdleSlideshowLoadError(error);
     console.error("[staff-idle-slideshow] load failed:", message);
     warmStaffIdleSlideshowCacheInBackground();
-    return NextResponse.json(
-      {
-        slides: [],
-        intervalMs: STAFF_IDLE_SLIDESHOW_INTERVAL_MS,
-        healthy: false,
-        retrying: true,
-        error: message
-      },
-      { status: 200, headers: jsonHeaders(true) }
-    );
+    return NextResponse.json(emptyRetryingPayload(message), {
+      status: 200,
+      headers: jsonHeaders(true)
+    });
   }
 }
