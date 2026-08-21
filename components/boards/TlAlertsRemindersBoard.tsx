@@ -89,22 +89,18 @@ function payloadHasRows(payload: BoardPayload | null) {
 }
 
 function usePassiveServicePages<T>(items: T[], pageSize: number, intervalMs: number) {
-  const pageCount = Math.max(1, Math.ceil(items.length / pageSize) || 1);
-  const [pageIndex, setPageIndex] = useState(0);
-
-  useEffect(() => {
-    setPageIndex(0);
-  }, [items.length, pageSize]);
+  const pageCount = Math.max(1, items.length === 0 ? 1 : Math.ceil(items.length / pageSize));
+  const [pageTick, setPageTick] = useState(0);
 
   useEffect(() => {
     if (pageCount <= 1) return;
     const id = window.setInterval(() => {
-      setPageIndex((previous) => (previous + 1) % pageCount);
+      setPageTick((previous) => previous + 1);
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [pageCount, intervalMs]);
+  }, [pageCount, intervalMs, items.length, pageSize]);
 
-  const safePage = Math.min(pageIndex, pageCount - 1);
+  const safePage = pageTick % pageCount;
   const start = safePage * pageSize;
   const end = Math.min(start + pageSize, items.length);
   return {
