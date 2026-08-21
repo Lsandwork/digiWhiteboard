@@ -4,8 +4,17 @@ export const STAFF_IDLE_SLIDESHOW_INTERVAL_MS = 20_000;
 export const STAFF_IDLE_SLIDESHOW_LIMIT = 24;
 /** Poll for newly uploaded media library photos while the board is idle. */
 export const STAFF_IDLE_SLIDESHOW_POLL_MS = 60_000;
-/** Retry sooner while the API is still warming the slideshow cache. */
-export const STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS = 15_000;
+/**
+ * After a failed/slow media-library read, wait this long before asking again.
+ * Aggressive retries were stacking 40–60s Vercel+Supabase calls on the staff board.
+ */
+export const STAFF_IDLE_SLIDESHOW_RETRY_POLL_MS = 5 * 60_000;
+/** Hard budget for the list API — never wait on a hung Supabase round-trip. */
+export const STAFF_IDLE_SLIDESHOW_DB_TIMEOUT_MS = 4_000;
+/** Browser abort for `/api/staff/idle-slideshow` so the empty state is not stuck on "Loading…". */
+export const STAFF_IDLE_SLIDESHOW_CLIENT_FETCH_TIMEOUT_MS = 6_000;
+/** Media proxy budget — prefer a fast miss over a hung TV frame. */
+export const STAFF_IDLE_SLIDESHOW_MEDIA_TIMEOUT_MS = 5_000;
 /** In-memory list cache — cuts Supabase REST load from board polling. */
 export const STAFF_IDLE_SLIDESHOW_CACHE_TTL_MS = 60_000;
 export const STAFF_IDLE_SLIDESHOW_LAST_GOOD_TTL_MS = 600_000;
@@ -13,6 +22,8 @@ export const STAFF_IDLE_SLIDESHOW_CACHE_KEY = "staff-idle-slideshow:list";
 export const STAFF_IDLE_SLIDESHOW_LAST_GOOD_KEY = "staff-idle-slideshow:last-good";
 /** Only scan recent uploads — full-table order-by was timing out in production. */
 export const STAFF_IDLE_SLIDESHOW_LOOKBACK_DAYS = 180;
+/** Minimum gap between background cache warms after a miss/timeout. */
+export const STAFF_IDLE_SLIDESHOW_WARM_COOLDOWN_MS = 5 * 60_000;
 
 export type StaffIdleSlideshowSlide = {
   id: string;
