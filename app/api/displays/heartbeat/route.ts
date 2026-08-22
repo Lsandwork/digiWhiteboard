@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
+import { parseDisplayType, type HeartbeatRequest } from "@/lib/display-keeper";
 import { buildHeartbeatResponse } from "@/lib/display-keeper-server";
-import type { DisplayType, HeartbeatRequest } from "@/lib/display-keeper";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-
-function parseDisplayType(value: unknown): DisplayType | null {
-  if (value === "staff_whiteboard" || value === "lobby_whiteboard") return value;
-  return null;
-}
 
 export async function POST(request: Request) {
   try {

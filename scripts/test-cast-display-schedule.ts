@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseDisplayType } from "../lib/display-keeper";
 import {
   getCastDisplaySchedulePhase,
   isCastDisplayMorningOpenWindow,
@@ -71,6 +72,15 @@ assert.equal(isCastDisplayMorningOpenWindow(openAfternoon), false);
   const gate = readFileSync(join(process.cwd(), "components/display/DisplayClosedHoursGate.tsx"), "utf8");
   assert.match(gate, /DisplayClosedHoursGate/);
   assert.match(gate, /isCastDisplayOpenHours/);
+
+  assert.equal(parseDisplayType("tl_alerts_reminders"), "tl_alerts_reminders");
+  assert.equal(parseDisplayType("staff_whiteboard"), "staff_whiteboard");
+  assert.equal(parseDisplayType("lobby_whiteboard"), "lobby_whiteboard");
+  assert.equal(parseDisplayType("nope"), null);
+
+  const heartbeat = readFileSync(join(process.cwd(), "app/api/displays/heartbeat/route.ts"), "utf8");
+  assert.match(heartbeat, /parseDisplayType/);
+  assert.doesNotMatch(heartbeat, /staff_whiteboard\" \|\| value === \"lobby_whiteboard\"/);
 }
 
 console.log("cast display schedule hours: ok");
