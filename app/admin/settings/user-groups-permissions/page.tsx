@@ -4,7 +4,7 @@ import { UserGroupsPermissionsPage } from "@/components/admin/UserGroupsPermissi
 import { ToastProvider } from "@/components/admin/ui/ToastProvider";
 import { isSuperAdminAccess, isSuperAdminLegacyRole } from "@/lib/admin/permissions";
 import { getAdminSession } from "@/lib/admin/session";
-import { getUserAccess } from "@/lib/admin/user-access";
+import { resolveSessionAccess } from "@/lib/admin/resolve-user-access";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -16,9 +16,7 @@ export default async function UserGroupsPermissionsRoutePage() {
   }
 
   const supabase = getServiceSupabase();
-  const access = session.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
+  const access = await resolveSessionAccess(session, supabase);
 
   const allowed = isSuperAdminLegacyRole(session.role) || isSuperAdminAccess(access);
 

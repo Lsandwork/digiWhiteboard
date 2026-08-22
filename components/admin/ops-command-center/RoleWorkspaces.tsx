@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { ClipboardList } from "lucide-react";
@@ -33,7 +35,7 @@ type BoardDog = {
 async function fetchBoardDogs() {
   const res = await fetch("/api/board/checkouts", { cache: "no-store" }).catch(() => null);
   if (!res || !res.ok) return { checking_in: [] as BoardDog[], checking_out: [] as BoardDog[] };
-  const body = await res.json();
+  const body = await readResponseJson(res);
   return {
     checking_in: (body.checking_in || []) as BoardDog[],
     checking_out: (body.checking_out || []) as BoardDog[]
@@ -64,7 +66,7 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
       setFeedError("Unable to refresh arriving/leaving dogs. Showing last known board state.");
       return;
     }
-    const body = await res.json().catch(() => null);
+    const body = await readResponseJson(res).catch(() => null);
     if (!body || body.error) {
       setFeedError(
         typeof body?.error === "string"
@@ -306,7 +308,7 @@ export function OvernightCommandPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/admin/ops-command-center?view=overnight", { cache: "no-store" });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (res.ok) setRounds(body.rounds || []);
     setLoading(false);
   }, []);
@@ -465,7 +467,7 @@ export function ShiftHandoffPanel() {
 
   const load = useCallback(async () => {
     const res = await fetch("/api/admin/ops-command-center?view=handoffs", { cache: "no-store" });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (res.ok) setRows(body.handoffs || []);
   }, []);
 
@@ -566,7 +568,7 @@ export function ShiftHandoffPanel() {
                       fields: compiled.fields
                     })
                   });
-                  const body = await res.json().catch(() => ({}));
+                  const body = await readResponseJson(res).catch(() => ({}));
                   if (!res.ok) throw new Error(body.error ?? "Unable to submit shift handoff.");
                   setItems([emptyShiftHandoffItem()]);
                   clearAutosave("shift_handoff_draft");
@@ -627,7 +629,7 @@ export function OpsSystemHealthPanel() {
   useEffect(() => {
     void (async () => {
       const res = await fetch("/api/admin/ops-command-center?view=system_health", { cache: "no-store" });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (res.ok) setData(body);
     })();
   }, []);

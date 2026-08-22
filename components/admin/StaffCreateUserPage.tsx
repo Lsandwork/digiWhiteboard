@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
@@ -35,7 +37,7 @@ export function StaffCreateUserPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/session", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load session.");
       setSession(body as SessionPayload);
     } catch (error) {
@@ -120,7 +122,7 @@ export function StaffCreateUserPage() {
                   headers: { "content-type": "application/json" },
                   body: JSON.stringify(payload)
                 });
-                const body = await response.json();
+                const body = await readResponseJson(response);
                 if (!response.ok) throw new Error(body.error ?? "Unable to create user.");
                 const full_name = String(payload.full_name ?? "").trim();
                 const email = String(payload.email ?? "").trim();

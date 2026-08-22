@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronRight, ExternalLink, RefreshCw, X } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -393,7 +395,7 @@ export function FitdogAlertsPanel() {
         pageSize: panelView === "resolved" ? "100" : "50"
       });
       const res = await fetch(`/api/admin/fitdog-alerts?${params}`, { cache: "no-store" });
-      const json = (await res.json()) as ListPayload & { error?: string };
+      const json = (await readResponseJson(res)) as ListPayload & { error?: string };
       if (!res.ok) throw new Error(json.error || "Failed to load Fitdog alerts.");
       setData(json);
       setSettingsForm({
@@ -433,7 +435,7 @@ export function FitdogAlertsPanel() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/fitdog-alerts?view=sync", { cache: "no-store" });
-      const json = (await res.json()) as {
+      const json = (await readResponseJson(res)) as {
         history?: FitdogSyncRun[];
         settings?: FitdogIntegrationSettings;
         error?: string;
@@ -466,7 +468,7 @@ export function FitdogAlertsPanel() {
   async function openDetail(id: string) {
     try {
       const res = await fetch(`/api/admin/fitdog-alerts?view=detail&id=${encodeURIComponent(id)}`, { cache: "no-store" });
-      const json = (await res.json()) as DetailPayload & { error?: string };
+      const json = (await readResponseJson(res)) as DetailPayload & { error?: string };
       if (!res.ok) throw new Error(json.error || "Unable to load alert.");
       setDrawer(json);
       setNote("");
@@ -487,7 +489,7 @@ export function FitdogAlertsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(extra.alert_id || drawer?.alert.id ? { action, alert_id: drawer?.alert.id, ...extra } : { action, ...extra })
       });
-      const json = (await res.json()) as { error?: string; run?: FitdogSyncRun };
+      const json = (await readResponseJson(res)) as { error?: string; run?: FitdogSyncRun };
       if (!res.ok) throw new Error(json.error || "Action failed.");
       if (action === "sync") {
         const detail =

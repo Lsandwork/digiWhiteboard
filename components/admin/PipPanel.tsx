@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   HeartHandshake,
@@ -68,7 +70,7 @@ export function PipPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/hr/pip", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to load PIP plans.");
       setPlans(body.plans ?? []);
       setReviewsThisWeek(body.reviews_this_week ?? []);
@@ -82,7 +84,7 @@ export function PipPanel() {
   const loadAiMeta = useCallback(async () => {
     try {
       const response = await fetch("/api/admin/hr/pip/ai", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) return;
       setAiReady(Boolean(body.gemini_configured && body.hr_consult_enabled));
       if (body.location) setAiLocation(String(body.location));
@@ -154,7 +156,7 @@ export function PipPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingId ? { id: editingId, ...payload } : payload)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to save PIP plan.");
       showToast(editingId ? "Growth plan updated." : "Growth plan created.", "success");
       setEditingId(null);
@@ -174,7 +176,7 @@ export function PipPanel() {
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/hr/pip?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to remove PIP.");
       showToast("PIP removed from workspace.", "success");
       if (selectedId === id) setSelectedId(null);
@@ -203,7 +205,7 @@ export function PipPanel() {
           progress_percent: selected?.progress_percent ?? 0
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to save check-in.");
       showToast("Check-in saved.", "success");
       setCheckInNote("");
@@ -234,7 +236,7 @@ export function PipPanel() {
           record_ids: selected?.source_record_ids ?? []
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "PIP AI unavailable.");
       setAiReply(String(body.reply || ""));
       const draft = body.draft_fields as Partial<{

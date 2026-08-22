@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Stethoscope } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
@@ -68,7 +70,7 @@ export function VetVisitsPanel() {
         pageSize: "50"
       });
       const res = await fetch(`/api/admin/vet-visits?${params}`, { cache: "no-store" });
-      const json = (await res.json()) as ListPayload & { error?: string };
+      const json = (await readResponseJson(res)) as ListPayload & { error?: string };
       if (!res.ok) throw new Error(json.error || "Failed to load vet visits.");
       setData(json);
     } catch (error) {
@@ -97,7 +99,7 @@ export function VetVisitsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "create", ...form })
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await readResponseJson(res)) as { error?: string };
       if (!res.ok) throw new Error(json.error || "Create failed.");
       showToast("Vet visit logged. Admin and management were alerted.", "success");
       setManualOpen(false);
@@ -128,7 +130,7 @@ export function VetVisitsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update", id, ...patch })
       });
-      const json = (await res.json()) as { record?: VetVisit; error?: string };
+      const json = (await readResponseJson(res)) as { record?: VetVisit; error?: string };
       if (!res.ok) throw new Error(json.error || "Update failed.");
       if (json.record) setDrawer(json.record);
       await load();

@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useState } from "react";
 import { LogOut, UserRoundCog } from "lucide-react";
 
@@ -16,7 +18,7 @@ export function ImpersonationBanner() {
       try {
         const response = await fetch("/api/admin/session", { cache: "no-store" });
         if (!response.ok) return;
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!active) return;
         setImpersonator(body.impersonator ?? null);
         setCurrentEmail(body.username ?? null);

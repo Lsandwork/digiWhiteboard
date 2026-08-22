@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useState } from "react";
 import type { ManagementReport } from "@/lib/staff/management-reports";
 
@@ -20,7 +22,7 @@ export function useManagementSupportFetch(initialUrl = "/api/admin/management-su
     setError(null);
     try {
       const response = await fetch(url, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
       setData(body as ManagementSupportPayload);
       return body as ManagementSupportPayload;

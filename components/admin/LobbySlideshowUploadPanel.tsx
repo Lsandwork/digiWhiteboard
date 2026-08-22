@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Trash2, UploadCloud } from "lucide-react";
 import type { LobbySlideshowUploadRecord } from "@/lib/lobby/slideshow-uploads";
@@ -27,7 +29,7 @@ export function LobbySlideshowUploadPanel({ onToast }: LobbySlideshowUploadPanel
     setLoading(true);
     try {
       const response = await fetch("/api/admin/lobby-slideshow", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load slideshow uploads.");
       setUploads(body.uploads ?? []);
     } catch (error) {
@@ -73,7 +75,7 @@ export function LobbySlideshowUploadPanel({ onToast }: LobbySlideshowUploadPanel
     setDeletingId(id);
     try {
       const response = await fetch(`/api/admin/lobby-slideshow/${id}`, { method: "DELETE" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to remove upload.");
       onToast("Removed from the lobby slideshow.", "success");
       setUploads((current) => current.filter((item) => item.id !== id));

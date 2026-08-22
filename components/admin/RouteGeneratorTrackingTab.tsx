@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, MessageSquare, RefreshCw, ShieldOff } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -104,7 +106,7 @@ export function RouteGeneratorTrackingTab({ operatingDate, planId, busy, onBusy 
       if (link !== "all") params.set("link", link);
       if (q.trim()) params.set("q", q.trim());
       const response = await fetch(`/api/admin/route-generator?${params}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to load tracking.");
       setRows(body.rows ?? []);
       setEvents(body.events ?? []);
@@ -136,7 +138,7 @@ export function RouteGeneratorTrackingTab({ operatingDate, planId, busy, onBusy 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...payload })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Request failed.");
       showToast(body.message || "Updated.", "success");
       await load();

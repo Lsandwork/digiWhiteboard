@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, HelpCircle, Lock, RotateCcw, Search } from "lucide-react";
@@ -39,7 +41,7 @@ export function UserGroupsPermissionsPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/user-groups-permissions", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load permissions.");
       setPayload(body as MatrixPayload);
       setSaveState("saved");
@@ -94,7 +96,7 @@ export function UserGroupsPermissionsPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ role, permission, enabled })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Update failed.");
       setPayload({ ...payload, matrix: body.matrix as RolePermissionMatrix });
       setSaveState("saved");
@@ -131,7 +133,7 @@ export function UserGroupsPermissionsPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ role, categoryPermissions: permissions, enabled, bulk: true })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Update failed.");
       setPayload({ ...payload, matrix: body.matrix as RolePermissionMatrix });
       setSaveState("saved");
@@ -151,7 +153,7 @@ export function UserGroupsPermissionsPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ resetDefaults: true })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Reset failed.");
       setPayload((current) => (current ? { ...current, matrix: body.matrix } : current));
       setSaveState("saved");

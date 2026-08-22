@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BellRing, CheckCheck, RefreshCw } from "lucide-react";
 import type { AdminTab } from "@/lib/admin/types";
@@ -40,7 +42,7 @@ async function fetchLinkedReports(ids: string[]): Promise<Map<string, Management
       try {
         const response = await fetch(`/api/admin/notifications?report_id=${encodeURIComponent(id)}`, { cache: "no-store" });
         if (!response.ok) return;
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (body.report) map.set(id, body.report as ManagementReport);
       } catch {
         // skip inaccessible linked reports
@@ -87,7 +89,7 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
     setError(null);
     try {
       const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load notifications.");
       const payload = body as NotificationsPayload;
       setData(payload);
@@ -194,7 +196,7 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
         }
       }
       const response = await fetch(`/api/admin/notifications/${encodeURIComponent(notificationId)}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "This notification could not be loaded.");
       setModalDetail(body as NotificationDetailPayload);
       if (body.report) {
@@ -234,7 +236,7 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "mark_all_notifications_read" })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to mark all read.");
       setSelected([]);
       await load();
@@ -258,7 +260,7 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
             body: JSON.stringify({ action: "mark_notification_read", notification_id: notificationId })
           });
           if (!response.ok) {
-            const body = await response.json();
+            const body = await readResponseJson(response);
             throw new Error(body.error ?? "Unable to mark notification read.");
           }
         })
@@ -285,7 +287,7 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ message, internal_note: options.internalNote, mark_resolved: options.markResolved })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Response didn't send. Try again.");
       setReplyText("");
       setModalSuccess(body.message ?? "Response sent.");
@@ -310,7 +312,7 @@ export function NotificationsPanel({ onOpenTab, personalOnly = false }: Notifica
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to update.");
       if (body.detail) setModalDetail(body.detail as NotificationDetailPayload);
       setModalSuccess("Updated.");

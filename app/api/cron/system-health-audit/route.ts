@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { runSystemHealthAudit } from "@/lib/admin/system-health-audit";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS });
     const state = await runSystemHealthAudit(supabase, { trigger: "cron", autoFix: true });
     return NextResponse.json({
       ok: true,

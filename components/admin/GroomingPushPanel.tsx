@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock3, Scissors, Send, XCircle } from "lucide-react";
 import {
@@ -47,7 +49,7 @@ export function GroomingPushPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/grooming-push", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load grooming push notices.");
       setData(body as GroomingPayload);
     } catch (error) {
@@ -126,7 +128,7 @@ export function GroomingPushPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to push grooming notice.");
 
       const pushedName = form.manualOverride ? parsedManualDog.dog_name : form.selectedDog?.dogName;
@@ -150,7 +152,7 @@ export function GroomingPushPanel() {
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/grooming-push/${data.activeNotice.id}/clear`, { method: "POST" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to clear grooming notice.");
       showToast("Grooming notice cleared.", "success");
       await load();

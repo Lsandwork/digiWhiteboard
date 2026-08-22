@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useState } from "react";
 
 export function useLobbyDogPhoto(animalId: string | null | undefined, initialUrl: string | null | undefined) {
@@ -25,7 +27,7 @@ export function useLobbyDogPhoto(animalId: string | null | undefined, initialUrl
         });
         if (!response.ok || cancelled) return;
 
-        const body = (await response.json()) as { photo_url?: string | null };
+        const body = (await readResponseJson(response)) as { photo_url?: string | null };
         const nextUrl = body.photo_url?.trim();
         if (nextUrl && !cancelled) {
           setPhotoUrl(nextUrl);

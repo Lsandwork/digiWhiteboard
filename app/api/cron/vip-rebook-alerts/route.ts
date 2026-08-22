@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 import { processVipRebookAlerts } from "@/lib/staff/vip-auto-book";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS });
     const result = await processVipRebookAlerts(supabase);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {

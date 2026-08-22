@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlarmClock,
@@ -126,7 +128,7 @@ export function DailyRemindersSection({ canView }: { canView: boolean }) {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/push-notices/daily-reminders", { cache: "no-store" });
-      const body = (await response.json()) as DailyRemindersPayload & { error?: string };
+      const body = (await readResponseJson(response)) as DailyRemindersPayload & { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Unable to load Daily Reminders.");
       setData(body);
     } catch (error) {
@@ -147,7 +149,7 @@ export function DailyRemindersSection({ canView }: { canView: boolean }) {
     setBusy(true);
     try {
       const response = await run();
-      const body = (await response.json()) as { error?: string; message?: string };
+      const body = (await readResponseJson(response)) as { error?: string; message?: string };
       if (!response.ok) throw new Error(body.error ?? message);
       showToast(body.message ?? successMessage, "success");
       await load();
@@ -408,7 +410,7 @@ export function DailyRemindersSection({ canView }: { canView: boolean }) {
                             `/api/admin/push-notices/daily-reminders/history?reminder_id=${reminder.id}&limit=50`,
                             { cache: "no-store" }
                           );
-                          const body = (await response.json()) as { history?: HistoryRow[]; error?: string };
+                          const body = (await readResponseJson(response)) as { history?: HistoryRow[]; error?: string };
                           if (!response.ok) throw new Error(body.error ?? "Unable to load history.");
                           setHistoryRows(body.history ?? []);
                         } catch (error) {

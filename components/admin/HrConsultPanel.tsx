@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageCircleHeart, Paperclip, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -53,7 +55,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
     setLoading(true);
     try {
       const response = await fetch("/api/admin/hr-consult", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load HR Consult.");
       setPayload(body as ConsultPayload);
     } catch (error) {
@@ -76,7 +78,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
       void (async () => {
         try {
           const response = await fetch(`/api/admin/hr?id=${encodeURIComponent(initialRecordId)}`, { cache: "no-store" });
-          const body = await response.json();
+          const body = await readResponseJson(response);
           if (!response.ok || cancelled) return;
           const report = body.report as { title?: string; source?: string; report_type?: string };
           const uploaded = report?.source === "hr_upload" || Boolean(body.record?.uploaded);
@@ -126,7 +128,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
           report_id: attachedRecordId
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to send message.");
       setPayload((current) =>
         current
@@ -157,7 +159,7 @@ export function HrConsultPanel({ initialRecordId }: { initialRecordId?: string |
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "clear" })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to clear conversation.");
       autoScanRef.current = false;
       setPayload((current) => (current ? { ...current, thread: body.thread } : current));

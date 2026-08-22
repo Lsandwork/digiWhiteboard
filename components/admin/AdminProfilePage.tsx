@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { Camera, KeyRound, Trash2, UserRound } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -63,7 +65,7 @@ export function AdminProfilePage({ username, role, displayLabel }: AdminProfileP
       try {
         const response = await fetch("/api/admin/profile", { cache: "no-store" });
         if (!response.ok) return;
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!cancelled) setAvatarUrl(body.avatarUrl ?? null);
       } catch {
         // Non-fatal — the profile photo is optional.
@@ -84,7 +86,7 @@ export function AdminProfilePage({ username, role, displayLabel }: AdminProfileP
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ password, confirm_password: confirmPassword })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to update password.");
       setPassword("");
       setConfirmPassword("");
@@ -104,7 +106,7 @@ export function AdminProfilePage({ username, role, displayLabel }: AdminProfileP
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ avatarUrl: nextAvatarUrl })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to update profile photo.");
       if (body.demo) {
         showToast(body.message ?? "Demo mode — not saved.", "info");

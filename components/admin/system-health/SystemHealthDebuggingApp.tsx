@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 type SectionId =
@@ -202,7 +204,7 @@ export function SystemHealthDebuggingApp() {
         cache: "no-store",
         credentials: "same-origin"
       });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (!res.ok) throw new Error(body.error || "Failed to load System Health");
       setBundle(body);
       setSettingsDraft((body.settings as Record<string, unknown>) || null);
@@ -218,7 +220,7 @@ export function SystemHealthDebuggingApp() {
       cache: "no-store",
       credentials: "same-origin"
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (!res.ok) {
       setError(body.error || "Failed to load audit issues");
       return null;
@@ -261,7 +263,7 @@ export function SystemHealthDebuggingApp() {
         cache: "no-store",
         credentials: "same-origin"
       });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (res.ok) setSectionData(body.data ?? body);
       else setError(body.error || "Failed to load section");
     },
@@ -300,7 +302,7 @@ export function SystemHealthDebuggingApp() {
         `/api/admin/system-health?view=route_audit&correlationId=${encodeURIComponent(selectedAudit)}`,
         { cache: "no-store" }
       );
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (!res.ok) {
         setError(body.error || "Failed to load route audit");
         setAuditDetail(null);
@@ -339,7 +341,7 @@ export function SystemHealthDebuggingApp() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "apply_migration_072" })
       });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (!res.ok || body.ok === false) {
         setError(body.detail || body.error || "Unable to apply migration 072");
         return;
@@ -357,7 +359,7 @@ export function SystemHealthDebuggingApp() {
     setSchemaBusy(true);
     try {
       const res = await fetch("/api/admin/system-health?view=migration_sql", { cache: "no-store" });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (!res.ok) {
         // Fall back to public path hint for non-configure roles
         const ok = await copyText(
@@ -388,7 +390,7 @@ export function SystemHealthDebuggingApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "search", query: search })
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (res.ok) setSearchResult(body.data ?? body);
     else setError(body.error || "Search failed");
   };
@@ -400,7 +402,7 @@ export function SystemHealthDebuggingApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "save_settings", settings: settingsDraft })
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (!res.ok) {
       setError(body.error || "Unable to save settings");
       return;
@@ -420,7 +422,7 @@ export function SystemHealthDebuggingApp() {
         reason: "Temporary elevated diagnostics"
       })
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (!res.ok) {
       setError(body.error || "Unable to start live debug");
       return;
@@ -435,7 +437,7 @@ export function SystemHealthDebuggingApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "end_live_debug" })
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (!res.ok) {
       setError(body.error || "Unable to end live debug");
       return;
@@ -456,7 +458,7 @@ export function SystemHealthDebuggingApp() {
         credentials: "same-origin",
         body: JSON.stringify({ action: "run_whiteboard_audit", auto_fix: true })
       });
-      const body = await res.json().catch(() => ({}));
+      const body = await readResponseJson(res).catch(() => ({}));
       if (!res.ok) {
         setError(String(body.error || `Unable to run whiteboard audit (${res.status})`));
         setCopyNote(null);
@@ -505,7 +507,7 @@ export function SystemHealthDebuggingApp() {
           note: issueId ? "Acknowledged from Audit Issues." : "Acknowledged all remaining open audit issues."
         })
       });
-      const body = await res.json().catch(() => ({}));
+      const body = await readResponseJson(res).catch(() => ({}));
       if (!res.ok) {
         setError(String(body.error || `Unable to acknowledge issue (${res.status})`));
         return;
@@ -536,7 +538,7 @@ export function SystemHealthDebuggingApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "bug_context", correlationId })
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (!res.ok) {
       setError(body.error || "Unable to build debug context");
       return;
@@ -552,7 +554,7 @@ export function SystemHealthDebuggingApp() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, errorId })
     });
-    const body = await res.json();
+    const body = await readResponseJson(res);
     if (!res.ok) {
       setError(body.error || "Unable to update error");
       return;

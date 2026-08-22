@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, MessageCircleHeart, Mic, MicOff, Send, Video, X } from "lucide-react";
 import { FitdogGeminiAvatar } from "@/components/ai/FitdogGeminiAvatar";
@@ -86,9 +88,8 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
 
   useEffect(() => {
     if (!open) return;
-    void fetch("/api/fitdog-ai/chat", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((body) => setConfigured(Boolean(body.configured)))
+    void fetchAdminJson<{ configured?: boolean }>("/api/fitdog-ai/chat")
+      .then(({ body }) => setConfigured(Boolean(body.configured)))
       .catch(() => setConfigured(false));
   }, [open]);
 
@@ -194,7 +195,10 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
     setPushingNoticeId(messageId);
     setError(null);
     try {
-      const response = await fetch("/api/admin/push-notices", {
+      const { ok, body } = await fetchAdminJson<{
+        error?: string;
+        notice?: { id: string; title: string; message: string | null };
+      }>("/api/admin/push-notices", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -205,8 +209,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
           display_mode: noticeDraft.display_mode ?? "normal"
         })
       });
-      const body = (await response.json()) as { error?: string; notice?: { id: string; title: string; message: string | null } };
-      if (!response.ok || !body.notice) {
+      if (!ok || !body.notice) {
         throw new Error(body.error ?? "Unable to push notice.");
       }
       const result: FitdogAiPushNoticeResult = {
@@ -228,7 +231,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         )
       );
     } catch (pushError) {
-      setError(pushError instanceof Error ? pushError.message : "Unable to push notice.");
+      setError(humanizeUnknownError(pushError, "Unable to push notice."));
     } finally {
       setPushingNoticeId(null);
     }
@@ -260,21 +263,20 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
       setError(null);
 
       try {
-        const response = await fetch("/api/fitdog-ai/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: trimmed, currentPage, history })
-        });
-        const body = (await response.json()) as {
+        const { ok, body } = await fetchAdminJson<{
           error?: string;
           reply?: string;
           actionLinks?: FitdogActionLink[];
           tone?: FitdogAiChatMessage["tone"];
           pushNoticeResult?: FitdogAiPushNoticeResult | null;
           pendingPushNotice?: FitdogAiPushNoticeDraft | null;
-        };
+        }>("/api/fitdog-ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: trimmed, currentPage, history })
+        });
 
-        if (!response.ok && !body.reply) {
+        if (!ok && !body.reply) {
           throw new Error(body.error ?? "Fitdog AI could not respond right now.");
         }
 
@@ -290,7 +292,7 @@ export function FitdogAiChatWindow({ open, onClose, currentPage }: FitdogAiChatW
         };
         setMessages((current) => [...current, assistantMessage]);
       } catch (sendError) {
-        setError(sendError instanceof Error ? sendError.message : "Fitdog AI could not respond right now.");
+        setError(humanizeUnknownError(sendError, "Fitdog AI could not respond right now."));
       } finally {
         setSending(false);
         inputRef.current?.focus();

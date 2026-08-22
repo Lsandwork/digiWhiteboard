@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useState } from "react";
 import { Plus, RefreshCw, Shield } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
@@ -90,7 +92,7 @@ export function TrackIncidentsPanel() {
         pageSize: "50"
       });
       const res = await fetch(`/api/admin/track-incidents?${params}`, { cache: "no-store" });
-      const json = (await res.json()) as ListPayload & { error?: string };
+      const json = (await readResponseJson(res)) as ListPayload & { error?: string };
       if (!res.ok) throw new Error(json.error || "Failed to load incidents.");
       setData(json);
     } catch (error) {
@@ -121,7 +123,7 @@ export function TrackIncidentsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "sync" })
       });
-      const json = (await res.json()) as { run?: TrackIncidentSyncRun; error?: string };
+      const json = (await readResponseJson(res)) as { run?: TrackIncidentSyncRun; error?: string };
       if (!res.ok) throw new Error(json.error || "Sync failed.");
       const run = json.run;
       if (run?.status === "skipped") {
@@ -144,7 +146,7 @@ export function TrackIncidentsPanel() {
     setShowHistory(true);
     try {
       const res = await fetch("/api/admin/track-incidents?view=sync", { cache: "no-store" });
-      const json = (await res.json()) as { history?: TrackIncidentSyncRun[]; error?: string };
+      const json = (await readResponseJson(res)) as { history?: TrackIncidentSyncRun[]; error?: string };
       if (!res.ok) throw new Error(json.error || "Unable to load sync history.");
       setHistory(json.history ?? []);
     } catch (error) {
@@ -159,7 +161,7 @@ export function TrackIncidentsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "create", ...manualForm })
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await readResponseJson(res)) as { error?: string };
       if (!res.ok) throw new Error(json.error || "Create failed.");
       showToast("Incident created.", "success");
       setManualOpen(false);
@@ -184,7 +186,7 @@ export function TrackIncidentsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update", id, ...patch })
       });
-      const json = (await res.json()) as { record?: TrackIncident; error?: string };
+      const json = (await readResponseJson(res)) as { record?: TrackIncident; error?: string };
       if (!res.ok) throw new Error(json.error || "Update failed.");
       if (json.record) setDrawer(json.record);
       await load();

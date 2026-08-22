@@ -3,7 +3,7 @@ import { getBlogSettings, publishBlogArticle, seedBlogTopics, writeBlogAudit } f
 import { runFullAutoSeoCycle, retryFailedWordPressMirrors } from "@/lib/blog/scheduler/auto-run";
 import { processSocialPostQueue } from "@/lib/blog/social/service";
 import { isAuthorizedCron } from "@/lib/cron-auth";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: "emergency_off" });
   }
 
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS });
   const results: Record<string, unknown> = {};
 
   try {

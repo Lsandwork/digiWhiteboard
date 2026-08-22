@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BellRing, Download, Lightbulb, Pencil, Plus, PowerOff, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -124,7 +126,7 @@ export function PushNoticesPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/push-notices", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load Push Notices.");
       setData(body as PushNoticesPayload);
     } catch (error) {
@@ -155,7 +157,7 @@ export function PushNoticesPanel() {
     setBusy(true);
     try {
       const response = await request();
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? label);
       showToast(successMessage, "success");
       await load();
@@ -284,7 +286,7 @@ export function PushNoticesPanel() {
       });
       let body: { ok?: boolean; error?: string; skipped?: string } = {};
       try {
-        body = (await response.json()) as { ok?: boolean; error?: string; skipped?: string };
+        body = (await readResponseJson(response)) as { ok?: boolean; error?: string; skipped?: string };
       } catch {
         if (response.status === 404) {
           throw new Error("Shelly flash API is not deployed yet. Redeploy production, then try again.");
@@ -322,7 +324,7 @@ export function PushNoticesPanel() {
           reason: "push_notices_user_clear"
         })
       });
-      const body = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      const body = (await readResponseJson(response).catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!response.ok || !body.ok) {
         throw new Error(body.error ?? "Unable to clear the alert light.");
       }

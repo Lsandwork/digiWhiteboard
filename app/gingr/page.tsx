@@ -3,7 +3,7 @@ import { GingrPageClient } from "@/components/gingr/GingrPageClient";
 import { ToastProvider } from "@/components/admin/ui/ToastProvider";
 import { inspectGingrEmbedPolicy } from "@/lib/gingr/embed-policy";
 import { getAdminSession } from "@/lib/admin/session";
-import { getUserAccess } from "@/lib/admin/user-access";
+import { resolveSessionAccess } from "@/lib/admin/resolve-user-access";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +18,7 @@ export default async function GingrRoutePage() {
   }
 
   const supabase = getServiceSupabase();
-  const access = session.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
+  const access = await resolveSessionAccess(session, supabase);
 
   const embedPolicy = await inspectGingrEmbedPolicy();
 

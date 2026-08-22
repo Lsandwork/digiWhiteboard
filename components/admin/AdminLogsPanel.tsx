@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { AdminBoardType, AuditLogEntry } from "@/lib/admin/types";
@@ -29,7 +31,7 @@ export function AdminLogsPanel({ webhookUrl, events, failedEvents, board }: Admi
       if (actorFilter) params.set("actor", actorFilter);
       if (search) params.set("search", search);
       const response = await fetch(`/api/admin/logs?${params.toString()}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       setAuditLogs(body.audit_logs ?? []);
     } finally {
       setLoading(false);

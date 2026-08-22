@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Copy, ExternalLink, MonitorPlay, RefreshCw } from "lucide-react";
 import type { AdminBoardType } from "@/lib/admin/types";
@@ -59,7 +61,7 @@ export function CastDisplayPanel({ board, onToast }: CastDisplayPanelProps) {
     setLoading(true);
     try {
       const response = await fetch(`/api/admin/displays?displayType=${displayType}`, { cache: "no-store" });
-      const body = (await response.json()) as { devices?: DisplayDevice[] };
+      const body = (await readResponseJson(response)) as { devices?: DisplayDevice[] };
       if (response.ok) {
         setDevices(body.devices ?? []);
       }

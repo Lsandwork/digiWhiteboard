@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { MonitorPlay, Send, Video, XCircle } from "lucide-react";
@@ -38,7 +40,7 @@ export function YardPushNoticesPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/yard-push-notices", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load yard push notices.");
       setData(body as YardPushPayload);
     } catch (error) {
@@ -65,7 +67,7 @@ export function YardPushNoticesPanel() {
     setBusy(true);
     try {
       const response = await request();
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? label);
       showToast(body.message ?? successMessage, "success");
       await load();

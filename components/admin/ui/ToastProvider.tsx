@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, AlertCircle, X } from "lucide-react";
+import { humanizeUnknownError, LIVE_DATA_UNAVAILABLE_MESSAGE } from "@/lib/safe-url";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -22,9 +23,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: ToastType = "success") => {
     const id = `${Date.now()}-${Math.random()}`;
-    const safeMessage = /did not match the expected pattern/i.test(message)
-      ? "Something went wrong. Reload the page and try again."
-      : message;
+    const safeMessage = humanizeUnknownError(message, LIVE_DATA_UNAVAILABLE_MESSAGE);
     setToasts((current) => [...current, { id, message: safeMessage, type }]);
   }, []);
 

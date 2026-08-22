@@ -1,5 +1,8 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+import { humanizeUnknownError } from "@/lib/safe-url";
+
 type BoardFetchOptions = {
   url: string;
   timeoutMs?: number;
@@ -71,7 +74,7 @@ export async function fetchBoardJson<T>(options: BoardFetchOptions): Promise<Boa
       cache: "no-store",
       signal: controller.signal
     });
-    const data = (await response.json()) as T;
+    const data = await readResponseJson<T>(response);
 
     if (!response.ok) {
       throw new Error(`Request failed (${response.status})`);
@@ -90,7 +93,7 @@ export async function fetchBoardJson<T>(options: BoardFetchOptions): Promise<Boa
       error: null
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Request failed";
+    const message = humanizeUnknownError(error, "Request failed");
     const failures = (failureCountByKey.get(cacheKey) ?? 0) + 1;
     failureCountByKey.set(cacheKey, failures);
     const backoffMs = nextBackoffMs(failures);

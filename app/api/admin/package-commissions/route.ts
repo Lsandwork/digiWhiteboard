@@ -8,9 +8,12 @@ import {
 } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { hasPermission, hasRole, legacyRoleToRoleKey } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, hasPermission, hasRole, legacyRoleToRoleKey } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { listAdminUsers } from "@/lib/admin/users";
+import { humanizeUnknownError } from "@/lib/safe-url";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { SERVICE_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/server";
 import { listCommissionTrainerOptions } from "@/lib/staff/commission-ledger/trainers";
 import {
   acknowledgeTrainerStatement,
@@ -54,6 +57,7 @@ import { normalizeCommissionDateFilter } from "@/lib/staff/commission-ledger/dat
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 function buildViewer(
   session: ReturnType<typeof getAdminSessionFromRequest>,
@@ -93,11 +97,18 @@ function actorFrom(session: ReturnType<typeof getAdminSessionFromRequest>, displ
 async function resolveAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
   const role = session?.role;
-  const supabase = getServiceSupabase();
-  const access = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
-  const displayName = await resolveSessionDisplayName(supabase, session);
+  const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_TIMEOUT_MS });
+  const fallbackAccess = accessFromLegacyRole(session?.adminUserId ?? null, session?.email, session?.role);
+  const [access, displayName] = await Promise.all([
+    session?.adminUserId
+      ? withTimeoutFallback(
+          getUserAccess(supabase, session.adminUserId, session.role, session.email),
+          SERVICE_SUPABASE_TIMEOUT_MS,
+          fallbackAccess
+        )
+      : Promise.resolve(fallbackAccess),
+    withTimeoutFallback(resolveSessionDisplayName(supabase, session), 2_500, session?.email ?? null)
+  ]);
 
   const canView =
     canViewPackageCommissions(role) ||
@@ -190,7 +201,11 @@ export async function GET(request: Request) {
   const view = url.searchParams.get("view") ?? "ledger";
 
   try {
-    const trainers = canManage ? listCommissionTrainerOptions(await listAdminUsers(supabase)) : [];
+    const trainers = canManage
+      ? listCommissionTrainerOptions(
+          await withTimeoutFallback(listAdminUsers(supabase), SERVICE_SUPABASE_TIMEOUT_MS, [])
+        )
+      : [];
 
     if (view === "record") {
       const id = url.searchParams.get("id") ?? "";
@@ -264,8 +279,8 @@ export async function GET(request: Request) {
       canComment
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load package commissions.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const message = humanizeUnknownError(error, "Unable to load package commissions.");
+    return NextResponse.json({ error: message }, { status: 503 });
   }
 }
 
@@ -578,7 +593,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "Unsupported action." }, { status: 400 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update package commissions.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    const message = humanizeUnknownError(error, "Unable to update package commissions.");
+    return NextResponse.json({ error: message }, { status: 503 });
   }
 }

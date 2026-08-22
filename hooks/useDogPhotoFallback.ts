@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useState } from "react";
 import { getRememberedDogPhoto, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
@@ -31,7 +33,7 @@ async function fetchAnimalPhotoOnce(animalId: string) {
   })
     .then(async (response) => {
       if (!response.ok) return null;
-      const body = (await response.json()) as { photo_url?: string | null };
+      const body = (await readResponseJson(response)) as { photo_url?: string | null };
       const photoUrl = body.photo_url?.trim() || null;
       if (photoUrl) {
         rememberStableDogPhoto(cacheKey, photoUrl);

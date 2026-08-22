@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useState } from "react";
 import type { AdminBoardType, PublishLogEntry } from "@/lib/admin/types";
 import { Modal } from "@/components/admin/ui/Modal";
@@ -20,7 +22,7 @@ export function ChangeHistoryModal({ open, board, onClose }: ChangeHistoryModalP
     const timer = window.setTimeout(() => {
       setLoading(true);
       void fetch(`/api/admin/publish-history?board=${board}&limit=20`, { cache: "no-store" })
-        .then((response) => response.json())
+        .then((response) => readResponseJson(response))
         .then((body) => setHistory(body.history ?? []))
         .finally(() => setLoading(false));
     }, 0);

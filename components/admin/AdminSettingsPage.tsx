@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useMemo, useState } from "react";
 import type { AdminGlobalSettings } from "@/lib/admin/settings";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
@@ -48,7 +50,7 @@ export function AdminSettingsPage({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(draft)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to save settings.");
       onSaved(body.settings);
       setLastSavedAt(new Date());

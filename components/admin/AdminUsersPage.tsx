@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, UserPlus } from "lucide-react";
 import type { AdminUserPublic } from "@/lib/admin/users";
@@ -79,7 +81,7 @@ export function AdminUsersPage() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/users", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load users.");
       setData(body as UsersPayload);
     } catch (error) {
@@ -243,7 +245,7 @@ export function AdminUsersPage() {
         setBusy(true);
         try {
           const response = await fetch("/api/admin/users", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-          const body = await response.json();
+          const body = await readResponseJson(response);
           if (!response.ok) throw new Error(body.error ?? "Unable to add user.");
           showToast("User added.", "success");
           setAddOpen(false);
@@ -265,7 +267,7 @@ export function AdminUsersPage() {
             setBusy(true);
             try {
               const response = await fetch(`/api/admin/users/${editUser.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
-              const body = await response.json();
+              const body = await readResponseJson(response);
               if (!response.ok) throw new Error(body.error ?? "Unable to update user.");
               showToast("User updated.", "success");
               setEditUser(null);
@@ -292,7 +294,7 @@ export function AdminUsersPage() {
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify(payload)
               });
-              const body = await response.json();
+              const body = await readResponseJson(response);
               if (!response.ok) throw new Error(body.error ?? "Unable to change password.");
               showToast("Password updated.", "success");
               setPasswordUser(null);
@@ -319,7 +321,7 @@ export function AdminUsersPage() {
           setBusy(true);
           try {
             const response = await fetch(`/api/admin/users/${deleteUser.id}`, { method: "DELETE" });
-            const body = await response.json();
+            const body = await readResponseJson(response);
             if (!response.ok) throw new Error(body.error ?? "Unable to delete user.");
             showToast("User deleted.", "success");
             setDeleteUser(null);
@@ -343,7 +345,7 @@ export function AdminUsersPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status: user.status === "active" ? "disabled" : "active" })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to update user.");
       showToast(user.status === "active" ? "User disabled." : "User reactivated.", "success");
       await load();

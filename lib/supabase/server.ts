@@ -4,11 +4,19 @@ function isConfigured(value: string | undefined, placeholder: string): value is 
   return Boolean(value && value !== placeholder && /^https?:\/\//.test(value));
 }
 
+/** Interactive admin/staff routes. Abort hung REST so Cloudflare never serves a 522 HTML page. */
+export const SERVICE_SUPABASE_TIMEOUT_MS = 8_000;
+
+/** Cron / background jobs that already expect a longer run. */
+export const SERVICE_SUPABASE_CRON_TIMEOUT_MS = 60_000;
+
 type ServiceSupabaseOptions = {
   /**
    * Abort the underlying REST call after this many ms. Promise.race timeouts
    * alone do not stop the fetch, and Vercel will wait on it before sending the
    * HTTP response — that is what makes login/dashboard appear frozen.
+   * Defaults to SERVICE_SUPABASE_TIMEOUT_MS. Pass 0 to disable (do not use on
+   * user-facing routes).
    */
   timeoutMs?: number;
 };
@@ -44,7 +52,12 @@ export function getServiceSupabase(options: ServiceSupabaseOptions = {}) {
     throw new Error("Supabase server environment variables are not configured.");
   }
 
-  const timeoutMs = options.timeoutMs && options.timeoutMs > 0 ? options.timeoutMs : undefined;
+  const timeoutMs =
+    options.timeoutMs === 0
+      ? undefined
+      : options.timeoutMs && options.timeoutMs > 0
+        ? options.timeoutMs
+        : SERVICE_SUPABASE_TIMEOUT_MS;
 
   return createClient(url, serviceKey, {
     auth: {

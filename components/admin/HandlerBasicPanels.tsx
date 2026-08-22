@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -78,7 +80,7 @@ export function HandlerChecklistPanel() {
     const loadChecklist = async () => {
       try {
         const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error ?? "Unable to load checklist items.");
         const currentEmail = String(body.currentUser?.email ?? "").trim().toLowerCase();
         const currentId = String(body.currentUser?.adminUserId ?? "").trim();
@@ -108,7 +110,7 @@ export function HandlerChecklistPanel() {
       setLoadingDaily(true);
       try {
         const response = await fetch("/api/admin/handler-checklist", { cache: "no-store" });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error ?? "Unable to load checklist progress.");
         if (!active) return;
         const parsed = (body.checklist_state ?? {}) as ChecklistState;
@@ -338,7 +340,7 @@ export function HandlerShiftEntryPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load shift log entries.");
       const currentActor = body.currentUser?.email ?? body.currentUser?.adminUserId ?? "";
       setActor(currentActor);
@@ -392,7 +394,7 @@ export function HandlerShiftEntryPanel() {
           template_field_values: serializeTemplateFieldValues(payload.template_fields)
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entry.");
       showToast("Handler shift entry saved to Team Log.", "success");
       setForm(emptyShiftForm);
@@ -418,7 +420,7 @@ export function HandlerShiftEntryPanel() {
           entries: toCrossoverBulkPayload(entries, { ...defaults, department_area: defaults.department_area || "Daycare" })
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entries.");
       const saved = Number(body.result?.saved ?? entries.length);
       const failed = Number(body.result?.failed ?? 0);
@@ -488,7 +490,7 @@ export function HandlerWriteUpsPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/management-support?view=write_ups", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load write-ups.");
       setReports((body.reports as ManagementReport[]) ?? []);
     } catch (error) {

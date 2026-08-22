@@ -1,5 +1,6 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LobbyClassSchedule } from "@/components/lobby/LobbyClassSchedule";
@@ -220,7 +221,9 @@ export function LobbyCheckoutBoard({
           headers: requestHeaders,
           signal: controller.signal
         });
-        const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
+        const checkoutBody = normalizeCheckoutsResponse(
+          (await readResponseJson<Partial<LobbyCheckoutsResponse>>(checkoutsRes))
+        );
 
         if (checkoutsRes.ok && !checkoutBody.error) {
           applyCheckoutUpdate(checkoutBody, "fast");
@@ -253,7 +256,9 @@ export function LobbyCheckoutBoard({
           headers: requestHeaders,
           signal: controller.signal
         });
-        const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
+        const checkoutBody = normalizeCheckoutsResponse(
+          (await readResponseJson<Partial<LobbyCheckoutsResponse>>(checkoutsRes))
+        );
 
         const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
 
@@ -314,7 +319,7 @@ export function LobbyCheckoutBoard({
       ]);
 
       if (settingsRes.ok) {
-        const body = (await settingsRes.json()) as { settings?: LobbySettings };
+        const body = await readResponseJson<{ settings?: LobbySettings }>(settingsRes);
         if (body.settings) {
           const sanitized = sanitizeLobbySettings(body.settings, debugBoard);
           setSettings((current) => {
@@ -341,7 +346,7 @@ export function LobbyCheckoutBoard({
       }
 
       if (statusRes.ok) {
-        const body = (await statusRes.json()) as LobbyStatusResponse;
+        const body = await readResponseJson<LobbyStatusResponse>(statusRes);
         setSettings((current) => {
           const nextRefresh = clampCheckoutPollMs(body.refresh_interval_ms);
           if (current.refresh_interval_ms === nextRefresh) return current;

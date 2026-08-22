@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlarmClock,
@@ -78,7 +80,7 @@ export function WalksBoardPanel() {
           cache: "no-store",
           signal: controller.signal
         });
-        const body = (await response.json()) as WalkBoardPublicState & { error?: string };
+        const body = (await readResponseJson(response)) as WalkBoardPublicState & { error?: string };
         if (!response.ok) throw new Error(body.error ?? "Unable to load Walks Board.");
         setData(body);
         setHasLoaded(true);
@@ -159,7 +161,7 @@ export function WalksBoardPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "complete", cycleId: cycle.id, version: cycle.version })
       });
-      const payload = await response.json();
+      const payload = await readResponseJson(response);
       if (!response.ok) throw new Error(payload.error ?? "Unable to mark complete.");
       showToast("Walk check marked complete. Thank you.", "success");
       await load({ silent: true });

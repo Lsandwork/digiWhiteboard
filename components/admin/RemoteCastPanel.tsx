@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MonitorPlay,
@@ -65,7 +67,7 @@ export function RemoteCastPanel() {
     if (!silent) setLoading(true);
     try {
       const response = await fetch("/api/remote-cast/receivers", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load displays.");
       if (!mountedRef.current) return;
       setReceivers(body.receivers ?? []);
@@ -103,7 +105,7 @@ export function RemoteCastPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ pairingCode: pairingCode.trim(), displayName: pairingName.trim() || undefined })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to pair display.");
       if (body.demo) {
         showToast(body.message ?? "Demo mode — not saved.", "info");
@@ -127,7 +129,7 @@ export function RemoteCastPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ receiverId, command, ...extra })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to send command.");
       if (body.demo) throw new Error(body.message ?? "Demo mode — not saved.");
       return body.receiver as RemoteCastReceiverPublic | undefined;
@@ -179,7 +181,7 @@ export function RemoteCastPanel() {
       const response = await fetch(`/api/remote-cast/receivers?id=${encodeURIComponent(receiverId)}`, {
         method: "DELETE"
       });
-      const body = await response.json().catch(() => ({}));
+      const body = await readResponseJson(response).catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Unable to remove display.");
       if (body.demo) {
         showToast(body.message ?? "Demo mode — not saved.", "info");

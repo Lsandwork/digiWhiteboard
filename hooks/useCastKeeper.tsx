@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import {
   createContext,
   useCallback,
@@ -87,7 +89,7 @@ async function postHeartbeat(body: Record<string, unknown>) {
         }
         return null;
       }
-      return (await response.json()) as HeartbeatResponse;
+      return (await readResponseJson(response)) as HeartbeatResponse;
     } catch {
       if (attempt === 0) {
         await new Promise((resolve) => window.setTimeout(resolve, 750));

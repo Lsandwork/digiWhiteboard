@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ClipboardList, Download, FilePenLine, MessageSquarePlus, Send, ShieldAlert } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -197,7 +199,7 @@ function GroomerManagementSupportPanel({ showRequests = true }: { showRequests?:
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action, description })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit form.");
       showToast(
         action === "create_groomer_complaint"
@@ -348,7 +350,7 @@ function TrainerManagementSupportPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action, description })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit form.");
       showToast(
         action === "create_trainer_complaint"
@@ -471,7 +473,7 @@ function TeamLeadManagementSupportPanel({
         ? "/api/admin/management-support"
         : "/api/admin/management-support?view=write_ups";
       const response = await fetch(url, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load management support.");
       setData(body as Payload);
       if (!form.documented_by && body.currentUser?.email) {
@@ -493,7 +495,7 @@ function TeamLeadManagementSupportPanel({
     setError(null);
     try {
       const response = await fetch("/api/admin/management-support", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load complaints.");
       setComplaintData(body as Payload);
     } catch (loadError) {
@@ -508,7 +510,7 @@ function TeamLeadManagementSupportPanel({
     setError(null);
     try {
       const response = await fetch("/api/admin/management-support?view=team_lead_requests", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load requests.");
       setRequestData(body as Payload);
     } catch (loadError) {
@@ -546,7 +548,7 @@ function TeamLeadManagementSupportPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "create_groomer_complaint", description })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit complaint.");
       showToast("Complaint submitted to admin and management for review.", "success");
       setComplaintSubTab("filed");
@@ -569,7 +571,7 @@ function TeamLeadManagementSupportPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "create_team_lead_request", description })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit request.");
       showToast("Request submitted to admin and management for review.", "success");
       setRequestSubTab("filed");
@@ -592,7 +594,7 @@ function TeamLeadManagementSupportPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "create_write_up", ...form })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to submit write-up.");
       showToast("Write-up submitted to admin and management for review.", "success");
       setForm({

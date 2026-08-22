@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Activity,
@@ -124,7 +126,7 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
     setLoading(true);
     try {
       const response = await fetch("/api/admin/overview", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to load overview.");
       setData(body as OverviewPayload);
     } catch (error) {
@@ -169,7 +171,7 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "run_system_health_audit", auto_fix: true })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to run system health audit.");
       setData((prev) =>
         prev
@@ -203,7 +205,7 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "add_board_note", text: noteText })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to save note.");
       setNoteText("");
       showToast("Board note saved.", "success");
