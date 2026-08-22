@@ -15,6 +15,10 @@ import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { SERVICE_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/server";
 import { listCommissionTrainersFromDb } from "@/lib/staff/commission-ledger/trainers";
 import {
+  canListCommissionsViaPostgres,
+  listCommissionRecordsViaPostgres
+} from "@/lib/staff/commission-ledger/list-via-postgres";
+import {
   acknowledgeTrainerStatement,
   bulkUpdateCommissionRecords,
   createCellComment,
@@ -59,8 +63,9 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 8;
 
 /** Ledger GET must return before the browser's 8s abort. */
-const COMMISSIONS_QUERY_TIMEOUT_MS = 3_000;
+const COMMISSIONS_QUERY_TIMEOUT_MS = 6_000;
 const COMMISSIONS_OPTIONAL_TIMEOUT_MS = 1_200;
+const COMMISSIONS_REST_RACE_TIMEOUT_MS = 3_500;
 
 function buildViewer(
   session: ReturnType<typeof getAdminSessionFromRequest>,
@@ -242,11 +247,13 @@ function ledgerPayload(
     canManage: boolean;
     canComment: boolean;
     delayed?: boolean;
+    delayedReason?: string;
   }
 ) {
   return {
     ...result,
     delayed: Boolean(extras.delayed),
+    delayedReason: extras.delayedReason ?? null,
     trainers: extras.trainers,
     currentUser: {
       email: extras.session?.email ?? null,
@@ -259,6 +266,44 @@ function ledgerPayload(
     canManage: extras.canManage,
     canComment: extras.canComment
   };
+}
+
+function firstRejectedMessage(error: unknown): string {
+  if (error instanceof AggregateError && error.errors.length) {
+    return humanizeUnknownError(error.errors[0], "Commission ledger is delayed.");
+  }
+  return humanizeUnknownError(error, "Commission ledger is delayed.");
+}
+
+async function loadLedgerList(viewer: ReturnType<typeof buildViewer>, filters: CommissionListFilters) {
+  const pgAvailable = canListCommissionsViaPostgres();
+  const restClient = getServiceSupabase({
+    timeoutMs: pgAvailable ? COMMISSIONS_REST_RACE_TIMEOUT_MS : COMMISSIONS_QUERY_TIMEOUT_MS
+  });
+  const rest = listCommissionRecords(restClient, viewer, filters);
+
+  if (!pgAvailable) {
+    try {
+      return { delayed: false as const, delayedReason: undefined as string | undefined, result: await rest };
+    } catch (error) {
+      return {
+        delayed: true as const,
+        delayedReason: humanizeUnknownError(error, "Commission ledger is delayed."),
+        result: emptyLedgerResult(filters)
+      };
+    }
+  }
+
+  try {
+    const result = await Promise.any([rest, listCommissionRecordsViaPostgres(viewer, filters)]);
+    return { delayed: false as const, delayedReason: undefined as string | undefined, result };
+  } catch (error) {
+    return {
+      delayed: true as const,
+      delayedReason: firstRejectedMessage(error),
+      result: emptyLedgerResult(filters)
+    };
+  }
 }
 
 export async function GET(request: Request) {
@@ -322,10 +367,19 @@ export async function GET(request: Request) {
     }
 
     const filters = parseListFilters(url);
-    const listed = listCommissionRecords(supabase, viewer, filters)
-      .then((result) => ({ delayed: false as const, result }))
-      .catch(() => ({ delayed: true as const, result: emptyLedgerResult(filters) }));
-    const [trainers, { delayed, result }] = await Promise.all([trainersPromise, listed]);
+    const [trainers, { delayed, delayedReason, result }] = await Promise.all([
+      trainersPromise,
+      loadLedgerList(viewer, filters)
+    ]);
+    if (delayed) {
+      console.warn(
+        JSON.stringify({
+          scope: "commissions",
+          event: "ledger_delayed",
+          reason: delayedReason ?? null
+        })
+      );
+    }
 
     return NextResponse.json(
       ledgerPayload(result, {
@@ -335,7 +389,8 @@ export async function GET(request: Request) {
         viewer,
         canManage,
         canComment,
-        delayed
+        delayed,
+        delayedReason
       })
     );
   } catch (error) {

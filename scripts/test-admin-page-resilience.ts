@@ -13,6 +13,8 @@ assert.match(server, /options\.timeoutMs === 0/);
 
 const records = readFileSync("lib/staff/commission-ledger/records.ts", "utf8");
 assert.match(records, /LEDGER_LIST_COLUMNS/);
+assert.match(records, /q = q\.gte\(dateField, dateFrom\)/);
+assert.doesNotMatch(records, /fallbackField/);
 assert.doesNotMatch(records, /ensureCommissionLedgerHotPath/);
 assert.doesNotMatch(records, /ensureCommissionLedgerBackfill\(supabase\)/);
 assert.doesNotMatch(records, /ensureIvonneRejectedDuplicatesPurged/);
@@ -20,18 +22,28 @@ assert.doesNotMatch(records, /count: "exact"/);
 
 const commissionsRoute = readFileSync("app/api/admin/package-commissions/route.ts", "utf8");
 assert.match(commissionsRoute, /accessFromLegacyRole/);
-assert.match(commissionsRoute, /COMMISSIONS_QUERY_TIMEOUT_MS/);
+assert.match(commissionsRoute, /COMMISSIONS_QUERY_TIMEOUT_MS = 6_000/);
+assert.match(commissionsRoute, /listCommissionRecordsViaPostgres/);
+assert.match(commissionsRoute, /Promise\.any/);
+assert.match(commissionsRoute, /delayedReason/);
 assert.match(commissionsRoute, /listCommissionTrainersFromDb/);
 assert.match(commissionsRoute, /liveMatrix/);
 assert.match(commissionsRoute, /humanizeUnknownError/);
 assert.doesNotMatch(commissionsRoute, /listAdminUsers/);
 assert.doesNotMatch(commissionsRoute, /getServiceSupabase\(\)/);
+assert.doesNotMatch(commissionsRoute, /\.catch\(\(\) => \(\{ delayed: true/);
 
 const panel = readFileSync("components/admin/PackageCommissionsPanel.tsx", "utf8");
 assert.match(panel, /fetchAdminJson/);
 assert.match(panel, /loadError/);
+assert.match(panel, /delayedReason/);
 assert.doesNotMatch(panel, /await response\.json\(\)/);
 assert.match(panel, /timeoutMs: 8_000/);
+
+const postgresLedger = readFileSync("lib/staff/commission-ledger/list-via-postgres.ts", "utf8");
+assert.match(postgresLedger, /statement_timeout/);
+assert.match(postgresLedger, /package_commission_records/);
+assert.doesNotMatch(postgresLedger, /service_date >=/);
 
 const toast = readFileSync("components/admin/ui/ToastProvider.tsx", "utf8");
 assert.match(toast, /humanizeUnknownError/);

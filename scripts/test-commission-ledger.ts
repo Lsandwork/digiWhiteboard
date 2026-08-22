@@ -20,6 +20,7 @@ import {
   listCommissionTrainerOptions,
   type CommissionViewer
 } from "../lib/staff/commission-ledger";
+import { buildCommissionLedgerSelect } from "../lib/staff/commission-ledger/list-via-postgres";
 
 // Money (integer cents)
 assert.equal(parseMoneyToCents("$1,200.50"), 120050);
@@ -192,5 +193,32 @@ assert.equal(
     finalCommissionCents: 9999
   })
 );
+
+const indexedDateQuery = buildCommissionLedgerSelect(
+  { isTrainerOnly: false },
+  { dateFrom: "08/22/2026", dateTo: "08/22/2026", page: 1, pageSize: 25 }
+);
+assert.match(indexedDateQuery.text, /sale_date >= \$1/);
+assert.match(indexedDateQuery.text, /sale_date <= \$2/);
+assert.doesNotMatch(indexedDateQuery.text, /service_date >=/);
+assert.deepEqual(indexedDateQuery.values.slice(0, 2), ["2026-08-22", "2026-08-22"]);
+assert.match(indexedDateQuery.text, /archived_at is null/);
+assert.match(indexedDateQuery.text, /order by sale_date desc nulls last/i);
+assert.equal(indexedDateQuery.values.at(-2), 25);
+assert.equal(indexedDateQuery.values.at(-1), 0);
+
+const injectedSort = buildCommissionLedgerSelect(
+  { isTrainerOnly: false },
+  { sortBy: "sale_date;drop table package_commission_records", sortDir: "desc" }
+);
+assert.match(injectedSort.text, /order by sale_date desc/i);
+assert.doesNotMatch(injectedSort.text, /drop table/i);
+
+const trainerScoped = buildCommissionLedgerSelect(
+  { isTrainerOnly: true, adminUserId: "11111111-1111-1111-1111-111111111111" },
+  { page: 2, pageSize: 25 }
+);
+assert.match(trainerScoped.text, /trainer_user_id = \$1/);
+assert.equal(trainerScoped.from, 25);
 
 console.log("commission ledger: ok");
