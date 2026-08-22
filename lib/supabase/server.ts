@@ -7,8 +7,13 @@ function isConfigured(value: string | undefined, placeholder: string): value is 
 /** Interactive admin/staff routes. Abort hung REST so Cloudflare never serves a 522 HTML page. */
 export const SERVICE_SUPABASE_TIMEOUT_MS = 8_000;
 
-/** Cron / background jobs that already expect a longer run. */
-export const SERVICE_SUPABASE_CRON_TIMEOUT_MS = 60_000;
+/**
+ * Cron / background jobs. Kept well above interactive reads but far below the
+ * old 60s: `service_role` has no server-side statement_timeout, so a query the
+ * caller has already abandoned can keep holding its Postgres backend. With
+ * minute-by-minute crons that is how the connection pool gets exhausted.
+ */
+export const SERVICE_SUPABASE_CRON_TIMEOUT_MS = 20_000;
 
 type ServiceSupabaseOptions = {
   /**
