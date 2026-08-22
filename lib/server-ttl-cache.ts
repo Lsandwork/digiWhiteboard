@@ -68,7 +68,7 @@ export function debugBoardLog(enabled: boolean, message: string, details?: Recor
 /** Race a promise against a timeout. Does not cancel the underlying work. */
 export function withTimeoutFallback<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
-    promise,
+    promise.catch(() => fallback),
     new Promise<T>((resolve) => {
       setTimeout(() => resolve(fallback), ms);
     })

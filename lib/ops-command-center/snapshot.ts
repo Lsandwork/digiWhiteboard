@@ -681,7 +681,7 @@ export async function loadOpsCommandCenterSnapshot(input: {
   try {
     const snapshot = await withTimeoutFallback(
       buildOpsCommandCenterSnapshot(input),
-      OPS_SNAPSHOT_TIMEOUT_MS + 2_000,
+      OPS_SNAPSHOT_TIMEOUT_MS,
       null
     );
     if (snapshot) {

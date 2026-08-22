@@ -9,8 +9,9 @@ import {
 import { emptyOpsCommandCenterSnapshot } from "../lib/ops-command-center/snapshot";
 import { OPS_SNAPSHOT_TIMEOUT_MS } from "../lib/ops-command-center/constants";
 import { readResponseJson } from "../lib/http/read-response-json";
+import { withTimeoutFallback } from "../lib/server-ttl-cache";
 
-assert.equal(OPS_SNAPSHOT_TIMEOUT_MS, 6_000);
+assert.equal(OPS_SNAPSHOT_TIMEOUT_MS, 2_500);
 
 assert.equal(
   humanizeUnknownError(new Error("The string did not match the expected pattern."), "Unable to load My Shift. Retry shortly."),
@@ -50,16 +51,18 @@ async function testJsonReaders() {
 {
   const route = readFileSync("app/api/admin/ops-command-center/route.ts", "utf8");
   assert.match(route, /loadOpsCommandCenterSnapshot/);
-  assert.match(route, /timeoutMs:\s*OPS_SNAPSHOT_TIMEOUT_MS/);
+  assert.match(route, /accessFromLegacyRole/);
   assert.match(route, /maxDuration/);
+  assert.doesNotMatch(route, /getUserAccess/);
   assert.doesNotMatch(route, /buildOpsCommandCenterSnapshot\(/);
 }
 
 {
   const panel = readFileSync("components/admin/ops-command-center/OpsCommandCenterPanel.tsx", "utf8");
   assert.match(panel, /readResponseJson/);
-  assert.match(panel, /humanizeUnknownError/);
+  assert.match(panel, /emptyOpsCommandCenterSnapshot/);
   assert.doesNotMatch(panel, /45_000/);
+  assert.doesNotMatch(panel, /This page is taking too long to load/);
 }
 
 {

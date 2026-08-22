@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
-import { getUserAccess } from "@/lib/admin/user-access";
-import { getServiceSupabase } from "@/lib/supabase/server";
 import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
 import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { humanizeUnknownError } from "@/lib/safe-url";
@@ -43,14 +41,9 @@ async function requireOpsAccess(request: Request) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };
   const session = getAdminSessionFromRequest(request);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
-  const fallbackAccess = accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role);
-  const access =
-    (await withTimeoutFallback(
-      getUserAccess(supabase, session.adminUserId, session.role, session.email),
-      OPS_SNAPSHOT_TIMEOUT_MS,
-      fallbackAccess
-    )) ?? fallbackAccess;
+  // Session role is enough to open My Shift. A live permission-matrix read used
+  // to add 6s+ before the snapshot even started, which blew the client abort.
+  const access = accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role);
   const canView =
     hasPermission(access, "view_my_shift") ||
     hasPermission(access, "view_ops_command_center") ||
