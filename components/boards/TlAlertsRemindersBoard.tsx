@@ -34,6 +34,10 @@ import {
   TL_DAILY_TEAM_REMINDERS,
   shouldShowDailyTeamRemindersForServices
 } from "@/lib/tl-digi-board/daily-team-reminders";
+import {
+  TL_MEDICATIONS_FOCUS_REMINDERS,
+  shouldUseMedicationsFocusLayout
+} from "@/lib/tl-digi-board/medications-focus-layout";
 import "./tl-alerts-reminders-board.css";
 import { TlBoardPushTakeover } from "@/components/boards/TlBoardPushTakeover";
 import { DisplayClosedHoursGate } from "@/components/display/DisplayClosedHoursGate";
@@ -220,7 +224,7 @@ function DogPhoto({
 function MedicationTableRow({ row }: { row: TlBoardMedicationRow }) {
   const tone =
     row.displayStatus === "overdue"
-      ? "tl-table__row--overdue"
+      ? "tl-table__row--overdue tl-table__row--overdue-flash"
       : row.displayStatus === "needs_medication" ||
           row.displayStatus === "prepared" ||
           row.displayStatus === "partially_administered"
@@ -501,8 +505,15 @@ function BoardInner() {
     : [];
 
   const serviceRows = snapshot?.additionalServices ?? [];
+  // Full-width meds when Additional Services are all complete in Gingr (resolved meta only).
+  const medicationsFocus = shouldUseMedicationsFocusLayout({
+    hasResolved,
+    servicesHealth: meta?.servicesHealth,
+    servicesAllClear: Boolean(meta?.servicesAllClear)
+  });
   // Layout from resolved Additional Services only — avoids flash before first payload / last-good.
-  const showDailyTeamReminders = hasResolved && shouldShowDailyTeamRemindersForServices(serviceRows);
+  const showDailyTeamReminders =
+    hasResolved && !medicationsFocus && shouldShowDailyTeamRemindersForServices(serviceRows);
   const servicesPageSize = showDailyTeamReminders
     ? TL_SERVICES_PAGE_SIZE_WITH_REMINDERS
     : TL_SERVICES_PAGE_SIZE_EXPANDED;
@@ -522,6 +533,7 @@ function BoardInner() {
     allClear: Boolean(meta?.servicesAllClear),
     hasRows: serviceRows.length > 0
   });
+  const overdueCount = summary?.overdue ?? 0;
 
   const retryLabel =
     retryInSec != null && (headerKind === "issue" || headerKind === "stale" || headerKind === "delayed")
@@ -530,7 +542,7 @@ function BoardInner() {
 
   return (
     <>
-      <main className="tl-board">
+      <main className={`tl-board${medicationsFocus ? " tl-board--meds-focus" : ""}`}>
       <header className="tl-board__header">
         <div className="tl-board__brand">
           <div className="tl-board__logo-row">
@@ -581,7 +593,39 @@ function BoardInner() {
 
       {error && headerKind === "issue" ? <p className="tl-board__error">{error}</p> : null}
 
-      {summary && medCard !== "checking" && medCard !== "error" ? (
+      {medicationsFocus && medCard !== "checking" && medCard !== "error" ? (
+        <section className="tl-focus-banner" aria-label="Medication focus reminders">
+          <div className="tl-focus-banner__head">
+            <p className="tl-focus-banner__eyebrow">Additional Services · All Clear in Gingr</p>
+            <h2 className="tl-focus-banner__title">
+              Focus on medication{overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}
+            </h2>
+            <p className="tl-focus-banner__lead">
+              Record every dose in Gingr. Flashing rows mean NOT ADMINISTERED — mark them now.
+            </p>
+          </div>
+          <ul className="tl-focus-banner__list">
+            {TL_MEDICATIONS_FOCUS_REMINDERS.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+          {summary ? (
+            <div className="tl-focus-banner__stats" aria-label="Medication counts">
+              <span>
+                Due <strong>{summary.due}</strong>
+              </span>
+              <span>
+                Remaining <strong>{summary.remaining}</strong>
+              </span>
+              <span className={summary.overdue > 0 ? "tl-focus-banner__stat--overdue" : ""}>
+                Overdue <strong>{summary.overdue}</strong>
+              </span>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {!medicationsFocus && summary && medCard !== "checking" && medCard !== "error" ? (
         <section className="tl-board__stats" aria-label="Medication summary">
           <div className="tl-stat">
             <span className="tl-stat__label">Medications Due</span>
@@ -602,18 +646,23 @@ function BoardInner() {
         </section>
       ) : null}
 
-      <section className="tl-board__split">
+      <section className={`tl-board__split${medicationsFocus ? " tl-board__split--meds-only" : ""}`}>
         <GingrStatusCard
           title="Medication Reminders"
-          subtitle="Only shows items not yet completed in Gingr."
+          subtitle={
+            medicationsFocus
+              ? "Full-width focus — mark doses in Gingr. Overdue (NOT ADMINISTERED) rows flash."
+              : "Only shows items not yet completed in Gingr."
+          }
           kind={medCard}
           lastSync={lastSync}
           retryLabel={retryLabel}
           errorNoun="medications"
+          className={medicationsFocus ? "tl-panel--meds-focus" : undefined}
         >
           {medicationRows.length ? (
             <div className="tl-table-wrap">
-              <table className="tl-table">
+              <table className={`tl-table${medicationsFocus ? " tl-table--meds-focus" : ""}`}>
                 <thead>
                   <tr>
                     <th>Dog</th>
@@ -635,67 +684,69 @@ function BoardInner() {
           ) : null}
         </GingrStatusCard>
 
-        <div
-          className={`tl-board__stack${showDailyTeamReminders ? "" : " tl-board__stack--services-expanded"}`}
-        >
-          <GingrStatusCard
-            title="Additional Services"
-            subtitle="Only shows services not marked completed in Gingr."
-            kind={serviceCard}
-            lastSync={lastSync}
-            retryLabel={retryLabel}
-            errorNoun="additional services"
-            className="tl-panel--services"
-            allClearDetail={
-              servicesSummary?.completed ? `${servicesSummary.completed} completed in Gingr today.` : undefined
-            }
+        {!medicationsFocus ? (
+          <div
+            className={`tl-board__stack${showDailyTeamReminders ? "" : " tl-board__stack--services-expanded"}`}
           >
-            {serviceRows.length ? (
-              <div className={`tl-table-wrap${serviceRows.length > servicesPageSize ? " tl-table-wrap--paged" : ""}`}>
-                {servicePages.pageCount > 1 ? (
-                  <p className="tl-services-page" aria-live="polite">
-                    {servicePages.start}–{servicePages.end} of {servicePages.total}
-                  </p>
-                ) : null}
-                <table
-                  className={`tl-table tl-table--services${servicesDense ? " tl-table--services-dense" : ""}`}
-                >
-                  <thead>
-                    <tr>
-                      <th>Dog</th>
-                      <th>Service</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {servicePages.pageItems.map((row) => (
-                      <ServiceTableRow key={row.id} row={row} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-          </GingrStatusCard>
+            <GingrStatusCard
+              title="Additional Services"
+              subtitle="Only shows services not marked completed in Gingr."
+              kind={serviceCard}
+              lastSync={lastSync}
+              retryLabel={retryLabel}
+              errorNoun="additional services"
+              className="tl-panel--services"
+              allClearDetail={
+                servicesSummary?.completed ? `${servicesSummary.completed} completed in Gingr today.` : undefined
+              }
+            >
+              {serviceRows.length ? (
+                <div className={`tl-table-wrap${serviceRows.length > servicesPageSize ? " tl-table-wrap--paged" : ""}`}>
+                  {servicePages.pageCount > 1 ? (
+                    <p className="tl-services-page" aria-live="polite">
+                      {servicePages.start}–{servicePages.end} of {servicePages.total}
+                    </p>
+                  ) : null}
+                  <table
+                    className={`tl-table tl-table--services${servicesDense ? " tl-table--services-dense" : ""}`}
+                  >
+                    <thead>
+                      <tr>
+                        <th>Dog</th>
+                        <th>Service</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {servicePages.pageItems.map((row) => (
+                        <ServiceTableRow key={row.id} row={row} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </GingrStatusCard>
 
-          {showDailyTeamReminders ? (
-            <section className="tl-panel tl-panel--reminders" aria-label="Daily Team Reminders">
-              <div className="tl-panel__head">
-                <h2 className="tl-panel__title">Daily Team Reminders</h2>
-                <p className="tl-panel__sub">Standing checklist for the Team Lead floor.</p>
-              </div>
-              <ul className="tl-team-reminders">
-                {TL_DAILY_TEAM_REMINDERS.map((item) => (
-                  <li key={item} className="tl-team-reminders__item">
-                    <span className="tl-team-reminders__mark" aria-hidden>
-                      ✓
-                    </span>
-                    <span className="tl-team-reminders__text">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </div>
+            {showDailyTeamReminders ? (
+              <section className="tl-panel tl-panel--reminders" aria-label="Daily Team Reminders">
+                <div className="tl-panel__head">
+                  <h2 className="tl-panel__title">Daily Team Reminders</h2>
+                  <p className="tl-panel__sub">Standing checklist for the Team Lead floor.</p>
+                </div>
+                <ul className="tl-team-reminders">
+                  {TL_DAILY_TEAM_REMINDERS.map((item) => (
+                    <li key={item} className="tl-team-reminders__item">
+                      <span className="tl-team-reminders__mark" aria-hidden>
+                        ✓
+                      </span>
+                      <span className="tl-team-reminders__text">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
       </section>
       </main>
       <TlBoardPushTakeover />

@@ -35,6 +35,7 @@
     "test:tl-board-dog-photos": "tsx scripts/test-tl-board-dog-photos.ts",
     "test:tl-board-push-takeover": "tsx scripts/test-tl-board-push-takeover.ts",
     "test:tl-daily-team-reminders": "tsx scripts/test-tl-daily-team-reminders.ts",
+    "test:tl-medications-focus-layout": "tsx scripts/test-tl-medications-focus-layout.ts",
     "test:package-group-walks": "tsx scripts/test-package-group-walks.ts",
     "test:tl-additional-services": "tsx scripts/test-tl-additional-services.ts",
     "test:tl-additional-services-audit": "tsx scripts/test-tl-additional-services-audit.ts",
