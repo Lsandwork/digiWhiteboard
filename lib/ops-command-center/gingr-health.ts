@@ -41,6 +41,8 @@ export function evaluateGingrHealth(input: {
   lastWebhookAt?: string | null;
   lastDogSeenAt?: string | null;
   nowMs?: number;
+  /** True when the timestamp probes timed out — missing stamps are not "Gingr never synced". */
+  probeTimedOut?: boolean;
 }): GingrHealthSnapshot {
   const nowMs = input.nowMs ?? Date.now();
   const webhookAt = input.lastWebhookAt ?? null;
@@ -51,6 +53,16 @@ export function evaluateGingrHealth(input: {
   const freshestAge = ageMs(freshestAt, nowMs);
 
   if (freshestAge == null) {
+    if (input.probeTimedOut) {
+      return {
+        status: "degraded",
+        label: "Gingr ● Checking…",
+        detail: "Gingr health check is still catching up. The staff board still updates when Gingr requests succeed.",
+        webhookAt,
+        lastSeenAt,
+        freshestAt
+      };
+    }
     return {
       status: "unknown",
       label: "Gingr ● Status unknown",

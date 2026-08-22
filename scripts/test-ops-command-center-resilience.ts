@@ -7,11 +7,13 @@ import {
   LIVE_DATA_UNAVAILABLE_MESSAGE
 } from "../lib/safe-url";
 import { emptyOpsCommandCenterSnapshot } from "../lib/ops-command-center/snapshot";
-import { OPS_SNAPSHOT_TIMEOUT_MS } from "../lib/ops-command-center/constants";
+import { OPS_SNAPSHOT_BUILD_TIMEOUT_MS, OPS_SNAPSHOT_TIMEOUT_MS } from "../lib/ops-command-center/constants";
 import { readResponseJson } from "../lib/http/read-response-json";
 import { withTimeoutFallback } from "../lib/server-ttl-cache";
 
-assert.equal(OPS_SNAPSHOT_TIMEOUT_MS, 2_500);
+assert.equal(OPS_SNAPSHOT_TIMEOUT_MS, 6_000);
+assert.equal(OPS_SNAPSHOT_BUILD_TIMEOUT_MS, 7_000);
+assert.ok(OPS_SNAPSHOT_BUILD_TIMEOUT_MS > OPS_SNAPSHOT_TIMEOUT_MS);
 
 assert.equal(
   humanizeUnknownError(new Error("The string did not match the expected pattern."), "Unable to load My Shift. Retry shortly."),
@@ -30,10 +32,14 @@ const empty = emptyOpsCommandCenterSnapshot({
   roleKey: "super_admin",
   roleLabel: "Super Admin"
 });
-assert.equal(empty.stale, true);
 assert.equal(empty.greetingName, "Lonnie");
 assert.equal(empty.shiftSummary.dogsOnFloor, 0);
-assert.equal(empty.gingrHealth.status, "degraded");
+assert.equal(empty.pending, true);
+assert.equal(empty.stale, false);
+assert.equal(empty.gingrHealth.status, "healthy");
+assert.equal(empty.staffOpsHealth.status, "ok");
+assert.doesNotMatch(empty.staffOpsHealth.detail || "", /could not be loaded/);
+assert.doesNotMatch(empty.gingrHealth.detail || "", /No Gingr webhook/);
 
 async function testJsonReaders() {
   const html = new Response("<!DOCTYPE html><html><title>supabas out</title>Error code 522</html>", {
@@ -63,12 +69,16 @@ async function testJsonReaders() {
   assert.match(panel, /emptyOpsCommandCenterSnapshot/);
   assert.doesNotMatch(panel, /45_000/);
   assert.doesNotMatch(panel, /This page is taking too long to load/);
+  assert.match(panel, /data\.pending/);
+  assert.match(panel, /staffOpsHealth.status === "error"/);
 }
 
 {
   const snapshot = readFileSync("lib/ops-command-center/snapshot.ts", "utf8");
   assert.match(snapshot, /OPS_SNAPSHOT_TIMEOUT_MS/);
+  assert.match(snapshot, /OPS_SNAPSHOT_BUILD_TIMEOUT_MS/);
   assert.match(snapshot, /last-good|OPS_SNAPSHOT_LAST_GOOD_KEY/);
+  assert.match(snapshot, /shouldCacheOpsSnapshot|probeTimedOut|delayedStaffFeed/);
 }
 
 void testJsonReaders()

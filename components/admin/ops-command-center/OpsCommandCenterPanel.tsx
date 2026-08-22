@@ -270,7 +270,7 @@ export function OpsCommandCenterPanel({
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full border px-3 py-1 text-xs ${
-              data.gingrHealth.status === "healthy"
+              data.pending || loading || data.gingrHealth.status === "healthy"
                 ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
                 : data.gingrHealth.status === "degraded"
                   ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
@@ -278,7 +278,7 @@ export function OpsCommandCenterPanel({
             }`}
             title={data.gingrHealth.detail || undefined}
           >
-            {data.gingrHealth.label}
+            {data.pending || loading ? "Gingr ● Checking…" : data.gingrHealth.label}
           </span>
           <button type="button" className="admin-btn-secondary" onClick={() => void load()}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -287,14 +287,14 @@ export function OpsCommandCenterPanel({
         </div>
       </header>
 
-      {data.stale ? (
+      {data.stale && !data.pending && !loading ? (
         <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <p>Live data is delayed. Showing the last good My Shift until the database responds.</p>
         </div>
       ) : null}
 
-      {data.gingrHealth.status !== "healthy" ? (
+      {!data.pending && !loading && data.gingrHealth.status !== "healthy" && data.gingrHealth.status !== "degraded" ? (
         <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
@@ -304,7 +304,7 @@ export function OpsCommandCenterPanel({
         </div>
       ) : null}
 
-      {data.staffOpsHealth && data.staffOpsHealth.status !== "ok" ? (
+      {!data.pending && !loading && data.staffOpsHealth && data.staffOpsHealth.status === "error" ? (
         <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-50">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>

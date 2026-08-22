@@ -64,12 +64,14 @@ export async function GET(request: Request) {
     };
 
     if (fresh) setTtlCache("board-checkouts:fast", result, FAST_CHECKOUT_CACHE_TTL_MS);
-    setTtlCache(LAST_GOOD_KEY, payload, 120_000);
+    if (result.checking_in.length || result.checking_out.length) {
+      setTtlCache(LAST_GOOD_KEY, payload, 120_000);
+    }
 
     after(async () => {
-      const supabase = getServiceSupabase();
-      // Never awaited by the board response — keeps the Gingr basket ~5s fresh
-      // so a dog added to the basket shows up without waiting for the slow poll.
+      const supabase = getServiceSupabase({ timeoutMs: FAST_CHECKOUT_QUERY_TIMEOUT_MS });
+      // Always refresh Gingr here — even when the Supabase query timed out —
+      // so the next 500ms empty-board poll can paint a just-added basket dog.
       const [, , cleared, swept] = await Promise.all([
         refreshGingrBoardCache().catch(() => null),
         refreshRetiredTransitionKeys(supabase, now).catch(() => null),
@@ -106,6 +108,9 @@ export async function GET(request: Request) {
       }
     });
   } catch (error) {
+    after(async () => {
+      await refreshGingrBoardCache().catch(() => null);
+    });
     const message = error instanceof Error ? error.message : "Unable to load fast checkout board.";
     const lastGood = getTtlCache<Record<string, unknown>>(LAST_GOOD_KEY);
     debugBoardLog(debugBoard, "fast checkouts failed", { error: message, hasLastGood: Boolean(lastGood) });

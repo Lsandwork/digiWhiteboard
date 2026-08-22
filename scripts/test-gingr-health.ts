@@ -28,4 +28,13 @@ assert.equal(degraded.status, "degraded");
 const unknown = evaluateGingrHealth({ lastWebhookAt: null, lastDogSeenAt: null, nowMs });
 assert.equal(unknown.status, "unknown");
 
+const timedOutProbe = evaluateGingrHealth({
+  lastWebhookAt: null,
+  lastDogSeenAt: null,
+  nowMs,
+  probeTimedOut: true
+});
+assert.equal(timedOutProbe.status, "degraded");
+assert.doesNotMatch(timedOutProbe.detail, /No Gingr webhook or board dog sync timestamps yet/);
+
 console.log("gingr health tests passed");

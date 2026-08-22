@@ -34,11 +34,17 @@ assert.ok(getGingrBoardRefreshIntervalMs() <= 2000);
 {
   const checkouts = source("app/api/board/checkouts/route.ts");
   assert.match(checkouts, /private, no-store, max-age=0/);
+  assert.match(checkouts, /refreshGingrBoardCache\(\)\.catch/);
+  const fastCheckout = source("lib/board-fast-checkout.ts");
+  assert.match(fastCheckout, /supabaseTimedOut/);
+  assert.match(fastCheckout, /gingr_back_of_house_cache/);
   const liveBoard = source("app/api/live-board/route.ts");
   assert.match(liveBoard, /getCachedBackOfHouseBoard/);
   assert.match(liveBoard, /private, no-store, max-age=0/);
   const webhook = source("app/api/gingr/webhook/route.ts");
   assert.match(webhook, /Promise\.all\(\[reservationQuery, visibleQuery\]\)/);
+  assert.match(webhook, /resolveActiveBoardWebhookType/);
+  assert.match(webhook, /timeoutMs: WEBHOOK_WRITE_TIMEOUT_MS/);
 }
 
 {

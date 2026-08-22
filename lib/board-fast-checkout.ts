@@ -43,11 +43,12 @@ export type FastCheckoutLoadResult = {
   expired_checkout_rows: number;
   basket_filtered: boolean;
   basket_cleared_rows: number;
-  data_source: "supabase_live_transition_dogs";
+  data_source: "supabase_live_transition_dogs" | "gingr_back_of_house_cache";
 };
 
 export type FastBoardTransitionLoadResult = FastCheckoutLoadResult & {
   checking_in: LiveDog[];
+  supabase_timed_out?: boolean;
 };
 
 function enrichDogs(dogs: LiveDog[]) {
@@ -219,34 +220,41 @@ export async function loadFastPromptedCheckouts(
 
 /**
  * Staff board fast path: one Supabase query for both active check-ins and
- * prompted checkouts. This avoids waiting for the heavier Gingr-backed
- * /api/live-board request before a webhook-triggered dog can appear.
+ * prompted checkouts, then merge the cached Gingr basket. A Supabase timeout
+ * must still return those cached basket dogs — otherwise a hung REST call
+ * hides a dog that is already in Gingr.
  */
 export async function loadFastBoardTransitions(
   supabase: SupabaseClient,
   now = new Date()
 ): Promise<FastBoardTransitionLoadResult> {
-  const { data, error } = await withTimeoutOrThrow(
-    Promise.resolve(
-      supabase
-        .from("live_transition_dogs")
-        .select(
-          "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at"
-        )
-        .eq("hidden", false)
-        .in("display_status", ["checking_in", "checking_out"])
-        // Newest first, and never let null anchors sort ahead of real transitions —
-        // a row limit must not hide the dog that just checked in or out.
-        .order("status_started_at", { ascending: false, nullsFirst: false })
-        .limit(FAST_BOARD_ROW_LIMIT)
-    ),
-    FAST_CHECKOUT_QUERY_TIMEOUT_MS,
-    "fast-board live_transition_dogs"
-  );
+  let rows: LiveDog[] = [];
+  let supabaseTimedOut = false;
+  try {
+    const { data, error } = await withTimeoutOrThrow(
+      Promise.resolve(
+        supabase
+          .from("live_transition_dogs")
+          .select(
+            "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at"
+          )
+          .eq("hidden", false)
+          .in("display_status", ["checking_in", "checking_out"])
+          // Newest first, and never let null anchors sort ahead of real transitions —
+          // a row limit must not hide the dog that just checked in or out.
+          .order("status_started_at", { ascending: false, nullsFirst: false })
+          .limit(FAST_BOARD_ROW_LIMIT)
+      ),
+      FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+      "fast-board live_transition_dogs"
+    );
+    if (error) throw error;
+    rows = enrichDogs((data ?? []) as LiveDog[]);
+  } catch {
+    supabaseTimedOut = true;
+    rows = [];
+  }
 
-  if (error) throw error;
-
-  const rows = enrichDogs((data ?? []) as LiveDog[]);
   const gingrBoardDogs = loadCachedGingrBoardDogs(now).filter((dog) => !isRetiredGingrDog(dog));
 
   const checkinRows = rows.filter((dog) => dog.display_status === "checking_in");
@@ -265,16 +273,18 @@ export async function loadFastBoardTransitions(
   );
 
   let visible = applyCachedBackOfHousePhotos([...visibleCheckins, ...visibleCheckouts]);
-  try {
-    visible = applyCachedBackOfHousePhotos(
-      await withTimeoutOrThrow(
-        applyStoredAnimalPhotos(supabase, visible),
-        FAST_CHECKOUT_PHOTO_TIMEOUT_MS,
-        "fast-board photos"
-      )
-    );
-  } catch {
-    // Photos are optional — dog status should never wait for photo storage.
+  if (!supabaseTimedOut) {
+    try {
+      visible = applyCachedBackOfHousePhotos(
+        await withTimeoutOrThrow(
+          applyStoredAnimalPhotos(supabase, visible),
+          FAST_CHECKOUT_PHOTO_TIMEOUT_MS,
+          "fast-board photos"
+        )
+      );
+    } catch {
+      // Photos are optional — dog status should never wait for photo storage.
+    }
   }
 
   const checkingIn = visible.filter((dog) => dog.display_status === "checking_in");
@@ -290,7 +300,8 @@ export async function loadFastBoardTransitions(
     expired_checkout_rows: expiredCount,
     basket_filtered: basketFiltered,
     basket_cleared_rows: 0,
-    data_source: "supabase_live_transition_dogs"
+    data_source: supabaseTimedOut ? "gingr_back_of_house_cache" : "supabase_live_transition_dogs",
+    supabase_timed_out: supabaseTimedOut
   };
 }
 

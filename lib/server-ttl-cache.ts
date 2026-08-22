@@ -65,6 +65,24 @@ export function debugBoardLog(enabled: boolean, message: string, details?: Recor
   console.info(`[FitdogBoardDebug] ${message}`);
 }
 
+export type TimeoutResult<T> = { value: T; timedOut: boolean };
+
+/** Race a promise against a timeout and report whether the fallback was used. */
+export function withTimeoutResult<T>(promise: Promise<T>, ms: number, fallback: T): Promise<TimeoutResult<T>> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve({ value: fallback, timedOut: true }), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve({ value, timedOut: false });
+      })
+      .catch(() => {
+        clearTimeout(timer);
+        resolve({ value: fallback, timedOut: true });
+      });
+  });
+}
+
 /** Race a promise against a timeout. Does not cancel the underlying work. */
 export function withTimeoutFallback<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([
