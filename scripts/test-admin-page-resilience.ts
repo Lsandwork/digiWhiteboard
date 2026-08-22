@@ -47,6 +47,9 @@ const postgresLedger = readFileSync("lib/staff/commission-ledger/list-via-postgr
 assert.match(postgresLedger, /statement_timeout/);
 assert.match(postgresLedger, /package_commission_records/);
 assert.match(postgresLedger, /6543/);
+assert.match(postgresLedger, /rejectUnauthorized: false/);
+// The connection string itself must carry no sslmode (see test:commission-ledger).
+assert.doesNotMatch(postgresLedger, /\$\{database\}\?/);
 assert.doesNotMatch(postgresLedger, /service_date >=/);
 
 const restLedger = readFileSync("lib/staff/commission-ledger/list-via-rest.ts", "utf8");

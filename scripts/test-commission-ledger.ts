@@ -20,7 +20,10 @@ import {
   listCommissionTrainerOptions,
   type CommissionViewer
 } from "../lib/staff/commission-ledger";
-import { buildCommissionLedgerSelect } from "../lib/staff/commission-ledger/list-via-postgres";
+import {
+  buildCommissionLedgerSelect,
+  buildLedgerDatabaseUrl
+} from "../lib/staff/commission-ledger/list-via-postgres";
 import { buildCommissionLedgerRestPath } from "../lib/staff/commission-ledger/list-via-rest";
 
 // Money (integer cents)
@@ -234,5 +237,18 @@ assert.match(restPath.path, /order=sale_date\.desc\.nullslast/);
 assert.match(restPath.path, /limit=25/);
 assert.doesNotMatch(restPath.path, /sale_date=gte/);
 assert.equal(restPath.pageSize, 25);
+
+// `sslmode=require` in the connection string is parsed as verify-full and
+// overrides the client's ssl options, which rejected Supabase's pooler chain
+// with "self-signed certificate in certificate chain".
+const previousPassword = process.env.SUPABASE_DB_PASSWORD;
+process.env.SUPABASE_DB_PASSWORD = "p@ss:word/1";
+const pooledUrl = buildLedgerDatabaseUrl();
+assert.ok(pooledUrl, "pooler URL should build when a password is set");
+assert.doesNotMatch(pooledUrl, /sslmode/);
+assert.match(pooledUrl, /@aws-0-us-east-1\.pooler\.supabase\.com:6543\/postgres$/);
+assert.match(pooledUrl, /p%40ss%3Aword%2F1/);
+if (previousPassword === undefined) delete process.env.SUPABASE_DB_PASSWORD;
+else process.env.SUPABASE_DB_PASSWORD = previousPassword;
 
 console.log("commission ledger: ok");
