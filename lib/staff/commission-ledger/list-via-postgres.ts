@@ -35,6 +35,11 @@ export function canListCommissionsViaPostgres(): boolean {
   return Boolean(buildDatabaseUrl());
 }
 
+/** Exposed for diagnostics; returns a connection string, never logged. */
+export function buildLedgerDatabaseUrl(): string | null {
+  return buildDatabaseUrl({ usePooler: true, port: "6543" });
+}
+
 function ledgerSelectList(): string {
   return LEDGER_LIST_COLUMNS.split(", ")
     .map((column) => (TEXT_CAST_COLUMNS.has(column) ? `${column}::text as ${column}` : column))

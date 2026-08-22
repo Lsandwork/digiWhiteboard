@@ -53,6 +53,15 @@ const restLedger = readFileSync("lib/staff/commission-ledger/list-via-rest.ts", 
 assert.match(restLedger, /count=none/);
 assert.match(restLedger, /package_commission_records/);
 
+const diagnostics = readFileSync("lib/staff/commission-ledger/diagnostics.ts", "utf8");
+assert.match(diagnostics, /legacy_settings_rows/);
+assert.match(diagnostics, /direct_postgres/);
+assert.match(diagnostics, /rest_exact_count/);
+// Diagnostics must report configuration presence, never secret values.
+assert.doesNotMatch(diagnostics, /process\.env\.SUPABASE_SERVICE_ROLE_KEY\s*\}/);
+assert.match(commissionsRoute, /view === "diagnostics"/);
+assert.match(commissionsRoute, /Super Admin only/);
+
 const toast = readFileSync("components/admin/ui/ToastProvider.tsx", "utf8");
 assert.match(toast, /humanizeUnknownError/);
 

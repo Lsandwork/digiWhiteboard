@@ -205,6 +205,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const sortDir = (searchParams.get("sortDir") === "asc" ? "asc" : "desc") as "asc" | "desc";
 
   const isTrainer = Boolean(data?.currentUser?.isTrainerOnly);
+  const isSuperAdmin = Boolean(data?.currentUser?.isSuperAdmin);
   const ledgerBodyText = isTrainer ? "text-sm leading-snug" : "text-base leading-snug";
   const ledgerHeadText = isTrainer ? "text-[11px]" : "text-xs";
   const ledgerTypeText = isTrainer ? "text-xs" : "text-sm";
@@ -330,8 +331,8 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         if (body.delayed) {
           setLoadError(
             body.delayedReason
-              ? `Commission ledger is delayed. ${body.delayedReason}`
-              : "Commission ledger is delayed."
+              ? `Commission ledger did not load — ${body.delayedReason}`
+              : "Commission ledger did not load."
           );
           if (Array.isArray(body.rows) && body.rows.length > 0) {
             setData(body as LedgerPayload);
@@ -791,6 +792,19 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       <button type="button" className="underline" onClick={() => void load()}>
                         Retry
                       </button>
+                      {isSuperAdmin ? (
+                        <>
+                          {" · "}
+                          <a
+                            className="underline"
+                            href="/api/admin/package-commissions?view=diagnostics"
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Run diagnostics
+                          </a>
+                        </>
+                      ) : null}
                     </td>
                   </tr>
                 ) : !data?.rows?.length ? (
