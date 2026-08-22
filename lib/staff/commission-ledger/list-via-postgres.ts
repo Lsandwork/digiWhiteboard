@@ -9,25 +9,23 @@ import { LEDGER_LIST_COLUMNS, LEDGER_SORTABLE_COLUMNS } from "./records";
 import type { CommissionListFilters, CommissionListResult, CommissionViewer } from "./types";
 
 const PROJECT_REF = "tzkocaucqtmmnrttxira";
-const CONNECT_TIMEOUT_MS = 2_000;
+const CONNECT_TIMEOUT_MS = 1_200;
 const STATEMENT_TIMEOUT_MS = 4_000;
 
 const DATE_COLUMNS = new Set(["sale_date", "service_date", "created_at", "confirmed_at", "paid_at"]);
 const TEXT_CAST_COLUMNS = new Set(["sale_date", "service_date", "archived_at", "created_at", "updated_at"]);
 
-function buildDatabaseUrl(options?: { usePooler?: boolean }): string | null {
+function buildDatabaseUrl(options?: { usePooler?: boolean; port?: string }): string | null {
   const password = process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD;
   if (password?.trim()) {
-    const usePooler =
-      options?.usePooler ??
-      (process.env.SUPABASE_USE_DIRECT !== "true" && process.env.SUPABASE_USE_POOLER !== "false");
+    const usePooler = options?.usePooler ?? true;
     const host =
       process.env.SUPABASE_DB_HOST ??
       (usePooler ? "aws-0-us-east-1.pooler.supabase.com" : `db.${PROJECT_REF}.supabase.co`);
-    const port = process.env.SUPABASE_DB_PORT ?? "5432";
+    const port = options?.port ?? process.env.SUPABASE_DB_PORT ?? (usePooler ? "6543" : "5432");
     const user = process.env.SUPABASE_DB_USER ?? (usePooler ? `postgres.${PROJECT_REF}` : "postgres");
     const database = process.env.SUPABASE_DB_NAME ?? "postgres";
-    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password.trim())}@${host}:${port}/${database}`;
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password.trim())}@${host}:${port}/${database}?sslmode=require`;
   }
   const direct = process.env.DATABASE_URL ?? process.env.SUPABASE_DB_URL ?? process.env.POSTGRES_URL;
   return direct?.trim() || null;
@@ -52,7 +50,7 @@ export function buildCommissionLedgerSelect(
   filters: CommissionListFilters = {}
 ): { text: string; values: unknown[]; page: number; pageSize: number; from: number } {
   const page = Math.max(1, filters.page ?? 1);
-  const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
+  const pageSize = Math.min(25, Math.max(10, filters.pageSize ?? 25));
   const from = (page - 1) * pageSize;
   const sortBy = LEDGER_SORTABLE_COLUMNS[filters.sortBy ?? "sale_date"] ?? "sale_date";
   const ascending = (filters.sortDir ?? "desc") === "asc";
@@ -138,11 +136,18 @@ limit ${param(pageSize)} offset ${param(from)}`;
 }
 
 async function connectPg(): Promise<Client> {
-  const attempts: Array<{ usePooler: boolean }> = [{ usePooler: true }, { usePooler: false }];
+  const hasPassword = Boolean(
+    (process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD)?.trim()
+  );
+  const attempts: Array<{ usePooler: boolean; port?: string }> = hasPassword
+    ? [{ usePooler: true, port: "6543" }]
+    : [{ usePooler: true }];
   let lastError: unknown;
+  const seen = new Set<string>();
   for (const attempt of attempts) {
     const databaseUrl = buildDatabaseUrl(attempt);
-    if (!databaseUrl) break;
+    if (!databaseUrl || seen.has(databaseUrl)) continue;
+    seen.add(databaseUrl);
     const client = new Client({
       connectionString: databaseUrl,
       ssl: { rejectUnauthorized: false },
@@ -151,7 +156,9 @@ async function connectPg(): Promise<Client> {
     });
     try {
       await client.connect();
-      await client.query(`set statement_timeout = ${STATEMENT_TIMEOUT_MS}`);
+      if (attempt.port !== "6543") {
+        await client.query(`set statement_timeout = ${STATEMENT_TIMEOUT_MS}`);
+      }
       return client;
     } catch (error) {
       lastError = error;

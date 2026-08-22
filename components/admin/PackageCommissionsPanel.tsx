@@ -269,27 +269,28 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     setLoading(true);
     setLoadError(null);
     try {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("view", "ledger");
-      if (tab === "ledger" || tab === "reports") {
-        params.delete("reviewStatus");
-        params.delete("approvalStatus");
-      }
-      if (tab === "needs_review") {
-        params.set("reviewStatus", "needs_review,disputed");
-        params.delete("approvalStatus");
-      }
-      if (tab === "approval") {
-        params.set("approvalStatus", "pending");
-        params.delete("reviewStatus");
-      }
-      if (tab === "rules" || tab === "payroll" || tab === "imports") {
-        params.set("view", tab === "rules" ? "rules" : tab === "payroll" ? "payroll" : "imports");
-      }
-      if (tab === "reports") {
-        params.set("view", "report");
-        params.set("reportType", reportType);
-        params.set("pageSize", "5000");
+      const params = new URLSearchParams();
+      if (tab === "ledger" || tab === "needs_review" || tab === "approval") {
+        params.set("view", "ledger");
+        params.set("fast", "1");
+        params.set("pageSize", "25");
+        params.set("page", searchParams.get("page") ?? "1");
+        const trainerIds = searchParams.get("trainerIds") ?? searchParams.get("trainer");
+        if (trainerIds) params.set("trainerIds", trainerIds);
+        if (tab === "needs_review") params.set("reviewStatus", "needs_review,disputed");
+        if (tab === "approval") params.set("approvalStatus", "pending");
+      } else {
+        const copied = new URLSearchParams(searchParams.toString());
+        copied.set("view", "ledger");
+        if (tab === "rules" || tab === "payroll" || tab === "imports") {
+          copied.set("view", tab === "rules" ? "rules" : tab === "payroll" ? "payroll" : "imports");
+        }
+        if (tab === "reports") {
+          copied.set("view", "report");
+          copied.set("reportType", reportType);
+          copied.set("pageSize", "5000");
+        }
+        copied.forEach((value, key) => params.set(key, value));
       }
 
       const { ok, body } = await fetchAdminJson<
@@ -299,7 +300,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           delayed?: boolean;
           delayedReason?: string | null;
         }
-      >(`/api/admin/package-commissions?${params.toString()}`, { timeoutMs: 8_000 });
+      >(`/api/admin/package-commissions?${params.toString()}`, { timeoutMs: 10_000 });
       if (!ok) throw new Error(body.error ?? "Unable to load commissions.");
       if (tab === "reports") {
         setData({
@@ -348,6 +349,20 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           }
         } else {
           setData(body as LedgerPayload);
+          const dateFrom = searchParams.get("dateFrom");
+          const dateTo = searchParams.get("dateTo");
+          if (tab === "ledger" && (dateFrom || dateTo)) {
+            const filtered = new URLSearchParams(params);
+            filtered.delete("fast");
+            if (dateFrom) filtered.set("dateFrom", dateFrom);
+            if (dateTo) filtered.set("dateTo", dateTo);
+            const second = await fetchAdminJson<
+              LedgerPayload & { delayed?: boolean; delayedReason?: string | null }
+            >(`/api/admin/package-commissions?${filtered.toString()}`, { timeoutMs: 6_000 });
+            if (second.ok && !second.body.delayed && Array.isArray(second.body.rows)) {
+              setData(second.body as LedgerPayload);
+            }
+          }
         }
       } else {
         setData((current) => ({
