@@ -11,10 +11,50 @@ import { loadEnvFiles } from "./load-env-local";
  * connection forever, then clears backends that are already stuck.
  * Pass --apply to make changes; default is a dry run.
  */
-function directUrl() {
+const PROJECT_REF = "tzkocaucqtmmnrttxira";
+
+/**
+ * The direct host (db.<ref>.supabase.co) is IPv6-only on current Supabase
+ * projects, so it is unreachable from most home/office IPv4 networks. Try it,
+ * then fall back to the Supavisor session pooler, which accepts the same
+ * `alter role` / `pg_terminate_backend` statements.
+ */
+function candidateUrls() {
   const password = process.env.SUPABASE_DB_PASSWORD?.trim();
   if (!password) throw new Error("missing SUPABASE_DB_PASSWORD");
-  return `postgresql://postgres:${encodeURIComponent(password)}@db.tzkocaucqtmmnrttxira.supabase.co:5432/postgres`;
+  const secret = encodeURIComponent(password);
+  return [
+    {
+      label: "direct (db.<ref>.supabase.co:5432)",
+      url: `postgresql://postgres:${secret}@db.${PROJECT_REF}.supabase.co:5432/postgres`
+    },
+    {
+      label: "session pooler (aws-0-us-east-1.pooler.supabase.com:5432)",
+      url: `postgresql://postgres.${PROJECT_REF}:${secret}@aws-0-us-east-1.pooler.supabase.com:5432/postgres`
+    }
+  ];
+}
+
+async function connect() {
+  let lastError: unknown;
+  for (const candidate of candidateUrls()) {
+    const client = new Client({
+      connectionString: candidate.url,
+      ssl: { rejectUnauthorized: false },
+      connectionTimeoutMillis: 10_000,
+      statement_timeout: 30_000
+    });
+    try {
+      await client.connect();
+      console.log(`connected via ${candidate.label}`);
+      return client;
+    } catch (error) {
+      console.log(`could not connect via ${candidate.label}: ${error instanceof Error ? error.message : error}`);
+      lastError = error;
+      await client.end().catch(() => undefined);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("could not connect to Postgres");
 }
 
 /**
@@ -30,13 +70,7 @@ const API_ROLES = ["service_role"] as const;
 async function main() {
   loadEnvFiles();
   const apply = process.argv.includes("--apply");
-  const client = new Client({
-    connectionString: directUrl(),
-    ssl: { rejectUnauthorized: false },
-    connectionTimeoutMillis: 25_000,
-    statement_timeout: 30_000
-  });
-  await client.connect();
+  const client = await connect();
   console.log(apply ? "mode: APPLY" : "mode: dry run (pass --apply to change anything)");
 
   const before = await client.query<{ total: string; stuck: string }>(
