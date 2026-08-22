@@ -7,7 +7,12 @@ import {
 } from "@/lib/board-checkout-merge";
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl } from "@/lib/animal-photo-store";
-import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
+import {
+  FAST_BOARD_ROW_LIMIT,
+  FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+  loadFastPromptedCheckouts
+} from "@/lib/board-fast-checkout";
+import { withTimeoutOrThrow } from "@/lib/server-ttl-cache";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { getGingrAnimalPhotoUrlMap } from "@/lib/gingr-animal-photo";
 import {
@@ -22,6 +27,13 @@ import type { LobbyCheckoutDog } from "@/lib/lobby/types";
 import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
+
+/** Lobby hot-path columns — avoid select(*) on a table that grows all day. */
+const LOBBY_CHECKOUT_ROW_SELECT =
+  "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at";
+
+/** Full lobby sync may call Gingr + photo enrichment; keep bounded like the staff board. */
+export const LOBBY_FULL_CHECKOUT_TIMEOUT_MS = 8_000;
 
 export function isVisibleLobbyCheckoutDog(
   dog: LiveDog,
@@ -92,12 +104,20 @@ async function loadSupabaseCheckoutDogs(
   now: Date,
   options: { promptedOnly: boolean }
 ) {
-  const { data, error } = await supabase
-    .from("live_transition_dogs")
-    .select("*")
-    .eq("hidden", false)
-    .eq("display_status", "checking_out")
-    .order("status_started_at", { ascending: true });
+  const { data, error } = await withTimeoutOrThrow(
+    Promise.resolve(
+      supabase
+        .from("live_transition_dogs")
+        .select(LOBBY_CHECKOUT_ROW_SELECT)
+        .eq("hidden", false)
+        .eq("display_status", "checking_out")
+        // Newest first — a row limit must never hide the dog that just checked out.
+        .order("status_started_at", { ascending: false, nullsFirst: false })
+        .limit(FAST_BOARD_ROW_LIMIT)
+    ),
+    FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+    "lobby-checkout live_transition_dogs"
+  );
 
   if (error) throw error;
 

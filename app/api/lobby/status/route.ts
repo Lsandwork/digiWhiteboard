@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
+import { FAST_CHECKOUT_QUERY_TIMEOUT_MS } from "@/lib/board-fast-checkout";
 import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
-import { loadLobbyCheckoutDogs } from "@/lib/lobby/checkout";
+import { loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import { loadLobbySettings } from "@/lib/lobby/settings";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -12,9 +13,9 @@ export async function GET(request: Request) {
   const now = new Date();
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: FAST_CHECKOUT_QUERY_TIMEOUT_MS });
     const settings = await loadLobbySettings(supabase);
-    const checkout = await loadLobbyCheckoutDogs(supabase, settings.max_queue_count, now);
+    const checkout = await loadLobbyCheckoutDogsFast(supabase, now);
 
     return NextResponse.json({
       healthy: true,

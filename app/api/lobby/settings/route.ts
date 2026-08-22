@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { FAST_CHECKOUT_QUERY_TIMEOUT_MS } from "@/lib/board-fast-checkout";
 import { cachedLoadLobbySettings } from "@/lib/board-settings-cache";
 import { canReadLobbyBoard, isLobbyAdmin, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import { updateLobbySettings } from "@/lib/lobby/settings";
@@ -14,7 +15,10 @@ export async function GET(request: Request) {
   const debugBoard = new URL(request.url).searchParams.get("debugBoard") === "1";
 
   try {
-    const settings = sanitizeLobbySettings(await cachedLoadLobbySettings(getServiceSupabase()), debugBoard);
+    const settings = sanitizeLobbySettings(
+      await cachedLoadLobbySettings(getServiceSupabase({ timeoutMs: FAST_CHECKOUT_QUERY_TIMEOUT_MS })),
+      debugBoard
+    );
     return NextResponse.json(
       { settings },
       {

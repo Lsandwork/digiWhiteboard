@@ -5,7 +5,12 @@ import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
-import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
+import {
+  LOBBY_FULL_CHECKOUT_TIMEOUT_MS,
+  loadLobbyCheckoutDogs,
+  loadLobbyCheckoutDogsFast
+} from "@/lib/lobby/checkout";
+import { FAST_CHECKOUT_QUERY_TIMEOUT_MS } from "@/lib/board-fast-checkout";
 import { sanitizeLobbyCheckouts } from "@/lib/lobby/validate";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -33,7 +38,9 @@ export async function GET(request: Request) {
   const lastGoodKey = `${cacheKey}:last-good`;
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({
+      timeoutMs: fast ? FAST_CHECKOUT_QUERY_TIMEOUT_MS : LOBBY_FULL_CHECKOUT_TIMEOUT_MS
+    });
     const loadCheckouts = async () => {
       if (fast) return loadLobbyCheckoutDogsFast(supabase, now);
       const settings = await cachedLoadLobbySettings(supabase);
@@ -114,8 +121,10 @@ export async function GET(request: Request) {
       durationMs: Date.now() - startedAt
     });
     if (lastGood) {
+      // Last-good payloads are still valid board data — do not attach `error` or
+      // lobby clients treat the sync as failed and flash "Unable to verify lobby checkouts."
       return NextResponse.json(
-        sanitizeLobbyCheckouts({ ...lastGood, stale: true, error: message }),
+        sanitizeLobbyCheckouts({ ...lastGood, stale: true }),
         { status: 200, headers: { "cache-control": "private, max-age=1" } }
       );
     }
