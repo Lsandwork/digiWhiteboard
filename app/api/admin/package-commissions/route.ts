@@ -19,6 +19,7 @@ import {
   listCommissionRecordsViaPostgres
 } from "@/lib/staff/commission-ledger/list-via-postgres";
 import { listCommissionRecordsViaRest } from "@/lib/staff/commission-ledger/list-via-rest";
+import { runLedgerDiagnostics } from "@/lib/staff/commission-ledger/diagnostics";
 import {
   acknowledgeTrainerStatement,
   bulkUpdateCommissionRecords,
@@ -347,6 +348,13 @@ export async function GET(request: Request) {
       : Promise.resolve([]);
 
   try {
+    if (view === "diagnostics") {
+      if (!viewer.isSuperAdmin) {
+        return NextResponse.json({ error: "Super Admin only." }, { status: 403 });
+      }
+      return NextResponse.json(await runLedgerDiagnostics(viewer));
+    }
+
     if (view === "record") {
       const id = url.searchParams.get("id") ?? "";
       const record = await getCommissionRecord(supabase, viewer, id);
