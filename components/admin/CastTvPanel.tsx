@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
@@ -73,8 +75,8 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
         fetch("/api/cast-tv/media", { cache: "no-store", credentials: "include" }),
         fetch("/api/cast-tv/settings?heartbeat=1", { cache: "no-store", credentials: "include" })
       ]);
-      const mediaBody = await mediaResponse.json();
-      const settingsBody = await settingsResponse.json();
+      const mediaBody = await readResponseJson(mediaResponse);
+      const settingsBody = await readResponseJson(settingsResponse);
 
       if (!mediaResponse.ok) throw new Error(mediaBody.error ?? "Unable to load CAST-TV media.");
       if (!settingsResponse.ok) throw new Error(settingsBody.error ?? "Unable to load CAST-TV settings.");
@@ -187,7 +189,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(patch)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Update failed.");
       setMedia((current) => current.map((item) => (item.id === id ? body.media : item)));
       onToast("Media updated.", "success");
@@ -202,7 +204,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     setBusyId(id);
     try {
       const response = await fetch(`/api/cast-tv/media/${id}`, { method: "DELETE" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Delete failed.");
       setMedia((current) => current.filter((item) => item.id !== id));
       onToast("Media deleted.", "success");
@@ -221,7 +223,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, direction })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Reorder failed.");
       setMedia(body.media ?? []);
     } catch (error) {
@@ -239,7 +241,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(patch)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Settings update failed.");
       setSettings(body.settings);
       onToast("CAST-TV settings saved.", "success");

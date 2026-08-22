@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, FileText, RefreshCw, Search, ShieldAlert, Trash2, Upload } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
@@ -119,7 +121,7 @@ export function HrHubPanel({
     setLoading(true);
     try {
       const response = await fetch("/api/admin/hr", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load HR records.");
       setData(body as HubPayload);
     } catch (error) {
@@ -140,7 +142,7 @@ export function HrHubPanel({
       try {
         const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
         if (!response.ok) return;
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (cancelled) return;
         const members = Array.isArray(body.staff_directory) ? (body.staff_directory as StaffDirectoryMember[]) : [];
         setDirectory(members.filter((member) => member.status === "Active"));
@@ -256,7 +258,7 @@ export function HrHubPanel({
         method: "POST",
         body: form
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to upload write-up.");
       showToast("Uploaded write-up added to HR Records.", "success");
       setUploadOpen(false);
@@ -272,7 +274,7 @@ export function HrHubPanel({
   async function openDetail(id: string) {
     try {
       const response = await fetch(`/api/admin/hr?id=${encodeURIComponent(id)}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load record.");
       setDetailReport(body.report as ManagementReport);
       setDetailOpen(true);
@@ -313,7 +315,7 @@ export function HrHubPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: selected, action, ...extra })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to update HR records.");
       showToast(`Updated ${body.updated ?? selected.length} record${selected.length === 1 ? "" : "s"}.`, "success");
       setSelected([]);
@@ -346,7 +348,7 @@ export function HrHubPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "create_from_records", record_ids: selected })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to create PIP.");
       const count = Number(body.created || body.plans?.length || 0);
       showToast(

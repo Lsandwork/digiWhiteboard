@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useState } from "react";
 import { MessageSquare, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -45,7 +47,7 @@ export function SmsCostDashboardCard() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/sms-cost", { cache: "no-store" });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (!res.ok) throw new Error(body.error || "Unable to load SMS cost data.");
       setDashboard(body.dashboard);
       setThresholds(body.thresholds);
@@ -71,7 +73,7 @@ export function SmsCostDashboardCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "save_thresholds", ...draft })
       });
-      const body = await res.json();
+      const body = await readResponseJson(res);
       if (!res.ok) throw new Error(body.error || "Save failed.");
       setThresholds(body.thresholds);
       setDraft(body.thresholds);
@@ -268,7 +270,7 @@ export function SmsCostDashboardCard() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "send_test_alert" })
               });
-              const body = await res.json();
+              const body = await readResponseJson(res);
               if (!res.ok || !body.ok) throw new Error(body.error || "Test SMS failed.");
               showToast(`Test SMS sent to ${body.recipientCount} recipient(s).`, "success");
             } catch (error) {

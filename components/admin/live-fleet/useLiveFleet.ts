@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { LiveFleetSnapshot } from "@/lib/live-fleet/types";
 
@@ -20,17 +22,17 @@ export function useLiveFleet() {
     try {
       const qs = opts?.refresh ? "?refresh=1" : "";
       const response = await fetch(`/api/admin/live-fleet${qs}`, { cache: "no-store" });
+      const body = await readResponseJson<LiveFleetSnapshot & { error?: string }>(response);
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error || `Live Fleet request failed (${response.status})`);
       }
-      const data = (await response.json()) as LiveFleetSnapshot;
+      const data = body;
       if (!mountedRef.current) return;
       setSnapshot(data);
       setError(null);
     } catch (err) {
       if (!mountedRef.current) return;
-      setError(err instanceof Error ? err.message : "Unable to load Live Fleet");
+      setError(humanizeUnknownError(err, "Unable to load Live Fleet"));
     } finally {
       inflightRef.current = false;
       if (mountedRef.current) {

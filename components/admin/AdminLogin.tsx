@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowRight, Eye, EyeOff, Lock, ShieldCheck, UserRound } from "lucide-react";
@@ -74,7 +76,7 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
           signal: controller.signal
         });
         if (!response.ok) return;
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (cancelled) return;
         if (body.mustChangePassword && body.adminUserId) {
           setMustChangePassword(true);
@@ -116,7 +118,7 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
         body: JSON.stringify({ username, password }),
         signal: controller.signal
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Invalid username or password.");
 
       try {
@@ -169,7 +171,7 @@ export function AdminLogin({ nextPath = null }: { nextPath?: string | null }) {
           confirm_password: confirmPassword
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to update password.");
 
       const next = resolvePostLoginRoute(nextPath, body.role, body.isDemo);

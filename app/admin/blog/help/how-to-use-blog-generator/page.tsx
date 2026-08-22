@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getAdminSession } from "@/lib/admin/session";
 import { canAccessBlogGenerator, effectiveAccessLabel, hasPermission } from "@/lib/admin/permissions";
-import { getUserAccess } from "@/lib/admin/user-access";
+import { resolveSessionAccess } from "@/lib/admin/resolve-user-access";
 import { getAdminUserById } from "@/lib/admin/users";
 import { isBlogEnabled } from "@/lib/blog/flags";
 import { getBlogSettings } from "@/lib/blog/service";
@@ -29,9 +29,7 @@ export default async function BlogHelpGuidePage() {
 
   const supabase = getServiceSupabase();
   const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
-  const access = session.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
+  const access = await resolveSessionAccess(session, supabase);
 
   if (
     !canAccessBlogGenerator(access, session.role, session.email, adminUser?.full_name) &&

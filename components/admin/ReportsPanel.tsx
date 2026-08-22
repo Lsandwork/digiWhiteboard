@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
@@ -128,7 +130,7 @@ export function ReportsPanel() {
       try {
         const params = new URLSearchParams({ kind: nextKind, from: nextFrom, to: nextTo });
         const response = await fetch(`/api/admin/reports?${params.toString()}`, { cache: "no-store" });
-        const body = await response.json().catch(() => ({}));
+        const body = await readResponseJson(response).catch(() => ({}));
         if (!response.ok) throw new Error(body.error ?? "Unable to load reports.");
         setPayload(body as ReportsPayload);
       } catch (error) {

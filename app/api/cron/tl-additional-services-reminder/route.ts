@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import { isAuthorizedCron } from "@/lib/cron-auth";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 import {
   isTlServicesEmailSendSlot,
   parseTlServicesEmailState,
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS });
     const emailState =
       (await loadAdminSettingsJsonKey(
         supabase,

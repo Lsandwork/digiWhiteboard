@@ -1,3 +1,4 @@
+import { readResponseJson } from "@/lib/http/read-response-json";
 import type {
   PhotoAssignmentSource,
   PhotoBatchCounts,
@@ -73,7 +74,7 @@ export type BulkItemsPatch = {
 };
 
 async function readJson<T>(response: Response): Promise<T & { error?: string }> {
-  const body = (await response.json().catch(() => ({}))) as T & { error?: string };
+  const body = (await readResponseJson(response).catch(() => ({}))) as T & { error?: string };
   if (!response.ok) {
     throw new Error(body.error || `Request failed (${response.status})`);
   }

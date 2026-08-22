@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare, ExternalLink, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -53,7 +55,7 @@ export function RuffopsChecklistPanel() {
     if (!quiet) setLoading(true);
     try {
       const response = await fetch("/api/admin/ruffops-checklist", { cache: "no-store" });
-      const body = await response.json().catch(() => ({}));
+      const body = await readResponseJson(response).catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Unable to load RuffOps Checklist.");
       setState(body as RuffopsChecklistState);
     } catch (error) {
@@ -123,7 +125,7 @@ export function RuffopsChecklistPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ item_key: item.key, completed: nextCompleted })
       });
-      const body = await response.json().catch(() => ({}));
+      const body = await readResponseJson(response).catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Unable to update checklist.");
       setState(body as RuffopsChecklistState);
     } catch (error) {

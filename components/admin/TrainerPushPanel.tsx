@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock3, Dumbbell, Send, XCircle } from "lucide-react";
 import {
@@ -49,7 +51,7 @@ export function TrainerPushPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/trainer-push", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load trainer push notices.");
       setData(body as TrainerPayload);
     } catch (error) {
@@ -114,7 +116,7 @@ export function TrainerPushPanel() {
           safety_tags
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to push trainer notice.");
       showToast(`Training request pushed for ${body.notice?.dog_name ?? form.dog_name}.`, "success");
       await load();
@@ -130,7 +132,7 @@ export function TrainerPushPanel() {
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/trainer-push/${data.activeNotice.id}/clear`, { method: "POST" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to clear trainer notice.");
       showToast("Trainer notice cleared.", "success");
       await load();

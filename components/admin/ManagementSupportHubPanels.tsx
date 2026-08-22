@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, MessageSquare, RefreshCw, UserRound } from "lucide-react";
 import { SupportCommandCenter } from "@/components/admin/support-command-center/SupportCommandCenter";
@@ -329,7 +331,7 @@ function useSupportHub(reportType?: ManagementReportType | ManagementReportType[
         if (value) params.set(key, value);
       });
       const response = await fetch(`/api/admin/management-support-hub?${params.toString()}`, { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load support inbox.");
       setData(body as HubPayload);
     } catch (error) {
@@ -353,7 +355,7 @@ function useSupportHub(reportType?: ManagementReportType | ManagementReportType[
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action, id: selected.id, ...payload, user_role: data?.currentUser.role ?? "admin" })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to update item.");
       showToast("Support item updated.", "success");
       setSelected(body.item as ManagementReport);
@@ -569,7 +571,7 @@ export function AdminTrainerEntriesPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/management-support-hub?view=trainer_entries", { cache: "no-store" });
-      const body = (await response.json()) as TrainerEntriesPayload;
+      const body = (await readResponseJson(response)) as TrainerEntriesPayload;
       if (!response.ok) throw new Error((body as { error?: string }).error ?? "Unable to load trainer entries.");
       setEntries(body.entries ?? []);
     } catch (error) {

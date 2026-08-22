@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock3, Dog, Loader2, PawPrint, Search } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -111,7 +113,7 @@ export function PackageGroupWalksPanel() {
   const load = useCallback(async (options: { silent?: boolean } = {}) => {
     try {
       const response = await fetch("/api/admin/package-group-walks", { cache: "no-store" });
-      const body = (await response.json()) as PackageGroupWalkState & { error?: string };
+      const body = (await readResponseJson(response)) as PackageGroupWalkState & { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Unable to load Package Group Walks.");
       setState(body);
       setLoadError(null);
@@ -183,7 +185,7 @@ export function PackageGroupWalksPanel() {
             businessDate: row.businessDate
           })
         });
-        const body = (await response.json()) as { error?: string; completion?: PackageGroupWalkCompletion };
+        const body = (await readResponseJson(response)) as { error?: string; completion?: PackageGroupWalkCompletion };
         if (!response.ok) throw new Error(body.error ?? "Unable to mark the group walk completed.");
 
         setPhases((previous) => ({ ...previous, [row.gingrAnimalId]: "done" }));

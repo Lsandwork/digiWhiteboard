@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -126,7 +128,7 @@ export function RouteGeneratorPanel() {
       const response = await fetch(`/api/admin/route-generator?view=plan&planId=${encodeURIComponent(planId)}`, {
         cache: "no-store"
       });
-      const next = (await response.json()) as PlanBundle & { error?: string };
+      const next = (await readResponseJson(response)) as PlanBundle & { error?: string };
       if (!response.ok) {
         if (!options?.quiet) {
           throw new Error(next.error || "Unable to load the latest route plan.");
@@ -151,7 +153,7 @@ export function RouteGeneratorPanel() {
             `/api/admin/route-generator?view=report_run&reportRunId=${encodeURIComponent(nextReportRunId)}`,
             { cache: "no-store" }
           );
-          const body = await response.json();
+          const body = await readResponseJson(response);
           if (response.ok) {
             skipped = body.metadata?.skippedOccurrences ?? skipped;
             warnings = body.metadata?.warnings?.length ? body.metadata.warnings : warnings;
@@ -182,7 +184,7 @@ export function RouteGeneratorPanel() {
           cache: "no-store",
           signal: controller.signal
         });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Unable to load Route Generator.");
         const nextBootstrap = body as Bootstrap;
         setBootstrap(nextBootstrap);
@@ -226,7 +228,7 @@ export function RouteGeneratorPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, ...payload })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Request failed.");
       return body;
     } finally {
@@ -281,7 +283,7 @@ export function RouteGeneratorPanel() {
       `/api/admin/route-generator?view=report_run&reportRunId=${encodeURIComponent(reportRunIdValue)}`,
       { cache: "no-store" }
     );
-    const body = await response.json();
+    const body = await readResponseJson(response);
     if (!response.ok) throw new Error(body.error || "Unable to refresh report run.");
     setPullMeta({
       pickup: Number(body.run?.pickup_count ?? 0),

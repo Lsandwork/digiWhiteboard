@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -344,7 +346,7 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
         cache: "no-store",
         signal: controller.signal
       }).finally(() => window.clearTimeout(timeout));
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load Staff Admin records.");
       setData(body as StaffOpsPayload);
     } catch (error) {
@@ -474,7 +476,7 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? label);
       const action = String(payload.action ?? "");
       if (action === "create_crossover_bulk") {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { runFitdogSync } from "@/lib/fitdog-ops/sync";
 import { getFitdogIntegrationSettings } from "@/lib/fitdog-ops/store";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS });
   const settings = await getFitdogIntegrationSettings(supabase);
   const url = new URL(request.url);
   const modeParam = url.searchParams.get("mode");

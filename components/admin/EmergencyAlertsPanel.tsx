@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Send, ShieldAlert, XCircle } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -47,7 +49,7 @@ export function EmergencyAlertsPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/push-notices", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load emergency alerts.");
       setData(body as PushNoticesPayload);
     } catch (error) {
@@ -87,7 +89,7 @@ export function EmergencyAlertsPanel() {
           display_duration_minutes: Number(displayDurationMinutes) || 10
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to push emergency alert.");
       showToast("Emergency alert pushed.", "success");
       setTitle("");
@@ -109,7 +111,7 @@ export function EmergencyAlertsPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "clear" })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to clear emergency alert.");
       showToast("Emergency alert cleared.", "success");
       await load();

@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Bell, BellRing, CheckCircle2, ChevronRight, X } from "lucide-react";
 import { ADMIN_TABS, type AdminTab } from "@/lib/admin/types";
@@ -68,7 +70,7 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
     try {
       const response = await fetch("/api/admin/notification-bell", { cache: "no-store" });
       if (!response.ok) return;
-      const body = (await response.json()) as BellPayload;
+      const body = (await readResponseJson(response)) as BellPayload;
       setData(body);
 
       const signature = body.walkAlerts
@@ -129,7 +131,7 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "clear_inbox" })
       });
-      const body = await response.json().catch(() => ({}));
+      const body = await readResponseJson(response).catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Unable to clear inbox.");
       showToast("Inbox cleared. Assigned alerts stay open.", "success");
       await load();
@@ -149,7 +151,7 @@ export function NotificationBell({ onOpenTab }: NotificationBellProps) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ action: "complete", cycleId: alert.id, version: alert.version })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Walks Board action failed.");
       showToast("Walk check marked complete.", "success");
       await load();

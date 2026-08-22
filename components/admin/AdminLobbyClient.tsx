@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { FormEvent, useCallback, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
@@ -42,10 +44,10 @@ export function AdminLobbyClient() {
           fetch("/api/lobby/status", { headers: { "x-admin-password": credential }, cache: "no-store" })
         ]);
 
-      const settingsBody = await settingsRes.json();
-      const checkoutsBody = await checkoutsRes.json();
-      const promotionsBody = await promotionsRes.json();
-      const statusBody = await statusRes.json();
+      const settingsBody = await readResponseJson(settingsRes);
+      const checkoutsBody = await readResponseJson(checkoutsRes);
+      const promotionsBody = await readResponseJson(promotionsRes);
+      const statusBody = await readResponseJson(statusRes);
 
       if (!settingsRes.ok) throw new Error(settingsBody.error ?? "Unable to load lobby admin.");
 
@@ -76,7 +78,7 @@ export function AdminLobbyClient() {
         headers,
         body: JSON.stringify(patch)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to save settings.");
       await load();
     } catch (saveError) {

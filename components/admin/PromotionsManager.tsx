@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useMemo, useState } from "react";
 import { Copy, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import type { LobbyPromotion } from "@/lib/lobby/types";
@@ -58,7 +60,7 @@ export function PromotionsManager({ promotions, onRefresh, onToast }: Promotions
         ? await fetch(`/api/lobby/promotions/${editing.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })
         : await fetch("/api/lobby/promotions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
-      const result = await response.json();
+      const result = await readResponseJson(response);
       if (!response.ok) throw new Error(result.error ?? "Unable to save promotion.");
       onToast(editing ? "Promotion updated." : "Promotion added.", "success");
       setModalOpen(false);

@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useMemo, useState } from "react";
 import type { SkippedOccurrence } from "@/lib/route-generator/fitdog-api";
 import type { GingrTaxiServiceRow } from "@/lib/route-generator/gingr-taxi";
@@ -68,7 +70,7 @@ export function RouteGeneratorExtras({
           `/api/admin/route-generator?view=gingr_taxi&date=${encodeURIComponent(date)}`,
           { cache: "no-store" }
         );
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Unable to load Gingr taxi services.");
         if (cancelled) return;
         setGingrConfigured(Boolean(body.configured));

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { releaseQueuedDailyReminders, sendDueDailyReminders } from "@/lib/staff/daily-reminders";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 import { isAuthorizedCron } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS });
     const summary = await sendDueDailyReminders(supabase);
     await releaseQueuedDailyReminders(supabase);
     return NextResponse.json({ ok: true, ...summary });

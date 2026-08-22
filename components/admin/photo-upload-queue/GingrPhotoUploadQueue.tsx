@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Download, ImagePlus, Library, RefreshCw } from "lucide-react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
@@ -66,7 +68,7 @@ export function BulkPhotoLibrary({ onOpenMediaLibrary }: { onOpenMediaLibrary?: 
       }
 
       const ensure = await fetch("/api/admin/photo-upload-queue?ensure_today=1", { cache: "no-store" });
-      const ensureBody = await ensure.json();
+      const ensureBody = await readResponseJson(ensure);
       if (!ensure.ok) throw new Error(ensureBody.error || "Unable to open photo library.");
       setCanDownload(Boolean(ensureBody.permissions?.can_download));
 

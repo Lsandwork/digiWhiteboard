@@ -6,6 +6,27 @@ import { computeMissingRequired } from "./map";
 
 const LEGACY_KEY = "package_commissions";
 
+let ledgerHotPathReady = false;
+
+/**
+ * Ledger list must not run JSON backfill / sale-date repair / duplicate purge
+ * on every GET. Those each read admin_settings and can hang the commissions tab
+ * when Supabase REST is slow. After the first successful existence check on
+ * this instance, skip them.
+ */
+export async function ensureCommissionLedgerHotPath(supabase: SupabaseClient) {
+  if (ledgerHotPathReady) return { ready: true as const, checked: false as const };
+  const { error } = await supabase.from("package_commission_records").select("id", { count: "exact", head: true }).limit(1);
+  if (error) {
+    if (isMissingLedgerTableError(error.message)) {
+      throw new Error(missingLedgerTablesMessage());
+    }
+    throw new Error(error.message);
+  }
+  ledgerHotPathReady = true;
+  return { ready: true as const, checked: true as const };
+}
+
 function isMissingLedgerTableError(message: string) {
   return (
     /relation .* does not exist/i.test(message) ||

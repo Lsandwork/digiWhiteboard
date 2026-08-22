@@ -3,7 +3,7 @@ import { ToastProvider } from "@/components/admin/ui/ToastProvider";
 import { BlogPageClient } from "@/components/blog/shell/BlogPageClient";
 import { getAdminSession } from "@/lib/admin/session";
 import { canAccessBlogGenerator } from "@/lib/admin/permissions";
-import { getUserAccess } from "@/lib/admin/user-access";
+import { resolveSessionAccess } from "@/lib/admin/resolve-user-access";
 import { getAdminUserById } from "@/lib/admin/users";
 import { isBlogEnabled } from "@/lib/blog/flags";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -24,9 +24,7 @@ export default async function AutomaticBlogPage() {
   }
 
   const supabase = getServiceSupabase();
-  const access = session.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
+  const access = await resolveSessionAccess(session, supabase);
   const adminUser = session.adminUserId ? await getAdminUserById(supabase, session.adminUserId) : null;
 
   if (!canAccessBlogGenerator(access, session.role, session.email, adminUser?.full_name)) {

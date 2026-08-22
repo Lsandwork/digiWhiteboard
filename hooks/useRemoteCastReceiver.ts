@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RECEIVER_HEARTBEAT_MS,
@@ -117,7 +119,7 @@ export function useRemoteCastReceiver(debugBoard = false): RemoteCastReceiverRun
         body: JSON.stringify({ token: existing ?? undefined })
       });
       if (!response.ok) throw new Error(`Register failed (${response.status}).`);
-      const body = (await response.json()) as {
+      const body = (await readResponseJson(response)) as {
         receiverId: string;
         receiverToken: string | null;
         state: RemoteCastReceiverState;
@@ -164,7 +166,7 @@ export function useRemoteCastReceiver(debugBoard = false): RemoteCastReceiverRun
         return;
       }
       if (!response.ok) throw new Error(`State poll failed (${response.status}).`);
-      const body = (await response.json()) as { state: RemoteCastReceiverState };
+      const body = (await readResponseJson(response)) as { state: RemoteCastReceiverState };
       if (!mountedRef.current) return;
       applyState(body.state);
       setConnection("online");
@@ -196,7 +198,7 @@ export function useRemoteCastReceiver(debugBoard = false): RemoteCastReceiverRun
         return;
       }
       if (!response.ok) return;
-      const body = (await response.json()) as { state: RemoteCastReceiverState };
+      const body = (await readResponseJson(response)) as { state: RemoteCastReceiverState };
       if (!mountedRef.current) return;
       applyState(body.state);
       setConnection("online");

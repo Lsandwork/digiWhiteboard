@@ -3,7 +3,7 @@ import { ToastProvider } from "@/components/admin/ui/ToastProvider";
 import { RufflyPageClient } from "@/components/ruffly/shell/RufflyPageClient";
 import { getAdminSession } from "@/lib/admin/session";
 import { hasPermission } from "@/lib/admin/permissions";
-import { getUserAccess } from "@/lib/admin/user-access";
+import { resolveSessionAccess } from "@/lib/admin/resolve-user-access";
 import {
   isRufflyAiEnabled,
   isRufflyAutomationsEnabled,
@@ -26,9 +26,7 @@ export default async function RufflyRoutePage() {
   }
 
   const supabase = getServiceSupabase();
-  const access = session.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-    : null;
+  const access = await resolveSessionAccess(session, supabase);
 
   if (access && !hasPermission(access, "ruffly.view") && session.role !== "owner_admin") {
     redirect("/admin?board=staff&tab=crossover_communication");

@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -139,6 +141,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
   const [data, setData] = useState<LedgerPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkModal, setBulkModal] = useState<{
@@ -262,6 +265,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams(searchParams.toString());
       params.set("view", "ledger");
@@ -286,9 +290,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         params.set("pageSize", "5000");
       }
 
-      const response = await fetch(`/api/admin/package-commissions?${params.toString()}`, { cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to load commissions.");
+      const { ok, body } = await fetchAdminJson<LedgerPayload & { error?: string; report?: LedgerPayload["report"] }>(
+        `/api/admin/package-commissions?${params.toString()}`
+      );
+      if (!ok) throw new Error(body.error ?? "Unable to load commissions.");
       if (tab === "reports") {
         setData({
           rows: body.report?.rows ?? [],
@@ -331,7 +336,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         }));
       }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load commissions.", "error");
+      const message = humanizeUnknownError(error, "Unable to load commissions.");
+      setLoadError(message);
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -348,24 +355,35 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   }, [page, tab]);
 
   async function postAction(payload: Record<string, unknown>) {
-    const response = await fetch("/api/admin/package-commissions", {
+    const { ok, body } = await fetchAdminJson<{
+      error?: string;
+      csv?: string;
+      results?: unknown[];
+      errors?: unknown[];
+      imported?: number;
+      created?: number;
+      failed?: number;
+      duplicates?: number;
+      skippedDuplicates?: number;
+    }>("/api/admin/package-commissions", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "Request failed.");
+    if (!ok) throw new Error(body.error ?? "Request failed.");
     return body;
   }
 
   async function openDrawer(id: string) {
     setDrawerId(id);
     try {
-      const response = await fetch(`/api/admin/package-commissions?view=record&id=${encodeURIComponent(id)}`, {
-        cache: "no-store"
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "Unable to load record.");
+      const { ok, body } = await fetchAdminJson<{
+        error?: string;
+        record?: PackageCommissionRecord;
+        threads?: unknown[];
+        audit?: unknown[];
+      }>(`/api/admin/package-commissions?view=record&id=${encodeURIComponent(id)}`);
+      if (!ok || !body.record) throw new Error(body.error ?? "Unable to load record.");
       setDrawer({ record: body.record, threads: body.threads ?? [], audit: body.audit ?? [] });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to open record.", "error");
@@ -711,6 +729,15 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                   <tr>
                     <td colSpan={12} className={`${ledgerCellPad} py-6 text-admin-muted`}>
                       Loading commission ledger…
+                    </td>
+                  </tr>
+                ) : loadError ? (
+                  <tr>
+                    <td colSpan={12} className={`${ledgerCellPad} py-6 text-admin-muted`}>
+                      {loadError}{" "}
+                      <button type="button" className="underline" onClick={() => void load()}>
+                        Retry
+                      </button>
                     </td>
                   </tr>
                 ) : !data?.rows?.length ? (
@@ -1255,7 +1282,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 const imported = Number(body.imported ?? body.created ?? 0);
                 const failed = Number(body.failed ?? 0);
                 const duplicates = Number(body.duplicates ?? body.skippedDuplicates ?? 0);
-                const errors = Array.isArray(body.errors) ? body.errors : [];
+                const errors = Array.isArray(body.errors)
+                  ? (body.errors as { line: number; message: string; severity?: string }[])
+                  : [];
                 setImportResult({ imported, failed, errors });
                 const parts = [`Imported ${imported} row(s)`];
                 if (duplicates) parts.push(`${duplicates} duplicate(s) skipped`);
@@ -1402,9 +1431,10 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
   const [end, setEnd] = useState("");
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/admin/package-commissions?view=payroll", { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "Unable to load payroll.");
+    const { ok, body } = await fetchAdminJson<{ error?: string; periods?: Array<Record<string, unknown>> }>(
+      "/api/admin/package-commissions?view=payroll"
+    );
+    if (!ok) throw new Error(body.error ?? "Unable to load payroll.");
     setPeriods(body.periods ?? []);
   }, []);
 
@@ -1424,13 +1454,12 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
             type="button"
             className="crossover-btn crossover-btn--primary"
             onClick={async () => {
-              const response = await fetch("/api/admin/package-commissions", {
+              const { ok, body } = await fetchAdminJson<{ error?: string }>("/api/admin/package-commissions", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ action: "payroll_create", name, start_date: start, end_date: end })
               });
-              const body = await response.json();
-              if (!response.ok) {
+              if (!ok) {
                 showToast(body.error ?? "Unable to create period.", "error");
                 return;
               }
@@ -1474,13 +1503,12 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
                             period.status === "locked"
                               ? window.prompt("Reason to change locked period (Super Admin):") ?? ""
                               : undefined;
-                          const response = await fetch("/api/admin/package-commissions", {
+                          const { ok, body } = await fetchAdminJson<{ error?: string }>("/api/admin/package-commissions", {
                             method: "POST",
                             headers: { "content-type": "application/json" },
                             body: JSON.stringify({ action: "payroll_status", id: period.id, status, reason })
                           });
-                          const body = await response.json();
-                          if (!response.ok) showToast(body.error ?? "Failed", "error");
+                          if (!ok) showToast(body.error ?? "Failed", "error");
                           else {
                             showToast(`Period marked ${status}.`, "success");
                             await load();
@@ -1506,10 +1534,11 @@ function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
   const [batches, setBatches] = useState<Array<Record<string, unknown>>>([]);
 
   useEffect(() => {
-    void fetch("/api/admin/package-commissions?view=imports", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((body) => {
-        if (body.error) throw new Error(body.error);
+    void fetchAdminJson<{ error?: string; batches?: Array<Record<string, unknown>> }>(
+      "/api/admin/package-commissions?view=imports"
+    )
+      .then(({ ok, body }) => {
+        if (!ok) throw new Error(body.error ?? "Unable to load imports.");
         setBatches(body.batches ?? []);
       })
       .catch((error) => showToast(error instanceof Error ? error.message : "Unable to load imports.", "error"));
@@ -1547,13 +1576,15 @@ function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
                       className="crossover-btn crossover-btn--ghost"
                       onClick={async () => {
                         if (!window.confirm("Undo this import? Unpaid imported rows will be archived.")) return;
-                        const response = await fetch("/api/admin/package-commissions", {
-                          method: "POST",
-                          headers: { "content-type": "application/json" },
-                          body: JSON.stringify({ action: "undo_import", batch_id: batch.id })
-                        });
-                        const body = await response.json();
-                        if (!response.ok) showToast(body.error ?? "Undo failed.", "error");
+                        const { ok, body } = await fetchAdminJson<{ error?: string; archived?: number }>(
+                          "/api/admin/package-commissions",
+                          {
+                            method: "POST",
+                            headers: { "content-type": "application/json" },
+                            body: JSON.stringify({ action: "undo_import", batch_id: batch.id })
+                          }
+                        );
+                        if (!ok) showToast(body.error ?? "Undo failed.", "error");
                         else {
                           showToast(`Archived ${body.archived ?? 0} imported row(s).`, "success");
                           setBatches((current) =>
@@ -1583,9 +1614,10 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
   const [form, setForm] = useState({ name: "", rate: "50", commission_type: "package_sale", calculation_type: "percentage_of_gross" });
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/admin/package-commissions?view=rules", { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error ?? "Unable to load rules.");
+    const { ok, body } = await fetchAdminJson<{ error?: string; rules?: Array<Record<string, unknown>> }>(
+      "/api/admin/package-commissions?view=rules"
+    );
+    if (!ok) throw new Error(body.error ?? "Unable to load rules.");
     setRules(body.rules ?? []);
   }, []);
 
@@ -1611,13 +1643,12 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
             type="button"
             className="crossover-btn crossover-btn--primary"
             onClick={async () => {
-              const response = await fetch("/api/admin/package-commissions", {
+              const { ok, body } = await fetchAdminJson<{ error?: string }>("/api/admin/package-commissions", {
                 method: "POST",
                 headers: { "content-type": "application/json" },
                 body: JSON.stringify({ action: "rule_create", ...form })
               });
-              const body = await response.json();
-              if (!response.ok) showToast(body.error ?? "Unable to create rule.", "error");
+              if (!ok) showToast(body.error ?? "Unable to create rule.", "error");
               else {
                 showToast("Rule created.", "success");
                 setForm({ name: "", rate: "50", commission_type: "package_sale", calculation_type: "percentage_of_gross" });

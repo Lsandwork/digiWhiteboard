@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useState } from "react";
 import type { TlDigiBoardConfig } from "@/lib/tl-digi-board/config";
 import type { TlDigiBoardSnapshot } from "@/lib/tl-digi-board/types";
@@ -50,7 +52,7 @@ export function TlDigiBoardPanel() {
   const load = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/tl-digi-board", { cache: "no-store" });
-      const json = (await res.json().catch(() => ({}))) as AdminPayload;
+      const json = (await readResponseJson(res).catch(() => ({}))) as AdminPayload;
       if (!res.ok) throw new Error(json.error || "Unable to load TL Digi Board.");
       setConfig(json.config);
       setSnapshot(json.snapshot ?? null);
@@ -83,7 +85,7 @@ export function TlDigiBoardPanel() {
           }
         })
       });
-      const json = (await res.json().catch(() => ({}))) as { config?: AdminPayload["config"]; error?: string };
+      const json = (await readResponseJson(res).catch(() => ({}))) as { config?: AdminPayload["config"]; error?: string };
       if (!res.ok) throw new Error(json.error || "Changes not saved.");
       if (json.config) setConfig(json.config);
       setSaveMessage("✓ Saved");

@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import type { CastBoardType } from "@/lib/whiteboard/cast-options";
@@ -64,7 +66,7 @@ async function fetchWhiteboardState(
       return { unchanged: true as const };
     }
 
-    const body = (await response.json()) as WhiteboardStateResponse & { error?: string };
+    const body = (await readResponseJson(response)) as WhiteboardStateResponse & { error?: string };
     if (!response.ok) {
       throw new Error(body.error ?? `Whiteboard state failed (${response.status}).`);
     }

@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Loader2, PawPrint, RefreshCw, Search } from "lucide-react";
 import type { GroomingPushActiveDog, GroomingPushDogGroup } from "@/lib/grooming-push-active-dogs";
@@ -44,7 +46,7 @@ export function GroomingDogPicker({ value, onChange, disabled = false }: Groomin
           ? `/api/gingr/active-dogs-for-grooming-push?fresh=1&t=${Date.now()}`
           : `/api/gingr/active-dogs-for-grooming-push?t=${Date.now()}`;
         const response = await fetch(url, { cache: "no-store", signal });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error ?? "Unable to load dogs from Gingr.");
         const nextDogs = Array.isArray(body.dogs) ? body.dogs : [];
         setDogs(nextDogs);

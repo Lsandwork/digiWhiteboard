@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, KeyRound, LogIn, Pencil, Plus, Search, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -127,7 +129,7 @@ export function StaffDirectoryPanel() {
 
     try {
       const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load staff directory.");
       setData(body as StaffDirectoryPayload);
     } catch (error) {
@@ -164,7 +166,7 @@ export function StaffDirectoryPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? label);
       showToast(success, "success");
       await load(true);
@@ -200,7 +202,7 @@ export function StaffDirectoryPanel() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ targetAdminUserId: member.admin_user_id })
       });
-      const body = await response.json().catch(() => ({}));
+      const body = await readResponseJson(response).catch(() => ({}));
       if (!response.ok) throw new Error(body.error ?? "Unable to log in as this employee.");
       showToast(`Logging in as ${member.name}…`, "success");
       window.location.assign("/admin");

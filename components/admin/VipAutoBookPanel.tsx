@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Crown, Pencil, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
@@ -161,7 +163,7 @@ export function VipAutoBookPanel() {
         pageSize: "75"
       });
       const res = await fetch(`/api/admin/vip-auto-book?${params}`, { cache: "no-store" });
-      const json = (await res.json()) as ListPayload & { error?: string };
+      const json = (await readResponseJson(res)) as ListPayload & { error?: string };
       if (!res.ok) throw new Error(json.error || "Failed to load VIP Auto Book.");
       setData(json);
     } catch (error) {
@@ -188,7 +190,7 @@ export function VipAutoBookPanel() {
         const res = await fetch(`/api/admin/vip-auto-book?action=search&q=${encodeURIComponent(term)}`, {
           cache: "no-store"
         });
-        const json = (await res.json()) as { hits?: VipDirectoryHit[]; error?: string };
+        const json = (await readResponseJson(res)) as { hits?: VipDirectoryHit[]; error?: string };
         if (!res.ok) throw new Error(json.error || "Search failed.");
         if (!cancelled) setHits(json.hits ?? []);
       } catch {
@@ -280,7 +282,7 @@ export function VipAutoBookPanel() {
             : { action: "create", ...payload }
         )
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await readResponseJson(res)) as { error?: string };
       if (!res.ok) throw new Error(json.error || (editingId ? "Could not update VIP client." : "Could not save VIP client."));
       showToast(editingId ? "VIP client updated." : "VIP Auto Book client saved.", "success");
       setManualOpen(false);
@@ -300,7 +302,7 @@ export function VipAutoBookPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update", id, ...patch })
       });
-      const json = (await res.json()) as { record?: VipAutoBookClient; error?: string };
+      const json = (await readResponseJson(res)) as { record?: VipAutoBookClient; error?: string };
       if (!res.ok) throw new Error(json.error || "Update failed.");
       if (json.record) setDrawer(json.record);
       await load();
@@ -319,7 +321,7 @@ export function VipAutoBookPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "delete", id: deleteTarget.id })
       });
-      const json = (await res.json()) as { error?: string };
+      const json = (await readResponseJson(res)) as { error?: string };
       if (!res.ok) throw new Error(json.error || "Could not delete VIP client.");
       showToast("VIP client deleted.", "success");
       if (drawer?.id === deleteTarget.id) setDrawer(null);
@@ -340,7 +342,7 @@ export function VipAutoBookPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "sync_directory" })
       });
-      const json = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      const json = (await readResponseJson(res)) as { ok?: boolean; message?: string; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error || json.message || "Directory sync failed.");
       showToast(json.message || "Fitdog directory synced.", "success");
       await load();
@@ -359,7 +361,7 @@ export function VipAutoBookPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "sync_gingr" })
       });
-      const json = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      const json = (await readResponseJson(res)) as { ok?: boolean; message?: string; error?: string };
       if (!res.ok || !json.ok) throw new Error(json.error || json.message || "Gingr sync failed.");
       showToast(json.message || "Gingr last-day booked synced.", "success");
       await load();

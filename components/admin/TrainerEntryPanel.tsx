@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
@@ -53,7 +55,7 @@ export function TrainerEntryPanel() {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load shift log entries.");
       const currentActor = body.currentUser?.email ?? body.currentUser?.adminUserId ?? "";
       setActor(currentActor);
@@ -107,7 +109,7 @@ export function TrainerEntryPanel() {
           template_field_values: serializeTemplateFieldValues(payload.template_fields)
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entry.");
       showToast("Trainer's entry saved.", "success");
       setForm(emptyForm);
@@ -133,7 +135,7 @@ export function TrainerEntryPanel() {
           entries: toCrossoverBulkPayload(entries, { ...defaults, department_area: defaults.department_area || "Training" })
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to save trainer entries.");
       const saved = Number(body.result?.saved ?? entries.length);
       const failed = Number(body.result?.failed ?? 0);

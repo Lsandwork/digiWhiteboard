@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { OpsDog } from "@/lib/ops-command-center/types";
@@ -70,7 +72,7 @@ export function OpsGlobalSearch({
         const res = await fetch(`/api/admin/ops-command-center?q=${encodeURIComponent(query.trim())}`, {
           cache: "no-store"
         });
-        const body = await res.json();
+        const body = await readResponseJson(res);
         if (res.ok) setDogs((body.dogs || []) as OpsDog[]);
       } finally {
         setLoading(false);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncLiveFleetTelemetry } from "@/lib/live-fleet/sync";
 import { ensureLiveFleetSchema } from "@/lib/live-fleet/ensure-schema";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getServiceSupabase, SERVICE_SUPABASE_CRON_TIMEOUT_MS } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const schema = await ensureLiveFleetSchema(getServiceSupabase());
+  const schema = await ensureLiveFleetSchema(getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_CRON_TIMEOUT_MS }));
   const result = await syncLiveFleetTelemetry({ force: true });
   return NextResponse.json({
     ok: true,

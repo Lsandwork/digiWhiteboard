@@ -1,7 +1,8 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { assertCanManage, assertNotManagementDestructive, trainerOwnsRecord } from "./auth";
 import { writeCommissionAudit } from "./audit";
-import { ensureCommissionLedgerBackfill, ensureCommissionSaleDatesRepaired, ensureIvonneRejectedDuplicatesPurged } from "./backfill";
+import { ensureCommissionLedgerHotPath } from "./backfill";
 import { mapDbRecord, computeMissingRequired } from "./map";
 import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import { trainerRateBpsForPackage } from "./location-rate";
@@ -173,9 +174,7 @@ export async function listCommissionRecords(
   viewer: CommissionViewer,
   filters: CommissionListFilters = {}
 ): Promise<CommissionListResult> {
-  await ensureCommissionLedgerBackfill(supabase);
-  await ensureCommissionSaleDatesRepaired(supabase);
-  await ensureIvonneRejectedDuplicatesPurged(supabase);
+  await ensureCommissionLedgerHotPath(supabase);
 
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
@@ -184,15 +183,12 @@ export async function listCommissionRecords(
   const sortBy = SORTABLE[filters.sortBy ?? "sale_date"] ?? "sale_date";
   const ascending = (filters.sortDir ?? "desc") === "asc";
 
-  let countQuery = applyListFilters(
+  const countQuery = applyListFilters(
     supabase.from("package_commission_records").select("id", { count: "exact", head: true }),
     filters,
     viewer
   );
-  const { count, error: countError } = await countQuery;
-  if (countError) throw new Error(countError.message);
-
-  let dataQuery = applyListFilters(
+  const dataQuery = applyListFilters(
     supabase.from("package_commission_records").select("*"),
     filters,
     viewer
@@ -200,10 +196,16 @@ export async function listCommissionRecords(
     .order(sortBy, { ascending, nullsFirst: false })
     .range(from, to);
 
-  const { data, error } = await dataQuery;
+  const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
+  if (countError) throw new Error(countError.message);
   if (error) throw new Error(error.message);
 
-  const summary = await loadSummary(supabase, filters, viewer);
+  let summary = emptySummary();
+  try {
+    summary = await withTimeoutFallback(loadSummary(supabase, filters, viewer), 2_500, emptySummary());
+  } catch {
+    // Totals are optional — never hide the ledger because the 10k summary scan timed out.
+  }
 
   return {
     rows: ((data ?? []) as Record<string, unknown>[]).map((row) => mapDbRecord(row)),
@@ -219,7 +221,7 @@ export async function getCommissionRecord(
   viewer: CommissionViewer,
   id: string
 ) {
-  await ensureCommissionLedgerBackfill(supabase);
+  await ensureCommissionLedgerHotPath(supabase);
   const { data, error } = await supabase.from("package_commission_records").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Commission record not found.");

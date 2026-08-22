@@ -10,7 +10,7 @@ function looksLikeHtml(text: string) {
  * never reach `JSON.parse` — Safari throws "The string did not match the
  * expected pattern" and the raw HTML can render in the admin UI.
  */
-export async function readResponseJson<T = Record<string, unknown>>(response: Response): Promise<T> {
+export async function readResponseJson<T = any>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type") || "";
   const text = await response.text();
 

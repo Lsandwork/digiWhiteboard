@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   AlertTriangle,
@@ -136,7 +138,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
     setLoading(true);
     try {
       const response = await fetch("/api/admin/support-command-center", { cache: "no-store" });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to load Support Command Center.");
       setData(body as CommandCenterPayload);
     } catch (error) {
@@ -218,7 +220,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
         const response = await fetch(`/api/admin/support-command-center?case_id=${encodeURIComponent(caseId)}`, {
           cache: "no-store"
         });
-        const body = await response.json();
+        const body = await readResponseJson(response);
         if (!response.ok) throw new Error(body.error || "Case not found.");
         setSelectedAlert(caseToAlertRow(body.case as ManagementReport));
       } catch (error) {
@@ -246,7 +248,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, id, ...payload })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Action failed.");
       showToast("Updated.", "success");
       setSelectedAlert(null);
@@ -271,7 +273,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "create_pip", ...pipForm, source_record_ids: selectedAlert?.source === "support_case" ? [selectedAlert.source_id] : [] })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to create PIP.");
       showToast("PIP created. Review before sharing with the employee.", "success");
       setCreatePipOpen(false);
@@ -303,7 +305,7 @@ export function SupportCommandCenter({ onNavigate }: Props) {
           message: selectedAlert ? `Focus on ${selectedAlert.employee}: ${selectedAlert.summary}` : "Analyze current command-center priorities."
         })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "AI unavailable.");
       setAiReply(String(body.reply || ""));
       setAiLabel(String(body.label || "AI-generated — manager review required"));

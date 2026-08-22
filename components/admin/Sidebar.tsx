@@ -1,5 +1,7 @@
 "use client";
 
+import { readResponseJson } from "@/lib/http/read-response-json";
+
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -495,7 +497,7 @@ export function Sidebar({
       try {
         const res = await fetch("/api/admin/fitdog-alerts?view=badge", { cache: "no-store" });
         if (!res.ok) return;
-        const json = (await res.json()) as { count?: number };
+        const json = (await readResponseJson(res)) as { count?: number };
         if (!cancelled) setBadgeCounts({ fitdog_alerts: Number(json.count || 0) });
       } catch {
         // Badge fetch is best-effort.

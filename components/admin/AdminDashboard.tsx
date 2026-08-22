@@ -317,7 +317,7 @@ export function AdminDashboard() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(patch)
     });
-    const body = await response.json();
+    const body = await readResponseJson(response);
     if (!response.ok) throw new Error(body.error ?? "Unable to save settings.");
     setLastSavedAt(new Date());
     showToast("Settings saved.", "success");
@@ -339,7 +339,7 @@ export function AdminDashboard() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ board })
       });
-      const body = await response.json();
+      const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Publish failed.");
       showToast(`Publish successful — ${body.version}`, "success");
       await load(true);
