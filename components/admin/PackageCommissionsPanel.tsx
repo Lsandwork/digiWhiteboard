@@ -45,6 +45,7 @@ type LedgerPayload = {
   canManage: boolean;
   canComment: boolean;
   delayed?: boolean;
+  delayedReason?: string | null;
   report?: CommissionReportPayload;
   currentUser?: {
     email: string | null;
@@ -292,7 +293,12 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
       }
 
       const { ok, body } = await fetchAdminJson<
-        LedgerPayload & { error?: string; report?: LedgerPayload["report"]; delayed?: boolean }
+        LedgerPayload & {
+          error?: string;
+          report?: LedgerPayload["report"];
+          delayed?: boolean;
+          delayedReason?: string | null;
+        }
       >(`/api/admin/package-commissions?${params.toString()}`, { timeoutMs: 8_000 });
       if (!ok) throw new Error(body.error ?? "Unable to load commissions.");
       if (tab === "reports") {
@@ -320,9 +326,28 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           currentUser: data?.currentUser
         });
       } else if (tab === "ledger" || tab === "needs_review" || tab === "approval") {
-        setData(body as LedgerPayload);
         if (body.delayed) {
-          setLoadError("Commission ledger is delayed. Retry.");
+          setLoadError(
+            body.delayedReason
+              ? `Commission ledger is delayed. ${body.delayedReason}`
+              : "Commission ledger is delayed."
+          );
+          if (Array.isArray(body.rows) && body.rows.length > 0) {
+            setData(body as LedgerPayload);
+          } else {
+            setData((current) =>
+              current
+                ? {
+                    ...current,
+                    trainers: body.trainers ?? current.trainers,
+                    canManage: body.canManage ?? current.canManage,
+                    canComment: body.canComment ?? current.canComment
+                  }
+                : (body as LedgerPayload)
+            );
+          }
+        } else {
+          setData(body as LedgerPayload);
         }
       } else {
         setData((current) => ({
@@ -697,6 +722,15 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             </div>
           ) : null}
 
+          {loadError && data?.rows?.length ? (
+            <p className="mb-2 text-sm text-admin-muted">
+              {loadError}{" "}
+              <button type="button" className="underline" onClick={() => void load()}>
+                Retry
+              </button>
+            </p>
+          ) : null}
+
           <div className="admin-ledger-table-wrap overflow-x-auto">
             <table className={`w-full border-collapse text-left md:min-w-[1100px] ${isTrainer ? "admin-ledger-table--compact" : ""}`}>
               <thead className="admin-ledger-table-head">
@@ -735,7 +769,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                       Loading commission ledger…
                     </td>
                   </tr>
-                ) : loadError ? (
+                ) : loadError && !data?.rows?.length ? (
                   <tr>
                     <td colSpan={12} className={`${ledgerCellPad} py-6 text-admin-muted`}>
                       {loadError}{" "}

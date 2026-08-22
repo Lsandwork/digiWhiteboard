@@ -20,7 +20,7 @@ import type {
   ReviewStatus
 } from "./types";
 
-const SORTABLE: Record<string, string> = {
+export const LEDGER_SORTABLE_COLUMNS: Record<string, string> = {
   sale_date: "sale_date",
   service_date: "service_date",
   trainer_name: "trainer_name",
@@ -120,31 +120,22 @@ function applyListFilters(
       q = q.or(parts.join(","));
     }
   }
-  const dateField = filters.dateField ?? "sale_date";
+  const requestedDateField = filters.dateField ?? "sale_date";
+  const dateField = (
+    requestedDateField === "sale_date" ||
+    requestedDateField === "service_date" ||
+    requestedDateField === "created_at" ||
+    requestedDateField === "confirmed_at" ||
+    requestedDateField === "paid_at"
+      ? requestedDateField
+      : "sale_date"
+  );
   const dateFrom = normalizeCommissionDateFilter(filters.dateFrom);
   const dateTo = normalizeCommissionDateFilter(filters.dateTo);
-  if (dateFrom || dateTo) {
-    const buildRange = (field: "sale_date" | "service_date") => {
-      const parts: string[] = [];
-      if (dateFrom) parts.push(`${field}.gte.${dateFrom}`);
-      if (dateTo) parts.push(`${field}.lte.${dateTo}`);
-      return parts.length ? `and(${parts.join(",")})` : null;
-    };
-
-    if (dateField === "sale_date" || dateField === "service_date") {
-      const primaryRange = buildRange(dateField);
-      const fallbackField = dateField === "sale_date" ? "service_date" : "sale_date";
-      const fallbackRange = buildRange(fallbackField);
-      if (primaryRange && fallbackRange) {
-        q = q.or(`${primaryRange},${fallbackRange}`);
-      } else if (primaryRange) {
-        q = q.or(primaryRange);
-      }
-    } else {
-      if (dateFrom) q = q.gte(dateField, dateFrom);
-      if (dateTo) q = q.lte(dateField, dateTo);
-    }
-  }
+  // Filter the chosen date column only. OR(sale_date, service_date) cannot use
+  // package_commission_records_sale_date_idx and was aborting the 3s ledger GET.
+  if (dateFrom) q = q.gte(dateField, dateFrom);
+  if (dateTo) q = q.lte(dateField, dateTo);
   if (filters.reviewStatus?.length) q = q.in("review_status", filters.reviewStatus);
   if (filters.approvalStatus?.length) q = q.in("approval_status", filters.approvalStatus);
   if (filters.paymentStatus?.length) q = q.in("payment_status", filters.paymentStatus);
@@ -168,7 +159,7 @@ function applyListFilters(
   return q;
 }
 
-const LEDGER_LIST_COLUMNS =
+export const LEDGER_LIST_COLUMNS =
   "id, trainer_user_id, trainer_name, trainer_email, sale_date, service_date, client_name, dog_name, commission_type, package_or_class, quantity, gross_amount_cents, discount_amount_cents, refund_amount_cents, commission_rate_bps, calculated_commission_cents, final_commission_cents, review_status, approval_status, payment_status, refund_status, source, gingr_transaction_url, has_open_comments, is_possible_duplicate, missing_required_info, payroll_period_id, archived_at, created_at, updated_at";
 
 export type ListCommissionRecordsOptions = {
@@ -186,7 +177,7 @@ export async function listCommissionRecords(
   const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
-  const sortBy = SORTABLE[filters.sortBy ?? "sale_date"] ?? "sale_date";
+  const sortBy = LEDGER_SORTABLE_COLUMNS[filters.sortBy ?? "sale_date"] ?? "sale_date";
   const ascending = (filters.sortDir ?? "desc") === "asc";
 
   const dataQuery = applyListFilters(
