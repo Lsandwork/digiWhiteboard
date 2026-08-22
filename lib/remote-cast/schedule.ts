@@ -112,7 +112,8 @@ export async function applyCastDisplaySchedule(
   if (morningRefresh) {
     await Promise.all([
       queueDisplayCommand(supabase, { displayType: "lobby_whiteboard", commandType: "hard_refresh" }),
-      queueDisplayCommand(supabase, { displayType: "staff_whiteboard", commandType: "hard_refresh" })
+      queueDisplayCommand(supabase, { displayType: "staff_whiteboard", commandType: "hard_refresh" }),
+      queueDisplayCommand(supabase, { displayType: "tl_alerts_reminders", commandType: "hard_refresh" })
     ]);
     await bumpCastHardReloadNonce(supabase);
     keeperHardRefresh = true;

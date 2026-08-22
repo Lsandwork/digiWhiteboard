@@ -8,6 +8,7 @@ import { LobbyCheckoutBoard } from "@/components/lobby/LobbyCheckoutBoard";
 import { LobbyErrorBoundary } from "@/components/lobby/LobbyErrorBoundary";
 import { CastKeeperProvider } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
+import { DisplayClosedHoursGate } from "@/components/display/DisplayClosedHoursGate";
 
 /**
  * Lobby board — same rich layout everywhere (laptop, cast target, direct display URL).
@@ -23,7 +24,7 @@ export function LobbyBoardPageClient({ embeddedDisplayToken }: { embeddedDisplay
 
   const debugBoard = searchParams.get("debugBoard") === "1";
 
-  useDisplaySync({ enabled: true });
+  useDisplaySync({ enabled: !castDisplayMode });
 
   if (!castDisplayMode) {
     return (
@@ -38,17 +39,43 @@ export function LobbyBoardPageClient({ embeddedDisplayToken }: { embeddedDisplay
   return (
     <BoardRenderErrorBoundary label="Lobby Board" debugBoard={debugBoard}>
       <LobbyErrorBoundary debugBoard={debugBoard}>
-        <DisplayBootstrap />
-        <CastKeeperProvider
-          displayType="lobby_whiteboard"
-          route="/lobby/checkouts"
-          enabled
-          allowStaleReload={!chromecastReceiver}
-        >
-          <CastDisplaySession receiver={chromecastReceiver || tvDisplay || castMode} />
-          <LobbyCheckoutBoard embeddedDisplayToken={embeddedDisplayToken} castKeeperMode />
-        </CastKeeperProvider>
+        <DisplayClosedHoursGate>
+          <LobbyCastDisplayBody
+            chromecastReceiver={chromecastReceiver}
+            tvDisplay={tvDisplay}
+            castMode={castMode}
+            embeddedDisplayToken={embeddedDisplayToken}
+          />
+        </DisplayClosedHoursGate>
       </LobbyErrorBoundary>
     </BoardRenderErrorBoundary>
+  );
+}
+
+function LobbyCastDisplayBody({
+  chromecastReceiver,
+  tvDisplay,
+  castMode,
+  embeddedDisplayToken
+}: {
+  chromecastReceiver: boolean;
+  tvDisplay: boolean;
+  castMode: boolean;
+  embeddedDisplayToken?: string;
+}) {
+  useDisplaySync({ enabled: true });
+  return (
+    <>
+      <DisplayBootstrap />
+      <CastKeeperProvider
+        displayType="lobby_whiteboard"
+        route="/lobby/checkouts"
+        enabled
+        allowStaleReload={!chromecastReceiver}
+      >
+        <CastDisplaySession receiver={chromecastReceiver || tvDisplay || castMode} />
+        <LobbyCheckoutBoard embeddedDisplayToken={embeddedDisplayToken} castKeeperMode />
+      </CastKeeperProvider>
+    </>
   );
 }

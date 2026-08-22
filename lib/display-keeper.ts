@@ -3,6 +3,19 @@ import type { DisplaySyncState } from "@/lib/display-sync";
 
 export type DisplayType = "staff_whiteboard" | "lobby_whiteboard" | "tl_alerts_reminders";
 
+export const DISPLAY_TYPES: readonly DisplayType[] = [
+  "staff_whiteboard",
+  "lobby_whiteboard",
+  "tl_alerts_reminders"
+] as const;
+
+export function parseDisplayType(value: unknown): DisplayType | null {
+  if (value === "staff_whiteboard" || value === "lobby_whiteboard" || value === "tl_alerts_reminders") {
+    return value;
+  }
+  return null;
+}
+
 export type DisplayCommandType =
   | "hard_refresh"
   | "clear_notice"

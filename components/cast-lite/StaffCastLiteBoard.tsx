@@ -12,6 +12,7 @@ import { groomingClockFromMs } from "@/components/board/GroomingPushNoticeOverla
 import { PushNoticeBoardVeil } from "@/components/board/PushNoticeFlashLayers";
 import { StaffAlertTakeover } from "@/components/whiteboard/StaffAlertTakeover";
 import { CastKeeperProvider, useCastKeeperContext } from "@/hooks/useCastKeeper";
+import { DisplayClosedHoursGate } from "@/components/display/DisplayClosedHoursGate";
 import { useFitdogAlertSound } from "@/hooks/useFitdogAlertSound";
 import { useWhiteboardCastState } from "@/hooks/useWhiteboardCastState";
 import { CastDisplaySession } from "@/components/cast-lite/CastDisplaySession";
@@ -348,13 +349,15 @@ export function StaffCastLiteBoard({ options }: StaffCastLiteBoardProps) {
     searchParams.get("chromecast") === "1" || searchParams.get("display") === "tv";
 
   return (
-    <CastKeeperProvider
-      displayType="staff_whiteboard"
-      route="/staff-cast"
-      enabled
-      allowStaleReload={!chromecastReceiver}
-    >
-      <StaffCastLiteContent options={options} chromecastReceiver={chromecastReceiver} />
-    </CastKeeperProvider>
+    <DisplayClosedHoursGate>
+      <CastKeeperProvider
+        displayType="staff_whiteboard"
+        route="/staff-cast"
+        enabled
+        allowStaleReload={!chromecastReceiver}
+      >
+        <StaffCastLiteContent options={options} chromecastReceiver={chromecastReceiver} />
+      </CastKeeperProvider>
+    </DisplayClosedHoursGate>
   );
 }

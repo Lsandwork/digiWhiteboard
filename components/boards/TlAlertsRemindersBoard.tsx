@@ -36,6 +36,7 @@ import {
 } from "@/lib/tl-digi-board/daily-team-reminders";
 import "./tl-alerts-reminders-board.css";
 import { TlBoardPushTakeover } from "@/components/boards/TlBoardPushTakeover";
+import { DisplayClosedHoursGate } from "@/components/display/DisplayClosedHoursGate";
 
 type BoardPayload = TlDigiBoardSnapshot & {
   config?: { displayTitle?: string; enabled?: boolean };
@@ -780,8 +781,10 @@ function GingrStatusCard({
 
 export function TlAlertsRemindersBoard() {
   return (
-    <CastKeeperProvider displayType="tl_alerts_reminders" route="/boards/tl-alerts-reminders" enabled allowStaleReload={false}>
-      <BoardInner />
-    </CastKeeperProvider>
+    <DisplayClosedHoursGate>
+      <CastKeeperProvider displayType="tl_alerts_reminders" route="/boards/tl-alerts-reminders" enabled allowStaleReload={false}>
+        <BoardInner />
+      </CastKeeperProvider>
+    </DisplayClosedHoursGate>
   );
 }
