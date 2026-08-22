@@ -25,7 +25,10 @@ function buildDatabaseUrl(options?: { usePooler?: boolean; port?: string }): str
     const port = options?.port ?? process.env.SUPABASE_DB_PORT ?? (usePooler ? "6543" : "5432");
     const user = process.env.SUPABASE_DB_USER ?? (usePooler ? `postgres.${PROJECT_REF}` : "postgres");
     const database = process.env.SUPABASE_DB_NAME ?? "postgres";
-    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password.trim())}@${host}:${port}/${database}?sslmode=require`;
+    // No sslmode here: pg treats `sslmode=require` as verify-full, and the
+    // parsed connection string overrides the client's ssl options, which
+    // rejects Supabase's pooler chain with "self-signed certificate".
+    return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password.trim())}@${host}:${port}/${database}`;
   }
   const direct = process.env.DATABASE_URL ?? process.env.SUPABASE_DB_URL ?? process.env.POSTGRES_URL;
   return direct?.trim() || null;
@@ -144,8 +147,12 @@ async function connectPg(): Promise<Client> {
   const hasPassword = Boolean(
     (process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD)?.trim()
   );
+  // Transaction pooling first (the serverless-safe port), then session pooling.
   const attempts: Array<{ usePooler: boolean; port?: string }> = hasPassword
-    ? [{ usePooler: true, port: "6543" }]
+    ? [
+        { usePooler: true, port: "6543" },
+        { usePooler: true, port: "5432" }
+      ]
     : [{ usePooler: true }];
   let lastError: unknown;
   const seen = new Set<string>();
