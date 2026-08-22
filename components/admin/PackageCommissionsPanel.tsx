@@ -355,14 +355,21 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   }, [page, tab]);
 
   async function postAction(payload: Record<string, unknown>) {
-    const { ok, body } = await fetchAdminJson<{ error?: string } & Record<string, unknown>>(
-      "/api/admin/package-commissions",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload)
-      }
-    );
+    const { ok, body } = await fetchAdminJson<{
+      error?: string;
+      csv?: string;
+      results?: unknown[];
+      errors?: unknown[];
+      imported?: number;
+      created?: number;
+      failed?: number;
+      duplicates?: number;
+      skippedDuplicates?: number;
+    }>("/api/admin/package-commissions", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload)
+    });
     if (!ok) throw new Error(body.error ?? "Request failed.");
     return body;
   }
@@ -376,7 +383,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         threads?: unknown[];
         audit?: unknown[];
       }>(`/api/admin/package-commissions?view=record&id=${encodeURIComponent(id)}`);
-      if (!ok) throw new Error(body.error ?? "Unable to load record.");
+      if (!ok || !body.record) throw new Error(body.error ?? "Unable to load record.");
       setDrawer({ record: body.record, threads: body.threads ?? [], audit: body.audit ?? [] });
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Unable to open record.", "error");
@@ -1275,7 +1282,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 const imported = Number(body.imported ?? body.created ?? 0);
                 const failed = Number(body.failed ?? 0);
                 const duplicates = Number(body.duplicates ?? body.skippedDuplicates ?? 0);
-                const errors = Array.isArray(body.errors) ? body.errors : [];
+                const errors = Array.isArray(body.errors)
+                  ? (body.errors as { line: number; message: string; severity?: string }[])
+                  : [];
                 setImportResult({ imported, failed, errors });
                 const parts = [`Imported ${imported} row(s)`];
                 if (duplicates) parts.push(`${duplicates} duplicate(s) skipped`);

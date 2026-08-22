@@ -98,7 +98,7 @@ async function resolveAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
   const role = session?.role;
   const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_TIMEOUT_MS });
-  const fallbackAccess = accessFromLegacyRole(session?.adminUserId ?? null, session?.email, session?.role);
+  const fallbackAccess = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
   const [access, displayName] = await Promise.all([
     session?.adminUserId
       ? withTimeoutFallback(

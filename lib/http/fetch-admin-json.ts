@@ -11,7 +11,7 @@ type AdminFetchInit = RequestInit & {
  * Admin/staff fetch that never feeds Cloudflare HTML into JSON.parse.
  * Times out so a hung origin cannot freeze a tab.
  */
-export async function fetchAdminJson<T = Record<string, unknown>>(
+export async function fetchAdminJson<T = any>(
   input: RequestInfo | URL,
   init: AdminFetchInit = {}
 ): Promise<{ ok: boolean; status: number; body: T }> {
