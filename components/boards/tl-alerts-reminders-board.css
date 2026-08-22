@@ -190,11 +190,115 @@
   min-height: 0;
 }
 
+.tl-board__split--meds-only {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .tl-board__split > .tl-panel {
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.tl-panel--meds-focus {
+  min-height: 18rem;
+}
+
+.tl-table--meds-focus {
+  font-size: 1.02rem;
+}
+
+.tl-table--meds-focus .tl-table__dog-name {
+  font-size: 1.2rem;
+}
+
+.tl-table--meds-focus .tl-badge {
+  font-size: 0.88rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.tl-focus-banner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 1rem 1.25rem;
+  align-items: start;
+  margin: 0 0 1rem;
+  padding: 0.95rem 1.15rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(245, 185, 66, 0.45);
+  background: linear-gradient(90deg, rgba(245, 185, 66, 0.14), rgba(18, 26, 43, 0.85) 55%);
+}
+
+.tl-focus-banner__eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--tl-amber);
+  font-weight: 750;
+}
+
+.tl-focus-banner__title {
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  font-weight: 750;
+}
+
+.tl-focus-banner__lead {
+  margin: 0.35rem 0 0;
+  color: var(--tl-muted);
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+.tl-focus-banner__list {
+  margin: 0;
+  padding: 0 0 0 1.1rem;
+  color: var(--tl-text);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.tl-focus-banner__list li + li {
+  margin-top: 0.25rem;
+}
+
+.tl-focus-banner__stats {
+  display: grid;
+  gap: 0.45rem;
+  justify-items: end;
+  text-align: right;
+  color: var(--tl-muted);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tl-focus-banner__stats strong {
+  display: inline-block;
+  margin-left: 0.35rem;
+  color: var(--tl-text);
+  font-size: 1.25rem;
+  font-weight: 750;
+}
+
+.tl-focus-banner__stat--overdue,
+.tl-focus-banner__stat--overdue strong {
+  color: var(--tl-red);
+}
+
+@media (max-width: 1200px) {
+  .tl-focus-banner {
+    grid-template-columns: 1fr;
+  }
+  .tl-focus-banner__stats {
+    justify-items: start;
+    text-align: left;
+    grid-auto-flow: column;
+    grid-template-columns: repeat(3, auto);
+    gap: 1rem;
+  }
 }
 
 /* Right column: Additional Services, then Daily Team Reminders when shown. */
@@ -312,6 +416,32 @@
 
 .tl-table__row--overdue {
   background: linear-gradient(90deg, rgba(255, 92, 92, 0.16), transparent 55%);
+}
+
+/* CSS-only flash — no JS timers, no extra bandwidth. */
+.tl-table__row--overdue-flash {
+  animation: tl-overdue-row-flash 1.8s ease-in-out infinite;
+  box-shadow: inset 3px 0 0 0 var(--tl-red);
+}
+
+@keyframes tl-overdue-row-flash {
+  0%,
+  100% {
+    background: linear-gradient(90deg, rgba(255, 92, 92, 0.12), transparent 60%);
+    box-shadow: inset 3px 0 0 0 rgba(255, 92, 92, 0.55);
+  }
+  50% {
+    background: linear-gradient(90deg, rgba(255, 92, 92, 0.38), rgba(255, 92, 92, 0.08) 55%, transparent 75%);
+    box-shadow: inset 4px 0 0 0 var(--tl-red);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-table__row--overdue-flash {
+    animation: none;
+    background: linear-gradient(90deg, rgba(255, 92, 92, 0.28), transparent 55%);
+    box-shadow: inset 4px 0 0 0 var(--tl-red);
+  }
 }
 
 .tl-table__row--service {
