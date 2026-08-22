@@ -57,6 +57,10 @@ const diagnostics = readFileSync("lib/staff/commission-ledger/diagnostics.ts", "
 assert.match(diagnostics, /legacy_settings_rows/);
 assert.match(diagnostics, /direct_postgres/);
 assert.match(diagnostics, /rest_exact_count/);
+// Serial probes stacked past maxDuration and 504'd the report.
+assert.match(diagnostics, /Promise\.all\(\[/);
+assert.match(diagnostics, /PROBE_TIMEOUT_MS/);
+assert.match(commissionsRoute, /maxDuration = 30/);
 // Diagnostics must report configuration presence, never secret values.
 assert.doesNotMatch(diagnostics, /process\.env\.SUPABASE_SERVICE_ROLE_KEY\s*\}/);
 assert.match(commissionsRoute, /view === "diagnostics"/);

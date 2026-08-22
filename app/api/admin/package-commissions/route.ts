@@ -62,7 +62,8 @@ import { normalizeCommissionDateFilter } from "@/lib/staff/commission-ledger/dat
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+/** Headroom so the diagnostics report can never be cut off by a 504. */
+export const maxDuration = 30;
 
 /** Fast ledger page: 25 rows, under the browser abort. */
 const COMMISSIONS_QUERY_TIMEOUT_MS = 5_000;
