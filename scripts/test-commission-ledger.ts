@@ -21,6 +21,7 @@ import {
   type CommissionViewer
 } from "../lib/staff/commission-ledger";
 import { buildCommissionLedgerSelect } from "../lib/staff/commission-ledger/list-via-postgres";
+import { buildCommissionLedgerRestPath } from "../lib/staff/commission-ledger/list-via-rest";
 
 // Money (integer cents)
 assert.equal(parseMoneyToCents("$1,200.50"), 120050);
@@ -220,5 +221,18 @@ const trainerScoped = buildCommissionLedgerSelect(
 );
 assert.match(trainerScoped.text, /trainer_user_id = \$1/);
 assert.equal(trainerScoped.from, 25);
+
+const hugePage = buildCommissionLedgerSelect({ isTrainerOnly: false }, { pageSize: 5000 });
+assert.equal(hugePage.pageSize, 25);
+
+const restPath = buildCommissionLedgerRestPath(
+  { isTrainerOnly: false },
+  { page: 1, pageSize: 25 }
+);
+assert.match(restPath.path, /archived_at=is\.null/);
+assert.match(restPath.path, /order=sale_date\.desc\.nullslast/);
+assert.match(restPath.path, /limit=25/);
+assert.doesNotMatch(restPath.path, /sale_date=gte/);
+assert.equal(restPath.pageSize, 25);
 
 console.log("commission ledger: ok");

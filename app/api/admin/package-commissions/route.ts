@@ -11,13 +11,14 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { accessFromLegacyRole, hasPermission, hasRole, legacyRoleToRoleKey } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { humanizeUnknownError } from "@/lib/safe-url";
-import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { SERVICE_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/server";
 import { listCommissionTrainersFromDb } from "@/lib/staff/commission-ledger/trainers";
 import {
   canListCommissionsViaPostgres,
   listCommissionRecordsViaPostgres
 } from "@/lib/staff/commission-ledger/list-via-postgres";
+import { listCommissionRecordsViaRest } from "@/lib/staff/commission-ledger/list-via-rest";
 import {
   acknowledgeTrainerStatement,
   bulkUpdateCommissionRecords,
@@ -60,12 +61,12 @@ import { normalizeCommissionDateFilter } from "@/lib/staff/commission-ledger/dat
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 8;
+export const maxDuration = 15;
 
-/** Ledger GET must return before the browser's 8s abort. */
-const COMMISSIONS_QUERY_TIMEOUT_MS = 6_000;
+/** Fast ledger page: 25 rows, under the browser abort. */
+const COMMISSIONS_QUERY_TIMEOUT_MS = 5_000;
 const COMMISSIONS_OPTIONAL_TIMEOUT_MS = 1_200;
-const COMMISSIONS_REST_RACE_TIMEOUT_MS = 3_500;
+const LEDGER_CACHE_TTL_MS = 60_000;
 
 function buildViewer(
   session: ReturnType<typeof getAdminSessionFromRequest>,
@@ -196,8 +197,8 @@ function parseListFilters(url: URL): CommissionListFilters {
     page: Number(url.searchParams.get("page") ?? 1),
     pageSize:
       url.searchParams.get("pageSize") === "all"
-        ? 5000
-        : Number(url.searchParams.get("pageSize") ?? 25),
+        ? 25
+        : Math.min(25, Math.max(10, Number(url.searchParams.get("pageSize") ?? 25))),
     sortBy: url.searchParams.get("sortBy") ?? "sale_date",
     sortDir: (url.searchParams.get("sortDir") as "asc" | "desc") ?? "desc"
   };
@@ -268,42 +269,61 @@ function ledgerPayload(
   };
 }
 
-function firstRejectedMessage(error: unknown): string {
-  if (error instanceof AggregateError && error.errors.length) {
-    return humanizeUnknownError(error.errors[0], "Commission ledger is delayed.");
+function capLedgerFilters(filters: CommissionListFilters, fast: boolean): CommissionListFilters {
+  const next: CommissionListFilters = {
+    ...filters,
+    pageSize: Math.min(25, Math.max(10, filters.pageSize ?? 25))
+  };
+  if (fast) {
+    next.dateFrom = undefined;
+    next.dateTo = undefined;
+    next.q = undefined;
   }
-  return humanizeUnknownError(error, "Commission ledger is delayed.");
+  return next;
 }
 
 async function loadLedgerList(viewer: ReturnType<typeof buildViewer>, filters: CommissionListFilters) {
-  const pgAvailable = canListCommissionsViaPostgres();
-  const restClient = getServiceSupabase({
-    timeoutMs: pgAvailable ? COMMISSIONS_REST_RACE_TIMEOUT_MS : COMMISSIONS_QUERY_TIMEOUT_MS
-  });
-  const rest = listCommissionRecords(restClient, viewer, filters);
+  const cacheKey = [
+    "commissions:ledger",
+    viewer.isTrainerOnly ? viewer.adminUserId ?? viewer.email ?? "trainer" : "all",
+    filters.page ?? 1,
+    filters.pageSize ?? 25,
+    filters.dateFrom ?? "",
+    filters.dateTo ?? "",
+    (filters.reviewStatus ?? []).join(","),
+    (filters.approvalStatus ?? []).join(","),
+    (filters.trainerIds ?? []).join(",")
+  ].join(":");
+  const cached = getTtlCache<Awaited<ReturnType<typeof listCommissionRecordsViaRest>>>(cacheKey);
+  const errors: string[] = [];
 
-  if (!pgAvailable) {
+  if (canListCommissionsViaPostgres()) {
     try {
-      return { delayed: false as const, delayedReason: undefined as string | undefined, result: await rest };
+      const result = await listCommissionRecordsViaPostgres(viewer, filters);
+      setTtlCache(cacheKey, result, LEDGER_CACHE_TTL_MS);
+      return { delayed: false as const, delayedReason: undefined as string | undefined, result };
     } catch (error) {
-      return {
-        delayed: true as const,
-        delayedReason: humanizeUnknownError(error, "Commission ledger is delayed."),
-        result: emptyLedgerResult(filters)
-      };
+      errors.push(humanizeUnknownError(error, "postgres"));
     }
   }
 
   try {
-    const result = await Promise.any([rest, listCommissionRecordsViaPostgres(viewer, filters)]);
+    const result = await listCommissionRecordsViaRest(viewer, filters, COMMISSIONS_QUERY_TIMEOUT_MS);
+    setTtlCache(cacheKey, result, LEDGER_CACHE_TTL_MS);
     return { delayed: false as const, delayedReason: undefined as string | undefined, result };
   } catch (error) {
-    return {
-      delayed: true as const,
-      delayedReason: firstRejectedMessage(error),
-      result: emptyLedgerResult(filters)
-    };
+    errors.push(humanizeUnknownError(error, "Commission ledger is delayed."));
   }
+
+  if (cached) {
+    return { delayed: false as const, delayedReason: undefined as string | undefined, result: cached };
+  }
+
+  return {
+    delayed: true as const,
+    delayedReason: errors.filter(Boolean).join(" · ") || "Commission ledger is delayed.",
+    result: emptyLedgerResult(filters)
+  };
 }
 
 export async function GET(request: Request) {
@@ -316,13 +336,15 @@ export async function GET(request: Request) {
   const viewer = buildViewer(session, access, canManage, canComment);
   const url = new URL(request.url);
   const view = url.searchParams.get("view") ?? "ledger";
-  const trainersPromise = canManage
-    ? withTimeoutFallback(
-        listCommissionTrainersFromDb(getServiceSupabase({ timeoutMs: COMMISSIONS_OPTIONAL_TIMEOUT_MS })),
-        COMMISSIONS_OPTIONAL_TIMEOUT_MS,
-        []
-      )
-    : Promise.resolve([]);
+  const fast = url.searchParams.get("fast") === "1";
+  const trainersPromise =
+    canManage && view !== "ledger"
+      ? withTimeoutFallback(
+          listCommissionTrainersFromDb(getServiceSupabase({ timeoutMs: COMMISSIONS_OPTIONAL_TIMEOUT_MS })),
+          COMMISSIONS_OPTIONAL_TIMEOUT_MS,
+          []
+        )
+      : Promise.resolve([]);
 
   try {
     if (view === "record") {
@@ -366,7 +388,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ report, canManage, trainers });
     }
 
-    const filters = parseListFilters(url);
+    const filters = capLedgerFilters(parseListFilters(url), fast);
     const [trainers, { delayed, delayedReason, result }] = await Promise.all([
       trainersPromise,
       loadLedgerList(viewer, filters)

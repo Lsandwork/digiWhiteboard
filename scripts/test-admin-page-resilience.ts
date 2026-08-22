@@ -22,28 +22,36 @@ assert.doesNotMatch(records, /count: "exact"/);
 
 const commissionsRoute = readFileSync("app/api/admin/package-commissions/route.ts", "utf8");
 assert.match(commissionsRoute, /accessFromLegacyRole/);
-assert.match(commissionsRoute, /COMMISSIONS_QUERY_TIMEOUT_MS = 6_000/);
+assert.match(commissionsRoute, /COMMISSIONS_QUERY_TIMEOUT_MS = 5_000/);
 assert.match(commissionsRoute, /listCommissionRecordsViaPostgres/);
-assert.match(commissionsRoute, /Promise\.any/);
+assert.match(commissionsRoute, /listCommissionRecordsViaRest/);
+assert.match(commissionsRoute, /capLedgerFilters/);
 assert.match(commissionsRoute, /delayedReason/);
 assert.match(commissionsRoute, /listCommissionTrainersFromDb/);
 assert.match(commissionsRoute, /liveMatrix/);
 assert.match(commissionsRoute, /humanizeUnknownError/);
 assert.doesNotMatch(commissionsRoute, /listAdminUsers/);
 assert.doesNotMatch(commissionsRoute, /getServiceSupabase\(\)/);
+assert.doesNotMatch(commissionsRoute, /Promise\.any/);
 assert.doesNotMatch(commissionsRoute, /\.catch\(\(\) => \(\{ delayed: true/);
 
 const panel = readFileSync("components/admin/PackageCommissionsPanel.tsx", "utf8");
 assert.match(panel, /fetchAdminJson/);
 assert.match(panel, /loadError/);
 assert.match(panel, /delayedReason/);
+assert.match(panel, /fast", "1"/);
 assert.doesNotMatch(panel, /await response\.json\(\)/);
-assert.match(panel, /timeoutMs: 8_000/);
+assert.match(panel, /timeoutMs: 10_000/);
 
 const postgresLedger = readFileSync("lib/staff/commission-ledger/list-via-postgres.ts", "utf8");
 assert.match(postgresLedger, /statement_timeout/);
 assert.match(postgresLedger, /package_commission_records/);
+assert.match(postgresLedger, /6543/);
 assert.doesNotMatch(postgresLedger, /service_date >=/);
+
+const restLedger = readFileSync("lib/staff/commission-ledger/list-via-rest.ts", "utf8");
+assert.match(restLedger, /count=none/);
+assert.match(restLedger, /package_commission_records/);
 
 const toast = readFileSync("components/admin/ui/ToastProvider.tsx", "utf8");
 assert.match(toast, /humanizeUnknownError/);
