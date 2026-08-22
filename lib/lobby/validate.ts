@@ -186,6 +186,22 @@ export function userFacingCheckoutMessage(error: string | undefined, hasVisibleC
   return hasVisibleCheckouts ? "Live board temporarily refreshing" : null;
 }
 
+/** True when the API attached a hard failure — stale last-good payloads are still usable. */
+export function lobbyCheckoutSyncFailed(body: { error?: string; stale?: boolean }) {
+  return Boolean(body.error) && !body.stale;
+}
+
+/** Banner text for a soft/stale sync failure. Idle boards skip technical noise. */
+export function lobbyCheckoutRefreshBanner(error: string | undefined, hasVisibleCheckouts: boolean) {
+  const message = userFacingCheckoutMessage(error, hasVisibleCheckouts);
+  if (message) return message;
+  if (!error) return null;
+  if (isTechnicalCheckoutError(error)) {
+    return hasVisibleCheckouts ? "Live board temporarily refreshing" : null;
+  }
+  return hasVisibleCheckouts ? "Live board temporarily refreshing" : "Unable to verify lobby checkouts.";
+}
+
 export function getDefaultLobbySettings() {
   return DEFAULT_LOBBY_SETTINGS;
 }

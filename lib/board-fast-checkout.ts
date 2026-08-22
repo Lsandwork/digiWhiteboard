@@ -31,8 +31,8 @@ export type { RetiredTransitionKeys } from "@/lib/board-retired-keys";
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 export const FAST_CHECKOUT_QUERY_TIMEOUT_MS = 1500;
-const FAST_CHECKOUT_PHOTO_TIMEOUT_MS = 250;
-const FAST_BOARD_ROW_LIMIT = 80;
+export const FAST_CHECKOUT_PHOTO_TIMEOUT_MS = 250;
+export const FAST_BOARD_ROW_LIMIT = 80;
 
 export type FastCheckoutLoadResult = {
   checking_out: LiveDog[];

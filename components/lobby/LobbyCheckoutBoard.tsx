@@ -40,6 +40,8 @@ import {
 import { debugBoardClient } from "@/lib/board-debug";
 import {
   getDefaultLobbySettings,
+  lobbyCheckoutRefreshBanner,
+  lobbyCheckoutSyncFailed,
   sanitizeLobbyCheckouts,
   sanitizeLobbySettings,
   userFacingCheckoutMessage
@@ -227,6 +229,10 @@ export function LobbyCheckoutBoard({
           setRefreshMessage(null);
           setHealthy(true);
           if (castKeeperMode) castKeeper?.markDataFresh();
+        } else if (checkoutsRes.ok && checkoutBody.stale && !lobbyCheckoutSyncFailed(checkoutBody)) {
+          applyCheckoutUpdate(checkoutBody, "fast");
+          setLastFastFetchAt(new Date().toISOString());
+          if (castKeeperMode) castKeeper?.markDataFresh();
         }
       } catch {
         // Keep the last good lobby checkout data when a fast refresh fails.
@@ -249,15 +255,21 @@ export function LobbyCheckoutBoard({
         });
         const checkoutBody = normalizeCheckoutsResponse((await checkoutsRes.json()) as Partial<LobbyCheckoutsResponse>);
 
-        if (checkoutsRes.ok && !checkoutBody.error) {
+        const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
+
+        if (checkoutsRes.ok && !lobbyCheckoutSyncFailed(checkoutBody)) {
           applyCheckoutUpdate(checkoutBody, "full");
           setFullDebug(checkoutBody.debug);
           setLastFullFetchAt(new Date().toISOString());
-          setRefreshMessage(null);
-          setHealthy(true);
+          if (!checkoutBody.error && !checkoutBody.stale) {
+            setRefreshMessage(null);
+            setHealthy(true);
+          } else {
+            setRefreshMessage(lobbyCheckoutRefreshBanner(checkoutBody.error, hasVisibleCheckouts));
+            setHealthy(false);
+          }
           if (castKeeperMode) castKeeper?.markDataFresh();
         } else {
-          const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
           const message = userFacingCheckoutMessage(checkoutBody.error, hasVisibleCheckouts);
           if (message) {
             setRefreshMessage(message);
@@ -266,7 +278,10 @@ export function LobbyCheckoutBoard({
           }
           if (!hasVisibleCheckouts) {
             setHealthy(false);
-            setRefreshMessage(message || "Unable to verify lobby checkouts.");
+            setRefreshMessage(
+              lobbyCheckoutRefreshBanner(checkoutBody.error, hasVisibleCheckouts) ??
+                (checkoutsRes.ok ? null : "Unable to verify lobby checkouts.")
+            );
           } else if (message) {
             setHealthy(false);
           }
@@ -282,7 +297,8 @@ export function LobbyCheckoutBoard({
         const hasVisibleCheckouts = Boolean(checkoutsRef.current.featured || checkoutsRef.current.queue.length);
         setHealthy(false);
         setRefreshMessage(
-          hasVisibleCheckouts ? "Live board temporarily refreshing" : "Unable to verify lobby checkouts."
+          lobbyCheckoutRefreshBanner("Unable to load lobby checkouts.", hasVisibleCheckouts) ??
+            (hasVisibleCheckouts ? "Live board temporarily refreshing" : null)
         );
       } finally {
         window.clearTimeout(timeout);
@@ -326,8 +342,6 @@ export function LobbyCheckoutBoard({
 
       if (statusRes.ok) {
         const body = (await statusRes.json()) as LobbyStatusResponse;
-        // Empty checkout queue is not proof of a healthy board — only the status probe is.
-        setHealthy(Boolean(body.healthy));
         setSettings((current) => {
           const nextRefresh = clampCheckoutPollMs(body.refresh_interval_ms);
           if (current.refresh_interval_ms === nextRefresh) return current;
