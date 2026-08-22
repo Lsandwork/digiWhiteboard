@@ -2,7 +2,6 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { assertCanManage, assertNotManagementDestructive, trainerOwnsRecord } from "./auth";
 import { writeCommissionAudit } from "./audit";
-import { ensureCommissionLedgerHotPath } from "./backfill";
 import { mapDbRecord, computeMissingRequired } from "./map";
 import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import { trainerRateBpsForPackage } from "./location-rate";
@@ -169,13 +168,20 @@ function applyListFilters(
   return q;
 }
 
+const LEDGER_LIST_COLUMNS =
+  "id, trainer_user_id, trainer_name, trainer_email, sale_date, service_date, client_name, dog_name, commission_type, package_or_class, quantity, gross_amount_cents, discount_amount_cents, refund_amount_cents, commission_rate_bps, calculated_commission_cents, final_commission_cents, review_status, approval_status, payment_status, refund_status, source, gingr_transaction_url, has_open_comments, is_possible_duplicate, missing_required_info, payroll_period_id, archived_at, created_at, updated_at";
+
+export type ListCommissionRecordsOptions = {
+  /** 10k-row totals scan. Off for the interactive ledger so first paint is one page query. */
+  includeSummary?: boolean;
+};
+
 export async function listCommissionRecords(
   supabase: SupabaseClient,
   viewer: CommissionViewer,
-  filters: CommissionListFilters = {}
+  filters: CommissionListFilters = {},
+  options: ListCommissionRecordsOptions = {}
 ): Promise<CommissionListResult> {
-  await ensureCommissionLedgerHotPath(supabase);
-
   const page = Math.max(1, filters.page ?? 1);
   const pageSize = Math.min(5000, Math.max(10, filters.pageSize ?? 25));
   const from = (page - 1) * pageSize;
@@ -183,33 +189,30 @@ export async function listCommissionRecords(
   const sortBy = SORTABLE[filters.sortBy ?? "sale_date"] ?? "sale_date";
   const ascending = (filters.sortDir ?? "desc") === "asc";
 
-  const countQuery = applyListFilters(
-    supabase.from("package_commission_records").select("id", { count: "exact", head: true }),
-    filters,
-    viewer
-  );
   const dataQuery = applyListFilters(
-    supabase.from("package_commission_records").select("*"),
+    supabase.from("package_commission_records").select(LEDGER_LIST_COLUMNS),
     filters,
     viewer
   )
     .order(sortBy, { ascending, nullsFirst: false })
     .range(from, to);
 
-  const [{ count, error: countError }, { data, error }] = await Promise.all([countQuery, dataQuery]);
-  if (countError) throw new Error(countError.message);
+  const { data, error } = await dataQuery;
   if (error) throw new Error(error.message);
 
+  const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => mapDbRecord(row));
+  // Exact COUNT(*) is a second REST round-trip that was hanging the tab. Infer
+  // enough for Next/Previous: a full page means there is at least one more row.
+  const inferredTotal = rows.length < pageSize ? from + rows.length : from + pageSize + 1;
+
   let summary = emptySummary();
-  try {
-    summary = await withTimeoutFallback(loadSummary(supabase, filters, viewer), 2_500, emptySummary());
-  } catch {
-    // Totals are optional — never hide the ledger because the 10k summary scan timed out.
+  if (options.includeSummary) {
+    summary = await withTimeoutFallback(loadSummary(supabase, filters, viewer), 1_200, emptySummary());
   }
 
   return {
-    rows: ((data ?? []) as Record<string, unknown>[]).map((row) => mapDbRecord(row)),
-    total: count ?? 0,
+    rows,
+    total: inferredTotal,
     page,
     pageSize,
     summary
@@ -221,7 +224,6 @@ export async function getCommissionRecord(
   viewer: CommissionViewer,
   id: string
 ) {
-  await ensureCommissionLedgerHotPath(supabase);
   const { data, error } = await supabase.from("package_commission_records").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Commission record not found.");

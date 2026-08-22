@@ -419,17 +419,22 @@ export async function answerCommissionQuestion(params: {
   }
 
   try {
-    const result = await listCommissionRecords(supabase, viewer, {
-      trainerIds,
-      trainerNames,
-      dateField: "sale_date",
-      dateFrom: parsed.dateFrom,
-      dateTo: parsed.dateTo,
-      page: 1,
-      pageSize: 25,
-      sortBy: "sale_date",
-      sortDir: "desc"
-    });
+    const result = await listCommissionRecords(
+      supabase,
+      viewer,
+      {
+        trainerIds,
+        trainerNames,
+        dateField: "sale_date",
+        dateFrom: parsed.dateFrom,
+        dateTo: parsed.dateTo,
+        page: 1,
+        pageSize: 25,
+        sortBy: "sale_date",
+        sortDir: "desc"
+      },
+      { includeSummary: true }
+    );
 
     const total = centsToDisplay(result.summary.totalCommissionsCents);
     const paid = centsToDisplay(result.summary.paidCents);
