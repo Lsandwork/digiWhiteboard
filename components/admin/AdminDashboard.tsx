@@ -353,11 +353,22 @@ export function AdminDashboard() {
   async function refreshDashboard() {
     setRefreshing(true);
     try {
-      const response = await fetch("/api/admin/refresh", { method: "POST" });
-      if (!response.ok) throw new Error("Refresh failed.");
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 8_000);
+      const response = await fetch("/api/admin/refresh", { method: "POST", signal: controller.signal });
+      window.clearTimeout(timeout);
+      const body = await readResponseJson<{ ok?: boolean; delayed?: boolean }>(response).catch(
+        () => ({ ok: false, delayed: true })
+      );
+      if (!response.ok && !body.ok) throw new Error("Refresh failed.");
       await broadcastCastHardReload();
       await load(true);
-      showToast("Refresh complete. Lobby and staff TVs were signaled to reload.", "success");
+      showToast(
+        body.delayed
+          ? "Refresh signaled. Live data is delayed — boards will catch up."
+          : "Refresh complete. Lobby and staff TVs were signaled to reload.",
+        "success"
+      );
     } catch (refreshError) {
       showToast(humanizeUnknownError(refreshError, "Refresh failed."), "error");
     } finally {
@@ -702,11 +713,22 @@ export function AdminDashboard() {
         {tab === "route_generator" ? <RouteGeneratorPanel /> : null}
         {tab === "live_fleet" ? <LiveFleetPanel /> : null}
         {tab === "my_shift" ? (
-          <OpsCommandCenterPanel mode="my_shift" onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)} />
+          <OpsCommandCenterPanel
+            mode="my_shift"
+            email={data.username}
+            displayName={displayLabel}
+            roleKey={userAccess.primaryRole}
+            roleLabel={userAccess.displayLabel}
+            onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)}
+          />
         ) : null}
         {tab === "ops_command_center" ? (
           <OpsCommandCenterPanel
             mode="ops_command_center"
+            email={data.username}
+            displayName={displayLabel}
+            roleKey={userAccess.primaryRole}
+            roleLabel={userAccess.displayLabel}
             onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)}
           />
         ) : null}

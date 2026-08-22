@@ -8,7 +8,7 @@ import { useToast } from "@/components/admin/ui/ToastProvider";
 import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
-import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
+import { emptyOpsCommandCenterSnapshot, type OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
 import {
@@ -50,16 +50,30 @@ function formatNow() {
 
 export function OpsCommandCenterPanel({
   mode,
-  onNavigate
+  onNavigate,
+  email,
+  displayName,
+  roleKey,
+  roleLabel
 }: {
   mode: Mode;
   onNavigate?: (tab: string) => void;
+  email?: string | null;
+  displayName?: string | null;
+  roleKey?: string;
+  roleLabel?: string;
 }) {
-  const [data, setData] = useState<OpsCommandCenterSnapshot | null>(null);
+  const [data, setData] = useState<OpsCommandCenterSnapshot>(() =>
+    emptyOpsCommandCenterSnapshot({
+      email,
+      displayName,
+      roleKey: roleKey || "viewer",
+      roleLabel: roleLabel || "Staff"
+    })
+  );
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [pollMs, setPollMs] = useState(60_000);
-  const dataRef = useRef<OpsCommandCenterSnapshot | null>(null);
+  const dataRef = useRef<OpsCommandCenterSnapshot | null>(data);
   const [query, setQuery] = useState("");
   const [dogHits, setDogHits] = useState<Array<OpsDog | BoardSearchHit>>([]);
   const [selectedDogId, setSelectedDogId] = useState<string | null>(null);
@@ -71,7 +85,7 @@ export function OpsCommandCenterPanel({
 
   const load = useCallback(async () => {
     const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 12_000);
+    const timeout = window.setTimeout(() => controller.abort(), 8_000);
     try {
       const res = await fetch("/api/admin/ops-command-center", {
         cache: "no-store",
@@ -81,7 +95,6 @@ export function OpsCommandCenterPanel({
       if (body.greetingName || body.shiftSummary) {
         dataRef.current = body;
         setData(body);
-        setError(null);
         setPollMs(body.stale ? 90_000 : 60_000);
         return;
       }
@@ -90,11 +103,9 @@ export function OpsCommandCenterPanel({
       }
       dataRef.current = body as OpsCommandCenterSnapshot;
       setData(body as OpsCommandCenterSnapshot);
-      setError(null);
       setPollMs(60_000);
-    } catch (err) {
-      const message = humanizeUnknownError(err, "Unable to load My Shift. Retry shortly.");
-      if (!dataRef.current) setError(message);
+    } catch {
+      setData((current) => (current ? { ...current, stale: true } : current));
       setPollMs((current) => Math.min(Math.max(current, 30_000) * 2, 120_000));
     } finally {
       window.clearTimeout(timeout);
@@ -208,30 +219,6 @@ export function OpsCommandCenterPanel({
     } finally {
       setLogBusy(false);
     }
-  }
-
-  if (loading && !data) {
-    return (
-      <section className="space-y-4 p-1">
-        <div className="h-24 animate-pulse rounded-2xl bg-white/5" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-24 animate-pulse rounded-2xl bg-white/5" />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <section className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
-        <p className="font-medium">{humanizeUnknownError(error, "Unable to load My Shift. Retry shortly.")}</p>
-        <button type="button" className="admin-btn-secondary mt-3" onClick={() => void load()}>
-          Retry
-        </button>
-      </section>
-    );
   }
 
   if (!data) return null;
