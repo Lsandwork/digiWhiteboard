@@ -4,6 +4,7 @@
  */
 
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { isInfrastructureError } from "@/lib/safe-url";
 
 type SupabaseClient = ReturnType<typeof getServiceSupabase>;
 import {
@@ -161,13 +162,17 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
   const supabase = supabaseClient ?? getServiceSupabase();
   let opsFailed = false;
   let alertsFailed = false;
+  let opsTimedOut = false;
+  let alertsTimedOut = false;
   const [ops, alerts] = await Promise.all([
-    listStaffOps(supabase).catch(() => {
+    listStaffOps(supabase).catch((error: unknown) => {
       opsFailed = true;
+      opsTimedOut = isInfrastructureError(error);
       return null;
     }),
-    listOpenAlerts(supabase).catch(() => {
+    listOpenAlerts(supabase).catch((error: unknown) => {
       alertsFailed = true;
+      alertsTimedOut = isInfrastructureError(error);
       return [] as OperationsAlert[];
     })
   ]);
@@ -190,8 +195,17 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
     occurredAt: log.created_at
   }));
 
+  const timedOut = opsTimedOut || alertsTimedOut;
   const feedHealth: "ok" | "degraded" | "error" =
-    opsFailed && alertsFailed ? "error" : opsFailed || alertsFailed ? "degraded" : "ok";
+    timedOut && !ops && !alertsFailed
+      ? "ok"
+      : timedOut
+        ? "degraded"
+        : opsFailed && alertsFailed
+          ? "error"
+          : opsFailed || alertsFailed
+            ? "degraded"
+            : "ok";
 
   return {
     followUps,
@@ -210,11 +224,13 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
     feedDetail:
       feedHealth === "ok"
         ? null
-        : opsFailed && alertsFailed
-          ? "Staff ops and payment alerts could not be loaded."
-          : opsFailed
-            ? "Staff ops feed could not be loaded."
-            : "Payment alerts could not be loaded."
+        : timedOut
+          ? "Staff ops is still refreshing live data."
+          : opsFailed && alertsFailed
+            ? "Staff ops and payment alerts could not be loaded."
+            : opsFailed
+              ? "Staff ops feed could not be loaded."
+              : "Payment alerts could not be loaded."
   };
 }
 

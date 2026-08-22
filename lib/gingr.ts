@@ -27,6 +27,23 @@ const flagKeys = [
   "taxi"
 ] as const;
 
+const BASKET_CHECKOUT_WEBHOOK_TYPES = new Set([
+  "added_to_basket",
+  "add_to_basket",
+  "added to basket",
+  "checkout_basket",
+  "checkout_basket_added",
+  "basket_added"
+]);
+
+/** Gingr basket-add events are checkout prompts — write them as checking_out immediately. */
+export function resolveActiveBoardWebhookType(webhookType: string): "checking_in" | "checking_out" | null {
+  const token = webhookType.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (token === "checking_in") return "checking_in";
+  if (token === "checking_out" || BASKET_CHECKOUT_WEBHOOK_TYPES.has(token)) return "checking_out";
+  return null;
+}
+
 export function verifyGingrSignature(payload: GingrWebhookPayload, key: string | undefined) {
   if (!key || !payload.signature) {
     return false;

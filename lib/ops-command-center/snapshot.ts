@@ -1,6 +1,7 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { getTtlCache, setTtlCache, withTimeoutFallback, withTimeoutResult } from "@/lib/server-ttl-cache";
 import {
+  OPS_SNAPSHOT_BUILD_TIMEOUT_MS,
   OPS_SNAPSHOT_LAST_GOOD_KEY,
   OPS_SNAPSHOT_LAST_GOOD_TTL_MS,
   OPS_SNAPSHOT_TIMEOUT_MS
@@ -105,6 +106,8 @@ export type OpsCommandCenterSnapshot = {
   };
   /** True when this payload is last-good or a timeout fallback. */
   stale?: boolean;
+  /** First paint / in-flight snapshot — hide failure banners until a real probe finishes. */
+  pending?: boolean;
   tools: Array<{ tab: string; label: string }>;
   /** Staff-directory department for My Shift entry + peer handoff (not RBAC role). */
   homeDepartment: string | null;
@@ -239,7 +242,9 @@ function notificationToWorkItem(note: OpsNotification): OpsWorkItem {
   };
 }
 
-function emptyStaffFeed() {
+type StaffFeedSnapshot = ReturnType<typeof emptyStaffFeed>;
+
+function emptyStaffFeed(health: "ok" | "degraded" | "error" = "ok", detail: string | null = null) {
   return {
     followUps: [],
     issues: [],
@@ -261,8 +266,31 @@ function emptyStaffFeed() {
     ownerFollowUpCount: 0,
     criticalPaymentCount: 0,
     openIssueCount: 0,
-    feedHealth: "error" as const,
-    feedDetail: "Staff ops feed could not be loaded."
+    feedHealth: health,
+    feedDetail: detail
+  };
+}
+
+function delayedStaffFeed(): StaffFeedSnapshot {
+  return emptyStaffFeed("ok", null);
+}
+
+function staffFeedFromSnapshot(snapshot: OpsCommandCenterSnapshot): StaffFeedSnapshot {
+  return {
+    followUps: [],
+    issues: [],
+    paymentAlerts: [],
+    crossoverMessages: [] as CrossoverMessage[],
+    staffDirectory: [] as StaffDirectoryMember[],
+    followUpItems: snapshot.openWork.filter((item) => item.kind === "owner_follow_up"),
+    issueItems: snapshot.openWork.filter((item) => item.kind === "active_issue"),
+    alertItems: snapshot.alertFeed,
+    activityEvents: [],
+    ownerFollowUpCount: snapshot.shiftSummary.ownerFollowUps,
+    criticalPaymentCount: snapshot.shiftSummary.criticalAlerts,
+    openIssueCount: snapshot.shiftSummary.openWork,
+    feedHealth: snapshot.staffOpsHealth.status === "error" ? "error" : snapshot.staffOpsHealth.status === "degraded" ? "degraded" : "ok",
+    feedDetail: snapshot.staffOpsHealth.detail
   };
 }
 
@@ -297,19 +325,27 @@ export function emptyOpsCommandCenterSnapshot(input: {
     notifications: [],
     recentEvents: [],
     gingrHealth: {
-      status: "degraded",
-      label: "Live data delayed",
-      detail: "My Shift could not refresh live data. Showing a safe empty board until the database responds."
+      status: "healthy",
+      label: "Gingr ● Checking…",
+      detail: ""
     },
     staffOpsHealth: {
-      status: "error",
-      detail: "Staff ops feed could not be verified. Empty queues here do not mean All Clear."
+      status: "ok",
+      detail: null
     },
     tools: toolsForRole(input.roleKey),
     homeDepartment: null,
     departmentHandoff: { department: null, previousName: null, shiftNotes: [], assignOptions: [] },
-    stale: true
+    stale: false,
+    pending: true
   };
+}
+
+function shouldCacheOpsSnapshot(snapshot: OpsCommandCenterSnapshot) {
+  if (snapshot.pending || snapshot.stale) return false;
+  if (snapshot.staffOpsHealth.status === "error") return false;
+  if (snapshot.gingrHealth.status === "unknown") return false;
+  return true;
 }
 
 export async function buildOpsCommandCenterSnapshot(input: {
@@ -321,15 +357,16 @@ export async function buildOpsCommandCenterSnapshot(input: {
   access?: UserAccess | null;
 }): Promise<OpsCommandCenterSnapshot> {
   const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
+  const lastGood = getTtlCache<OpsCommandCenterSnapshot>(OPS_SNAPSHOT_LAST_GOOD_KEY);
 
   const timedCount = async (query: PromiseLike<{ count: number | null }>) => {
-    const result = await withTimeoutFallback(Promise.resolve(query), OPS_SNAPSHOT_TIMEOUT_MS, { count: 0 });
-    return result.count || 0;
+    const result = await withTimeoutResult(Promise.resolve(query), OPS_SNAPSHOT_TIMEOUT_MS, { count: 0 });
+    return { count: result.value.count || 0, timedOut: result.timedOut };
   };
 
   const timedMaybe = async <T,>(query: PromiseLike<{ data: T | null }>) => {
-    const result = await withTimeoutFallback(Promise.resolve(query), OPS_SNAPSHOT_TIMEOUT_MS, { data: null as T | null });
-    return result.data;
+    const result = await withTimeoutResult(Promise.resolve(query), OPS_SNAPSHOT_TIMEOUT_MS, { data: null as T | null });
+    return { data: result.value.data, timedOut: result.timedOut };
   };
   const yardTeamLead = isTeamLeadDashboardUser({
     legacyRole: input.roleKey,
@@ -356,9 +393,9 @@ export async function buildOpsCommandCenterSnapshot(input: {
     notifications,
     recentEvents,
     statusCounts,
-    lastWebhook,
-    lastDogSeen,
-    staffFeed,
+    lastWebhookResult,
+    lastDogSeenResult,
+    staffFeedResult,
     boardLanes,
     additionalServicesFeed,
     cachedFacilityFeed
@@ -411,7 +448,7 @@ export async function buildOpsCommandCenterSnapshot(input: {
         .limit(1)
         .maybeSingle()
     ),
-    withTimeoutFallback(loadStaffOpsFeed(supabase), OPS_SNAPSHOT_TIMEOUT_MS, emptyStaffFeed()),
+    withTimeoutResult(loadStaffOpsFeed(supabase), OPS_SNAPSHOT_TIMEOUT_MS, delayedStaffFeed()),
     withTimeoutFallback(loadBoardLaneSamples(8, supabase), OPS_SNAPSHOT_TIMEOUT_MS, { arriving: [], leaving: [] }),
     groomerDashboard
       ? withTimeoutFallback(
@@ -429,8 +466,32 @@ export async function buildOpsCommandCenterSnapshot(input: {
       : Promise.resolve({ date: "", services: [], birthdays: [], syncedAt: null } as MyShiftFacilityFeed)
   ]);
 
-  const checkingInCount = checkingIn;
-  const checkingOutCount = checkingOut;
+  const checkingInCount = checkingIn.timedOut
+    ? lastGood?.shiftSummary.dogsArriving ?? 0
+    : checkingIn.count;
+  const checkingOutCount = checkingOut.timedOut
+    ? lastGood?.shiftSummary.dogsCheckingOut ?? 0
+    : checkingOut.count;
+  const webhookAt = lastWebhookResult.timedOut
+    ? null
+    : lastWebhookResult.data?.created_at
+      ? String(lastWebhookResult.data.created_at)
+      : null;
+  const lastSeenAt = lastDogSeenResult.timedOut
+    ? null
+    : lastDogSeenResult.data?.last_seen_from_gingr_at
+      ? String(lastDogSeenResult.data.last_seen_from_gingr_at)
+      : null;
+  const gingrProbeTimedOut = lastWebhookResult.timedOut || lastDogSeenResult.timedOut;
+  const staffFeed = staffFeedResult.timedOut
+    ? lastGood
+      ? staffFeedFromSnapshot(lastGood)
+      : delayedStaffFeed()
+    : staffFeedResult.value;
+  const snapshotStale = Boolean(
+    (checkingIn.timedOut || checkingOut.timedOut || gingrProbeTimedOut || staffFeedResult.timedOut) &&
+      lastGood
+  );
   const dogsOnFloorFromOps =
     (statusCounts.checked_in || 0) +
     (statusCounts.arrived || 0) +
@@ -572,10 +633,14 @@ export async function buildOpsCommandCenterSnapshot(input: {
       staffFeed.criticalPaymentCount +
       staffFeed.issueItems.filter((item) => item.priority === "critical").length;
 
-  const gingrHealth = evaluateGingrHealth({
-    lastWebhookAt: lastWebhook?.created_at ? String(lastWebhook.created_at) : null,
-    lastDogSeenAt: lastDogSeen?.last_seen_from_gingr_at ? String(lastDogSeen.last_seen_from_gingr_at) : null
-  });
+  const gingrHealth =
+    gingrProbeTimedOut && lastGood?.gingrHealth.status && lastGood.gingrHealth.status !== "unknown"
+      ? lastGood.gingrHealth
+      : evaluateGingrHealth({
+          lastWebhookAt: webhookAt,
+          lastDogSeenAt: lastSeenAt,
+          probeTimedOut: gingrProbeTimedOut
+        });
 
   // Merge ops events with staff activity when ops timeline is thin.
   const mergedEvents: OpsEvent[] = [...recentEvents];
@@ -644,6 +709,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
       status: staffFeed.feedHealth ?? "ok",
       detail: staffFeed.feedDetail ?? null
     },
+    stale: snapshotStale || undefined,
+    pending: false,
     tools: toolsForRole(input.roleKey),
     homeDepartment,
     departmentHandoff: {
@@ -681,11 +748,13 @@ export async function loadOpsCommandCenterSnapshot(input: {
   try {
     const snapshot = await withTimeoutFallback(
       buildOpsCommandCenterSnapshot(input),
-      OPS_SNAPSHOT_TIMEOUT_MS,
+      OPS_SNAPSHOT_BUILD_TIMEOUT_MS,
       null
     );
     if (snapshot) {
-      setTtlCache(OPS_SNAPSHOT_LAST_GOOD_KEY, snapshot, OPS_SNAPSHOT_LAST_GOOD_TTL_MS);
+      if (shouldCacheOpsSnapshot(snapshot)) {
+        setTtlCache(OPS_SNAPSHOT_LAST_GOOD_KEY, snapshot, OPS_SNAPSHOT_LAST_GOOD_TTL_MS);
+      }
       return snapshot;
     }
   } catch {
@@ -697,6 +766,7 @@ export async function loadOpsCommandCenterSnapshot(input: {
     return {
       ...lastGood,
       stale: true,
+      pending: false,
       gingrHealth: {
         status: "degraded",
         label: "Live data delayed",
@@ -705,5 +775,14 @@ export async function loadOpsCommandCenterSnapshot(input: {
     };
   }
 
-  return emptyOpsCommandCenterSnapshot(input);
+  return {
+    ...emptyOpsCommandCenterSnapshot(input),
+    pending: false,
+    stale: true,
+    gingrHealth: {
+      status: "degraded",
+      label: "Live data delayed",
+      detail: "My Shift could not refresh live data. Retry shortly — empty queues here do not mean All Clear."
+    }
+  };
 }
