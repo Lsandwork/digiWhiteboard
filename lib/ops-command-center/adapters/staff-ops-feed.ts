@@ -4,6 +4,8 @@
  */
 
 import { getServiceSupabase } from "@/lib/supabase/server";
+
+type SupabaseClient = ReturnType<typeof getServiceSupabase>;
 import {
   listStaffOps,
   type ActiveIssue,
@@ -155,8 +157,8 @@ export function alertToWorkItem(row: OperationsAlert): OpsWorkItem {
   };
 }
 
-export async function loadStaffOpsFeed() {
-  const supabase = getServiceSupabase();
+export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
+  const supabase = supabaseClient ?? getServiceSupabase();
   let opsFailed = false;
   let alertsFailed = false;
   const [ops, alerts] = await Promise.all([
@@ -216,11 +218,14 @@ export async function loadStaffOpsFeed() {
   };
 }
 
-export async function loadBoardLaneSamples(limit = 6): Promise<{
+export async function loadBoardLaneSamples(
+  limit = 6,
+  supabaseClient?: SupabaseClient
+): Promise<{
   arriving: BoardLaneDog[];
   leaving: BoardLaneDog[];
 }> {
-  const supabase = getServiceSupabase();
+  const supabase = supabaseClient ?? getServiceSupabase();
   const mapRow = (row: Record<string, unknown>): BoardLaneDog => ({
     id: String(row.id),
     name: String(row.animal_name || "Dog"),

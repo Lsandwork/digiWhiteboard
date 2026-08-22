@@ -65,6 +65,7 @@ import { ChangeHistoryModal } from "@/components/admin/ChangeHistoryModal";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { humanizeUnknownError } from "@/lib/safe-url";
+import { readResponseJson } from "@/lib/http/read-response-json";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
@@ -173,7 +174,7 @@ export function AdminDashboard() {
         window.location.assign("/admin/login");
         return;
       }
-      const body = await response.json();
+      const body = await readResponseJson<{ error?: string } & DashboardPayload>(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load admin dashboard.");
       setData(body as DashboardPayload);
     } catch (loadError) {

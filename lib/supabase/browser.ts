@@ -27,7 +27,13 @@ export function getBrowserSupabase() {
 
   if (!browserSupabase) {
     try {
-      browserSupabase = createClient(url, anonKey);
+      browserSupabase = createClient(url, anonKey, {
+        realtime: {
+          // When Supabase/Cloudflare 522s, default reconnect storms freeze admin tabs.
+          heartbeatIntervalMs: 30_000,
+          reconnectAfterMs: (tries: number) => Math.min(1_000 * 2 ** Math.max(0, tries), 30_000)
+        }
+      });
     } catch {
       return null;
     }

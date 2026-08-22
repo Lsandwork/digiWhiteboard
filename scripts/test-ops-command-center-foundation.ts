@@ -22,6 +22,8 @@ assert.ok(OPS_TASK_STATUSES.includes("snoozed"));
   const lobby = require("node:fs").readFileSync("components/lobby/LobbyCheckoutBoard.tsx", "utf8");
   assert.match(lobby, /Unable to verify lobby checkouts/);
   assert.doesNotMatch(lobby, /setHealthy\(body\.healthy \|\|/);
+  const route = require("node:fs").readFileSync("app/api/admin/ops-command-center/route.ts", "utf8");
+  assert.match(route, /OPS_SNAPSHOT_TIMEOUT_MS/);
 }
 
 // Board → ops status mapping (mirror adapter rules for unit coverage).

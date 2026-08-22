@@ -1,4 +1,5 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
 import type { OpsActor, OpsEvent, OpsEventCategory, OpsPriority } from "@/lib/ops-command-center/types";
 
 type EventRow = Record<string, unknown>;
@@ -100,7 +101,7 @@ export async function listOpsEventsForDog(
 }
 
 export async function listRecentOpsEvents(limit = 30): Promise<OpsEvent[]> {
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
   const { data } = await supabase
     .from("ops_events")
     .select("*")
