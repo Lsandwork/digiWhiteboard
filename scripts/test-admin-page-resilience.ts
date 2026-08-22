@@ -5,7 +5,8 @@ import { readResponseJson } from "../lib/http/read-response-json";
 import { LIVE_DATA_UNAVAILABLE_MESSAGE } from "../lib/safe-url";
 
 assert.equal(SERVICE_SUPABASE_TIMEOUT_MS, 8_000);
-assert.equal(SERVICE_SUPABASE_CRON_TIMEOUT_MS, 60_000);
+assert.equal(SERVICE_SUPABASE_CRON_TIMEOUT_MS, 20_000);
+assert.ok(SERVICE_SUPABASE_CRON_TIMEOUT_MS > SERVICE_SUPABASE_TIMEOUT_MS);
 
 const server = readFileSync("lib/supabase/server.ts", "utf8");
 assert.match(server, /SERVICE_SUPABASE_TIMEOUT_MS/);
