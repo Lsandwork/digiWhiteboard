@@ -44,6 +44,7 @@ type LedgerPayload = {
   trainers?: TrainerOption[];
   canManage: boolean;
   canComment: boolean;
+  delayed?: boolean;
   report?: CommissionReportPayload;
   currentUser?: {
     email: string | null;
@@ -290,9 +291,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         params.set("pageSize", "5000");
       }
 
-      const { ok, body } = await fetchAdminJson<LedgerPayload & { error?: string; report?: LedgerPayload["report"] }>(
-        `/api/admin/package-commissions?${params.toString()}`
-      );
+      const { ok, body } = await fetchAdminJson<
+        LedgerPayload & { error?: string; report?: LedgerPayload["report"]; delayed?: boolean }
+      >(`/api/admin/package-commissions?${params.toString()}`, { timeoutMs: 8_000 });
       if (!ok) throw new Error(body.error ?? "Unable to load commissions.");
       if (tab === "reports") {
         setData({
@@ -320,6 +321,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         });
       } else if (tab === "ledger" || tab === "needs_review" || tab === "approval") {
         setData(body as LedgerPayload);
+        if (body.delayed) {
+          setLoadError("Commission ledger is delayed. Retry.");
+        }
       } else {
         setData((current) => ({
           rows: current?.rows ?? [],

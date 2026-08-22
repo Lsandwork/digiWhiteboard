@@ -10,11 +10,10 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { accessFromLegacyRole, hasPermission, hasRole, legacyRoleToRoleKey } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
-import { listAdminUsers } from "@/lib/admin/users";
 import { humanizeUnknownError } from "@/lib/safe-url";
 import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { SERVICE_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/server";
-import { listCommissionTrainerOptions } from "@/lib/staff/commission-ledger/trainers";
+import { listCommissionTrainersFromDb } from "@/lib/staff/commission-ledger/trainers";
 import {
   acknowledgeTrainerStatement,
   bulkUpdateCommissionRecords,
@@ -57,7 +56,11 @@ import { normalizeCommissionDateFilter } from "@/lib/staff/commission-ledger/dat
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+export const maxDuration = 8;
+
+/** Ledger GET must return before the browser's 8s abort. */
+const COMMISSIONS_QUERY_TIMEOUT_MS = 3_000;
+const COMMISSIONS_OPTIONAL_TIMEOUT_MS = 1_200;
 
 function buildViewer(
   session: ReturnType<typeof getAdminSessionFromRequest>,
@@ -94,21 +97,27 @@ function actorFrom(session: ReturnType<typeof getAdminSessionFromRequest>, displ
   };
 }
 
-async function resolveAccess(request: Request) {
+async function resolveAccess(request: Request, options: { liveMatrix?: boolean } = {}) {
   const session = getAdminSessionFromRequest(request);
   const role = session?.role;
-  const supabase = getServiceSupabase({ timeoutMs: SERVICE_SUPABASE_TIMEOUT_MS });
   const fallbackAccess = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
-  const [access, displayName] = await Promise.all([
-    session?.adminUserId
-      ? withTimeoutFallback(
+  const supabase = getServiceSupabase({
+    timeoutMs: options.liveMatrix ? SERVICE_SUPABASE_TIMEOUT_MS : COMMISSIONS_QUERY_TIMEOUT_MS
+  });
+
+  // Cookie role already authorizes Super Admin / trainers. The live permission
+  // matrix was an extra 8s REST wait before the first ledger row query.
+  const access =
+    options.liveMatrix && session?.adminUserId
+      ? await withTimeoutFallback(
           getUserAccess(supabase, session.adminUserId, session.role, session.email),
-          SERVICE_SUPABASE_TIMEOUT_MS,
+          2_500,
           fallbackAccess
         )
-      : Promise.resolve(fallbackAccess),
-    withTimeoutFallback(resolveSessionDisplayName(supabase, session), 2_500, session?.email ?? null)
-  ]);
+      : fallbackAccess;
+  const displayName = options.liveMatrix
+    ? await withTimeoutFallback(resolveSessionDisplayName(supabase, session), 1_200, session?.email ?? null)
+    : session?.email ?? null;
 
   const canView =
     canViewPackageCommissions(role) ||
@@ -189,6 +198,69 @@ function parseListFilters(url: URL): CommissionListFilters {
   };
 }
 
+function emptyLedgerResult(filters: CommissionListFilters) {
+  return {
+    rows: [],
+    total: 0,
+    page: Math.max(1, filters.page ?? 1),
+    pageSize: Math.min(5000, Math.max(10, filters.pageSize ?? 25)),
+    summary: {
+      grossSalesCents: 0,
+      totalCommissionsCents: 0,
+      pendingReviewCents: 0,
+      approvedCents: 0,
+      readyForPayrollCents: 0,
+      paidCents: 0,
+      refundedCents: 0,
+      openQuestions: 0
+    }
+  };
+}
+
+function ledgerPayload(
+  result: {
+    rows: unknown[];
+    total: number;
+    page: number;
+    pageSize: number;
+    summary: {
+      grossSalesCents: number;
+      totalCommissionsCents: number;
+      pendingReviewCents: number;
+      approvedCents: number;
+      readyForPayrollCents: number;
+      paidCents: number;
+      refundedCents: number;
+      openQuestions: number;
+    };
+  },
+  extras: {
+    trainers: Awaited<ReturnType<typeof listCommissionTrainersFromDb>>;
+    session: ReturnType<typeof getAdminSessionFromRequest>;
+    role: string | null | undefined;
+    viewer: ReturnType<typeof buildViewer>;
+    canManage: boolean;
+    canComment: boolean;
+    delayed?: boolean;
+  }
+) {
+  return {
+    ...result,
+    delayed: Boolean(extras.delayed),
+    trainers: extras.trainers,
+    currentUser: {
+      email: extras.session?.email ?? null,
+      adminUserId: extras.session?.adminUserId ?? null,
+      role: extras.role ?? null,
+      roleKey: extras.viewer.roleKey,
+      isTrainerOnly: extras.viewer.isTrainerOnly,
+      isSuperAdmin: extras.viewer.isSuperAdmin
+    },
+    canManage: extras.canManage,
+    canComment: extras.canComment
+  };
+}
+
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
   const { session, role, supabase, access, canView, canManage, canComment } = await resolveAccess(request);
@@ -199,14 +271,15 @@ export async function GET(request: Request) {
   const viewer = buildViewer(session, access, canManage, canComment);
   const url = new URL(request.url);
   const view = url.searchParams.get("view") ?? "ledger";
+  const trainersPromise = canManage
+    ? withTimeoutFallback(
+        listCommissionTrainersFromDb(getServiceSupabase({ timeoutMs: COMMISSIONS_OPTIONAL_TIMEOUT_MS })),
+        COMMISSIONS_OPTIONAL_TIMEOUT_MS,
+        []
+      )
+    : Promise.resolve([]);
 
   try {
-    const trainers = canManage
-      ? listCommissionTrainerOptions(
-          await withTimeoutFallback(listAdminUsers(supabase), SERVICE_SUPABASE_TIMEOUT_MS, [])
-        )
-      : [];
-
     if (view === "record") {
       const id = url.searchParams.get("id") ?? "";
       const record = await getCommissionRecord(supabase, viewer, id);
@@ -218,7 +291,7 @@ export async function GET(request: Request) {
     }
 
     if (view === "rules") {
-      const rules = await listCommissionRules(supabase);
+      const [rules, trainers] = await Promise.all([listCommissionRules(supabase), trainersPromise]);
       return NextResponse.json({ rules, canManage, trainers });
     }
 
@@ -236,48 +309,35 @@ export async function GET(request: Request) {
 
     if (view === "report") {
       const filters = parseListFilters(url);
-      if (filters.trainerIds?.length && trainers.length) {
-        filters.trainerNames = trainers
-          .filter((trainer) => filters.trainerIds!.includes(trainer.id))
-          .map((trainer) => trainer.full_name);
-      }
-      const reportType = (url.searchParams.get("reportType") ?? "trainer_statement") as CommissionReportType;
-      const report = await buildCommissionReport(supabase, viewer, filters, reportType);
+      const [trainers, report] = await Promise.all([
+        trainersPromise,
+        buildCommissionReport(
+          supabase,
+          viewer,
+          filters,
+          (url.searchParams.get("reportType") ?? "trainer_statement") as CommissionReportType
+        )
+      ]);
       return NextResponse.json({ report, canManage, trainers });
     }
 
     const filters = parseListFilters(url);
-    if (filters.trainerIds?.length && trainers.length) {
-      filters.trainerNames = trainers
-        .filter((trainer) => filters.trainerIds!.includes(trainer.id))
-        .map((trainer) => trainer.full_name);
-    }
-    const result = await listCommissionRecords(supabase, viewer, filters);
+    const listed = listCommissionRecords(supabase, viewer, filters)
+      .then((result) => ({ delayed: false as const, result }))
+      .catch(() => ({ delayed: true as const, result: emptyLedgerResult(filters) }));
+    const [trainers, { delayed, result }] = await Promise.all([trainersPromise, listed]);
 
-    return NextResponse.json({
-      ...result,
-      summaryDisplay: {
-        grossSales: centsToDisplay(result.summary.grossSalesCents),
-        totalCommissions: centsToDisplay(result.summary.totalCommissionsCents),
-        pendingReview: centsToDisplay(result.summary.pendingReviewCents),
-        approved: centsToDisplay(result.summary.approvedCents),
-        readyForPayroll: centsToDisplay(result.summary.readyForPayrollCents),
-        paid: centsToDisplay(result.summary.paidCents),
-        refunded: centsToDisplay(result.summary.refundedCents),
-        openQuestions: result.summary.openQuestions
-      },
-      trainers,
-      currentUser: {
-        email: session?.email ?? null,
-        adminUserId: session?.adminUserId ?? null,
-        role: role ?? null,
-        roleKey: viewer.roleKey,
-        isTrainerOnly: viewer.isTrainerOnly,
-        isSuperAdmin: viewer.isSuperAdmin
-      },
-      canManage,
-      canComment
-    });
+    return NextResponse.json(
+      ledgerPayload(result, {
+        trainers,
+        session,
+        role,
+        viewer,
+        canManage,
+        canComment,
+        delayed
+      })
+    );
   } catch (error) {
     const message = humanizeUnknownError(error, "Unable to load package commissions.");
     return NextResponse.json({ error: message }, { status: 503 });
@@ -286,7 +346,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
-  const { session, supabase, access, canManage, canComment, canView, actor } = await resolveAccess(request);
+  const { session, supabase, access, canManage, canComment, canView, actor } = await resolveAccess(request, {
+    liveMatrix: true
+  });
   if (!canView) {
     return NextResponse.json({ error: "You do not have permission to view package commissions." }, { status: 403 });
   }
@@ -408,7 +470,7 @@ export async function POST(request: Request) {
 
     if (action === "import_csv") {
       if (!canManage) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-      const trainers = listCommissionTrainerOptions(await listAdminUsers(supabase));
+      const trainers = await listCommissionTrainersFromDb(supabase);
       const result = await importCommissionCsvToLedger(supabase, viewer, actor, {
         csvText: String(body.csv ?? ""),
         filename: body.filename != null ? String(body.filename) : "upload.csv",

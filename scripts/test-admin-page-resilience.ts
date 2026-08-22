@@ -11,22 +11,27 @@ const server = readFileSync("lib/supabase/server.ts", "utf8");
 assert.match(server, /SERVICE_SUPABASE_TIMEOUT_MS/);
 assert.match(server, /options\.timeoutMs === 0/);
 
-const commissionsRoute = readFileSync("app/api/admin/package-commissions/route.ts", "utf8");
-assert.match(commissionsRoute, /accessFromLegacyRole/);
-assert.match(commissionsRoute, /SERVICE_SUPABASE_TIMEOUT_MS/);
-assert.match(commissionsRoute, /humanizeUnknownError/);
-assert.doesNotMatch(commissionsRoute, /getServiceSupabase\(\)/);
-
 const records = readFileSync("lib/staff/commission-ledger/records.ts", "utf8");
-assert.match(records, /ensureCommissionLedgerHotPath/);
+assert.match(records, /LEDGER_LIST_COLUMNS/);
+assert.doesNotMatch(records, /ensureCommissionLedgerHotPath/);
 assert.doesNotMatch(records, /ensureCommissionLedgerBackfill\(supabase\)/);
 assert.doesNotMatch(records, /ensureIvonneRejectedDuplicatesPurged/);
+assert.doesNotMatch(records, /count: "exact"/);
+
+const commissionsRoute = readFileSync("app/api/admin/package-commissions/route.ts", "utf8");
+assert.match(commissionsRoute, /accessFromLegacyRole/);
+assert.match(commissionsRoute, /COMMISSIONS_QUERY_TIMEOUT_MS/);
+assert.match(commissionsRoute, /listCommissionTrainersFromDb/);
+assert.match(commissionsRoute, /liveMatrix/);
+assert.match(commissionsRoute, /humanizeUnknownError/);
+assert.doesNotMatch(commissionsRoute, /listAdminUsers/);
+assert.doesNotMatch(commissionsRoute, /getServiceSupabase\(\)/);
 
 const panel = readFileSync("components/admin/PackageCommissionsPanel.tsx", "utf8");
 assert.match(panel, /fetchAdminJson/);
 assert.match(panel, /loadError/);
 assert.doesNotMatch(panel, /await response\.json\(\)/);
-assert.doesNotMatch(panel, /await fetch\("\/api\/admin\/package-commissions/);
+assert.match(panel, /timeoutMs: 8_000/);
 
 const toast = readFileSync("components/admin/ui/ToastProvider.tsx", "utf8");
 assert.match(toast, /humanizeUnknownError/);
