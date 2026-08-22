@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, RefreshCw, Search, ShieldAlert } from "lucide-react";
 import { BulkShiftLogComposer } from "@/components/admin/BulkShiftLogComposer";
 import { SmsCostDashboardCard } from "@/components/admin/ops-command-center/SmsCostDashboardCard";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
+import { readResponseJson } from "@/lib/http/read-response-json";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import type { OpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import type { OpsDog } from "@/lib/ops-command-center/types";
@@ -56,6 +58,8 @@ export function OpsCommandCenterPanel({
   const [data, setData] = useState<OpsCommandCenterSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pollMs, setPollMs] = useState(60_000);
+  const dataRef = useRef<OpsCommandCenterSnapshot | null>(null);
   const [query, setQuery] = useState("");
   const [dogHits, setDogHits] = useState<Array<OpsDog | BoardSearchHit>>([]);
   const [selectedDogId, setSelectedDogId] = useState<string | null>(null);
@@ -66,27 +70,46 @@ export function OpsCommandCenterPanel({
   const { showToast } = useToast();
 
   const load = useCallback(async () => {
-    setError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const res = await fetch("/api/admin/ops-command-center", { cache: "no-store" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.error || "Failed to load command center");
+      const res = await fetch("/api/admin/ops-command-center", {
+        cache: "no-store",
+        signal: controller.signal
+      });
+      const body = await readResponseJson<OpsCommandCenterSnapshot & { error?: string }>(res);
+      if (body.greetingName || body.shiftSummary) {
+        dataRef.current = body;
+        setData(body);
+        setError(null);
+        setPollMs(body.stale ? 90_000 : 60_000);
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(body.error || "Failed to load command center");
+      }
+      dataRef.current = body as OpsCommandCenterSnapshot;
       setData(body as OpsCommandCenterSnapshot);
+      setError(null);
+      setPollMs(60_000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      const message = humanizeUnknownError(err, "Unable to load My Shift. Retry shortly.");
+      if (!dataRef.current) setError(message);
+      setPollMs((current) => Math.min(Math.max(current, 30_000) * 2, 120_000));
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     const boot = window.setTimeout(() => void load(), 0);
-    const stop = startVisibilityAwareInterval(() => void load(), 45_000);
+    const stop = startVisibilityAwareInterval(() => void load(), pollMs);
     return () => {
       window.clearTimeout(boot);
       stop();
     };
-  }, [load]);
+  }, [load, pollMs]);
 
   useEffect(() => {
     const term = query.trim();
@@ -96,7 +119,7 @@ export function OpsCommandCenterPanel({
         const res = await fetch(`/api/admin/ops-command-center?q=${encodeURIComponent(term)}`, {
           cache: "no-store"
         });
-        const body = await res.json();
+        const body = await readResponseJson<{ dogs?: OpsDog[]; boardDogs?: BoardSearchHit[] }>(res);
         if (res.ok) {
           const opsDogs = (body.dogs || []) as OpsDog[];
           const boardDogs = (body.boardDogs || []) as BoardSearchHit[];
@@ -114,7 +137,7 @@ export function OpsCommandCenterPanel({
     let cancelled = false;
     void (async () => {
       const res = await fetch(`/api/admin/ops-command-center/dogs/${selectedDogId}`, { cache: "no-store" });
-      const body = await res.json();
+      const body = await readResponseJson<Record<string, unknown>>(res);
       if (!cancelled && res.ok) setDogProfile(body);
     })();
     return () => {
@@ -134,8 +157,8 @@ export function OpsCommandCenterPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "work_item_action", itemId, workAction, title: itemTitle || null })
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body.error || "Unable to update row");
+      const body = await readResponseJson<{ error?: string }>(res).catch(() => ({} as { error?: string }));
+      if (!res.ok) throw new Error(humanizeUnknownError(body.error, "Unable to update row"));
       await load();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Unable to update row");
@@ -164,8 +187,10 @@ export function OpsCommandCenterPanel({
           })
         })
       });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error ?? "Unable to save shift log entries.");
+      const body = await readResponseJson<{ error?: string; result?: { saved?: number; failed?: number } }>(response).catch(
+        () => ({} as { error?: string; result?: { saved?: number; failed?: number } })
+      );
+      if (!response.ok) throw new Error(humanizeUnknownError(body.error, "Unable to save shift log entries."));
       const saved = Number(body.result?.saved ?? entries.length);
       const failed = Number(body.result?.failed ?? 0);
       showToast(
@@ -201,7 +226,7 @@ export function OpsCommandCenterPanel({
   if (error && !data) {
     return (
       <section className="rounded-2xl border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
-        <p className="font-medium">{error}</p>
+        <p className="font-medium">{humanizeUnknownError(error, "Unable to load My Shift. Retry shortly.")}</p>
         <button type="button" className="admin-btn-secondary mt-3" onClick={() => void load()}>
           Retry
         </button>
@@ -274,6 +299,13 @@ export function OpsCommandCenterPanel({
           </button>
         </div>
       </header>
+
+      {data.stale ? (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>Live data is delayed. Showing the last good My Shift until the database responds.</p>
+        </div>
+      ) : null}
 
       {data.gingrHealth.status !== "healthy" ? (
         <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">

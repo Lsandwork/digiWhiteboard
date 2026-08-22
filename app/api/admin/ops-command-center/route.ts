@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { humanizeUnknownError } from "@/lib/safe-url";
 import {
   accessFromLegacyRole,
   hasPermission,
@@ -9,7 +12,7 @@ import {
   ROLE_LABELS
 } from "@/lib/admin/permissions";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
-import { buildOpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
+import { loadOpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
 import { searchOpsDogs } from "@/lib/ops-command-center/dogs";
 import { searchBoardDogs } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { createOpsTask, updateOpsTaskStatus } from "@/lib/ops-command-center/tasks";
@@ -34,15 +37,20 @@ import {
 } from "@/lib/ops-command-center/overnight-handoff";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 async function requireOpsAccess(request: Request) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };
   const session = getAdminSessionFromRequest(request);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
+  const fallbackAccess = accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role);
   const access =
-    (await getUserAccess(supabase, session.adminUserId, session.role, session.email)) ??
-    accessFromLegacyRole(null, session.email, session.role);
+    (await withTimeoutFallback(
+      getUserAccess(supabase, session.adminUserId, session.role, session.email),
+      OPS_SNAPSHOT_TIMEOUT_MS,
+      fallbackAccess
+    )) ?? fallbackAccess;
   const canView =
     hasPermission(access, "view_my_shift") ||
     hasPermission(access, "view_ops_command_center") ||
@@ -61,37 +69,51 @@ export async function GET(request: Request) {
   const q = url.searchParams.get("q")?.trim() || "";
   if (q) {
     const [dogs, boardDogs] = await Promise.all([
-      searchOpsDogs(q, 25).catch(() => []),
-      searchBoardDogs(q, 25).catch(() => [])
+      withTimeoutFallback(searchOpsDogs(q, 25).catch(() => []), OPS_SNAPSHOT_TIMEOUT_MS, []),
+      withTimeoutFallback(searchBoardDogs(q, 25).catch(() => []), OPS_SNAPSHOT_TIMEOUT_MS, [])
     ]);
     return NextResponse.json({ dogs, boardDogs });
   }
 
   const view = url.searchParams.get("view");
   if (view === "system_health") {
-    const health = await buildOpsSystemHealth();
-    return NextResponse.json(health);
+    try {
+      const health = await withTimeoutFallback(buildOpsSystemHealth(), OPS_SNAPSHOT_TIMEOUT_MS, null);
+      if (health) return NextResponse.json(health);
+    } catch {
+      // Fall through to a safe payload.
+    }
+    return NextResponse.json({ error: "Unable to load system health." }, { status: 503 });
   }
   if (view === "overnight") {
     await escalateMissedOvernightRounds().catch(() => 0);
-    const rounds = await ensureOvernightRoundsForDate();
+    const rounds = await withTimeoutFallback(ensureOvernightRoundsForDate(), OPS_SNAPSHOT_TIMEOUT_MS, []);
     return NextResponse.json({ rounds });
   }
   if (view === "handoffs") {
-    const handoffs = await listRecentShiftHandoffs(20);
+    const handoffs = await withTimeoutFallback(listRecentShiftHandoffs(20), OPS_SNAPSHOT_TIMEOUT_MS, []);
     return NextResponse.json({ handoffs });
   }
 
-  const roleKey = legacyRoleToRoleKey(gate.session.role);
-  const snapshot = await buildOpsCommandCenterSnapshot({
-    adminUserId: gate.session.adminUserId,
-    email: gate.session.email,
-    displayName: gate.access.displayLabel || null,
-    roleKey,
-    roleLabel: ROLE_LABELS[roleKey] || gate.access.displayLabel || "Staff",
-    access: gate.access
-  });
-  return NextResponse.json(snapshot);
+  try {
+    const roleKey = legacyRoleToRoleKey(gate.session.role);
+    const snapshot = await loadOpsCommandCenterSnapshot({
+      adminUserId: gate.session.adminUserId,
+      email: gate.session.email,
+      displayName: gate.access.displayLabel || null,
+      roleKey,
+      roleLabel: ROLE_LABELS[roleKey] || gate.access.displayLabel || "Staff",
+      access: gate.access
+    });
+    return NextResponse.json(snapshot);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: humanizeUnknownError(error, "Unable to load My Shift. Retry shortly.")
+      },
+      { status: 503 }
+    );
+  }
 }
 
 export async function POST(request: Request) {

@@ -4,16 +4,42 @@
  */
 
 const SAFARI_PATTERN_ERROR = /did not match the expected pattern/i;
+const HTML_ERROR_PAGE = /<!doctype|<html[\s>]|error code 522|cf-error|cloudflare/i;
+const TIMEOUT_ERROR = /timed out|timeout|aborted|abort/i;
+const NETWORK_ERROR = /failed to fetch|networkerror|fetch failed/i;
+
+export const LIVE_DATA_UNAVAILABLE_MESSAGE = "Live data is temporarily unavailable. Retry shortly.";
+export const LIVE_DATA_SLOW_MESSAGE = "This page is taking too long to load. Retry shortly.";
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error ?? "");
+}
 
 export function isSafariPatternError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  return SAFARI_PATTERN_ERROR.test(message);
+  return SAFARI_PATTERN_ERROR.test(errorText(error));
+}
+
+export function isInfrastructureError(error: unknown): boolean {
+  const message = errorText(error);
+  return (
+    isSafariPatternError(error) ||
+    HTML_ERROR_PAGE.test(message) ||
+    TIMEOUT_ERROR.test(message) ||
+    NETWORK_ERROR.test(message) ||
+    (message.includes("<") && message.includes(">") && message.length > 180)
+  );
 }
 
 export function humanizeUnknownError(error: unknown, fallback: string): string {
   if (isSafariPatternError(error)) return fallback;
-  const message = error instanceof Error ? error.message.trim() : "";
-  return message || fallback;
+  const message = errorText(error).trim();
+  if (!message) return fallback;
+  if (HTML_ERROR_PAGE.test(message) || (message.includes("<") && message.includes(">") && message.length > 180)) {
+    return LIVE_DATA_UNAVAILABLE_MESSAGE;
+  }
+  if (TIMEOUT_ERROR.test(message)) return LIVE_DATA_SLOW_MESSAGE;
+  if (NETWORK_ERROR.test(message)) return LIVE_DATA_UNAVAILABLE_MESSAGE;
+  return message;
 }
 
 function trimValue(value: unknown): string {

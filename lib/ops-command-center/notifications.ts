@@ -1,4 +1,5 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
 import type { OpsActor, OpsNotification, OpsPriority } from "@/lib/ops-command-center/types";
 import { writeOpsAuditEvent } from "@/lib/ops-command-center/audit";
 
@@ -77,7 +78,7 @@ export async function listOpsNotificationsForUser(
   userAdminId: string,
   options?: { roleKey?: string | null; limit?: number; unreadOnly?: boolean }
 ): Promise<OpsNotification[]> {
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
   const limit = Math.min(Math.max(options?.limit ?? 40, 1), 100);
   let query = supabase
     .from("ops_notifications")

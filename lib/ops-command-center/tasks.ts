@@ -1,4 +1,5 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
 import type { OpsActor, OpsPriority, OpsTask, OpsTaskStatus } from "@/lib/ops-command-center/types";
 import { writeOpsAuditEvent } from "@/lib/ops-command-center/audit";
 import { recordOpsEvent } from "@/lib/ops-command-center/events";
@@ -148,7 +149,7 @@ export async function listOpenOpsTasks(options?: {
   assignedRole?: string | null;
   limit?: number;
 }): Promise<OpsTask[]> {
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
   let query = supabase
     .from("ops_tasks")
     .select("*")
