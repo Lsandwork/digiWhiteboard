@@ -22,13 +22,16 @@ export type PhotoUploadAuthOk = {
 
 export type PhotoUploadAuthResult = PhotoUploadAuthOk | { error: Response };
 
-export async function requirePhotoUploadAccess(request: Request): Promise<PhotoUploadAuthResult> {
+export async function requirePhotoUploadAccess(
+  request: Request,
+  options?: { timeoutMs?: number }
+): Promise<PhotoUploadAuthResult> {
   if (!isAdminRequest(request)) {
     return { error: unauthorizedAdminResponse() };
   }
 
   const session = getAdminSessionFromRequest(request);
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: options?.timeoutMs });
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);

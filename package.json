@@ -80,6 +80,7 @@
     "test:walks-board": "tsx scripts/test-walks-board.ts",
     "test:admin-reports": "tsx scripts/test-admin-reports.ts",
     "test:ruffops-checklist": "tsx scripts/test-ruffops-checklist.ts",
+    "test:cast-tv-access": "tsx scripts/test-cast-tv-access.ts && tsx scripts/test-cast-tv-upload.ts",
     "test:cast-picker": "tsx scripts/test-cast-picker.ts",
     "test:cast-platform": "tsx scripts/test-cast-platform.ts",
     "test:cast-display-schedule": "tsx scripts/test-cast-display-schedule.ts",

@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { moveCastTvMedia, reorderCastTvMedia } from "@/lib/cast-tv/media";
-import { requireCastTvManager } from "@/lib/cast-tv/api-auth";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
     const body = await request.json();
     const orderedIds = Array.isArray(body.orderedIds)
       ? body.orderedIds.map((id: unknown) => String(id))
@@ -39,8 +33,5 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ media });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to reorder CAST-TV media.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to reorder CAST-TV media.");
 }

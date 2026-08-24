@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
 import { updateCastTvSettings, isCastTvOnline, loadCastTvHeartbeat, loadCastTvSettings } from "@/lib/cast-tv/media";
-import { resolveCastTvManager, requireCastTvManager } from "@/lib/cast-tv/api-auth";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
+import { castTvErrorMessage } from "@/lib/cast-tv/errors";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
+import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getCastTvSupabase();
     const settings = await loadCastTvSettings(supabase);
 
     const url = new URL(request.url);
@@ -37,19 +40,13 @@ export async function GET(request: Request) {
         : { screen_id: screenId, last_seen_at: null, online: false }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load CAST-TV settings.";
+    const message = castTvErrorMessage(error, "Unable to load CAST-TV settings.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
 export async function PATCH(request: Request) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
     const body = await request.json();
 
     const settings = await updateCastTvSettings(auth.supabase, {
@@ -72,8 +69,5 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json({ settings });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update CAST-TV settings.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to update CAST-TV settings.");
 }

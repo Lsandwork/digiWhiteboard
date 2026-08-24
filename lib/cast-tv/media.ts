@@ -1,9 +1,18 @@
+import { normalizeAdminUserId } from "@/lib/admin/users";
+import {
+  CAST_TV_HEIC_MIME,
+  CAST_TV_IMAGE_MIME,
+  CAST_TV_VIDEO_MAX_BYTES,
+  CAST_TV_VIDEO_MIME,
+  inferCastTvMimeType,
+  mediaTypeForMime,
+  validateCastTvUpload
+} from "@/lib/cast-tv/mime";
 import {
   CAST_TV_IMAGE_DURATION_OPTIONS,
   CAST_TV_SETTINGS_ID,
   type CastTvImageDuration,
   type CastTvMediaRecord,
-  type CastTvMediaType,
   type CastTvObjectFit,
   type CastTvPlaylistItem,
   type CastTvSettings,
@@ -12,16 +21,25 @@ import {
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+function isMissingCastTvRelation(error: { code?: string } | null) {
+  return error?.code === "42P01" || error?.code === "PGRST205";
+}
+
 export const CAST_TV_BUCKET = "cast-tv-media";
 
-export const CAST_TV_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
-
-export const CAST_TV_VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-
-export const CAST_TV_ALLOWED_MIME = new Set([...CAST_TV_IMAGE_MIME, ...CAST_TV_VIDEO_MIME]);
-
-export const CAST_TV_IMAGE_MAX_BYTES = 20 * 1024 * 1024;
-export const CAST_TV_VIDEO_MAX_BYTES = 250 * 1024 * 1024;
+export {
+  CAST_TV_ALLOWED_MIME,
+  CAST_TV_IMAGE_MAX_BYTES,
+  CAST_TV_IMAGE_MIME,
+  CAST_TV_SERVER_UPLOAD_MAX_BYTES,
+  CAST_TV_VIDEO_MAX_BYTES,
+  CAST_TV_VIDEO_MIME,
+  inferCastTvMimeType,
+  isHeicCastTvUpload,
+  mediaTypeForMime,
+  shouldUseCastTvServerUpload,
+  validateCastTvUpload
+} from "@/lib/cast-tv/mime";
 
 function sanitizeFileName(name: string) {
   return name
@@ -34,31 +52,6 @@ function sanitizeFileName(name: string) {
 function displayNameFromFileName(fileName: string) {
   const base = fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
   return base || "CAST-TV media";
-}
-
-export function mediaTypeForMime(mimeType: string): CastTvMediaType | null {
-  if (CAST_TV_IMAGE_MIME.has(mimeType)) return "image";
-  if (CAST_TV_VIDEO_MIME.has(mimeType)) return "video";
-  return null;
-}
-
-export function validateCastTvUpload(file: { name: string; type: string; size: number }) {
-  const mediaType = mediaTypeForMime(file.type);
-  if (!mediaType) {
-    throw new Error("Upload JPG, JPEG, PNG, WEBP, MP4, WEBM, or MOV files only.");
-  }
-  const maxBytes = mediaType === "image" ? CAST_TV_IMAGE_MAX_BYTES : CAST_TV_VIDEO_MAX_BYTES;
-  if (file.size > maxBytes) {
-    throw new Error(
-      mediaType === "image"
-        ? "Images must be 20MB or smaller."
-        : "Videos must be 250MB or smaller."
-    );
-  }
-  if (mediaType === "video" && file.type === "video/quicktime") {
-    // MOV may not autoplay on all TVs — still allowed but warn at upload time in admin UI via mime note.
-  }
-  return mediaType;
 }
 
 export function buildCastTvStoragePath(fileName: string) {
@@ -111,7 +104,7 @@ export async function loadCastTvMedia(
 
   const { data, error } = await query;
   if (error) {
-    if (error.code === "42P01") return [];
+    if (isMissingCastTvRelation(error)) return [];
     throw error;
   }
 
@@ -125,6 +118,61 @@ export async function buildCastTvPlaylist(supabase: SupabaseClient): Promise<Cas
     .map((record) => withCacheBustedSrc(mediaRecordToPlaylistItem(record)));
 }
 
+const CAST_TV_BUCKET_MIME_TYPES = [
+  ...CAST_TV_IMAGE_MIME,
+  ...CAST_TV_VIDEO_MIME,
+  ...CAST_TV_HEIC_MIME,
+  "image/jpg",
+  "image/pjpeg"
+];
+
+export async function ensureCastTvBucket(supabase: SupabaseClient) {
+  try {
+    const { data } = await supabase.storage.getBucket(CAST_TV_BUCKET);
+    if (data) {
+      try {
+        await supabase.storage.updateBucket(CAST_TV_BUCKET, {
+          public: true,
+          fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
+          allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
+        });
+      } catch {
+        // Allowed types may already be correct; uploads can still proceed.
+      }
+      return;
+    }
+
+    const { error } = await supabase.storage.createBucket(CAST_TV_BUCKET, {
+      public: true,
+      fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
+      allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
+    });
+    if (error && !/already exists|duplicate/i.test(error.message)) {
+      // Leave the failure to the signed/service upload so the caller gets a storage error.
+    }
+  } catch {
+    // Bucket probe failed; signed or service-role uploads may still work if it exists.
+  }
+}
+
+export async function uploadCastTvObject(
+  supabase: SupabaseClient,
+  storagePath: string,
+  buffer: Buffer | Uint8Array,
+  contentType: string
+) {
+  await ensureCastTvBucket(supabase);
+  const bytes = Uint8Array.from(buffer);
+  const body = new Blob([bytes], { type: contentType || "application/octet-stream" });
+  const { error } = await supabase.storage.from(CAST_TV_BUCKET).upload(storagePath, body, {
+    contentType,
+    upsert: false
+  });
+  if (error) {
+    throw new Error(error.message || "Unable to upload CAST-TV media.");
+  }
+}
+
 export async function findDuplicateCastTvUpload(
   supabase: SupabaseClient,
   input: { fileName: string; fileSize: number }
@@ -133,19 +181,25 @@ export async function findDuplicateCastTvUpload(
   const { data, error } = await supabase
     .from("cast_tv_media")
     .select("id, file_name, file_size_bytes")
-    .eq("file_name", normalizedName)
     .eq("file_size_bytes", input.fileSize)
-    .maybeSingle();
+    .limit(25);
 
-  if (error && error.code !== "42P01") throw error;
-  return (data as CastTvMediaRecord | null) ?? null;
+  if (error && !isMissingCastTvRelation(error)) throw error;
+  const match = (data ?? []).find(
+    (row) => String((row as { file_name?: string }).file_name ?? "").trim().toLowerCase() === normalizedName
+  );
+  return (match as CastTvMediaRecord | undefined) ?? null;
 }
 
 export async function createCastTvSignedUpload(
   supabase: SupabaseClient,
   input: { fileName: string; mimeType: string; fileSize: number }
 ) {
-  validateCastTvUpload({ name: input.fileName, type: input.mimeType, size: input.fileSize });
+  const { mediaType, mimeType } = validateCastTvUpload({
+    name: input.fileName,
+    type: input.mimeType,
+    size: input.fileSize
+  });
 
   const duplicate = await findDuplicateCastTvUpload(supabase, {
     fileName: input.fileName,
@@ -155,6 +209,7 @@ export async function createCastTvSignedUpload(
     throw new Error("This file already exists in the CAST-TV library.");
   }
 
+  await ensureCastTvBucket(supabase);
   const storagePath = buildCastTvStoragePath(input.fileName);
   const { data, error } = await supabase.storage.from(CAST_TV_BUCKET).createSignedUploadUrl(storagePath);
   if (error || !data?.signedUrl) {
@@ -165,9 +220,9 @@ export async function createCastTvSignedUpload(
     storage_path: storagePath,
     signed_upload_url: data.signedUrl,
     token: data.token,
-    mime_type: input.mimeType,
+    mime_type: mimeType,
     file_size_bytes: input.fileSize,
-    media_type: mediaTypeForMime(input.mimeType)!
+    media_type: mediaType
   };
 }
 
@@ -184,7 +239,7 @@ export async function createCastTvMediaRecord(
     imageDisplaySeconds?: CastTvImageDuration;
   }
 ) {
-  const mediaType = validateCastTvUpload({
+  const { mediaType, mimeType } = validateCastTvUpload({
     name: input.fileName,
     type: input.mimeType,
     size: input.fileSize
@@ -212,11 +267,11 @@ export async function createCastTvMediaRecord(
       storage_path: input.storagePath,
       public_url: publicUrl,
       media_type: mediaType,
-      mime_type: input.mimeType,
+      mime_type: mimeType,
       file_size_bytes: input.fileSize,
       image_display_seconds: input.imageDisplaySeconds ?? settings.default_image_seconds,
       display_order: nextOrder,
-      uploaded_by: input.uploadedBy ?? null,
+      uploaded_by: normalizeAdminUserId(input.uploadedBy),
       uploaded_by_name: input.uploadedByName ?? null
     })
     .select("*")
@@ -258,7 +313,7 @@ export async function replaceCastTvMediaFile(
     storagePath: string;
   }
 ) {
-  const mediaType = validateCastTvUpload({
+  const { mediaType, mimeType } = validateCastTvUpload({
     name: input.fileName,
     type: input.mimeType,
     size: input.fileSize
@@ -283,7 +338,7 @@ export async function replaceCastTvMediaFile(
       storage_path: input.storagePath,
       public_url: publicUrl,
       media_type: mediaType,
-      mime_type: input.mimeType,
+      mime_type: mimeType,
       file_size_bytes: input.fileSize,
       duration_seconds: null,
       display_name: existing.display_name || displayNameFromFileName(input.fileName)
@@ -371,7 +426,20 @@ export async function loadCastTvSettings(supabase: SupabaseClient): Promise<Cast
     .eq("id", CAST_TV_SETTINGS_ID)
     .maybeSingle();
 
-  if (error && error.code !== "42P01") throw error;
+  if (error && isMissingCastTvRelation(error)) {
+    return {
+      id: CAST_TV_SETTINGS_ID,
+      default_image_seconds: 10,
+      transition_ms: 700,
+      transition_style: "fade",
+      object_fit: "contain",
+      show_standby_logo: true,
+      is_paused: false,
+      updated_at: new Date().toISOString(),
+      updated_by: null
+    };
+  }
+  if (error) throw error;
 
   if (data) return data as CastTvSettings;
 
@@ -408,7 +476,10 @@ export async function updateCastTvSettings(
 
   const { data, error } = await supabase
     .from("cast_tv_settings")
-    .update(patch)
+    .update({
+      ...patch,
+      ...(patch.updated_by !== undefined ? { updated_by: normalizeAdminUserId(patch.updated_by) } : {})
+    })
     .eq("id", CAST_TV_SETTINGS_ID)
     .select("*")
     .single();
@@ -451,7 +522,7 @@ export async function loadCastTvHeartbeat(
     .eq("screen_id", screenId)
     .maybeSingle();
 
-  if (error && error.code !== "42P01") throw error;
+  if (error && !isMissingCastTvRelation(error)) throw error;
   return data;
 }
 

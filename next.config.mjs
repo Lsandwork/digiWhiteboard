@@ -4,7 +4,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig = {
   reactStrictMode: true,
   // Keep Chromium/Playwright out of the Next bundler so Vercel can resolve native binaries.
-  serverExternalPackages: ["playwright-core", "@sparticuz/chromium", "playwright", "pg"],
+  serverExternalPackages: ["playwright-core", "@sparticuz/chromium", "playwright", "pg", "sharp"],
   outputFileTracingIncludes: {
     "/api/admin/fitdog-alerts": [
       "./node_modules/@sparticuz/chromium/**/*",
