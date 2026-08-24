@@ -20,6 +20,7 @@
     "test:ruffly": "tsx scripts/test-ruffly-core.ts && tsx scripts/test-ruffly-domain-routing.ts",
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
     "test:display-tv-layout": "tsx scripts/test-display-tv-layout.ts",
+    "test:lobby-slideshow-layout": "tsx scripts/test-lobby-slideshow-layout.ts",
     "test:fitdog-domain": "tsx scripts/test-fitdog-domain-routing.ts",
     "test:admin-session-cookies": "tsx scripts/test-admin-session-cookies.ts",
     "test:session-edge-node-parity": "tsx scripts/test-session-edge-node-parity.ts",

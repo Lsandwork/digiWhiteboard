@@ -307,7 +307,7 @@ export function SocialMomentsCarousel({
             src={currentClip.poster}
             alt=""
             fill
-            className="social-video-poster object-cover"
+            className="social-video-poster object-contain"
             sizes="(max-width: 768px) 100vw, 520px"
             priority
           />
@@ -318,7 +318,7 @@ export function SocialMomentsCarousel({
             src={SOCIAL_MOMENTS[0].poster}
             alt=""
             fill
-            className="object-cover"
+            className="object-contain"
             sizes="(max-width: 768px) 100vw, 520px"
             priority
           />
@@ -328,7 +328,7 @@ export function SocialMomentsCarousel({
               src={currentClip.poster}
               alt={currentClip.title}
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 100vw, 520px"
             />
             <div className="social-video-static-controls">
