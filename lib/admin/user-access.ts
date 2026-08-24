@@ -100,22 +100,18 @@ export async function getUserAccess(
   legacyRole?: string | null,
   email?: string | null
 ): Promise<UserAccess> {
-  const matrix = await loadRolePermissionMatrix(supabase);
-
   if (!userId) return accessFromLegacyRole(null, email ?? null, legacyRole);
 
-  let name: string | null = null;
-  if (!isBlogSuiteNamedUser({ email })) {
-    try {
-      const record = await getAdminUserById(supabase, userId);
-      name = record?.full_name ?? null;
-      email = email ?? record?.email ?? null;
-    } catch {
-      name = null;
-    }
-  }
+  const [matrix, record, state] = await Promise.all([
+    loadRolePermissionMatrix(supabase),
+    isBlogSuiteNamedUser({ email })
+      ? Promise.resolve(null)
+      : getAdminUserById(supabase, userId).catch(() => null),
+    loadState(supabase)
+  ]);
 
-  const state = await loadState(supabase);
+  const name = record?.full_name ?? null;
+  email = email ?? record?.email ?? null;
   const assignment = state.assignments[userId];
   if (!assignment) {
     const primaryRole = legacyRoleToRoleKey(legacyRole);
@@ -159,7 +155,15 @@ export async function setUserAccess(
   return state.assignments[userId];
 }
 
+let lastLegacyAccessMigrateAt = 0;
+const LEGACY_ACCESS_MIGRATE_TTL_MS = 10 * 60 * 1000;
+
 export async function migrateLegacyUserAccess(supabase: SupabaseClient) {
+  if (Date.now() - lastLegacyAccessMigrateAt < LEGACY_ACCESS_MIGRATE_TTL_MS) return;
+  // Claim the slot before the query so overlapping session/dashboard after()
+  // work cannot stampede `admin_users` when PostgREST is already slow.
+  lastLegacyAccessMigrateAt = Date.now();
+
   const { data, error } = await supabase
     .from("admin_users")
     .select("id, email, role");
