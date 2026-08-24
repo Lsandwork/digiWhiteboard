@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { createCastTvMediaRecord } from "@/lib/cast-tv/media";
+import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
 import { requireCastTvManager } from "@/lib/cast-tv/api-auth";
 import { blockDemoWrite } from "@/lib/admin/api-auth";
 import type { CastTvImageDuration } from "@/lib/cast-tv/types";
+import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const fileName = String(body.fileName ?? "").trim();
-    const mimeType = String(body.mimeType ?? "").trim();
+    const mimeType = inferCastTvMimeType(fileName, String(body.mimeType ?? "").trim());
     const fileSize = Number(body.fileSize ?? 0);
     const storagePath = String(body.storagePath ?? "").trim();
     const displayName = body.displayName ? String(body.displayName).trim() : null;
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Upload metadata is incomplete." }, { status: 400 });
     }
 
-    const media = await createCastTvMediaRecord(auth.supabase, {
+    const supabase = getServiceSupabase({ timeoutMs: 20_000 });
+    const media = await createCastTvMediaRecord(supabase, {
       fileName,
       mimeType,
       fileSize,

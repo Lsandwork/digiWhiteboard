@@ -186,6 +186,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     try {
       const response = await fetch(`/api/cast-tv/media/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(patch)
       });
@@ -203,7 +204,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
   async function deleteMedia(id: string) {
     setBusyId(id);
     try {
-      const response = await fetch(`/api/cast-tv/media/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/cast-tv/media/${id}`, { method: "DELETE", credentials: "include" });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Delete failed.");
       setMedia((current) => current.filter((item) => item.id !== id));
@@ -220,6 +221,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     try {
       const response = await fetch("/api/cast-tv/reorder", {
         method: "POST",
+        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ id, direction })
       });
@@ -238,6 +240,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     try {
       const response = await fetch("/api/cast-tv/settings", {
         method: "PATCH",
+        credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(patch)
       });
@@ -427,7 +430,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           <div>
             <h3 className="crossover-card__title">Media Upload</h3>
             <p className="crossover-card__subtitle">
-              JPG, JPEG, PNG, WEBP, MP4, WEBM, or MOV. Images up to 20MB, videos up to 250MB.
+              JPG, JPEG, PNG, WEBP, HEIC, MP4, WEBM, or MOV. Images up to 20MB, videos up to 250MB.
             </p>
           </div>
         </div>
@@ -455,7 +458,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           <input
             ref={inputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.webm,.mov"
             multiple
             className="sr-only"
             disabled={uploading}
@@ -573,7 +576,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       <input
         ref={replaceInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
+        accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,video/mp4,video/webm,video/quicktime,.jpg,.jpeg,.png,.webp,.heic,.heif,.mp4,.webm,.mov"
         className="sr-only"
         onChange={(event) => {
           const file = event.target.files?.[0];

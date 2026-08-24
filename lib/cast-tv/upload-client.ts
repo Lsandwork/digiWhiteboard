@@ -1,4 +1,9 @@
 import { readApiJson } from "@/lib/admin/safe-fetch-json";
+import {
+  inferCastTvMimeType,
+  isHeicCastTvUpload,
+  shouldUseCastTvServerUpload
+} from "@/lib/cast-tv/mime";
 
 type UploadTargetResponse = {
   error?: string;
@@ -21,13 +26,37 @@ type UploadCompleteResponse = {
 
 type ReplaceCompleteResponse = UploadCompleteResponse;
 
+const FETCH_INIT: Pick<RequestInit, "credentials"> = { credentials: "include" };
+
+function fileMime(file: File) {
+  return inferCastTvMimeType(file.name, file.type);
+}
+
+async function uploadViaServer(file: File, displayName?: string) {
+  const form = new FormData();
+  form.append("file", file);
+  if (displayName) form.append("displayName", displayName);
+  const response = await fetch("/api/cast-tv/media/upload", {
+    ...FETCH_INIT,
+    method: "POST",
+    body: form
+  });
+  const body = await readApiJson<UploadCompleteResponse>(response);
+  if (!response.ok || !body.media) {
+    throw new Error(body.error ?? "Unable to save CAST-TV media.");
+  }
+  return body.media;
+}
+
 async function requestUploadTarget(file: File) {
+  const mimeType = fileMime(file);
   const response = await fetch("/api/cast-tv/media/upload-url", {
+    ...FETCH_INIT,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       fileName: file.name,
-      mimeType: file.type,
+      mimeType,
       fileSize: file.size
     })
   });
@@ -41,7 +70,10 @@ async function requestUploadTarget(file: File) {
 async function uploadFileToSignedUrl(file: File, signedUrl: string, mimeType: string) {
   const response = await fetch(signedUrl, {
     method: "PUT",
-    headers: { "content-type": mimeType },
+    headers: {
+      "content-type": mimeType,
+      "x-upsert": "false"
+    },
     body: file
   });
 
@@ -59,6 +91,7 @@ async function finalizeUpload(input: {
   displayName?: string;
 }) {
   const response = await fetch("/api/cast-tv/media/upload-complete", {
+    ...FETCH_INIT,
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -78,19 +111,41 @@ async function finalizeUpload(input: {
 
 export async function uploadCastTvMedia(file: File, displayName?: string, onProgress?: (pct: number) => void) {
   onProgress?.(5);
-  const target = await requestUploadTarget(file);
-  onProgress?.(20);
-  await uploadFileToSignedUrl(file, target.signed_upload_url!, target.mime_type ?? file.type);
-  onProgress?.(85);
-  const media = await finalizeUpload({
-    fileName: file.name,
-    mimeType: target.mime_type ?? file.type,
-    fileSize: target.file_size_bytes ?? file.size,
-    storagePath: target.storage_path!,
-    displayName
-  });
-  onProgress?.(100);
-  return media;
+  const mimeType = fileMime(file);
+  if (isHeicCastTvUpload(file.name, mimeType) && !shouldUseCastTvServerUpload(file)) {
+    throw new Error("This iPhone photo is too large to convert here. Export it as JPG and try again.");
+  }
+
+  if (shouldUseCastTvServerUpload(file)) {
+    onProgress?.(25);
+    const media = await uploadViaServer(file, displayName);
+    onProgress?.(100);
+    return media;
+  }
+
+  try {
+    const target = await requestUploadTarget(file);
+    onProgress?.(20);
+    await uploadFileToSignedUrl(file, target.signed_upload_url!, target.mime_type ?? mimeType);
+    onProgress?.(85);
+    const media = await finalizeUpload({
+      fileName: file.name,
+      mimeType: target.mime_type ?? mimeType,
+      fileSize: target.file_size_bytes ?? file.size,
+      storagePath: target.storage_path!,
+      displayName
+    });
+    onProgress?.(100);
+    return media;
+  } catch (error) {
+    if (file.size <= 3_500_000) {
+      onProgress?.(40);
+      const media = await uploadViaServer(file, displayName);
+      onProgress?.(100);
+      return media;
+    }
+    throw error;
+  }
 }
 
 export async function replaceCastTvMedia(
@@ -99,18 +154,39 @@ export async function replaceCastTvMedia(
   onProgress?: (pct: number) => void
 ) {
   onProgress?.(5);
+  const mimeType = fileMime(file);
+
+  if (shouldUseCastTvServerUpload(file)) {
+    onProgress?.(25);
+    const form = new FormData();
+    form.append("file", file);
+    form.append("replaceId", mediaId);
+    const response = await fetch("/api/cast-tv/media/upload", {
+      ...FETCH_INIT,
+      method: "POST",
+      body: form
+    });
+    const body = await readApiJson<ReplaceCompleteResponse>(response);
+    if (!response.ok || !body.media) {
+      throw new Error(body.error ?? "Unable to replace CAST-TV media.");
+    }
+    onProgress?.(100);
+    return body.media;
+  }
+
   const target = await requestUploadTarget(file);
   onProgress?.(20);
-  await uploadFileToSignedUrl(file, target.signed_upload_url!, target.mime_type ?? file.type);
+  await uploadFileToSignedUrl(file, target.signed_upload_url!, target.mime_type ?? mimeType);
   onProgress?.(85);
 
   const response = await fetch(`/api/cast-tv/media/${mediaId}`, {
+    ...FETCH_INIT,
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       action: "replace",
       fileName: file.name,
-      mimeType: target.mime_type ?? file.type,
+      mimeType: target.mime_type ?? mimeType,
       fileSize: target.file_size_bytes ?? file.size,
       storagePath: target.storage_path
     })

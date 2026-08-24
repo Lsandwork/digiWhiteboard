@@ -37,7 +37,7 @@ export async function POST(request: Request, context: RouteContext) {
   const blocked = demoWriteGuard(request);
   if (blocked) return blocked;
 
-  const auth = await requirePhotoUploadAccess(request);
+  const auth = await requirePhotoUploadAccess(request, { timeoutMs: 60_000 });
   if (!isPhotoUploadAuthOk(auth)) return auth.error;
 
   try {

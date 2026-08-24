@@ -26,5 +26,7 @@ assert.match(migration, /cast_tv_media/);
 assert.match(migration, /cast_tv_settings/);
 assert.match(migration, /cast-tv-media/);
 assert.match(migration, /supabase_realtime/);
+assert.match(read("supabase/migrations/087_cast_tv_media_upload.sql"), /cast_tv_media_signed_insert/);
+assert.match(read("app/api/cast-tv/media/upload/route.ts"), /normalizeCastTvUploadBytes/);
 
 console.log("cast-tv access tests passed");
