@@ -3,13 +3,15 @@ import {
   isAdminRequest,
   unauthorizedAdminResponse
 } from "@/lib/admin/api-auth";
-import { type UserAccess } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, type UserAccess } from "@/lib/admin/permissions";
 import { canManageCastTv } from "@/lib/cast-tv/permissions";
 import { castTvErrorMessage } from "@/lib/cast-tv/errors";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
 import { getServiceSupabase } from "@/lib/supabase/server";
+
+const ACCESS_LOOKUP_MS = 2_500;
 
 export type CastTvManager = {
   session: ReturnType<typeof getAdminSessionFromRequest>;
@@ -26,16 +28,29 @@ export async function castTvActorAccess(request: Request) {
     return { session, access: null as UserAccess | null, supabase };
   }
 
-  try {
-    const access = session?.adminUserId
-      ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
-      : session?.role || session?.email
-        ? await getUserAccess(supabase, null, session.role, session.email)
-        : null;
-    return { session, access, supabase };
-  } catch {
+  if (!session) {
     return { session, access: null as UserAccess | null, supabase };
   }
+
+  try {
+    const lookup = session.adminUserId
+      ? getUserAccess(supabase, session.adminUserId, session.role, session.email)
+      : session.role || session.email
+        ? getUserAccess(supabase, null, session.role, session.email)
+        : Promise.resolve(null);
+    const access = await Promise.race([
+      lookup,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ACCESS_LOOKUP_MS))
+    ]);
+    if (access) return { session, access, supabase };
+  } catch {
+    /* RBAC JSON reads hang in production; fall back to the signed session role. */
+  }
+
+  const fallback = session.role
+    ? accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role)
+    : null;
+  return { session, access: fallback, supabase };
 }
 
 /** Authenticated CAST-TV manager (admin or marketing). Does not require adminUserId on the session. */

@@ -3,12 +3,13 @@ import {
   CAST_TV_SERVER_UPLOAD_MAX_BYTES,
   inferCastTvMimeType,
   isHeicCastTvUpload,
-  shouldUseCastTvServerUpload
+  validateCastTvUpload
 } from "@/lib/cast-tv/mime";
 
 type UploadTargetResponse = {
   error?: string;
   storage_path?: string;
+  bucket?: string;
   signed_upload_url?: string;
   mime_type?: string;
   file_size_bytes?: number;
@@ -35,7 +36,9 @@ function fileMime(file: File) {
 
 function canFallbackToCastTvServerUpload(file: File) {
   try {
-    return shouldUseCastTvServerUpload(file);
+    if (file.size <= 0 || file.size > CAST_TV_SERVER_UPLOAD_MAX_BYTES) return false;
+    validateCastTvUpload(file);
+    return true;
   } catch {
     return isHeicCastTvUpload(file.name, file.type) && file.size <= CAST_TV_SERVER_UPLOAD_MAX_BYTES;
   }
@@ -87,7 +90,10 @@ async function uploadFileToSignedUrl(file: File, signedUrl: string, mimeType: st
   });
 
   if (!response.ok) {
-    const preview = (await response.text()).slice(0, 120).trim();
+    const preview = (await response.text()).slice(0, 180).trim();
+    if (/<!doctype|<html|SSL handshake|Error code 52/i.test(preview)) {
+      throw new Error("CAST-TV storage is temporarily unavailable. Try again in a moment.");
+    }
     throw new Error(preview || `Storage upload failed (${response.status}).`);
   }
 }
@@ -97,6 +103,7 @@ async function finalizeUpload(input: {
   mimeType: string;
   fileSize: number;
   storagePath: string;
+  bucket?: string;
   displayName?: string;
 }) {
   const response = await fetch("/api/cast-tv/media/upload-complete", {
@@ -108,6 +115,7 @@ async function finalizeUpload(input: {
       mimeType: input.mimeType,
       fileSize: input.fileSize,
       storagePath: input.storagePath,
+      bucket: input.bucket,
       displayName: input.displayName
     })
   });
@@ -132,6 +140,7 @@ export async function uploadCastTvMedia(file: File, displayName?: string, onProg
       mimeType: target.mime_type ?? mimeType,
       fileSize: target.file_size_bytes ?? file.size,
       storagePath: target.storage_path!,
+      bucket: target.bucket,
       displayName
     });
     onProgress?.(100);

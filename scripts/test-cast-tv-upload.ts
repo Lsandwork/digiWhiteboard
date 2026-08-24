@@ -106,12 +106,17 @@ abortError.name = "AbortError";
 assert.match(castTvErrorMessage(abortError, "fallback"), /timed out/);
 const timeoutResponse = castTvErrorResponse(abortError, "fallback");
 assert.equal(timeoutResponse.status, 504);
+assert.match(
+  castTvErrorMessage({ message: "<!DOCTYPE html> supabase.co | 525: SSL handshake failed" }, "fallback"),
+  /storage is temporarily unavailable/
+);
 
 const root = process.cwd();
 const uploadClient = readFileSync(join(root, "lib/cast-tv/upload-client.ts"), "utf8");
 assert.match(uploadClient, /credentials: "include"/);
 assert.match(uploadClient, /\/api\/cast-tv\/media\/upload-url/);
 assert.match(uploadClient, /\/api\/cast-tv\/media\/upload-complete/);
+assert.match(uploadClient, /validateCastTvUpload/);
 assert.match(uploadClient, /canFallbackToCastTvServerUpload/);
 assert.match(uploadClient, /\/api\/cast-tv\/media\/upload/);
 assert.doesNotMatch(
@@ -124,6 +129,8 @@ assert.match(apiAuth, /canManageCastTv\(null, role\)/);
 assert.match(apiAuth, /getEffectiveAdminRole/);
 assert.match(apiAuth, /getCastTvSupabase/);
 assert.match(apiAuth, /Unable to authorize CAST-TV/);
+assert.match(apiAuth, /accessFromLegacyRole/);
+assert.match(apiAuth, /ACCESS_LOOKUP_MS/);
 
 const uploadRoute = readFileSync(join(root, "app/api/cast-tv/media/upload/route.ts"), "utf8");
 assert.match(uploadRoute, /normalizeCastTvUploadBytes/);
@@ -145,6 +152,8 @@ const mediaRoute = readFileSync(join(root, "app/api/cast-tv/media/route.ts"), "u
 assert.match(mediaRoute, /getCastTvSupabase/);
 assert.match(mediaRoute, /maxDuration = 60/);
 assert.match(mediaRoute, /castTvErrorMessage/);
+assert.match(mediaRoute, /playlist/);
+assert.match(mediaRoute, /admin: true/);
 
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
 assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 15_000/);
@@ -165,7 +174,8 @@ assert.doesNotMatch(media, /\.from\("cast_tv_media"\)/);
 
 const libraryStore = readFileSync(join(root, "lib/cast-tv/library-store.ts"), "utf8");
 assert.match(libraryStore, /cast-tv\/library\.json/);
-assert.match(libraryStore, /CAST_TV_STORAGE_BUCKET = "lobby-slideshow"/);
+assert.match(libraryStore, /CAST_TV_LEGACY_MEDIA_BUCKET = "cast-tv-media"/);
+assert.match(libraryStore, /CAST_TV_LAST_GOOD_CACHE_KEY/);
 assert.match(libraryStore, /\.download\(/);
 assert.match(libraryStore, /JSON_UPLOAD_MIME/);
 assert.doesNotMatch(libraryStore, /loadAdminSettingsJsonKey/);
@@ -179,6 +189,7 @@ const panel = readFileSync(join(root, "components/admin/CastTvPanel.tsx"), "utf8
 assert.doesNotMatch(panel, /postgres_changes/);
 const tvPlayer = readFileSync(join(root, "components/cast-tv/useCastTvPlaylist.ts"), "utf8");
 assert.doesNotMatch(tvPlayer, /postgres_changes/);
+assert.match(tvPlayer, /currentIdRef\.current/);
 
 const libraryMigration = readFileSync(join(root, "supabase/migrations/088_cast_tv_library_storage.sql"), "utf8");
 assert.match(libraryMigration, /application\/json/);

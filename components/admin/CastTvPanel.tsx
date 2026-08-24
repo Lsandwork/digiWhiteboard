@@ -69,60 +69,74 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const disabledMedia = useMemo(() => media.filter((item) => !item.is_enabled), [media]);
 
   const loadData = useCallback(async () => {
+    let loadedMedia: CastTvMediaRecord[] | null = null;
     try {
-      const [mediaResponse, settingsResponse] = await Promise.all([
-        fetch("/api/cast-tv/media", { cache: "no-store", credentials: "include" }),
-        fetch("/api/cast-tv/settings?heartbeat=1", { cache: "no-store", credentials: "include" })
-      ]);
+      const mediaResponse = await fetch("/api/cast-tv/media", { cache: "no-store", credentials: "include" });
       const mediaBody = await readResponseJson(mediaResponse);
-      const settingsBody = await readResponseJson(settingsResponse);
-
       if (!mediaResponse.ok) throw new Error(mediaBody.error ?? "Unable to load CAST-TV media.");
-      if (!settingsResponse.ok) throw new Error(settingsBody.error ?? "Unable to load CAST-TV settings.");
 
-      if (Array.isArray(mediaBody.media)) {
-        setMedia(mediaBody.media);
-      } else if (Array.isArray(mediaBody.playlist) && mediaBody.playlist.length > 0) {
-        setMedia(
-          mediaBody.playlist.map((item: {
-            id: string;
-            displayName?: string;
-            mediaType: "image" | "video";
-            src: string;
-            imageDisplaySeconds?: number;
-            updatedAt?: string;
-          }) => ({
-            id: item.id,
-            display_name: item.displayName ?? null,
-            file_name: item.displayName ?? "CAST-TV media",
-            storage_path: "",
-            public_url: item.src,
-            media_type: item.mediaType,
-            mime_type: null,
-            file_size_bytes: null,
-            duration_seconds: null,
-            image_display_seconds: item.imageDisplaySeconds ?? 10,
-            display_order: 0,
-            is_enabled: true,
-            uploaded_by: null,
-            uploaded_by_name: null,
-            created_at: item.updatedAt ?? new Date().toISOString(),
-            updated_at: item.updatedAt ?? new Date().toISOString()
-          }))
-        );
-        onToast("Loaded playlist from the TV feed. Refresh the page if delete controls fail.", "info");
-      } else {
-        setMedia([]);
+      if (Array.isArray(mediaBody.media) && mediaBody.media.length) {
+        loadedMedia = mediaBody.media as CastTvMediaRecord[];
+      } else if (Array.isArray(mediaBody.playlist) && mediaBody.playlist.length) {
+        loadedMedia = (mediaBody.playlist as Array<{
+          id: string;
+          displayName?: string;
+          mediaType: "image" | "video";
+          src: string;
+          imageDisplaySeconds?: number;
+          updatedAt?: string;
+        }>).map((item) => ({
+          id: item.id,
+          display_name: item.displayName ?? null,
+          file_name: item.displayName ?? "CAST-TV media",
+          storage_path: "",
+          public_url: item.src,
+          media_type: item.mediaType,
+          mime_type: null,
+          file_size_bytes: null,
+          duration_seconds: null,
+          image_display_seconds: (item.imageDisplaySeconds === 5 ||
+          item.imageDisplaySeconds === 10 ||
+          item.imageDisplaySeconds === 15 ||
+          item.imageDisplaySeconds === 20 ||
+          item.imageDisplaySeconds === 30 ||
+          item.imageDisplaySeconds === 60
+            ? item.imageDisplaySeconds
+            : 10) as CastTvImageDuration,
+          display_order: 0,
+          is_enabled: true,
+          uploaded_by: null,
+          uploaded_by_name: null,
+          created_at: item.updatedAt ?? new Date().toISOString(),
+          updated_at: item.updatedAt ?? new Date().toISOString()
+        }));
+      } else if (Array.isArray(mediaBody.media)) {
+        loadedMedia = mediaBody.media as CastTvMediaRecord[];
       }
-      setSettings(settingsBody.settings ?? null);
-      if (settingsBody.heartbeat) {
-        setHeartbeat({
-          online: Boolean(settingsBody.heartbeat.online),
-          last_seen_at: settingsBody.heartbeat.last_seen_at ?? null
-        });
+      if (loadedMedia) {
+        setMedia(loadedMedia);
       }
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Unable to load CAST-TV.", "error");
+    }
+
+    try {
+      const settingsResponse = await fetch("/api/cast-tv/settings?heartbeat=1", {
+        cache: "no-store",
+        credentials: "include"
+      });
+      const settingsBody = await readResponseJson(settingsResponse);
+      if (settingsResponse.ok) {
+        setSettings(settingsBody.settings ?? null);
+        if (settingsBody.heartbeat) {
+          setHeartbeat({
+            online: Boolean(settingsBody.heartbeat.online),
+            last_seen_at: settingsBody.heartbeat.last_seen_at ?? null
+          });
+        }
+      }
+    } catch {
+      /* settings must not hide the playlist */
     } finally {
       setLoading(false);
     }
@@ -146,8 +160,32 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
 
     try {
       for (const file of files) {
-        await uploadCastTvMedia(file, undefined, (pct) => setUploadProgress(pct));
+        const uploaded = await uploadCastTvMedia(file, undefined, (pct) => setUploadProgress(pct));
         successCount += 1;
+        if (uploaded?.id) {
+          const now = new Date().toISOString();
+          setMedia((current) => {
+            const nextItem: CastTvMediaRecord = {
+              id: uploaded.id,
+              display_name: uploaded.display_name ?? file.name,
+              file_name: file.name,
+              storage_path: "",
+              public_url: uploaded.public_url ?? "",
+              media_type: uploaded.media_type,
+              mime_type: file.type || null,
+              file_size_bytes: file.size,
+              duration_seconds: null,
+              image_display_seconds: 10,
+              display_order: current.length + 1,
+              is_enabled: true,
+              uploaded_by: null,
+              uploaded_by_name: null,
+              created_at: now,
+              updated_at: now
+            };
+            return [...current.filter((item) => item.id !== uploaded.id), nextItem];
+          });
+        }
       }
       onToast(
         successCount === 1 ? "Media uploaded to CAST-TV." : `Uploaded ${successCount} files to CAST-TV.`,
@@ -276,7 +314,12 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
             <video src={item.public_url ?? ""} muted playsInline preload="metadata" className="cast-tv-admin-card__thumb" />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={item.public_url ?? ""} alt="" className="cast-tv-admin-card__thumb" />
+            <img
+              src={item.public_url ?? ""}
+              alt={item.display_name ?? item.file_name}
+              className="cast-tv-admin-card__thumb"
+              referrerPolicy="no-referrer"
+            />
           )}
         </div>
         <div className="cast-tv-admin-card__body">

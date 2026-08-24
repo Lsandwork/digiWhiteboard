@@ -1,4 +1,5 @@
-import { CAST_TV_BUCKET, buildCastTvStoragePath, uploadCastTvObject } from "@/lib/cast-tv/media";
+import { CAST_TV_LEGACY_MEDIA_BUCKET, CAST_TV_STORAGE_BUCKET } from "@/lib/cast-tv/library-store";
+import { buildCastTvStoragePath, uploadCastTvObject } from "@/lib/cast-tv/media";
 import { isHeicCastTvUpload } from "@/lib/cast-tv/mime";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -23,16 +24,26 @@ export async function convertStoredCastTvHeicIfNeeded(
     return input;
   }
 
-  const { data, error } = await supabase.storage.from(CAST_TV_BUCKET).download(input.storagePath);
-  if (error || !data) {
-    throw new Error(error?.message || "Unable to read the uploaded iPhone photo.");
+  const buckets = [CAST_TV_STORAGE_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET];
+  let file: Blob | null = null;
+  for (const bucket of buckets) {
+    const { data, error } = await supabase.storage.from(bucket).download(input.storagePath);
+    if (!error && data) {
+      file = data;
+      break;
+    }
+  }
+  if (!file) {
+    throw new Error("Unable to read the uploaded iPhone photo.");
   }
 
-  const jpeg = await convertHeicBufferToJpeg(Buffer.from(await data.arrayBuffer()));
+  const jpeg = await convertHeicBufferToJpeg(Buffer.from(await file.arrayBuffer()));
   const fileName = input.fileName.replace(/\.[^.]+$/, ".jpg");
   const storagePath = buildCastTvStoragePath(fileName);
   await uploadCastTvObject(supabase, storagePath, jpeg, "image/jpeg");
-  await supabase.storage.from(CAST_TV_BUCKET).remove([input.storagePath]);
+  for (const bucket of buckets) {
+    await supabase.storage.from(bucket).remove([input.storagePath]);
+  }
 
   return {
     fileName,

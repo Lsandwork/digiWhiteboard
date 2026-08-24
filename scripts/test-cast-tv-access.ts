@@ -30,8 +30,8 @@ assert.match(read("supabase/migrations/087_cast_tv_media_upload.sql"), /cast_tv_
 assert.match(read("app/api/cast-tv/media/upload/route.ts"), /normalizeCastTvUploadBytes/);
 assert.match(read("app/api/cast-tv/media/route.ts"), /getCastTvSupabase/);
 assert.match(read("lib/cast-tv/supabase.ts"), /15_000/);
-assert.match(read("lib/cast-tv/library-store.ts"), /cast-tv\/library\.json/);
-assert.doesNotMatch(read("lib/cast-tv/library-store.ts"), /loadAdminSettingsJsonKey/);
+assert.match(read("lib/cast-tv/library-store.ts"), /cast-tv-media/);
+assert.match(read("lib/cast-tv/api-auth.ts"), /accessFromLegacyRole/);
 assert.match(read("app/api/cast-tv/media/upload-url/route.ts"), /handleCastTvWrite/);
 assert.match(read("lib/cast-tv/upload-client.ts"), /canFallbackToCastTvServerUpload/);
 assert.match(read("next.config.mjs"), /"sharp"/);

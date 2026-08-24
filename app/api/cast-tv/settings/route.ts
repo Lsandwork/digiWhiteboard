@@ -13,7 +13,13 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   try {
     const supabase = getCastTvSupabase();
-    const settings = await loadCastTvSettings(supabase);
+    let settings;
+    try {
+      settings = await loadCastTvSettings(supabase);
+    } catch (error) {
+      const message = castTvErrorMessage(error, "Unable to load CAST-TV settings.");
+      return NextResponse.json({ error: message, settings: null }, { status: 500 });
+    }
 
     const url = new URL(request.url);
     const includeHeartbeat = url.searchParams.get("heartbeat") === "1";
@@ -21,24 +27,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ settings });
     }
 
-    const manager = await resolveCastTvManager(request);
-    if (!manager) {
-      return NextResponse.json({ settings });
+    try {
+      const manager = await resolveCastTvManager(request);
+      if (!manager) {
+        return NextResponse.json({ settings });
+      }
+
+      const screenId = url.searchParams.get("screen")?.trim() || "default";
+      const heartbeat = await loadCastTvHeartbeat(supabase, screenId);
+
+      return NextResponse.json({
+        settings,
+        heartbeat: heartbeat
+          ? {
+              screen_id: heartbeat.screen_id,
+              last_seen_at: heartbeat.last_seen_at,
+              online: isCastTvOnline(heartbeat.last_seen_at)
+            }
+          : { screen_id: screenId, last_seen_at: null, online: false }
+      });
+    } catch {
+      return NextResponse.json({
+        settings,
+        heartbeat: { screen_id: "default", last_seen_at: null, online: false }
+      });
     }
-
-    const screenId = url.searchParams.get("screen")?.trim() || "default";
-    const heartbeat = await loadCastTvHeartbeat(supabase, screenId);
-
-    return NextResponse.json({
-      settings,
-      heartbeat: heartbeat
-        ? {
-            screen_id: heartbeat.screen_id,
-            last_seen_at: heartbeat.last_seen_at,
-            online: isCastTvOnline(heartbeat.last_seen_at)
-          }
-        : { screen_id: screenId, last_seen_at: null, online: false }
-    });
   } catch (error) {
     const message = castTvErrorMessage(error, "Unable to load CAST-TV settings.");
     return NextResponse.json({ error: message }, { status: 500 });
