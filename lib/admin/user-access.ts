@@ -110,32 +110,68 @@ export async function getUserAccess(
     loadState(supabase)
   ]);
 
-  const name = record?.full_name ?? null;
-  email = email ?? record?.email ?? null;
-  const assignment = state.assignments[userId];
+  return accessFromLoadedSources({
+    userId,
+    email: email ?? record?.email ?? null,
+    name: record?.full_name ?? null,
+    legacyRole,
+    matrix,
+    state
+  });
+}
+
+function accessFromLoadedSources(input: {
+  userId: string;
+  email: string | null;
+  name: string | null;
+  legacyRole?: string | null;
+  matrix: Awaited<ReturnType<typeof loadRolePermissionMatrix>>;
+  state: UserAccessState;
+}): UserAccess {
+  const assignment = input.state.assignments[input.userId];
   if (!assignment) {
-    const primaryRole = legacyRoleToRoleKey(legacyRole);
+    const primaryRole = legacyRoleToRoleKey(input.legacyRole);
     const roles = [primaryRole];
     return buildUserAccess({
-      userId,
-      email,
-      name,
+      userId: input.userId,
+      email: input.email,
+      name: input.name,
       primaryRole,
       roles,
-      permissions: resolveUserPermissions(roles, matrix, legacyRole)
+      permissions: resolveUserPermissions(roles, input.matrix, input.legacyRole)
     });
   }
 
   const roles = [...new Set([assignment.primaryRole, ...assignment.roles])];
   return buildUserAccess({
-    userId,
-    email,
-    name,
+    userId: input.userId,
+    email: input.email,
+    name: input.name,
     primaryRole: assignment.primaryRole,
     roles: assignment.roles,
     departments: assignment.departments,
-    permissions: resolveUserPermissions(roles, matrix, legacyRole)
+    permissions: resolveUserPermissions(roles, input.matrix, input.legacyRole)
   });
+}
+
+/** One matrix + settings read for the Users page instead of N serial getUserAccess calls. */
+export async function getUserAccessMap(
+  supabase: SupabaseClient,
+  users: Array<{ id: string; email?: string | null; full_name?: string | null; role?: string | null }>
+): Promise<Record<string, UserAccess>> {
+  const [matrix, state] = await Promise.all([loadRolePermissionMatrix(supabase), loadState(supabase)]);
+  const map: Record<string, UserAccess> = {};
+  for (const user of users) {
+    map[user.id] = accessFromLoadedSources({
+      userId: user.id,
+      email: user.email ?? null,
+      name: user.full_name ?? null,
+      legacyRole: user.role,
+      matrix,
+      state
+    });
+  }
+  return map;
 }
 
 export async function setUserAccess(
