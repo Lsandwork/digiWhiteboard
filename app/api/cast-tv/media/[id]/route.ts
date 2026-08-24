@@ -41,7 +41,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
       const media = await replaceCastTvMediaFile(supabase, id, converted);
 
-      await writeAdminAuditLog({
+      void writeAdminAuditLog({
         actorAdminId: auth.session?.adminUserId,
         actorEmail: auth.session?.email,
         action: "cast_tv.media.replaced",
@@ -76,7 +76,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     const media = await updateCastTvMediaRecord(auth.supabase, id, patch);
 
     if (patch.is_enabled !== undefined) {
-      await writeAdminAuditLog({
+      void writeAdminAuditLog({
         actorAdminId: auth.session?.adminUserId,
         actorEmail: auth.session?.email,
         action: patch.is_enabled ? "cast_tv.media.enabled" : "cast_tv.media.disabled",
@@ -85,7 +85,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         details: { display_name: media.display_name }
       });
     } else if (patch.image_display_seconds !== undefined) {
-      await writeAdminAuditLog({
+      void writeAdminAuditLog({
         actorAdminId: auth.session?.adminUserId,
         actorEmail: auth.session?.email,
         action: "cast_tv.media.duration_changed",
@@ -94,7 +94,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         details: { image_display_seconds: media.image_display_seconds }
       });
     } else {
-      await writeAdminAuditLog({
+      void writeAdminAuditLog({
         actorAdminId: auth.session?.adminUserId,
         actorEmail: auth.session?.email,
         action: "cast_tv.media.updated",
@@ -113,7 +113,7 @@ export async function DELETE(request: Request, context: RouteContext) {
     const { id } = await context.params;
     const media = await deleteCastTvMediaRecord(auth.supabase, id);
 
-    await writeAdminAuditLog({
+    void writeAdminAuditLog({
       actorAdminId: auth.session?.adminUserId,
       actorEmail: auth.session?.email,
       action: "cast_tv.media.deleted",

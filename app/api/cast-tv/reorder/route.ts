@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "orderedIds or id+direction is required." }, { status: 400 });
     }
 
-    await writeAdminAuditLog({
+    void writeAdminAuditLog({
       actorAdminId: auth.session?.adminUserId,
       actorEmail: auth.session?.email,
       action: "cast_tv.playlist.reordered",

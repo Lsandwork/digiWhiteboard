@@ -59,7 +59,7 @@ export async function PATCH(request: Request) {
       updated_by: auth.session?.adminUserId ?? null
     });
 
-    await writeAdminAuditLog({
+    void writeAdminAuditLog({
       actorAdminId: auth.session?.adminUserId,
       actorEmail: auth.session?.email,
       action: "cast_tv.settings.changed",

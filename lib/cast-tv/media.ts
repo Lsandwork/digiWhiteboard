@@ -1,8 +1,11 @@
 import { normalizeAdminUserId } from "@/lib/admin/users";
 import { validateCastTvUpload } from "@/lib/cast-tv/mime";
 import {
+  CAST_TV_STORAGE_BUCKET,
   defaultCastTvSettings,
+  loadCastTvHeartbeats,
   loadCastTvLibrary,
+  mutateCastTvHeartbeats,
   mutateCastTvLibrary
 } from "@/lib/cast-tv/library-store";
 import {
@@ -19,7 +22,7 @@ import {
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 /** Production CAST-TV Postgres tables hang; files go in the working lobby slideshow bucket. */
-export const CAST_TV_BUCKET = "lobby-slideshow";
+export const CAST_TV_BUCKET = CAST_TV_STORAGE_BUCKET;
 
 export {
   CAST_TV_ALLOWED_MIME,
@@ -194,6 +197,11 @@ export async function createCastTvMediaRecord(
   });
 
   return mutateCastTvLibrary(supabase, (library) => {
+    const byPath = library.media.find((row) => row.storage_path === input.storagePath);
+    if (byPath) {
+      return { state: library, result: byPath };
+    }
+
     const duplicate = library.media.find(
       (row) =>
         row.file_name.trim().toLowerCase() === input.fileName.trim().toLowerCase() &&
@@ -365,7 +373,7 @@ export async function moveCastTvMedia(
 }
 
 export async function loadCastTvSettings(supabase: SupabaseClient): Promise<CastTvSettings> {
-  const library = await loadCastTvLibrary(supabase);
+  const library = await loadCastTvLibrary(supabase, { recoverOrphans: false });
   return library.settings ?? defaultCastTvSettings();
 }
 
@@ -406,17 +414,14 @@ export async function recordCastTvHeartbeat(
 ) {
   const screenId = input.screenId.trim() || "default";
   const now = new Date().toISOString();
-  return mutateCastTvLibrary(supabase, (library) => {
+  return mutateCastTvHeartbeats(supabase, (heartbeats) => {
     const heartbeat = {
       screen_id: screenId,
       last_seen_at: now,
       user_agent: input.userAgent ?? null
     };
     return {
-      state: {
-        ...library,
-        heartbeats: { ...library.heartbeats, [screenId]: heartbeat }
-      },
+      heartbeats: { ...heartbeats, [screenId]: heartbeat },
       result: heartbeat
     };
   });
@@ -426,8 +431,8 @@ export async function loadCastTvHeartbeat(
   supabase: SupabaseClient,
   screenId = "default"
 ) {
-  const library = await loadCastTvLibrary(supabase);
-  return library.heartbeats[screenId] ?? null;
+  const heartbeats = await loadCastTvHeartbeats(supabase);
+  return heartbeats[screenId] ?? null;
 }
 
 export function isCastTvOnline(lastSeenAt: string | null | undefined, now = Date.now()) {

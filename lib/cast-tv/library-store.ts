@@ -1,4 +1,4 @@
-import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+import { inferCastTvMimeType, mediaTypeForMime } from "@/lib/cast-tv/mime";
 import {
   CAST_TV_SETTINGS_ID,
   type CastTvImageDuration,
@@ -10,7 +10,10 @@ import {
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-export const CAST_TV_LIBRARY_SETTINGS_KEY = "cast_tv_library";
+/** Production CAST-TV Postgres tables hang; playlist JSON lives next to the files. */
+export const CAST_TV_STORAGE_BUCKET = "lobby-slideshow";
+export const CAST_TV_LIBRARY_OBJECT_PATH = "cast-tv/library.json";
+export const CAST_TV_HEARTBEATS_OBJECT_PATH = "cast-tv/heartbeats.json";
 
 export type CastTvHeartbeatRecord = {
   screen_id: string;
@@ -24,9 +27,17 @@ export type CastTvLibraryState = {
   heartbeats: Record<string, CastTvHeartbeatRecord>;
 };
 
+export type CastTvStorageListItem = {
+  name: string;
+  updated_at?: string | null;
+  created_at?: string | null;
+  metadata?: { size?: number; mimetype?: string } | null;
+};
+
 const IMAGE_DURATIONS = new Set<CastTvImageDuration>([5, 10, 15, 20, 30, 60]);
 const TRANSITIONS = new Set<CastTvTransitionStyle>(["fade", "crossfade", "none"]);
 const OBJECT_FITS = new Set<CastTvObjectFit>(["contain", "cover"]);
+const JSON_UPLOAD_MIME = ["application/json", "text/plain", "image/jpeg"] as const;
 
 export function defaultCastTvSettings(): CastTvSettings {
   return {
@@ -44,6 +55,19 @@ export function defaultCastTvSettings(): CastTvSettings {
 
 export function emptyCastTvLibrary(): CastTvLibraryState {
   return { media: [], settings: defaultCastTvSettings(), heartbeats: {} };
+}
+
+export function isMissingCastTvStorageObject(
+  error: { message?: string; statusCode?: string | number } | null | undefined
+) {
+  if (!error) return true;
+  const code = String(error.statusCode ?? "");
+  const message = String(error.message ?? "");
+  return (
+    code === "404" ||
+    code === "400" ||
+    /not found|does not exist|No such file|object not found/i.test(message)
+  );
 }
 
 function asMediaRecord(value: unknown): CastTvMediaRecord | null {
@@ -93,48 +117,172 @@ function asSettings(value: unknown): CastTvSettings {
   };
 }
 
+export function parseCastTvHeartbeats(value: unknown): Record<string, CastTvHeartbeatRecord> {
+  const heartbeats: Record<string, CastTvHeartbeatRecord> = {};
+  const raw =
+    value && typeof value === "object" && "heartbeats" in value
+      ? (value as { heartbeats?: unknown }).heartbeats
+      : value;
+  if (!raw || typeof raw !== "object") return heartbeats;
+  for (const [screenId, entry] of Object.entries(raw as Record<string, unknown>)) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Partial<CastTvHeartbeatRecord>;
+    if (!row.last_seen_at) continue;
+    heartbeats[screenId] = {
+      screen_id: String(row.screen_id || screenId),
+      last_seen_at: String(row.last_seen_at),
+      user_agent: row.user_agent ?? null
+    };
+  }
+  return heartbeats;
+}
+
 export function parseCastTvLibrary(value: unknown): CastTvLibraryState {
   if (!value || typeof value !== "object") return emptyCastTvLibrary();
-  const raw = value as Partial<CastTvLibraryState> & { media?: unknown; heartbeats?: unknown };
+  const raw = value as Partial<CastTvLibraryState> & { media?: unknown };
   const media = Array.isArray(raw.media)
     ? raw.media
         .map(asMediaRecord)
         .filter((row): row is CastTvMediaRecord => Boolean(row))
         .sort((a, b) => a.display_order - b.display_order || a.created_at.localeCompare(b.created_at))
     : [];
-  const heartbeats: Record<string, CastTvHeartbeatRecord> = {};
-  if (raw.heartbeats && typeof raw.heartbeats === "object") {
-    for (const [screenId, entry] of Object.entries(raw.heartbeats as Record<string, unknown>)) {
-      if (!entry || typeof entry !== "object") continue;
-      const row = entry as Partial<CastTvHeartbeatRecord>;
-      if (!row.last_seen_at) continue;
-      heartbeats[screenId] = {
-        screen_id: String(row.screen_id || screenId),
-        last_seen_at: String(row.last_seen_at),
-        user_agent: row.user_agent ?? null
-      };
-    }
-  }
   return {
     media,
     settings: asSettings(raw.settings),
-    heartbeats
+    heartbeats: parseCastTvHeartbeats(raw.heartbeats)
   };
 }
 
-export async function loadCastTvLibrary(supabase: SupabaseClient): Promise<CastTvLibraryState> {
-  const loaded = await loadAdminSettingsJsonKey(
-    supabase,
-    CAST_TV_LIBRARY_SETTINGS_KEY,
-    parseCastTvLibrary,
-    emptyCastTvLibrary()
+function isLibrarySidecar(name: string) {
+  return name === "library.json" || name === "heartbeats.json" || name.endsWith(".json");
+}
+
+export function mergeCastTvStorageObjects(
+  library: CastTvLibraryState,
+  objects: CastTvStorageListItem[],
+  publicUrlForPath: (storagePath: string, updatedAt?: string) => string
+): { library: CastTvLibraryState; added: number } {
+  const known = new Set(library.media.map((item) => item.storage_path));
+  const extras: CastTvMediaRecord[] = [];
+  let nextOrder = library.media.reduce((max, item) => Math.max(max, item.display_order), 0);
+
+  for (const object of objects) {
+    const name = String(object.name || "").trim();
+    if (!name || isLibrarySidecar(name) || name.endsWith("/")) continue;
+    const storagePath = name.startsWith("cast-tv/") ? name : `cast-tv/${name}`;
+    if (known.has(storagePath)) continue;
+
+    const mime = inferCastTvMimeType(name, object.metadata?.mimetype);
+    const mediaType = mediaTypeForMime(mime, name);
+    if (!mediaType) continue;
+
+    const updatedAt = String(object.updated_at || object.created_at || new Date().toISOString());
+    const id = name.replace(/\.[^.]+$/, "") || storagePath;
+    nextOrder += 1;
+    extras.push({
+      id,
+      display_name: name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "CAST-TV media",
+      file_name: name,
+      storage_path: storagePath,
+      public_url: publicUrlForPath(storagePath, updatedAt),
+      media_type: mediaType,
+      mime_type: mime || null,
+      file_size_bytes: typeof object.metadata?.size === "number" ? object.metadata.size : null,
+      duration_seconds: null,
+      image_display_seconds: library.settings.default_image_seconds,
+      display_order: nextOrder,
+      is_enabled: true,
+      uploaded_by: null,
+      uploaded_by_name: null,
+      created_at: String(object.created_at || updatedAt),
+      updated_at: updatedAt
+    });
+    known.add(storagePath);
+  }
+
+  if (!extras.length) return { library, added: 0 };
+  return {
+    library: {
+      ...library,
+      media: [...library.media, ...extras]
+    },
+    added: extras.length
+  };
+}
+
+async function downloadJsonObject(supabase: SupabaseClient, path: string): Promise<unknown | null> {
+  const { data, error } = await supabase.storage.from(CAST_TV_STORAGE_BUCKET).download(path);
+  if (error || !data) {
+    if (isMissingCastTvStorageObject(error)) return null;
+    throw error ?? new Error(`Unable to read CAST-TV object ${path}.`);
+  }
+  const text = await data.text();
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+async function uploadJsonObject(supabase: SupabaseClient, path: string, value: unknown) {
+  const bytes = Buffer.from(JSON.stringify(value), "utf8");
+  let lastMessage = "Unable to save CAST-TV library.";
+  for (const mime of JSON_UPLOAD_MIME) {
+    const { error } = await supabase.storage.from(CAST_TV_STORAGE_BUCKET).upload(path, bytes, {
+      contentType: mime,
+      upsert: true,
+      cacheControl: "0"
+    });
+    if (!error) return;
+    lastMessage = error.message || lastMessage;
+    if (!/mime|not supported|allowed|invalid type/i.test(error.message || "")) {
+      throw new Error(lastMessage);
+    }
+  }
+  throw new Error(lastMessage);
+}
+
+function publicUrlForPath(supabase: SupabaseClient, storagePath: string, updatedAt?: string) {
+  const { data } = supabase.storage.from(CAST_TV_STORAGE_BUCKET).getPublicUrl(storagePath);
+  if (!updatedAt) return data.publicUrl;
+  return `${data.publicUrl}?v=${encodeURIComponent(updatedAt)}`;
+}
+
+async function recoverOrphanedCastTvFiles(
+  supabase: SupabaseClient,
+  library: CastTvLibraryState
+): Promise<CastTvLibraryState> {
+  const { data, error } = await supabase.storage.from(CAST_TV_STORAGE_BUCKET).list("cast-tv", {
+    limit: 100,
+    sortBy: { column: "name", order: "asc" }
+  });
+  if (error || !data?.length) return library;
+  const merged = mergeCastTvStorageObjects(library, data, (storagePath, updatedAt) =>
+    publicUrlForPath(supabase, storagePath, updatedAt)
   );
-  return loaded ?? emptyCastTvLibrary();
+  return merged.library;
+}
+
+export async function loadCastTvLibrary(
+  supabase: SupabaseClient,
+  options: { recoverOrphans?: boolean } = {}
+): Promise<CastTvLibraryState> {
+  const stored = await downloadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH);
+  const library = parseCastTvLibrary(stored);
+  if (options.recoverOrphans === false) return library;
+  try {
+    return await recoverOrphanedCastTvFiles(supabase, library);
+  } catch {
+    return library;
+  }
 }
 
 export async function saveCastTvLibrary(supabase: SupabaseClient, state: CastTvLibraryState) {
-  const ok = await saveAdminSettingsJsonKey(supabase, CAST_TV_LIBRARY_SETTINGS_KEY, state);
-  if (!ok) throw new Error("Unable to save CAST-TV library.");
+  await uploadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH, {
+    media: state.media,
+    settings: state.settings
+  });
 }
 
 export async function mutateCastTvLibrary<T>(
@@ -144,5 +292,31 @@ export async function mutateCastTvLibrary<T>(
   const current = await loadCastTvLibrary(supabase);
   const { state, result } = mutator(current);
   await saveCastTvLibrary(supabase, state);
+  return result;
+}
+
+export async function loadCastTvHeartbeats(
+  supabase: SupabaseClient
+): Promise<Record<string, CastTvHeartbeatRecord>> {
+  const stored = await downloadJsonObject(supabase, CAST_TV_HEARTBEATS_OBJECT_PATH);
+  return parseCastTvHeartbeats(stored);
+}
+
+export async function saveCastTvHeartbeats(
+  supabase: SupabaseClient,
+  heartbeats: Record<string, CastTvHeartbeatRecord>
+) {
+  await uploadJsonObject(supabase, CAST_TV_HEARTBEATS_OBJECT_PATH, heartbeats);
+}
+
+export async function mutateCastTvHeartbeats<T>(
+  supabase: SupabaseClient,
+  mutator: (
+    heartbeats: Record<string, CastTvHeartbeatRecord>
+  ) => { heartbeats: Record<string, CastTvHeartbeatRecord>; result: T }
+): Promise<T> {
+  const current = await loadCastTvHeartbeats(supabase);
+  const { heartbeats, result } = mutator(current);
+  await saveCastTvHeartbeats(supabase, heartbeats);
   return result;
 }

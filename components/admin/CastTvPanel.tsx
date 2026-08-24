@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { uploadCastTvMedia, replaceCastTvMedia } from "@/lib/cast-tv/upload-client";
-import { getBrowserSupabase } from "@/lib/supabase/browser";
 import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 import {
   CAST_TV_IMAGE_DURATION_OPTIONS,
@@ -135,22 +134,6 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       void loadData();
     }, 30_000);
     return () => window.clearInterval(timer);
-  }, [loadData]);
-
-  useEffect(() => {
-    const supabase = getBrowserSupabase();
-    if (!supabase) return;
-
-    const channel = supabase
-      .channel(`cast-tv-admin-media-${Date.now()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "cast_tv_media" }, () => {
-        void loadData();
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
   }, [loadData]);
 
   async function handleFiles(fileList: FileList | File[] | null) {
