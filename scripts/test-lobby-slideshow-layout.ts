@@ -47,6 +47,14 @@ assert.doesNotMatch(
   "social video must not scale past the frame and clip edges"
 );
 
+const assetImage = source("components/lobby/LobbyAssetImage.tsx");
+assert.match(assetImage, /if \(fill\) \{/);
+assert.doesNotMatch(
+  assetImage,
+  /fill=\{fill\}/,
+  "Next Image must not receive fill together with width and height"
+);
+
 assert.match(carousel, /social-video-poster object-contain/);
 assert.equal((carousel.match(/object-cover/g) ?? []).length, 0, "lobby social posters must not use object-cover");
 assert.ok(
