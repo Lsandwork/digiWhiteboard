@@ -41,6 +41,7 @@ assertObjectFitContain(css, ".lobby-idle-slideshow--tv .lobby-idle-slideshow__vi
 {
   const tvFrame = ruleBodiesForSelector(css, ".lobby-idle-slideshow--tv .lobby-idle-slideshow__frame").join("\n");
   assert.match(tvFrame, /aspect-ratio:\s*16\s*\/\s*9/, "TV idle slideshow frame must stay 16:9 so designed slides fill the card");
+  assert.match(tvFrame, /100cqw/, "TV idle slideshow frame must size from the available slot, not collapsed abs-positioned children");
   assert.doesNotMatch(tvFrame, /aspect-ratio:\s*auto/, "TV idle slideshow frame must not stretch into a crop box");
 }
 
