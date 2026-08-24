@@ -37,6 +37,19 @@ assertObjectFitContain(css, ".lobby-idle-slideshow__image");
 assertObjectFitContain(css, ".lobby-idle-slideshow__video");
 assertObjectFitContain(css, ".lobby-idle-slideshow--tv .lobby-idle-slideshow__image");
 assertObjectFitContain(css, ".lobby-idle-slideshow--tv .lobby-idle-slideshow__video");
+
+{
+  const tvFrame = ruleBodiesForSelector(css, ".lobby-idle-slideshow--tv .lobby-idle-slideshow__frame").join("\n");
+  assert.match(tvFrame, /aspect-ratio:\s*16\s*\/\s*9/, "TV idle slideshow frame must stay 16:9 so designed slides fill the card");
+  assert.doesNotMatch(tvFrame, /aspect-ratio:\s*auto/, "TV idle slideshow frame must not stretch into a crop box");
+}
+
+{
+  const tvShellRules = ruleBodiesForSelector(css, "html.lobby-tv-display .social-video-shell");
+  const tvShell = tvShellRules.join("\n");
+  assert.match(tvShell, /aspect-ratio:\s*9\s*\/\s*16/, "TV social frame must stay 9:16 so Instagram clips are not cropped");
+}
+
 assertObjectFitContain(css, ".social-video-layer");
 assertObjectFitContain(css, ".social-video-shell img");
 assertObjectFitContain(css, ".social-video");
