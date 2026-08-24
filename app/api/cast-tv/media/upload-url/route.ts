@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createCastTvSignedUpload } from "@/lib/cast-tv/media";
 import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getCastTvSupabase, CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS } from "@/lib/cast-tv/supabase";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = getServiceSupabase({ timeoutMs: 60_000 });
+    const supabase = getCastTvSupabase(CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS);
     const target = await createCastTvSignedUpload(supabase, { fileName, mimeType, fileSize });
     return NextResponse.json(target);
   }, "Unable to prepare CAST-TV upload.");

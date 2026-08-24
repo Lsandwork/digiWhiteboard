@@ -56,6 +56,7 @@ assert.equal(formFile?.name, "promo.jpg");
 assert.equal(formFile?.size, 3);
 assert.equal(asCastTvFormFile("not-a-file"), null);
 
+assert.match(castTvErrorMessage({ message: "AbortError: The user aborted a request." }, "fallback"), /timed out/);
 const abortError = new Error("This operation was aborted");
 abortError.name = "AbortError";
 assert.match(castTvErrorMessage(abortError, "fallback"), /timed out/);
@@ -77,6 +78,7 @@ assert.doesNotMatch(
 const apiAuth = readFileSync(join(root, "lib/cast-tv/api-auth.ts"), "utf8");
 assert.match(apiAuth, /canManageCastTv\(null, role\)/);
 assert.match(apiAuth, /getEffectiveAdminRole/);
+assert.match(apiAuth, /getCastTvSupabase/);
 assert.match(apiAuth, /Unable to authorize CAST-TV/);
 
 const uploadRoute = readFileSync(join(root, "app/api/cast-tv/media/upload/route.ts"), "utf8");
@@ -94,6 +96,14 @@ assert.match(uploadCompleteRoute, /convertStoredCastTvHeicIfNeeded/);
 
 const normalizeUpload = readFileSync(join(root, "lib/cast-tv/normalize-upload.ts"), "utf8");
 assert.doesNotMatch(normalizeUpload, /import sharp from/);
+
+const mediaRoute = readFileSync(join(root, "app/api/cast-tv/media/route.ts"), "utf8");
+assert.match(mediaRoute, /getCastTvSupabase/);
+assert.match(mediaRoute, /maxDuration = 60/);
+assert.match(mediaRoute, /castTvErrorMessage/);
+
+const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
+assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 30_000/);
 
 const nextConfig = readFileSync(join(root, "next.config.mjs"), "utf8");
 assert.match(nextConfig, /"sharp"/);

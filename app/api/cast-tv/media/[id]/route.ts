@@ -9,7 +9,7 @@ import {
 import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import type { CastTvImageDuration } from "@/lib/cast-tv/types";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getCastTvSupabase, CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS } from "@/lib/cast-tv/supabase";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,7 +32,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "Replace metadata is incomplete." }, { status: 400 });
       }
 
-      const supabase = getServiceSupabase({ timeoutMs: 60_000 });
+      const supabase = getCastTvSupabase(CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS);
       const converted = await convertStoredCastTvHeicIfNeeded(supabase, {
         fileName,
         mimeType,

@@ -21,6 +21,10 @@ import {
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
+function isMissingCastTvRelation(error: { code?: string } | null) {
+  return error?.code === "42P01" || error?.code === "PGRST205";
+}
+
 export const CAST_TV_BUCKET = "cast-tv-media";
 
 export {
@@ -100,7 +104,7 @@ export async function loadCastTvMedia(
 
   const { data, error } = await query;
   if (error) {
-    if (error.code === "42P01") return [];
+    if (isMissingCastTvRelation(error)) return [];
     throw error;
   }
 
@@ -180,7 +184,7 @@ export async function findDuplicateCastTvUpload(
     .eq("file_size_bytes", input.fileSize)
     .limit(25);
 
-  if (error && error.code !== "42P01") throw error;
+  if (error && !isMissingCastTvRelation(error)) throw error;
   const match = (data ?? []).find(
     (row) => String((row as { file_name?: string }).file_name ?? "").trim().toLowerCase() === normalizedName
   );
@@ -422,7 +426,20 @@ export async function loadCastTvSettings(supabase: SupabaseClient): Promise<Cast
     .eq("id", CAST_TV_SETTINGS_ID)
     .maybeSingle();
 
-  if (error && error.code !== "42P01") throw error;
+  if (error && isMissingCastTvRelation(error)) {
+    return {
+      id: CAST_TV_SETTINGS_ID,
+      default_image_seconds: 10,
+      transition_ms: 700,
+      transition_style: "fade",
+      object_fit: "contain",
+      show_standby_logo: true,
+      is_paused: false,
+      updated_at: new Date().toISOString(),
+      updated_by: null
+    };
+  }
+  if (error) throw error;
 
   if (data) return data as CastTvSettings;
 
@@ -505,7 +522,7 @@ export async function loadCastTvHeartbeat(
     .eq("screen_id", screenId)
     .maybeSingle();
 
-  if (error && error.code !== "42P01") throw error;
+  if (error && !isMissingCastTvRelation(error)) throw error;
   return data;
 }
 

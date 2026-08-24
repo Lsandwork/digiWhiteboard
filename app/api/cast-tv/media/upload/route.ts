@@ -4,7 +4,7 @@ import { asCastTvFormFile } from "@/lib/cast-tv/form-file";
 import { createCastTvMediaRecord, replaceCastTvMediaFile, uploadCastTvObject } from "@/lib/cast-tv/media";
 import { CAST_TV_SERVER_UPLOAD_MAX_BYTES } from "@/lib/cast-tv/mime";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getCastTvSupabase, CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS } from "@/lib/cast-tv/supabase";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const replaceId = form.get("replaceId") ? String(form.get("replaceId")).trim() : "";
     const { normalizeCastTvUploadBytes } = await import("@/lib/cast-tv/normalize-upload");
     const normalized = await normalizeCastTvUploadBytes(file);
-    const supabase = getServiceSupabase({ timeoutMs: 60_000 });
+    const supabase = getCastTvSupabase(CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS);
 
     await uploadCastTvObject(supabase, normalized.storagePath, normalized.buffer, normalized.mimeType);
 

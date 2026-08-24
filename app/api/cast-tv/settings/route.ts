@@ -2,14 +2,17 @@ import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { updateCastTvSettings, isCastTvOnline, loadCastTvHeartbeat, loadCastTvSettings } from "@/lib/cast-tv/media";
 import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
+import { castTvErrorMessage } from "@/lib/cast-tv/errors";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getCastTvSupabase();
     const settings = await loadCastTvSettings(supabase);
 
     const url = new URL(request.url);
@@ -37,7 +40,7 @@ export async function GET(request: Request) {
         : { screen_id: screenId, last_seen_at: null, online: false }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load CAST-TV settings.";
+    const message = castTvErrorMessage(error, "Unable to load CAST-TV settings.");
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { buildCastTvPlaylist, loadCastTvMedia } from "@/lib/cast-tv/media";
 import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
-import { getServiceSupabase } from "@/lib/supabase/server";
+import { castTvErrorMessage } from "@/lib/cast-tv/errors";
+import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   try {
@@ -13,10 +16,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ media, admin: true });
     }
 
-    const playlist = await buildCastTvPlaylist(getServiceSupabase());
+    const playlist = await buildCastTvPlaylist(getCastTvSupabase());
     return NextResponse.json({ playlist });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load CAST-TV media.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: castTvErrorMessage(error, "Unable to load CAST-TV media.") },
+      { status: 500 }
+    );
   }
 }

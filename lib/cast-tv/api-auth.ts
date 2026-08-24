@@ -5,8 +5,10 @@ import {
 } from "@/lib/admin/api-auth";
 import { type UserAccess } from "@/lib/admin/permissions";
 import { canManageCastTv } from "@/lib/cast-tv/permissions";
+import { castTvErrorMessage } from "@/lib/cast-tv/errors";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
+import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export type CastTvManager = {
@@ -17,7 +19,7 @@ export type CastTvManager = {
 
 export async function castTvActorAccess(request: Request) {
   const session = getAdminSessionFromRequest(request);
-  const supabase = getServiceSupabase();
+  const supabase = getCastTvSupabase();
   const role = getEffectiveAdminRole(request);
 
   if (canManageCastTv(null, role)) {
@@ -61,10 +63,7 @@ export async function requireCastTvManager(request: Request) {
 
     return manager;
   } catch (error) {
-    const message =
-      error instanceof Error && error.message.trim()
-        ? error.message
-        : "Unable to authorize CAST-TV.";
+    const message = castTvErrorMessage(error, "Unable to authorize CAST-TV.");
     return { error: Response.json({ error: message }, { status: 500 }) };
   }
 }
