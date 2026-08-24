@@ -1447,13 +1447,21 @@ html.staff-tv-display .fitdog-tv-stage--staff {
   background-color: #02060b;
 }
 
-/* Uniform 1920×1080 TV canvas — scales to fit any display without distortion */
+/* Uniform 1920×1080 TV canvas — scales to the *visible* viewport (Hi-Browser fullscreen). */
+html.fitdog-tv-active {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  --fitdog-tv-scale: min(100vw / 1920, 100vh / 1080);
+}
+
 html.fitdog-tv-active,
 html.fitdog-tv-active body {
   overflow: hidden;
   width: 100%;
   height: 100%;
   margin: 0;
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 .fitdog-tv-stage {
