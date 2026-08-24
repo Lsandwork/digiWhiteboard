@@ -8,10 +8,12 @@ import { LobbyScheduleCard } from "@/components/lobby/LobbyScheduleCard";
 
 export function LobbyClassSchedule({
   schedule = LOBBY_CLASS_SCHEDULE,
-  compact = false
+  compact = false,
+  band = false
 }: {
   schedule?: LobbyScheduleDay[];
   compact?: boolean;
+  band?: boolean;
 }) {
   const safeSchedule = Array.isArray(schedule)
     ? schedule.filter(
@@ -28,22 +30,24 @@ export function LobbyClassSchedule({
 
   return (
     <section
-      className={`lobby-panel lobby-class-schedule lobby-class-schedule--light${compact ? " lobby-class-schedule--compact" : ""}`}
+      className={`lobby-panel lobby-class-schedule lobby-class-schedule--light${compact ? " lobby-class-schedule--compact" : ""}${band ? " lobby-class-schedule--band" : ""}`}
     >
       <div className="relative z-10">
         <div className="lobby-class-schedule__heading">
           <Image src={lobbyLightAssets.calendarTeal} alt="" width={36} height={36} className="h-8 w-8 object-contain" unoptimized />
           <h3>Class Schedule</h3>
         </div>
-        <div className="lobby-class-schedule-grid grid grid-cols-5 gap-3">
+        <div className="lobby-class-schedule-grid">
           {days.map((entry) => (
             <LobbyScheduleCard key={entry.day} day={entry.day} classes={entry.classes} />
           ))}
         </div>
-        <p className="lobby-class-schedule__footer">
-          <Image src={lobbyLightAssets.pawOutlineTeal} alt="" width={20} height={20} className="h-4 w-4 object-contain" unoptimized />
-          Ask our team about class add-ons to make your pup&apos;s day even more exciting!
-        </p>
+        {band ? null : (
+          <p className="lobby-class-schedule__footer">
+            <Image src={lobbyLightAssets.pawOutlineTeal} alt="" width={20} height={20} className="h-4 w-4 object-contain" unoptimized />
+            Ask our team about class add-ons to make your pup&apos;s day even more exciting!
+          </p>
+        )}
       </div>
     </section>
   );

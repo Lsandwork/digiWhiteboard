@@ -76,4 +76,20 @@ assert.ok(
   "lobby social posters and fallbacks must use object-contain"
 );
 
+const board = source("components/lobby/LobbyCheckoutBoard.tsx");
+assert.doesNotMatch(board, /LobbyValuesFooter/);
+assert.doesNotMatch(board, /Safe, Loving Environment/);
+assert.match(board, /LobbyClassSchedule band/);
+assert.ok(
+  board.indexOf("lobby-main-grid") < board.indexOf("LobbyClassSchedule band"),
+  "class schedule must sit below the main slideshow/social grid"
+);
+
+{
+  const band = ruleBodiesForSelector(css, ".lobby-class-schedule--band").join("\n");
+  assert.match(band, /flex-shrink:\s*0|flex:\s*0 0 auto/);
+}
+
+assert.match(css, /\.lobby-class-schedule--band \.lobby-class-schedule__footer/);
+
 console.log("lobby slideshow layout tests passed");
