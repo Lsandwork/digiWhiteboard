@@ -14,6 +14,8 @@ import {
   validateCastTvUpload
 } from "../lib/cast-tv/mime";
 import { normalizeCastTvUploadBytes } from "../lib/cast-tv/normalize-upload";
+import { parseCastTvLibrary, emptyCastTvLibrary } from "../lib/cast-tv/library-store";
+import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 
 assert.equal(inferCastTvMimeType("promo.jpg", ""), "image/jpeg");
 assert.equal(inferCastTvMimeType("promo.JPG", "application/octet-stream"), "image/jpeg");
@@ -49,6 +51,28 @@ assert.equal(
   true,
   "marketing RBAC access can manage CAST-TV without a legacy role string"
 );
+
+const parsedLibrary = parseCastTvLibrary({
+  media: [
+    {
+      id: "slide-1",
+      file_name: "yard.jpg",
+      storage_path: "cast-tv/slide-1.jpg",
+      public_url: "https://cdn.example/yard.jpg",
+      media_type: "image",
+      image_display_seconds: 10,
+      display_order: 1,
+      is_enabled: true,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z"
+    }
+  ]
+});
+assert.equal(parsedLibrary.media.length, 1);
+assert.equal(parsedLibrary.media[0].file_name, "yard.jpg");
+assert.equal(mediaRecordToPlaylistItem(parsedLibrary.media[0]).src, "https://cdn.example/yard.jpg");
+assert.equal(parseCastTvLibrary(null).media.length, 0);
+assert.equal(emptyCastTvLibrary().settings.default_image_seconds, 10);
 
 const file = new File([new Uint8Array([1, 2, 3])], "promo.jpg", { type: "image/jpeg" });
 const formFile = asCastTvFormFile(file);
@@ -103,7 +127,7 @@ assert.match(mediaRoute, /maxDuration = 60/);
 assert.match(mediaRoute, /castTvErrorMessage/);
 
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
-assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 30_000/);
+assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 20_000/);
 
 const nextConfig = readFileSync(join(root, "next.config.mjs"), "utf8");
 assert.match(nextConfig, /"sharp"/);
@@ -113,9 +137,10 @@ assert.match(migration, /image\/heic/);
 assert.match(migration, /cast_tv_media_signed_insert/);
 
 const media = readFileSync(join(root, "lib/cast-tv/media.ts"), "utf8");
-assert.match(media, /ensureCastTvBucket/);
-assert.match(media, /Bucket probe failed/);
-assert.doesNotMatch(media, /\.maybeSingle\(\);\s*\n\s*if \(error && error\.code !== "42P01"\) throw error;\s*\n\s*return \(data as CastTvMediaRecord \| null\)/);
+assert.match(media, /lobby-slideshow/);
+assert.match(media, /loadCastTvLibrary/);
+assert.match(media, /mutateCastTvLibrary/);
+assert.doesNotMatch(media, /\.from\("cast_tv_media"\)/);
 
 console.log("cast-tv upload tests passed");
 
@@ -136,7 +161,7 @@ async function testJpegIngest() {
   });
   assert.equal(normalized.mimeType, "image/jpeg");
   assert.equal(normalized.mediaType, "image");
-  assert.match(normalized.storagePath, /^media\/.+\.jpg$/);
+  assert.match(normalized.storagePath, /^cast-tv\/.+\.jpg$/);
   assert.ok(normalized.fileSize > 0);
 }
 
