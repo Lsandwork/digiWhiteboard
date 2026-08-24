@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { TabErrorBoundary } from "@/components/admin/TabErrorBoundary";
+import { defaultLobbySettings } from "@/lib/lobby/settings";
+import { defaultStaffSettings } from "@/lib/staff/settings";
 import { AdminShell } from "@/components/admin/AdminShell";
 import { StatusCards } from "@/components/admin/StatusCards";
 import { BoardSettings } from "@/components/admin/BoardSettings";
@@ -70,6 +73,7 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
+import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
 import { navigateAdminDashboard, useAdminDashboardLocation } from "@/lib/admin/dashboard-nav";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
 import { broadcastCastHardReload } from "@/lib/lobby/google-cast";
@@ -119,24 +123,88 @@ const defaultStaff: StaffBoardSettings = {
   published_by: null
 };
 
+type SessionBootstrap = {
+  authenticated?: boolean;
+  username?: string | null;
+  adminUserId?: string | null;
+  role?: string | null;
+  isDemo?: boolean;
+  demoRole?: string | null;
+  mustChangePassword?: boolean;
+  access?: UserAccess | null;
+};
+
+function bootstrapDashboardPayload(session: SessionBootstrap, board: AdminBoardType): DashboardPayload {
+  return {
+    board,
+    username: session.username ?? "admin",
+    fullName: null,
+    session: {
+      email: session.username ?? "admin",
+      adminUserId: session.adminUserId ?? undefined,
+      role: session.role ?? undefined,
+      isDemo: session.isDemo ?? false,
+      demoRole: session.demoRole ?? undefined,
+      mustChangePassword: session.mustChangePassword ?? false,
+      access: session.access ?? null
+    } as DashboardPayload["session"],
+    admin_settings: DEFAULT_ADMIN_SETTINGS,
+    lobby_settings: {
+      ...defaultLobbySettings,
+      class_schedule: defaultLobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE,
+      published_version: defaultLobbySettings.published_version ?? "v1.0.0",
+      published_at: defaultLobbySettings.published_at ?? null,
+      published_by: defaultLobbySettings.published_by ?? null
+    },
+    staff_settings: defaultStaffSettings,
+    promotions: [],
+    active_checkouts: 0,
+    lobby_checkouts_count: 0,
+    sync_status: "degraded",
+    last_synced_at: null,
+    data_source: "Session",
+    webhook_url: "",
+    events: [],
+    failed_events: [],
+    staff_dogs: []
+  } as DashboardPayload;
+}
+
+function useSavedAgoLabel(savedAt: Date | null) {
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => {
+    if (!savedAt) return;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [savedAt]);
+  if (!savedAt) return "All changes saved";
+  const seconds = Math.max(1, Math.round(((nowMs || savedAt.getTime()) - savedAt.getTime()) / 1000));
+  return `All changes saved • Last saved ${seconds}s ago`;
+}
+
 export function AdminDashboard() {
   const location = useAdminDashboardLocation();
   const { showToast } = useToast();
 
-  const [data, setData] = useState<DashboardPayload | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardPayload | null>(null);
+  const [sessionBootstrap, setSessionBootstrap] = useState<SessionBootstrap | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [castRefreshing, setCastRefreshing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  const [currentTimeMs, setCurrentTimeMs] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmResetBoard, setConfirmResetBoard] = useState(false);
   const [navOverride, setNavOverride] = useState<{ board: AdminBoardType; tab: AdminTab } | null>(null);
+  const dashboardAbortRef = useRef<AbortController | null>(null);
+  const hydrateAbortRef = useRef<AbortController | null>(null);
 
   const board = navOverride?.board ?? location.board;
   const tab = navOverride?.tab ?? location.tab ?? "my_shift";
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
   const hrConsultRecordId = location.extra.record ?? null;
 
   useEffect(() => {
@@ -161,23 +229,92 @@ export function AdminDashboard() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setBusy(true);
     else setRefreshing(true);
-    setError(null);
+    if (!silent) setError(null);
+    dashboardAbortRef.current?.abort();
+    hydrateAbortRef.current?.abort();
     const controller = new AbortController();
+    dashboardAbortRef.current = controller;
     const timeout = window.setTimeout(() => controller.abort(), 12_000);
     try {
-      const response = await fetch(`/api/admin/dashboard?board=${board}`, {
-        cache: "no-store",
-        credentials: "same-origin",
-        signal: controller.signal
-      });
+      const response = await fetch(
+        `/api/admin/dashboard?board=${encodeURIComponent(board)}&tab=${encodeURIComponent(tabRef.current)}`,
+        {
+          cache: "no-store",
+          credentials: "same-origin",
+          signal: controller.signal
+        }
+      );
       if (response.status === 401) {
         window.location.assign("/admin/login");
         return;
       }
       const body = await readResponseJson<{ error?: string } & DashboardPayload>(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load admin dashboard.");
-      setData(body as DashboardPayload);
+      const tabForFetch = tabRef.current;
+      const liteSettings = skipSettingsAndAccess(tabForFetch);
+      const liteWidgets = skipHeavyBoardWidgets(board, tabForFetch);
+      const next = body as DashboardPayload;
+      setDashboardData((current) => {
+        if (!current || (!liteSettings && !liteWidgets)) return next;
+        return {
+          ...next,
+          ...(liteSettings
+            ? {
+                admin_settings: current.admin_settings ?? next.admin_settings,
+                lobby_settings: current.lobby_settings,
+                staff_settings: current.staff_settings,
+                session: next.session
+                  ? {
+                      ...next.session,
+                      access:
+                        (current.session as { access?: UserAccess | null } | undefined)?.access ??
+                        (next.session as { access?: UserAccess | null } | undefined)?.access
+                    }
+                  : current.session
+              }
+            : {}),
+          ...(liteWidgets
+            ? {
+                promotions: current.promotions.length ? current.promotions : next.promotions,
+                events: current.events.length ? current.events : next.events,
+                failed_events: current.failed_events.length ? current.failed_events : next.failed_events,
+                staff_dogs: current.staff_dogs.length ? current.staff_dogs : next.staff_dogs,
+                active_checkouts: current.active_checkouts || next.active_checkouts,
+                lobby_checkouts_count: current.lobby_checkouts_count || next.lobby_checkouts_count,
+                sync_status: current.sync_status !== "degraded" ? current.sync_status : next.sync_status,
+                last_synced_at: current.last_synced_at ?? next.last_synced_at,
+                data_source: current.data_source !== "Session" ? current.data_source : next.data_source,
+                webhook_url: current.webhook_url || next.webhook_url
+              }
+            : {})
+        };
+      });
+      setError(null);
+      if (liteSettings || liteWidgets) {
+        hydrateAbortRef.current?.abort();
+        const hydrateController = new AbortController();
+        hydrateAbortRef.current = hydrateController;
+        const hydrateTimeout = window.setTimeout(() => hydrateController.abort(), 12_000);
+        void fetch(`/api/admin/dashboard?board=${encodeURIComponent(board)}`, {
+          cache: "no-store",
+          credentials: "same-origin",
+          signal: hydrateController.signal
+        })
+          .then(async (hydrateResponse) => {
+            if (hydrateResponse.status === 401) {
+              window.location.assign("/admin/login");
+              return;
+            }
+            if (!hydrateResponse.ok || hydrateAbortRef.current !== hydrateController) return;
+            const hydrateBody = await readResponseJson<DashboardPayload>(hydrateResponse);
+            if (hydrateAbortRef.current !== hydrateController) return;
+            setDashboardData(hydrateBody);
+          })
+          .catch(() => undefined)
+          .finally(() => window.clearTimeout(hydrateTimeout));
+      }
     } catch (loadError) {
+      if (controller.signal.aborted && dashboardAbortRef.current !== controller) return;
       const aborted = loadError instanceof DOMException && loadError.name === "AbortError";
       setError(
         aborted
@@ -186,10 +323,36 @@ export function AdminDashboard() {
       );
     } finally {
       window.clearTimeout(timeout);
-      setBusy(false);
-      setRefreshing(false);
+      if (dashboardAbortRef.current === controller) {
+        setBusy(false);
+        setRefreshing(false);
+      }
     }
   }, [board]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/admin/session", {
+          cache: "no-store",
+          credentials: "same-origin"
+        });
+        if (response.status === 401) {
+          window.location.assign("/admin/login");
+          return;
+        }
+        const body = await readResponseJson<SessionBootstrap>(response);
+        if (!cancelled && response.ok) setSessionBootstrap(body);
+      } catch {
+        // Dashboard fetch still runs; cookie session is enough to paint tabs.
+      }
+    }
+    void loadSession();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function goToBoardTab(nextBoard: AdminBoardType, nextTab: AdminTab, extra?: Record<string, string>) {
     setNavOverride({ board: nextBoard, tab: nextTab });
@@ -204,23 +367,38 @@ export function AdminDashboard() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  useEffect(() => {
-    const initial = window.setTimeout(() => setCurrentTimeMs(Date.now()), 0);
-    const timer = window.setInterval(() => setCurrentTimeMs(Date.now()), 1000);
-    return () => {
-      window.clearTimeout(initial);
-      window.clearInterval(timer);
-    };
-  }, []);
+  const savedLabel = useSavedAgoLabel(lastSavedAt);
 
   useEffect(() => {
-    const session = data?.session as { role?: string; isDemo?: boolean; demoRole?: string; access?: UserAccess | null; adminUserId?: string } | undefined;
-    if (!session) return;
+    const session = dashboardData?.session as
+      | { role?: string; isDemo?: boolean; demoRole?: string; access?: UserAccess | null; adminUserId?: string }
+      | undefined;
+    const bootstrapSession = sessionBootstrap
+      ? {
+          email: sessionBootstrap.username ?? "",
+          role: sessionBootstrap.role ?? undefined,
+          isDemo: sessionBootstrap.isDemo,
+          demoRole: sessionBootstrap.demoRole ?? undefined,
+          access: sessionBootstrap.access,
+          adminUserId: sessionBootstrap.adminUserId ?? undefined
+        }
+      : null;
+    const resolved = session ?? bootstrapSession;
+    if (!resolved) return;
 
-    const isDemo = Boolean(session.isDemo);
-    const effectiveRole = isDemo ? getEffectiveDemoRole({ email: data?.username ?? "", ...session }) : session.role;
-    const access = session.access
-      ?? accessFromLegacyRole(session.adminUserId ?? null, data?.username ?? null, effectiveRole);
+    const isDemo = Boolean(resolved.isDemo);
+    const username = dashboardData?.username ?? sessionBootstrap?.username ?? "";
+    const effectiveRole = isDemo
+      ? getEffectiveDemoRole({
+          email: username,
+          role: resolved.role,
+          isDemo: resolved.isDemo,
+          demoRole: resolved.demoRole ?? undefined,
+          adminUserId: resolved.adminUserId
+        })
+      : resolved.role;
+    const access =
+      resolved.access ?? accessFromLegacyRole(resolved.adminUserId ?? null, username || null, effectiveRole);
     const staffOnly = !isDemo && isStaffDigiBoardOnlyLegacyRole(effectiveRole);
     const marketingAccount = !isDemo && isLobbyDigiBoardOnlyLegacyRole(effectiveRole);
     const effectiveBoard = staffOnly ? "staff" : board;
@@ -271,19 +449,13 @@ export function AdminDashboard() {
     }
     // Do not bounce known tabs to My Shift. A false-negative permission check
     // was sending every role there after a click; forbidden tools fail at the API.
-  }, [board, data?.session, data?.username, location.tab, navOverride, tab]);
+  }, [board, dashboardData?.session, dashboardData?.username, location.tab, navOverride, sessionBootstrap, tab]);
 
   useEffect(() => {
     if (board === "staff" && tab === "users") {
       goToBoardTab("lobby", "users");
     }
   }, [board, tab]);
-
-  const savedLabel = useMemo(() => {
-    if (!lastSavedAt) return "All changes saved";
-    const seconds = Math.max(1, Math.round(((currentTimeMs || lastSavedAt.getTime()) - lastSavedAt.getTime()) / 1000));
-    return `All changes saved • Last saved ${seconds}s ago`;
-  }, [currentTimeMs, lastSavedAt]);
 
   function setBoard(nextBoard: AdminBoardType) {
     let nextTab: AdminTab = tab;
@@ -398,7 +570,7 @@ export function AdminDashboard() {
   }
 
   function openBoard() {
-    const isDemo = Boolean((data?.session as { isDemo?: boolean } | undefined)?.isDemo);
+    const isDemo = Boolean((dashboardData?.session as { isDemo?: boolean } | undefined)?.isDemo);
     const url = isDemo
       ? "/demo/board"
       : board === "marketing"
@@ -409,7 +581,9 @@ export function AdminDashboard() {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 
-  if (!data) {
+  const displayData = dashboardData ?? (sessionBootstrap ? bootstrapDashboardPayload(sessionBootstrap, board) : null);
+
+  if (!displayData) {
     return (
       <main className="admin-theme grid min-h-screen place-items-center p-6 text-white">
         {error ? (
@@ -420,11 +594,13 @@ export function AdminDashboard() {
             </button>
           </div>
         ) : (
-          <p>Loading admin dashboard…</p>
+          <p>Signing you in…</p>
         )}
       </main>
     );
   }
+
+  const data = displayData;
 
   const lobbySettings = data.lobby_settings;
   const staffSettings = data.staff_settings ?? defaultStaff;
@@ -542,7 +718,15 @@ export function AdminDashboard() {
         preview={preview}
         showPreview={showPreview && !isStaffOverview && !isDemo && canSeeAdminUtilities && board !== "marketing"}
       >
-        {error ? <p className="admin-error">{error}</p> : null}
+        {error ? (
+          <p className="admin-error">
+            {error}{" "}
+            <button type="button" className="admin-btn-secondary ml-2" onClick={() => void load()}>
+              Retry
+            </button>
+          </p>
+        ) : null}
+        <TabErrorBoundary tab={tab}>
 
         {showRoleHubNav ? (
           <SuperAdminNestedReturnBar tab={tab} onNavigate={(nextTab) => setActiveTab(nextTab)} />
@@ -818,7 +1002,7 @@ export function AdminDashboard() {
               settings={adminSettings}
               lastSyncedAt={data.last_synced_at}
               dataSource={data.data_source}
-              onSaved={(settings) => setData({ ...data, admin_settings: settings })}
+              onSaved={(settings) => setDashboardData({ ...data, admin_settings: settings })}
               onRefresh={() => load(true)}
               onResetBoard={() => resetSettings()}
               canViewUserGroupsPermissions={canViewUserGroupsPermissions}
@@ -849,6 +1033,7 @@ export function AdminDashboard() {
             }}
           />
         ) : null}
+        </TabErrorBoundary>
       </AdminShell>
 
       <PreviewModal

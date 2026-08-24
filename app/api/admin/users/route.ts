@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
@@ -10,6 +10,7 @@ import { canAssignPrimaryRole, canCreateAdminUsers } from "@/lib/admin/user-crea
 import { loadAdminSettings } from "@/lib/admin/settings";
 import {
   getUserAccess,
+  getUserAccessMap,
   migrateLegacyUserAccess,
   roleKeyToLegacyRole,
   setUserAccess
@@ -24,6 +25,7 @@ import {
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 15;
 
 function parseRoleKeys(values: unknown): RoleKey[] {
   if (!Array.isArray(values)) return [];
@@ -43,19 +45,20 @@ export async function GET(request: Request) {
   if (!isAdminRequest(request)) return unauthorizedAdminResponse();
 
   const session = getAdminSessionFromRequest(request);
-  const supabase = getServiceSupabase();
-  await migrateLegacyUserAccess(supabase).catch(() => undefined);
+  const supabase = getServiceSupabase({ timeoutMs: 8_000 });
+  after(() => {
+    void migrateLegacyUserAccess(supabase).catch(() => undefined);
+  });
 
   const users = await listAdminUsers(supabase);
-  const enriched = await Promise.all(
-    users.map(async (user) => ({
-      ...user,
-      access: await getUserAccess(supabase, user.id, user.role, user.email)
-    }))
-  );
+  const accessMap = await getUserAccessMap(supabase, users);
+  const enriched = users.map((user) => ({
+    ...user,
+    access: accessMap[user.id]
+  }));
 
   const actorAccess = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+    ? accessMap[session.adminUserId] ?? null
     : null;
 
   return NextResponse.json({

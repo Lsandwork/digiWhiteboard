@@ -173,7 +173,6 @@ export async function listMediaLibrary(
   const page = Math.max(1, Number(filters.page || 1));
   const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize || MEDIA_LIBRARY_PAGE_SIZE)));
   const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
   const canDownload = canDownloadPhotoUploads(options.access, options.role);
   const mediaType = (filters.mediaType || "all") as MediaTypeFilter;
   const q = String(filters.q || "").trim();
@@ -190,13 +189,12 @@ export async function listMediaLibrary(
       created_at, updated_at, uploaded_to_gingr_at, uploaded_to_gingr_by,
       media_kind, duration_seconds, uploaded_by, uploaded_by_name,
       photo_upload_batches!inner(service_date, batch_name, created_by_name, photographer_name)
-    `,
-      { count: "exact" }
+    `
     )
     .neq("status", "failed")
     .neq("status", "excluded")
     .order("created_at", { ascending: false })
-    .range(from, to);
+    .range(from, from + pageSize);
 
   if (mediaType === "photos") query = query.eq("media_kind", "photo");
   if (mediaType === "videos") query = query.eq("media_kind", "video");
@@ -204,11 +202,13 @@ export async function listMediaLibrary(
   if (range.gte) query = query.gte("created_at", range.gte);
   if (range.lt) query = query.lt("created_at", range.lt);
 
-  const { data, error, count } = await query;
+  const { data, error } = await query;
   if (error) throw new Error(error.message || "Unable to load media library.");
 
-  const items = (data ?? []).map((row) => mapLibraryItem(row as Record<string, unknown>, canDownload));
-  const total = count ?? items.length;
+  const fetched = (data ?? []).map((row) => mapLibraryItem(row as Record<string, unknown>, canDownload));
+  const hasMore = fetched.length > pageSize;
+  const items = hasMore ? fetched.slice(0, pageSize) : fetched;
+  const total = from + items.length + (hasMore ? 1 : 0);
 
   return {
     items,
