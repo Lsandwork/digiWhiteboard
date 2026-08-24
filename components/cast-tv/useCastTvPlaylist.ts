@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getBrowserSupabase } from "@/lib/supabase/browser";
 import {
   CAST_TV_HEARTBEAT_MS,
   CAST_TV_POLL_MS,
@@ -106,52 +105,6 @@ export function useCastTvPlaylist(screenId = "default") {
       window.clearInterval(heartbeatTimer);
     };
   }, [refresh, sendHeartbeat]);
-
-  useEffect(() => {
-    const supabase = getBrowserSupabase();
-    if (!supabase) return;
-
-    let mediaChannel: ReturnType<typeof supabase.channel> | null = null;
-    let settingsChannel: ReturnType<typeof supabase.channel> | null = null;
-    let reconnectTimer: number | null = null;
-    let cancelled = false;
-
-    const subscribe = () => {
-      if (cancelled) return;
-
-      mediaChannel = supabase
-        .channel(`cast-tv-media-${screenId}-${Date.now()}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "cast_tv_media" }, () => {
-          void refresh();
-        })
-        .subscribe();
-
-      settingsChannel = supabase
-        .channel(`cast-tv-settings-${screenId}-${Date.now()}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "cast_tv_settings" }, () => {
-          void refresh();
-        })
-        .subscribe((status) => {
-          if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-            if (reconnectTimer) window.clearTimeout(reconnectTimer);
-            reconnectTimer = window.setTimeout(() => {
-              if (mediaChannel) void supabase.removeChannel(mediaChannel);
-              if (settingsChannel) void supabase.removeChannel(settingsChannel);
-              subscribe();
-            }, 10_000);
-          }
-        });
-    };
-
-    subscribe();
-
-    return () => {
-      cancelled = true;
-      if (reconnectTimer) window.clearTimeout(reconnectTimer);
-      if (mediaChannel) void supabase.removeChannel(mediaChannel);
-      if (settingsChannel) void supabase.removeChannel(settingsChannel);
-    };
-  }, [refresh, screenId]);
 
   const advance = useCallback(() => {
     setPlaylist((items) => {

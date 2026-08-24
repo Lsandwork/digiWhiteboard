@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       uploadedByName: auth.session?.email ?? null
     });
 
-    await writeAdminAuditLog({
+    void writeAdminAuditLog({
       actorAdminId: auth.session?.adminUserId,
       actorEmail: auth.session?.email,
       action: "cast_tv.media.uploaded",

@@ -146,31 +146,17 @@ export async function probeCloudStorage(supabase: Supabase): Promise<StorageProb
     });
   }
 
-  // Functional evidence: recent media metadata rows (binaries may be older)
+  // Functional evidence: recent CAST-TV objects in storage (Postgres media tables hang).
   let recentMediaAt: string | null = null;
   try {
-    const [castTv, photos] = await Promise.all([
-      supabase
-        .from("cast_tv_media")
-        .select("created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("photo_upload_items")
-        .select("created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    ]);
-    const times = [castTv.data?.created_at, photos.data?.created_at]
-      .filter(Boolean)
-      .map((t) => String(t));
-    if (times.length) {
-      recentMediaAt = times.sort().reverse()[0] ?? null;
-    }
+    const { data } = await supabase.storage.from(CAST_TV_BUCKET).list("cast-tv", {
+      limit: 5,
+      sortBy: { column: "updated_at", order: "desc" }
+    });
+    const stamp = data?.find((row) => row.updated_at || row.created_at);
+    recentMediaAt = stamp?.updated_at || stamp?.created_at || null;
   } catch {
-    /* optional tables */
+    /* optional */
   }
 
   const critical = buckets.filter((b) => b.critical);

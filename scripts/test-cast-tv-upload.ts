@@ -14,7 +14,12 @@ import {
   validateCastTvUpload
 } from "../lib/cast-tv/mime";
 import { normalizeCastTvUploadBytes } from "../lib/cast-tv/normalize-upload";
-import { parseCastTvLibrary, emptyCastTvLibrary } from "../lib/cast-tv/library-store";
+import {
+  emptyCastTvLibrary,
+  isMissingCastTvStorageObject,
+  mergeCastTvStorageObjects,
+  parseCastTvLibrary
+} from "../lib/cast-tv/library-store";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 
 assert.equal(inferCastTvMimeType("promo.jpg", ""), "image/jpeg");
@@ -73,6 +78,21 @@ assert.equal(parsedLibrary.media[0].file_name, "yard.jpg");
 assert.equal(mediaRecordToPlaylistItem(parsedLibrary.media[0]).src, "https://cdn.example/yard.jpg");
 assert.equal(parseCastTvLibrary(null).media.length, 0);
 assert.equal(emptyCastTvLibrary().settings.default_image_seconds, 10);
+assert.equal(isMissingCastTvStorageObject({ statusCode: "404", message: "Object not found" }), true);
+assert.equal(isMissingCastTvStorageObject({ statusCode: "403", message: "Unauthorized" }), false);
+
+const recovered = mergeCastTvStorageObjects(
+  emptyCastTvLibrary(),
+  [{ name: "slide-9.jpg", created_at: "2026-01-02T00:00:00.000Z", metadata: { size: 12, mimetype: "image/jpeg" } }],
+  (path) => `https://cdn.example/${path}`
+);
+assert.equal(recovered.added, 1);
+assert.equal(recovered.library.media[0].storage_path, "cast-tv/slide-9.jpg");
+assert.match(recovered.library.media[0].public_url, /cast-tv\/slide-9\.jpg/);
+assert.equal(
+  mergeCastTvStorageObjects(recovered.library, [{ name: "library.json" }], () => "").added,
+  0
+);
 
 const file = new File([new Uint8Array([1, 2, 3])], "promo.jpg", { type: "image/jpeg" });
 const formFile = asCastTvFormFile(file);
@@ -127,7 +147,7 @@ assert.match(mediaRoute, /maxDuration = 60/);
 assert.match(mediaRoute, /castTvErrorMessage/);
 
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
-assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 20_000/);
+assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 15_000/);
 
 const nextConfig = readFileSync(join(root, "next.config.mjs"), "utf8");
 assert.match(nextConfig, /"sharp"/);
@@ -137,10 +157,32 @@ assert.match(migration, /image\/heic/);
 assert.match(migration, /cast_tv_media_signed_insert/);
 
 const media = readFileSync(join(root, "lib/cast-tv/media.ts"), "utf8");
-assert.match(media, /lobby-slideshow/);
+assert.match(media, /CAST_TV_STORAGE_BUCKET/);
 assert.match(media, /loadCastTvLibrary/);
 assert.match(media, /mutateCastTvLibrary/);
+assert.match(media, /mutateCastTvHeartbeats/);
 assert.doesNotMatch(media, /\.from\("cast_tv_media"\)/);
+
+const libraryStore = readFileSync(join(root, "lib/cast-tv/library-store.ts"), "utf8");
+assert.match(libraryStore, /cast-tv\/library\.json/);
+assert.match(libraryStore, /CAST_TV_STORAGE_BUCKET = "lobby-slideshow"/);
+assert.match(libraryStore, /\.download\(/);
+assert.match(libraryStore, /JSON_UPLOAD_MIME/);
+assert.doesNotMatch(libraryStore, /loadAdminSettingsJsonKey/);
+assert.doesNotMatch(libraryStore, /settings-json-store/);
+
+const storageProbe = readFileSync(join(root, "lib/system-health/probes/storage.ts"), "utf8");
+assert.doesNotMatch(storageProbe, /\.from\("cast_tv_media"\)/);
+assert.match(storageProbe, /list\("cast-tv"/);
+
+const panel = readFileSync(join(root, "components/admin/CastTvPanel.tsx"), "utf8");
+assert.doesNotMatch(panel, /postgres_changes/);
+const tvPlayer = readFileSync(join(root, "components/cast-tv/useCastTvPlaylist.ts"), "utf8");
+assert.doesNotMatch(tvPlayer, /postgres_changes/);
+
+const libraryMigration = readFileSync(join(root, "supabase/migrations/088_cast_tv_library_storage.sql"), "utf8");
+assert.match(libraryMigration, /application\/json/);
+assert.match(libraryMigration, /lobby-slideshow/);
 
 console.log("cast-tv upload tests passed");
 
