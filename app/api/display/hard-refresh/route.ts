@@ -3,6 +3,8 @@ import { loadCastHardReloadNonce } from "@/lib/display-sync-server";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 10;
 
 const NO_STORE = {
   "cache-control": "no-store, no-cache, must-revalidate, max-age=0",

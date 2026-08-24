@@ -20,7 +20,8 @@ import {
   isMissingCastTvStorageObject,
   mergeCastTvLibraries,
   mergeCastTvStorageObjects,
-  parseCastTvLibrary
+  parseCastTvLibrary,
+  parseCastTvRefreshNonce
 } from "../lib/cast-tv/library-store";
 import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
@@ -81,6 +82,13 @@ assert.equal(parsedLibrary.media[0].file_name, "yard.jpg");
 assert.equal(mediaRecordToPlaylistItem(parsedLibrary.media[0]).src, "https://cdn.example/yard.jpg");
 assert.equal(parseCastTvLibrary(null).media.length, 0);
 assert.equal(emptyCastTvLibrary().settings.default_image_seconds, 10);
+assert.equal(parseCastTvRefreshNonce({ nonce: 42 }), 42);
+assert.equal(parseCastTvRefreshNonce({ nonce: -3 }), 0);
+assert.equal(parseCastTvRefreshNonce(null), 0);
+assert.equal(
+  mergeCastTvStorageObjects(emptyCastTvLibrary(), [{ name: "refresh.json" }], () => "").added,
+  0
+);
 assert.equal(isMissingCastTvStorageObject({ statusCode: "404", message: "Object not found" }), true);
 assert.equal(isMissingCastTvStorageObject({ statusCode: "403", message: "Unauthorized" }), false);
 
@@ -176,6 +184,10 @@ assert.match(mediaRoute, /playlist/);
 assert.match(mediaRoute, /admin: true/);
 assert.doesNotMatch(mediaRoute, /buildCastTvPlaylist/);
 
+const settingsRoute = readFileSync(join(root, "app/api/cast-tv/settings/route.ts"), "utf8");
+assert.match(settingsRoute, /castHardReloadNonce/);
+assert.match(settingsRoute, /loadCastHardReloadNonce/);
+
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
 assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 15_000/);
 
@@ -201,6 +213,8 @@ assert.match(libraryStore, /CAST_TV_LAST_GOOD_CACHE_KEY/);
 assert.match(libraryStore, /builtinMarketingCastTvMedia/);
 assert.match(libraryStore, /loadLegacySettingsLibrary/);
 assert.match(libraryStore, /withTimeoutFallback/);
+assert.match(libraryStore, /cast-tv\/refresh\.json/);
+assert.match(libraryStore, /CAST_TV_STORAGE_BUCKET = "lobby-slideshow"/);
 assert.match(libraryStore, /\.download\(/);
 assert.match(libraryStore, /JSON_UPLOAD_MIME/);
 
@@ -213,6 +227,9 @@ assert.doesNotMatch(panel, /postgres_changes/);
 const tvPlayer = readFileSync(join(root, "components/cast-tv/useCastTvPlaylist.ts"), "utf8");
 assert.doesNotMatch(tvPlayer, /postgres_changes/);
 assert.match(tvPlayer, /currentIdRef\.current/);
+assert.match(tvPlayer, /visitPageAsNewNavigation/);
+assert.match(tvPlayer, /TV_HARD_REFRESH_ENDPOINT/);
+assert.match(tvPlayer, /castHardReloadNonce/);
 
 const libraryMigration = readFileSync(join(root, "supabase/migrations/088_cast_tv_library_storage.sql"), "utf8");
 assert.match(libraryMigration, /application\/json/);

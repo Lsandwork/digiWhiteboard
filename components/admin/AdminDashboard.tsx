@@ -226,10 +226,10 @@ export function AdminDashboard() {
     }
   }, [location.rawBoard, location.tab]);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (silent = false, options?: { suppressError?: boolean }) => {
     if (!silent) setBusy(true);
     else setRefreshing(true);
-    if (!silent) setError(null);
+    if (!options?.suppressError && !silent) setError(null);
     dashboardAbortRef.current?.abort();
     hydrateAbortRef.current?.abort();
     const controller = new AbortController();
@@ -315,6 +315,7 @@ export function AdminDashboard() {
       }
     } catch (loadError) {
       if (controller.signal.aborted && dashboardAbortRef.current !== controller) return;
+      if (options?.suppressError) return;
       const aborted = loadError instanceof DOMException && loadError.name === "AbortError";
       setError(
         aborted
@@ -526,19 +527,27 @@ export function AdminDashboard() {
     setRefreshing(true);
     try {
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 8_000);
-      const response = await fetch("/api/admin/refresh", { method: "POST", signal: controller.signal });
+      const timeout = window.setTimeout(() => controller.abort(), 10_000);
+      const response = await fetch("/api/admin/refresh", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        signal: controller.signal
+      });
       window.clearTimeout(timeout);
-      const body = await readResponseJson<{ ok?: boolean; delayed?: boolean }>(response).catch(
-        () => ({ ok: false, delayed: true })
-      );
+      const body = await readResponseJson<{
+        ok?: boolean;
+        delayed?: boolean;
+        cast_hard_reload_nonce?: number;
+      }>(response).catch(() => ({ ok: false, delayed: true }));
       if (!response.ok && !body.ok) throw new Error("Refresh failed.");
       await broadcastCastHardReload();
-      await load(true);
+      await load(true, { suppressError: true });
+      const signaled = Number(body.cast_hard_reload_nonce) > 0;
       showToast(
-        body.delayed
+        body.delayed && !signaled
           ? "Refresh signaled. Live data is delayed — boards will catch up."
-          : "Refresh complete. Lobby and staff TVs were signaled to reload.",
+          : "Refresh complete. CAST-TV, lobby, and staff displays were signaled to reload.",
         "success"
       );
     } catch (refreshError) {
@@ -552,9 +561,9 @@ export function AdminDashboard() {
     setCastRefreshing(true);
     try {
       const nonce = await requestCastHardRefreshAllDisplays();
-      showToast(`Lobby and staff TVs will hard refresh now (signal #${nonce}).`, "success");
+      showToast(`CAST-TV, lobby, and staff displays will hard refresh now (signal #${nonce}).`, "success");
     } catch (castError) {
-      showToast(humanizeUnknownError(castError, "Cast refresh failed."), "error");
+      showToast(castError instanceof Error ? castError.message : "Unable to refresh cast displays.", "error");
     } finally {
       setCastRefreshing(false);
     }
