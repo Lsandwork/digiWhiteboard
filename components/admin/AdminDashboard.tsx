@@ -539,7 +539,7 @@ export function AdminDashboard() {
         ok?: boolean;
         delayed?: boolean;
         cast_hard_reload_nonce?: number;
-      }>(response).catch(() => ({ ok: false, delayed: true }));
+      }>(response).catch(() => ({ ok: false, delayed: true, cast_hard_reload_nonce: 0 }));
       if (!response.ok && !body.ok) throw new Error("Refresh failed.");
       await broadcastCastHardReload();
       await load(true, { suppressError: true });

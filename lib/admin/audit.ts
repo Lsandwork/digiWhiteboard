@@ -15,16 +15,19 @@ export async function writeAdminAuditLog(input: AuditInput) {
   try {
     const supabase = getServiceSupabase();
     await withTimeoutFallback(
-      supabase.from("admin_audit_logs").insert({
-        actor_admin_id: normalizeAdminUserId(input.actorAdminId),
-        actor_email: input.actorEmail ?? null,
-        action: input.action,
-        target_type: input.targetType ?? null,
-        target_id: input.targetId ?? null,
-        details: input.details ?? null
-      }),
+      (async () => {
+        await supabase.from("admin_audit_logs").insert({
+          actor_admin_id: normalizeAdminUserId(input.actorAdminId),
+          actor_email: input.actorEmail ?? null,
+          action: input.action,
+          target_type: input.targetType ?? null,
+          target_id: input.targetId ?? null,
+          details: input.details ?? null
+        });
+        return true;
+      })(),
       800,
-      null
+      false
     );
   } catch {
     // Audit logging must not block primary operations.
