@@ -1,3 +1,4 @@
+import { getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { inferCastTvMimeType, mediaTypeForMime } from "@/lib/cast-tv/mime";
 import {
   CAST_TV_SETTINGS_ID,
@@ -12,8 +13,13 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 
 /** Production CAST-TV Postgres tables hang; playlist JSON lives next to the files. */
 export const CAST_TV_STORAGE_BUCKET = "lobby-slideshow";
+export const CAST_TV_LEGACY_MEDIA_BUCKET = "cast-tv-media";
 export const CAST_TV_LIBRARY_OBJECT_PATH = "cast-tv/library.json";
 export const CAST_TV_HEARTBEATS_OBJECT_PATH = "cast-tv/heartbeats.json";
+export const CAST_TV_LAST_GOOD_CACHE_KEY = "cast-tv:last-good-library";
+export const CAST_TV_LAST_GOOD_TTL_MS = 24 * 60 * 60 * 1000;
+
+const CAST_TV_LIBRARY_BUCKETS = [CAST_TV_STORAGE_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET] as const;
 
 export type CastTvHeartbeatRecord = {
   screen_id: string;
@@ -81,6 +87,7 @@ function asMediaRecord(value: unknown): CastTvMediaRecord | null {
     display_name: row.display_name ?? null,
     file_name: String(row.file_name),
     storage_path: String(row.storage_path),
+    bucket: row.bucket ? String(row.bucket) : null,
     public_url: row.public_url ?? null,
     media_type: row.media_type,
     mime_type: row.mime_type ?? null,
@@ -160,17 +167,28 @@ function isLibrarySidecar(name: string) {
 export function mergeCastTvStorageObjects(
   library: CastTvLibraryState,
   objects: CastTvStorageListItem[],
-  publicUrlForPath: (storagePath: string, updatedAt?: string) => string
+  publicUrlForPath: (storagePath: string, updatedAt?: string) => string,
+  options: { bucket?: string; pathPrefix?: string } = {}
 ): { library: CastTvLibraryState; added: number } {
-  const known = new Set(library.media.map((item) => item.storage_path));
+  const known = new Set(library.media.map((item) => `${item.bucket || ""}:${item.storage_path}`));
   const extras: CastTvMediaRecord[] = [];
   let nextOrder = library.media.reduce((max, item) => Math.max(max, item.display_order), 0);
+  const bucket = options.bucket || CAST_TV_STORAGE_BUCKET;
+  const prefix = options.pathPrefix;
 
   for (const object of objects) {
     const name = String(object.name || "").trim();
     if (!name || isLibrarySidecar(name) || name.endsWith("/")) continue;
-    const storagePath = name.startsWith("cast-tv/") ? name : `cast-tv/${name}`;
-    if (known.has(storagePath)) continue;
+    const storagePath =
+      prefix === ""
+        ? name
+        : prefix
+          ? `${prefix}/${name}`
+          : name.startsWith("cast-tv/")
+            ? name
+            : `cast-tv/${name}`;
+    const key = `${bucket}:${storagePath}`;
+    if (known.has(key) || known.has(`:${storagePath}`)) continue;
 
     const mime = inferCastTvMimeType(name, object.metadata?.mimetype);
     const mediaType = mediaTypeForMime(mime, name);
@@ -184,6 +202,7 @@ export function mergeCastTvStorageObjects(
       display_name: name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "CAST-TV media",
       file_name: name,
       storage_path: storagePath,
+      bucket,
       public_url: publicUrlForPath(storagePath, updatedAt),
       media_type: mediaType,
       mime_type: mime || null,
@@ -197,7 +216,7 @@ export function mergeCastTvStorageObjects(
       created_at: String(object.created_at || updatedAt),
       updated_at: updatedAt
     });
-    known.add(storagePath);
+    known.add(key);
   }
 
   if (!extras.length) return { library, added: 0 };
@@ -211,70 +230,141 @@ export function mergeCastTvStorageObjects(
 }
 
 async function downloadJsonObject(supabase: SupabaseClient, path: string): Promise<unknown | null> {
-  const { data, error } = await supabase.storage.from(CAST_TV_STORAGE_BUCKET).download(path);
-  if (error || !data) {
-    if (isMissingCastTvStorageObject(error)) return null;
-    throw error ?? new Error(`Unable to read CAST-TV object ${path}.`);
+  let lastError: { message?: string; statusCode?: string | number } | null = null;
+  for (const bucket of CAST_TV_LIBRARY_BUCKETS) {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    if (data && !error) {
+      const text = await data.text();
+      if (!text.trim()) continue;
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        continue;
+      }
+    }
+    if (error && !isMissingCastTvStorageObject(error)) lastError = error;
   }
-  const text = await data.text();
-  if (!text.trim()) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
+  if (lastError) throw lastError;
+  return null;
 }
 
 async function uploadJsonObject(supabase: SupabaseClient, path: string, value: unknown) {
   const bytes = Buffer.from(JSON.stringify(value), "utf8");
   let lastMessage = "Unable to save CAST-TV library.";
-  for (const mime of JSON_UPLOAD_MIME) {
-    const { error } = await supabase.storage.from(CAST_TV_STORAGE_BUCKET).upload(path, bytes, {
-      contentType: mime,
-      upsert: true,
-      cacheControl: "0"
-    });
-    if (!error) return;
-    lastMessage = error.message || lastMessage;
-    if (!/mime|not supported|allowed|invalid type/i.test(error.message || "")) {
-      throw new Error(lastMessage);
+  for (const bucket of CAST_TV_LIBRARY_BUCKETS) {
+    for (const mime of JSON_UPLOAD_MIME) {
+      const { error } = await supabase.storage.from(bucket).upload(path, bytes, {
+        contentType: mime,
+        upsert: true,
+        cacheControl: "0"
+      });
+      if (!error) return;
+      lastMessage = error.message || lastMessage;
+      if (!/mime|not supported|allowed|invalid type/i.test(error.message || "")) {
+        break;
+      }
     }
   }
   throw new Error(lastMessage);
 }
 
-function publicUrlForPath(supabase: SupabaseClient, storagePath: string, updatedAt?: string) {
-  const { data } = supabase.storage.from(CAST_TV_STORAGE_BUCKET).getPublicUrl(storagePath);
+export function publicUrlForCastTvStorage(
+  supabase: SupabaseClient,
+  storagePath: string,
+  updatedAt?: string,
+  bucket = CAST_TV_STORAGE_BUCKET
+) {
+  const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath);
   if (!updatedAt) return data.publicUrl;
   return `${data.publicUrl}?v=${encodeURIComponent(updatedAt)}`;
+}
+
+async function listBucketPrefix(
+  supabase: SupabaseClient,
+  bucket: string,
+  prefix: string
+): Promise<CastTvStorageListItem[]> {
+  const { data, error } = await supabase.storage.from(bucket).list(prefix, {
+    limit: 100,
+    sortBy: { column: "name", order: "asc" }
+  });
+  if (error || !data?.length) return [];
+  return data;
 }
 
 async function recoverOrphanedCastTvFiles(
   supabase: SupabaseClient,
   library: CastTvLibraryState
 ): Promise<CastTvLibraryState> {
-  const { data, error } = await supabase.storage.from(CAST_TV_STORAGE_BUCKET).list("cast-tv", {
-    limit: 100,
-    sortBy: { column: "name", order: "asc" }
-  });
-  if (error || !data?.length) return library;
-  const merged = mergeCastTvStorageObjects(library, data, (storagePath, updatedAt) =>
-    publicUrlForPath(supabase, storagePath, updatedAt)
-  );
-  return merged.library;
+  const scans: Array<{ bucket: string; prefix: string; pathPrefix: string }> = [
+    { bucket: CAST_TV_STORAGE_BUCKET, prefix: "cast-tv", pathPrefix: "cast-tv" },
+    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv", pathPrefix: "cast-tv" },
+    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "", pathPrefix: "" }
+  ];
+
+  let current = library;
+  for (const scan of scans) {
+    try {
+      const objects = await listBucketPrefix(supabase, scan.bucket, scan.prefix);
+      const merged = mergeCastTvStorageObjects(
+        current,
+        objects,
+        (storagePath, updatedAt) => publicUrlForCastTvStorage(supabase, storagePath, updatedAt, scan.bucket),
+        { bucket: scan.bucket, pathPrefix: scan.pathPrefix }
+      );
+      current = merged.library;
+    } catch {
+      /* one bucket failing must not hide files in the others */
+    }
+  }
+  return current;
+}
+
+function rememberLastGoodLibrary(library: CastTvLibraryState) {
+  if (!library.media.length) return;
+  setTtlCache(CAST_TV_LAST_GOOD_CACHE_KEY, library, CAST_TV_LAST_GOOD_TTL_MS);
+}
+
+function lastGoodLibrary(): CastTvLibraryState | null {
+  return getTtlCache<CastTvLibraryState>(CAST_TV_LAST_GOOD_CACHE_KEY);
+}
+
+function hydrateLibraryUrls(supabase: SupabaseClient, library: CastTvLibraryState): CastTvLibraryState {
+  return {
+    ...library,
+    media: library.media.map((item) => ({
+      ...item,
+      public_url:
+        item.public_url ||
+        publicUrlForCastTvStorage(supabase, item.storage_path, item.updated_at, item.bucket || CAST_TV_STORAGE_BUCKET)
+    }))
+  };
 }
 
 export async function loadCastTvLibrary(
   supabase: SupabaseClient,
   options: { recoverOrphans?: boolean } = {}
 ): Promise<CastTvLibraryState> {
-  const stored = await downloadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH);
-  const library = parseCastTvLibrary(stored);
-  if (options.recoverOrphans === false) return library;
   try {
-    return await recoverOrphanedCastTvFiles(supabase, library);
-  } catch {
+    const stored = await downloadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH);
+    let library = hydrateLibraryUrls(supabase, parseCastTvLibrary(stored));
+    if (options.recoverOrphans !== false) {
+      try {
+        library = hydrateLibraryUrls(supabase, await recoverOrphanedCastTvFiles(supabase, library));
+      } catch {
+        /* keep parsed library */
+      }
+    }
+    if (library.media.length) rememberLastGoodLibrary(library);
+    else {
+      const cached = lastGoodLibrary();
+      if (cached?.media.length) return hydrateLibraryUrls(supabase, cached);
+    }
     return library;
+  } catch (error) {
+    const cached = lastGoodLibrary();
+    if (cached) return hydrateLibraryUrls(supabase, cached);
+    throw error;
   }
 }
 
@@ -283,6 +373,7 @@ export async function saveCastTvLibrary(supabase: SupabaseClient, state: CastTvL
     media: state.media,
     settings: state.settings
   });
+  rememberLastGoodLibrary(state);
 }
 
 export async function mutateCastTvLibrary<T>(

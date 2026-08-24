@@ -13,6 +13,7 @@ export type CastTvMediaRecord = {
   display_name: string | null;
   file_name: string;
   storage_path: string;
+  bucket?: string | null;
   public_url: string | null;
   media_type: CastTvMediaType;
   mime_type: string | null;

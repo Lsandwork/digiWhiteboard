@@ -16,11 +16,22 @@ export function isCastTvTimeoutError(error: unknown) {
   );
 }
 
+export function isCastTvHtmlError(error: unknown) {
+  const message = rawErrorMessage(error);
+  return /<!doctype|<html|SSL handshake|Error code 52|Web server is down|cf-error/i.test(message);
+}
+
 export function castTvErrorMessage(error: unknown, fallback: string) {
   if (isCastTvTimeoutError(error)) {
     return "CAST-TV timed out waiting for the database. Try again in a moment.";
   }
+  if (isCastTvHtmlError(error)) {
+    return "CAST-TV storage is temporarily unavailable. Try again in a moment.";
+  }
   const message = rawErrorMessage(error);
+  if (/<!doctype|<html/i.test(message)) {
+    return fallback;
+  }
   return message || fallback;
 }
 

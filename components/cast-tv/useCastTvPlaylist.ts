@@ -63,7 +63,10 @@ export function useCastTvPlaylist(screenId = "default") {
       const settingsBody = await settingsResponse.json();
 
       if (mediaResponse.ok && Array.isArray(mediaBody.playlist)) {
-        applyPlaylist(mediaBody.playlist as CastTvPlaylistItem[]);
+        const next = mediaBody.playlist as CastTvPlaylistItem[];
+        if (next.length > 0 || !currentIdRef.current) {
+          applyPlaylist(next);
+        }
       }
 
       if (settingsResponse.ok && settingsBody.settings) {

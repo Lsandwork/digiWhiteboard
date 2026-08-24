@@ -1,12 +1,14 @@
 import { normalizeAdminUserId } from "@/lib/admin/users";
 import { validateCastTvUpload } from "@/lib/cast-tv/mime";
 import {
+  CAST_TV_LEGACY_MEDIA_BUCKET,
   CAST_TV_STORAGE_BUCKET,
   defaultCastTvSettings,
   loadCastTvHeartbeats,
   loadCastTvLibrary,
   mutateCastTvHeartbeats,
-  mutateCastTvLibrary
+  mutateCastTvLibrary,
+  publicUrlForCastTvStorage
 } from "@/lib/cast-tv/library-store";
 import {
   CAST_TV_IMAGE_DURATION_OPTIONS,
@@ -60,11 +62,13 @@ export function buildCastTvStoragePath(fileName: string) {
   return `cast-tv/${id}.${sanitizeFileName(ext)}`;
 }
 
-export function publicUrlForCastTvPath(supabase: SupabaseClient, storagePath: string, updatedAt?: string) {
-  const { data } = supabase.storage.from(CAST_TV_BUCKET).getPublicUrl(storagePath);
-  if (!updatedAt) return data.publicUrl;
-  const version = encodeURIComponent(updatedAt);
-  return `${data.publicUrl}?v=${version}`;
+export function publicUrlForCastTvPath(
+  supabase: SupabaseClient,
+  storagePath: string,
+  updatedAt?: string,
+  bucket = CAST_TV_BUCKET
+) {
+  return publicUrlForCastTvStorage(supabase, storagePath, updatedAt, bucket);
 }
 
 export function mediaRecordToPlaylistItem(record: CastTvMediaRecord): CastTvPlaylistItem {
@@ -90,7 +94,12 @@ export async function loadCastTvMedia(
   options: { enabledOnly?: boolean } = {}
 ): Promise<CastTvMediaRecord[]> {
   const library = await loadCastTvLibrary(supabase);
-  const records = library.media;
+  const records = library.media.map((record) => ({
+    ...record,
+    public_url:
+      record.public_url ||
+      publicUrlForCastTvPath(supabase, record.storage_path, record.updated_at, record.bucket || CAST_TV_BUCKET)
+  }));
   if (options.enabledOnly) return records.filter((record) => record.is_enabled);
   return records;
 }
@@ -110,31 +119,40 @@ export async function uploadCastTvObject(
   supabase: SupabaseClient,
   storagePath: string,
   buffer: Buffer | Uint8Array,
-  contentType: string
+  contentType: string,
+  bucket = CAST_TV_BUCKET
 ) {
   const bytes = Uint8Array.from(buffer);
   const body = new Blob([bytes], { type: contentType || "application/octet-stream" });
-  const { error } = await supabase.storage.from(CAST_TV_BUCKET).upload(storagePath, body, {
-    contentType,
-    upsert: false
-  });
-  if (error) {
-    throw new Error(error.message || "Unable to upload CAST-TV media.");
+  const buckets = bucket === CAST_TV_BUCKET ? [CAST_TV_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET] : [bucket, CAST_TV_BUCKET];
+  let lastMessage = "Unable to upload CAST-TV media.";
+  for (const target of buckets) {
+    const { error } = await supabase.storage.from(target).upload(storagePath, body, {
+      contentType,
+      upsert: false
+    });
+    if (!error) return target;
+    lastMessage = error.message || lastMessage;
   }
+  throw new Error(lastMessage);
 }
 
 export async function findDuplicateCastTvUpload(
   supabase: SupabaseClient,
   input: { fileName: string; fileSize: number }
 ) {
-  const normalizedName = input.fileName.trim().toLowerCase();
-  const existing = await loadCastTvMedia(supabase);
-  return (
-    existing.find(
-      (row) =>
-        row.file_name.trim().toLowerCase() === normalizedName && row.file_size_bytes === input.fileSize
-    ) ?? null
-  );
+  try {
+    const normalizedName = input.fileName.trim().toLowerCase();
+    const existing = await loadCastTvMedia(supabase);
+    return (
+      existing.find(
+        (row) =>
+          row.file_name.trim().toLowerCase() === normalizedName && row.file_size_bytes === input.fileSize
+      ) ?? null
+    );
+  } catch {
+    return null;
+  }
 }
 
 export async function createCastTvSignedUpload(
@@ -156,15 +174,30 @@ export async function createCastTvSignedUpload(
   }
 
   const storagePath = buildCastTvStoragePath(input.fileName);
-  const { data, error } = await supabase.storage.from(CAST_TV_BUCKET).createSignedUploadUrl(storagePath);
-  if (error || !data?.signedUrl) {
-    throw new Error(error?.message || "Unable to prepare CAST-TV upload.");
+  const buckets = [CAST_TV_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET];
+  let signedUrl: string | null = null;
+  let token: string | undefined;
+  let bucket = CAST_TV_BUCKET;
+  let lastMessage = "Unable to prepare CAST-TV upload.";
+  for (const target of buckets) {
+    const { data, error } = await supabase.storage.from(target).createSignedUploadUrl(storagePath);
+    if (!error && data?.signedUrl) {
+      signedUrl = data.signedUrl;
+      token = data.token;
+      bucket = target;
+      break;
+    }
+    lastMessage = error?.message || lastMessage;
+  }
+  if (!signedUrl) {
+    throw new Error(lastMessage);
   }
 
   return {
     storage_path: storagePath,
-    signed_upload_url: data.signedUrl,
-    token: data.token,
+    bucket,
+    signed_upload_url: signedUrl,
+    token,
     mime_type: mimeType,
     file_size_bytes: input.fileSize,
     media_type: mediaType
@@ -184,6 +217,7 @@ export async function createCastTvMediaRecord(
     mimeType: string;
     fileSize: number;
     storagePath: string;
+    bucket?: string | null;
     displayName?: string | null;
     uploadedBy?: string | null;
     uploadedByName?: string | null;
@@ -212,12 +246,14 @@ export async function createCastTvMediaRecord(
     }
 
     const now = new Date().toISOString();
+    const bucket = input.bucket || CAST_TV_BUCKET;
     const record: CastTvMediaRecord = {
       id: newMediaId(),
       display_name: input.displayName?.trim() || displayNameFromFileName(input.fileName),
       file_name: input.fileName.trim(),
       storage_path: input.storagePath,
-      public_url: publicUrlForCastTvPath(supabase, input.storagePath, now),
+      bucket,
+      public_url: publicUrlForCastTvPath(supabase, input.storagePath, now, bucket),
       media_type: mediaType,
       mime_type: mimeType,
       file_size_bytes: input.fileSize,
@@ -271,6 +307,7 @@ export async function replaceCastTvMediaFile(
     mimeType: string;
     fileSize: number;
     storagePath: string;
+    bucket?: string | null;
   }
 ) {
   const { mediaType, mimeType } = validateCastTvUpload({
@@ -284,11 +321,13 @@ export async function replaceCastTvMediaFile(
     if (index < 0) throw new Error("Media item not found.");
     const existing = library.media[index];
     const now = new Date().toISOString();
+    const bucket = input.bucket || existing.bucket || CAST_TV_BUCKET;
     const updated: CastTvMediaRecord = {
       ...existing,
       file_name: input.fileName.trim(),
       storage_path: input.storagePath,
-      public_url: publicUrlForCastTvPath(supabase, input.storagePath, now),
+      bucket,
+      public_url: publicUrlForCastTvPath(supabase, input.storagePath, now, bucket),
       media_type: mediaType,
       mime_type: mimeType,
       file_size_bytes: input.fileSize,
