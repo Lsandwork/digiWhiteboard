@@ -4,6 +4,7 @@ import { SERVICE_SUPABASE_CRON_TIMEOUT_MS, SERVICE_SUPABASE_TIMEOUT_MS } from ".
 import { readResponseJson } from "../lib/http/read-response-json";
 import { LIVE_DATA_UNAVAILABLE_MESSAGE } from "../lib/safe-url";
 import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
+import { capStaffOpsListPayload, STAFF_OPS_LIST_MESSAGE_LIMIT } from "../lib/staff/admin-ops";
 
 assert.equal(skipSettingsAndAccess(null), false);
 assert.equal(skipSettingsAndAccess("package_commissions"), true);
@@ -15,6 +16,25 @@ assert.equal(skipHeavyBoardWidgets("staff", null), false);
 assert.equal(skipHeavyBoardWidgets("staff", "package_commissions"), true);
 assert.equal(skipHeavyBoardWidgets("staff", "overview"), false);
 assert.equal(skipHeavyBoardWidgets("lobby", "content"), false);
+assert.equal(STAFF_OPS_LIST_MESSAGE_LIMIT, 120);
+assert.equal(
+  capStaffOpsListPayload({
+    crossover_messages: Array.from({ length: 200 }, (_, i) => ({
+      id: `m${i}`,
+      created_at: "2026-01-01T00:00:00.000Z"
+    })),
+    crossover_message_replies: [
+      { id: "r1", crossover_message_id: "m0", created_at: "2026-01-01T00:00:00.000Z" },
+      { id: "r2", crossover_message_id: "m199", created_at: "2026-01-01T00:00:00.000Z" }
+    ],
+    owner_follow_ups: [],
+    active_issues: [],
+    activity_logs: [],
+    staff_directory: [],
+    notifications: []
+  } as never).crossover_messages.length,
+  120
+);
 
 assert.equal(SERVICE_SUPABASE_TIMEOUT_MS, 8_000);
 assert.equal(SERVICE_SUPABASE_CRON_TIMEOUT_MS, 20_000);
@@ -127,6 +147,23 @@ const userAccess = readFileSync("lib/admin/user-access.ts", "utf8");
 assert.match(userAccess, /Promise\.all\(/);
 assert.match(userAccess, /LEGACY_ACCESS_MIGRATE_TTL_MS/);
 assert.match(userAccess, /Claim the slot before the query/);
+assert.match(userAccess, /export async function getUserAccessMap/);
+
+const usersRoute = readFileSync("app/api/admin/users/route.ts", "utf8");
+assert.match(usersRoute, /getUserAccessMap/);
+assert.doesNotMatch(usersRoute, /users\.map\(async \(user\) =>/);
+
+const staffOps = readFileSync("lib/staff/admin-ops.ts", "utf8");
+assert.match(staffOps, /STAFF_OPS_LIST_MESSAGE_LIMIT = 120/);
+assert.match(staffOps, /export function capStaffOpsListPayload/);
+
+const staffOpsRoute = readFileSync("app/api/admin/staff-operations/route.ts", "utf8");
+assert.match(staffOpsRoute, /STAFF_OPS_LOAD_TIMEOUT_MS = 8_000/);
+assert.match(staffOpsRoute, /capStaffOpsListPayload/);
+
+const mediaLibrary = readFileSync("lib/media-library/service.ts", "utf8");
+assert.doesNotMatch(mediaLibrary, /count: "exact"/);
+assert.match(mediaLibrary, /from \+ pageSize/);
 
 const commissionsPanel = readFileSync("components/admin/PackageCommissionsPanel.tsx", "utf8");
 assert.match(commissionsPanel, /retry/);

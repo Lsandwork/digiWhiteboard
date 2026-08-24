@@ -24,6 +24,7 @@ import {
   deleteCrossoverMessage,
   deleteStaffDirectoryMember,
   createOwnerFollowUp,
+  capStaffOpsListPayload,
   listStaffOps,
   clearStaffInboxNotifications,
   markAllStaffNotificationsRead,
@@ -43,7 +44,7 @@ import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/li
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
-const STAFF_OPS_LOAD_TIMEOUT_MS = 25_000;
+const STAFF_OPS_LOAD_TIMEOUT_MS = 8_000;
 const STAFF_OPS_CACHE_TTL_MS = 20_000;
 
 function crossoverForbiddenResponse() {
@@ -141,7 +142,7 @@ export async function GET(request: Request) {
       role: role ?? null
     };
     return NextResponse.json({
-      ...state,
+      ...capStaffOpsListPayload(state),
       // Never expose other users' notifications in the payload.
       notifications: notificationsForSession(state, readerSession),
       currentUser: {

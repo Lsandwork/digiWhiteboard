@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { blockDemoWrite, isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { accessFromLegacyRole, type UserAccess } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest, type AdminSession } from "@/lib/admin/session";
-import { getUserAccess } from "@/lib/admin/user-access";
 import { normalizeAdminUserId } from "@/lib/admin/users";
 import {
   canAccessPhotoUploadQueue,
@@ -31,10 +30,15 @@ export async function requirePhotoUploadAccess(
   }
 
   const session = getAdminSessionFromRequest(request);
+<<<<<<< HEAD
   const supabase = getServiceSupabase({ timeoutMs: options?.timeoutMs });
   const access = session?.adminUserId
     ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
     : accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
+=======
+  const supabase = getServiceSupabase({ timeoutMs: 8_000 });
+  const access = accessFromLegacyRole(session?.adminUserId ?? null, session?.email ?? null, session?.role);
+>>>>>>> dd1b713 (Cap Team Log and Users payloads that stall after login)
 
   if (!canAccessPhotoUploadQueue(access, session?.role)) {
     return {
