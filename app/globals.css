@@ -964,8 +964,8 @@ html.lobby-tv-display .lobby-idle-state .lobby-idle-checkout-slot {
 
 html.lobby-tv-display .lobby-class-schedule--band {
   flex: 0 0 auto;
-  margin-top: 0.75rem;
-  padding: 0.7rem 1rem 0.75rem;
+  margin-top: 0.65rem;
+  padding: 0.55rem 0.95rem 0.6rem;
   max-height: none;
   overflow: visible;
 }
@@ -974,25 +974,25 @@ html.lobby-tv-display .lobby-class-schedule--band > div {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  gap: 1.15rem;
+  gap: 0.95rem;
   width: 100%;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__heading {
-  flex: 0 0 8.75rem;
+  flex: 0 0 7.1rem;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 0.3rem;
+  gap: 0.25rem;
   margin: 0;
-  padding-right: 1rem;
+  padding-right: 0.85rem;
   border-right: 1px solid rgba(27, 175, 200, 0.28);
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__heading h3 {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   letter-spacing: 0.16em;
-  line-height: 1.15;
+  line-height: 1.12;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule-grid {
@@ -1000,7 +1000,7 @@ html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule-grid {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.45rem 1.1rem;
+  gap: 0.35rem 0.95rem;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__footer {
@@ -1008,17 +1008,17 @@ html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__footer 
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-schedule-day__label {
-  font-size: 0.78rem;
-  padding: 0.32rem 0.5rem;
-  margin-bottom: 0.4rem;
+  font-size: 0.74rem;
+  padding: 0.28rem 0.45rem;
+  margin-bottom: 0.32rem;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-schedule-day__list {
-  gap: 0.28rem;
+  gap: 0.22rem;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-schedule-day__list li {
-  font-size: 0.84rem;
+  font-size: 0.8rem;
 }
 
 html.lobby-tv-display .lobby-idle-state .social-moments-card {
@@ -1026,7 +1026,7 @@ html.lobby-tv-display .lobby-idle-state .social-moments-card {
   min-height: 0;
   height: 100%;
   flex-direction: column;
-  padding: 0.9rem 1rem 0.85rem;
+  padding: 0.7rem 0.8rem 0.65rem;
 }
 
 html.lobby-tv-display .lobby-idle-state .social-moments-header {
@@ -1068,7 +1068,7 @@ html.lobby-tv-display .lobby-idle-slideshow--tv {
 html.lobby-tv-display .lobby-idle-slideshow--tv .lobby-idle-slideshow__frame {
   aspect-ratio: 16 / 9;
   flex: 0 0 auto;
-  width: min(100cqw, calc((100cqh - 1.5rem) * 16 / 9));
+  width: min(100cqw, calc((100cqh - 1.15rem) * 16 / 9));
   height: auto;
   max-width: 100%;
   max-height: 100%;
