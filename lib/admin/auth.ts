@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { timingSafeEqual } from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { findAdminUsersByEmails, verifyAdminUserPassword, type AdminUserRecord } from "@/lib/admin/users";
+import { findAdminUsersForLogin, verifyAdminUserPassword, type AdminUserRecord } from "@/lib/admin/users";
 import { DEMO_PASSWORD, findDemoAccount } from "@/lib/demo/constants";
 
 /** Canonical Super Admin identity (Lonnie Sandoval). */
@@ -27,6 +27,9 @@ function loginLookupEmails(username: string) {
   const lookups = [normalized];
   if (isSuperAdminLoginAlias(normalized)) {
     lookups.push(SUPER_ADMIN_EMAIL);
+  }
+  if (normalized && !normalized.includes("@")) {
+    lookups.push(`${normalized}@fitdog.com`);
   }
   return [...new Set(lookups.filter(Boolean))];
 }
@@ -62,6 +65,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 
 export type AdminAuthResult = {
   ok: boolean;
+  unavailable?: boolean;
   email: string;
   adminUserId?: string;
   role?: string;
@@ -70,6 +74,10 @@ export type AdminAuthResult = {
   demoRole?: string;
   source: "database" | "env" | "demo";
 };
+
+function isAuthTimeout(error: unknown) {
+  return error instanceof Error && /timed out/i.test(error.message);
+}
 
 function resultFromDbUser(dbUser: AdminUserRecord, source: AdminAuthResult["source"]): AdminAuthResult {
   const isDemoDbUser = dbUser.email.endsWith("@demo.com");
@@ -95,8 +103,10 @@ async function envPasswordMatches(password: string) {
 
 function pickLoginUser(users: AdminUserRecord[], normalized: string) {
   const active = users.filter((user) => user.status === "active");
+  const withDomain = normalized.includes("@") ? normalized : `${normalized}@fitdog.com`;
   return (
     active.find((user) => user.email === normalized) ||
+    active.find((user) => user.email === withDomain) ||
     active.find((user) => user.email === SUPER_ADMIN_EMAIL) ||
     null
   );
@@ -104,7 +114,7 @@ function pickLoginUser(users: AdminUserRecord[], normalized: string) {
 
 async function lookupLoginUsers(emails: string[], timeoutMs = AUTH_QUERY_TIMEOUT_MS) {
   const supabase = authSupabase(timeoutMs);
-  return withTimeout(findAdminUsersByEmails(supabase, emails), timeoutMs, "admin user lookup");
+  return withTimeout(findAdminUsersForLogin(supabase, emails), timeoutMs, "admin user lookup");
 }
 
 export async function verifyAdminCredentials(username: string, password: string): Promise<AdminAuthResult> {
@@ -150,8 +160,11 @@ export async function verifyAdminCredentials(username: string, password: string)
     if (dbUser && (await verifyAdminUserPassword(dbUser, password))) {
       return resultFromDbUser(dbUser, "database");
     }
-  } catch {
-    // Database unavailable — staff logins need the DB; env already handled above.
+  } catch (error) {
+    if (isAuthTimeout(error)) {
+      return { ok: false, unavailable: true, email: normalized, source: "database" };
+    }
+    return { ok: false, unavailable: true, email: normalized, source: "database" };
   }
 
   return { ok: false, email: normalized, source: "database" };
