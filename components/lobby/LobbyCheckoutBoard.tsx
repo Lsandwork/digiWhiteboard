@@ -7,7 +7,6 @@ import { LobbyClassSchedule } from "@/components/lobby/LobbyClassSchedule";
 import { LobbyFeaturedCard } from "@/components/lobby/LobbyFeaturedCard";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
-import { LobbyValuesFooter } from "@/components/lobby/LobbyValuesFooter";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
@@ -475,7 +474,6 @@ export function LobbyCheckoutBoard({
   const activeCheckoutStartedAt = activeCheckoutDog?.prompted_at ?? null;
   const activeCheckoutExpiresAt = activeCheckoutDog?.display_until ?? null;
   const activePollingIntervalCount = castKeeperMode ? 2 : 3;
-  const footerMessage = settings.footer_message ?? defaultSettings.footer_message;
   const castHealth: CastModeStatus =
     !healthy && !lastFastFetchAt && !lastFullFetchAt
       ? "offline"
@@ -574,10 +572,6 @@ export function LobbyCheckoutBoard({
             )}
 
             {checkoutActive ? <LobbyQueueList dogs={queue} /> : null}
-
-            {settings.show_events ? (
-              <LobbyClassSchedule compact={checkoutActive || showTvLayout} schedule={settings.class_schedule} />
-            ) : null}
           </div>
 
           {settings.show_promotions ? (
@@ -592,7 +586,9 @@ export function LobbyCheckoutBoard({
           )}
         </div>
 
-        <LobbyValuesFooter footerMessage={footerMessage} />
+        {settings.show_events ? (
+          <LobbyClassSchedule band compact={checkoutActive} schedule={settings.class_schedule} />
+        ) : null}
         </div>
       </TvLayoutCanvas>
 
