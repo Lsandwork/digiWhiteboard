@@ -69,6 +69,21 @@ export function LobbyAssetImage({
     );
   }
 
+  if (fill) {
+    return (
+      <Image
+        src={currentSrc}
+        alt={alt}
+        fill
+        className={className}
+        priority={priority}
+        sizes={sizes}
+        unoptimized
+        onError={handleError}
+      />
+    );
+  }
+
   return (
     <Image
       src={currentSrc}
@@ -77,7 +92,6 @@ export function LobbyAssetImage({
       height={height}
       className={className}
       priority={priority}
-      fill={fill}
       sizes={sizes}
       unoptimized
       onError={handleError}
