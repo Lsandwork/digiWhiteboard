@@ -1,13 +1,10 @@
 import { normalizeAdminUserId } from "@/lib/admin/users";
+import { validateCastTvUpload } from "@/lib/cast-tv/mime";
 import {
-  CAST_TV_HEIC_MIME,
-  CAST_TV_IMAGE_MIME,
-  CAST_TV_VIDEO_MAX_BYTES,
-  CAST_TV_VIDEO_MIME,
-  inferCastTvMimeType,
-  mediaTypeForMime,
-  validateCastTvUpload
-} from "@/lib/cast-tv/mime";
+  defaultCastTvSettings,
+  loadCastTvLibrary,
+  mutateCastTvLibrary
+} from "@/lib/cast-tv/library-store";
 import {
   CAST_TV_IMAGE_DURATION_OPTIONS,
   CAST_TV_SETTINGS_ID,
@@ -21,11 +18,8 @@ import {
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-function isMissingCastTvRelation(error: { code?: string } | null) {
-  return error?.code === "42P01" || error?.code === "PGRST205";
-}
-
-export const CAST_TV_BUCKET = "cast-tv-media";
+/** Production CAST-TV Postgres tables hang; files go in the working lobby slideshow bucket. */
+export const CAST_TV_BUCKET = "lobby-slideshow";
 
 export {
   CAST_TV_ALLOWED_MIME,
@@ -60,7 +54,7 @@ export function buildCastTvStoragePath(fileName: string) {
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `media/${id}.${sanitizeFileName(ext)}`;
+  return `cast-tv/${id}.${sanitizeFileName(ext)}`;
 }
 
 export function publicUrlForCastTvPath(supabase: SupabaseClient, storagePath: string, updatedAt?: string) {
@@ -92,23 +86,10 @@ export async function loadCastTvMedia(
   supabase: SupabaseClient,
   options: { enabledOnly?: boolean } = {}
 ): Promise<CastTvMediaRecord[]> {
-  let query = supabase
-    .from("cast_tv_media")
-    .select("*")
-    .order("display_order", { ascending: true })
-    .order("created_at", { ascending: true });
-
-  if (options.enabledOnly) {
-    query = query.eq("is_enabled", true);
-  }
-
-  const { data, error } = await query;
-  if (error) {
-    if (isMissingCastTvRelation(error)) return [];
-    throw error;
-  }
-
-  return (data ?? []) as CastTvMediaRecord[];
+  const library = await loadCastTvLibrary(supabase);
+  const records = library.media;
+  if (options.enabledOnly) return records.filter((record) => record.is_enabled);
+  return records;
 }
 
 export async function buildCastTvPlaylist(supabase: SupabaseClient): Promise<CastTvPlaylistItem[]> {
@@ -118,41 +99,8 @@ export async function buildCastTvPlaylist(supabase: SupabaseClient): Promise<Cas
     .map((record) => withCacheBustedSrc(mediaRecordToPlaylistItem(record)));
 }
 
-const CAST_TV_BUCKET_MIME_TYPES = [
-  ...CAST_TV_IMAGE_MIME,
-  ...CAST_TV_VIDEO_MIME,
-  ...CAST_TV_HEIC_MIME,
-  "image/jpg",
-  "image/pjpeg"
-];
-
-export async function ensureCastTvBucket(supabase: SupabaseClient) {
-  try {
-    const { data } = await supabase.storage.getBucket(CAST_TV_BUCKET);
-    if (data) {
-      try {
-        await supabase.storage.updateBucket(CAST_TV_BUCKET, {
-          public: true,
-          fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
-          allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
-        });
-      } catch {
-        // Allowed types may already be correct; uploads can still proceed.
-      }
-      return;
-    }
-
-    const { error } = await supabase.storage.createBucket(CAST_TV_BUCKET, {
-      public: true,
-      fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
-      allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
-    });
-    if (error && !/already exists|duplicate/i.test(error.message)) {
-      // Leave the failure to the signed/service upload so the caller gets a storage error.
-    }
-  } catch {
-    // Bucket probe failed; signed or service-role uploads may still work if it exists.
-  }
+export async function ensureCastTvBucket(_supabase: SupabaseClient) {
+  // Files are stored in the existing lobby-slideshow bucket under cast-tv/.
 }
 
 export async function uploadCastTvObject(
@@ -161,7 +109,6 @@ export async function uploadCastTvObject(
   buffer: Buffer | Uint8Array,
   contentType: string
 ) {
-  await ensureCastTvBucket(supabase);
   const bytes = Uint8Array.from(buffer);
   const body = new Blob([bytes], { type: contentType || "application/octet-stream" });
   const { error } = await supabase.storage.from(CAST_TV_BUCKET).upload(storagePath, body, {
@@ -178,17 +125,13 @@ export async function findDuplicateCastTvUpload(
   input: { fileName: string; fileSize: number }
 ) {
   const normalizedName = input.fileName.trim().toLowerCase();
-  const { data, error } = await supabase
-    .from("cast_tv_media")
-    .select("id, file_name, file_size_bytes")
-    .eq("file_size_bytes", input.fileSize)
-    .limit(25);
-
-  if (error && !isMissingCastTvRelation(error)) throw error;
-  const match = (data ?? []).find(
-    (row) => String((row as { file_name?: string }).file_name ?? "").trim().toLowerCase() === normalizedName
+  const existing = await loadCastTvMedia(supabase);
+  return (
+    existing.find(
+      (row) =>
+        row.file_name.trim().toLowerCase() === normalizedName && row.file_size_bytes === input.fileSize
+    ) ?? null
   );
-  return (match as CastTvMediaRecord | undefined) ?? null;
 }
 
 export async function createCastTvSignedUpload(
@@ -209,7 +152,6 @@ export async function createCastTvSignedUpload(
     throw new Error("This file already exists in the CAST-TV library.");
   }
 
-  await ensureCastTvBucket(supabase);
   const storagePath = buildCastTvStoragePath(input.fileName);
   const { data, error } = await supabase.storage.from(CAST_TV_BUCKET).createSignedUploadUrl(storagePath);
   if (error || !data?.signedUrl) {
@@ -224,6 +166,12 @@ export async function createCastTvSignedUpload(
     file_size_bytes: input.fileSize,
     media_type: mediaType
   };
+}
+
+function newMediaId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 export async function createCastTvMediaRecord(
@@ -245,40 +193,41 @@ export async function createCastTvMediaRecord(
     size: input.fileSize
   });
 
-  const duplicate = await findDuplicateCastTvUpload(supabase, {
-    fileName: input.fileName,
-    fileSize: input.fileSize
-  });
-  if (duplicate) {
-    throw new Error("This file already exists in the CAST-TV library.");
-  }
+  return mutateCastTvLibrary(supabase, (library) => {
+    const duplicate = library.media.find(
+      (row) =>
+        row.file_name.trim().toLowerCase() === input.fileName.trim().toLowerCase() &&
+        row.file_size_bytes === input.fileSize
+    );
+    if (duplicate) {
+      throw new Error("This file already exists in the CAST-TV library.");
+    }
 
-  const settings = await loadCastTvSettings(supabase);
-  const existing = await loadCastTvMedia(supabase);
-  const nextOrder = existing.reduce((max, item) => Math.max(max, item.display_order), 0) + 1;
-  const now = new Date().toISOString();
-  const publicUrl = publicUrlForCastTvPath(supabase, input.storagePath, now);
-
-  const { data, error } = await supabase
-    .from("cast_tv_media")
-    .insert({
+    const now = new Date().toISOString();
+    const record: CastTvMediaRecord = {
+      id: newMediaId(),
       display_name: input.displayName?.trim() || displayNameFromFileName(input.fileName),
       file_name: input.fileName.trim(),
       storage_path: input.storagePath,
-      public_url: publicUrl,
+      public_url: publicUrlForCastTvPath(supabase, input.storagePath, now),
       media_type: mediaType,
       mime_type: mimeType,
       file_size_bytes: input.fileSize,
-      image_display_seconds: input.imageDisplaySeconds ?? settings.default_image_seconds,
-      display_order: nextOrder,
+      duration_seconds: null,
+      image_display_seconds: input.imageDisplaySeconds ?? library.settings.default_image_seconds,
+      display_order: library.media.reduce((max, item) => Math.max(max, item.display_order), 0) + 1,
+      is_enabled: true,
       uploaded_by: normalizeAdminUserId(input.uploadedBy),
-      uploaded_by_name: input.uploadedByName ?? null
-    })
-    .select("*")
-    .single();
+      uploaded_by_name: input.uploadedByName ?? null,
+      created_at: now,
+      updated_at: now
+    };
 
-  if (error) throw error;
-  return data as CastTvMediaRecord;
+    return {
+      state: { ...library, media: [...library.media, record] },
+      result: record
+    };
+  });
 }
 
 export async function updateCastTvMediaRecord(
@@ -291,16 +240,19 @@ export async function updateCastTvMediaRecord(
     display_order: number;
   }>
 ) {
-  const { data, error } = await supabase
-    .from("cast_tv_media")
-    .update(patch)
-    .eq("id", id)
-    .select("*")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) throw new Error("Media item not found.");
-  return data as CastTvMediaRecord;
+  return mutateCastTvLibrary(supabase, (library) => {
+    const index = library.media.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error("Media item not found.");
+    const now = new Date().toISOString();
+    const updated: CastTvMediaRecord = {
+      ...library.media[index],
+      ...patch,
+      updated_at: now
+    };
+    const media = library.media.slice();
+    media[index] = updated;
+    return { state: { ...library, media }, result: updated };
+  });
 }
 
 export async function replaceCastTvMediaFile(
@@ -319,81 +271,74 @@ export async function replaceCastTvMediaFile(
     size: input.fileSize
   });
 
-  const { data: existing, error: loadError } = await supabase
-    .from("cast_tv_media")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (loadError) throw loadError;
-  if (!existing) throw new Error("Media item not found.");
-
-  const now = new Date().toISOString();
-  const publicUrl = publicUrlForCastTvPath(supabase, input.storagePath, now);
-
-  const { data, error } = await supabase
-    .from("cast_tv_media")
-    .update({
+  const replaced = await mutateCastTvLibrary(supabase, (library) => {
+    const index = library.media.findIndex((item) => item.id === id);
+    if (index < 0) throw new Error("Media item not found.");
+    const existing = library.media[index];
+    const now = new Date().toISOString();
+    const updated: CastTvMediaRecord = {
+      ...existing,
       file_name: input.fileName.trim(),
       storage_path: input.storagePath,
-      public_url: publicUrl,
+      public_url: publicUrlForCastTvPath(supabase, input.storagePath, now),
       media_type: mediaType,
       mime_type: mimeType,
       file_size_bytes: input.fileSize,
       duration_seconds: null,
-      display_name: existing.display_name || displayNameFromFileName(input.fileName)
-    })
-    .eq("id", id)
-    .select("*")
-    .single();
+      display_name: existing.display_name || displayNameFromFileName(input.fileName),
+      updated_at: now
+    };
+    const media = library.media.slice();
+    media[index] = updated;
+    return {
+      state: { ...library, media },
+      result: { updated, previousPath: existing.storage_path }
+    };
+  });
 
-  if (error) throw error;
-
-  if (existing.storage_path && existing.storage_path !== input.storagePath) {
-    await supabase.storage.from(CAST_TV_BUCKET).remove([existing.storage_path]);
+  if (replaced.previousPath && replaced.previousPath !== input.storagePath) {
+    await supabase.storage.from(CAST_TV_BUCKET).remove([replaced.previousPath]);
   }
 
-  return data as CastTvMediaRecord;
+  return replaced.updated;
 }
 
 export async function deleteCastTvMediaRecord(supabase: SupabaseClient, id: string) {
-  const { data: existing, error: loadError } = await supabase
-    .from("cast_tv_media")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (loadError) throw loadError;
-  if (!existing) throw new Error("Media item not found.");
-
-  const { error: deleteError } = await supabase.from("cast_tv_media").delete().eq("id", id);
-  if (deleteError) throw deleteError;
+  const existing = await mutateCastTvLibrary(supabase, (library) => {
+    const record = library.media.find((item) => item.id === id);
+    if (!record) throw new Error("Media item not found.");
+    return {
+      state: { ...library, media: library.media.filter((item) => item.id !== id) },
+      result: record
+    };
+  });
 
   if (existing.storage_path) {
     await supabase.storage.from(CAST_TV_BUCKET).remove([existing.storage_path]);
   }
 
-  return existing as CastTvMediaRecord;
+  return existing;
 }
 
 export async function reorderCastTvMedia(supabase: SupabaseClient, orderedIds: string[]) {
   if (!orderedIds.length) return [];
 
-  const existing = await loadCastTvMedia(supabase);
-  const known = new Set(existing.map((item) => item.id));
-  for (const id of orderedIds) {
-    if (!known.has(id)) throw new Error("One or more media items were not found.");
-  }
-
-  const updates = orderedIds.map((id, index) =>
-    supabase.from("cast_tv_media").update({ display_order: index + 1 }).eq("id", id)
-  );
-
-  const results = await Promise.all(updates);
-  const failed = results.find((result) => result.error);
-  if (failed?.error) throw failed.error;
-
-  return loadCastTvMedia(supabase);
+  return mutateCastTvLibrary(supabase, (library) => {
+    const known = new Set(library.media.map((item) => item.id));
+    for (const id of orderedIds) {
+      if (!known.has(id)) throw new Error("One or more media items were not found.");
+    }
+    const now = new Date().toISOString();
+    const order = new Map(orderedIds.map((id, index) => [id, index + 1]));
+    const media = library.media
+      .map((item) => ({
+        ...item,
+        display_order: order.get(item.id) ?? item.display_order,
+        updated_at: order.has(item.id) ? now : item.updated_at
+      }))
+      .sort((a, b) => a.display_order - b.display_order || a.created_at.localeCompare(b.created_at));
+    return { state: { ...library, media }, result: media };
+  });
 }
 
 export async function moveCastTvMedia(
@@ -420,37 +365,8 @@ export async function moveCastTvMedia(
 }
 
 export async function loadCastTvSettings(supabase: SupabaseClient): Promise<CastTvSettings> {
-  const { data, error } = await supabase
-    .from("cast_tv_settings")
-    .select("*")
-    .eq("id", CAST_TV_SETTINGS_ID)
-    .maybeSingle();
-
-  if (error && isMissingCastTvRelation(error)) {
-    return {
-      id: CAST_TV_SETTINGS_ID,
-      default_image_seconds: 10,
-      transition_ms: 700,
-      transition_style: "fade",
-      object_fit: "contain",
-      show_standby_logo: true,
-      is_paused: false,
-      updated_at: new Date().toISOString(),
-      updated_by: null
-    };
-  }
-  if (error) throw error;
-
-  if (data) return data as CastTvSettings;
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("cast_tv_settings")
-    .insert({ id: CAST_TV_SETTINGS_ID })
-    .select("*")
-    .single();
-
-  if (insertError) throw insertError;
-  return inserted as CastTvSettings;
+  const library = await loadCastTvLibrary(supabase);
+  return library.settings ?? defaultCastTvSettings();
 }
 
 export async function updateCastTvSettings(
@@ -472,20 +388,16 @@ export async function updateCastTvSettings(
     throw new Error("Invalid default image duration.");
   }
 
-  await loadCastTvSettings(supabase);
-
-  const { data, error } = await supabase
-    .from("cast_tv_settings")
-    .update({
+  return mutateCastTvLibrary(supabase, (library) => {
+    const settings: CastTvSettings = {
+      ...library.settings,
       ...patch,
-      ...(patch.updated_by !== undefined ? { updated_by: normalizeAdminUserId(patch.updated_by) } : {})
-    })
-    .eq("id", CAST_TV_SETTINGS_ID)
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data as CastTvSettings;
+      id: CAST_TV_SETTINGS_ID,
+      updated_by: patch.updated_by !== undefined ? normalizeAdminUserId(patch.updated_by) : library.settings.updated_by,
+      updated_at: new Date().toISOString()
+    };
+    return { state: { ...library, settings }, result: settings };
+  });
 }
 
 export async function recordCastTvHeartbeat(
@@ -494,36 +406,28 @@ export async function recordCastTvHeartbeat(
 ) {
   const screenId = input.screenId.trim() || "default";
   const now = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from("cast_tv_heartbeats")
-    .upsert(
-      {
-        screen_id: screenId,
-        last_seen_at: now,
-        user_agent: input.userAgent ?? null
+  return mutateCastTvLibrary(supabase, (library) => {
+    const heartbeat = {
+      screen_id: screenId,
+      last_seen_at: now,
+      user_agent: input.userAgent ?? null
+    };
+    return {
+      state: {
+        ...library,
+        heartbeats: { ...library.heartbeats, [screenId]: heartbeat }
       },
-      { onConflict: "screen_id" }
-    )
-    .select("screen_id, last_seen_at")
-    .single();
-
-  if (error) throw error;
-  return data;
+      result: heartbeat
+    };
+  });
 }
 
 export async function loadCastTvHeartbeat(
   supabase: SupabaseClient,
   screenId = "default"
 ) {
-  const { data, error } = await supabase
-    .from("cast_tv_heartbeats")
-    .select("screen_id, last_seen_at")
-    .eq("screen_id", screenId)
-    .maybeSingle();
-
-  if (error && !isMissingCastTvRelation(error)) throw error;
-  return data;
+  const library = await loadCastTvLibrary(supabase);
+  return library.heartbeats[screenId] ?? null;
 }
 
 export function isCastTvOnline(lastSeenAt: string | null | undefined, now = Date.now()) {
