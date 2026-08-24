@@ -3,6 +3,18 @@ import { readFileSync } from "node:fs";
 import { SERVICE_SUPABASE_CRON_TIMEOUT_MS, SERVICE_SUPABASE_TIMEOUT_MS } from "../lib/supabase/server";
 import { readResponseJson } from "../lib/http/read-response-json";
 import { LIVE_DATA_UNAVAILABLE_MESSAGE } from "../lib/safe-url";
+import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
+
+assert.equal(skipSettingsAndAccess(null), false);
+assert.equal(skipSettingsAndAccess("package_commissions"), true);
+assert.equal(skipSettingsAndAccess("my_shift"), true);
+assert.equal(skipSettingsAndAccess("crossover_communication"), true);
+assert.equal(skipSettingsAndAccess("overview"), false);
+assert.equal(skipSettingsAndAccess("settings"), false);
+assert.equal(skipHeavyBoardWidgets("staff", null), false);
+assert.equal(skipHeavyBoardWidgets("staff", "package_commissions"), true);
+assert.equal(skipHeavyBoardWidgets("staff", "overview"), false);
+assert.equal(skipHeavyBoardWidgets("lobby", "content"), false);
 
 assert.equal(SERVICE_SUPABASE_TIMEOUT_MS, 8_000);
 assert.equal(SERVICE_SUPABASE_CRON_TIMEOUT_MS, 20_000);
@@ -83,6 +95,49 @@ assert.doesNotMatch(boardFetch, /response\.json\(\)/);
 
 const cronFitdog = readFileSync("app/api/cron/fitdog-sync/route.ts", "utf8");
 assert.match(cronFitdog, /SERVICE_SUPABASE_CRON_TIMEOUT_MS/);
+
+const dashboardSource = readFileSync("components/admin/AdminDashboard.tsx", "utf8");
+assert.match(dashboardSource, /bootstrapDashboardPayload/);
+assert.match(dashboardSource, /sessionBootstrap/);
+assert.match(dashboardSource, /\/api\/admin\/session/);
+assert.match(dashboardSource, /TabErrorBoundary/);
+assert.match(dashboardSource, /useSavedAgoLabel/);
+assert.match(dashboardSource, /tab=\$\{encodeURIComponent\(tabRef\.current\)\}/);
+assert.match(dashboardSource, /\/api\/admin\/dashboard\?board=\$\{encodeURIComponent\(board\)\}`/);
+assert.match(dashboardSource, /skipSettingsAndAccess/);
+assert.match(dashboardSource, /hydrateAbortRef/);
+assert.doesNotMatch(dashboardSource, /setInterval\(\(\) => setCurrentTimeMs/);
+assert.match(dashboardSource, /if \(!savedAt\) return/);
+
+const dashboardLoad = readFileSync("lib/admin/dashboard-load.ts", "utf8");
+assert.match(dashboardLoad, /export function skipSettingsAndAccess/);
+assert.match(dashboardLoad, /if \(!tab\) return false/);
+assert.match(dashboardLoad, /export function skipHeavyBoardWidgets/);
+
+const sessionSource = readFileSync("app/api/admin/session/route.ts", "utf8");
+assert.match(sessionSource, /SESSION_ENRICH_BUDGET_MS = 800/);
+assert.match(sessionSource, /cookiePayload/);
+assert.match(sessionSource, /Promise\.race/);
+
+const dashboardRoute = readFileSync("app/api/admin/dashboard/route.ts", "utf8");
+assert.match(dashboardRoute, /skipSettingsAndAccess/);
+assert.match(dashboardRoute, /skipAccessWork/);
+
+const userAccess = readFileSync("lib/admin/user-access.ts", "utf8");
+assert.match(userAccess, /Promise\.all\(/);
+assert.match(userAccess, /LEGACY_ACCESS_MIGRATE_TTL_MS/);
+assert.match(userAccess, /Claim the slot before the query/);
+
+const commissionsPanel = readFileSync("components/admin/PackageCommissionsPanel.tsx", "utf8");
+assert.match(commissionsPanel, /retry/);
+
+const liveFleetCron = readFileSync("app/api/cron/live-fleet-sync/route.ts", "utf8");
+assert.match(liveFleetCron, /SCHEMA_RECHECK_MS/);
+assert.match(liveFleetCron, /ensureLiveFleetSchemaCached/);
+
+const tlCron = readFileSync("app/api/cron/tl-digi-board-sync/route.ts", "utf8");
+assert.match(tlCron, /SCHEMA_RECHECK_MS/);
+assert.match(tlCron, /maxDuration = 25/);
 
 async function testHtmlGuard() {
   const html = new Response("<!DOCTYPE html><html><title>Error</title>Error code 522</html>", {

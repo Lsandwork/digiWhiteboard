@@ -329,23 +329,35 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         });
       } else if (tab === "ledger" || tab === "needs_review" || tab === "approval") {
         if (body.delayed) {
-          setLoadError(
-            body.delayedReason
-              ? `Commission ledger did not load — ${body.delayedReason}`
-              : "Commission ledger did not load."
-          );
-          if (Array.isArray(body.rows) && body.rows.length > 0) {
-            setData(body as LedgerPayload);
+          let resolved = body;
+          if (!Array.isArray(body.rows) || body.rows.length === 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, 600));
+            const retry = await fetchAdminJson<
+              LedgerPayload & { delayed?: boolean; delayedReason?: string | null; error?: string }
+            >(`/api/admin/package-commissions?${params.toString()}`, { timeoutMs: 8_000 });
+            if (retry.ok) resolved = retry.body;
+          }
+          if (resolved.delayed && (!Array.isArray(resolved.rows) || resolved.rows.length === 0)) {
+            setLoadError(
+              resolved.delayedReason
+                ? `Commission ledger did not load — ${resolved.delayedReason}`
+                : "Commission ledger did not load."
+            );
+          } else {
+            setLoadError(null);
+          }
+          if (Array.isArray(resolved.rows) && resolved.rows.length > 0) {
+            setData(resolved as LedgerPayload);
           } else {
             setData((current) =>
               current
                 ? {
                     ...current,
-                    trainers: body.trainers ?? current.trainers,
-                    canManage: body.canManage ?? current.canManage,
-                    canComment: body.canComment ?? current.canComment
+                    trainers: resolved.trainers ?? current.trainers,
+                    canManage: resolved.canManage ?? current.canManage,
+                    canComment: resolved.canComment ?? current.canComment
                   }
-                : (body as LedgerPayload)
+                : (resolved as LedgerPayload)
             );
           }
         } else {
