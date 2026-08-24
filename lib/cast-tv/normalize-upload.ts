@@ -1,4 +1,4 @@
-import sharp from "sharp";
+import { convertHeicBufferToJpeg } from "@/lib/cast-tv/convert-heic";
 import { buildCastTvStoragePath } from "@/lib/cast-tv/media";
 import { inferCastTvMimeType, isHeicCastTvUpload, validateCastTvUpload } from "@/lib/cast-tv/mime";
 
@@ -32,23 +32,16 @@ export async function normalizeCastTvUploadBytes(file: {
   }
 
   if (isHeicCastTvUpload(file.name, mimeType)) {
-    try {
-      const jpeg = await sharp(input, { failOn: "none" })
-        .rotate()
-        .jpeg({ quality: 92, mozjpeg: true, chromaSubsampling: "4:4:4" })
-        .toBuffer();
-      const fileName = file.name.replace(/\.[^.]+$/, ".jpg");
-      return {
-        buffer: jpeg,
-        mimeType: "image/jpeg",
-        fileName,
-        mediaType: "image",
-        fileSize: jpeg.length,
-        storagePath: buildCastTvStoragePath(fileName)
-      };
-    } catch {
-      throw new Error("Could not convert this iPhone photo. Export it as JPG and try again.");
-    }
+    const jpeg = await convertHeicBufferToJpeg(input);
+    const fileName = file.name.replace(/\.[^.]+$/, ".jpg");
+    return {
+      buffer: jpeg,
+      mimeType: "image/jpeg",
+      fileName,
+      mediaType: "image",
+      fileSize: jpeg.length,
+      storagePath: buildCastTvStoragePath(fileName)
+    };
   }
 
   return {

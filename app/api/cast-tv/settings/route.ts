@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
 import { updateCastTvSettings, isCastTvOnline, loadCastTvHeartbeat, loadCastTvSettings } from "@/lib/cast-tv/media";
-import { resolveCastTvManager, requireCastTvManager } from "@/lib/cast-tv/api-auth";
+import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -43,13 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
     const body = await request.json();
 
     const settings = await updateCastTvSettings(auth.supabase, {
@@ -72,8 +66,5 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json({ settings });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update CAST-TV settings.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to update CAST-TV settings.");
 }

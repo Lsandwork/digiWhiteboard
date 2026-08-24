@@ -9,7 +9,7 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
-type CastTvManager = {
+export type CastTvManager = {
   session: ReturnType<typeof getAdminSessionFromRequest>;
   access: UserAccess | null;
   supabase: ReturnType<typeof getServiceSupabase>;
@@ -48,15 +48,23 @@ export async function resolveCastTvManager(request: Request): Promise<CastTvMana
 }
 
 export async function requireCastTvManager(request: Request) {
-  const manager = await resolveCastTvManager(request);
-  if (!manager) {
-    if (!isAdminRequest(request)) {
-      return { error: unauthorizedAdminResponse() };
+  try {
+    const manager = await resolveCastTvManager(request);
+    if (!manager) {
+      if (!isAdminRequest(request)) {
+        return { error: unauthorizedAdminResponse() };
+      }
+      return {
+        error: Response.json({ error: "You do not have permission to manage CAST-TV." }, { status: 403 })
+      };
     }
-    return {
-      error: Response.json({ error: "You do not have permission to manage CAST-TV." }, { status: 403 })
-    };
-  }
 
-  return manager;
+    return manager;
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message.trim()
+        ? error.message
+        : "Unable to authorize CAST-TV.";
+    return { error: Response.json({ error: message }, { status: 500 }) };
+  }
 }

@@ -1,22 +1,18 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
+import { convertStoredCastTvHeicIfNeeded } from "@/lib/cast-tv/convert-heic";
 import { createCastTvMediaRecord } from "@/lib/cast-tv/media";
 import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
-import { requireCastTvManager } from "@/lib/cast-tv/api-auth";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import type { CastTvImageDuration } from "@/lib/cast-tv/types";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
     const body = await request.json();
     const fileName = String(body.fileName ?? "").trim();
     const mimeType = inferCastTvMimeType(fileName, String(body.mimeType ?? "").trim());
@@ -31,12 +27,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Upload metadata is incomplete." }, { status: 400 });
     }
 
-    const supabase = getServiceSupabase({ timeoutMs: 20_000 });
-    const media = await createCastTvMediaRecord(supabase, {
+    const supabase = getServiceSupabase({ timeoutMs: 60_000 });
+    const converted = await convertStoredCastTvHeicIfNeeded(supabase, {
       fileName,
       mimeType,
       fileSize,
-      storagePath,
+      storagePath
+    });
+    const media = await createCastTvMediaRecord(supabase, {
+      fileName: converted.fileName,
+      mimeType: converted.mimeType,
+      fileSize: converted.fileSize,
+      storagePath: converted.storagePath,
       displayName,
       imageDisplaySeconds,
       uploadedBy: auth.session?.adminUserId ?? null,
@@ -53,8 +55,5 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ media });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to save CAST-TV media.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to save CAST-TV media.");
 }

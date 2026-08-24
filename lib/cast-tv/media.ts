@@ -123,23 +123,31 @@ const CAST_TV_BUCKET_MIME_TYPES = [
 ];
 
 export async function ensureCastTvBucket(supabase: SupabaseClient) {
-  const { data } = await supabase.storage.getBucket(CAST_TV_BUCKET);
-  if (data) {
-    await supabase.storage.updateBucket(CAST_TV_BUCKET, {
+  try {
+    const { data } = await supabase.storage.getBucket(CAST_TV_BUCKET);
+    if (data) {
+      try {
+        await supabase.storage.updateBucket(CAST_TV_BUCKET, {
+          public: true,
+          fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
+          allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
+        });
+      } catch {
+        // Allowed types may already be correct; uploads can still proceed.
+      }
+      return;
+    }
+
+    const { error } = await supabase.storage.createBucket(CAST_TV_BUCKET, {
       public: true,
       fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
       allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
     });
-    return;
-  }
-
-  const { error } = await supabase.storage.createBucket(CAST_TV_BUCKET, {
-    public: true,
-    fileSizeLimit: CAST_TV_VIDEO_MAX_BYTES,
-    allowedMimeTypes: CAST_TV_BUCKET_MIME_TYPES
-  });
-  if (error && !/already exists|duplicate/i.test(error.message)) {
-    throw new Error(error.message || "Unable to prepare CAST-TV storage.");
+    if (error && !/already exists|duplicate/i.test(error.message)) {
+      // Leave the failure to the signed/service upload so the caller gets a storage error.
+    }
+  } catch {
+    // Bucket probe failed; signed or service-role uploads may still work if it exists.
   }
 }
 

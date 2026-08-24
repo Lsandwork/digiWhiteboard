@@ -1,26 +1,20 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
-import { requireCastTvManager } from "@/lib/cast-tv/api-auth";
+import { asCastTvFormFile } from "@/lib/cast-tv/form-file";
 import { createCastTvMediaRecord, replaceCastTvMediaFile, uploadCastTvObject } from "@/lib/cast-tv/media";
 import { CAST_TV_SERVER_UPLOAD_MAX_BYTES } from "@/lib/cast-tv/mime";
-import { normalizeCastTvUploadBytes } from "@/lib/cast-tv/normalize-upload";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
     const form = await request.formData();
-    const file = form.get("file");
-    if (!(file instanceof File) || file.size <= 0) {
+    const file = asCastTvFormFile(form.get("file"));
+    if (!file) {
       return NextResponse.json({ error: "Choose a photo or video to upload." }, { status: 400 });
     }
     if (file.size > CAST_TV_SERVER_UPLOAD_MAX_BYTES) {
@@ -32,6 +26,7 @@ export async function POST(request: Request) {
 
     const displayName = form.get("displayName") ? String(form.get("displayName")).trim() : null;
     const replaceId = form.get("replaceId") ? String(form.get("replaceId")).trim() : "";
+    const { normalizeCastTvUploadBytes } = await import("@/lib/cast-tv/normalize-upload");
     const normalized = await normalizeCastTvUploadBytes(file);
     const supabase = getServiceSupabase({ timeoutMs: 60_000 });
 
@@ -64,8 +59,5 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ media });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to save CAST-TV media.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to save CAST-TV media.");
 }

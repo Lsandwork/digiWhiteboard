@@ -90,9 +90,9 @@ export function validateCastTvUpload(file: { name: string; type: string; size: n
   return { mediaType, mimeType: mime };
 }
 
+/** FormData fallback only for small HEIC files if the signed-URL path fails. JPEGs never go through Vercel. */
 export function shouldUseCastTvServerUpload(file: { name: string; type: string; size: number }) {
   if (file.size <= 0 || file.size > CAST_TV_SERVER_UPLOAD_MAX_BYTES) return false;
-  const { mediaType } = validateCastTvUpload(file);
-  if (isHeicCastTvUpload(file.name, file.type)) return true;
-  return mediaType === "image";
+  validateCastTvUpload(file);
+  return isHeicCastTvUpload(file.name, file.type);
 }

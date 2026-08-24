@@ -28,5 +28,8 @@ assert.match(migration, /cast-tv-media/);
 assert.match(migration, /supabase_realtime/);
 assert.match(read("supabase/migrations/087_cast_tv_media_upload.sql"), /cast_tv_media_signed_insert/);
 assert.match(read("app/api/cast-tv/media/upload/route.ts"), /normalizeCastTvUploadBytes/);
+assert.match(read("app/api/cast-tv/media/upload-url/route.ts"), /handleCastTvWrite/);
+assert.match(read("lib/cast-tv/upload-client.ts"), /canFallbackToCastTvServerUpload/);
+assert.match(read("next.config.mjs"), /"sharp"/);
 
 console.log("cast-tv access tests passed");

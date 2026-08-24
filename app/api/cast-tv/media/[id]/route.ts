@@ -1,33 +1,30 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
+import { convertStoredCastTvHeicIfNeeded } from "@/lib/cast-tv/convert-heic";
 import {
   deleteCastTvMediaRecord,
   replaceCastTvMediaFile,
   updateCastTvMediaRecord
 } from "@/lib/cast-tv/media";
-import { requireCastTvManager } from "@/lib/cast-tv/api-auth";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
+import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import type { CastTvImageDuration } from "@/lib/cast-tv/types";
+import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  const { id } = await context.params;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
+    const { id } = await context.params;
     const body = await request.json();
 
     if (body.action === "replace") {
       const fileName = String(body.fileName ?? "").trim();
-      const mimeType = String(body.mimeType ?? "").trim();
+      const mimeType = inferCastTvMimeType(fileName, String(body.mimeType ?? "").trim());
       const fileSize = Number(body.fileSize ?? 0);
       const storagePath = String(body.storagePath ?? "").trim();
 
@@ -35,12 +32,14 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json({ error: "Replace metadata is incomplete." }, { status: 400 });
       }
 
-      const media = await replaceCastTvMediaFile(auth.supabase, id, {
+      const supabase = getServiceSupabase({ timeoutMs: 60_000 });
+      const converted = await convertStoredCastTvHeicIfNeeded(supabase, {
         fileName,
         mimeType,
         fileSize,
         storagePath
       });
+      const media = await replaceCastTvMediaFile(supabase, id, converted);
 
       await writeAdminAuditLog({
         actorAdminId: auth.session?.adminUserId,
@@ -106,22 +105,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     return NextResponse.json({ media });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to update CAST-TV media.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to update CAST-TV media.");
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  const { id } = await context.params;
-
-  try {
+  return handleCastTvWrite(request, async (auth) => {
+    const { id } = await context.params;
     const media = await deleteCastTvMediaRecord(auth.supabase, id);
 
     await writeAdminAuditLog({
@@ -134,8 +123,5 @@ export async function DELETE(request: Request, context: RouteContext) {
     });
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to delete CAST-TV media.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to delete CAST-TV media.");
 }

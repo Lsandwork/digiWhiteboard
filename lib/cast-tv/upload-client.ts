@@ -1,5 +1,6 @@
 import { readApiJson } from "@/lib/admin/safe-fetch-json";
 import {
+  CAST_TV_SERVER_UPLOAD_MAX_BYTES,
   inferCastTvMimeType,
   isHeicCastTvUpload,
   shouldUseCastTvServerUpload
@@ -32,10 +33,19 @@ function fileMime(file: File) {
   return inferCastTvMimeType(file.name, file.type);
 }
 
-async function uploadViaServer(file: File, displayName?: string) {
+function canFallbackToCastTvServerUpload(file: File) {
+  try {
+    return shouldUseCastTvServerUpload(file);
+  } catch {
+    return isHeicCastTvUpload(file.name, file.type) && file.size <= CAST_TV_SERVER_UPLOAD_MAX_BYTES;
+  }
+}
+
+async function uploadViaServer(file: File, displayName?: string, replaceId?: string) {
   const form = new FormData();
   form.append("file", file);
   if (displayName) form.append("displayName", displayName);
+  if (replaceId) form.append("replaceId", replaceId);
   const response = await fetch("/api/cast-tv/media/upload", {
     ...FETCH_INIT,
     method: "POST",
@@ -71,8 +81,7 @@ async function uploadFileToSignedUrl(file: File, signedUrl: string, mimeType: st
   const response = await fetch(signedUrl, {
     method: "PUT",
     headers: {
-      "content-type": mimeType,
-      "x-upsert": "false"
+      "content-type": mimeType || "application/octet-stream"
     },
     body: file
   });
@@ -112,16 +121,6 @@ async function finalizeUpload(input: {
 export async function uploadCastTvMedia(file: File, displayName?: string, onProgress?: (pct: number) => void) {
   onProgress?.(5);
   const mimeType = fileMime(file);
-  if (isHeicCastTvUpload(file.name, mimeType) && !shouldUseCastTvServerUpload(file)) {
-    throw new Error("This iPhone photo is too large to convert here. Export it as JPG and try again.");
-  }
-
-  if (shouldUseCastTvServerUpload(file)) {
-    onProgress?.(25);
-    const media = await uploadViaServer(file, displayName);
-    onProgress?.(100);
-    return media;
-  }
 
   try {
     const target = await requestUploadTarget(file);
@@ -138,7 +137,7 @@ export async function uploadCastTvMedia(file: File, displayName?: string, onProg
     onProgress?.(100);
     return media;
   } catch (error) {
-    if (file.size <= 3_500_000) {
+    if (canFallbackToCastTvServerUpload(file)) {
       onProgress?.(40);
       const media = await uploadViaServer(file, displayName);
       onProgress?.(100);
@@ -156,15 +155,23 @@ export async function replaceCastTvMedia(
   onProgress?.(5);
   const mimeType = fileMime(file);
 
-  if (shouldUseCastTvServerUpload(file)) {
-    onProgress?.(25);
-    const form = new FormData();
-    form.append("file", file);
-    form.append("replaceId", mediaId);
-    const response = await fetch("/api/cast-tv/media/upload", {
+  try {
+    const target = await requestUploadTarget(file);
+    onProgress?.(20);
+    await uploadFileToSignedUrl(file, target.signed_upload_url!, target.mime_type ?? mimeType);
+    onProgress?.(85);
+
+    const response = await fetch(`/api/cast-tv/media/${mediaId}`, {
       ...FETCH_INIT,
-      method: "POST",
-      body: form
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "replace",
+        fileName: file.name,
+        mimeType: target.mime_type ?? mimeType,
+        fileSize: target.file_size_bytes ?? file.size,
+        storagePath: target.storage_path
+      })
     });
     const body = await readApiJson<ReplaceCompleteResponse>(response);
     if (!response.ok || !body.media) {
@@ -172,29 +179,13 @@ export async function replaceCastTvMedia(
     }
     onProgress?.(100);
     return body.media;
+  } catch (error) {
+    if (canFallbackToCastTvServerUpload(file)) {
+      onProgress?.(40);
+      const media = await uploadViaServer(file, undefined, mediaId);
+      onProgress?.(100);
+      return media;
+    }
+    throw error;
   }
-
-  const target = await requestUploadTarget(file);
-  onProgress?.(20);
-  await uploadFileToSignedUrl(file, target.signed_upload_url!, target.mime_type ?? mimeType);
-  onProgress?.(85);
-
-  const response = await fetch(`/api/cast-tv/media/${mediaId}`, {
-    ...FETCH_INIT,
-    method: "PATCH",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      action: "replace",
-      fileName: file.name,
-      mimeType: target.mime_type ?? mimeType,
-      fileSize: target.file_size_bytes ?? file.size,
-      storagePath: target.storage_path
-    })
-  });
-  const body = await readApiJson<ReplaceCompleteResponse>(response);
-  if (!response.ok || !body.media) {
-    throw new Error(body.error ?? "Unable to replace CAST-TV media.");
-  }
-  onProgress?.(100);
-  return body.media;
 }

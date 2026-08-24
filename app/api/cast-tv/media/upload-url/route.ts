@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 import { createCastTvSignedUpload } from "@/lib/cast-tv/media";
 import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
-import { requireCastTvManager } from "@/lib/cast-tv/api-auth";
-import { blockDemoWrite } from "@/lib/admin/api-auth";
+import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const demoBlock = blockDemoWrite(request);
-  if (demoBlock) return demoBlock;
-
-  const auth = await requireCastTvManager(request);
-  if ("error" in auth) return auth.error;
-
-  try {
+  return handleCastTvWrite(request, async () => {
     const body = await request.json();
     const fileName = String(body.fileName ?? "").trim();
     const mimeType = inferCastTvMimeType(fileName, String(body.mimeType ?? "").trim());
@@ -30,11 +25,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const supabase = getServiceSupabase({ timeoutMs: 20_000 });
+    const supabase = getServiceSupabase({ timeoutMs: 60_000 });
     const target = await createCastTvSignedUpload(supabase, { fileName, mimeType, fileSize });
     return NextResponse.json(target);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to prepare CAST-TV upload.";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  }, "Unable to prepare CAST-TV upload.");
 }
