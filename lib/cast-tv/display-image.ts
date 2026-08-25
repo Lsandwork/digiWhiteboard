@@ -4,6 +4,7 @@ import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 
 export const CAST_TV_DISPLAY_MAX_EDGE = 1920;
 export const CAST_TV_DISPLAY_JPEG_QUALITY = 88;
+export const CAST_TV_THUMB_MAX_EDGE = 320;
 export const CAST_TV_DUPLICATE_MESSAGE = "This photo is already on CAST-TV.";
 
 const UUID_STEM =
@@ -150,12 +151,18 @@ export function isDecodableCastTvImageKind(kind: CastTvImageKind) {
   return kind === "jpeg" || kind === "png" || kind === "webp" || kind === "heic" || kind === "gif";
 }
 
-export async function transcodeCastTvDisplayImage(input: Buffer): Promise<TranscodedCastTvJpeg> {
+export async function transcodeCastTvDisplayImage(
+  input: Buffer,
+  options: { maxEdge?: number; includeHashes?: boolean } = {}
+): Promise<TranscodedCastTvJpeg> {
   const kind = sniffCastTvImageKind(input);
   if (!isDecodableCastTvImageKind(kind)) {
     throw new Error("This file is not a valid photo. Upload a JPG, PNG, WEBP, or HEIC image.");
   }
 
+  const maxEdge = options.maxEdge ?? CAST_TV_DISPLAY_MAX_EDGE;
+  const includeHashes = options.includeHashes !== false;
+  const quality = maxEdge <= CAST_TV_THUMB_MAX_EDGE ? 55 : CAST_TV_DISPLAY_JPEG_QUALITY;
   const sharp = await loadSharp();
   let failOn: "error" | "none" = "error";
   try {
@@ -171,13 +178,13 @@ export async function transcodeCastTvDisplayImage(input: Buffer): Promise<Transc
 
   const { data, info } = await sharp(input, { failOn, animated: false })
     .rotate()
-    .resize(CAST_TV_DISPLAY_MAX_EDGE, CAST_TV_DISPLAY_MAX_EDGE, {
+    .resize(maxEdge, maxEdge, {
       fit: "inside",
       withoutEnlargement: true
     })
     .toColorspace("srgb")
     .jpeg({
-      quality: CAST_TV_DISPLAY_JPEG_QUALITY,
+      quality,
       progressive: false,
       chromaSubsampling: "4:2:0"
     })
@@ -201,20 +208,22 @@ export async function transcodeCastTvDisplayImage(input: Buffer): Promise<Transc
           .toBuffer()
       : data;
 
-  const pixelRaw = await sharp(even)
-    .resize(16, 16, { fit: "fill" })
-    .removeAlpha()
-    .raw()
-    .toBuffer();
+  const pixelRaw = includeHashes
+    ? await sharp(even)
+        .resize(16, 16, { fit: "fill" })
+        .removeAlpha()
+        .raw()
+        .toBuffer()
+    : Buffer.alloc(0);
 
   return {
     buffer: even,
     mimeType: "image/jpeg",
     width: Math.max(width, 2),
     height: Math.max(height, 2),
-    contentHash: sha256Hex(even),
-    pixelHash: sha256Hex(pixelRaw),
-    originalHash: sha256Hex(input)
+    contentHash: includeHashes ? sha256Hex(even) : "",
+    pixelHash: includeHashes ? sha256Hex(pixelRaw) : "",
+    originalHash: includeHashes ? sha256Hex(input) : ""
   };
 }
 

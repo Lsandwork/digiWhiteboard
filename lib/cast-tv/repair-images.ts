@@ -12,12 +12,16 @@ export async function repairCastTvLibraryImages(
 ): Promise<CastTvMediaRecord[]> {
   const budgetMs = options.budgetMs ?? 35_000;
   const started = Date.now();
-  const library = await loadCastTvLibrary(supabase);
+  const library = await loadCastTvLibrary(supabase, { skipCache: true, recoverOrphans: false, trigger: "mutation" });
   const nextMedia: CastTvMediaRecord[] = [];
   let changed = false;
   const removed: CastTvMediaRecord[] = [];
 
   for (const item of library.media) {
+    if (item.storage_missing) {
+      nextMedia.push(item);
+      continue;
+    }
     if (item.media_type !== "image") {
       nextMedia.push(item);
       continue;

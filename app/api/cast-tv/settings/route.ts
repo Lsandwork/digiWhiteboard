@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { updateCastTvSettings, isCastTvOnline, loadCastTvHeartbeat, loadCastTvSettings } from "@/lib/cast-tv/media";
+import { mediaRevisionFromLibrary } from "@/lib/cast-tv/admin-list";
+import { updateCastTvSettings, isCastTvOnline, loadCastTvHeartbeat } from "@/lib/cast-tv/media";
 import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
 import { castTvErrorMessage } from "@/lib/cast-tv/errors";
+import { loadCastTvLibrary } from "@/lib/cast-tv/library-store";
+import { logCastTvQuery } from "@/lib/cast-tv/query-log";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
 import { loadCastHardReloadNonce } from "@/lib/display-sync-server";
@@ -14,9 +17,20 @@ export const maxDuration = 60;
 export async function GET(request: Request) {
   try {
     const supabase = getCastTvSupabase();
+    const started = Date.now();
     let settings;
+    let mediaRevision = "";
     try {
-      settings = await loadCastTvSettings(supabase);
+      const library = await loadCastTvLibrary(supabase, { trigger: "settings" });
+      settings = library.settings;
+      mediaRevision = mediaRevisionFromLibrary(library.media, library.settings.updated_at);
+      logCastTvQuery({
+        name: "api.cast-tv.settings",
+        rows: 1,
+        durationMs: Date.now() - started,
+        cache: "miss",
+        trigger: "settings"
+      });
     } catch (error) {
       const message = castTvErrorMessage(error, "Unable to load CAST-TV settings.");
       return NextResponse.json({ error: message, settings: null }, { status: 500 });
@@ -26,13 +40,13 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const includeHeartbeat = url.searchParams.get("heartbeat") === "1";
     if (!includeHeartbeat) {
-      return NextResponse.json({ settings, castHardReloadNonce });
+      return NextResponse.json({ settings, castHardReloadNonce, mediaRevision });
     }
 
     try {
       const manager = await resolveCastTvManager(request);
       if (!manager) {
-        return NextResponse.json({ settings, castHardReloadNonce });
+        return NextResponse.json({ settings, castHardReloadNonce, mediaRevision });
       }
 
       const screenId = url.searchParams.get("screen")?.trim() || "default";
@@ -41,6 +55,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         settings,
         castHardReloadNonce,
+        mediaRevision,
         heartbeat: heartbeat
           ? {
               screen_id: heartbeat.screen_id,
@@ -53,6 +68,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         settings,
         castHardReloadNonce,
+        mediaRevision,
         heartbeat: { screen_id: "default", last_seen_at: null, online: false }
       });
     }

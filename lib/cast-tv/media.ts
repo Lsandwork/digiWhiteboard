@@ -98,16 +98,25 @@ export function withCacheBustedSrc(item: CastTvPlaylistItem): CastTvPlaylistItem
 
 export async function loadCastTvMedia(
   supabase: SupabaseClient,
-  options: { enabledOnly?: boolean } = {}
+  options: {
+    enabledOnly?: boolean;
+    recoverOrphans?: boolean;
+    trigger?: "initial-load" | "refresh" | "playlist" | "mutation" | "probe" | "pagination" | "settings";
+  } = {}
 ): Promise<CastTvMediaRecord[]> {
-  const library = await loadCastTvLibrary(supabase);
+  const library = await loadCastTvLibrary(supabase, {
+    recoverOrphans: options.recoverOrphans === true,
+    trigger: options.trigger ?? (options.enabledOnly ? "playlist" : "refresh")
+  });
   const records = library.media.map((record) => ({
     ...record,
     public_url:
       record.public_url ||
       publicUrlForCastTvPath(supabase, record.storage_path, record.updated_at, record.bucket || CAST_TV_BUCKET)
   }));
-  if (options.enabledOnly) return records.filter((record) => record.is_enabled);
+  if (options.enabledOnly) {
+    return records.filter((record) => record.is_enabled && !record.storage_missing);
+  }
   return records;
 }
 
@@ -484,7 +493,7 @@ export async function moveCastTvMedia(
 }
 
 export async function loadCastTvSettings(supabase: SupabaseClient): Promise<CastTvSettings> {
-  const library = await loadCastTvLibrary(supabase, { recoverOrphans: false });
+  const library = await loadCastTvLibrary(supabase, { recoverOrphans: false, trigger: "settings" });
   return library.settings ?? defaultCastTvSettings();
 }
 
