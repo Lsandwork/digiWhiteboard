@@ -4,9 +4,8 @@ import { readResponseJson } from "@/lib/http/read-response-json";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { LobbyClassSchedule } from "@/components/lobby/LobbyClassSchedule";
-import { LobbyFeaturedCard } from "@/components/lobby/LobbyFeaturedCard";
+import { LobbyCheckoutShowcase } from "@/components/lobby/LobbyCheckoutShowcase";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
-import { LobbyQueueList } from "@/components/lobby/LobbyQueueList";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
 import { CastModeStatusIndicator, type CastModeStatus } from "@/components/display/CastModeStatusIndicator";
@@ -28,6 +27,7 @@ import { useInFlightPoll } from "@/hooks/useInFlightPoll";
 import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import {
   areLobbyCheckoutsDisplayEqual,
+  getLobbyCheckoutMergeKey,
   stabilizeLobbyCheckoutsResponse
 } from "@/lib/lobby-display-stable";
 import {
@@ -85,7 +85,18 @@ function normalizeCheckoutsResponse(body: Partial<LobbyCheckoutsResponse> | null
 }
 
 function checkoutDogsFromResponse(response: LobbyCheckoutsResponse) {
-  return [...(response.featured ? [response.featured] : []), ...(response.queue ?? [])];
+  return uniqueCheckoutDogs(response.featured, response.queue ?? []);
+}
+
+function uniqueCheckoutDogs(featured: LobbyCheckoutsResponse["featured"], queue: LobbyCheckoutsResponse["queue"]) {
+  const dogs = featured ? [featured, ...(queue ?? [])] : queue ?? [];
+  const seen = new Set<string>();
+  return dogs.filter((dog) => {
+    const key = getLobbyCheckoutMergeKey(dog);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function LobbyCheckoutBoard({
@@ -469,7 +480,11 @@ export function LobbyCheckoutBoard({
   const { featured, queue, hasCheckout } = useLobbyCheckoutTimers(displayCheckouts, nowMs);
   const checkoutActive = displayMode === "CHECKOUT_ACTIVE" && hasCheckout;
   const idleCarouselPaused = checkoutActive;
-  const activeCheckoutDog = checkoutActive ? featured ?? queue[0] ?? null : null;
+  const showcaseDogs = useMemo(
+    () => (checkoutActive ? uniqueCheckoutDogs(featured, queue) : []),
+    [checkoutActive, featured, queue]
+  );
+  const activeCheckoutDog = checkoutActive ? showcaseDogs[0] ?? null : null;
   const rawCheckoutCount = checkoutDogsFromResponse(rawCheckouts).length;
   const activeCheckoutStartedAt = activeCheckoutDog?.prompted_at ?? null;
   const activeCheckoutExpiresAt = activeCheckoutDog?.display_until ?? null;
@@ -481,13 +496,8 @@ export function LobbyCheckoutBoard({
         ? "reconnecting"
         : "live";
   const castDogPhotoUrls = useMemo(
-    () => [
-      featured?.dog_photo_url,
-      queue[0]?.dog_photo_url,
-      queue[1]?.dog_photo_url,
-      queue[2]?.dog_photo_url
-    ],
-    [featured?.dog_photo_url, queue]
+    () => showcaseDogs.map((dog) => dog.dog_photo_url),
+    [showcaseDogs]
   );
   useDogPhotoPreloader(castDogPhotoUrls, { enabled: castMode, debugBoard, width: 640 });
   useCastModeRuntime({
@@ -559,20 +569,15 @@ export function LobbyCheckoutBoard({
         ) : null}
 
         <div className="lobby-main-grid mt-3 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-4">
-          <div
-            className="lobby-checkout-column flex min-h-0 flex-col gap-3"
-            data-queue-size={queue.length}
-          >
-            {checkoutActive && featured ? (
-              <LobbyFeaturedCard key={featured.gingr_animal_id ?? featured.id} dog={featured} />
-            ) : (
+          {checkoutActive ? (
+            <LobbyCheckoutShowcase dogs={showcaseDogs} />
+          ) : (
+            <div className="lobby-checkout-column flex min-h-0 flex-col gap-3">
               <section className="lobby-panel lobby-idle-checkout-slot overflow-hidden">
                 <LobbyIdleSlideshow tvMode={showTvLayout} />
               </section>
-            )}
-
-            {checkoutActive ? <LobbyQueueList dogs={queue} /> : null}
-          </div>
+            </div>
+          )}
 
           {settings.show_promotions ? (
             <SocialMomentsCarousel paused={idleCarouselPaused} performanceMode={castMode} />
@@ -602,7 +607,7 @@ export function LobbyCheckoutBoard({
           fullDebug={fullDebug}
           checkouts={checkouts}
           rawCheckoutCount={rawCheckoutCount}
-          visibleCheckoutCount={(featured ? 1 : 0) + queue.length}
+          visibleCheckoutCount={showcaseDogs.length || (featured ? 1 : 0) + queue.length}
           checkoutPollMs={checkoutPollMs}
           displayMode={displayMode}
           activeCheckoutDogName={activeCheckoutDog?.dog_name ?? null}
