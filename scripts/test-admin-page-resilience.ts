@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { SERVICE_SUPABASE_CRON_TIMEOUT_MS, SERVICE_SUPABASE_TIMEOUT_MS } from "../lib/supabase/server";
 import { readResponseJson } from "../lib/http/read-response-json";
 import { LIVE_DATA_UNAVAILABLE_MESSAGE } from "../lib/safe-url";
-import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
+import { skipDashboardBackgroundHydrate, skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
+import { OVERVIEW_QUERY_TIMEOUT_MS, OVERVIEW_SETTINGS_POINTERS, emptyOverviewPayload } from "../lib/admin/overview";
 import { capStaffOpsListPayload, STAFF_OPS_LIST_MESSAGE_LIMIT } from "../lib/staff/admin-ops";
 
 assert.equal(skipSettingsAndAccess(null), false);
@@ -14,10 +15,26 @@ assert.equal(skipSettingsAndAccess("overview"), false);
 assert.equal(skipSettingsAndAccess("settings"), false);
 assert.equal(skipHeavyBoardWidgets("staff", null), false);
 assert.equal(skipHeavyBoardWidgets("staff", "package_commissions"), true);
-assert.equal(skipHeavyBoardWidgets("staff", "overview"), false);
+assert.equal(skipHeavyBoardWidgets("staff", "overview"), true);
+assert.equal(skipHeavyBoardWidgets("staff", "integrations"), false);
 assert.equal(skipHeavyBoardWidgets("lobby", "content"), false);
 assert.equal(skipHeavyBoardWidgets("marketing", "cast_tv"), true);
 assert.equal(skipHeavyBoardWidgets("marketing", "settings"), false);
+assert.equal(skipHungBoardSnapshots("staff", "overview"), true);
+assert.equal(skipHungBoardSnapshots("staff", null), true);
+assert.equal(skipHungBoardSnapshots("staff", "integrations"), false);
+assert.equal(skipHungBoardSnapshots("lobby", "content"), false);
+assert.equal(skipDashboardBackgroundHydrate("staff", "overview"), true);
+assert.equal(skipDashboardBackgroundHydrate("staff", "ops_system_health"), true);
+assert.equal(skipDashboardBackgroundHydrate("staff", "package_commissions"), true);
+assert.equal(skipDashboardBackgroundHydrate("staff", "my_shift"), false);
+assert.equal(skipDashboardBackgroundHydrate("staff", "integrations"), false);
+assert.equal(skipDashboardBackgroundHydrate("marketing", "cast_tv"), true);
+assert.equal(OVERVIEW_QUERY_TIMEOUT_MS, 4_000);
+assert.equal(emptyOverviewPayload().degraded, true);
+assert.equal(emptyOverviewPayload().metrics.length, 6);
+assert.ok(OVERVIEW_SETTINGS_POINTERS.some((pointer) => pointer.path === "staff_admin_ops->active_issues"));
+assert.ok(OVERVIEW_SETTINGS_POINTERS.every((pointer) => !pointer.path.includes("crossover_messages")));
 assert.equal(STAFF_OPS_LIST_MESSAGE_LIMIT, 120);
 assert.equal(
   capStaffOpsListPayload({
@@ -128,7 +145,7 @@ assert.match(dashboardSource, /tab=\$\{encodeURIComponent\(tabRef\.current\)\}/)
 assert.match(dashboardSource, /\/api\/admin\/dashboard\?board=\$\{encodeURIComponent\(board\)\}`/);
 assert.match(dashboardSource, /skipSettingsAndAccess/);
 assert.match(dashboardSource, /hydrateAbortRef/);
-assert.match(dashboardSource, /skipBackgroundHydrate/);
+assert.match(dashboardSource, /skipDashboardBackgroundHydrate/);
 assert.doesNotMatch(dashboardSource, /setInterval\(\(\) => setCurrentTimeMs/);
 assert.match(dashboardSource, /if \(!savedAt\) return/);
 
@@ -136,6 +153,30 @@ const dashboardLoad = readFileSync("lib/admin/dashboard-load.ts", "utf8");
 assert.match(dashboardLoad, /export function skipSettingsAndAccess/);
 assert.match(dashboardLoad, /if \(!tab\) return false/);
 assert.match(dashboardLoad, /export function skipHeavyBoardWidgets/);
+assert.match(dashboardLoad, /export function skipHungBoardSnapshots/);
+assert.match(dashboardLoad, /export function skipDashboardBackgroundHydrate/);
+
+const overviewSource = readFileSync("lib/admin/overview.ts", "utf8");
+assert.match(overviewSource, /OVERVIEW_QUERY_TIMEOUT_MS = 4_000/);
+assert.match(overviewSource, /loadAdminSettingsJsonPointers/);
+assert.match(overviewSource, /staff_admin_ops->active_issues/);
+assert.match(overviewSource, /storage\/v1\/object\/public/);
+assert.match(overviewSource, /emptyOverviewPayload/);
+assert.doesNotMatch(overviewSource, /listAllManagementReports/);
+assert.doesNotMatch(overviewSource, /listStaffOps/);
+assert.doesNotMatch(overviewSource, /loadCastTvHeartbeat/);
+assert.doesNotMatch(overviewSource, /select\("\*"\)/);
+
+const overviewRoute = readFileSync("app/api/admin/overview/route.ts", "utf8");
+assert.match(overviewRoute, /maxDuration = 20/);
+assert.match(overviewRoute, /timeoutMs: OVERVIEW_QUERY_TIMEOUT_MS/);
+assert.match(overviewRoute, /emptyOverviewPayload/);
+assert.doesNotMatch(overviewRoute, /maxDuration = 60/);
+
+const overviewPanel = readFileSync("components/admin/OverviewPanel.tsx", "utf8");
+assert.match(overviewPanel, /AbortController/);
+assert.match(overviewPanel, /10_000/);
+assert.match(overviewPanel, /data\.degraded/);
 
 const sessionSource = readFileSync("app/api/admin/session/route.ts", "utf8");
 assert.match(sessionSource, /SESSION_ENRICH_BUDGET_MS = 800/);
@@ -145,6 +186,10 @@ assert.match(sessionSource, /Promise\.race/);
 const dashboardRoute = readFileSync("app/api/admin/dashboard/route.ts", "utf8");
 assert.match(dashboardRoute, /skipSettingsAndAccess/);
 assert.match(dashboardRoute, /skipAccessWork/);
+assert.match(dashboardRoute, /skipHungBoardSnapshots/);
+assert.match(dashboardRoute, /skipHungSnapshots/);
+assert.doesNotMatch(dashboardRoute, /live_transition_dogs"\)\s*\.select\("\*"\)/);
+assert.doesNotMatch(dashboardRoute, /gingr_webhook_events"\)\s*\.select\("\*"\)/);
 
 const userAccess = readFileSync("lib/admin/user-access.ts", "utf8");
 assert.match(userAccess, /Promise\.all\(/);

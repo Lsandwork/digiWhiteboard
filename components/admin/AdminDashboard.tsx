@@ -73,7 +73,7 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
-import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
+import { skipDashboardBackgroundHydrate, skipHeavyBoardWidgets, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
 import { navigateAdminDashboard, useAdminDashboardLocation } from "@/lib/admin/dashboard-nav";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
 import { broadcastCastHardReload } from "@/lib/lobby/google-cast";
@@ -290,7 +290,7 @@ export function AdminDashboard() {
         };
       });
       setError(null);
-      const skipBackgroundHydrate = board === "marketing" && skipHeavyBoardWidgets(board, tabForFetch);
+      const skipBackgroundHydrate = skipDashboardBackgroundHydrate(board, tabForFetch);
       if ((liteSettings || liteWidgets) && !skipBackgroundHydrate) {
         hydrateAbortRef.current?.abort();
         const hydrateController = new AbortController();

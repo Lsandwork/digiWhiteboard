@@ -1,23 +1,43 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
-import { listDisplayDevices } from "@/lib/display-keeper-server";
-import { activePipPlans, listPipPlans, pipReviewsDueThisWeek, type PipPlan } from "@/lib/hr/pip";
+import {
+  loadAdminSettingsJsonKey,
+  loadAdminSettingsJsonPointers,
+  saveAdminSettingsJsonKey,
+  type AdminSettingsJsonPointer
+} from "@/lib/admin/settings-json-store";
+import { activePipPlans, pipReviewsDueThisWeek, type PipPlan } from "@/lib/hr/pip";
 import { buildHrHubStats, isHrRecord, toHrRecord, formatHrReportType } from "@/lib/hr/records";
-import { loadCastTvHeartbeat, isCastTvOnline } from "@/lib/cast-tv/media";
-import { listStaffOps, type ActiveIssue, type OwnerFollowUp, type StaffActivityLog } from "@/lib/staff/admin-ops";
+import { type ActiveIssue, type OwnerFollowUp, type StaffActivityLog } from "@/lib/staff/admin-ops";
 import {
   computeSupportHubStats,
   mapReportToInboxRow,
   type SupportInboxRow
 } from "@/lib/staff/management-support-admin";
-import { listAllManagementReports } from "@/lib/staff/management-reports";
-import { listStaffPushNotices, type StaffPushNotice } from "@/lib/staff/push-notices";
+import type { ManagementReport } from "@/lib/staff/management-reports";
+import type { StaffPushNotice } from "@/lib/staff/push-notices";
 import {
-  loadSystemHealthAudit,
   toOverviewSystemHealth,
-  type OverviewSystemHealth
+  type OverviewSystemHealth,
+  type SystemHealthAuditState
 } from "@/lib/admin/system-health-audit";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+
+/** Interactive overview GET. Do not raise this — hung JSONB must fail-soft. */
+export const OVERVIEW_QUERY_TIMEOUT_MS = 4_000;
+export const OVERVIEW_CLIENT_TIMEOUT_MS = 10_000;
+export const OVERVIEW_CAST_TV_TIMEOUT_MS = 3_000;
+
+export const OVERVIEW_SETTINGS_POINTERS: AdminSettingsJsonPointer[] = [
+  { alias: "active_issues", path: "staff_admin_ops->active_issues" },
+  { alias: "owner_follow_ups", path: "staff_admin_ops->owner_follow_ups" },
+  { alias: "activity_logs", path: "staff_admin_ops->activity_logs" },
+  { alias: "reports", path: "management_reports->reports" },
+  { alias: "notices", path: "staff_push_notices->notices" },
+  { alias: "pip_plans", path: "hr_pip_plans->plans" },
+  { alias: "board_notes", path: "overview_board_notes" },
+  { alias: "system_health", path: "system_health_audit" }
+];
 
 export type OverviewAlertPriority = "high" | "medium" | "low";
 export type OverviewAlertStatus = "New" | "In Progress" | "Assigned" | "Escalated" | "Overdue" | "Resolved";
@@ -101,6 +121,8 @@ export type OverviewBoardNote = {
 
 export type OverviewPayload = {
   generated_at: string;
+  /** True when a store timed out — page still renders with whatever arrived. */
+  degraded?: boolean;
   metrics: OverviewMetric[];
   priorities: {
     urgent_count: number;
@@ -338,6 +360,132 @@ export async function saveOverviewBoardNote(
   return note;
 }
 
+function newestByCreatedAt<T extends { created_at?: string }>(value: unknown, limit: number): T[] {
+  if (!Array.isArray(value)) return [];
+  return [...(value as T[])]
+    .sort(
+      (a, b) =>
+        new Date(String(b?.created_at || 0)).getTime() - new Date(String(a?.created_at || 0)).getTime()
+    )
+    .slice(0, limit);
+}
+
+function emptySystemHealthState(): SystemHealthAuditState {
+  return {
+    version: 1,
+    last_run_at: null,
+    last_run_id: null,
+    overall_status: "never_run",
+    open_issues: [],
+    recent_rows: [],
+    runs: []
+  };
+}
+
+function parseOverviewSystemHealth(value: unknown): SystemHealthAuditState {
+  if (!value || typeof value !== "object") return emptySystemHealthState();
+  const raw = value as Partial<SystemHealthAuditState>;
+  return {
+    version: 1,
+    last_run_at: raw.last_run_at ? String(raw.last_run_at) : null,
+    last_run_id: raw.last_run_id ? String(raw.last_run_id) : null,
+    overall_status:
+      raw.overall_status === "all_clear" ||
+      raw.overall_status === "issues" ||
+      raw.overall_status === "failed_fixes" ||
+      raw.overall_status === "never_run"
+        ? raw.overall_status
+        : "never_run",
+    open_issues: Array.isArray(raw.open_issues) ? raw.open_issues : [],
+    recent_rows: Array.isArray(raw.recent_rows) ? raw.recent_rows : [],
+    runs: Array.isArray(raw.runs) ? raw.runs.slice(0, 20) : []
+  };
+}
+
+function isCastTvOnline(lastSeenAt: string | null | undefined, now = Date.now()) {
+  if (!lastSeenAt) return false;
+  const seen = new Date(lastSeenAt).getTime();
+  if (Number.isNaN(seen)) return false;
+  return now - seen <= 90_000;
+}
+
+type OverviewStores = {
+  ok: boolean;
+  issues: ActiveIssue[];
+  followUps: OwnerFollowUp[];
+  activity: StaffActivityLog[];
+  reports: ManagementReport[];
+  notices: StaffPushNotice[];
+  pipPlans: PipPlan[];
+  boardNotes: OverviewBoardNote[];
+  systemHealth: SystemHealthAuditState;
+};
+
+const EMPTY_OVERVIEW_STORES: OverviewStores = {
+  ok: false,
+  issues: [],
+  followUps: [],
+  activity: [],
+  reports: [],
+  notices: [],
+  pipPlans: [],
+  boardNotes: [],
+  systemHealth: emptySystemHealthState()
+};
+
+async function loadOverviewStores(supabase: SupabaseClient): Promise<OverviewStores> {
+  const row = await loadAdminSettingsJsonPointers(supabase, OVERVIEW_SETTINGS_POINTERS);
+  if (!row) return EMPTY_OVERVIEW_STORES;
+  return {
+    ok: true,
+    issues: newestByCreatedAt<ActiveIssue>(row.active_issues, 80),
+    followUps: newestByCreatedAt<OwnerFollowUp>(row.owner_follow_ups, 80),
+    activity: newestByCreatedAt<StaffActivityLog>(row.activity_logs, 20),
+    reports: newestByCreatedAt<ManagementReport>(row.reports, 80),
+    notices: newestByCreatedAt<StaffPushNotice>(row.notices, 40),
+    pipPlans: Array.isArray(row.pip_plans) ? (row.pip_plans as PipPlan[]).slice(0, 40) : [],
+    boardNotes: parseBoardNotes(row.board_notes),
+    systemHealth: parseOverviewSystemHealth(row.system_health)
+  };
+}
+
+async function loadOverviewDevices(supabase: SupabaseClient) {
+  const { data, error } = await supabase
+    .from("display_devices")
+    .select("id, name, last_seen_at")
+    .order("last_seen_at", { ascending: false })
+    .limit(50);
+  if (error) return [] as Array<{ last_seen_at?: string | null }>;
+  return (data ?? []) as Array<{ last_seen_at?: string | null }>;
+}
+
+async function loadCastTvOnlinePublic(now: number): Promise<boolean> {
+  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  if (!base) return false;
+  for (const bucket of ["lobby-slideshow", "cast-tv-media"] as const) {
+    try {
+      const response = await fetch(`${base}/storage/v1/object/public/${bucket}/cast-tv/heartbeats.json`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(OVERVIEW_CAST_TV_TIMEOUT_MS)
+      });
+      if (response.status === 400 || response.status === 404) continue;
+      if (!response.ok) continue;
+      const parsed = (await response.json()) as unknown;
+      const raw =
+        parsed && typeof parsed === "object" && "heartbeats" in parsed
+          ? (parsed as { heartbeats?: unknown }).heartbeats
+          : parsed;
+      if (!raw || typeof raw !== "object") continue;
+      const entries = Object.values(raw as Record<string, { last_seen_at?: string }>);
+      if (entries.some((entry) => isCastTvOnline(entry?.last_seen_at, now))) return true;
+      return false;
+    } catch {
+      break;
+    }
+  }
+  return false;
+}
+
 export async function buildOverviewPayload(supabase: SupabaseClient): Promise<OverviewPayload> {
   const now = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
@@ -346,20 +494,14 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
   const todayStartMs = todayStart.getTime();
   const yesterdayStartMs = todayStartMs - dayMs;
 
-  const [ops, reports, notices, pipPlans, devices, castHeartbeat, boardNotes, systemHealthState] =
-    await Promise.all([
-      listStaffOps(supabase),
-      listAllManagementReports(supabase),
-      listStaffPushNotices(supabase, 100),
-      listPipPlans(supabase),
-      listDisplayDevices(supabase).catch(() => []),
-      loadCastTvHeartbeat(supabase).catch(() => null),
-      loadBoardNotes(supabase),
-      loadSystemHealthAudit(supabase).catch(() => null)
-    ]);
+  const [stores, devices, castOnline] = await Promise.all([
+    withTimeoutFallback(loadOverviewStores(supabase), OVERVIEW_QUERY_TIMEOUT_MS, EMPTY_OVERVIEW_STORES),
+    withTimeoutFallback(loadOverviewDevices(supabase), OVERVIEW_QUERY_TIMEOUT_MS, []),
+    withTimeoutFallback(loadCastTvOnlinePublic(now), OVERVIEW_CAST_TV_TIMEOUT_MS, false)
+  ]);
 
-  const openIssues = ops.active_issues.filter((issue) => isOpenOpsStatus(issue.status));
-  const openFollowUps = ops.owner_follow_ups.filter((item) => isOpenOpsStatus(item.status));
+  const openIssues = stores.issues.filter((issue) => isOpenOpsStatus(issue.status));
+  const openFollowUps = stores.followUps.filter((item) => isOpenOpsStatus(item.status));
   const overdueFollowUps = openFollowUps.filter(
     (item) => item.due_date && new Date(`${item.due_date}T23:59:59`).getTime() < now
   );
@@ -369,23 +511,32 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
     (issue) => String(issue.priority).toLowerCase() === "urgent" || String(issue.priority).toLowerCase() === "high"
   );
 
-  const supportRows = reports.map(mapReportToInboxRow);
+  let supportRows: SupportInboxRow[] = [];
+  try {
+    supportRows = stores.reports.map(mapReportToInboxRow);
+  } catch {
+    supportRows = [];
+  }
   const supportStats = computeSupportHubStats(supportRows);
   const openSupport = supportRows.filter(
     (row) => row.status !== "Closed" && row.status !== "Resolved"
   );
   const highSupport = openSupport.filter((row) => row.priority === "Urgent" || row.priority === "High");
 
-  const hrReports = reports.filter(isHrRecord);
+  let hrReports: ManagementReport[] = [];
+  try {
+    hrReports = stores.reports.filter(isHrRecord);
+  } catch {
+    hrReports = [];
+  }
   const hrRecords = hrReports.map(toHrRecord);
   const hrStats = buildHrHubStats(hrRecords);
   const openHr = hrRecords.filter((r) => !["Closed", "Resolved", "Reviewed"].includes(r.status));
 
-  const activeNotices = notices.filter((notice) => notice.is_active && !notice.cleared_at);
-  const highNotices = activeNotices.filter((n) => n.priority === "urgent" || n.display_mode === "urgent");
+  const activeNotices = stores.notices.filter((notice) => notice.is_active && !notice.cleared_at);
 
-  const activePip = activePipPlans(pipPlans);
-  const pipDueWeek = pipReviewsDueThisWeek(pipPlans);
+  const activePip = activePipPlans(stores.pipPlans);
+  const pipDueWeek = pipReviewsDueThisWeek(stores.pipPlans);
 
   const alerts: OverviewAlert[] = [
     ...openIssues.map(issueToAlert),
@@ -405,14 +556,13 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
   const overdueAlerts = alerts.filter((a) => a.status === "Overdue" || a.sla_remaining_ms < 0);
 
   const onlineDevices = devices.filter((device) => {
-    const seen = new Date(device.last_seen_at).getTime();
+    const seen = new Date(String(device.last_seen_at || "")).getTime();
     return Number.isFinite(seen) && now - seen <= 5 * 60 * 1000;
   });
-  const castOnline = isCastTvOnline(castHeartbeat?.last_seen_at, now);
   const totalDevices = Math.max(devices.length, castOnline || devices.length ? 1 : 0);
   const onlineCount = onlineDevices.length + (castOnline ? 1 : 0);
   const healthRatio = totalDevices ? onlineCount / (devices.length + 1) : castOnline ? 1 : 1;
-  const boardHealthLabel = !devices.length && !castHeartbeat
+  const boardHealthLabel = !devices.length && !castOnline
     ? "Good"
     : healthRatio >= 0.8
       ? "Good"
@@ -430,7 +580,7 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
     now + 1
   );
   const createdYesterdayAlerts = countCreatedBetween(
-    [...ops.active_issues, ...notices.map((n) => ({ created_at: n.pushed_at || n.created_at }))],
+    [...stores.issues, ...stores.notices.map((n) => ({ created_at: n.pushed_at || n.created_at }))],
     yesterdayStartMs,
     todayStartMs
   );
@@ -442,7 +592,7 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
     now + 1
   );
   const tasksYesterday = countCreatedBetween(
-    [...ops.active_issues, ...ops.owner_follow_ups],
+    [...stores.issues, ...stores.followUps],
     yesterdayStartMs,
     todayStartMs
   );
@@ -540,7 +690,7 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
   ].filter((item) => item.count > 0);
 
   const recent_activity: OverviewActivityItem[] = [
-    ...ops.activity_logs.slice(0, 15).map((log: StaffActivityLog) => ({
+    ...stores.activity.slice(0, 15).map((log: StaffActivityLog) => ({
       id: log.id,
       title: log.title,
       description: log.description,
@@ -584,6 +734,7 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
 
   return {
     generated_at: new Date().toISOString(),
+    degraded: !stores.ok,
     metrics,
     priorities: {
       urgent_count: priorityItems.reduce((sum, item) => sum + item.count, 0),
@@ -595,7 +746,7 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
     action_center,
     recent_activity,
     upcoming_reviews,
-    board_notes: boardNotes,
+    board_notes: stores.boardNotes,
     board_health: {
       label: boardHealthLabel,
       detail: `Uptime ${uptimePct}%`,
@@ -603,16 +754,56 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
       total_devices: devices.length,
       cast_tv_online: castOnline
     },
-    system_health: toOverviewSystemHealth(
-      systemHealthState ?? {
-        version: 1,
-        last_run_at: null,
-        last_run_id: null,
-        overall_status: "never_run",
-        open_issues: [],
-        recent_rows: [],
-        runs: []
+    system_health: toOverviewSystemHealth(stores.systemHealth)
+  };
+}
+
+export function emptyOverviewPayload(): OverviewPayload {
+  const zero = (key: string, label: string, tone: OverviewMetric["tone"], href_tab: string): OverviewMetric => ({
+    key,
+    label,
+    value: 0,
+    detail: "Temporarily unavailable",
+    trend_label: "0 vs yesterday",
+    trend_direction: "flat",
+    tone,
+    href_tab
+  });
+  return {
+    generated_at: new Date().toISOString(),
+    degraded: true,
+    metrics: [
+      zero("active_alerts", "Active Alerts", "red", "push_notices"),
+      zero("hr_notifications", "HR Notifications", "orange", "hr_hub"),
+      zero("pip", "Employees on PIP", "purple", "hr_pip"),
+      zero("open_tasks", "Open Tasks", "blue", "active_issues"),
+      zero("staffing", "Staffing Issues", "amber", "active_issues"),
+      {
+        key: "board_health",
+        label: "Board Health",
+        value: "Fair",
+        detail: "Live snapshot delayed",
+        trend_label: "Retry shortly",
+        trend_direction: "flat",
+        tone: "amber",
+        href_tab: "display"
       }
-    )
+    ],
+    priorities: { urgent_count: 0, items: [] },
+    alerts: [],
+    hr_notifications: [],
+    pip_plans: [],
+    action_center: [],
+    recent_activity: [],
+    upcoming_reviews: [],
+    board_notes: [],
+    board_health: {
+      label: "Fair",
+      detail: "Live snapshot delayed",
+      online_devices: 0,
+      total_devices: 0,
+      cast_tv_online: false
+    },
+    system_health: toOverviewSystemHealth(emptySystemHealthState())
   };
 }

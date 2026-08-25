@@ -2,7 +2,7 @@
 
 import { readResponseJson } from "@/lib/http/read-response-json";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -116,6 +116,8 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
   const { showToast } = useToast();
   const [data, setData] = useState<OverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const [alertFilter, setAlertFilter] = useState<AlertFilter>("all");
   const [alertQuery, setAlertQuery] = useState("");
   const [noteText, setNoteText] = useState("");
@@ -124,14 +126,20 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
     try {
-      const response = await fetch("/api/admin/overview", { cache: "no-store" });
+      const response = await fetch("/api/admin/overview", { cache: "no-store", signal: controller.signal });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error || "Unable to load overview.");
       setData(body as OverviewPayload);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load overview.", "error");
+      const aborted = (error instanceof DOMException && error.name === "AbortError") || controller.signal.aborted;
+      if (!aborted || !dataRef.current) {
+        showToast(error instanceof Error ? error.message : "Unable to load overview.", "error");
+      }
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   }, [showToast]);
@@ -249,6 +257,12 @@ export function OverviewPanel({ onNavigate, boardMetaPanels }: OverviewPanelProp
           </button>
         </div>
       </header>
+
+      {data.degraded ? (
+        <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          Some overview data is delayed. Figures below may be incomplete — tap Refresh.
+        </p>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
         {data.metrics.map((metric) => (

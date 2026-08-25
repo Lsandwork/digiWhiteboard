@@ -43,6 +43,10 @@ assert.match(apiSrc, /end_live_debug/);
 assert.match(apiSrc, /run_whiteboard_audit/);
 assert.match(apiSrc, /acknowledge_audit_issue/);
 assert.match(apiSrc, /audit_issues/);
+assert.match(apiSrc, /maxDuration = 20/);
+assert.match(apiSrc, /humanizeUnknownError/);
+assert.match(healthChecks, /SYSTEM_HEALTH_HUNG_TABLE_TIMEOUT_MS/);
+assert.match(healthChecks, /probeTimedOut/);
 
 const uiSrc = readFileSync(
   resolve(__dirname, "../components/admin/system-health/SystemHealthDebuggingApp.tsx"),

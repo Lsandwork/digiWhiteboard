@@ -15,6 +15,11 @@ import { probeBackgroundWorker, probeJobQueue } from "@/lib/system-health/probes
 import { probeRouteGenerator } from "@/lib/system-health/probes/route-generator";
 import { checkSystemHealthSchema, SYSTEM_HEALTH_REQUIRED_TABLES } from "@/lib/system-health/ensure-schema";
 import type { SchemaReadiness } from "@/lib/system-health/ensure-schema";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+
+/** Interactive System Health probes. Hung Gingr tables must not 500 the page. */
+export const SYSTEM_HEALTH_PROBE_TIMEOUT_MS = 3_000;
+export const SYSTEM_HEALTH_HUNG_TABLE_TIMEOUT_MS = 1_200;
 
 export type ServiceHealthCard = {
   id: string;
@@ -139,18 +144,39 @@ export async function runFunctionalHealthChecks(): Promise<{
 
   const safeCount = async (fn: () => PromiseLike<{ count: number | null }>) => {
     try {
-      const r = await fn();
+      const r = await withTimeoutFallback(Promise.resolve(fn()), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, {
+        count: 0
+      });
       return r.count ?? 0;
     } catch {
       return 0;
     }
   };
-  const safeMaybe = async <T,>(fn: () => PromiseLike<{ data: T | null }>) => {
+  const safeMaybe = async <T,>(fn: () => PromiseLike<{ data: T | null; error?: { message?: string } | null }>) => {
     try {
-      return await fn();
+      return await withTimeoutFallback(Promise.resolve(fn()), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, {
+        data: null as T | null,
+        error: null
+      });
     } catch {
-      return { data: null as T | null };
+      return { data: null as T | null, error: null };
     }
+  };
+  /** `live_transition_dogs` / `gingr_webhook_events` hang in production — never block the suite. */
+  const safeHungTable = async <T,>(
+    fn: () => PromiseLike<{ data: T | null; error?: { message?: string } | null }>
+  ): Promise<{ data: T | null; timedOut: boolean }> => {
+    const sentinel = Symbol("hung-table-timeout");
+    const result = await Promise.race([
+      Promise.resolve(fn())
+        .then((row) => ({ data: row.data ?? null, timedOut: false }))
+        .catch(() => ({ data: null as T | null, timedOut: true })),
+      new Promise<{ data: T | null; timedOut: boolean }>((resolve) => {
+        setTimeout(() => resolve({ data: null, timedOut: true }), SYSTEM_HEALTH_HUNG_TABLE_TIMEOUT_MS);
+      })
+    ]);
+    void sentinel;
+    return result;
   };
 
   const [
@@ -177,27 +203,46 @@ export async function runFunctionalHealthChecks(): Promise<{
   ] = await Promise.all([
     (async () => {
       const t0 = Date.now();
-      const result = await supabase
-        .from("admin_settings")
-        .select("id")
-        .eq("id", "default")
-        .maybeSingle();
-      return { ...result, latencyMs: Date.now() - t0 };
+      try {
+        const result = await withTimeoutFallback(
+          Promise.resolve(
+            supabase.from("admin_settings").select("id").eq("id", "default").maybeSingle()
+          ).then((row) => ({
+            data: row.data,
+            error: row.error ? { message: row.error.message } : null
+          })),
+          SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+          { data: null, error: { message: "Database probe timed out" } }
+        );
+        return { ...result, latencyMs: Date.now() - t0 };
+      } catch {
+        return {
+          data: null,
+          error: { message: "Database probe timed out" },
+          latencyMs: Date.now() - t0
+        };
+      }
     })(),
-    supabase
-      .from("gingr_webhook_events")
-      .select("created_at, processing_error")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("live_transition_dogs")
-      .select("last_seen_from_gingr_at")
-      .not("last_seen_from_gingr_at", "is", null)
-      .order("last_seen_from_gingr_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    loadSystemHealthAudit(supabase).catch(() => null),
+    safeHungTable<{ created_at: string | null; processing_error: string | null }>(() =>
+      supabase
+        .from("gingr_webhook_events")
+        .select("created_at, processing_error")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ),
+    safeHungTable<{ last_seen_from_gingr_at: string | null }>(() =>
+      supabase
+        .from("live_transition_dogs")
+        .select("last_seen_from_gingr_at")
+        .not("last_seen_from_gingr_at", "is", null)
+        .order("last_seen_from_gingr_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ),
+    withTimeoutFallback(loadSystemHealthAudit(supabase), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, null).catch(
+      () => null
+    ),
     countErrors(supabase, hourAgo).catch(() => 0),
     countErrors(supabase, dayAgo).catch(() => 0),
     safeCount(() =>
@@ -240,19 +285,38 @@ export async function runFunctionalHealthChecks(): Promise<{
     integrationStats(supabase, "twilio", dayAgo).catch(() => null),
     (async () => {
       try {
-        const r = await supabase
-          .from("system_health_events")
-          .select("user_id")
-          .eq("event_category", "user_activity")
-          .gte("occurred_at", hourAgo)
-          .not("user_id", "is", null)
-          .limit(500);
+        const r = await withTimeoutFallback(
+          Promise.resolve(
+            supabase
+              .from("system_health_events")
+              .select("user_id")
+              .eq("event_category", "user_activity")
+              .gte("occurred_at", hourAgo)
+              .not("user_id", "is", null)
+              .limit(500)
+          ).then((row) => ({ data: (row.data ?? []) as Array<{ user_id: string | null }> })),
+          SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+          { data: [] as Array<{ user_id: string | null }> }
+        );
         return new Set((r.data ?? []).map((row) => row.user_id)).size;
       } catch {
         return 0;
       }
     })(),
-    probeCloudStorage(supabase).catch((err) => ({
+    withTimeoutFallback(
+      probeCloudStorage(supabase),
+      SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+      {
+        status: "WARNING" as HealthStatus,
+        detail: "Storage probe timed out.",
+        responseTimeMs: null,
+        lastSuccessAt: null,
+        lastFailureAt: new Date().toISOString(),
+        lastError: "probe_timeout",
+        buckets: [],
+        recentMediaAt: null
+      }
+    ).catch((err) => ({
       status: "FAILED" as HealthStatus,
       detail: err instanceof Error ? err.message : "Storage probe failed",
       responseTimeMs: null,
@@ -262,7 +326,20 @@ export async function runFunctionalHealthChecks(): Promise<{
       buckets: [],
       recentMediaAt: null
     })),
-    probeRealtime(supabase).catch((err) => ({
+    withTimeoutFallback(
+      probeRealtime(supabase),
+      SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+      {
+        status: "WARNING" as HealthStatus,
+        detail: "Realtime probe timed out.",
+        responseTimeMs: null,
+        lastSuccessAt: null,
+        lastFailureAt: new Date().toISOString(),
+        lastError: "probe_timeout",
+        realtimeHttpOk: null,
+        boardFreshestAt: null
+      }
+    ).catch((err) => ({
       status: "FAILED" as HealthStatus,
       detail: err instanceof Error ? err.message : "Realtime probe failed",
       responseTimeMs: null,
@@ -272,7 +349,20 @@ export async function runFunctionalHealthChecks(): Promise<{
       realtimeHttpOk: null,
       boardFreshestAt: null
     })),
-    probeBackgroundWorker(supabase).catch((err) => ({
+    withTimeoutFallback(
+      probeBackgroundWorker(supabase),
+      SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+      {
+        status: "WARNING" as HealthStatus,
+        detail: "Worker probe timed out.",
+        responseTimeMs: null,
+        lastSuccessAt: null,
+        lastFailureAt: new Date().toISOString(),
+        lastError: "probe_timeout",
+        workerUrlConfigured: Boolean(process.env.ROUTE_WORKER_URL),
+        httpOk: null
+      }
+    ).catch((err) => ({
       status: "FAILED" as HealthStatus,
       detail: err instanceof Error ? err.message : "Worker probe failed",
       responseTimeMs: null,
@@ -282,7 +372,29 @@ export async function runFunctionalHealthChecks(): Promise<{
       workerUrlConfigured: Boolean(process.env.ROUTE_WORKER_URL),
       httpOk: null
     })),
-    probeJobQueue(supabase).catch((err) => ({
+    withTimeoutFallback(
+      probeJobQueue(supabase),
+      SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+      {
+        status: "WARNING" as HealthStatus,
+        detail: "Queue probe timed out.",
+        responseTimeMs: null,
+        lastSuccessAt: null,
+        lastFailureAt: new Date().toISOString(),
+        lastError: "probe_timeout",
+        counts: {
+          queued: 0,
+          running: 0,
+          waitingAuth: 0,
+          completed: 0,
+          completedWithWarnings: 0,
+          failed: 0,
+          cancelled: 0,
+          stuckRunning: 0
+        },
+        failedToday: 0
+      }
+    ).catch((err) => ({
       status: "FAILED" as HealthStatus,
       detail: err instanceof Error ? err.message : "Queue probe failed",
       responseTimeMs: null,
@@ -301,7 +413,18 @@ export async function runFunctionalHealthChecks(): Promise<{
       },
       failedToday: 0
     })),
-    checkSystemHealthSchema(supabase).catch(
+    withTimeoutFallback(
+      checkSystemHealthSchema(supabase),
+      SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+      {
+        ready: false,
+        migration: "072_system_health_debugging.sql",
+        present: [],
+        missing: [...SYSTEM_HEALTH_REQUIRED_TABLES],
+        canApplyViaPg: false,
+        detail: "Unable to verify System Health schema."
+      } satisfies SchemaReadiness
+    ).catch(
       (): SchemaReadiness => ({
         ready: false,
         migration: "072_system_health_debugging.sql",
@@ -316,10 +439,25 @@ export async function runFunctionalHealthChecks(): Promise<{
   const dbProbe = dbProbeTimed;
   const dbMs = dbProbeTimed.latencyMs;
   const totalProbeMs = Date.now() - started;
+  const gingrProbeTimedOut = webhook.timedOut || lastDogSeen.timedOut;
 
-  const routeGen = await probeRouteGenerator(supabase, {
-    routeFailToday: Number(routeFail) || 0
-  }).catch((err) => ({
+  const routeGen = await withTimeoutFallback(
+    probeRouteGenerator(supabase, {
+      routeFailToday: Number(routeFail) || 0
+    }),
+    SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
+    {
+      status: "WARNING" as HealthStatus,
+      detail: "Route generator probe timed out.",
+      responseTimeMs: null,
+      lastSuccessAt: null,
+      lastFailureAt: null,
+      lastError: "probe_timeout",
+      errorsLast24h: Number(routeFail) || 0,
+      lastRouteGeneration: null,
+      source: "module_ready" as const
+    }
+  ).catch((err) => ({
     status: "WARNING" as HealthStatus,
     detail: err instanceof Error ? err.message : "Route generator probe failed",
     responseTimeMs: null,
@@ -335,7 +473,8 @@ export async function runFunctionalHealthChecks(): Promise<{
     lastWebhookAt: webhook.data?.created_at ? String(webhook.data.created_at) : null,
     lastDogSeenAt: lastDogSeen.data?.last_seen_from_gingr_at
       ? String(lastDogSeen.data.last_seen_from_gingr_at)
-      : null
+      : null,
+    probeTimedOut: gingrProbeTimedOut
   });
 
   const sms = getSmsProvider();
