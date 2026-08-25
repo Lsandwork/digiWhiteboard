@@ -5,7 +5,11 @@ import { getServiceSupabase } from "@/lib/supabase/server";
 import { getTlDigiBoardSnapshot } from "@/lib/tl-digi-board/server";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 25;
+
+const SCHEMA_RECHECK_MS = 30 * 60 * 1000;
+let lastChecklistSchemaAt = 0;
+let lastChecklistSchema: Awaited<ReturnType<typeof ensureRuffopsChecklistSchema>> | null = null;
 
 /** Centralized Gingr medication sync for TL Digi Board (~1 minute Vercel cron + on-demand TV polls). */
 export async function GET(request: Request) {
@@ -26,7 +30,15 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServiceSupabase({ timeoutMs: 20_000 });
-    const schema = await ensureRuffopsChecklistSchema(supabase);
+    let schema = lastChecklistSchema;
+    if (!schema?.ready || Date.now() - lastChecklistSchemaAt > SCHEMA_RECHECK_MS) {
+      schema = await ensureRuffopsChecklistSchema(supabase);
+      lastChecklistSchema = schema;
+      lastChecklistSchemaAt = Date.now();
+    }
+    if (!schema) {
+      return NextResponse.json({ ok: false, error: "Checklist schema unavailable." }, { status: 500 });
+    }
     const snapshot = await getTlDigiBoardSnapshot(supabase, { forceRefresh: true });
     return NextResponse.json({
       ok: true,

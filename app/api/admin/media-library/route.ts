@@ -11,10 +11,10 @@ import type { MediaDatePreset, MediaTypeFilter } from "@/lib/media-library/types
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const auth = await requirePhotoUploadAccess(request);
-  if (!isPhotoUploadAuthOk(auth)) return auth.error;
-
   try {
+    const auth = await requirePhotoUploadAccess(request);
+    if (!isPhotoUploadAuthOk(auth)) return auth.error;
+
     const { searchParams } = new URL(request.url);
     const datePreset = (searchParams.get("date_preset") || "all") as MediaDatePreset;
     const mediaType = (searchParams.get("media_type") || "all") as MediaTypeFilter;

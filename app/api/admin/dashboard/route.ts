@@ -9,6 +9,7 @@ import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { cachedLoadSettingsBundle, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
+import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import { defaultLobbySettings } from "@/lib/lobby/settings";
 import { defaultStaffSettings } from "@/lib/staff/settings";
@@ -29,12 +30,6 @@ const DEFAULT_SETTINGS_BUNDLE = {
   lobby: defaultLobbySettings,
   staff: defaultStaffSettings
 };
-
-/** Staff tabs that fetch their own data — skip heavy board widgets on first paint. */
-function skipHeavyBoardWidgets(board: AdminBoardType, tab: string | null) {
-  if (board !== "staff") return false;
-  return tab !== "overview" && tab !== "integrations" && tab !== "logs";
-}
 
 function parseBoardType(value: string | null): AdminBoardType {
   if (value === "staff") return "staff";
@@ -77,6 +72,7 @@ export async function GET(request: Request) {
     const board = parseBoardType(url.searchParams.get("board"));
     const tab = url.searchParams.get("tab");
     const lightLoad = skipHeavyBoardWidgets(board, tab);
+    const skipAccessWork = skipSettingsAndAccess(tab);
     const supabase = getServiceSupabase({ timeoutMs: DASHBOARD_QUERY_TIMEOUT_MS });
 
     after(() => {
@@ -90,7 +86,9 @@ export async function GET(request: Request) {
     const emptyWidgets = [[], null, [], [], []] as const;
 
     const [settingsBundle, widgetResults, access, profileUser] = await Promise.all([
-      timed("settings bundle", DEFAULT_SETTINGS_BUNDLE, cachedLoadSettingsBundle(supabase)),
+      skipAccessWork
+        ? Promise.resolve(DEFAULT_SETTINGS_BUNDLE)
+        : timed("settings bundle", DEFAULT_SETTINGS_BUNDLE, cachedLoadSettingsBundle(supabase)),
       lightLoad
         ? Promise.resolve(emptyWidgets)
         : Promise.all([
@@ -130,12 +128,16 @@ export async function GET(request: Request) {
                 .limit(20)
             )
           ]),
-      session?.adminUserId
-        ? timed("user access", fallbackAccess, getUserAccess(supabase, session.adminUserId, session.role, session.email))
-        : Promise.resolve(null),
-      session?.adminUserId
-        ? timed("admin profile", null, getAdminUserById(supabase, session.adminUserId))
-        : Promise.resolve(null)
+      skipAccessWork
+        ? Promise.resolve(fallbackAccess)
+        : session?.adminUserId
+          ? timed("user access", fallbackAccess, getUserAccess(supabase, session.adminUserId, session.role, session.email))
+          : Promise.resolve(null),
+      skipAccessWork
+        ? Promise.resolve(null)
+        : session?.adminUserId
+          ? timed("admin profile", null, getAdminUserById(supabase, session.adminUserId))
+          : Promise.resolve(null)
     ]);
 
     const [promotions, checkouts, dogs, events, failedEvents] = widgetResults;

@@ -452,6 +452,27 @@ export async function findAdminUsersByEmails(supabase: SupabaseClient, emails: s
   return (data ?? []) as AdminUserRecord[];
 }
 
+/** Login must not pull avatar blobs or other wide columns — that stalls sign-in. */
+export const ADMIN_LOGIN_USER_COLUMNS =
+  "id, email, role, status, password_hash, force_password_change";
+
+export async function findAdminUsersForLogin(supabase: SupabaseClient, emails: string[]) {
+  const normalized = [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
+  if (!normalized.length) return [] as AdminUserRecord[];
+
+  const { data, error } = await supabase
+    .from("admin_users")
+    .select(ADMIN_LOGIN_USER_COLUMNS)
+    .in("email", normalized);
+  if (error) {
+    if (isMissingAdminUsersTable(error)) {
+      return findAdminUsersByEmails(supabase, normalized);
+    }
+    throwAdminUserError(error);
+  }
+  return (data ?? []) as AdminUserRecord[];
+}
+
 export async function listAdminUsers(supabase: SupabaseClient): Promise<AdminUserPublic[]> {
   const { data, error } = await supabase
     .from("admin_users")

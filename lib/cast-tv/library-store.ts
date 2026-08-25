@@ -25,12 +25,18 @@ export const CAST_TV_STORAGE_BUCKET = "lobby-slideshow";
 export const CAST_TV_LEGACY_MEDIA_BUCKET = "cast-tv-media";
 export const CAST_TV_LIBRARY_OBJECT_PATH = "cast-tv/library.json";
 export const CAST_TV_HEARTBEATS_OBJECT_PATH = "cast-tv/heartbeats.json";
+export const CAST_TV_REFRESH_OBJECT_PATH = "cast-tv/refresh.json";
 /** Playlist JSON from the brief admin_settings era, before Storage library.json. */
 export const CAST_TV_LIBRARY_SETTINGS_KEY = "cast_tv_library";
 export const CAST_TV_LAST_GOOD_CACHE_KEY = "cast-tv:last-good-library";
 export const CAST_TV_LAST_GOOD_TTL_MS = 24 * 60 * 60 * 1000;
 
 const CAST_TV_LIBRARY_BUCKETS = [CAST_TV_STORAGE_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET] as const;
+
+export type CastTvRefreshState = {
+  nonce: number;
+  updatedAt: string;
+};
 
 export type CastTvHeartbeatRecord = {
   screen_id: string;
@@ -248,7 +254,19 @@ export function parseCastTvLibrary(value: unknown): CastTvLibraryState {
 
 function isLibrarySidecar(name: string) {
   const base = basenameCastTvFile(name).toLowerCase();
-  return base === "library.json" || base === "heartbeats.json" || base.endsWith(".json");
+  return (
+    base === "library.json" ||
+    base === "heartbeats.json" ||
+    base === "refresh.json" ||
+    base.endsWith(".json")
+  );
+}
+
+export function parseCastTvRefreshNonce(value: unknown): number {
+  if (!value || typeof value !== "object") return 0;
+  const nonce = Number((value as { nonce?: unknown }).nonce);
+  if (!Number.isFinite(nonce)) return 0;
+  return Math.max(0, Math.trunc(nonce));
 }
 
 export function mergeCastTvStorageObjects(
@@ -633,4 +651,17 @@ export async function mutateCastTvHeartbeats<T>(
   const { heartbeats, result } = mutator(current);
   await saveCastTvHeartbeats(supabase, heartbeats);
   return result;
+}
+
+export async function loadCastTvRefreshNonce(supabase: SupabaseClient): Promise<number> {
+  const stored = await downloadJsonObject(supabase, CAST_TV_REFRESH_OBJECT_PATH);
+  return parseCastTvRefreshNonce(stored);
+}
+
+export async function saveCastTvRefreshNonce(supabase: SupabaseClient, nonce: number) {
+  const nextNonce = parseCastTvRefreshNonce({ nonce });
+  await uploadJsonObject(supabase, CAST_TV_REFRESH_OBJECT_PATH, {
+    nonce: nextNonce,
+    updatedAt: new Date().toISOString()
+  } satisfies CastTvRefreshState);
 }

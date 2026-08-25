@@ -493,6 +493,21 @@ async function saveState(supabase: SupabaseClient, state: StaffOpsState) {
   throw new Error("Staff admin storage is not available.");
 }
 
+export const STAFF_OPS_LIST_MESSAGE_LIMIT = 120;
+
+/** First paint for Team Log — keep the stored blob intact, trim the HTTP payload. */
+export function capStaffOpsListPayload(state: StaffOpsState): StaffOpsState {
+  const crossover_messages = state.crossover_messages.slice(0, STAFF_OPS_LIST_MESSAGE_LIMIT);
+  const ids = new Set(crossover_messages.map((item) => item.id));
+  return {
+    ...state,
+    crossover_messages,
+    crossover_message_replies: state.crossover_message_replies.filter((reply) => ids.has(reply.crossover_message_id)),
+    owner_follow_ups: state.owner_follow_ups.slice(0, STAFF_OPS_LIST_MESSAGE_LIMIT),
+    active_issues: state.active_issues.slice(0, STAFF_OPS_LIST_MESSAGE_LIMIT)
+  };
+}
+
 export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsState> {
   const state = parseState(await loadState(supabase));
   return enrichStaffOpsActorLabels(supabase, state);
