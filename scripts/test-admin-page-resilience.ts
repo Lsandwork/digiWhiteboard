@@ -4,7 +4,7 @@ import { SERVICE_SUPABASE_CRON_TIMEOUT_MS, SERVICE_SUPABASE_TIMEOUT_MS } from ".
 import { readResponseJson } from "../lib/http/read-response-json";
 import { LIVE_DATA_UNAVAILABLE_MESSAGE } from "../lib/safe-url";
 import { skipDashboardBackgroundHydrate, skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
-import { OVERVIEW_QUERY_TIMEOUT_MS, OVERVIEW_SETTINGS_POINTERS } from "../lib/admin/overview";
+import { OVERVIEW_QUERY_TIMEOUT_MS, OVERVIEW_SETTINGS_POINTERS, emptyOverviewPayload } from "../lib/admin/overview";
 import { capStaffOpsListPayload, STAFF_OPS_LIST_MESSAGE_LIMIT } from "../lib/staff/admin-ops";
 
 assert.equal(skipSettingsAndAccess(null), false);
@@ -29,6 +29,8 @@ assert.equal(skipDashboardBackgroundHydrate("staff", "my_shift"), false);
 assert.equal(skipDashboardBackgroundHydrate("staff", "integrations"), false);
 assert.equal(skipDashboardBackgroundHydrate("marketing", "cast_tv"), true);
 assert.equal(OVERVIEW_QUERY_TIMEOUT_MS, 4_000);
+assert.equal(emptyOverviewPayload().degraded, true);
+assert.equal(emptyOverviewPayload().metrics.length, 6);
 assert.ok(OVERVIEW_SETTINGS_POINTERS.some((pointer) => pointer.path === "staff_admin_ops->active_issues"));
 assert.ok(OVERVIEW_SETTINGS_POINTERS.every((pointer) => !pointer.path.includes("crossover_messages")));
 assert.equal(STAFF_OPS_LIST_MESSAGE_LIMIT, 120);

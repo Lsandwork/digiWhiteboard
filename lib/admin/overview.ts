@@ -26,7 +26,7 @@ import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 /** Interactive overview GET. Do not raise this — hung JSONB must fail-soft. */
 export const OVERVIEW_QUERY_TIMEOUT_MS = 4_000;
 export const OVERVIEW_CLIENT_TIMEOUT_MS = 10_000;
-export const OVERVIEW_CAST_TV_TIMEOUT_MS = 2_000;
+export const OVERVIEW_CAST_TV_TIMEOUT_MS = 3_000;
 
 export const OVERVIEW_SETTINGS_POINTERS: AdminSettingsJsonPointer[] = [
   { alias: "active_issues", path: "staff_admin_ops->active_issues" },
@@ -478,8 +478,9 @@ async function loadCastTvOnlinePublic(now: number): Promise<boolean> {
       if (!raw || typeof raw !== "object") continue;
       const entries = Object.values(raw as Record<string, { last_seen_at?: string }>);
       if (entries.some((entry) => isCastTvOnline(entry?.last_seen_at, now))) return true;
+      return false;
     } catch {
-      continue;
+      break;
     }
   }
   return false;
@@ -496,7 +497,7 @@ export async function buildOverviewPayload(supabase: SupabaseClient): Promise<Ov
   const [stores, devices, castOnline] = await Promise.all([
     withTimeoutFallback(loadOverviewStores(supabase), OVERVIEW_QUERY_TIMEOUT_MS, EMPTY_OVERVIEW_STORES),
     withTimeoutFallback(loadOverviewDevices(supabase), OVERVIEW_QUERY_TIMEOUT_MS, []),
-    withTimeoutFallback(loadCastTvOnlinePublic(now), OVERVIEW_CAST_TV_TIMEOUT_MS + 500, false)
+    withTimeoutFallback(loadCastTvOnlinePublic(now), OVERVIEW_CAST_TV_TIMEOUT_MS, false)
   ]);
 
   const openIssues = stores.issues.filter((issue) => isOpenOpsStatus(issue.status));

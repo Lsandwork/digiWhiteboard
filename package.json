@@ -62,6 +62,7 @@
     "test:route-generator-all": "npm run test:route-generator && npm run test:live-fleet && npm run test:samsara-csv && npm run test:household-coords && npm run test:route-generator-production-final && npm run test:route-owner-sms && npm run test:route-owner-sms-kill-switch && npm run test:jasper-demo-sms-guards",
     "test:ops-command-center": "tsx scripts/test-ops-command-center-foundation.ts",
     "test:admin-page-resilience": "tsx scripts/test-admin-page-resilience.ts",
+    "test:admin-overview-load": "tsx scripts/test-admin-overview-load.ts",
     "test:platform-reliability": "tsx scripts/test-platform-reliability.ts",
     "inventory:platform": "tsx scripts/inventory-platform.ts",
     "test:bulk-shift-entries": "tsx scripts/test-bulk-shift-entries.ts",
