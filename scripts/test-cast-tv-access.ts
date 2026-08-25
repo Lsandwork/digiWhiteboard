@@ -30,6 +30,7 @@ assert.match(read("supabase/migrations/087_cast_tv_media_upload.sql"), /cast_tv_
 assert.match(read("app/api/cast-tv/media/upload/route.ts"), /normalizeCastTvUploadBytes/);
 assert.match(read("app/api/cast-tv/media/route.ts"), /getCastTvSupabase/);
 assert.match(read("lib/cast-tv/supabase.ts"), /15_000/);
+assert.doesNotMatch(read("lib/cast-tv/supabase.ts"), /CAST_TV_SUPABASE_TIMEOUT_MS = 2[0-9]_000/);
 assert.match(read("lib/cast-tv/library-store.ts"), /cast-tv-media/);
 assert.match(read("lib/cast-tv/api-auth.ts"), /accessFromLegacyRole/);
 assert.match(read("app/api/cast-tv/media/upload-url/route.ts"), /handleCastTvWrite/);
@@ -37,7 +38,12 @@ assert.match(read("lib/cast-tv/upload-client.ts"), /canFallbackToCastTvServerUpl
 assert.match(read("lib/cast-tv/upload-client.ts"), /isDuplicateUploadError/);
 assert.match(read("app/api/cast-tv/media/file/route.ts"), /transcodeCastTvDisplayImage/);
 assert.match(read("app/api/cast-tv/media/file/route.ts"), /isTransientCastTvStorageError/);
+assert.match(read("app/api/cast-tv/media/file/route.ts"), /kind === "thumb"/);
 assert.match(read("lib/cast-tv/stored-image.ts"), /getPublicUrl/);
+assert.match(read("lib/cast-tv/library-store.ts"), /recoverOrphans === true/);
+assert.match(read("components/admin/CastTvPanel.tsx"), /CAST_TV_ADMIN_PAGE_SIZE/);
+assert.match(read("components/cast-tv/useCastTvPlaylist.ts"), /readCastTvPlaylistCache/);
+assert.doesNotMatch(read("app/api/cast-tv/media/route.ts"), /repairCastTvLibraryImages/);
 assert.match(read("next.config.mjs"), /"sharp"/);
 assert.match(read("next.config.mjs"), /@img\/sharp-libvips-linux-x64/);
 assert.match(read("next.config.mjs"), /@img\/sharp-wasm32/);

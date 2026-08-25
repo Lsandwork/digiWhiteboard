@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  isCastTvPlaylistCacheFresh,
+  readCastTvPlaylistCache,
+  writeCastTvPlaylistCache
+} from "@/lib/cast-tv/client-cache";
+import {
   CAST_TV_HEARTBEAT_MS,
   CAST_TV_POLL_MS,
   type CastTvPlaylistItem,
@@ -41,6 +46,9 @@ export function useCastTvPlaylist(screenId = "default") {
   const [ready, setReady] = useState(false);
   const currentIdRef = useRef<string | null>(null);
   const seenNonceRef = useRef<number | null>(null);
+  const revisionRef = useRef<string | null>(null);
+  const refreshInFlightRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     currentIdRef.current = currentId;
@@ -66,30 +74,81 @@ export function useCastTvPlaylist(screenId = "default") {
     });
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (trigger: "initial-load" | "refresh" = "refresh") => {
+    if (typeof document !== "undefined" && document.hidden && trigger === "refresh") return;
+    if (refreshInFlightRef.current) return;
+    const existing = readCastTvPlaylistCache();
+    if (
+      trigger === "refresh" &&
+      isCastTvPlaylistCacheFresh(existing) &&
+      existing?.revision &&
+      existing.revision === revisionRef.current
+    ) {
+      return;
+    }
+
+    refreshInFlightRef.current = true;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
+      let latestSettings = existing?.settings ?? null;
+      let latestRevision = revisionRef.current;
+
+      if (trigger === "refresh") {
+        const settingsResponse = await fetch("/api/cast-tv/settings", {
+          cache: "no-store",
+          signal: controller.signal
+        });
+        const settingsBody = await settingsResponse.json();
+        if (settingsResponse.ok && settingsBody.settings) {
+          latestSettings = settingsBody.settings as CastTvSettings;
+          setSettings(latestSettings);
+          applyRefreshNonce(settingsBody.castHardReloadNonce);
+        }
+        if (typeof settingsBody.mediaRevision === "string") {
+          latestRevision = settingsBody.mediaRevision;
+        }
+        if (latestRevision && latestRevision === revisionRef.current && (existing?.playlist.length || currentIdRef.current)) {
+          revisionRef.current = latestRevision;
+          return;
+        }
+      }
+
       const [mediaResponse, settingsResponse] = await Promise.all([
-        fetch("/api/cast-tv/media", { cache: "no-store" }),
-        fetch("/api/cast-tv/settings", { cache: "no-store" })
+        fetch("/api/cast-tv/media?playlist=1", { cache: "no-store", signal: controller.signal }),
+        trigger === "initial-load"
+          ? fetch("/api/cast-tv/settings", { cache: "no-store", signal: controller.signal })
+          : Promise.resolve(null)
       ]);
 
       const mediaBody = await mediaResponse.json();
-      const settingsBody = await settingsResponse.json();
+      const settingsBody = settingsResponse ? await settingsResponse.json() : null;
+      if (settingsBody?.settings) {
+        latestSettings = settingsBody.settings as CastTvSettings;
+        setSettings(latestSettings);
+        applyRefreshNonce(settingsBody.castHardReloadNonce);
+      }
+      if (typeof settingsBody?.mediaRevision === "string") {
+        latestRevision = settingsBody.mediaRevision;
+      }
 
       if (mediaResponse.ok && Array.isArray(mediaBody.playlist)) {
         const next = mediaBody.playlist as CastTvPlaylistItem[];
         if (next.length > 0 || !currentIdRef.current) {
           applyPlaylist(next);
         }
-      }
-
-      if (settingsResponse.ok && settingsBody.settings) {
-        setSettings(settingsBody.settings as CastTvSettings);
-        applyRefreshNonce(settingsBody.castHardReloadNonce);
+        revisionRef.current = latestRevision;
+        writeCastTvPlaylistCache({
+          playlist: next.length > 0 || !currentIdRef.current ? next : existing?.playlist ?? next,
+          settings: latestSettings,
+          revision: latestRevision ?? undefined
+        });
       }
     } catch {
       // TV display stays quiet on network errors.
     } finally {
+      refreshInFlightRef.current = false;
       setReady(true);
     }
   }, [applyPlaylist, applyRefreshNonce]);
@@ -107,26 +166,40 @@ export function useCastTvPlaylist(screenId = "default") {
   }, [screenId]);
 
   useEffect(() => {
-    void refresh();
+    const cachedPlaylist = readCastTvPlaylistCache();
+    if (cachedPlaylist?.playlist.length) {
+      applyPlaylist(cachedPlaylist.playlist);
+      if (cachedPlaylist.settings) setSettings(cachedPlaylist.settings);
+      if (cachedPlaylist.revision) revisionRef.current = cachedPlaylist.revision;
+      setReady(true);
+    }
+
+    const skipInitialNetwork = isCastTvPlaylistCacheFresh(cachedPlaylist);
+    if (!skipInitialNetwork) {
+      void refresh("initial-load");
+    }
     void sendHeartbeat();
 
     const pollTimer = window.setInterval(() => {
-      void refresh();
+      void refresh("refresh");
     }, CAST_TV_POLL_MS);
 
     const heartbeatTimer = window.setInterval(() => {
+      if (document.hidden) return;
       void sendHeartbeat();
     }, CAST_TV_HEARTBEAT_MS);
 
     return () => {
+      abortRef.current?.abort();
       window.clearInterval(pollTimer);
       window.clearInterval(heartbeatTimer);
     };
-  }, [refresh, sendHeartbeat]);
+  }, [applyPlaylist, refresh, sendHeartbeat]);
 
   useEffect(() => {
     let cancelled = false;
     const checkNonce = async () => {
+      if (document.hidden) return;
       try {
         const response = await fetch(TV_HARD_REFRESH_ENDPOINT, { cache: "no-store" });
         if (!response.ok || cancelled) return;

@@ -29,6 +29,7 @@ export type CastTvMediaRecord = {
   content_hash?: string | null;
   pixel_hash?: string | null;
   display_ready?: boolean;
+  storage_missing?: boolean;
 };
 
 export type CastTvPlaylistItem = {

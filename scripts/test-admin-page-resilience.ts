@@ -16,6 +16,8 @@ assert.equal(skipHeavyBoardWidgets("staff", null), false);
 assert.equal(skipHeavyBoardWidgets("staff", "package_commissions"), true);
 assert.equal(skipHeavyBoardWidgets("staff", "overview"), false);
 assert.equal(skipHeavyBoardWidgets("lobby", "content"), false);
+assert.equal(skipHeavyBoardWidgets("marketing", "cast_tv"), true);
+assert.equal(skipHeavyBoardWidgets("marketing", "settings"), false);
 assert.equal(STAFF_OPS_LIST_MESSAGE_LIMIT, 120);
 assert.equal(
   capStaffOpsListPayload({
@@ -126,6 +128,7 @@ assert.match(dashboardSource, /tab=\$\{encodeURIComponent\(tabRef\.current\)\}/)
 assert.match(dashboardSource, /\/api\/admin\/dashboard\?board=\$\{encodeURIComponent\(board\)\}`/);
 assert.match(dashboardSource, /skipSettingsAndAccess/);
 assert.match(dashboardSource, /hydrateAbortRef/);
+assert.match(dashboardSource, /skipBackgroundHydrate/);
 assert.doesNotMatch(dashboardSource, /setInterval\(\(\) => setCurrentTimeMs/);
 assert.match(dashboardSource, /if \(!savedAt\) return/);
 

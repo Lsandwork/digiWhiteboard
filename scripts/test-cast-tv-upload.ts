@@ -27,6 +27,13 @@ import { loadSharp } from "../lib/sharp-runtime";
 import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 import {
+  CAST_TV_ADMIN_PAGE_SIZE,
+  paginateCastTvAdminMedia
+} from "../lib/cast-tv/admin-list";
+import { isCastTvQueryLogEnabled } from "../lib/cast-tv/query-log";
+import { CAST_TV_PLAYLIST_CACHE_MS } from "../lib/cast-tv/client-cache";
+import { castTvFileThumbSrc, castTvStorageThumbUrl } from "../lib/cast-tv/thumbs";
+import {
   CAST_TV_DUPLICATE_MESSAGE,
   isLegacyCastTvDumpPath,
   isRecoverableCastTvStoragePath,
@@ -409,15 +416,21 @@ const normalizeUpload = readFileSync(join(root, "lib/cast-tv/normalize-upload.ts
 assert.doesNotMatch(normalizeUpload, /import sharp from/);
 
 const mediaRoute = readFileSync(join(root, "app/api/cast-tv/media/route.ts"), "utf8");
-assert.match(mediaRoute, /loadCastTvMedia/);
+assert.match(mediaRoute, /loadCastTvLibrary/);
 assert.match(mediaRoute, /playlist/);
 assert.match(mediaRoute, /admin: true/);
-assert.match(mediaRoute, /repairCastTvLibraryImages/);
+assert.match(mediaRoute, /paginateCastTvAdminMedia/);
+assert.match(mediaRoute, /playlistOnly/);
+assert.match(mediaRoute, /probeAndMarkMissingCastTvMedia/);
+assert.match(mediaRoute, /storage_missing/);
+assert.doesNotMatch(mediaRoute, /repairCastTvLibraryImages/);
 assert.doesNotMatch(mediaRoute, /buildCastTvPlaylist/);
 
 const settingsRoute = readFileSync(join(root, "app/api/cast-tv/settings/route.ts"), "utf8");
 assert.match(settingsRoute, /castHardReloadNonce/);
 assert.match(settingsRoute, /loadCastHardReloadNonce/);
+assert.match(settingsRoute, /mediaRevision/);
+assert.match(settingsRoute, /trigger: "settings"/);
 
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
 assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 15_000/);
@@ -463,7 +476,11 @@ assert.doesNotMatch(libraryStore, /\{ bucket: [^,]+, prefix: "" \}/);
 
 assert.match(libraryStore, /isUploadedCastTvMedia/);
 assert.match(libraryStore, /hasUploaded/);
-assert.match(libraryStore, /storedMediaCount/);
+assert.match(libraryStore, /CAST_TV_LIBRARY_FAST_CACHE_KEY/);
+assert.match(libraryStore, /recoverOrphans === true/);
+assert.match(libraryStore, /includeLegacy === true/);
+assert.doesNotMatch(libraryStore, /recoverOrphans !== false/);
+assert.doesNotMatch(libraryStore, /includeLegacy !== false/);
 
 const repairImages = readFileSync(join(root, "lib/cast-tv/repair-images.ts"), "utf8");
 assert.match(repairImages, /deleteRemovedCastTvStorage/);
@@ -487,6 +504,14 @@ assert.match(panel, /Delete selected/);
 assert.match(panel, /selectedIds/);
 assert.match(panel, /date\.getTime\(\) === 0/);
 assert.match(panel, /async function moveMedia/);
+assert.match(panel, /CAST_TV_ADMIN_PAGE_SIZE/);
+assert.match(panel, /status: "disabled"/);
+assert.match(panel, /document\.hidden/);
+assert.match(panel, /AbortController/);
+assert.match(panel, /thumb_url/);
+assert.match(panel, /storage_missing/);
+assert.match(panel, /Load more/);
+assert.match(panel, /castTvFileThumbSrc/);
 
 const bulkDeleteRoute = readFileSync(join(root, "app/api/cast-tv/media/bulk-delete/route.ts"), "utf8");
 assert.match(bulkDeleteRoute, /deleteCastTvMediaRecords/);
@@ -508,6 +533,10 @@ assert.match(tvPlayer, /currentIdRef\.current/);
 assert.match(tvPlayer, /visitPageAsNewNavigation/);
 assert.match(tvPlayer, /TV_HARD_REFRESH_ENDPOINT/);
 assert.match(tvPlayer, /castHardReloadNonce/);
+assert.match(tvPlayer, /\/api\/cast-tv\/media\?playlist=1/);
+assert.match(tvPlayer, /document\.hidden/);
+assert.match(tvPlayer, /AbortController/);
+assert.match(tvPlayer, /next\.length > 0 \|\| !currentIdRef\.current/);
 const imageSlide = readFileSync(join(root, "components/cast-tv/CastTvImageSlide.tsx"), "utf8");
 assert.doesNotMatch(imageSlide, /from "next\/image"/);
 assert.match(imageSlide, /<img/);
@@ -519,10 +548,57 @@ const fileRoute = readFileSync(join(root, "app/api/cast-tv/media/file/route.ts")
 assert.match(fileRoute, /transcodeCastTvDisplayImage/);
 assert.match(fileRoute, /isTransientCastTvStorageError/);
 assert.match(fileRoute, /\? 503 : 404/);
+assert.match(fileRoute, /kind === "thumb"/);
+assert.match(fileRoute, /storage_missing/);
+assert.match(fileRoute, /CAST_TV_THUMB_MAX_EDGE/);
+assert.doesNotMatch(fileRoute, /recoverOrphans: true/);
 assert.match(uploadClient, /isDuplicateUploadError/);
 const storedImage = readFileSync(join(root, "lib/cast-tv/stored-image.ts"), "utf8");
 assert.match(storedImage, /getPublicUrl/);
 assert.match(storedImage, /cache: "no-store"/);
+assert.match(storedImage, /probeCastTvStorageExists/);
+assert.match(storedImage, /markMissingCastTvStorage/);
+
+const queryLog = readFileSync(join(root, "lib/cast-tv/query-log.ts"), "utf8");
+assert.match(queryLog, /\[cast-tv-query\]/);
+assert.match(queryLog, /NODE_ENV !== "production"/);
+assert.equal(CAST_TV_PLAYLIST_CACHE_MS, 20_000);
+assert.equal(CAST_TV_ADMIN_PAGE_SIZE, 20);
+assert.equal(typeof isCastTvQueryLogEnabled(), "boolean");
+
+const thumbs = readFileSync(join(root, "lib/cast-tv/thumbs.ts"), "utf8");
+assert.match(thumbs, /storage\/v1\/render\/image\/public/);
+assert.doesNotMatch(thumbs, /from "@\/lib\/cast-tv\/library-store"/);
+
+const fakeMedia: CastTvMediaRecord[] = Array.from({ length: 45 }, (_, index) => ({
+  id: `id-${index}`,
+  display_name: `Item ${index}`,
+  file_name: `item-${index}.jpg`,
+  storage_path: `cast-tv/item-${index}.jpg`,
+  bucket: "lobby-slideshow",
+  public_url: `https://example.test/item-${index}.jpg`,
+  media_type: "image",
+  mime_type: "image/jpeg",
+  file_size_bytes: 1000,
+  duration_seconds: null,
+  image_display_seconds: 10,
+  display_order: index + 1,
+  is_enabled: index < 30,
+  uploaded_by: null,
+  uploaded_by_name: null,
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+  storage_missing: index === 40
+}));
+const activePage = paginateCastTvAdminMedia(fakeMedia, { status: "active", offset: 0, limit: CAST_TV_ADMIN_PAGE_SIZE });
+assert.equal(activePage.items.length, 20);
+assert.equal(activePage.page.hasMore, true);
+assert.equal(activePage.counts.active, 30);
+assert.equal(activePage.counts.disabled, 15);
+assert.equal(activePage.counts.missing, 1);
+assert.equal("content_hash" in activePage.items[0], false);
+assert.equal(castTvStorageThumbUrl({ ...fakeMedia[40], storage_missing: true }), null);
+assert.match(castTvFileThumbSrc(fakeMedia[0]), /kind=thumb&fallback=1/);
 
 const libraryMigration = readFileSync(join(root, "supabase/migrations/088_cast_tv_library_storage.sql"), "utf8");
 assert.match(libraryMigration, /application\/json/);

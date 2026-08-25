@@ -1,4 +1,5 @@
-import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { getOrLoadTtlCache, getTtlCache, invalidateTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { logCastTvQuery } from "@/lib/cast-tv/query-log";
 import {
   basenameCastTvFile,
   isLegacyCastTvDumpPath,
@@ -31,6 +32,8 @@ export const CAST_TV_REFRESH_OBJECT_PATH = "cast-tv/refresh.json";
 export const CAST_TV_LIBRARY_SETTINGS_KEY = "cast_tv_library";
 export const CAST_TV_LAST_GOOD_CACHE_KEY = "cast-tv:last-good-library";
 export const CAST_TV_LAST_GOOD_TTL_MS = 24 * 60 * 60 * 1000;
+export const CAST_TV_LIBRARY_FAST_CACHE_KEY = "cast-tv:library-fast";
+export const CAST_TV_LIBRARY_FAST_TTL_MS = 4_000;
 
 const CAST_TV_LIBRARY_BUCKETS = [CAST_TV_STORAGE_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET] as const;
 
@@ -192,7 +195,8 @@ function asMediaRecord(value: unknown): CastTvMediaRecord | null {
     updated_at: String(row.updated_at || new Date().toISOString()),
     content_hash: typeof row.content_hash === "string" && row.content_hash ? row.content_hash : null,
     pixel_hash: typeof row.pixel_hash === "string" && row.pixel_hash ? row.pixel_hash : null,
-    display_ready: row.display_ready === true
+    display_ready: row.display_ready === true,
+    storage_missing: row.storage_missing === true
   };
 }
 
@@ -502,10 +506,18 @@ function hydrateLibraryUrls(supabase: SupabaseClient, library: CastTvLibraryStat
   };
 }
 
-export async function loadCastTvLibrary(
+export type LoadCastTvLibraryOptions = {
+  recoverOrphans?: boolean;
+  includeLegacy?: boolean;
+  skipCache?: boolean;
+  trigger?: "initial-load" | "refresh" | "mutation" | "playlist" | "settings" | "thumbnail" | "probe" | "pagination";
+};
+
+async function loadCastTvLibraryUncached(
   supabase: SupabaseClient,
-  options: { recoverOrphans?: boolean } = {}
+  options: LoadCastTvLibraryOptions
 ): Promise<CastTvLibraryState> {
+  const started = Date.now();
   try {
     const stored = await downloadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH);
     const storedMediaCount = Array.isArray((stored as { media?: unknown } | null)?.media)
@@ -514,14 +526,16 @@ export async function loadCastTvLibrary(
     let library = hydrateLibraryUrls(supabase, parseCastTvLibrary(stored));
     let added = 0;
 
-    const legacy = await loadLegacySettingsLibrary(supabase);
-    if (legacy) {
-      const merged = mergeCastTvLibraries(library, legacy);
-      library = merged.library;
-      added += merged.added;
+    if (options.includeLegacy === true) {
+      const legacy = await loadLegacySettingsLibrary(supabase);
+      if (legacy) {
+        const merged = mergeCastTvLibraries(library, legacy);
+        library = merged.library;
+        added += merged.added;
+      }
     }
 
-    if (options.recoverOrphans !== false) {
+    if (options.recoverOrphans === true) {
       try {
         const recovered = hydrateLibraryUrls(supabase, await recoverOrphanedCastTvFiles(supabase, library));
         const merged = mergeCastTvLibraries(library, recovered);
@@ -565,16 +579,37 @@ export async function loadCastTvLibrary(
     else {
       const cached = lastGoodLibrary();
       if (cached?.media.length) {
+        logCastTvQuery({
+          name: "storage.library.json",
+          rows: cached.media.length,
+          durationMs: Date.now() - started,
+          cache: "hit",
+          trigger: options.trigger ?? "refresh"
+        });
         return hydrateLibraryUrls(supabase, {
           ...cached,
           media: purgeDuplicateCastTvMedia(cached.media).kept
         });
       }
     }
+    logCastTvQuery({
+      name: "storage.library.json",
+      rows: library.media.length,
+      durationMs: Date.now() - started,
+      cache: "miss",
+      trigger: options.trigger ?? "refresh"
+    });
     return library;
   } catch (error) {
     const cached = lastGoodLibrary();
     if (cached) {
+      logCastTvQuery({
+        name: "storage.library.json",
+        rows: cached.media.length,
+        durationMs: Date.now() - started,
+        cache: "hit",
+        trigger: options.trigger ?? "refresh"
+      });
       return hydrateLibraryUrls(supabase, {
         ...cached,
         media: purgeDuplicateCastTvMedia(cached.media).kept
@@ -582,6 +617,33 @@ export async function loadCastTvLibrary(
     }
     throw error;
   }
+}
+
+export async function loadCastTvLibrary(
+  supabase: SupabaseClient,
+  options: LoadCastTvLibraryOptions = {}
+): Promise<CastTvLibraryState> {
+  const recoverOrphans = options.recoverOrphans === true;
+  const includeLegacy = options.includeLegacy === true;
+  if (options.skipCache || recoverOrphans || includeLegacy) {
+    return loadCastTvLibraryUncached(supabase, { ...options, recoverOrphans, includeLegacy });
+  }
+
+  const cached = getTtlCache<CastTvLibraryState>(CAST_TV_LIBRARY_FAST_CACHE_KEY);
+  if (cached) {
+    logCastTvQuery({
+      name: "storage.library.json",
+      rows: cached.media.length,
+      durationMs: 0,
+      cache: "hit",
+      trigger: options.trigger ?? "refresh"
+    });
+    return cached;
+  }
+
+  return getOrLoadTtlCache(CAST_TV_LIBRARY_FAST_CACHE_KEY, CAST_TV_LIBRARY_FAST_TTL_MS, () =>
+    loadCastTvLibraryUncached(supabase, { ...options, recoverOrphans: false, includeLegacy: false })
+  );
 }
 
 export async function deleteRemovedCastTvStorage(
@@ -615,6 +677,7 @@ export async function deleteRemovedCastTvStorage(
 }
 
 export async function saveCastTvLibrary(supabase: SupabaseClient, state: CastTvLibraryState) {
+  invalidateTtlCache(CAST_TV_LIBRARY_FAST_CACHE_KEY);
   await uploadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH, {
     media: state.media,
     settings: state.settings
@@ -626,7 +689,7 @@ export async function mutateCastTvLibrary<T>(
   supabase: SupabaseClient,
   mutator: (state: CastTvLibraryState) => { state: CastTvLibraryState; result: T }
 ): Promise<T> {
-  const current = await loadCastTvLibrary(supabase);
+  const current = await loadCastTvLibrary(supabase, { skipCache: true, trigger: "mutation" });
   const { state, result } = mutator(current);
   await saveCastTvLibrary(supabase, state);
   return result;

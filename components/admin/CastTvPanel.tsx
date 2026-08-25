@@ -20,7 +20,13 @@ import {
 } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { uploadCastTvMedia, replaceCastTvMedia } from "@/lib/cast-tv/upload-client";
-import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
+import {
+  CAST_TV_ADMIN_PAGE_SIZE,
+  toCastTvAdminListItem,
+  type CastTvAdminListItem,
+  type CastTvMediaCounts
+} from "@/lib/cast-tv/admin-list";
+import { castTvFileThumbSrc } from "@/lib/cast-tv/thumbs";
 import {
   CAST_TV_IMAGE_DURATION_OPTIONS,
   type CastTvImageDuration,
@@ -34,6 +40,7 @@ type CastTvPanelProps = {
 
 const DISPLAY_URL = "https://casttv.ruffops.com";
 const FALLBACK_DISPLAY_URL = "/cast-tv";
+const EMPTY_COUNTS: CastTvMediaCounts = { active: 0, disabled: 0, missing: 0, total: 0 };
 
 function formatFileSize(bytes: number | null) {
   if (!bytes) return "—";
@@ -47,7 +54,7 @@ function formatDateTime(value: string) {
   return date.toLocaleString();
 }
 
-function thumbSrc(item: CastTvMediaRecord) {
+function previewSrc(item: CastTvAdminListItem) {
   if (item.media_type === "video") return item.public_url ?? "";
   if (item.public_url?.startsWith("/assets/")) return item.public_url;
   return `/api/cast-tv/media/file?id=${encodeURIComponent(item.id)}&v=${encodeURIComponent(item.updated_at)}`;
@@ -67,122 +74,232 @@ function isDuplicateUploadError(error: unknown) {
   return /already on CAST-TV|already exists in the CAST-TV/i.test(message);
 }
 
+function AdminThumb({ item }: { item: CastTvAdminListItem }) {
+  const [src, setSrc] = useState(item.thumb_url || castTvFileThumbSrc(item));
+  const [failed, setFailed] = useState(item.storage_missing === true);
+  const fallbackUsed = useRef(false);
+
+  useEffect(() => {
+    setFailed(item.storage_missing === true);
+    fallbackUsed.current = false;
+    setSrc(item.thumb_url || castTvFileThumbSrc(item));
+  }, [item.id, item.thumb_url, item.updated_at, item.storage_missing]);
+
+  if (item.media_type === "video") {
+    return (
+      <div className="cast-tv-admin-card__thumb is-video" aria-hidden>
+        Video
+      </div>
+    );
+  }
+
+  if (failed) {
+    return (
+      <div className="cast-tv-admin-card__thumb is-missing" aria-hidden>
+        Missing file
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={item.display_name ?? item.file_name}
+      className="cast-tv-admin-card__thumb"
+      referrerPolicy="no-referrer"
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        if (item.storage_missing || fallbackUsed.current || src.includes("fallback=1")) {
+          setFailed(true);
+          return;
+        }
+        fallbackUsed.current = true;
+        setSrc(castTvFileThumbSrc(item));
+      }}
+    />
+  );
+}
+
 export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
-  const [media, setMedia] = useState<CastTvMediaRecord[]>([]);
+  const onToastRef = useRef(onToast);
+  const mediaRevisionRef = useRef<string | null>(null);
+  onToastRef.current = onToast;
+
+  const [activeMedia, setActiveMedia] = useState<CastTvAdminListItem[]>([]);
+  const [disabledMedia, setDisabledMedia] = useState<CastTvAdminListItem[]>([]);
+  const [counts, setCounts] = useState<CastTvMediaCounts>(EMPTY_COUNTS);
+  const [activeHasMore, setActiveHasMore] = useState(false);
+  const [disabledHasMore, setDisabledHasMore] = useState(false);
+  const [disabledOpen, setDisabledOpen] = useState(false);
   const [settings, setSettings] = useState<CastTvSettings | null>(null);
   const [heartbeat, setHeartbeat] = useState<{ online: boolean; last_seen_at: string | null }>({
     online: false,
     last_seen_at: null
   });
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingDisabled, setLoadingDisabled] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [previewItem, setPreviewItem] = useState<CastTvMediaRecord | null>(null);
+  const [previewItem, setPreviewItem] = useState<CastTvAdminListItem | null>(null);
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  const activeMedia = useMemo(() => media.filter((item) => item.is_enabled), [media]);
-  const disabledMedia = useMemo(() => media.filter((item) => !item.is_enabled), [media]);
   const selectedCount = selectedIds.size;
   const allActiveSelected = Boolean(activeMedia.length) && activeMedia.every((item) => selectedIds.has(item.id));
   const allDisabledSelected =
     Boolean(disabledMedia.length) && disabledMedia.every((item) => selectedIds.has(item.id));
 
+  const knownIds = useMemo(
+    () => new Set([...activeMedia, ...disabledMedia].map((item) => item.id)),
+    [activeMedia, disabledMedia]
+  );
+
   useEffect(() => {
-    const known = new Set(media.map((item) => item.id));
     setSelectedIds((current) => {
-      const next = new Set([...current].filter((id) => known.has(id)));
+      const next = new Set([...current].filter((id) => knownIds.has(id)));
       return next.size === current.size ? current : next;
     });
-  }, [media]);
+  }, [knownIds]);
 
-  const loadData = useCallback(async () => {
-    let loadedMedia: CastTvMediaRecord[] | null = null;
-    try {
-      const mediaResponse = await fetch("/api/cast-tv/media", { cache: "no-store", credentials: "include" });
-      const mediaBody = await readResponseJson(mediaResponse);
-      if (!mediaResponse.ok) throw new Error(mediaBody.error ?? "Unable to load CAST-TV media.");
-
-      if (Array.isArray(mediaBody.media) && mediaBody.media.length) {
-        loadedMedia = mediaBody.media as CastTvMediaRecord[];
-      } else if (Array.isArray(mediaBody.playlist) && mediaBody.playlist.length) {
-        loadedMedia = (mediaBody.playlist as Array<{
-          id: string;
-          displayName?: string;
-          mediaType: "image" | "video";
-          src: string;
-          imageDisplaySeconds?: number;
-          updatedAt?: string;
-        }>).map((item) => ({
-          id: item.id,
-          display_name: item.displayName ?? null,
-          file_name: item.displayName ?? "CAST-TV media",
-          storage_path: "",
-          public_url: item.src,
-          media_type: item.mediaType,
-          mime_type: null,
-          file_size_bytes: null,
-          duration_seconds: null,
-          image_display_seconds: (item.imageDisplaySeconds === 5 ||
-          item.imageDisplaySeconds === 10 ||
-          item.imageDisplaySeconds === 15 ||
-          item.imageDisplaySeconds === 20 ||
-          item.imageDisplaySeconds === 30 ||
-          item.imageDisplaySeconds === 60
-            ? item.imageDisplaySeconds
-            : 10) as CastTvImageDuration,
-          display_order: 0,
-          is_enabled: true,
-          uploaded_by: null,
-          uploaded_by_name: null,
-          created_at: item.updatedAt ?? new Date().toISOString(),
-          updated_at: item.updatedAt ?? new Date().toISOString()
-        }));
-      } else if (Array.isArray(mediaBody.media)) {
-        loadedMedia = mediaBody.media as CastTvMediaRecord[];
+  const applyPage = useCallback(
+    (
+      status: "active" | "disabled",
+      body: {
+        items?: CastTvAdminListItem[];
+        page?: { hasMore?: boolean };
+        counts?: CastTvMediaCounts;
+        mediaRevision?: string;
+      },
+      append: boolean
+    ) => {
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (status === "active") {
+        setActiveMedia((current) => (append ? [...current, ...items.filter((item) => !current.some((row) => row.id === item.id))] : items));
+        setActiveHasMore(Boolean(body.page?.hasMore));
+      } else {
+        setDisabledMedia((current) => (append ? [...current, ...items.filter((item) => !current.some((row) => row.id === item.id))] : items));
+        setDisabledHasMore(Boolean(body.page?.hasMore));
       }
-      if (loadedMedia) {
-        setMedia(loadedMedia);
-      }
-    } catch (error) {
-      onToast(error instanceof Error ? error.message : "Unable to load CAST-TV.", "error");
-    }
+      if (body.counts) setCounts(body.counts);
+      if (body.mediaRevision) mediaRevisionRef.current = body.mediaRevision;
+    },
+    []
+  );
 
-    try {
-      const settingsResponse = await fetch("/api/cast-tv/settings?heartbeat=1", {
-        cache: "no-store",
-        credentials: "include"
+  const fetchMediaPage = useCallback(
+    async (input: {
+      status: "active" | "disabled";
+      offset: number;
+      append?: boolean;
+      probe?: boolean;
+      signal?: AbortSignal;
+    }) => {
+      const params = new URLSearchParams({
+        status: input.status,
+        limit: String(CAST_TV_ADMIN_PAGE_SIZE),
+        offset: String(input.offset)
       });
-      const settingsBody = await readResponseJson(settingsResponse);
-      if (settingsResponse.ok) {
-        setSettings(settingsBody.settings ?? null);
-        if (settingsBody.heartbeat) {
-          setHeartbeat({
-            online: Boolean(settingsBody.heartbeat.online),
-            last_seen_at: settingsBody.heartbeat.last_seen_at ?? null
-          });
-        }
-      }
-    } catch {
-      /* settings must not hide the playlist */
-    } finally {
-      setLoading(false);
+      if (input.probe) params.set("probe", "1");
+      const response = await fetch(`/api/cast-tv/media?${params.toString()}`, {
+        cache: "no-store",
+        credentials: "include",
+        signal: input.signal
+      });
+      const body = await readResponseJson(response);
+      if (!response.ok) throw new Error(body.error ?? "Unable to load CAST-TV media.");
+      applyPage(input.status, body, Boolean(input.append));
+    },
+    [applyPage]
+  );
+
+  const fetchSettings = useCallback(async (signal?: AbortSignal) => {
+    const settingsResponse = await fetch("/api/cast-tv/settings?heartbeat=1", {
+      cache: "no-store",
+      credentials: "include",
+      signal
+    });
+    const settingsBody = await readResponseJson(settingsResponse);
+    if (!settingsResponse.ok) return null;
+    setSettings(settingsBody.settings ?? null);
+    if (settingsBody.heartbeat) {
+      setHeartbeat({
+        online: Boolean(settingsBody.heartbeat.online),
+        last_seen_at: settingsBody.heartbeat.last_seen_at ?? null
+      });
     }
-  }, [onToast]);
+    if (typeof settingsBody.mediaRevision === "string") {
+      mediaRevisionRef.current = settingsBody.mediaRevision;
+      return settingsBody.mediaRevision;
+    }
+    return null;
+  }, []);
+
+  const reloadVisible = useCallback(
+    async (signal?: AbortSignal) => {
+      await fetchMediaPage({ status: "active", offset: 0, probe: true, signal });
+      if (disabledOpen) {
+        await fetchMediaPage({ status: "disabled", offset: 0, probe: true, signal });
+      }
+    },
+    [disabledOpen, fetchMediaPage]
+  );
+
+  const disabledOpenRef = useRef(false);
+  disabledOpenRef.current = disabledOpen;
 
   useEffect(() => {
-    void loadData();
+    const controller = new AbortController();
+    let cancelled = false;
+
+    async function initialLoad() {
+      try {
+        const revision = await Promise.all([
+          fetchSettings(controller.signal).catch(() => null),
+          fetchMediaPage({ status: "active", offset: 0, probe: true, signal: controller.signal })
+        ]).then(([value]) => value);
+        if (revision) mediaRevisionRef.current = revision;
+      } catch (error) {
+        if (controller.signal.aborted || cancelled) return;
+        onToastRef.current(error instanceof Error ? error.message : "Unable to load CAST-TV.", "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void initialLoad();
+
     const timer = window.setInterval(() => {
-      void loadData();
+      if (document.hidden) return;
+      void (async () => {
+        try {
+          const revision = await fetchSettings(controller.signal);
+          if (controller.signal.aborted) return;
+          if (revision && mediaRevisionRef.current && revision === mediaRevisionRef.current) return;
+          await fetchMediaPage({ status: "active", offset: 0, signal: controller.signal });
+          if (disabledOpenRef.current) {
+            await fetchMediaPage({ status: "disabled", offset: 0, signal: controller.signal });
+          }
+        } catch {
+          /* silent poll — do not toast timeouts */
+        }
+      })();
     }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [loadData]);
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearInterval(timer);
+    };
+  }, [fetchMediaPage, fetchSettings]);
 
   async function handleFiles(fileList: FileList | File[] | null) {
     const files = Array.from(fileList ?? []);
@@ -193,7 +310,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     let successCount = 0;
     let skippedCount = 0;
     const seenNames = new Set(
-      media
+      [...activeMedia, ...disabledMedia]
         .map((item) => uploadNameKey(item.file_name))
         .filter((name) => name && !isGeneratedCastTvName(name))
     );
@@ -211,26 +328,27 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           if (nameKey) seenNames.add(nameKey);
           if (uploaded?.id) {
             const now = new Date().toISOString();
-            setMedia((current) => {
-              const nextItem: CastTvMediaRecord = {
+            setActiveMedia((current) => {
+              const nextItem: CastTvAdminListItem = {
                 id: uploaded.id,
                 display_name: uploaded.display_name ?? file.name,
                 file_name: file.name,
                 storage_path: "",
+                bucket: null,
                 public_url: uploaded.public_url ?? "",
+                thumb_url: uploaded.public_url?.startsWith("/assets/") ? uploaded.public_url : null,
                 media_type: uploaded.media_type,
                 mime_type: file.type || null,
                 file_size_bytes: file.size,
-                duration_seconds: null,
                 image_display_seconds: 10,
                 display_order: current.length + 1,
                 is_enabled: true,
-                uploaded_by: null,
                 uploaded_by_name: null,
                 created_at: now,
-                updated_at: now
+                updated_at: now,
+                storage_missing: false
               };
-              return [...current.filter((item) => item.id !== uploaded.id), nextItem];
+              return [nextItem, ...current.filter((item) => item.id !== uploaded.id)];
             });
           }
         } catch (error) {
@@ -256,10 +374,10 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           successCount > 0 ? "info" : "error"
         );
       }
-      if (successCount > 0 || skippedCount > 0) await loadData();
+      if (successCount > 0 || skippedCount > 0) await reloadVisible();
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Upload failed.", "error");
-      if (successCount > 0) await loadData();
+      if (successCount > 0) await reloadVisible();
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -278,7 +396,13 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Update failed.");
-      setMedia((current) => current.map((item) => (item.id === id ? body.media : item)));
+      if (body.media && typeof patch.is_enabled === "boolean") {
+        await reloadVisible();
+      } else if (body.media) {
+        const next = toCastTvAdminListItem(body.media);
+        setActiveMedia((current) => current.map((item) => (item.id === id ? next : item)));
+        setDisabledMedia((current) => current.map((item) => (item.id === id ? next : item)));
+      }
       onToast("Media updated.", "success");
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Update failed.", "error");
@@ -293,7 +417,14 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       const response = await fetch(`/api/cast-tv/media/${id}`, { method: "DELETE", credentials: "include" });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Delete failed.");
-      setMedia((current) => current.filter((item) => item.id !== id));
+      setActiveMedia((current) => current.filter((item) => item.id !== id));
+      setDisabledMedia((current) => current.filter((item) => item.id !== id));
+      setCounts((current) => ({
+        ...current,
+        total: Math.max(0, current.total - 1),
+        active: Math.max(0, current.active - (activeMedia.some((item) => item.id === id) ? 1 : 0)),
+        disabled: Math.max(0, current.disabled - (disabledMedia.some((item) => item.id === id) ? 1 : 0))
+      }));
       onToast("Media deleted.", "success");
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Delete failed.", "error");
@@ -311,7 +442,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     });
   }
 
-  function toggleSelectAll(items: CastTvMediaRecord[], currentlyAllSelected: boolean) {
+  function toggleSelectAll(items: CastTvAdminListItem[], currentlyAllSelected: boolean) {
     setSelectedIds((current) => {
       const next = new Set(current);
       if (currentlyAllSelected) {
@@ -348,9 +479,11 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Delete failed.");
       const removed = new Set(ids);
-      setMedia((current) => current.filter((item) => !removed.has(item.id)));
+      setActiveMedia((current) => current.filter((item) => !removed.has(item.id)));
+      setDisabledMedia((current) => current.filter((item) => !removed.has(item.id)));
       setSelectedIds(new Set());
       onToast(ids.length === 1 ? "Media deleted." : `Deleted ${ids.length} items from CAST-TV.`, "success");
+      await reloadVisible();
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Delete failed.", "error");
     } finally {
@@ -369,7 +502,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Reorder failed.");
-      setMedia(body.media ?? []);
+      await fetchMediaPage({ status: "active", offset: 0 });
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Reorder failed.", "error");
     } finally {
@@ -402,11 +535,14 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     setBusyId(replaceTargetId);
     try {
       const mediaItem = await replaceCastTvMedia(replaceTargetId, file);
-      setMedia((current) =>
-        current.map((item) => (item.id === replaceTargetId ? { ...item, ...mediaItem } : item))
+      setActiveMedia((current) =>
+        current.map((item) => (item.id === replaceTargetId ? { ...item, ...mediaItem, updated_at: new Date().toISOString() } : item))
+      );
+      setDisabledMedia((current) =>
+        current.map((item) => (item.id === replaceTargetId ? { ...item, ...mediaItem, updated_at: new Date().toISOString() } : item))
       );
       onToast("Media replaced.", "success");
-      await loadData();
+      await reloadVisible();
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Replace failed.", "error");
     } finally {
@@ -426,7 +562,44 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     }
   }
 
-  function renderMediaRow(item: CastTvMediaRecord, index: number, list: CastTvMediaRecord[]) {
+  async function loadMoreActive() {
+    setLoadingMore(true);
+    try {
+      await fetchMediaPage({ status: "active", offset: activeMedia.length, append: true });
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "Unable to load more CAST-TV media.", "error");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function loadMoreDisabled() {
+    setLoadingMore(true);
+    try {
+      await fetchMediaPage({ status: "disabled", offset: disabledMedia.length, append: true });
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "Unable to load more CAST-TV media.", "error");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  async function openDisabled() {
+    const nextOpen = !disabledOpen;
+    setDisabledOpen(nextOpen);
+    if (!nextOpen || disabledMedia.length) return;
+    setLoadingDisabled(true);
+    try {
+      await fetchMediaPage({ status: "disabled", offset: 0, probe: true });
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "Unable to load disabled CAST-TV media.", "error");
+      setDisabledOpen(false);
+    } finally {
+      setLoadingDisabled(false);
+    }
+  }
+
+  function renderMediaRow(item: CastTvAdminListItem, index: number, list: CastTvAdminListItem[]) {
     const busy = busyId === item.id || bulkDeleting;
     const selected = selectedIds.has(item.id);
     return (
@@ -441,17 +614,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           />
         </label>
         <div className="cast-tv-admin-card__preview">
-          {item.media_type === "video" ? (
-            <video src={item.public_url ?? ""} muted playsInline preload="metadata" className="cast-tv-admin-card__thumb" />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbSrc(item)}
-              alt={item.display_name ?? item.file_name}
-              className="cast-tv-admin-card__thumb"
-              referrerPolicy="no-referrer"
-            />
-          )}
+          <AdminThumb item={item} />
         </div>
         <div className="cast-tv-admin-card__body">
           <div className="cast-tv-admin-card__title-row">
@@ -466,7 +629,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
               }}
             />
             <span className={`cast-tv-admin-card__status ${item.is_enabled ? "is-enabled" : "is-disabled"}`}>
-              {item.is_enabled ? "Enabled" : "Disabled"}
+              {item.storage_missing ? "Missing" : item.is_enabled ? "Enabled" : "Disabled"}
             </span>
           </div>
           <p className="cast-tv-admin-card__meta">
@@ -637,7 +800,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
 
       <section className="crossover-card">
         <div className="cast-tv-admin__playlist-header">
-          <h3 className="crossover-card__title">Active Playlist ({activeMedia.length})</h3>
+          <h3 className="crossover-card__title">Active Playlist ({counts.active})</h3>
           <div className="cast-tv-admin__bulk-bar">
             <label className="cast-tv-admin__checkbox">
               <input
@@ -662,34 +825,60 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
         {loading ? <p className="cast-tv-admin__empty">Loading media…</p> : null}
         {!loading && !activeMedia.length ? <p className="cast-tv-admin__empty">No enabled media yet.</p> : null}
         <div className="cast-tv-admin__grid">{activeMedia.map((item, index) => renderMediaRow(item, index, activeMedia))}</div>
+        {activeHasMore ? (
+          <button type="button" className="crossover-btn crossover-btn--ghost mt-4" disabled={loadingMore} onClick={() => void loadMoreActive()}>
+            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Load more
+          </button>
+        ) : null}
       </section>
 
-      {disabledMedia.length ? (
+      {counts.disabled ? (
         <section className="crossover-card">
           <div className="cast-tv-admin__playlist-header">
-            <h3 className="crossover-card__title">Disabled Media ({disabledMedia.length})</h3>
+            <h3 className="crossover-card__title">Disabled Media ({counts.disabled})</h3>
             <div className="cast-tv-admin__bulk-bar">
-              <label className="cast-tv-admin__checkbox">
-                <input
-                  type="checkbox"
-                  checked={allDisabledSelected}
-                  disabled={bulkDeleting}
-                  onChange={() => toggleSelectAllDisabled()}
-                />
-                Select all
-              </label>
-              <button
-                type="button"
-                className="crossover-btn crossover-btn--ghost"
-                disabled={!selectedCount || bulkDeleting}
-                onClick={() => void deleteSelected()}
-              >
-                {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                {selectedCount ? `Delete selected (${selectedCount})` : "Delete selected"}
+              <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void openDisabled()}>
+                {disabledOpen ? "Hide" : "Show"}
               </button>
+              {disabledOpen ? (
+                <label className="cast-tv-admin__checkbox">
+                  <input
+                    type="checkbox"
+                    checked={allDisabledSelected}
+                    disabled={bulkDeleting || !disabledMedia.length}
+                    onChange={() => toggleSelectAllDisabled()}
+                  />
+                  Select all
+                </label>
+              ) : null}
+              {disabledOpen ? (
+                <button
+                  type="button"
+                  className="crossover-btn crossover-btn--ghost"
+                  disabled={!selectedCount || bulkDeleting}
+                  onClick={() => void deleteSelected()}
+                >
+                  {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  {selectedCount ? `Delete selected (${selectedCount})` : "Delete selected"}
+                </button>
+              ) : null}
             </div>
           </div>
-          <div className="cast-tv-admin__grid">{disabledMedia.map((item, index) => renderMediaRow(item, index, disabledMedia))}</div>
+          {disabledOpen ? (
+            <>
+              {loadingDisabled ? <p className="cast-tv-admin__empty">Loading disabled media…</p> : null}
+              <div className="cast-tv-admin__grid">{disabledMedia.map((item, index) => renderMediaRow(item, index, disabledMedia))}</div>
+              {disabledHasMore ? (
+                <button type="button" className="crossover-btn crossover-btn--ghost mt-4" disabled={loadingMore} onClick={() => void loadMoreDisabled()}>
+                  {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Load more
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <p className="cast-tv-admin__empty">Disabled media loads only when you open this section.</p>
+          )}
         </section>
       ) : null}
 
@@ -790,9 +979,11 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           <div className="cast-tv-admin__preview-modal">
             {previewItem.media_type === "video" ? (
               <video src={previewItem.public_url ?? ""} controls autoPlay muted className="cast-tv-admin__preview-media" />
+            ) : previewItem.storage_missing ? (
+              <p className="cast-tv-admin__empty">This file is missing from storage.</p>
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={thumbSrc(previewItem)} alt="" className="cast-tv-admin__preview-media" />
+              <img src={previewSrc(previewItem)} alt="" className="cast-tv-admin__preview-media" />
             )}
           </div>
         ) : null}

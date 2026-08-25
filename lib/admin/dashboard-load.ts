@@ -1,9 +1,12 @@
 import type { AdminBoardType } from "@/lib/admin/types";
 
-/** Staff tabs that fetch their own data — skip heavy board widgets on first paint. */
+/** Tabs that fetch their own data — skip promotions / live dogs / webhook dumps on first paint. */
 export function skipHeavyBoardWidgets(board: AdminBoardType, tab: string | null) {
-  if (board !== "staff") return false;
   if (!tab) return false;
+  if (board === "marketing") {
+    return tab === "cast_tv" || tab === "sa_apps_hub" || tab === "bulk_photo_upload";
+  }
+  if (board !== "staff") return false;
   return tab !== "overview" && tab !== "integrations" && tab !== "logs";
 }
 

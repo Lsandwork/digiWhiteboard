@@ -13340,6 +13340,17 @@ body.cast-tv-root {
   display: block;
 }
 
+.cast-tv-admin-card__thumb.is-missing,
+.cast-tv-admin-card__thumb.is-video {
+  display: grid;
+  place-items: center;
+  color: rgba(248, 250, 252, 0.55);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: #0b1220;
+}
+
 .cast-tv-admin-card__title-row {
   display: flex;
   align-items: center;

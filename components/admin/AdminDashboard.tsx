@@ -290,7 +290,8 @@ export function AdminDashboard() {
         };
       });
       setError(null);
-      if (liteSettings || liteWidgets) {
+      const skipBackgroundHydrate = board === "marketing" && skipHeavyBoardWidgets(board, tabForFetch);
+      if ((liteSettings || liteWidgets) && !skipBackgroundHydrate) {
         hydrateAbortRef.current?.abort();
         const hydrateController = new AbortController();
         hydrateAbortRef.current = hydrateController;
