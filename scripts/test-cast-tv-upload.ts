@@ -15,11 +15,14 @@ import {
 } from "../lib/cast-tv/mime";
 import { normalizeCastTvUploadBytes } from "../lib/cast-tv/normalize-upload";
 import {
+  builtinMarketingCastTvMedia,
   emptyCastTvLibrary,
   isMissingCastTvStorageObject,
+  mergeCastTvLibraries,
   mergeCastTvStorageObjects,
   parseCastTvLibrary
 } from "../lib/cast-tv/library-store";
+import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 
 assert.equal(inferCastTvMimeType("promo.jpg", ""), "image/jpeg");
@@ -94,6 +97,25 @@ assert.equal(
   0
 );
 
+const builtins = builtinMarketingCastTvMedia();
+assert.equal(builtins.length, LOBBY_IDLE_SLIDESHOW.length);
+assert.ok(builtins.every((item) => item.is_enabled && item.public_url?.startsWith("/assets/")));
+assert.equal(
+  mergeCastTvLibraries(emptyCastTvLibrary(), { ...emptyCastTvLibrary(), media: builtins }).added,
+  builtins.length
+);
+assert.equal(
+  mergeCastTvLibraries(
+    { ...emptyCastTvLibrary(), media: builtins },
+    { ...emptyCastTvLibrary(), media: builtins }
+  ).added,
+  0,
+  "designed marketing slides must not duplicate"
+);
+const restored = mergeCastTvLibraries(emptyCastTvLibrary(), parsedLibrary);
+assert.equal(restored.added, 1);
+assert.equal(restored.library.media[0].file_name, "yard.jpg");
+
 const file = new File([new Uint8Array([1, 2, 3])], "promo.jpg", { type: "image/jpeg" });
 const formFile = asCastTvFormFile(file);
 assert.equal(formFile?.name, "promo.jpg");
@@ -149,11 +171,10 @@ const normalizeUpload = readFileSync(join(root, "lib/cast-tv/normalize-upload.ts
 assert.doesNotMatch(normalizeUpload, /import sharp from/);
 
 const mediaRoute = readFileSync(join(root, "app/api/cast-tv/media/route.ts"), "utf8");
-assert.match(mediaRoute, /getCastTvSupabase/);
-assert.match(mediaRoute, /maxDuration = 60/);
-assert.match(mediaRoute, /castTvErrorMessage/);
+assert.match(mediaRoute, /loadCastTvMedia/);
 assert.match(mediaRoute, /playlist/);
 assert.match(mediaRoute, /admin: true/);
+assert.doesNotMatch(mediaRoute, /buildCastTvPlaylist/);
 
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
 assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 15_000/);
@@ -175,11 +196,13 @@ assert.doesNotMatch(media, /\.from\("cast_tv_media"\)/);
 const libraryStore = readFileSync(join(root, "lib/cast-tv/library-store.ts"), "utf8");
 assert.match(libraryStore, /cast-tv\/library\.json/);
 assert.match(libraryStore, /CAST_TV_LEGACY_MEDIA_BUCKET = "cast-tv-media"/);
+assert.match(libraryStore, /CAST_TV_LIBRARY_SETTINGS_KEY = "cast_tv_library"/);
 assert.match(libraryStore, /CAST_TV_LAST_GOOD_CACHE_KEY/);
+assert.match(libraryStore, /builtinMarketingCastTvMedia/);
+assert.match(libraryStore, /loadLegacySettingsLibrary/);
+assert.match(libraryStore, /withTimeoutFallback/);
 assert.match(libraryStore, /\.download\(/);
 assert.match(libraryStore, /JSON_UPLOAD_MIME/);
-assert.doesNotMatch(libraryStore, /loadAdminSettingsJsonKey/);
-assert.doesNotMatch(libraryStore, /settings-json-store/);
 
 const storageProbe = readFileSync(join(root, "lib/system-health/probes/storage.ts"), "utf8");
 assert.doesNotMatch(storageProbe, /\.from\("cast_tv_media"\)/);

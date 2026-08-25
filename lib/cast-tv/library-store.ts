@@ -1,5 +1,6 @@
-import { getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
+import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { inferCastTvMimeType, mediaTypeForMime } from "@/lib/cast-tv/mime";
+import { LOBBY_IDLE_SLIDESHOW } from "@/lib/lobby/slideshow";
 import {
   CAST_TV_SETTINGS_ID,
   type CastTvImageDuration,
@@ -16,6 +17,8 @@ export const CAST_TV_STORAGE_BUCKET = "lobby-slideshow";
 export const CAST_TV_LEGACY_MEDIA_BUCKET = "cast-tv-media";
 export const CAST_TV_LIBRARY_OBJECT_PATH = "cast-tv/library.json";
 export const CAST_TV_HEARTBEATS_OBJECT_PATH = "cast-tv/heartbeats.json";
+/** Playlist JSON from the brief admin_settings era, before Storage library.json. */
+export const CAST_TV_LIBRARY_SETTINGS_KEY = "cast_tv_library";
 export const CAST_TV_LAST_GOOD_CACHE_KEY = "cast-tv:last-good-library";
 export const CAST_TV_LAST_GOOD_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -61,6 +64,70 @@ export function defaultCastTvSettings(): CastTvSettings {
 
 export function emptyCastTvLibrary(): CastTvLibraryState {
   return { media: [], settings: defaultCastTvSettings(), heartbeats: {} };
+}
+
+export function builtinMarketingCastTvMedia(): CastTvMediaRecord[] {
+  return LOBBY_IDLE_SLIDESHOW.map((slide, index) => {
+    const fileName = slide.src.split("/").pop() || `slide-${index + 1}.png`;
+    return {
+      id: `builtin-marketing-${fileName.replace(/\.[^.]+$/, "")}`,
+      display_name: slide.alt,
+      file_name: fileName,
+      storage_path: `builtin/marketing/${fileName}`,
+      bucket: null,
+      public_url: slide.src,
+      media_type: "image" as const,
+      mime_type: "image/png",
+      file_size_bytes: null,
+      duration_seconds: null,
+      image_display_seconds: 10 as CastTvImageDuration,
+      display_order: index + 1,
+      is_enabled: true,
+      uploaded_by: null,
+      uploaded_by_name: "Fitdog marketing",
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString()
+    };
+  });
+}
+
+function mediaKeys(item: CastTvMediaRecord) {
+  return [
+    `id:${item.id}`,
+    `path:${item.storage_path}`,
+    `file:${item.file_name.toLowerCase()}`
+  ];
+}
+
+export function mergeCastTvLibraries(
+  base: CastTvLibraryState,
+  incoming: CastTvLibraryState
+): { library: CastTvLibraryState; added: number } {
+  const known = new Set(base.media.flatMap(mediaKeys));
+  const extras = incoming.media.filter((item) => mediaKeys(item).every((key) => !known.has(key)));
+  if (!extras.length) {
+    const incomingNewer =
+      Date.parse(incoming.settings.updated_at) > Date.parse(base.settings.updated_at);
+    if (!incomingNewer) return { library: base, added: 0 };
+    return { library: { ...base, settings: incoming.settings }, added: 0 };
+  }
+
+  let nextOrder = base.media.reduce((max, item) => Math.max(max, item.display_order), 0);
+  const incomingNewer = Date.parse(incoming.settings.updated_at) > Date.parse(base.settings.updated_at);
+  return {
+    library: {
+      media: [
+        ...base.media,
+        ...extras.map((item) => {
+          nextOrder += 1;
+          return { ...item, display_order: item.display_order || nextOrder };
+        })
+      ].sort((a, b) => a.display_order - b.display_order || a.created_at.localeCompare(b.created_at)),
+      settings: incomingNewer ? incoming.settings : base.settings,
+      heartbeats: Object.keys(base.heartbeats).length ? base.heartbeats : incoming.heartbeats
+    },
+    added: extras.length
+  };
 }
 
 export function isMissingCastTvStorageObject(
@@ -284,22 +351,50 @@ async function listBucketPrefix(
   bucket: string,
   prefix: string
 ): Promise<CastTvStorageListItem[]> {
-  const { data, error } = await supabase.storage.from(bucket).list(prefix, {
-    limit: 100,
-    sortBy: { column: "name", order: "asc" }
-  });
-  if (error || !data?.length) return [];
-  return data;
+  const results: CastTvStorageListItem[] = [];
+  let offset = 0;
+  for (let page = 0; page < 8; page += 1) {
+    const { data, error } = await supabase.storage.from(bucket).list(prefix, {
+      limit: 100,
+      offset,
+      sortBy: { column: "name", order: "asc" }
+    });
+    if (error || !data?.length) break;
+    for (const object of data) {
+      const name = String(object.name || "").trim();
+      if (!name || name.endsWith("/")) continue;
+      const isFolder = !object.id || object.metadata == null;
+      if (isFolder && !/\.[a-z0-9]+$/i.test(name)) {
+        const childPrefix = prefix ? `${prefix}/${name}` : name;
+        try {
+          const nested = await listBucketPrefix(supabase, bucket, childPrefix);
+          results.push(...nested);
+        } catch {
+          /* skip one nested folder */
+        }
+        continue;
+      }
+      results.push({
+        name: prefix ? `${prefix}/${name}` : name,
+        updated_at: object.updated_at,
+        created_at: object.created_at,
+        metadata: object.metadata
+      });
+    }
+    if (data.length < 100) break;
+    offset += data.length;
+  }
+  return results;
 }
 
 async function recoverOrphanedCastTvFiles(
   supabase: SupabaseClient,
   library: CastTvLibraryState
 ): Promise<CastTvLibraryState> {
-  const scans: Array<{ bucket: string; prefix: string; pathPrefix: string }> = [
-    { bucket: CAST_TV_STORAGE_BUCKET, prefix: "cast-tv", pathPrefix: "cast-tv" },
-    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv", pathPrefix: "cast-tv" },
-    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "", pathPrefix: "" }
+  const scans: Array<{ bucket: string; prefix: string }> = [
+    { bucket: CAST_TV_STORAGE_BUCKET, prefix: "cast-tv" },
+    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv" },
+    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "" }
   ];
 
   let current = library;
@@ -310,7 +405,7 @@ async function recoverOrphanedCastTvFiles(
         current,
         objects,
         (storagePath, updatedAt) => publicUrlForCastTvStorage(supabase, storagePath, updatedAt, scan.bucket),
-        { bucket: scan.bucket, pathPrefix: scan.pathPrefix }
+        { bucket: scan.bucket, pathPrefix: "" }
       );
       current = merged.library;
     } catch {
@@ -318,6 +413,21 @@ async function recoverOrphanedCastTvFiles(
     }
   }
   return current;
+}
+
+async function loadLegacySettingsLibrary(supabase: SupabaseClient): Promise<CastTvLibraryState | null> {
+  try {
+    const { loadAdminSettingsJsonKey } = await import("@/lib/admin/settings-json-store");
+    const stored = await withTimeoutFallback(
+      loadAdminSettingsJsonKey(supabase, CAST_TV_LIBRARY_SETTINGS_KEY, parseCastTvLibrary, emptyCastTvLibrary()),
+      1_500,
+      null
+    );
+    if (!stored?.media.length) return null;
+    return hydrateLibraryUrls(supabase, stored);
+  } catch {
+    return null;
+  }
 }
 
 function rememberLastGoodLibrary(library: CastTvLibraryState) {
@@ -348,12 +458,42 @@ export async function loadCastTvLibrary(
   try {
     const stored = await downloadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH);
     let library = hydrateLibraryUrls(supabase, parseCastTvLibrary(stored));
+    let added = 0;
+
+    const legacy = await loadLegacySettingsLibrary(supabase);
+    if (legacy) {
+      const merged = mergeCastTvLibraries(library, legacy);
+      library = merged.library;
+      added += merged.added;
+    }
+
     if (options.recoverOrphans !== false) {
       try {
-        library = hydrateLibraryUrls(supabase, await recoverOrphanedCastTvFiles(supabase, library));
+        const recovered = hydrateLibraryUrls(supabase, await recoverOrphanedCastTvFiles(supabase, library));
+        const merged = mergeCastTvLibraries(library, recovered);
+        library = merged.library;
+        added += merged.added;
       } catch {
         /* keep parsed library */
       }
+    }
+
+    if (!library.media.some((item) => item.is_enabled !== false)) {
+      const builtins = {
+        ...emptyCastTvLibrary(),
+        media: builtinMarketingCastTvMedia(),
+        settings: library.settings
+      };
+      const merged = mergeCastTvLibraries(library, builtins);
+      library = merged.library;
+      added += merged.added;
+    }
+
+    library = hydrateLibraryUrls(supabase, library);
+    if (added > 0) {
+      void saveCastTvLibrary(supabase, library).catch((error) => {
+        console.error("[cast-tv] persist recovered playlist failed:", error);
+      });
     }
     if (library.media.length) rememberLastGoodLibrary(library);
     else {
