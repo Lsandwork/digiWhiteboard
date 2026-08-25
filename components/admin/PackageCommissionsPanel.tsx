@@ -295,15 +295,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         if (tab === "approval") params.set("approvalStatus", "pending");
       } else {
         const copied = new URLSearchParams(searchParams.toString());
-        copied.set("view", "ledger");
-        if (tab === "rules" || tab === "payroll" || tab === "imports") {
-          copied.set("view", tab === "rules" ? "rules" : tab === "payroll" ? "payroll" : "imports");
-        }
-        if (tab === "reports") {
-          copied.set("view", "report");
-          copied.set("reportType", reportType);
-          copied.set("pageSize", "5000");
-        }
+        copied.set("view", "report");
+        copied.set("reportType", reportType);
+        copied.set("pageSize", "5000");
         copied.forEach((value, key) => params.set(key, value));
       }
 
