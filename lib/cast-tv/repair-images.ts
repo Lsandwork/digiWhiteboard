@@ -1,6 +1,6 @@
 import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 import { dedupeCastTvMedia, isLocalCastTvAsset, matchCastTvDuplicate } from "@/lib/cast-tv/display-image";
-import { loadCastTvLibrary, saveCastTvLibrary } from "@/lib/cast-tv/library-store";
+import { deleteRemovedCastTvStorage, loadCastTvLibrary, saveCastTvLibrary } from "@/lib/cast-tv/library-store";
 import { normalizeStoredCastTvImage } from "@/lib/cast-tv/stored-image";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -14,6 +14,7 @@ export async function repairCastTvLibraryImages(
   const library = await loadCastTvLibrary(supabase);
   const nextMedia: CastTvMediaRecord[] = [];
   let changed = false;
+  const removed: CastTvMediaRecord[] = [];
 
   for (const item of library.media) {
     if (item.media_type !== "image") {
@@ -39,6 +40,7 @@ export async function repairCastTvLibraryImages(
         ignoreId: item.id
       });
       if (duplicate) {
+        removed.push(item);
         changed = true;
         continue;
       }
@@ -67,14 +69,7 @@ export async function repairCastTvLibraryImages(
         ignoreId: item.id
       });
       if (duplicate) {
-        if (item.storage_path && item.storage_path !== duplicate.storage_path) {
-          try {
-            const bucket = item.bucket || "lobby-slideshow";
-            await supabase.storage.from(bucket).remove([item.storage_path]);
-          } catch {
-            /* kept copy remains in the playlist */
-          }
-        }
+        removed.push(item);
         changed = true;
         continue;
       }
@@ -103,6 +98,9 @@ export async function repairCastTvLibraryImages(
   if (changed) {
     const ordered = media.map((item, index) => ({ ...item, display_order: index + 1 }));
     await saveCastTvLibrary(supabase, { ...library, media: ordered });
+    if (removed.length) {
+      await deleteRemovedCastTvStorage(supabase, removed);
+    }
     return ordered;
   }
 

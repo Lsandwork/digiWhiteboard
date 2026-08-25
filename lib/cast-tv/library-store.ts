@@ -1,8 +1,11 @@
 import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import {
   basenameCastTvFile,
-  dedupeCastTvMedia,
-  originalCastTvFileNameKey
+  isLegacyCastTvDumpPath,
+  isLocalCastTvAsset,
+  isRecoverableCastTvStoragePath,
+  originalCastTvFileNameKey,
+  purgeDuplicateCastTvMedia
 } from "@/lib/cast-tv/display-image";
 import { inferCastTvMimeType, mediaTypeForMime } from "@/lib/cast-tv/mime";
 import { LOBBY_IDLE_SLIDESHOW } from "@/lib/lobby/slideshow";
@@ -102,6 +105,7 @@ function mediaKeys(item: CastTvMediaRecord) {
   const fileKey = originalCastTvFileNameKey(item.file_name);
   if (fileKey) keys.push(`file:${fileKey}`);
   if (item.content_hash) keys.push(`hash:${item.content_hash}`);
+  if (item.pixel_hash) keys.push(`pixel:${item.pixel_hash}`);
   return keys;
 }
 
@@ -110,7 +114,13 @@ export function mergeCastTvLibraries(
   incoming: CastTvLibraryState
 ): { library: CastTvLibraryState; added: number } {
   const known = new Set(base.media.flatMap(mediaKeys));
-  const extras = incoming.media.filter((item) => mediaKeys(item).every((key) => !known.has(key)));
+  const baseHasCanonical = base.media.some(
+    (item) => item.is_enabled !== false && !isLegacyCastTvDumpPath(item.storage_path)
+  );
+  const incomingMedia = baseHasCanonical
+    ? incoming.media.filter((item) => !isLegacyCastTvDumpPath(item.storage_path))
+    : incoming.media;
+  const extras = incomingMedia.filter((item) => mediaKeys(item).every((key) => !known.has(key)));
   if (!extras.length) {
     const incomingNewer =
       Date.parse(incoming.settings.updated_at) > Date.parse(base.settings.updated_at);
@@ -230,7 +240,7 @@ export function parseCastTvLibrary(value: unknown): CastTvLibraryState {
         .sort((a, b) => a.display_order - b.display_order || a.created_at.localeCompare(b.created_at))
     : [];
   return {
-    media: dedupeCastTvMedia(media),
+    media: purgeDuplicateCastTvMedia(media).kept,
     settings: asSettings(raw.settings),
     heartbeats: parseCastTvHeartbeats(raw.heartbeats)
   };
@@ -256,6 +266,7 @@ export function mergeCastTvStorageObjects(
   for (const object of objects) {
     const name = String(object.name || "").trim();
     if (!name || isLibrarySidecar(name) || name.endsWith("/")) continue;
+    if (isLegacyCastTvDumpPath(name)) continue;
     const baseName = basenameCastTvFile(name);
     if (!baseName || isLibrarySidecar(baseName)) continue;
     const storagePath =
@@ -266,6 +277,7 @@ export function mergeCastTvStorageObjects(
           : name.startsWith("cast-tv/")
             ? name
             : `cast-tv/${baseName}`;
+    if (!isRecoverableCastTvStoragePath(storagePath)) continue;
     const key = `${bucket}:${storagePath}`;
     if (known.has(key) || known.has(`:${storagePath}`)) continue;
 
@@ -380,6 +392,7 @@ async function listBucketPrefix(
       if (!name || name.endsWith("/")) continue;
       const isFolder = !object.id || object.metadata == null;
       if (isFolder && !/\.[a-z0-9]+$/i.test(name)) {
+        if (name.toLowerCase() === "media") continue;
         const childPrefix = prefix ? `${prefix}/${name}` : name;
         try {
           const nested = await listBucketPrefix(supabase, bucket, childPrefix);
@@ -497,6 +510,9 @@ export async function loadCastTvLibrary(
       }
     }
 
+    const purged = purgeDuplicateCastTvMedia(library.media);
+    library = { ...library, media: purged.kept };
+
     if (!library.media.some((item) => item.is_enabled !== false)) {
       const builtins = {
         ...emptyCastTvLibrary(),
@@ -510,11 +526,14 @@ export async function loadCastTvLibrary(
 
     library = hydrateLibraryUrls(supabase, {
       ...library,
-      media: dedupeCastTvMedia(library.media)
+      media: purgeDuplicateCastTvMedia(library.media).kept
     });
-    if (added > 0) {
+    if (added > 0 || purged.removed.length > 0) {
       try {
         await saveCastTvLibrary(supabase, library);
+        if (purged.removed.length) {
+          await deleteRemovedCastTvStorage(supabase, purged.removed);
+        }
       } catch (error) {
         console.error("[cast-tv] persist recovered playlist failed:", error);
       }
@@ -522,14 +541,54 @@ export async function loadCastTvLibrary(
     if (library.media.length) rememberLastGoodLibrary(library);
     else {
       const cached = lastGoodLibrary();
-      if (cached?.media.length) return hydrateLibraryUrls(supabase, cached);
+      if (cached?.media.length) {
+        return hydrateLibraryUrls(supabase, {
+          ...cached,
+          media: purgeDuplicateCastTvMedia(cached.media).kept
+        });
+      }
     }
     return library;
   } catch (error) {
     const cached = lastGoodLibrary();
-    if (cached) return hydrateLibraryUrls(supabase, cached);
+    if (cached) {
+      return hydrateLibraryUrls(supabase, {
+        ...cached,
+        media: purgeDuplicateCastTvMedia(cached.media).kept
+      });
+    }
     throw error;
   }
+}
+
+export async function deleteRemovedCastTvStorage(
+  supabase: SupabaseClient,
+  items: CastTvMediaRecord[]
+) {
+  const targets = items.filter(
+    (item) =>
+      !isLocalCastTvAsset(item) &&
+      Boolean(item.storage_path) &&
+      !item.storage_path.startsWith("builtin/")
+  );
+  await Promise.all(
+    targets.map(async (item) => {
+      const buckets = [
+        ...new Set(
+          [item.bucket, CAST_TV_STORAGE_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET].filter(
+            (bucket): bucket is string => Boolean(bucket)
+          )
+        )
+      ];
+      for (const bucket of buckets) {
+        try {
+          await supabase.storage.from(bucket).remove([item.storage_path]);
+        } catch {
+          /* playlist no longer references the copy */
+        }
+      }
+    })
+  );
 }
 
 export async function saveCastTvLibrary(supabase: SupabaseClient, state: CastTvLibraryState) {

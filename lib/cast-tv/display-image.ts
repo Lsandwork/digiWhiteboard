@@ -54,6 +54,58 @@ export function isLocalCastTvAsset(record: Pick<CastTvMediaRecord, "public_url" 
   return !record.bucket && String(record.storage_path || "").startsWith("builtin/");
 }
 
+export function normalizeCastTvStoragePath(storagePath: string) {
+  return String(storagePath || "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "");
+}
+
+export function isCastTvSidecarPath(storagePath: string) {
+  const path = normalizeCastTvStoragePath(storagePath);
+  const base = basenameCastTvFile(path).toLowerCase();
+  return base === "library.json" || base === "heartbeats.json" || base.endsWith(".json");
+}
+
+/** Old `cast_tv_media` dump recovered from the bucket root (`media/<uuid>`). */
+export function isLegacyCastTvDumpPath(storagePath: string) {
+  const path = normalizeCastTvStoragePath(storagePath);
+  if (!path) return false;
+  return path === "media" || path.startsWith("media/");
+}
+
+export function isCanonicalCastTvStoragePath(storagePath: string) {
+  const path = normalizeCastTvStoragePath(storagePath);
+  return path.startsWith("cast-tv/") && path.length > "cast-tv/".length && !isCastTvSidecarPath(path);
+}
+
+export function isRecoverableCastTvStoragePath(storagePath: string) {
+  if (isLegacyCastTvDumpPath(storagePath) || isCastTvSidecarPath(storagePath)) return false;
+  return isCanonicalCastTvStoragePath(storagePath);
+}
+
+export function castTvMediaKeepScore(item: CastTvMediaRecord) {
+  let score = 0;
+  if (isLocalCastTvAsset(item)) score += 400;
+  if (isCanonicalCastTvStoragePath(item.storage_path)) score += 100;
+  if (!isLegacyCastTvDumpPath(item.storage_path)) score += 40;
+  if (item.is_enabled !== false) score += 20;
+  if (item.display_ready) score += 10;
+  if (originalCastTvFileNameKey(item.file_name)) score += 8;
+  if (item.content_hash || item.pixel_hash) score += 2;
+  return score;
+}
+
+function castTvMediaDuplicateKeys(item: CastTvMediaRecord) {
+  return [
+    `id:${item.id}`,
+    `path:${item.bucket || ""}:${normalizeCastTvStoragePath(item.storage_path)}`,
+    item.content_hash ? `hash:${String(item.content_hash).trim().toLowerCase()}` : "",
+    item.pixel_hash ? `pixel:${String(item.pixel_hash).trim().toLowerCase()}` : "",
+    originalCastTvFileNameKey(item.file_name) ? `file:${originalCastTvFileNameKey(item.file_name)}` : ""
+  ].filter(Boolean);
+}
+
 export function castTvImageDisplaySrc(
   record: Pick<CastTvMediaRecord, "id" | "media_type" | "public_url" | "storage_path" | "bucket" | "updated_at">
 ) {
@@ -189,24 +241,45 @@ export function matchCastTvDuplicate(
 }
 
 export function dedupeCastTvMedia(media: CastTvMediaRecord[]): CastTvMediaRecord[] {
+  const ranked = [...media].sort(
+    (a, b) =>
+      castTvMediaKeepScore(b) - castTvMediaKeepScore(a) ||
+      a.display_order - b.display_order ||
+      a.created_at.localeCompare(b.created_at)
+  );
   const seen = new Set<string>();
-  const kept: CastTvMediaRecord[] = [];
+  const keptIds = new Set<string>();
 
-  for (const item of media) {
-    const keys = [
-      `id:${item.id}`,
-      `path:${item.bucket || ""}:${item.storage_path}`,
-      item.content_hash ? `hash:${item.content_hash}` : "",
-      item.pixel_hash ? `pixel:${item.pixel_hash}` : "",
-      originalCastTvFileNameKey(item.file_name) ? `file:${originalCastTvFileNameKey(item.file_name)}` : ""
-    ].filter(Boolean);
-
+  for (const item of ranked) {
+    const keys = castTvMediaDuplicateKeys(item);
     if (keys.some((key) => seen.has(key))) continue;
     for (const key of keys) seen.add(key);
-    kept.push(item);
+    keptIds.add(item.id);
   }
 
-  return kept.map((item, index) => ({ ...item, display_order: index + 1 }));
+  return media
+    .filter((item) => keptIds.has(item.id))
+    .map((item, index) => ({ ...item, display_order: index + 1 }));
+}
+
+/**
+ * Drops recovered `media/` dump copies when canonical CAST-TV slides exist,
+ * then keeps one preferred copy of each remaining photo.
+ * Does not empty the playlist when the dump is the only content.
+ */
+export function purgeDuplicateCastTvMedia(media: CastTvMediaRecord[]): {
+  kept: CastTvMediaRecord[];
+  removed: CastTvMediaRecord[];
+} {
+  const usable = media.filter((item) => !isCastTvSidecarPath(item.storage_path) && !isCastTvSidecarPath(item.file_name));
+  const hasCanonical = usable.some(
+    (item) => item.is_enabled !== false && !isLegacyCastTvDumpPath(item.storage_path)
+  );
+  const source = hasCanonical ? usable.filter((item) => !isLegacyCastTvDumpPath(item.storage_path)) : usable;
+  const kept = dedupeCastTvMedia(source);
+  const keptIds = new Set(kept.map((item) => item.id));
+  const removed = media.filter((item) => !keptIds.has(item.id));
+  return { kept, removed };
 }
 
 export function jpegFileNameFrom(fileName: string) {

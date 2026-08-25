@@ -26,10 +26,14 @@ import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 import {
   CAST_TV_DUPLICATE_MESSAGE,
+  isLegacyCastTvDumpPath,
+  isRecoverableCastTvStoragePath,
   matchCastTvDuplicate,
+  purgeDuplicateCastTvMedia,
   sniffCastTvImageKind,
   transcodeCastTvDisplayImage
 } from "../lib/cast-tv/display-image";
+import type { CastTvMediaRecord } from "../lib/cast-tv/types";
 
 assert.equal(inferCastTvMimeType("promo.jpg", ""), "image/jpeg");
 assert.equal(inferCastTvMimeType("promo.JPG", "application/octet-stream"), "image/jpeg");
@@ -111,6 +115,141 @@ assert.equal(
   0,
   "same storage object must not be recovered twice"
 );
+assert.equal(isLegacyCastTvDumpPath("media/246a20a4-3dfd-42b9-8264-18134f143c8d.jpg"), true);
+assert.equal(isRecoverableCastTvStoragePath("media/246a20a4-3dfd-42b9-8264-18134f143c8d.jpg"), false);
+assert.equal(isRecoverableCastTvStoragePath("cast-tv/072edb55-e287-4204-890c-b2119c25d044.jpg"), true);
+assert.equal(
+  mergeCastTvStorageObjects(
+    emptyCastTvLibrary(),
+    [
+      {
+        name: "media/246a20a4-3dfd-42b9-8264-18134f143c8d.jpg",
+        metadata: { size: 136221, mimetype: "image/jpeg" }
+      }
+    ],
+    () => "https://cdn.example/media/dup.jpg",
+    { bucket: "cast-tv-media", pathPrefix: "" }
+  ).added,
+  0,
+  "legacy media/ dump objects must not be recovered into the slideshow"
+);
+assert.equal(
+  mergeCastTvStorageObjects(
+    recovered.library,
+    [{ name: "media/246a20a4-3dfd-42b9-8264-18134f143c8d.jpg", metadata: { mimetype: "image/jpeg" } }],
+    () => ""
+  ).added,
+  0,
+  "media/ dump names must not remap into cast-tv/"
+);
+
+function testMedia(
+  id: string,
+  storagePath: string,
+  extra: Partial<CastTvMediaRecord> = {}
+): CastTvMediaRecord {
+  return {
+    id,
+    display_name: null,
+    file_name: extra.file_name || `${id}.jpg`,
+    storage_path: storagePath,
+    bucket: extra.bucket ?? "lobby-slideshow",
+    public_url: extra.public_url ?? `https://cdn.example/${storagePath}`,
+    media_type: extra.media_type ?? "image",
+    mime_type: "image/jpeg",
+    file_size_bytes: extra.file_size_bytes ?? 120000,
+    duration_seconds: null,
+    image_display_seconds: 10,
+    display_order: extra.display_order ?? 1,
+    is_enabled: extra.is_enabled ?? true,
+    uploaded_by: null,
+    uploaded_by_name: null,
+    created_at: extra.created_at ?? "2026-08-25T00:00:00.000Z",
+    updated_at: extra.updated_at ?? "2026-08-25T00:00:00.000Z",
+    content_hash: extra.content_hash ?? null,
+    pixel_hash: extra.pixel_hash ?? null,
+    display_ready: extra.display_ready ?? false
+  };
+}
+
+const liveCanonical = testMedia("072edb55-e287-4204-890c-b2119c25d044", "cast-tv/072edb55-e287-4204-890c-b2119c25d044.jpg", {
+  file_size_bytes: 136221,
+  content_hash: "61af2c206f822d30",
+  display_order: 1
+});
+const liveDumpCopy = testMedia("media/246a20a4-3dfd-42b9-8264-18134f143c8d", "media/246a20a4-3dfd-42b9-8264-18134f143c8d.jpg", {
+  bucket: "cast-tv-media",
+  file_size_bytes: 136221,
+  content_hash: "61af2c206f822d30",
+  display_order: 23
+});
+const uniqueDump = testMedia("media/06a42907-5b46-4c8a-b236-cdc9820f1790", "media/06a42907-5b46-4c8a-b236-cdc9820f1790.jpg", {
+  bucket: "cast-tv-media",
+  file_size_bytes: 498264,
+  display_order: 24
+});
+const dumpVideo = testMedia("media/388f3661-abff-4e1c-955c-68c79ea3e1e3", "media/388f3661-abff-4e1c-955c-68c79ea3e1e3.mp4", {
+  bucket: "cast-tv-media",
+  media_type: "video",
+  display_order: 25
+});
+
+const purgedLive = purgeDuplicateCastTvMedia([liveDumpCopy, uniqueDump, dumpVideo, liveCanonical]);
+assert.equal(purgedLive.kept.length, 1);
+assert.equal(purgedLive.kept[0].id, liveCanonical.id);
+assert.equal(purgedLive.removed.length, 3);
+assert.ok(purgedLive.removed.every((item) => item.storage_path.startsWith("media/")));
+
+const dumpOnly = purgeDuplicateCastTvMedia([uniqueDump, dumpVideo]);
+assert.equal(dumpOnly.kept.length, 2, "do not empty CAST-TV when the dump is the only playlist");
+assert.equal(dumpOnly.removed.length, 0);
+
+const hashedDupes = purgeDuplicateCastTvMedia([
+  testMedia("dump-first", "media/dump-first.jpg", {
+    bucket: "cast-tv-media",
+    content_hash: "same-pixels",
+    display_order: 1
+  }),
+  testMedia("keep-cast-tv", "cast-tv/keep-cast-tv.jpg", {
+    content_hash: "same-pixels",
+    display_order: 2
+  })
+]);
+assert.deepEqual(
+  hashedDupes.kept.map((item) => item.id),
+  ["keep-cast-tv"],
+  "keep the cast-tv/ copy over a media/ dump even when the dump is listed first"
+);
+
+const namedOverUuid = purgeDuplicateCastTvMedia([
+  testMedia("uuid-copy", "cast-tv/uuid-copy.jpg", {
+    file_name: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee.jpg",
+    content_hash: "same-photo",
+    display_order: 1
+  }),
+  testMedia("named-copy", "cast-tv/named-copy.jpg", {
+    file_name: "Yard Day.jpg",
+    content_hash: "same-photo",
+    display_order: 2
+  })
+]);
+assert.equal(namedOverUuid.kept.length, 1);
+assert.equal(namedOverUuid.kept[0].id, "named-copy");
+assert.equal(namedOverUuid.removed[0].id, "uuid-copy");
+
+const parsedWithoutDump = parseCastTvLibrary({
+  media: [liveCanonical, liveDumpCopy, uniqueDump]
+});
+assert.equal(parsedWithoutDump.media.length, 1);
+assert.equal(parsedWithoutDump.media[0].id, liveCanonical.id);
+
+assert.equal(
+  mergeCastTvStorageObjects(parsedWithoutDump, [
+    { name: "media/246a20a4-3dfd-42b9-8264-18134f143c8d.jpg", metadata: { mimetype: "image/jpeg" } }
+  ], () => "", { pathPrefix: "" }).added,
+  0,
+  "purged dump files must not be recovered again"
+);
 
 const jsonRejected = sniffCastTvImageKind(Buffer.from('{"media":[]}'));
 assert.equal(jsonRejected, "json");
@@ -142,6 +281,14 @@ assert.equal(
 const restored = mergeCastTvLibraries(emptyCastTvLibrary(), parsedLibrary);
 assert.equal(restored.added, 1);
 assert.equal(restored.library.media[0].file_name, "yard.jpg");
+assert.equal(
+  mergeCastTvLibraries(parsedWithoutDump, {
+    ...emptyCastTvLibrary(),
+    media: [liveDumpCopy, uniqueDump]
+  }).added,
+  0,
+  "canonical slideshow must not re-absorb media/ dump copies"
+);
 
 const file = new File([new Uint8Array([1, 2, 3])], "promo.jpg", { type: "image/jpeg" });
 const formFile = asCastTvFormFile(file);
@@ -232,6 +379,17 @@ assert.match(libraryStore, /loadLegacySettingsLibrary/);
 assert.match(libraryStore, /withTimeoutFallback/);
 assert.match(libraryStore, /\.download\(/);
 assert.match(libraryStore, /JSON_UPLOAD_MIME/);
+assert.match(libraryStore, /purgeDuplicateCastTvMedia/);
+assert.match(libraryStore, /deleteRemovedCastTvStorage/);
+assert.match(libraryStore, /isLegacyCastTvDumpPath/);
+assert.match(libraryStore, /name\.toLowerCase\(\) === "media"/);
+assert.match(libraryStore, /\{ bucket: CAST_TV_STORAGE_BUCKET, prefix: "cast-tv" \}/);
+assert.match(libraryStore, /\{ bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv" \}/);
+assert.doesNotMatch(libraryStore, /\{ bucket: [^,]+, prefix: "" \}/);
+
+const repairImages = readFileSync(join(root, "lib/cast-tv/repair-images.ts"), "utf8");
+assert.match(repairImages, /deleteRemovedCastTvStorage/);
+assert.match(repairImages, /removed\.push\(item\)/);
 
 const storageProbe = readFileSync(join(root, "lib/system-health/probes/storage.ts"), "utf8");
 assert.doesNotMatch(storageProbe, /\.from\("cast_tv_media"\)/);
