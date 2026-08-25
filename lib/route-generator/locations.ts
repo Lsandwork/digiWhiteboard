@@ -18,6 +18,12 @@ export type FitdogLocationsConfig = {
   huntington: FitdogBaseLocation;
 };
 
+/**
+ * Samsara / coordinator label for Club destination stops (drop-off after an outing).
+ * Canonical club address stays on DEFAULT_FITDOG_LOCATIONS.club — do not duplicate it.
+ */
+export const FITDOG_CLUB_STOP_NAME = "Fitdog";
+
 /** Operational bases + outing destinations used by Route Generator. */
 export const DEFAULT_FITDOG_LOCATIONS: FitdogLocationsConfig = {
   hub: {
@@ -171,6 +177,38 @@ export function detectFitdogFacility(params: {
   if (clubFp && haystack.includes(clubFp.split(" ").slice(0, 3).join(" "))) return "club";
   if (hubFp && haystack.includes(hubFp.split(" ").slice(0, 3).join(" "))) return "hub";
   return null;
+}
+
+/** True when this leg is the Santa Monica Club (not Hub, Hahn, or Huntington). */
+export function isClubFitdogLocation(params: {
+  locationType?: string | null;
+  facilityKey?: string | null;
+  householdKey?: string | null;
+  locationName?: string | null;
+  addressRaw?: string | null;
+  addressStreet?: string | null;
+  addressCity?: string | null;
+  addressZip?: string | null;
+  locations?: FitdogLocationsConfig | null;
+}): boolean {
+  const type = String(params.locationType || "").toUpperCase();
+  if (type === "HUB" || type === "OUTING" || type === "HOME" || type === "CUSTOM") return false;
+  if (params.facilityKey === "club") return true;
+  if (params.facilityKey && params.facilityKey !== "club") return false;
+  const household = String(params.householdKey || "");
+  if (household.startsWith("facility:club")) return true;
+  if (/^facility:(hub|kenneth_hahn|huntington)(?::|$)/.test(household)) return false;
+  const detected = detectFitdogFacility({
+    addressRaw: params.addressRaw,
+    addressStreet: params.addressStreet,
+    addressCity: params.addressCity,
+    addressZip: params.addressZip,
+    locationName: params.locationName,
+    locations: params.locations
+  });
+  if (detected === "club") return true;
+  if (detected) return false;
+  return type === "FITDOG";
 }
 
 export type VanRouteEndpoints = {

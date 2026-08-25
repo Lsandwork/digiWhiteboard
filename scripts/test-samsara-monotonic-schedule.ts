@@ -107,4 +107,21 @@ function stop(overrides: Partial<ExportStopRow> & { stopName: string; stopOrder:
   assert.equal(notes, "Fitdog facility stop - 2 dog(s) already on-site: Bill, Atlas");
 }
 
+// 7. Blank arrival on the first stop is preserved (Samsara "already at starting stop").
+{
+  const rows = [
+    stop({ stopName: "Fitdog Westwood Hub", stopOrder: 1, scheduledArrival: "", scheduledDeparture: "8/11/2026 7:00" }),
+    stop({ stopName: "Baxter", stopOrder: 2, scheduledArrival: "8/11/2026 7:20", scheduledDeparture: "8/11/2026 7:25" })
+  ];
+  const result = enforceMonotonicRouteSchedule(rows);
+  assert.equal(rows[0]!.scheduledArrival, "");
+  assert.equal(rows[0]!.scheduledDeparture, "8/11/2026 7:00");
+  assert.equal(rows[1]!.scheduledArrival, "8/11/2026 7:20");
+  assert.equal(result.adjustedStops, 0);
+  const template = getCanonicalSamsaraTemplate();
+  const csv = buildCsv({ template, rows }).csv;
+  const validation = validateExport({ template, rows, csv, operatingDate: "2026-08-11" });
+  assert.equal(validation.ok, true, JSON.stringify(validation.report.errors));
+}
+
 console.log("test-samsara-monotonic-schedule: ok");
