@@ -26,6 +26,12 @@ import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/li
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
+import { FAST_CHECKOUT_QUERY_TIMEOUT_MS, VISIBLE_TRANSITION_SELECT } from "@/lib/board-fast-checkout";
+import {
+  isHungQueryError,
+  isLiveTransitionQueryInCooldown,
+  markLiveTransitionQueryTimeout
+} from "@/lib/hung-table-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -78,12 +84,16 @@ async function loadPromptedCheckoutRows(
 ) {
   const { data, error } = await supabase
     .from("live_transition_dogs")
-    .select("*")
+    .select(VISIBLE_TRANSITION_SELECT)
     .eq("hidden", false)
     .eq("display_status", "checking_out")
-    .order("status_started_at", { ascending: true });
+    .order("status_started_at", { ascending: true })
+    .limit(80);
 
-  if (error) throw error;
+  if (error) {
+    if (isHungQueryError(error)) markLiveTransitionQueryTimeout();
+    throw error;
+  }
 
   const rows = enrichDogs((data ?? []) as LiveDog[]);
   const prompted = rows.filter(isPromptedCheckoutDog);
@@ -120,12 +130,16 @@ async function loadActiveCheckinRows(
 ) {
   const { data, error } = await supabase
     .from("live_transition_dogs")
-    .select("*")
+    .select(VISIBLE_TRANSITION_SELECT)
     .eq("hidden", false)
     .eq("display_status", "checking_in")
-    .order("status_started_at", { ascending: true });
+    .order("status_started_at", { ascending: true })
+    .limit(80);
 
-  if (error) throw error;
+  if (error) {
+    if (isHungQueryError(error)) markLiveTransitionQueryTimeout();
+    throw error;
+  }
 
   const rows = enrichDogs((data ?? []) as LiveDog[]).filter(
     (dog) => dog.raw_payload?.source !== "gingr_back_of_house"
@@ -158,12 +172,16 @@ async function loadActiveCheckinRows(
 async function loadSupabaseBoardRows(supabase: ReturnType<typeof getServiceSupabase>) {
   const { data, error } = await supabase
     .from("live_transition_dogs")
-    .select("*")
+    .select(VISIBLE_TRANSITION_SELECT)
     .eq("hidden", false)
     .in("display_status", ["checking_in", "checking_out"])
-    .order("status_started_at", { ascending: true });
+    .order("status_started_at", { ascending: true })
+    .limit(80);
 
-  if (error) throw error;
+  if (error) {
+    if (isHungQueryError(error)) markLiveTransitionQueryTimeout();
+    throw error;
+  }
   return enrichDogs((data ?? []) as LiveDog[]);
 }
 
@@ -193,12 +211,21 @@ export async function GET(request: Request) {
   try {
     const requestStartedAt = Date.now();
     const loadLiveBoard = async () => {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: FAST_CHECKOUT_QUERY_TIMEOUT_MS });
+    const skipLiveTable = isLiveTransitionQueryInCooldown();
     const cachedGingrBoard = getCachedBackOfHouseBoard(now.getTime(), true);
     const usedCachedGingr = Boolean(cachedGingrBoard) || !canCallGingrEndpoint("back_of_house");
     let gingrBoard: Awaited<ReturnType<typeof fetchGingrBackOfHouse>> | null = null;
     let gingrError: string | null = null;
 
+    const emptyCheckin = { visible: [] as LiveDog[], expiredCheckinRows: 0, rawCheckinRows: 0 };
+    const emptyCheckout = {
+      visible: [] as LiveDog[],
+      rawCheckoutRows: 0,
+      promptedCheckoutRows: 0,
+      filteredUnpromptedRows: 0,
+      expiredCheckoutRows: 0
+    };
     const [gingrBoardResult, activeCheckinRows, promptedCheckoutRows] = await Promise.all([
       cachedGingrBoard
         ? Promise.resolve(cachedGingrBoard)
@@ -209,18 +236,26 @@ export async function GET(request: Request) {
         }
         return null;
       }),
-      timeoutResult(loadActiveCheckinRows(supabase, now), 2500, {
-        visible: [] as LiveDog[],
-        expiredCheckinRows: 0,
-        rawCheckinRows: 0
-      }),
-      timeoutResult(loadPromptedCheckoutRows(supabase, now), 2500, {
-        visible: [] as LiveDog[],
-        rawCheckoutRows: 0,
-        promptedCheckoutRows: 0,
-        filteredUnpromptedRows: 0,
-        expiredCheckoutRows: 0
-      })
+      skipLiveTable
+        ? Promise.resolve(emptyCheckin)
+        : timeoutResult(
+            loadActiveCheckinRows(supabase, now).catch((error) => {
+              if (isHungQueryError(error)) markLiveTransitionQueryTimeout();
+              return emptyCheckin;
+            }),
+            FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+            emptyCheckin
+          ),
+      skipLiveTable
+        ? Promise.resolve(emptyCheckout)
+        : timeoutResult(
+            loadPromptedCheckoutRows(supabase, now).catch((error) => {
+              if (isHungQueryError(error)) markLiveTransitionQueryTimeout();
+              return emptyCheckout;
+            }),
+            FAST_CHECKOUT_QUERY_TIMEOUT_MS,
+            emptyCheckout
+          )
     ]);
 
     gingrBoard = gingrBoardResult;
@@ -301,7 +336,12 @@ export async function GET(request: Request) {
         syncSummary = { synced: false, reason: gingrError ?? "Gingr unavailable", fallback: "supabase" };
       }
 
-      const supabaseDogs = await loadSupabaseBoardRows(supabase);
+      const supabaseDogs = skipLiveTable
+        ? []
+        : await loadSupabaseBoardRows(supabase).catch((error) => {
+            if (isHungQueryError(error)) markLiveTransitionQueryTimeout();
+            return [] as LiveDog[];
+          });
       const storedSupabaseDogs = await timeoutResult(applyStoredAnimalPhotos(supabase, supabaseDogs), 1500, supabaseDogs);
       rawRecordCount = storedSupabaseDogs.length;
       const visible = filterVisibleDogs(storedSupabaseDogs, now, {

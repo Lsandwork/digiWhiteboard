@@ -4,6 +4,13 @@ import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { loadSystemHealthAudit, toOverviewSystemHealth } from "@/lib/admin/system-health-audit";
 import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
 import { probeCloudStorage } from "@/lib/system-health/probes/storage";
+import {
+  getHungTableSupabase,
+  HUNG_TABLES,
+  isHungQueryError,
+  isHungTableInCooldown,
+  markHungTableTimeout
+} from "@/lib/hung-table-guard";
 
 export type IntegrationHealthRow = {
   id: string;
@@ -28,26 +35,55 @@ function mapProbeStatus(status: string): IntegrationHealthRow["status"] {
 }
 
 export async function buildOpsSystemHealth() {
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: 3_000 });
+  const hung = getHungTableSupabase();
+
+  const queryHung = async <T,>(
+    table: string,
+    work: () => PromiseLike<{ data?: T | null; error?: { message?: string } | null; count?: number | null }>
+  ) => {
+    if (isHungTableInCooldown(table)) {
+      return { data: null as T | null, count: 0, timedOut: true };
+    }
+    try {
+      const row = await work();
+      if (row.error && isHungQueryError(row.error)) {
+        markHungTableTimeout(table);
+        return { data: null as T | null, count: 0, timedOut: true };
+      }
+      return { data: row.data ?? null, count: row.count ?? 0, timedOut: false };
+    } catch (error) {
+      if (isHungQueryError(error)) markHungTableTimeout(table);
+      return { data: null as T | null, count: 0, timedOut: true };
+    }
+  };
+
   const [webhook, lastDogSeen, audit, boardCount, storage] = await Promise.all([
-    supabase
-      .from("gingr_webhook_events")
-      .select("created_at, processing_error")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("live_transition_dogs")
-      .select("last_seen_from_gingr_at")
-      .not("last_seen_from_gingr_at", "is", null)
-      .order("last_seen_from_gingr_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    queryHung<{ created_at: string | null; processing_error: string | null }>(HUNG_TABLES.gingrWebhookEvents, () =>
+      hung
+        .from("gingr_webhook_events")
+        .select("created_at, processing_error")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ),
+    queryHung<{ last_seen_from_gingr_at: string | null }>(HUNG_TABLES.liveTransitionDogs, () =>
+      hung
+        .from("live_transition_dogs")
+        .select("last_seen_from_gingr_at")
+        .not("last_seen_from_gingr_at", "is", null)
+        .order("last_seen_from_gingr_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    ),
     loadSystemHealthAudit(supabase).catch(() => null),
-    supabase
-      .from("live_transition_dogs")
-      .select("id", { count: "exact", head: true })
-      .eq("hidden", false),
+    queryHung(HUNG_TABLES.liveTransitionDogs, () =>
+      hung.from("live_transition_dogs").select("id", { count: "exact", head: true }).eq("hidden", false) as PromiseLike<{
+        data?: null;
+        error?: { message?: string } | null;
+        count?: number | null;
+      }>
+    ),
     probeCloudStorage(supabase).catch(() => null)
   ]);
 
@@ -55,7 +91,8 @@ export async function buildOpsSystemHealth() {
     lastWebhookAt: webhook.data?.created_at ? String(webhook.data.created_at) : null,
     lastDogSeenAt: lastDogSeen.data?.last_seen_from_gingr_at
       ? String(lastDogSeen.data.last_seen_from_gingr_at)
-      : null
+      : null,
+    probeTimedOut: webhook.timedOut || lastDogSeen.timedOut
   });
 
   const sms = getSmsProvider();

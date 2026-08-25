@@ -1,6 +1,13 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getTtlCache, setTtlCache, withTimeoutFallback, withTimeoutResult } from "@/lib/server-ttl-cache";
 import {
+  getHungTableSupabase,
+  HUNG_TABLES,
+  isHungQueryError,
+  isHungTableInCooldown,
+  markHungTableTimeout
+} from "@/lib/hung-table-guard";
+import {
   OPS_SNAPSHOT_BUILD_TIMEOUT_MS,
   OPS_SNAPSHOT_LAST_GOOD_KEY,
   OPS_SNAPSHOT_LAST_GOOD_TTL_MS,
@@ -357,16 +364,41 @@ export async function buildOpsCommandCenterSnapshot(input: {
   access?: UserAccess | null;
 }): Promise<OpsCommandCenterSnapshot> {
   const supabase = getServiceSupabase({ timeoutMs: OPS_SNAPSHOT_TIMEOUT_MS });
+  const hungSupabase = getHungTableSupabase();
   const lastGood = getTtlCache<OpsCommandCenterSnapshot>(OPS_SNAPSHOT_LAST_GOOD_KEY);
 
-  const timedCount = async (query: PromiseLike<{ count: number | null }>) => {
-    const result = await withTimeoutResult(Promise.resolve(query), OPS_SNAPSHOT_TIMEOUT_MS, { count: 0 });
-    return { count: result.value.count || 0, timedOut: result.timedOut };
+  const timedCount = async (table: string, query: () => PromiseLike<{ count: number | null; error?: { message?: string } | null }>) => {
+    if (isHungTableInCooldown(table)) {
+      return { count: 0, timedOut: true };
+    }
+    try {
+      const result = await withTimeoutResult(Promise.resolve(query()), OPS_SNAPSHOT_TIMEOUT_MS, { count: 0 });
+      if (result.timedOut || (result.value as { error?: { message?: string } }).error && isHungQueryError((result.value as { error?: unknown }).error)) {
+        markHungTableTimeout(table);
+        return { count: 0, timedOut: true };
+      }
+      return { count: result.value.count || 0, timedOut: result.timedOut };
+    } catch (error) {
+      if (isHungQueryError(error)) markHungTableTimeout(table);
+      return { count: 0, timedOut: true };
+    }
   };
 
-  const timedMaybe = async <T,>(query: PromiseLike<{ data: T | null }>) => {
-    const result = await withTimeoutResult(Promise.resolve(query), OPS_SNAPSHOT_TIMEOUT_MS, { data: null as T | null });
-    return { data: result.value.data, timedOut: result.timedOut };
+  const timedMaybe = async <T,>(table: string, query: () => PromiseLike<{ data: T | null; error?: { message?: string } | null }>) => {
+    if (isHungTableInCooldown(table)) {
+      return { data: null as T | null, timedOut: true };
+    }
+    try {
+      const result = await withTimeoutResult(Promise.resolve(query()), OPS_SNAPSHOT_TIMEOUT_MS, { data: null as T | null });
+      if (result.timedOut) {
+        markHungTableTimeout(table);
+        return { data: null as T | null, timedOut: true };
+      }
+      return { data: result.value.data, timedOut: false };
+    } catch (error) {
+      if (isHungQueryError(error)) markHungTableTimeout(table);
+      return { data: null as T | null, timedOut: true };
+    }
   };
   const yardTeamLead = isTeamLeadDashboardUser({
     legacyRole: input.roleKey,
@@ -400,15 +432,15 @@ export async function buildOpsCommandCenterSnapshot(input: {
     additionalServicesFeed,
     cachedFacilityFeed
   ] = await Promise.all([
-    timedCount(
-      supabase
+    timedCount(HUNG_TABLES.liveTransitionDogs, () =>
+      hungSupabase
         .from("live_transition_dogs")
         .select("id", { count: "exact", head: true })
         .eq("display_status", "checking_in")
         .eq("hidden", false)
     ),
-    timedCount(
-      supabase
+    timedCount(HUNG_TABLES.liveTransitionDogs, () =>
+      hungSupabase
         .from("live_transition_dogs")
         .select("id", { count: "exact", head: true })
         .eq("display_status", "checking_out")
@@ -436,11 +468,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
       : Promise.resolve([] as OpsNotification[]),
     withTimeoutFallback(listRecentOpsEvents(25), OPS_SNAPSHOT_TIMEOUT_MS, [] as OpsEvent[]),
     withTimeoutFallback(countDogsByStatus(), OPS_SNAPSHOT_TIMEOUT_MS, {} as Record<string, number>),
-    timedMaybe<{ created_at?: string }>(
-      supabase.from("gingr_webhook_events").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle()
+    timedMaybe<{ created_at?: string }>(HUNG_TABLES.gingrWebhookEvents, () =>
+      hungSupabase.from("gingr_webhook_events").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle()
     ),
-    timedMaybe<{ last_seen_from_gingr_at?: string }>(
-      supabase
+    timedMaybe<{ last_seen_from_gingr_at?: string }>(HUNG_TABLES.liveTransitionDogs, () =>
+      hungSupabase
         .from("live_transition_dogs")
         .select("last_seen_from_gingr_at")
         .not("last_seen_from_gingr_at", "is", null)

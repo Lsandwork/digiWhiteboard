@@ -179,7 +179,7 @@ function newestCheckoutTimestamp(dogs: LiveDog[]) {
   return newest;
 }
 
-const VISIBLE_TRANSITION_SELECT =
+export const VISIBLE_TRANSITION_SELECT =
   "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, raw_payload, hidden, updated_at";
 
 let visibleTransitionQueryInFlight: Promise<{ rows: LiveDog[]; timedOut: boolean }> | null = null;

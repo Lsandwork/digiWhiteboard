@@ -46,6 +46,7 @@ assert.match(apiSrc, /audit_issues/);
 assert.match(apiSrc, /maxDuration = 20/);
 assert.match(apiSrc, /humanizeUnknownError/);
 assert.match(healthChecks, /SYSTEM_HEALTH_HUNG_TABLE_TIMEOUT_MS/);
+assert.match(healthChecks, /queryHungRow/);
 assert.match(healthChecks, /probeTimedOut/);
 
 const uiSrc = readFileSync(

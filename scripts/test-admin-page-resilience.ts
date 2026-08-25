@@ -187,7 +187,7 @@ const dashboardRoute = readFileSync("app/api/admin/dashboard/route.ts", "utf8");
 assert.match(dashboardRoute, /skipSettingsAndAccess/);
 assert.match(dashboardRoute, /skipAccessWork/);
 assert.match(dashboardRoute, /skipHungBoardSnapshots/);
-assert.match(dashboardRoute, /skipHungSnapshots/);
+assert.match(dashboardRoute, /isHungTableInCooldown/);
 assert.doesNotMatch(dashboardRoute, /live_transition_dogs"\)\s*\.select\("\*"\)/);
 assert.doesNotMatch(dashboardRoute, /gingr_webhook_events"\)\s*\.select\("\*"\)/);
 

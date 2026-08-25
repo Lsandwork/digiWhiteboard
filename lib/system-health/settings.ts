@@ -132,20 +132,24 @@ export async function startLiveDebugSession(params: {
 }
 
 export async function listActiveLiveDebugSessions() {
-  const supabase = getServiceSupabase();
-  const now = new Date().toISOString();
-  // Expire stale
-  await supabase
-    .from("system_health_live_debug_sessions")
-    .update({ active: false, ended_at: now })
-    .eq("active", true)
-    .lt("expires_at", now);
-  const { data } = await supabase
-    .from("system_health_live_debug_sessions")
-    .select("*")
-    .eq("active", true)
-    .order("started_at", { ascending: false });
-  return data ?? [];
+  try {
+    const supabase = getServiceSupabase({ timeoutMs: 4_000 });
+    const now = new Date().toISOString();
+    await supabase
+      .from("system_health_live_debug_sessions")
+      .update({ active: false, ended_at: now })
+      .eq("active", true)
+      .lt("expires_at", now);
+    const { data, error } = await supabase
+      .from("system_health_live_debug_sessions")
+      .select("*")
+      .eq("active", true)
+      .order("started_at", { ascending: false });
+    if (error && /aborted|abort|timed out|timeout/i.test(error.message || "")) return [];
+    return data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function endLiveDebugSessions(params?: { feature?: string | null; sessionId?: string | null }) {

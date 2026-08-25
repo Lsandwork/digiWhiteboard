@@ -10,6 +10,7 @@ import { cachedLoadSettingsBundle, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/boar
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
 import { skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
+import { HUNG_TABLES, isHungTableInCooldown } from "@/lib/hung-table-guard";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import { defaultLobbySettings } from "@/lib/lobby/settings";
 import { defaultStaffSettings } from "@/lib/staff/settings";
@@ -72,7 +73,10 @@ export async function GET(request: Request) {
     const board = parseBoardType(url.searchParams.get("board"));
     const tab = url.searchParams.get("tab");
     const lightLoad = skipHeavyBoardWidgets(board, tab);
-    const skipHungSnapshots = skipHungBoardSnapshots(board, tab);
+    const skipHungSnapshots =
+      skipHungBoardSnapshots(board, tab) ||
+      isHungTableInCooldown(HUNG_TABLES.liveTransitionDogs) ||
+      isHungTableInCooldown(HUNG_TABLES.gingrWebhookEvents);
     const skipAccessWork = skipSettingsAndAccess(tab);
     const supabase = getServiceSupabase({ timeoutMs: DASHBOARD_QUERY_TIMEOUT_MS });
 

@@ -382,8 +382,8 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   assert.ok(health.includes("probeJobQueue"));
   assert.ok(health.includes("probeRouteGenerator"));
   assert.ok(health.includes("aggregateSystemHealth"));
-  assert.ok(health.includes("SYSTEM_HEALTH_HUNG_TABLE_TIMEOUT_MS"));
-  assert.ok(health.includes("safeHungTable"));
+  assert.ok(health.includes("queryHungRow"));
+  assert.ok(health.includes("getHungTableSupabase"));
   assert.ok(health.includes("probeTimedOut"));
   assert.ok(health.includes("withTimeoutFallback"));
 
@@ -401,6 +401,7 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   assert.ok(ui.includes("Apply migration 072"));
   assert.ok(ui.includes("humanizeUnknownError"));
   assert.ok(ui.includes("AbortController"));
+  assert.ok(ui.includes("fetchAdminJson"));
 
   const ensure = readFileSync(resolve(__dirname, "../lib/system-health/ensure-schema.ts"), "utf8");
   assert.ok(ensure.includes("072_system_health_debugging.sql"));
@@ -431,6 +432,7 @@ function baseReport(legs: ReconciliationReport["legs"]): ReconciliationReport {
   const apiRoute = readFileSync(resolve(__dirname, "../app/api/admin/system-health/route.ts"), "utf8");
   assert.ok(apiRoute.includes("maxDuration = 20"));
   assert.ok(apiRoute.includes("humanizeUnknownError"));
+  assert.ok(apiRoute.includes("emptySystemHealthViewPayload"));
   assert.ok(apiRoute.includes("degraded: true"));
 }
 

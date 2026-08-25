@@ -68,7 +68,7 @@
     "test:bulk-shift-entries": "tsx scripts/test-bulk-shift-entries.ts",
     "test:team-lead-my-shift": "tsx scripts/test-team-lead-my-shift.ts && tsx scripts/test-ops-command-center-work-item-actions.ts && tsx scripts/test-ops-command-center-live-feed.ts",
     "test:groomer-my-shift": "tsx scripts/test-groomer-my-shift.ts",
-    "test:system-health": "tsx scripts/test-system-health-debugging.ts",
+    "test:system-health": "tsx scripts/test-system-health-debugging.ts && tsx scripts/test-hung-table-guard.ts",
     "ruffops:debug": "tsx scripts/ruffops-debug.ts",
     "setup:route-generator-shadow": "tsx scripts/setup-route-generator-shadow.ts",
     "setup:route-generator-bases": "tsx scripts/seed-route-generator-bases.ts",

@@ -1,4 +1,10 @@
 import { invalidateTtlCache } from "@/lib/server-ttl-cache";
+import {
+  HUNG_TABLES,
+  isHungQueryError,
+  isHungTableInCooldown,
+  markHungTableTimeout
+} from "@/lib/hung-table-guard";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -32,20 +38,33 @@ export async function loadAdminSettingsJsonKey<T>(
   parse: (value: unknown) => T,
   fallback: T
 ): Promise<T | null> {
-  const { data, error } = await supabase
-    .from("admin_settings")
-    .select(`settings->${key}`)
-    .eq("id", "default")
-    .maybeSingle();
+  if (isHungTableInCooldown(HUNG_TABLES.adminSettings)) return fallback;
+  try {
+    const { data, error } = await supabase
+      .from("admin_settings")
+      .select(`settings->${key}`)
+      .eq("id", "default")
+      .maybeSingle();
 
-  if (error) {
-    if (isMissingAdminSettingsRelation(error)) return null;
+    if (error) {
+      if (isHungQueryError(error)) {
+        markHungTableTimeout(HUNG_TABLES.adminSettings);
+        return fallback;
+      }
+      if (isMissingAdminSettingsRelation(error)) return null;
+      throw error;
+    }
+
+    const raw = readScopedKey(data as Record<string, unknown> | null, key);
+    if (raw === undefined || raw === null) return fallback;
+    return parse(raw);
+  } catch (error) {
+    if (isHungQueryError(error)) {
+      markHungTableTimeout(HUNG_TABLES.adminSettings);
+      return fallback;
+    }
     throw error;
   }
-
-  const raw = readScopedKey(data as Record<string, unknown> | null, key);
-  if (raw === undefined || raw === null) return fallback;
-  return parse(raw);
 }
 
 export type AdminSettingsJsonPointer = {
@@ -63,35 +82,52 @@ export async function loadAdminSettingsJsonPointers(
   pointers: AdminSettingsJsonPointer[]
 ): Promise<Record<string, unknown> | null> {
   if (!pointers.length) return {};
+  if (isHungTableInCooldown(HUNG_TABLES.adminSettings)) return {};
 
-  const nestedSelect = pointers.map((pointer) => `${pointer.alias}:settings->${pointer.path}`).join(",");
-  const nested = await supabase.from("admin_settings").select(nestedSelect).eq("id", "default").maybeSingle();
-  if (!nested.error) return (nested.data as Record<string, unknown> | null) ?? {};
-  if (isMissingAdminSettingsRelation(nested.error)) return null;
-
-  const topLevelKeys = [...new Set(pointers.map((pointer) => pointer.path.split("->")[0] || pointer.path))];
-  const topSelect = topLevelKeys.map((key) => `${key}:settings->${key}`).join(",");
-  const top = await supabase.from("admin_settings").select(topSelect).eq("id", "default").maybeSingle();
-  if (top.error) {
-    if (isMissingAdminSettingsRelation(top.error)) return null;
-    throw top.error;
-  }
-
-  const row = (top.data as Record<string, unknown> | null) ?? {};
-  const out: Record<string, unknown> = {};
-  for (const pointer of pointers) {
-    const parts = pointer.path.split("->").filter(Boolean);
-    let cursor: unknown = parts.length ? row[parts[0]] : undefined;
-    for (const part of parts.slice(1)) {
-      if (!cursor || typeof cursor !== "object") {
-        cursor = undefined;
-        break;
-      }
-      cursor = (cursor as Record<string, unknown>)[part];
+  try {
+    const nestedSelect = pointers.map((pointer) => `${pointer.alias}:settings->${pointer.path}`).join(",");
+    const nested = await supabase.from("admin_settings").select(nestedSelect).eq("id", "default").maybeSingle();
+    if (!nested.error) return (nested.data as Record<string, unknown> | null) ?? {};
+    if (isHungQueryError(nested.error)) {
+      markHungTableTimeout(HUNG_TABLES.adminSettings);
+      return {};
     }
-    out[pointer.alias] = cursor;
+    if (isMissingAdminSettingsRelation(nested.error)) return null;
+
+    const topLevelKeys = [...new Set(pointers.map((pointer) => pointer.path.split("->")[0] || pointer.path))];
+    const topSelect = topLevelKeys.map((key) => `${key}:settings->${key}`).join(",");
+    const top = await supabase.from("admin_settings").select(topSelect).eq("id", "default").maybeSingle();
+    if (top.error) {
+      if (isHungQueryError(top.error)) {
+        markHungTableTimeout(HUNG_TABLES.adminSettings);
+        return {};
+      }
+      if (isMissingAdminSettingsRelation(top.error)) return null;
+      throw top.error;
+    }
+
+    const row = (top.data as Record<string, unknown> | null) ?? {};
+    const out: Record<string, unknown> = {};
+    for (const pointer of pointers) {
+      const parts = pointer.path.split("->").filter(Boolean);
+      let cursor: unknown = parts.length ? row[parts[0]] : undefined;
+      for (const part of parts.slice(1)) {
+        if (!cursor || typeof cursor !== "object") {
+          cursor = undefined;
+          break;
+        }
+        cursor = (cursor as Record<string, unknown>)[part];
+      }
+      out[pointer.alias] = cursor;
+    }
+    return out;
+  } catch (error) {
+    if (isHungQueryError(error)) {
+      markHungTableTimeout(HUNG_TABLES.adminSettings);
+      return {};
+    }
+    throw error;
   }
-  return out;
 }
 
 /**
