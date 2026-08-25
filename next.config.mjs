@@ -1,11 +1,37 @@
 import { withSentryConfig } from "@sentry/nextjs";
 
+const sharpNativeFiles = [
+  "./node_modules/sharp/**/*",
+  "./node_modules/@img/colour/**/*",
+  "./node_modules/@img/sharp-linux-x64/**/*",
+  "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+  "./node_modules/@img/sharp-linuxmusl-x64/**/*",
+  "./node_modules/@img/sharp-libvips-linuxmusl-x64/**/*",
+  "./node_modules/@img/sharp-wasm32/**/*",
+  "./node_modules/@emnapi/runtime/**/*"
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Keep Chromium/Playwright out of the Next bundler so Vercel can resolve native binaries.
-  serverExternalPackages: ["playwright-core", "@sparticuz/chromium", "playwright", "pg", "sharp"],
+  // Keep Chromium/Playwright/sharp out of the bundler so Vercel can resolve native binaries.
+  serverExternalPackages: [
+    "playwright-core",
+    "@sparticuz/chromium",
+    "playwright",
+    "pg",
+    "sharp",
+    "@img/sharp-wasm32",
+    "@img/sharp-linux-x64",
+    "@img/sharp-libvips-linux-x64",
+    "@img/sharp-linuxmusl-x64",
+    "@img/sharp-libvips-linuxmusl-x64"
+  ],
   outputFileTracingIncludes: {
+    "/api/**": sharpNativeFiles,
+    "/api/cast-tv/media/upload": sharpNativeFiles,
+    "/api/cast-tv/media/file": sharpNativeFiles,
+    "/api/cast-tv/media/upload-complete": sharpNativeFiles,
     "/api/admin/fitdog-alerts": [
       "./node_modules/@sparticuz/chromium/**/*",
       "./node_modules/playwright-core/**/*"

@@ -43,7 +43,7 @@ function formatFileSize(bytes: number | null) {
 
 function formatDateTime(value: string) {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime()) || date.getTime() === 0) return "—";
   return date.toLocaleString();
 }
 
@@ -84,9 +84,23 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const [previewItem, setPreviewItem] = useState<CastTvMediaRecord | null>(null);
   const [replaceTargetId, setReplaceTargetId] = useState<string | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const activeMedia = useMemo(() => media.filter((item) => item.is_enabled), [media]);
   const disabledMedia = useMemo(() => media.filter((item) => !item.is_enabled), [media]);
+  const selectedCount = selectedIds.size;
+  const allActiveSelected = Boolean(activeMedia.length) && activeMedia.every((item) => selectedIds.has(item.id));
+  const allDisabledSelected =
+    Boolean(disabledMedia.length) && disabledMedia.every((item) => selectedIds.has(item.id));
+
+  useEffect(() => {
+    const known = new Set(media.map((item) => item.id));
+    setSelectedIds((current) => {
+      const next = new Set([...current].filter((id) => known.has(id)));
+      return next.size === current.size ? current : next;
+    });
+  }, [media]);
 
   const loadData = useCallback(async () => {
     let loadedMedia: CastTvMediaRecord[] | null = null;
@@ -288,6 +302,62 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(items: CastTvMediaRecord[], currentlyAllSelected: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (currentlyAllSelected) {
+        for (const item of items) next.delete(item.id);
+      } else {
+        for (const item of items) next.add(item.id);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAllActive() {
+    toggleSelectAll(activeMedia, allActiveSelected);
+  }
+
+  function toggleSelectAllDisabled() {
+    toggleSelectAll(disabledMedia, allDisabledSelected);
+  }
+
+  async function deleteSelected() {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    if (!window.confirm(`Delete ${ids.length} item${ids.length === 1 ? "" : "s"} from CAST-TV? This cannot be undone.`)) {
+      return;
+    }
+    setBulkDeleting(true);
+    try {
+      const response = await fetch("/api/cast-tv/media/bulk-delete", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ids })
+      });
+      const body = await readResponseJson(response);
+      if (!response.ok) throw new Error(body.error ?? "Delete failed.");
+      const removed = new Set(ids);
+      setMedia((current) => current.filter((item) => !removed.has(item.id)));
+      setSelectedIds(new Set());
+      onToast(ids.length === 1 ? "Media deleted." : `Deleted ${ids.length} items from CAST-TV.`, "success");
+    } catch (error) {
+      onToast(error instanceof Error ? error.message : "Delete failed.", "error");
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   async function moveMedia(id: string, direction: "up" | "down") {
     setBusyId(id);
     try {
@@ -357,9 +427,19 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
   }
 
   function renderMediaRow(item: CastTvMediaRecord, index: number, list: CastTvMediaRecord[]) {
-    const busy = busyId === item.id;
+    const busy = busyId === item.id || bulkDeleting;
+    const selected = selectedIds.has(item.id);
     return (
-      <article key={item.id} className="cast-tv-admin-card">
+      <article key={item.id} className={`cast-tv-admin-card ${selected ? "is-selected" : ""}`}>
+        <label className="cast-tv-admin-card__select">
+          <input
+            type="checkbox"
+            checked={selected}
+            disabled={busy}
+            onChange={() => toggleSelected(item.id)}
+            aria-label={`Select ${item.display_name ?? item.file_name}`}
+          />
+        </label>
         <div className="cast-tv-admin-card__preview">
           {item.media_type === "video" ? (
             <video src={item.public_url ?? ""} muted playsInline preload="metadata" className="cast-tv-admin-card__thumb" />
@@ -556,7 +636,29 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       </section>
 
       <section className="crossover-card">
-        <h3 className="crossover-card__title">Active Playlist ({activeMedia.length})</h3>
+        <div className="cast-tv-admin__playlist-header">
+          <h3 className="crossover-card__title">Active Playlist ({activeMedia.length})</h3>
+          <div className="cast-tv-admin__bulk-bar">
+            <label className="cast-tv-admin__checkbox">
+              <input
+                type="checkbox"
+                checked={allActiveSelected}
+                disabled={!activeMedia.length || bulkDeleting}
+                onChange={() => toggleSelectAllActive()}
+              />
+              Select all
+            </label>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--ghost"
+              disabled={!selectedCount || bulkDeleting}
+              onClick={() => void deleteSelected()}
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              {selectedCount ? `Delete selected (${selectedCount})` : "Delete selected"}
+            </button>
+          </div>
+        </div>
         {loading ? <p className="cast-tv-admin__empty">Loading media…</p> : null}
         {!loading && !activeMedia.length ? <p className="cast-tv-admin__empty">No enabled media yet.</p> : null}
         <div className="cast-tv-admin__grid">{activeMedia.map((item, index) => renderMediaRow(item, index, activeMedia))}</div>
@@ -564,7 +666,29 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
 
       {disabledMedia.length ? (
         <section className="crossover-card">
-          <h3 className="crossover-card__title">Disabled Media ({disabledMedia.length})</h3>
+          <div className="cast-tv-admin__playlist-header">
+            <h3 className="crossover-card__title">Disabled Media ({disabledMedia.length})</h3>
+            <div className="cast-tv-admin__bulk-bar">
+              <label className="cast-tv-admin__checkbox">
+                <input
+                  type="checkbox"
+                  checked={allDisabledSelected}
+                  disabled={bulkDeleting}
+                  onChange={() => toggleSelectAllDisabled()}
+                />
+                Select all
+              </label>
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost"
+                disabled={!selectedCount || bulkDeleting}
+                onClick={() => void deleteSelected()}
+              >
+                {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {selectedCount ? `Delete selected (${selectedCount})` : "Delete selected"}
+              </button>
+            </div>
+          </div>
           <div className="cast-tv-admin__grid">{disabledMedia.map((item, index) => renderMediaRow(item, index, disabledMedia))}</div>
         </section>
       ) : null}

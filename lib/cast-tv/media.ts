@@ -412,6 +412,33 @@ export async function deleteCastTvMediaRecord(supabase: SupabaseClient, id: stri
   return existing;
 }
 
+export async function deleteCastTvMediaRecords(supabase: SupabaseClient, ids: string[]) {
+  const uniqueIds = [...new Set(ids.map((id) => String(id || "").trim()).filter(Boolean))];
+  if (!uniqueIds.length) throw new Error("Select at least one CAST-TV item to delete.");
+
+  const removed = await mutateCastTvLibrary(supabase, (library) => {
+    const idSet = new Set(uniqueIds);
+    const existing = library.media.filter((item) => idSet.has(item.id));
+    if (!existing.length) throw new Error("Media item not found.");
+    const media = library.media
+      .filter((item) => !idSet.has(item.id))
+      .map((item, index) => ({ ...item, display_order: index + 1 }));
+    return { state: { ...library, media }, result: existing };
+  });
+
+  await Promise.all(
+    removed.map(async (existing) => {
+      if (!existing.storage_path || existing.storage_path.startsWith("builtin/")) return;
+      await supabase.storage.from(existing.bucket || CAST_TV_BUCKET).remove([existing.storage_path]);
+      if (existing.bucket && existing.bucket !== CAST_TV_BUCKET) {
+        await supabase.storage.from(CAST_TV_BUCKET).remove([existing.storage_path]);
+      }
+    })
+  );
+
+  return removed;
+}
+
 export async function reorderCastTvMedia(supabase: SupabaseClient, orderedIds: string[]) {
   if (!orderedIds.length) return [];
 

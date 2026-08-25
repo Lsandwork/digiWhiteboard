@@ -4,7 +4,7 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { accessFromLegacyRole } from "../lib/admin/permissions";
 import { canManageCastTv } from "../lib/cast-tv/permissions";
-import { castTvErrorMessage, castTvErrorResponse } from "../lib/cast-tv/errors";
+import { castTvErrorMessage, castTvErrorResponse, isCastTvSharpLoadError } from "../lib/cast-tv/errors";
 import { asCastTvFormFile } from "../lib/cast-tv/form-file";
 import {
   inferCastTvMimeType,
@@ -23,7 +23,7 @@ import {
   parseCastTvLibrary,
   parseCastTvRefreshNonce
 } from "../lib/cast-tv/library-store";
-import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
+import { loadSharp } from "../lib/sharp-runtime";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 import {
   CAST_TV_DUPLICATE_MESSAGE,
@@ -349,6 +349,25 @@ assert.match(
   castTvErrorMessage({ message: "<!DOCTYPE html> supabase.co | 525: SSL handshake failed" }, "fallback"),
   /storage is temporarily unavailable/
 );
+assert.equal(
+  isCastTvSharpLoadError({
+    message:
+      'Failed to load external module sharp-20c6a5da84e2135f: Error: Could not load the "sharp" module using the linux-x64 runtime ERR_DLOPEN_FAILED: libvips-cpp.so.8.18.3: cannot open shared object file'
+  }),
+  true
+);
+assert.match(
+  castTvErrorMessage({
+    message:
+      'Failed to load external module sharp-20c6a5da84e2135f: Error: Could not load the "sharp" module using the linux-x64 runtime ERR_DLOPEN_FAILED: libvips-cpp.so.8.18.3'
+  }, "fallback"),
+  /photo processing is temporarily unavailable/
+);
+const sharpResponse = castTvErrorResponse(
+  { message: 'Could not load the "sharp" module using the linux-x64 runtime ERR_DLOPEN_FAILED' },
+  "fallback"
+);
+assert.equal(sharpResponse.status, 503);
 
 const root = process.cwd();
 const uploadClient = readFileSync(join(root, "lib/cast-tv/upload-client.ts"), "utf8");
@@ -404,6 +423,10 @@ assert.match(supabaseHelper, /CAST_TV_SUPABASE_TIMEOUT_MS = 15_000/);
 
 const nextConfig = readFileSync(join(root, "next.config.mjs"), "utf8");
 assert.match(nextConfig, /"sharp"/);
+assert.match(nextConfig, /@img\/sharp-libvips-linux-x64/);
+assert.match(nextConfig, /@img\/sharp-wasm32/);
+assert.match(nextConfig, /\/api\/\*\*/);
+assert.match(nextConfig, /\/api\/cast-tv\/media\/upload/);
 
 const migration = readFileSync(join(root, "supabase/migrations/087_cast_tv_media_upload.sql"), "utf8");
 assert.match(migration, /image\/heic/);
@@ -414,6 +437,7 @@ assert.match(media, /CAST_TV_STORAGE_BUCKET/);
 assert.match(media, /loadCastTvLibrary/);
 assert.match(media, /mutateCastTvLibrary/);
 assert.match(media, /mutateCastTvHeartbeats/);
+assert.match(media, /deleteCastTvMediaRecords/);
 assert.doesNotMatch(media, /\.from\("cast_tv_media"\)/);
 
 const libraryStore = readFileSync(join(root, "lib/cast-tv/library-store.ts"), "utf8");
@@ -457,6 +481,26 @@ const panel = readFileSync(join(root, "components/admin/CastTvPanel.tsx"), "utf8
 assert.doesNotMatch(panel, /postgres_changes/);
 assert.match(panel, /Skipped a duplicate photo/);
 assert.match(panel, /\/api\/cast-tv\/media\/file/);
+assert.match(panel, /\/api\/cast-tv\/media\/bulk-delete/);
+assert.match(panel, /Delete selected/);
+assert.match(panel, /selectedIds/);
+assert.match(panel, /date\.getTime\(\) === 0/);
+assert.match(panel, /async function moveMedia/);
+
+const bulkDeleteRoute = readFileSync(join(root, "app/api/cast-tv/media/bulk-delete/route.ts"), "utf8");
+assert.match(bulkDeleteRoute, /deleteCastTvMediaRecords/);
+assert.match(bulkDeleteRoute, /cast_tv\.media\.bulk_deleted/);
+
+const packageJson = readFileSync(join(root, "package.json"), "utf8");
+assert.match(packageJson, /@img\/sharp-wasm32/);
+assert.match(packageJson, /@img\/sharp-libvips-linux-x64/);
+assert.match(packageJson, /@img\/sharp-linux-x64/);
+
+const sharpRuntime = readFileSync(join(root, "lib/sharp-runtime.ts"), "utf8");
+assert.match(sharpRuntime, /ensureSharpLibvipsPath/);
+assert.match(sharpRuntime, /LD_LIBRARY_PATH/);
+assert.match(readFileSync(join(root, "lib/cast-tv/display-image.ts"), "utf8"), /from "@\/lib\/sharp-runtime"/);
+assert.match(readFileSync(join(root, "instrumentation.ts"), "utf8"), /ensureSharpLibvipsPath/);
 const tvPlayer = readFileSync(join(root, "components/cast-tv/useCastTvPlaylist.ts"), "utf8");
 assert.doesNotMatch(tvPlayer, /postgres_changes/);
 assert.match(tvPlayer, /currentIdRef\.current/);
@@ -486,6 +530,8 @@ assert.match(libraryMigration, /lobby-slideshow/);
 console.log("cast-tv upload tests passed");
 
 async function testJpegIngest() {
+  const loaded = await loadSharp();
+  assert.equal(typeof loaded, "function");
   const jpeg = await sharp({
     create: { width: 8, height: 8, channels: 3, background: { r: 255, g: 111, b: 38 } }
   })

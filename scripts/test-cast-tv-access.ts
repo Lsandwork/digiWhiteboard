@@ -39,5 +39,7 @@ assert.match(read("app/api/cast-tv/media/file/route.ts"), /transcodeCastTvDispla
 assert.match(read("app/api/cast-tv/media/file/route.ts"), /isTransientCastTvStorageError/);
 assert.match(read("lib/cast-tv/stored-image.ts"), /getPublicUrl/);
 assert.match(read("next.config.mjs"), /"sharp"/);
+assert.match(read("next.config.mjs"), /@img\/sharp-libvips-linux-x64/);
+assert.match(read("next.config.mjs"), /@img\/sharp-wasm32/);
 
 console.log("cast-tv access tests passed");

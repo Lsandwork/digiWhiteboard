@@ -21,14 +21,23 @@ export function isCastTvHtmlError(error: unknown) {
   return /<!doctype|<html|SSL handshake|Error code 52|Web server is down|cf-error/i.test(message);
 }
 
+export function isCastTvSharpLoadError(error: unknown) {
+  return /Could not load the "sharp" module|ERR_DLOPEN_FAILED|libvips-cpp|Failed to load external module sharp/i.test(
+    rawErrorMessage(error)
+  );
+}
+
 export function isTransientCastTvStorageError(error: unknown) {
-  if (isCastTvTimeoutError(error) || isCastTvHtmlError(error)) return true;
+  if (isCastTvTimeoutError(error) || isCastTvHtmlError(error) || isCastTvSharpLoadError(error)) return true;
   return /timeout|timed out|544|503|502|525|temporarily unavailable|unable to read the uploaded|fetch failed|network/i.test(
     rawErrorMessage(error)
   );
 }
 
 export function castTvErrorMessage(error: unknown, fallback: string) {
+  if (isCastTvSharpLoadError(error)) {
+    return "CAST-TV photo processing is temporarily unavailable. Try the upload again in a moment.";
+  }
   if (isCastTvTimeoutError(error)) {
     return "CAST-TV timed out waiting for the database. Try again in a moment.";
   }
@@ -44,6 +53,9 @@ export function castTvErrorMessage(error: unknown, fallback: string) {
 
 export function castTvErrorResponse(error: unknown, fallback: string) {
   const message = castTvErrorMessage(error, fallback);
+  if (isCastTvSharpLoadError(error)) {
+    return NextResponse.json({ error: message }, { status: 503 });
+  }
   const timedOut = isCastTvTimeoutError(error) || message.includes("timed out");
   return NextResponse.json({ error: message }, { status: timedOut ? 504 : 400 });
 }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { loadSharp } from "@/lib/sharp-runtime";
 import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 
 export const CAST_TV_DISPLAY_MAX_EDGE = 1920;
@@ -147,11 +148,6 @@ export function sniffCastTvImageKind(bytes: Buffer): CastTvImageKind {
 
 export function isDecodableCastTvImageKind(kind: CastTvImageKind) {
   return kind === "jpeg" || kind === "png" || kind === "webp" || kind === "heic" || kind === "gif";
-}
-
-async function loadSharp() {
-  const { default: sharp } = await import("sharp");
-  return sharp;
 }
 
 export async function transcodeCastTvDisplayImage(input: Buffer): Promise<TranscodedCastTvJpeg> {
