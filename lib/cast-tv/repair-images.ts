@@ -1,5 +1,6 @@
 import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 import { dedupeCastTvMedia, isLocalCastTvAsset, matchCastTvDuplicate } from "@/lib/cast-tv/display-image";
+import { isTransientCastTvStorageError } from "@/lib/cast-tv/errors";
 import { deleteRemovedCastTvStorage, loadCastTvLibrary, saveCastTvLibrary } from "@/lib/cast-tv/library-store";
 import { normalizeStoredCastTvImage } from "@/lib/cast-tv/stored-image";
 
@@ -88,7 +89,11 @@ export async function repairCastTvLibraryImages(
         updated_at: now
       });
       changed = true;
-    } catch {
+    } catch (error) {
+      if (isTransientCastTvStorageError(error)) {
+        nextMedia.push(item);
+        continue;
+      }
       nextMedia.push({ ...item, is_enabled: false });
       changed = true;
     }

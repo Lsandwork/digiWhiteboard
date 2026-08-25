@@ -21,6 +21,13 @@ export function isCastTvHtmlError(error: unknown) {
   return /<!doctype|<html|SSL handshake|Error code 52|Web server is down|cf-error/i.test(message);
 }
 
+export function isTransientCastTvStorageError(error: unknown) {
+  if (isCastTvTimeoutError(error) || isCastTvHtmlError(error)) return true;
+  return /timeout|timed out|544|503|502|525|temporarily unavailable|unable to read the uploaded|fetch failed|network/i.test(
+    rawErrorMessage(error)
+  );
+}
+
 export function castTvErrorMessage(error: unknown, fallback: string) {
   if (isCastTvTimeoutError(error)) {
     return "CAST-TV timed out waiting for the database. Try again in a moment.";

@@ -54,6 +54,20 @@ export function isLocalCastTvAsset(record: Pick<CastTvMediaRecord, "public_url" 
   return !record.bucket && String(record.storage_path || "").startsWith("builtin/");
 }
 
+export function isBuiltinMarketingCastTvItem(
+  item: Pick<CastTvMediaRecord, "id" | "storage_path" | "public_url" | "bucket">
+) {
+  return (
+    String(item.id || "").startsWith("builtin-marketing-") ||
+    normalizeCastTvStoragePath(item.storage_path).startsWith("builtin/marketing/") ||
+    isLocalCastTvAsset(item)
+  );
+}
+
+export function isUploadedCastTvMedia(item: Pick<CastTvMediaRecord, "id" | "storage_path" | "public_url" | "bucket">) {
+  return !isBuiltinMarketingCastTvItem(item) && !isLegacyCastTvDumpPath(item.storage_path);
+}
+
 export function normalizeCastTvStoragePath(storagePath: string) {
   return String(storagePath || "")
     .trim()
@@ -263,23 +277,32 @@ export function dedupeCastTvMedia(media: CastTvMediaRecord[]): CastTvMediaRecord
 }
 
 /**
- * Drops recovered `media/` dump copies when canonical CAST-TV slides exist,
- * then keeps one preferred copy of each remaining photo.
- * Does not empty the playlist when the dump is the only content.
+ * Drops recovered `media/` dump copies and auto-seeded lobby builtins when
+ * uploaded CAST-TV photos exist. Re-enables photos that repair disabled after
+ * a storage timeout. Does not empty the playlist when the dump is the only content.
  */
 export function purgeDuplicateCastTvMedia(media: CastTvMediaRecord[]): {
   kept: CastTvMediaRecord[];
   removed: CastTvMediaRecord[];
 } {
-  const usable = media.filter((item) => !isCastTvSidecarPath(item.storage_path) && !isCastTvSidecarPath(item.file_name));
-  const hasCanonical = usable.some(
-    (item) => item.is_enabled !== false && !isLegacyCastTvDumpPath(item.storage_path)
-  );
-  const source = hasCanonical ? usable.filter((item) => !isLegacyCastTvDumpPath(item.storage_path)) : usable;
+  const usable = media
+    .filter((item) => !isCastTvSidecarPath(item.storage_path) && !isCastTvSidecarPath(item.file_name))
+    .map((item) => restoreRepairDisabledCastTvItem(item));
+  const uploaded = usable.filter((item) => isUploadedCastTvMedia(item));
+  const dump = usable.filter((item) => isLegacyCastTvDumpPath(item.storage_path));
+  const builtins = usable.filter((item) => isBuiltinMarketingCastTvItem(item));
+  const source = uploaded.length ? uploaded : dump.length ? dump : builtins;
   const kept = dedupeCastTvMedia(source);
   const keptIds = new Set(kept.map((item) => item.id));
   const removed = media.filter((item) => !keptIds.has(item.id));
   return { kept, removed };
+}
+
+function restoreRepairDisabledCastTvItem(item: CastTvMediaRecord): CastTvMediaRecord {
+  if (item.is_enabled === false && item.display_ready !== true && !isBuiltinMarketingCastTvItem(item)) {
+    return { ...item, is_enabled: true };
+  }
+  return item;
 }
 
 export function jpegFileNameFrom(fileName: string) {

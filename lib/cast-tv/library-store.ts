@@ -4,6 +4,7 @@ import {
   isLegacyCastTvDumpPath,
   isLocalCastTvAsset,
   isRecoverableCastTvStoragePath,
+  isUploadedCastTvMedia,
   originalCastTvFileNameKey,
   purgeDuplicateCastTvMedia
 } from "@/lib/cast-tv/display-image";
@@ -507,6 +508,9 @@ export async function loadCastTvLibrary(
 ): Promise<CastTvLibraryState> {
   try {
     const stored = await downloadJsonObject(supabase, CAST_TV_LIBRARY_OBJECT_PATH);
+    const storedMediaCount = Array.isArray((stored as { media?: unknown } | null)?.media)
+      ? ((stored as { media: unknown[] }).media.length)
+      : 0;
     let library = hydrateLibraryUrls(supabase, parseCastTvLibrary(stored));
     let added = 0;
 
@@ -531,7 +535,8 @@ export async function loadCastTvLibrary(
     const purged = purgeDuplicateCastTvMedia(library.media);
     library = { ...library, media: purged.kept };
 
-    if (!library.media.some((item) => item.is_enabled !== false)) {
+    const hasUploaded = library.media.some((item) => isUploadedCastTvMedia(item));
+    if (!hasUploaded && !library.media.some((item) => item.is_enabled !== false)) {
       const builtins = {
         ...emptyCastTvLibrary(),
         media: builtinMarketingCastTvMedia(),
@@ -546,7 +551,7 @@ export async function loadCastTvLibrary(
       ...library,
       media: purgeDuplicateCastTvMedia(library.media).kept
     });
-    if (added > 0 || purged.removed.length > 0) {
+    if (added > 0 || purged.removed.length > 0 || library.media.length !== storedMediaCount) {
       try {
         await saveCastTvLibrary(supabase, library);
         if (purged.removed.length) {

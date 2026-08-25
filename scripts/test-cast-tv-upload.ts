@@ -245,6 +245,41 @@ assert.equal(namedOverUuid.kept.length, 1);
 assert.equal(namedOverUuid.kept[0].id, "named-copy");
 assert.equal(namedOverUuid.removed[0].id, "uuid-copy");
 
+const seededBuiltins = builtinMarketingCastTvMedia();
+const repairDisabledUpload = testMedia(
+  "f0084c59-a850-41e3-b0bd-da0fdb7a75b1",
+  "cast-tv/f0084c59-a850-41e3-b0bd-da0fdb7a75b1.jpg",
+  { is_enabled: false, display_ready: false, display_order: 2 }
+);
+const restoredUploads = purgeDuplicateCastTvMedia([
+  seededBuiltins[0],
+  repairDisabledUpload,
+  seededBuiltins[1],
+  testMedia("072edb55-e287-4204-890c-b2119c25d044", "cast-tv/072edb55-e287-4204-890c-b2119c25d044.jpg", {
+    is_enabled: false,
+    display_ready: false,
+    display_order: 4
+  })
+]);
+assert.equal(restoredUploads.kept.length, 2);
+assert.ok(restoredUploads.kept.every((item) => item.is_enabled && item.storage_path.startsWith("cast-tv/")));
+assert.ok(restoredUploads.removed.every((item) => String(item.id).startsWith("builtin-marketing-")));
+
+const userHidden = purgeDuplicateCastTvMedia([
+  testMedia("keep-on", "cast-tv/keep-on.jpg", { is_enabled: true, display_ready: true, display_order: 1 }),
+  testMedia("user-off", "cast-tv/user-off.jpg", { is_enabled: false, display_ready: true, display_order: 2 })
+]);
+assert.deepEqual(
+  userHidden.kept.map((item) => [item.id, item.is_enabled]),
+  [
+    ["keep-on", true],
+    ["user-off", false]
+  ],
+  "user-disabled display-ready photos stay hidden"
+);
+
+assert.equal(purgeDuplicateCastTvMedia(seededBuiltins).kept.length, seededBuiltins.length);
+
 const parsedWithoutDump = parseCastTvLibrary({
   media: [liveCanonical, liveDumpCopy, uniqueDump]
 });
@@ -401,9 +436,18 @@ assert.match(libraryStore, /\{ bucket: CAST_TV_STORAGE_BUCKET, prefix: "cast-tv"
 assert.match(libraryStore, /\{ bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv" \}/);
 assert.doesNotMatch(libraryStore, /\{ bucket: [^,]+, prefix: "" \}/);
 
+assert.match(libraryStore, /isUploadedCastTvMedia/);
+assert.match(libraryStore, /hasUploaded/);
+assert.match(libraryStore, /storedMediaCount/);
+
 const repairImages = readFileSync(join(root, "lib/cast-tv/repair-images.ts"), "utf8");
 assert.match(repairImages, /deleteRemovedCastTvStorage/);
 assert.match(repairImages, /removed\.push\(item\)/);
+assert.match(repairImages, /isTransientCastTvStorageError/);
+assert.doesNotMatch(
+  repairImages,
+  /catch \{\s*nextMedia\.push\(\{ \.\.\.item, is_enabled: false \}\)/
+);
 
 const storageProbe = readFileSync(join(root, "lib/system-health/probes/storage.ts"), "utf8");
 assert.doesNotMatch(storageProbe, /\.from\("cast_tv_media"\)/);
