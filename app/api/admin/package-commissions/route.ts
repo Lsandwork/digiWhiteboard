@@ -15,7 +15,8 @@ import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-
 import { SERVICE_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/server";
 import {
   COMMISSIONS_IMPORT_SLOW_MESSAGE,
-  COMMISSIONS_MUTATION_TIMEOUT_MS
+  COMMISSIONS_MUTATION_TIMEOUT_MS,
+  COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS
 } from "@/lib/staff/commission-ledger/import-timeouts";
 import { listCommissionTrainersFromDb } from "@/lib/staff/commission-ledger/trainers";
 import {
@@ -41,7 +42,10 @@ import {
   listCommissionRules,
   listCommentThreads,
   listImportBatches,
+  listImportBatchesViaPostgres,
   listPayrollPeriods,
+  listPayrollPeriodsViaPostgres,
+  listCommissionRulesViaPostgres,
   listRecordAudit,
   previewCommissionRule,
   purgeRejectedDuplicateCommissions,
@@ -288,6 +292,37 @@ function capLedgerFilters(filters: CommissionListFilters, fast: boolean): Commis
   return next;
 }
 
+async function loadCommissionSubtabList<T>(
+  viaPostgres: (() => Promise<T[]>) | null,
+  viaRest: () => Promise<T[]>
+): Promise<{ rows: T[]; delayed: boolean }> {
+  if (viaPostgres) {
+    try {
+      return { rows: await viaPostgres(), delayed: false };
+    } catch (error) {
+      console.warn(
+        JSON.stringify({
+          scope: "commissions",
+          event: "subtab_postgres_delayed",
+          reason: humanizeUnknownError(error, "postgres")
+        })
+      );
+    }
+  }
+  try {
+    return { rows: await viaRest(), delayed: false };
+  } catch (error) {
+    console.warn(
+      JSON.stringify({
+        scope: "commissions",
+        event: "subtab_rest_delayed",
+        reason: humanizeUnknownError(error, "rest")
+      })
+    );
+    return { rows: [], delayed: true };
+  }
+}
+
 async function loadLedgerList(viewer: ReturnType<typeof buildViewer>, filters: CommissionListFilters) {
   const cacheKey = [
     "commissions:ledger",
@@ -344,13 +379,14 @@ export async function GET(request: Request) {
   const view = url.searchParams.get("view") ?? "ledger";
   const fast = url.searchParams.get("fast") === "1";
   const trainersPromise =
-    canManage && view !== "ledger"
+    canManage && (view === "rules" || view === "report")
       ? withTimeoutFallback(
           listCommissionTrainersFromDb(getServiceSupabase({ timeoutMs: COMMISSIONS_OPTIONAL_TIMEOUT_MS })),
           COMMISSIONS_OPTIONAL_TIMEOUT_MS,
           []
         )
       : Promise.resolve([]);
+  const subtabSupabase = getServiceSupabase({ timeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS });
 
   try {
     if (view === "diagnostics") {
@@ -371,20 +407,50 @@ export async function GET(request: Request) {
     }
 
     if (view === "rules") {
-      const [rules, trainers] = await Promise.all([listCommissionRules(supabase), trainersPromise]);
-      return NextResponse.json({ rules, canManage, trainers });
+      const [rulesResult, trainers] = await Promise.all([
+        loadCommissionSubtabList(
+          canListCommissionsViaPostgres() ? listCommissionRulesViaPostgres : null,
+          () => listCommissionRules(subtabSupabase)
+        ),
+        trainersPromise
+      ]);
+      return NextResponse.json({
+        rules: rulesResult.rows,
+        canManage,
+        trainers,
+        delayed: rulesResult.delayed
+      });
     }
 
     if (view === "payroll") {
-      const periods = await listPayrollPeriods(supabase);
+      const { rows: periods, delayed } = await loadCommissionSubtabList(
+        canListCommissionsViaPostgres() ? listPayrollPeriodsViaPostgres : null,
+        () => listPayrollPeriods(subtabSupabase)
+      );
       const periodId = url.searchParams.get("periodId");
-      const summary = periodId ? await getPayrollPeriodSummary(supabase, periodId) : null;
-      return NextResponse.json({ periods, summary, canManage, isSuperAdmin: viewer.isSuperAdmin });
+      let summary = null;
+      if (periodId && !delayed) {
+        try {
+          summary = await getPayrollPeriodSummary(subtabSupabase, periodId);
+        } catch {
+          /* keep the period list even if the optional summary times out */
+        }
+      }
+      return NextResponse.json({
+        periods,
+        summary,
+        canManage,
+        isSuperAdmin: viewer.isSuperAdmin,
+        delayed
+      });
     }
 
     if (view === "imports") {
-      const batches = await listImportBatches(supabase);
-      return NextResponse.json({ batches, canManage });
+      const { rows: batches, delayed } = await loadCommissionSubtabList(
+        canListCommissionsViaPostgres() ? listImportBatchesViaPostgres : null,
+        () => listImportBatches(subtabSupabase)
+      );
+      return NextResponse.json({ batches, canManage, delayed });
     }
 
     if (view === "report") {

@@ -3,7 +3,8 @@ import { assertCanManage } from "./auth";
 import { writeCommissionAudit } from "./audit";
 import { insertCommissionRecordsForImport } from "./records";
 import { isTimeoutLikeError } from "@/lib/safe-url";
-import { COMMISSIONS_IMPORT_SLOW_MESSAGE } from "./import-timeouts";
+import { COMMISSIONS_IMPORT_SLOW_MESSAGE, COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS } from "./import-timeouts";
+import { withCommissionPostgres } from "./list-via-postgres";
 import {
   canListCommissionsViaPostgres,
   insertCommissionImportViaPostgres,
@@ -416,6 +417,25 @@ export async function listImportBatches(supabase: SupabaseClient) {
     .limit(50);
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function listImportBatchesViaPostgres(): Promise<Record<string, unknown>[]> {
+  if (!canListCommissionsViaPostgres()) {
+    throw new Error("Direct Postgres is not configured.");
+  }
+  return withCommissionPostgres(
+    async (client) => {
+      const result = await client.query(
+        `select * from package_commission_import_batches order by uploaded_at desc nulls last limit 50`
+      );
+      return result.rows as Record<string, unknown>[];
+    },
+    {
+      queryTimeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS,
+      statementTimeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS,
+      connectionTimeoutMs: 1_200
+    }
+  );
 }
 
 export async function undoImportBatch(

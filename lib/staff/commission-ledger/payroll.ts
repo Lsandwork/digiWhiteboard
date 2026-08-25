@@ -1,5 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 import { assertCanManage, assertSuperAdmin, assertNotManagementDestructive } from "./auth";
+import { COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS } from "./import-timeouts";
+import { canListCommissionsViaPostgres, withCommissionPostgres } from "./list-via-postgres";
 import { writeCommissionAudit } from "./audit";
 import { centsToDisplay } from "./money";
 import type { CommissionActor, CommissionViewer, PayrollPeriodStatus } from "./types";
@@ -8,9 +10,29 @@ export async function listPayrollPeriods(supabase: SupabaseClient) {
   const { data, error } = await supabase
     .from("package_commission_payroll_periods")
     .select("*")
-    .order("start_date", { ascending: false });
+    .order("start_date", { ascending: false })
+    .limit(50);
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function listPayrollPeriodsViaPostgres(): Promise<Record<string, unknown>[]> {
+  if (!canListCommissionsViaPostgres()) {
+    throw new Error("Direct Postgres is not configured.");
+  }
+  return withCommissionPostgres(
+    async (client) => {
+      const result = await client.query(
+        `select * from package_commission_payroll_periods order by start_date desc nulls last limit 50`
+      );
+      return result.rows as Record<string, unknown>[];
+    },
+    {
+      queryTimeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS,
+      statementTimeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS,
+      connectionTimeoutMs: 1_200
+    }
+  );
 }
 
 export async function createPayrollPeriod(
