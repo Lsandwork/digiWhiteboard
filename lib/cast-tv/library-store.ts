@@ -165,7 +165,7 @@ export function isMissingCastTvStorageObject(
   return (
     code === "404" ||
     code === "400" ||
-    /not found|does not exist|No such file|object not found/i.test(message)
+    /not found|does not exist|No such file|object not found|NoSuchKey/i.test(message)
   );
 }
 
@@ -346,18 +346,59 @@ export function mergeCastTvStorageObjects(
   };
 }
 
+async function parseJsonText(text: string): Promise<unknown | null> {
+  if (!text.trim()) return null;
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return null;
+  }
+}
+
 async function downloadJsonObject(supabase: SupabaseClient, path: string): Promise<unknown | null> {
   let lastError: { message?: string; statusCode?: string | number } | null = null;
+  const started = Date.now();
+
+  for (const bucket of CAST_TV_LIBRARY_BUCKETS) {
+    const { data: published } = supabase.storage.from(bucket).getPublicUrl(path);
+    if (!published?.publicUrl) continue;
+    try {
+      const response = await fetch(published.publicUrl, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(4_000)
+      });
+      if (response.status === 404 || response.status === 400) continue;
+      if (!response.ok) {
+        lastError = { message: `Storage JSON HTTP ${response.status}`, statusCode: response.status };
+        continue;
+      }
+      const parsed = await parseJsonText(await response.text());
+      if (parsed != null) {
+        logCastTvQuery({
+          name: "storage.library.json.public",
+          rows: Array.isArray((parsed as { media?: unknown }).media)
+            ? (parsed as { media: unknown[] }).media.length
+            : 1,
+          durationMs: Date.now() - started,
+          cache: "miss",
+          trigger: "refresh"
+        });
+        return parsed;
+      }
+    } catch (error) {
+      lastError = {
+        message: error instanceof Error ? error.message : "Storage JSON fetch failed",
+        statusCode: 544
+      };
+    }
+  }
+
   for (const bucket of CAST_TV_LIBRARY_BUCKETS) {
     const { data, error } = await supabase.storage.from(bucket).download(path);
     if (data && !error) {
-      const text = await data.text();
-      if (!text.trim()) continue;
-      try {
-        return JSON.parse(text) as unknown;
-      } catch {
-        continue;
-      }
+      const parsed = await parseJsonText(await data.text());
+      if (parsed != null) return parsed;
+      continue;
     }
     if (error && !isMissingCastTvStorageObject(error)) lastError = error;
   }

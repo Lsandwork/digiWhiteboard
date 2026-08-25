@@ -40,28 +40,49 @@ export async function downloadCastTvStorageFile(
     : [CAST_TV_STORAGE_BUCKET, CAST_TV_LEGACY_MEDIA_BUCKET];
   const unique = [...new Set(buckets.filter(Boolean))];
   let lastMessage = "Unable to read the uploaded CAST-TV file.";
-  for (const target of unique) {
-    const { data, error } = await supabase.storage.from(target).download(storagePath);
-    if (!error && data) {
-      return { bytes: Buffer.from(await data.arrayBuffer()), bucket: target };
-    }
-    lastMessage = error?.message || lastMessage;
+  let missing = false;
+  let transient = false;
 
+  for (const target of unique) {
     const { data: published } = supabase.storage.from(target).getPublicUrl(storagePath);
     if (!published?.publicUrl) continue;
     try {
-      const response = await fetch(published.publicUrl, { cache: "no-store" });
+      const response = await fetch(published.publicUrl, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3_000)
+      });
+      if (response.status === 404 || response.status === 400) {
+        missing = true;
+        lastMessage = `Object not found (${response.status}).`;
+        continue;
+      }
       if (!response.ok) {
+        transient = true;
         lastMessage = `Unable to read CAST-TV file (${response.status}).`;
         continue;
       }
       const bytes = Buffer.from(await response.arrayBuffer());
       if (bytes.length) return { bytes, bucket: target };
     } catch (caught) {
+      transient = true;
       lastMessage = caught instanceof Error && caught.message.trim() ? caught.message.trim() : lastMessage;
     }
   }
-  throw new Error(lastMessage);
+
+  if (missing && !transient) {
+    throw new Error("Object not found");
+  }
+
+  for (const target of unique) {
+    const { data, error } = await supabase.storage.from(target).download(storagePath);
+    if (!error && data) {
+      return { bytes: Buffer.from(await data.arrayBuffer()), bucket: target };
+    }
+    lastMessage = error?.message || lastMessage;
+    if (isMissingCastTvStorageObject(error)) missing = true;
+  }
+
+  throw new Error(missing && !transient ? "Object not found" : lastMessage);
 }
 
 export async function probeCastTvStorageExists(

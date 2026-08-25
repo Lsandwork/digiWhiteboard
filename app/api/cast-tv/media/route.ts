@@ -12,6 +12,7 @@ import { mediaRecordToPlaylistItem, withCacheBustedSrc } from "@/lib/cast-tv/med
 import { logCastTvQuery } from "@/lib/cast-tv/query-log";
 import { probeAndMarkMissingCastTvMedia } from "@/lib/cast-tv/stored-image";
 import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
+import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
     const library = await loadCastTvLibrary(supabase, {
       trigger: playlistOnly ? "playlist" : Number(url.searchParams.get("offset") || 0) > 0 ? "pagination" : "initial-load"
     });
-    const records = library.media.map((record) => ({
+    const records: CastTvMediaRecord[] = library.media.map((record) => ({
       ...record,
       public_url:
         record.public_url ||
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
     const probe = url.searchParams.get("probe") === "1";
     const trigger = offset > 0 ? "pagination" : "initial-load";
 
-    let nextRecords = records;
+    let nextRecords: CastTvMediaRecord[] = records;
     if (probe) {
       const pageIds = new Set(
         paginateCastTvAdminMedia(records, { status, offset, limit }).items.map((item) => item.id)
@@ -85,8 +86,13 @@ export async function GET(request: Request) {
         supabase,
         records.filter((item) => pageIds.has(item.id))
       );
-      const byId = new Map(records.map((item) => [item.id, item]));
-      for (const item of probed) byId.set(item.id, item);
+      const byId = new Map<string, CastTvMediaRecord>(records.map((item) => [item.id, item]));
+      for (const item of probed) {
+        byId.set(item.id, {
+          ...item,
+          public_url: item.public_url || byId.get(item.id)?.public_url || null
+        });
+      }
       nextRecords = [...byId.values()];
     }
 

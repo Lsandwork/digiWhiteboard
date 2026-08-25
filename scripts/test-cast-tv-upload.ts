@@ -476,7 +476,8 @@ assert.doesNotMatch(libraryStore, /\{ bucket: [^,]+, prefix: "" \}/);
 
 assert.match(libraryStore, /isUploadedCastTvMedia/);
 assert.match(libraryStore, /hasUploaded/);
-assert.match(libraryStore, /CAST_TV_LIBRARY_FAST_CACHE_KEY/);
+assert.match(libraryStore, /storage\.library\.json\.public/);
+assert.match(libraryStore, /AbortSignal\.timeout\(4_000\)/);
 assert.match(libraryStore, /recoverOrphans === true/);
 assert.match(libraryStore, /includeLegacy === true/);
 assert.doesNotMatch(libraryStore, /recoverOrphans !== false/);
@@ -556,7 +557,8 @@ assert.match(uploadClient, /isDuplicateUploadError/);
 const storedImage = readFileSync(join(root, "lib/cast-tv/stored-image.ts"), "utf8");
 assert.match(storedImage, /getPublicUrl/);
 assert.match(storedImage, /cache: "no-store"/);
-assert.match(storedImage, /probeCastTvStorageExists/);
+assert.match(storedImage, /AbortSignal\.timeout\(3_000\)/);
+assert.match(storedImage, /Object not found/);
 assert.match(storedImage, /markMissingCastTvStorage/);
 
 const queryLog = readFileSync(join(root, "lib/cast-tv/query-log.ts"), "utf8");
