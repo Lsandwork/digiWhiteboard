@@ -9,7 +9,7 @@ import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
 import { cachedLoadSettingsBundle, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
-import { skipHeavyBoardWidgets, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
+import { skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import { defaultLobbySettings } from "@/lib/lobby/settings";
 import { defaultStaffSettings } from "@/lib/staff/settings";
@@ -72,6 +72,7 @@ export async function GET(request: Request) {
     const board = parseBoardType(url.searchParams.get("board"));
     const tab = url.searchParams.get("tab");
     const lightLoad = skipHeavyBoardWidgets(board, tab);
+    const skipHungSnapshots = skipHungBoardSnapshots(board, tab);
     const skipAccessWork = skipSettingsAndAccess(tab);
     const supabase = getServiceSupabase({ timeoutMs: DASHBOARD_QUERY_TIMEOUT_MS });
 
@@ -100,33 +101,41 @@ export async function GET(request: Request) {
                 loadFastPromptedCheckouts(supabase)
               )
             ),
-            timedRows(
-              "transition dogs",
-              supabase
-                .from("live_transition_dogs")
-                .select("*")
-                .eq("hidden", false)
-                .in("display_status", ["checking_in", "checking_out"])
-                .order("updated_at", { ascending: false })
-                .limit(120)
-            ),
-            timedRows(
-              "webhook events",
-              supabase
-                .from("gingr_webhook_events")
-                .select("*")
-                .order("created_at", { ascending: false })
-                .limit(50)
-            ),
-            timedRows(
-              "failed webhook events",
-              supabase
-                .from("gingr_webhook_events")
-                .select("*")
-                .eq("processed", false)
-                .order("created_at", { ascending: false })
-                .limit(20)
-            )
+            skipHungSnapshots
+              ? Promise.resolve([])
+              : timedRows(
+                  "transition dogs",
+                  supabase
+                    .from("live_transition_dogs")
+                    .select(
+                      "id, gingr_reservation_id, gingr_animal_id, animal_name, owner_name, photo_url, reservation_type, current_status, display_status, room, notes, flags, status_started_at, completed_at, display_until, last_seen_from_gingr_at, hidden, updated_at"
+                    )
+                    .eq("hidden", false)
+                    .in("display_status", ["checking_in", "checking_out"])
+                    .order("updated_at", { ascending: false })
+                    .limit(120)
+                ),
+            skipHungSnapshots
+              ? Promise.resolve([])
+              : timedRows(
+                  "webhook events",
+                  supabase
+                    .from("gingr_webhook_events")
+                    .select("id, webhook_type, entity_id, entity_type, verified, processed, processing_error, created_at")
+                    .order("created_at", { ascending: false })
+                    .limit(50)
+                ),
+            skipHungSnapshots
+              ? Promise.resolve([])
+              : timedRows(
+                  "failed webhook events",
+                  supabase
+                    .from("gingr_webhook_events")
+                    .select("id, webhook_type, entity_id, entity_type, verified, processed, processing_error, created_at")
+                    .eq("processed", false)
+                    .order("created_at", { ascending: false })
+                    .limit(20)
+                )
           ]),
       skipAccessWork
         ? Promise.resolve(fallbackAccess)
@@ -206,7 +215,10 @@ export async function GET(request: Request) {
 }
 
 async function loadAllPromotions(supabase: ReturnType<typeof getServiceSupabase>) {
-  const { data, error } = await supabase.from("lobby_promotions").select("*").order("sort_order", { ascending: true });
+  const { data, error } = await supabase
+    .from("lobby_promotions")
+    .select("id, title, subtitle, category, icon_key, image_url, starts_at, ends_at, active, sort_order")
+    .order("sort_order", { ascending: true });
   if (error) throw error;
   return data ?? [];
 }

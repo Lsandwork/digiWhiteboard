@@ -1,22 +1,35 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
-import { canAccessAdminTab } from "@/lib/admin/permissions";
+import { accessFromLegacyRole, canAccessAdminTab } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
-import { buildOverviewPayload, saveOverviewBoardNote } from "@/lib/admin/overview";
+import {
+  buildOverviewPayload,
+  emptyOverviewPayload,
+  OVERVIEW_QUERY_TIMEOUT_MS,
+  saveOverviewBoardNote
+} from "@/lib/admin/overview";
 import { runSystemHealthAudit } from "@/lib/admin/system-health-audit";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 20;
 
 async function requireOverviewAccess(request: Request) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };
   const session = getAdminSessionFromRequest(request);
-  const supabase = getServiceSupabase();
-  const access = session?.adminUserId
-    ? await getUserAccess(supabase, session.adminUserId, session.role, session.email)
+  const supabase = getServiceSupabase({ timeoutMs: OVERVIEW_QUERY_TIMEOUT_MS });
+  const fallbackAccess = session
+    ? accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role)
     : null;
+  const access = session?.adminUserId
+    ? await withTimeoutFallback(
+        getUserAccess(supabase, session.adminUserId, session.role, session.email),
+        1_200,
+        fallbackAccess
+      )
+    : fallbackAccess;
   if (!canAccessAdminTab(access, "overview", session?.role, "staff")) {
     return {
       error: NextResponse.json({ error: "You do not have permission to view Overview." }, { status: 403 })
@@ -37,8 +50,8 @@ export async function GET(request: Request) {
     const payload = await buildOverviewPayload(auth.supabase);
     return NextResponse.json(payload);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to load overview.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[admin-overview] GET failed:", error);
+    return NextResponse.json(emptyOverviewPayload());
   }
 }
 
