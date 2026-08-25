@@ -2132,23 +2132,23 @@ html.lobby-tv-display .lobby-has-checkout .social-moments-card {
 }
 
 .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog {
-  flex-direction: row;
+  flex-direction: column;
   align-items: stretch;
 }
 
 .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__photo {
   flex: 1 1 auto;
-  padding: 0.85rem 0.5rem 0.85rem 1rem;
+  padding: 0.45rem 1.35rem 0;
 }
 
 .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__meta {
-  flex: 0 0 min(28vw, 22rem);
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
-  text-align: left;
-  padding: 1.25rem 1.6rem 1.4rem 0.4rem;
+  align-items: center;
+  text-align: center;
+  padding: 0.55rem 1.5rem 0.95rem;
 }
 
 .lobby-checkout-showcase {
@@ -2200,6 +2200,7 @@ html.lobby-tv-display .lobby-has-checkout .social-moments-card {
   display: flex;
   min-height: 0;
   min-width: 0;
+  height: 100%;
   flex-direction: column;
   overflow: hidden;
   border-radius: 1.35rem;
@@ -2218,27 +2219,34 @@ html.lobby-tv-display .lobby-has-checkout .social-moments-card {
 }
 
 .lobby-checkout-dog__photo {
-  display: grid;
+  position: relative;
+  display: flex;
   flex: 1 1 auto;
   min-height: 0;
-  place-items: center;
-  padding: 0.55rem 0.7rem 0.2rem;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.55rem 0.7rem 0;
   overflow: hidden;
 }
 
 .lobby-checkout-dog__image,
 .lobby-checkout-dog__fallback {
   display: block;
+  min-width: 0;
+  min-height: 0;
   width: auto;
   height: auto;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  object-position: center;
+  object-position: center bottom;
 }
 
 .lobby-checkout-dog__fallback {
   width: min(42%, 11rem);
+  height: auto;
+  max-height: 55%;
   opacity: 0.88;
 }
 
@@ -2276,11 +2284,19 @@ html.lobby-tv-display .lobby-has-checkout .social-moments-card {
 }
 
 .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__name {
-  font-size: clamp(2.1rem, 5.4vh, 4.4rem);
+  font-size: clamp(2.8rem, 7vh, 5.6rem);
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  line-height: 0.95;
 }
 
 .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__status {
-  font-size: clamp(0.78rem, 1.4vh, 1rem);
+  font-size: clamp(0.9rem, 1.7vh, 1.2rem);
+}
+
+.lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__detail {
+  font-size: clamp(0.95rem, 1.7vh, 1.35rem);
 }
 
 .lobby-checkout-showcase[data-count="3"] .lobby-checkout-dog__name,
@@ -2292,6 +2308,19 @@ html.lobby-tv-display .lobby-has-checkout .social-moments-card {
 
 html.lobby-tv-display .lobby-checkout-showcase {
   gap: 0.65rem;
+}
+
+html.lobby-tv-display .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__name {
+  font-size: 4.75rem;
+}
+
+html.lobby-tv-display .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__status {
+  font-size: 1.05rem;
+  letter-spacing: 0.18em;
+}
+
+html.lobby-tv-display .lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__detail {
+  font-size: 1.35rem;
 }
 
 html.lobby-tv-display .lobby-has-checkout .lobby-class-schedule--band {
