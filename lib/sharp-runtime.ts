@@ -2,8 +2,6 @@ import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-const require = createRequire(import.meta.url);
-
 const LIBVIPS_PACKAGES = [
   "@img/sharp-libvips-linux-x64",
   "@img/sharp-libvips-linuxmusl-x64"
@@ -13,17 +11,28 @@ function existingDir(dir: string) {
   return existsSync(dir) ? dir : null;
 }
 
+function resolveFromCwd() {
+  try {
+    return createRequire(join(process.cwd(), "package.json"));
+  } catch {
+    return null;
+  }
+}
+
 /** Put libvips next to sharp.node so Vercel/linux-x64 can dlopen it. */
 export function ensureSharpLibvipsPath() {
   const dirs: string[] = [];
+  const require = resolveFromCwd();
 
-  for (const name of LIBVIPS_PACKAGES) {
-    try {
-      const pkg = dirname(require.resolve(`${name}/package.json`));
-      const lib = join(pkg, "lib");
-      if (existsSync(lib)) dirs.push(lib);
-    } catch {
-      /* package not in this serverless bundle */
+  if (require) {
+    for (const name of LIBVIPS_PACKAGES) {
+      try {
+        const pkg = dirname(require.resolve(`${name}/package.json`));
+        const lib = join(pkg, "lib");
+        if (existsSync(lib)) dirs.push(lib);
+      } catch {
+        /* package not in this serverless bundle */
+      }
     }
   }
 
