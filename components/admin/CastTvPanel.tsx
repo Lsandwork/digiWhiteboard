@@ -2,7 +2,24 @@
 
 import { readResponseJson } from "@/lib/http/read-response-json";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowDown,
   ArrowUp,
@@ -10,6 +27,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  GripVertical,
   ImagePlus,
   Loader2,
   Monitor,
@@ -74,6 +92,11 @@ function isDuplicateUploadError(error: unknown) {
   return /already on CAST-TV|already exists in the CAST-TV/i.test(message);
 }
 
+function isInteractiveCastTvTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("input, button, select, textarea, a, label, [data-no-row-select]"));
+}
+
 function AdminThumb({ item }: { item: CastTvAdminListItem }) {
   const [src, setSrc] = useState(item.thumb_url || castTvFileThumbSrc(item));
   const [failed, setFailed] = useState(item.storage_missing === true);
@@ -122,6 +145,202 @@ function AdminThumb({ item }: { item: CastTvAdminListItem }) {
   );
 }
 
+type CastTvMediaRowProps = {
+  item: CastTvAdminListItem;
+  index: number;
+  listLength: number;
+  selected: boolean;
+  busy: boolean;
+  sortable?: boolean;
+  dragHandle?: ReactNode;
+  previewListeners?: Record<string, unknown>;
+  style?: CSSProperties;
+  className?: string;
+  setNodeRef?: (node: HTMLElement | null) => void;
+  onToggleSelect: (id: string, index: number, checked: boolean, shiftKey: boolean) => void;
+  onRowSelect: (id: string, index: number, shiftKey: boolean) => void;
+  onMove: (id: string, direction: "up" | "down") => void;
+  onPreview: (item: CastTvAdminListItem) => void;
+  onReplace: (id: string) => void;
+  onToggleEnabled: (item: CastTvAdminListItem) => void;
+  onDelete: (id: string) => void;
+  onRename: (id: string, value: string) => void;
+  onDuration: (id: string, seconds: CastTvImageDuration) => void;
+};
+
+function CastTvMediaRow({
+  item,
+  index,
+  listLength,
+  selected,
+  busy,
+  sortable = false,
+  dragHandle,
+  previewListeners,
+  style,
+  className = "",
+  setNodeRef,
+  onToggleSelect,
+  onRowSelect,
+  onMove,
+  onPreview,
+  onReplace,
+  onToggleEnabled,
+  onDelete,
+  onRename,
+  onDuration
+}: CastTvMediaRowProps) {
+  function stopRowSelect(event: MouseEvent) {
+    event.stopPropagation();
+  }
+
+  return (
+    <article
+      ref={setNodeRef}
+      style={style}
+      className={`cast-tv-admin-card ${selected ? "is-selected" : ""} ${sortable ? "is-sortable" : ""} ${className}`.trim()}
+      onClick={(event) => {
+        if (isInteractiveCastTvTarget(event.target)) return;
+        onRowSelect(item.id, index, event.shiftKey);
+      }}
+    >
+      {dragHandle ?? <span className="cast-tv-admin-card__drag is-spacer" aria-hidden />}
+      <label className="cast-tv-admin-card__select" onClick={stopRowSelect}>
+        <input
+          type="checkbox"
+          checked={selected}
+          disabled={busy}
+          onChange={(event) =>
+            onToggleSelect(item.id, index, event.target.checked, Boolean((event.nativeEvent as { shiftKey?: boolean }).shiftKey))
+          }
+          onClick={(event) => {
+            if (event.shiftKey) event.preventDefault();
+          }}
+          aria-label={`Select ${item.display_name ?? item.file_name}`}
+        />
+      </label>
+      <div
+        className="cast-tv-admin-card__preview"
+        data-no-row-select=""
+        title={sortable ? "Drag to reorder" : undefined}
+        {...(previewListeners ?? {})}
+      >
+        <AdminThumb item={item} />
+      </div>
+      <div className="cast-tv-admin-card__body">
+        <div className="cast-tv-admin-card__title-row">
+          <input
+            className="cast-tv-admin-card__name-input"
+            defaultValue={item.display_name ?? item.file_name}
+            onClick={stopRowSelect}
+            onBlur={(event) => {
+              const value = event.target.value.trim();
+              if (value && value !== (item.display_name ?? item.file_name)) {
+                onRename(item.id, value);
+              }
+            }}
+          />
+          <span className={`cast-tv-admin-card__status ${item.is_enabled ? "is-enabled" : "is-disabled"}`}>
+            {item.storage_missing ? "Missing" : item.is_enabled ? "Enabled" : "Disabled"}
+          </span>
+        </div>
+        <p className="cast-tv-admin-card__meta">
+          {item.media_type.toUpperCase()} · {formatFileSize(item.file_size_bytes)} · Uploaded {formatDateTime(item.created_at)}
+          {item.uploaded_by_name ? ` · ${item.uploaded_by_name}` : ""}
+        </p>
+        <div className="cast-tv-admin-card__controls" onClick={stopRowSelect}>
+          {item.media_type === "image" ? (
+            <label className="cast-tv-admin-card__duration">
+              Duration
+              <select
+                value={item.image_display_seconds}
+                disabled={busy}
+                onChange={(event) => onDuration(item.id, Number(event.target.value) as CastTvImageDuration)}
+              >
+                {CAST_TV_IMAGE_DURATION_OPTIONS.map((seconds) => (
+                  <option key={seconds} value={seconds}>
+                    {seconds}s
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span className="cast-tv-admin-card__duration">Full video length</span>
+          )}
+          <div className="cast-tv-admin-card__actions">
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy || index === 0} onClick={() => onMove(item.id, "up")}>
+              <ArrowUp className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--ghost"
+              disabled={busy || index === listLength - 1}
+              onClick={() => onMove(item.id, "down")}
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => onPreview(item)}>
+              <Eye className="h-4 w-4" />
+            </button>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => onReplace(item.id)}>
+              <ImagePlus className="h-4 w-4" />
+            </button>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => onToggleEnabled(item)}>
+              {item.is_enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+            <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => onDelete(item.id)}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CastTvSortableMediaRow(
+  props: Omit<CastTvMediaRowProps, "sortable" | "dragHandle" | "previewListeners" | "style" | "className" | "setNodeRef">
+) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.item.id,
+    disabled: props.busy
+  });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.72 : undefined,
+    zIndex: isDragging ? 2 : undefined
+  };
+
+  return (
+    <CastTvMediaRow
+      {...props}
+      sortable
+      setNodeRef={setNodeRef}
+      style={style}
+      className={isDragging ? "is-dragging" : ""}
+      previewListeners={listeners as Record<string, unknown>}
+      dragHandle={
+        <button
+          type="button"
+          className="cast-tv-admin-card__drag"
+          ref={setActivatorNodeRef}
+          {...listeners}
+          {...attributes}
+          data-no-row-select=""
+          disabled={props.busy}
+          aria-label={`Drag to reorder ${props.item.display_name ?? props.item.file_name}`}
+          title="Drag to reorder"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      }
+    />
+  );
+}
+
 export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
@@ -152,11 +371,20 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const [savingSettings, setSavingSettings] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  const lastActiveSelectIndexRef = useRef<number | null>(null);
+  const lastDisabledSelectIndexRef = useRef<number | null>(null);
 
   const selectedCount = selectedIds.size;
   const allActiveSelected = Boolean(activeMedia.length) && activeMedia.every((item) => selectedIds.has(item.id));
   const allDisabledSelected =
     Boolean(disabledMedia.length) && disabledMedia.every((item) => selectedIds.has(item.id));
+  const activeIds = useMemo(() => activeMedia.map((item) => item.id), [activeMedia]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const knownIds = useMemo(
     () => new Set([...activeMedia, ...disabledMedia].map((item) => item.id)),
@@ -433,8 +661,43 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     }
   }
 
-  function toggleSelected(id: string) {
+  function toggleSelected(list: "active" | "disabled", id: string, index: number, checked: boolean, shiftKey: boolean) {
+    const items = list === "active" ? activeMedia : disabledMedia;
+    const anchorRef = list === "active" ? lastActiveSelectIndexRef : lastDisabledSelectIndexRef;
     setSelectedIds((current) => {
+      if (shiftKey && anchorRef.current !== null) {
+        const start = Math.min(anchorRef.current, index);
+        const end = Math.max(anchorRef.current, index);
+        const next = new Set(current);
+        for (let i = start; i <= end; i += 1) {
+          const row = items[i];
+          if (row) next.add(row.id);
+        }
+        return next;
+      }
+      anchorRef.current = index;
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleRowSelected(list: "active" | "disabled", id: string, index: number, shiftKey: boolean) {
+    const items = list === "active" ? activeMedia : disabledMedia;
+    const anchorRef = list === "active" ? lastActiveSelectIndexRef : lastDisabledSelectIndexRef;
+    setSelectedIds((current) => {
+      if (shiftKey && anchorRef.current !== null) {
+        const start = Math.min(anchorRef.current, index);
+        const end = Math.max(anchorRef.current, index);
+        const next = new Set(current);
+        for (let i = start; i <= end; i += 1) {
+          const row = items[i];
+          if (row) next.add(row.id);
+        }
+        return next;
+      }
+      anchorRef.current = index;
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -482,6 +745,8 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
       setActiveMedia((current) => current.filter((item) => !removed.has(item.id)));
       setDisabledMedia((current) => current.filter((item) => !removed.has(item.id)));
       setSelectedIds(new Set());
+      lastActiveSelectIndexRef.current = null;
+      lastDisabledSelectIndexRef.current = null;
       onToast(ids.length === 1 ? "Media deleted." : `Deleted ${ids.length} items from CAST-TV.`, "success");
       await reloadVisible();
     } catch (error) {
@@ -491,23 +756,65 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     }
   }
 
-  async function moveMedia(id: string, direction: "up" | "down") {
-    setBusyId(id);
+  async function persistActiveOrder(next: CastTvAdminListItem[], previous: CastTvAdminListItem[]) {
+    setReordering(true);
+    setActiveMedia(next);
     try {
       const response = await fetch("/api/cast-tv/reorder", {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ id, direction })
+        body: JSON.stringify({ orderedIds: next.map((item) => item.id) })
       });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Reorder failed.");
-      await fetchMediaPage({ status: "active", offset: 0 });
     } catch (error) {
+      setActiveMedia(previous);
       onToast(error instanceof Error ? error.message : "Reorder failed.", "error");
     } finally {
-      setBusyId(null);
+      setReordering(false);
     }
+  }
+
+  async function moveMedia(id: string, direction: "up" | "down", list: "active" | "disabled") {
+    if (list === "disabled") {
+      setBusyId(id);
+      try {
+        const response = await fetch("/api/cast-tv/reorder", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ id, direction })
+        });
+        const body = await readResponseJson(response);
+        if (!response.ok) throw new Error(body.error ?? "Reorder failed.");
+        if (disabledOpen) await fetchMediaPage({ status: "disabled", offset: 0 });
+      } catch (error) {
+        onToast(error instanceof Error ? error.message : "Reorder failed.", "error");
+      } finally {
+        setBusyId(null);
+      }
+      return;
+    }
+
+    const index = activeMedia.findIndex((item) => item.id === id);
+    if (index < 0) return;
+    const swapIndex = direction === "up" ? index - 1 : index + 1;
+    if (swapIndex < 0 || swapIndex >= activeMedia.length) return;
+    const previous = activeMedia;
+    const next = arrayMove(activeMedia, index, swapIndex);
+    await persistActiveOrder(next, previous);
+  }
+
+  function handleActiveDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id || reordering || bulkDeleting) return;
+    const oldIndex = activeMedia.findIndex((item) => item.id === active.id);
+    const newIndex = activeMedia.findIndex((item) => item.id === over.id);
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return;
+    const previous = activeMedia;
+    const next = arrayMove(activeMedia, oldIndex, newIndex);
+    void persistActiveOrder(next, previous);
   }
 
   async function saveSettings(patch: Partial<CastTvSettings>) {
@@ -599,108 +906,33 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     }
   }
 
-  function renderMediaRow(item: CastTvAdminListItem, index: number, list: CastTvAdminListItem[]) {
-    const busy = busyId === item.id || bulkDeleting;
-    const selected = selectedIds.has(item.id);
-    return (
-      <article key={item.id} className={`cast-tv-admin-card ${selected ? "is-selected" : ""}`}>
-        <label className="cast-tv-admin-card__select">
-          <input
-            type="checkbox"
-            checked={selected}
-            disabled={busy}
-            onChange={() => toggleSelected(item.id)}
-            aria-label={`Select ${item.display_name ?? item.file_name}`}
-          />
-        </label>
-        <div className="cast-tv-admin-card__preview">
-          <AdminThumb item={item} />
-        </div>
-        <div className="cast-tv-admin-card__body">
-          <div className="cast-tv-admin-card__title-row">
-            <input
-              className="cast-tv-admin-card__name-input"
-              defaultValue={item.display_name ?? item.file_name}
-              onBlur={(event) => {
-                const value = event.target.value.trim();
-                if (value && value !== (item.display_name ?? item.file_name)) {
-                  void patchMedia(item.id, { display_name: value });
-                }
-              }}
-            />
-            <span className={`cast-tv-admin-card__status ${item.is_enabled ? "is-enabled" : "is-disabled"}`}>
-              {item.storage_missing ? "Missing" : item.is_enabled ? "Enabled" : "Disabled"}
-            </span>
-          </div>
-          <p className="cast-tv-admin-card__meta">
-            {item.media_type.toUpperCase()} · {formatFileSize(item.file_size_bytes)} · Uploaded {formatDateTime(item.created_at)}
-            {item.uploaded_by_name ? ` · ${item.uploaded_by_name}` : ""}
-          </p>
-          <div className="cast-tv-admin-card__controls">
-            {item.media_type === "image" ? (
-              <label className="cast-tv-admin-card__duration">
-                Duration
-                <select
-                  value={item.image_display_seconds}
-                  disabled={busy}
-                  onChange={(event) =>
-                    void patchMedia(item.id, {
-                      image_display_seconds: Number(event.target.value) as CastTvImageDuration
-                    })
-                  }
-                >
-                  {CAST_TV_IMAGE_DURATION_OPTIONS.map((seconds) => (
-                    <option key={seconds} value={seconds}>
-                      {seconds}s
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <span className="cast-tv-admin-card__duration">Full video length</span>
-            )}
-            <div className="cast-tv-admin-card__actions">
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy || index === 0} onClick={() => void moveMedia(item.id, "up")}>
-                <ArrowUp className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="crossover-btn crossover-btn--ghost"
-                disabled={busy || index === list.length - 1}
-                onClick={() => void moveMedia(item.id, "down")}
-              >
-                <ArrowDown className="h-4 w-4" />
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => setPreviewItem(item)}>
-                <Eye className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="crossover-btn crossover-btn--ghost"
-                disabled={busy}
-                onClick={() => {
-                  setReplaceTargetId(item.id);
-                  replaceInputRef.current?.click();
-                }}
-              >
-                <ImagePlus className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                className="crossover-btn crossover-btn--ghost"
-                disabled={busy}
-                onClick={() => void patchMedia(item.id, { is_enabled: !item.is_enabled })}
-              >
-                {item.is_enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-              <button type="button" className="crossover-btn crossover-btn--ghost" disabled={busy} onClick={() => void deleteMedia(item.id)}>
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      </article>
-    );
+  function renderMediaRow(item: CastTvAdminListItem, index: number, list: "active" | "disabled") {
+    const items = list === "active" ? activeMedia : disabledMedia;
+    const busy = busyId === item.id || bulkDeleting || (list === "active" && reordering);
+    const shared = {
+      item,
+      index,
+      listLength: items.length,
+      selected: selectedIds.has(item.id),
+      busy,
+      onToggleSelect: (id: string, rowIndex: number, checked: boolean, shiftKey: boolean) =>
+        toggleSelected(list, id, rowIndex, checked, shiftKey),
+      onRowSelect: (id: string, rowIndex: number, shiftKey: boolean) => toggleRowSelected(list, id, rowIndex, shiftKey),
+      onMove: (id: string, direction: "up" | "down") => void moveMedia(id, direction, list),
+      onPreview: setPreviewItem,
+      onReplace: (id: string) => {
+        setReplaceTargetId(id);
+        replaceInputRef.current?.click();
+      },
+      onToggleEnabled: (row: CastTvAdminListItem) => void patchMedia(row.id, { is_enabled: !row.is_enabled }),
+      onDelete: (id: string) => void deleteMedia(id),
+      onRename: (id: string, value: string) => void patchMedia(id, { display_name: value }),
+      onDuration: (id: string, seconds: CastTvImageDuration) => void patchMedia(id, { image_display_seconds: seconds })
+    };
+    if (list === "active") {
+      return <CastTvSortableMediaRow key={item.id} {...shared} />;
+    }
+    return <CastTvMediaRow key={item.id} {...shared} />;
   }
 
   return (
@@ -822,9 +1054,16 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
             </button>
           </div>
         </div>
+        <p className="cast-tv-admin__hint">
+          Drag photos or videos to change play order. Click a row, then Shift-click another to select the range.
+        </p>
         {loading ? <p className="cast-tv-admin__empty">Loading media…</p> : null}
         {!loading && !activeMedia.length ? <p className="cast-tv-admin__empty">No enabled media yet.</p> : null}
-        <div className="cast-tv-admin__grid">{activeMedia.map((item, index) => renderMediaRow(item, index, activeMedia))}</div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleActiveDragEnd}>
+          <SortableContext items={activeIds} strategy={verticalListSortingStrategy}>
+            <div className="cast-tv-admin__grid">{activeMedia.map((item, index) => renderMediaRow(item, index, "active"))}</div>
+          </SortableContext>
+        </DndContext>
         {activeHasMore ? (
           <button type="button" className="crossover-btn crossover-btn--ghost mt-4" disabled={loadingMore} onClick={() => void loadMoreActive()}>
             {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -868,7 +1107,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           {disabledOpen ? (
             <>
               {loadingDisabled ? <p className="cast-tv-admin__empty">Loading disabled media…</p> : null}
-              <div className="cast-tv-admin__grid">{disabledMedia.map((item, index) => renderMediaRow(item, index, disabledMedia))}</div>
+              <div className="cast-tv-admin__grid">{disabledMedia.map((item, index) => renderMediaRow(item, index, "disabled"))}</div>
               {disabledHasMore ? (
                 <button type="button" className="crossover-btn crossover-btn--ghost mt-4" disabled={loadingMore} onClick={() => void loadMoreDisabled()}>
                   {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
