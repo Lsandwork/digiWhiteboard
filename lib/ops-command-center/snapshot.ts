@@ -19,6 +19,7 @@ import { listRecentOpsEvents } from "@/lib/ops-command-center/events";
 import { countDogsByStatus } from "@/lib/ops-command-center/status";
 import type { OpsEvent, OpsNotification, OpsTask } from "@/lib/ops-command-center/types";
 import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
+import { loadLatestGingrWebhookEvent } from "@/lib/gingr-webhook-latest";
 import {
   loadBoardLaneSamples,
   loadStaffOpsFeed,
@@ -469,9 +470,11 @@ export async function buildOpsCommandCenterSnapshot(input: {
       : Promise.resolve([] as OpsNotification[]),
     withTimeoutFallback(listRecentOpsEvents(25), OPS_SNAPSHOT_TIMEOUT_MS, [] as OpsEvent[]),
     withTimeoutFallback(countDogsByStatus(), OPS_SNAPSHOT_TIMEOUT_MS, {} as Record<string, number>),
-    timedMaybe<{ created_at?: string }>(HUNG_TABLES.gingrWebhookEvents, () =>
-      hungSupabase.from("gingr_webhook_events").select("created_at").order("created_at", { ascending: false }).limit(1).maybeSingle()
-    ),
+    timedMaybe<{ created_at?: string }>(HUNG_TABLES.gingrWebhookEvents, async () => {
+      const { row, timedOut } = await loadLatestGingrWebhookEvent({ columns: "created_at" });
+      if (timedOut) return { data: null, error: { message: "Database probe timed out" } };
+      return { data: row ? { created_at: row.created_at ?? undefined } : null, error: null };
+    }),
     timedMaybe<{ last_seen_from_gingr_at?: string }>(HUNG_TABLES.liveTransitionDogs, () =>
       hungSupabase
         .from("live_transition_dogs")

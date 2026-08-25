@@ -6,7 +6,7 @@ import { accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getUserAccess, migrateLegacyUserAccess } from "@/lib/admin/user-access";
 import { getAdminUserById } from "@/lib/admin/users";
 import { loadFastPromptedCheckouts } from "@/lib/board-fast-checkout";
-import { cachedLoadSettingsBundle, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import { cachedLoadSettingsBundle, getOrLoadPromptedCheckoutCache } from "@/lib/board-settings-cache";
 import { getBoardEnvCheck } from "@/lib/env";
 import { publicOrigin } from "@/lib/gingr";
 import { skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
@@ -101,9 +101,7 @@ export async function GET(request: Request) {
             timed(
               "fast checkouts",
               null,
-              getOrLoadTtlCache(`board-checkouts:admin`, FAST_CHECKOUT_CACHE_TTL_MS, () =>
-                loadFastPromptedCheckouts(supabase)
-              )
+              getOrLoadPromptedCheckoutCache(`board-checkouts:admin`, () => loadFastPromptedCheckouts(supabase))
             ),
             skipHungSnapshots
               ? Promise.resolve([])

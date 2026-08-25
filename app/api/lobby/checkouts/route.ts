@@ -6,7 +6,12 @@ import {
   sweepExpiredTransitionRows
 } from "@/lib/board-fast-checkout";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
-import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
+import {
+  cachedLoadLobbySettings,
+  getOrLoadLobbyCheckoutCache,
+  invalidateBoardTransitionCaches,
+  lobbyCheckoutCacheTtlMs
+} from "@/lib/board-settings-cache";
 import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { canReadLobbyBoard, unauthorizedLobbyResponse } from "@/lib/lobby/auth";
 import {
@@ -16,7 +21,7 @@ import {
 } from "@/lib/lobby/checkout";
 import { FAST_CHECKOUT_QUERY_TIMEOUT_MS } from "@/lib/board-fast-checkout";
 import { sanitizeLobbyCheckouts } from "@/lib/lobby/validate";
-import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
+import { debugBoardLog, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +57,7 @@ export async function GET(request: Request) {
     };
     const checkout = fresh
       ? await loadCheckouts()
-      : await getOrLoadTtlCache(cacheKey, FAST_CHECKOUT_CACHE_TTL_MS, loadCheckouts);
+      : await getOrLoadLobbyCheckoutCache(cacheKey, loadCheckouts);
 
     const payload = sanitizeLobbyCheckouts({
       featured: checkout.featured,
@@ -80,7 +85,9 @@ export async function GET(request: Request) {
         : {})
     });
 
-    if (fresh) setTtlCache(cacheKey, checkout, FAST_CHECKOUT_CACHE_TTL_MS);
+    if (fresh) {
+      setTtlCache(cacheKey, checkout, lobbyCheckoutCacheTtlMs(checkout.activeCount, checkout.queue.length));
+    }
     const hasDogs = payload.counts.active > 0;
     // Never replace last-good dogs with an empty timeout payload. Idle empty is
     // stored only when Gingr confirmed the basket is clear.

@@ -21,7 +21,7 @@ import {
 } from "@/lib/gingr-board-sync";
 import { canCallGingrEndpoint, getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
-import { LIVE_BOARD_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import { LIVE_BOARD_CACHE_TTL_MS, liveBoardCacheTtlMs } from "@/lib/board-settings-cache";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -440,7 +440,14 @@ export async function GET(request: Request) {
 
     const response = debugBoard
       ? await loadLiveBoard()
-      : await getOrLoadTtlCache("live-board:response", LIVE_BOARD_CACHE_TTL_MS, loadLiveBoard);
+      : await getOrLoadTtlCache("live-board:response", LIVE_BOARD_CACHE_TTL_MS, loadLiveBoard).then((loaded) => {
+          setTtlCache(
+            "live-board:response",
+            loaded,
+            liveBoardCacheTtlMs(loaded.checking_in.length + loaded.checking_out.length)
+          );
+          return loaded;
+        });
 
     debugBoardLog(debugBoard, "live-board ok", {
       durationMs: Date.now() - requestStartedAt,

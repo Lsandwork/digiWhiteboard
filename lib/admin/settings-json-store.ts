@@ -1,10 +1,12 @@
 import { invalidateTtlCache } from "@/lib/server-ttl-cache";
+import { ADMIN_SETTINGS_KEY_CACHE_TTL_MS } from "@/lib/board-settings-cache";
 import {
   HUNG_TABLES,
   isHungQueryError,
   isHungTableInCooldown,
   markHungTableTimeout
 } from "@/lib/hung-table-guard";
+import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -39,6 +41,18 @@ export async function loadAdminSettingsJsonKey<T>(
   fallback: T
 ): Promise<T | null> {
   if (isHungTableInCooldown(HUNG_TABLES.adminSettings)) return fallback;
+  const cacheKey = `admin-settings:key:${key}`;
+  return getOrLoadTtlCache(cacheKey, ADMIN_SETTINGS_KEY_CACHE_TTL_MS, () =>
+    queryAdminSettingsJsonKey(supabase, key, parse, fallback)
+  );
+}
+
+async function queryAdminSettingsJsonKey<T>(
+  supabase: SupabaseClient,
+  key: string,
+  parse: (value: unknown) => T,
+  fallback: T
+): Promise<T | null> {
   try {
     const { data, error } = await supabase
       .from("admin_settings")
@@ -130,10 +144,7 @@ export async function loadAdminSettingsJsonPointers(
   }
 }
 
-/**
- * Patch one JSON key via Postgres jsonb_set — no read/modify/write of the full blob.
- * Falls back to read-merge-write when the RPC is not deployed yet.
- */
+/** Patch one JSON key via Postgres jsonb_set — no read/modify/write of the full blob. */
 export async function saveAdminSettingsJsonKey(
   supabase: SupabaseClient,
   key: string,
@@ -146,6 +157,7 @@ export async function saveAdminSettingsJsonKey(
 
   if (!rpcError) {
     invalidateTtlCache("settings:");
+    invalidateTtlCache("admin-settings:key:");
     invalidateTtlCache("staff-ops:");
     return true;
   }
@@ -155,25 +167,7 @@ export async function saveAdminSettingsJsonKey(
     throw rpcError;
   }
 
-  const current = await loadAdminSettingsJsonKey(supabase, key, (raw) => raw, null);
-  void current;
-  const { data, error } = await supabase.from("admin_settings").select("settings").eq("id", "default").maybeSingle();
-  if (error) {
-    if (isMissingAdminSettingsRelation(error)) return false;
-    throw error;
-  }
-  const settings = {
-    ...((data?.settings ?? {}) as Record<string, unknown>),
-    [key]: value
-  };
-  const { error: saveError } = await supabase
-    .from("admin_settings")
-    .upsert({ id: "default", settings, updated_at: new Date().toISOString() });
-  if (saveError) {
-    if (isMissingAdminSettingsRelation(saveError)) return false;
-    throw saveError;
-  }
-  invalidateTtlCache("settings:");
-  invalidateTtlCache("staff-ops:");
-  return true;
+  // Avoid transferring the 4+ MiB settings blob when patch_admin_settings_json is missing.
+  console.warn("[admin_settings] patch_admin_settings_json unavailable; save skipped for key:", key);
+  return false;
 }
