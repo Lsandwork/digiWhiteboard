@@ -860,7 +860,8 @@ html.lobby-tv-display .lobby-header .text-4xl {
   font-size: 1.2rem;
 }
 
-html.lobby-tv-display .lobby-header-tagline--idle .lobby-header-tagline__text {
+html.lobby-tv-display .lobby-header-tagline--idle .lobby-header-tagline__text,
+.lobby-tv-mode .lobby-header-tagline--idle .lobby-header-tagline__text {
   font-size: 0.92rem;
   letter-spacing: 0.16em;
 }
@@ -964,8 +965,8 @@ html.lobby-tv-display .lobby-idle-state .lobby-idle-checkout-slot {
 
 html.lobby-tv-display .lobby-class-schedule--band {
   flex: 0 0 auto;
-  margin-top: 0.4rem;
-  padding: 0.32rem 0.7rem 0.35rem;
+  margin-top: 0.28rem;
+  padding: 0.22rem 0.55rem 0.22rem;
   max-height: none;
   overflow: visible;
 }
@@ -990,7 +991,7 @@ html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__heading
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__heading h3 {
-  font-size: 0.98rem;
+  font-size: 0.78rem;
   letter-spacing: 0.16em;
   line-height: 1.12;
 }
@@ -1000,7 +1001,7 @@ html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule-grid {
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.35rem 0.95rem;
+  gap: 0.2rem 0.7rem;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__footer {
@@ -1008,17 +1009,18 @@ html.lobby-tv-display .lobby-class-schedule--band .lobby-class-schedule__footer 
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-schedule-day__label {
-  font-size: 0.74rem;
-  padding: 0.28rem 0.45rem;
-  margin-bottom: 0.32rem;
+  font-size: 0.62rem;
+  padding: 0.16rem 0.35rem;
+  margin-bottom: 0.18rem;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-schedule-day__list {
-  gap: 0.22rem;
+  gap: 0.1rem;
 }
 
 html.lobby-tv-display .lobby-class-schedule--band .lobby-schedule-day__list li {
-  font-size: 0.8rem;
+  font-size: 0.64rem;
+  line-height: 1.15;
 }
 
 html.lobby-tv-display .lobby-idle-state .social-moments-card {
@@ -1068,7 +1070,8 @@ html.lobby-tv-display .lobby-header__status {
   background: rgba(255, 255, 255, 0.78);
 }
 
-html.lobby-tv-display .lobby-header__wordmark {
+html.lobby-tv-display .lobby-header__wordmark,
+.lobby-tv-mode .lobby-header__wordmark {
   height: 1.85rem;
   max-width: 9.5rem;
 }
@@ -2103,14 +2106,49 @@ html.cast-keeper-paused .cast-video {
   gap: 0.25rem;
 }
 
-html.lobby-tv-display .lobby-has-checkout .lobby-main-grid {
+.lobby-has-checkout .lobby-main-grid {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
 }
 
-html.lobby-tv-display .lobby-has-checkout .social-moments-card,
-.lobby-has-checkout .social-moments-card {
+html.lobby-tv-display .lobby-has-checkout .lobby-main-grid,
+.lobby-tv-mode.lobby-has-checkout .lobby-main-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.lobby-has-checkout .social-moments-card,
+html.lobby-tv-display .lobby-has-checkout .social-moments-card {
   display: none;
+}
+
+.lobby-has-checkout .lobby-header-subtitle,
+.lobby-has-checkout .lobby-checkout-sync-btn,
+.lobby-tv-mode .lobby-header-subtitle,
+.lobby-tv-mode .lobby-checkout-sync-btn,
+.lobby-tv-mode .lobby-status-clock__date,
+.lobby-tv-mode .lobby-header-tagline__line {
+  display: none;
+}
+
+.lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__photo {
+  flex: 1 1 auto;
+  padding: 0.85rem 0.5rem 0.85rem 1rem;
+}
+
+.lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__meta {
+  flex: 0 0 min(28vw, 22rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  text-align: left;
+  padding: 1.25rem 1.6rem 1.4rem 0.4rem;
 }
 
 .lobby-checkout-showcase {
@@ -13894,14 +13932,9 @@ html.lobby-tv-display .lobby-header__title {
   font-size: clamp(1.05rem, 1.7vw, 1.45rem);
 }
 
-html.lobby-tv-display .lobby-header__motion {
-  gap: 0.1rem;
-  margin-left: 0.3rem;
-}
-
-html.lobby-tv-display .lobby-header__motion span {
-  width: 0.55rem;
-  height: 0.12rem;
+html.lobby-tv-display .lobby-header__motion,
+.lobby-tv-mode .lobby-header__motion {
+  display: none;
 }
 
 html.lobby-tv-display .lobby-main-grid {

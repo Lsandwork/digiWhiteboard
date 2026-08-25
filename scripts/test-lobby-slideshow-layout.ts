@@ -80,7 +80,8 @@ const board = source("components/lobby/LobbyCheckoutBoard.tsx");
 assert.doesNotMatch(board, /LobbyValuesFooter/);
 assert.doesNotMatch(board, /Safe, Loving Environment/);
 assert.match(board, /LobbyClassSchedule band/);
-assert.match(board, /LobbyCheckoutShowcase/);
+assert.match(board, /useLayoutEffect/);
+assert.match(css, /\.lobby-has-checkout \.lobby-main-grid/);
 assert.doesNotMatch(board, /LobbyFeaturedCard/);
 assert.doesNotMatch(board, /LobbyQueueList/);
 assert.ok(
