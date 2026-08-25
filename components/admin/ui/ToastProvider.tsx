@@ -23,7 +23,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback((message: string, type: ToastType = "success") => {
     const id = `${Date.now()}-${Math.random()}`;
-    const safeMessage = humanizeUnknownError(message, LIVE_DATA_UNAVAILABLE_MESSAGE);
+    const raw = String(message || "").trim() || "Something went wrong.";
+    // Only rewrite short technical exceptions. Product copy such as import
+    // results must not become "This page is taking too long to load."
+    const looksTechnical =
+      raw.length < 80 &&
+      (/^(AbortError|TimeoutError|The operation was aborted)/i.test(raw) ||
+        /failed to fetch|networkerror/i.test(raw));
+    const safeMessage = looksTechnical
+      ? humanizeUnknownError(raw, LIVE_DATA_UNAVAILABLE_MESSAGE)
+      : raw;
     setToasts((current) => [...current, { id, message: safeMessage, type }]);
   }, []);
 

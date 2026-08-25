@@ -128,4 +128,15 @@ assert.equal(legacy[0]?.dog_name, "Buddy");
 assert.equal(legacy[0]?.trainer_user_id, "t-other");
 assert.equal(legacy[0]?.sale_category, "package");
 
+const importsSrc = readFileSync(resolve(__dirname, "../lib/staff/commission-ledger/imports.ts"), "utf8");
+assert.match(importsSrc, /\.in\("sale_date"/);
+assert.match(importsSrc, /insertCommissionRecordsForImport/);
+assert.match(importsSrc, /COMMISSIONS_IMPORT_SLOW_MESSAGE/);
+assert.doesNotMatch(importsSrc, /findExistingSameDayDuplicate/);
+assert.doesNotMatch(importsSrc, /allow_duplicate: false/);
+
+const recordsSrc = readFileSync(resolve(__dirname, "../lib/staff/commission-ledger/records.ts"), "utf8");
+assert.match(recordsSrc, /COMMISSION_IMPORT_INSERT_CHUNK = 25/);
+assert.match(recordsSrc, /insertCommissionRecordsForImport/);
+
 console.log("package-commission-invoice-csv: all tests passed");

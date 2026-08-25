@@ -2,6 +2,10 @@
 
 import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
+import {
+  COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS,
+  COMMISSIONS_IMPORT_SLOW_MESSAGE
+} from "@/lib/staff/commission-ledger/import-timeouts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -266,7 +270,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     setParams({ sortBy: column, sortDir: nextDir, page: "1" });
   }
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { quiet?: boolean }) => {
     setLoading(true);
     setLoadError(null);
     try {
@@ -395,7 +399,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     } catch (error) {
       const message = humanizeUnknownError(error, "Unable to load commissions.");
       setLoadError(message);
-      showToast(message, "error");
+      if (!options?.quiet) showToast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -411,7 +415,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
     lastSelectedRowIndexRef.current = null;
   }, [page, tab]);
 
-  async function postAction(payload: Record<string, unknown>) {
+  async function postAction(
+    payload: Record<string, unknown>,
+    options?: { timeoutMs?: number; timeoutMessage?: string }
+  ) {
     const { ok, body } = await fetchAdminJson<{
       error?: string;
       csv?: string;
@@ -422,12 +429,15 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
       failed?: number;
       duplicates?: number;
       skippedDuplicates?: number;
+      timedOut?: boolean;
     }>("/api/admin/package-commissions", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      timeoutMs: options?.timeoutMs,
+      timeoutMessage: options?.timeoutMessage
     });
-    if (!ok) throw new Error(body.error ?? "Request failed.");
+    if (!ok && !body.timedOut) throw new Error(body.error ?? "Request failed.");
     return body;
   }
 
@@ -1357,7 +1367,13 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
             onClick={async () => {
               setBusy(true);
               try {
-                const body = await postAction({ action: "import_csv", csv: csvText, filename: csvFileName ?? "paste.csv" });
+                const body = await postAction(
+                  { action: "import_csv", csv: csvText, filename: csvFileName ?? "paste.csv" },
+                  {
+                    timeoutMs: COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS,
+                    timeoutMessage: COMMISSIONS_IMPORT_SLOW_MESSAGE
+                  }
+                );
                 const imported = Number(body.imported ?? body.created ?? 0);
                 const failed = Number(body.failed ?? 0);
                 const duplicates = Number(body.duplicates ?? body.skippedDuplicates ?? 0);
@@ -1368,10 +1384,15 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                 const parts = [`Imported ${imported} row(s)`];
                 if (duplicates) parts.push(`${duplicates} duplicate(s) skipped`);
                 if (failed) parts.push(`${failed} failed`);
-                showToast(parts.join("; ") + ".", failed ? "info" : duplicates ? "info" : "success");
-                if (imported > 0) await load();
+                if (body.timedOut) parts.push("stopped early — retry remaining rows");
+                showToast(
+                  parts.join("; ") + ".",
+                  body.timedOut || failed ? "info" : duplicates ? "info" : "success"
+                );
+                await load({ quiet: true });
               } catch (error) {
                 showToast(error instanceof Error ? error.message : "Import failed.", "error");
+                await load({ quiet: true });
               } finally {
                 setBusy(false);
               }

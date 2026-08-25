@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { SERVICE_SUPABASE_CRON_TIMEOUT_MS, SERVICE_SUPABASE_TIMEOUT_MS } from "../lib/supabase/server";
 import { readResponseJson } from "../lib/http/read-response-json";
-import { LIVE_DATA_UNAVAILABLE_MESSAGE } from "../lib/safe-url";
+import { LIVE_DATA_UNAVAILABLE_MESSAGE, LIVE_DATA_SLOW_MESSAGE, isTimeoutLikeError, humanizeUnknownError } from "../lib/safe-url";
+import {
+  COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS,
+  COMMISSIONS_MUTATION_TIMEOUT_MS
+} from "../lib/staff/commission-ledger/import-timeouts";
 import { skipDashboardBackgroundHydrate, skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
 import { OVERVIEW_QUERY_TIMEOUT_MS, OVERVIEW_SETTINGS_POINTERS, emptyOverviewPayload } from "../lib/admin/overview";
 import { capStaffOpsListPayload, STAFF_OPS_LIST_MESSAGE_LIMIT } from "../lib/staff/admin-ops";
@@ -58,6 +62,14 @@ assert.equal(
 assert.equal(SERVICE_SUPABASE_TIMEOUT_MS, 8_000);
 assert.equal(SERVICE_SUPABASE_CRON_TIMEOUT_MS, 20_000);
 assert.ok(SERVICE_SUPABASE_CRON_TIMEOUT_MS > SERVICE_SUPABASE_TIMEOUT_MS);
+assert.equal(COMMISSIONS_MUTATION_TIMEOUT_MS, 25_000);
+assert.equal(COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS, 28_000);
+assert.ok(COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS > COMMISSIONS_MUTATION_TIMEOUT_MS);
+assert.equal(isTimeoutLikeError({ name: "AbortError", message: "The operation was aborted." }), true);
+assert.equal(
+  humanizeUnknownError(new Error("The operation was aborted."), "fallback"),
+  LIVE_DATA_SLOW_MESSAGE
+);
 
 const server = readFileSync("lib/supabase/server.ts", "utf8");
 assert.match(server, /SERVICE_SUPABASE_TIMEOUT_MS/);
@@ -75,6 +87,9 @@ assert.doesNotMatch(records, /count: "exact"/);
 const commissionsRoute = readFileSync("app/api/admin/package-commissions/route.ts", "utf8");
 assert.match(commissionsRoute, /accessFromLegacyRole/);
 assert.match(commissionsRoute, /COMMISSIONS_QUERY_TIMEOUT_MS = 5_000/);
+assert.match(commissionsRoute, /COMMISSIONS_MUTATION_TIMEOUT_MS/);
+assert.match(commissionsRoute, /COMMISSIONS_IMPORT_SLOW_MESSAGE/);
+assert.match(commissionsRoute, /timeoutMs: COMMISSIONS_MUTATION_TIMEOUT_MS/);
 assert.match(commissionsRoute, /listCommissionRecordsViaPostgres/);
 assert.match(commissionsRoute, /listCommissionRecordsViaRest/);
 assert.match(commissionsRoute, /capLedgerFilters/);
@@ -94,6 +109,10 @@ assert.match(panel, /delayedReason/);
 assert.match(panel, /fast", "1"/);
 assert.doesNotMatch(panel, /await response\.json\(\)/);
 assert.match(panel, /timeoutMs: 10_000/);
+assert.match(panel, /COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS/);
+assert.match(panel, /timeoutMessage: COMMISSIONS_IMPORT_SLOW_MESSAGE/);
+assert.match(panel, /load\(\{ quiet: true \}\)/);
+assert.match(panel, /options\?\.quiet/);
 
 const postgresLedger = readFileSync("lib/staff/commission-ledger/list-via-postgres.ts", "utf8");
 assert.match(postgresLedger, /statement_timeout/);
@@ -123,6 +142,11 @@ assert.match(commissionsRoute, /Super Admin only/);
 
 const toast = readFileSync("components/admin/ui/ToastProvider.tsx", "utf8");
 assert.match(toast, /humanizeUnknownError/);
+assert.match(toast, /looksTechnical/);
+
+const fetchAdminJsonSrc = readFileSync("lib/http/fetch-admin-json.ts", "utf8");
+assert.match(fetchAdminJsonSrc, /timeoutMessage/);
+assert.match(fetchAdminJsonSrc, /isTimeoutLikeError/);
 
 const ssrAccess = readFileSync("lib/admin/resolve-user-access.ts", "utf8");
 assert.match(ssrAccess, /accessFromLegacyRole/);

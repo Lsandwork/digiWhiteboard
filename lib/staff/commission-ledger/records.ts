@@ -7,6 +7,7 @@ import { normalizeCommissionDateFilter, parseCommissionDate } from "./dates";
 import { trainerRateBpsForPackage } from "./location-rate";
 import { calculatePercentCommissionCents, parseMoneyToCents, parsePercentToBps } from "./money";
 import { namesMatchCaseInsensitive, commissionDedupeKey } from "./dedupe";
+import { isTimeoutLikeError } from "@/lib/safe-url";
 import type {
   ApprovalStatus,
   CommissionActor,
@@ -255,14 +256,15 @@ export type CreateCommissionInput = {
   allow_duplicate?: boolean;
 };
 
-export async function createCommissionRecord(
-  supabase: SupabaseClient,
-  viewer: CommissionViewer,
-  actor: CommissionActor,
-  input: CreateCommissionInput
-) {
-  assertCanManage(viewer);
+export const COMMISSION_IMPORT_INSERT_CHUNK = 25;
 
+function duplicateInsertMessage(message: string) {
+  return /same_day_dedupe|duplicate key|unique constraint/i.test(message)
+    ? "Duplicate commission already exists for this trainer/name/date/class. Same entry cannot be added twice."
+    : message;
+}
+
+function buildCommissionInsertPayload(actor: CommissionActor, input: CreateCommissionInput) {
   const trainerName = String(input.trainer_name ?? "").trim() || "Unassigned";
   const packageOrClass = String(input.package_or_class ?? "").trim();
   const client = String(input.client_name ?? "").trim();
@@ -299,36 +301,6 @@ export async function createCommissionRecord(
     commissionType === "adjustment" ||
     commissionType === "refund_reversal" ||
     commissionType === "bonus";
-
-  if (!skipDedupe) {
-    let dupQuery = supabase
-      .from("package_commission_records")
-      .select("id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
-      .eq("sale_date", saleDate)
-      .is("archived_at", null)
-      .limit(40);
-    if (input.trainer_user_id) {
-      dupQuery = dupQuery.eq("trainer_user_id", input.trainer_user_id);
-    }
-    const { data: dupes, error: dupError } = await dupQuery;
-    if (dupError) throw new Error(dupError.message);
-    const hit = (dupes ?? []).find((row) => {
-      const trainerOk = input.trainer_user_id
-        ? String(row.trainer_user_id ?? "") === input.trainer_user_id
-        : namesMatchCaseInsensitive(String(row.trainer_name ?? ""), trainerName);
-      return (
-        trainerOk &&
-        namesMatchCaseInsensitive(String(row.client_name ?? ""), client) &&
-        namesMatchCaseInsensitive(String(row.dog_name ?? ""), dog) &&
-        namesMatchCaseInsensitive(String(row.package_or_class ?? ""), packageOrClass)
-      );
-    });
-    if (hit) {
-      throw new Error(
-        "Duplicate commission already exists for this trainer/name/date/class. Same entry cannot be added twice."
-      );
-    }
-  }
 
   const warnings = computeMissingRequired({
     trainer_name: trainerName,
@@ -382,14 +354,51 @@ export async function createCommissionRecord(
     created_by: actor.adminUserId ?? null
   };
 
-  const { data, error } = await supabase.from("package_commission_records").insert(payload).select("*").single();
-  if (error) {
-    if (/same_day_dedupe|duplicate key|unique constraint/i.test(error.message)) {
+  return { payload, skipDedupe, saleDate, trainerName, client, dog, packageOrClass };
+}
+
+export async function createCommissionRecord(
+  supabase: SupabaseClient,
+  viewer: CommissionViewer,
+  actor: CommissionActor,
+  input: CreateCommissionInput
+) {
+  assertCanManage(viewer);
+  const prepared = buildCommissionInsertPayload(actor, input);
+
+  if (!prepared.skipDedupe) {
+    let dupQuery = supabase
+      .from("package_commission_records")
+      .select("id, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
+      .eq("sale_date", prepared.saleDate)
+      .is("archived_at", null)
+      .limit(40);
+    if (input.trainer_user_id) {
+      dupQuery = dupQuery.eq("trainer_user_id", input.trainer_user_id);
+    }
+    const { data: dupes, error: dupError } = await dupQuery;
+    if (dupError) throw new Error(dupError.message);
+    const hit = (dupes ?? []).find((row) => {
+      const trainerOk = input.trainer_user_id
+        ? String(row.trainer_user_id ?? "") === input.trainer_user_id
+        : namesMatchCaseInsensitive(String(row.trainer_name ?? ""), prepared.trainerName);
+      return (
+        trainerOk &&
+        namesMatchCaseInsensitive(String(row.client_name ?? ""), prepared.client) &&
+        namesMatchCaseInsensitive(String(row.dog_name ?? ""), prepared.dog) &&
+        namesMatchCaseInsensitive(String(row.package_or_class ?? ""), prepared.packageOrClass)
+      );
+    });
+    if (hit) {
       throw new Error(
         "Duplicate commission already exists for this trainer/name/date/class. Same entry cannot be added twice."
       );
     }
-    throw new Error(error.message);
+  }
+
+  const { data, error } = await supabase.from("package_commission_records").insert(prepared.payload).select("*").single();
+  if (error) {
+    throw new Error(duplicateInsertMessage(error.message));
   }
   const record = mapDbRecord(data as Record<string, unknown>);
   await writeCommissionAudit(supabase, {
@@ -399,6 +408,78 @@ export async function createCommissionRecord(
     newValue: String(record.final_commission_cents)
   });
   return record;
+}
+
+/**
+ * CSV import: one REST round-trip per chunk, no per-row duplicate SELECT or audit.
+ * Duplicate screening happens once before this is called.
+ */
+export async function insertCommissionRecordsForImport(
+  supabase: SupabaseClient,
+  actor: CommissionActor,
+  inputs: CreateCommissionInput[]
+): Promise<{
+  records: { id: string }[];
+  failures: { index: number; message: string }[];
+  timedOut: boolean;
+}> {
+  const records: { id: string }[] = [];
+  const failures: { index: number; message: string }[] = [];
+  const prepared: { index: number; payload: ReturnType<typeof buildCommissionInsertPayload>["payload"] }[] = [];
+
+  for (let index = 0; index < inputs.length; index += 1) {
+    try {
+      prepared.push({ index, payload: buildCommissionInsertPayload(actor, inputs[index]).payload });
+    } catch (error) {
+      failures.push({
+        index,
+        message: error instanceof Error ? error.message : "Invalid row"
+      });
+    }
+  }
+
+  const insertOne = async (item: (typeof prepared)[number]) => {
+    const { data, error } = await supabase
+      .from("package_commission_records")
+      .insert(item.payload)
+      .select("id")
+      .single();
+    if (error || !data) throw new Error(duplicateInsertMessage(error?.message ?? "Insert failed"));
+    records.push({ id: String(data.id) });
+  };
+
+  try {
+    for (let i = 0; i < prepared.length; i += COMMISSION_IMPORT_INSERT_CHUNK) {
+      const chunk = prepared.slice(i, i + COMMISSION_IMPORT_INSERT_CHUNK);
+      const { data, error } = await supabase
+        .from("package_commission_records")
+        .insert(chunk.map((item) => item.payload))
+        .select("id");
+      if (!error) {
+        for (const row of data ?? []) records.push({ id: String(row.id) });
+        continue;
+      }
+      if (isTimeoutLikeError(error)) throw error;
+      for (const item of chunk) {
+        try {
+          await insertOne(item);
+        } catch (rowError) {
+          if (isTimeoutLikeError(rowError)) throw rowError;
+          failures.push({
+            index: item.index,
+            message: rowError instanceof Error ? rowError.message : "Import failed"
+          });
+        }
+      }
+    }
+  } catch (error) {
+    if (isTimeoutLikeError(error)) {
+      return { records, failures, timedOut: true };
+    }
+    throw error;
+  }
+
+  return { records, failures, timedOut: false };
 }
 
 export async function updateCommissionRecord(
