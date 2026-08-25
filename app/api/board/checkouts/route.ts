@@ -11,7 +11,6 @@ import { fastCheckoutCacheTtlMs, getOrLoadFastCheckoutCache, invalidateBoardTran
 import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { debugBoardLog, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
-import { shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -92,16 +91,6 @@ export async function GET(request: Request) {
         invalidateBoardTransitionCaches();
       }
     });
-
-    if (result.checking_out.length) {
-      after(async () => {
-        await Promise.all(
-          result.checking_out.map((dog) =>
-            triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(dog))
-          )
-        );
-      });
-    }
 
     debugBoardLog(debugBoard, "fast transitions ok", {
       durationMs,

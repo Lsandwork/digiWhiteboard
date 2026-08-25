@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   resolveShellyAlertForPushNotice
 } from "../lib/shelly-push-alerts";
@@ -113,5 +115,24 @@ assert.equal(
   }),
   "checkout:dog-row-1:2026-07-09T08:00:00.000Z"
 );
+
+function source(relativePath: string) {
+  return readFileSync(join(process.cwd(), relativePath), "utf8");
+}
+
+{
+  const checkouts = source("app/api/board/checkouts/route.ts");
+  const liveBoard = source("app/api/live-board/route.ts");
+  const webhook = source("app/api/gingr/webhook/route.ts");
+
+  assert.doesNotMatch(checkouts, /triggerShellyAlert/);
+  assert.doesNotMatch(checkouts, /shellyCheckoutAlertKey/);
+  assert.doesNotMatch(liveBoard, /triggerShellyAlert/);
+  assert.doesNotMatch(liveBoard, /shellyCheckinAlertKey/);
+  assert.doesNotMatch(liveBoard, /shellyCheckoutAlertKey/);
+
+  assert.match(webhook, /triggerShellyAlert\("dog_check_in", shellyCheckinAlertKey\(savedDog\)\)/);
+  assert.match(webhook, /triggerShellyAlert\("dog_check_out", shellyCheckoutAlertKey\(savedDog\)\)/);
+}
 
 console.log("shelly alert tests passed");
