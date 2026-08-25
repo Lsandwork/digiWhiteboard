@@ -271,8 +271,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   }
 
   const load = useCallback(async (options?: { quiet?: boolean }) => {
-    setLoading(true);
-    setLoadError(null);
+    if (!options?.quiet) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const params = new URLSearchParams();
       if (tab === "ledger" || tab === "needs_review" || tab === "approval") {
@@ -1389,13 +1391,12 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                   parts.join("; ") + ".",
                   body.timedOut || failed ? "info" : duplicates ? "info" : "success"
                 );
-                await load({ quiet: true });
               } catch (error) {
                 showToast(error instanceof Error ? error.message : "Import failed.", "error");
-                await load({ quiet: true });
               } finally {
                 setBusy(false);
               }
+              void load({ quiet: true });
             }}
           >
             Import to ledger

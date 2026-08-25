@@ -5,6 +5,11 @@ import { insertCommissionRecordsForImport } from "./records";
 import { isTimeoutLikeError } from "@/lib/safe-url";
 import { COMMISSIONS_IMPORT_SLOW_MESSAGE } from "./import-timeouts";
 import {
+  canListCommissionsViaPostgres,
+  insertCommissionImportViaPostgres,
+  loadExistingSameDayDuplicatesViaPostgres
+} from "./import-via-postgres";
+import {
   parsePackageCommissionCsv,
   matchTrainerByName,
   type PackageCommissionTrainerOption
@@ -55,7 +60,7 @@ async function loadExistingSameDayDuplicates(
       .select("sale_date, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
       .in("sale_date", chunk)
       .is("archived_at", null)
-      .limit(8000);
+      .limit(400);
     if (error) throw new Error(error.message);
     for (const row of data ?? []) {
       found.add(
@@ -125,7 +130,14 @@ export async function importCommissionCsvToLedger(
   const saleDates = parsed
     .map((row) => parseSoldDate(row.sold_at))
     .filter((value): value is string => Boolean(value));
-  const existingKeys = await loadExistingSameDayDuplicates(supabase, saleDates);
+  let existingKeys = new Set<string>();
+  try {
+    existingKeys = canListCommissionsViaPostgres()
+      ? await loadExistingSameDayDuplicatesViaPostgres(saleDates)
+      : await loadExistingSameDayDuplicates(supabase, saleDates);
+  } catch (error) {
+    if (!isTimeoutLikeError(error)) throw error;
+  }
 
   for (let i = 0; i < parsed.length; i += 1) {
     const row = parsed[i];
@@ -246,30 +258,6 @@ export async function importCommissionCsvToLedger(
   const grossTotal = previewRows.reduce((sum, row) => sum + parseMoneyToCents(row.package_sale_amount), 0);
   const commissionTotal = previewRows.reduce((sum, row) => sum + Number(row._finalCents ?? 0), 0);
 
-  const { data: batch, error: batchError } = await supabase
-    .from("package_commission_import_batches")
-    .insert({
-      original_filename: input.filename ?? "paste.csv",
-      uploaded_by: actor.adminUserId ?? null,
-      mapping_template: { format: "auto_gingr_or_legacy" },
-      total_rows: parsed.length,
-      imported_rows: 0,
-      warning_rows: warnings,
-      failed_rows: errors.filter((e) => e.severity === "error").length,
-      duplicate_rows: duplicates,
-      gross_total_cents: grossTotal,
-      commission_total_cents: commissionTotal,
-      status: "completed"
-    })
-    .select("*")
-    .single();
-  if (batchError) throw new Error(batchError.message);
-
-  const records: { id: string }[] = [];
-  let imported = 0;
-  let failed = errors.filter((e) => e.severity === "error").length;
-  let timedOut = false;
-
   const createInputs = previewRows.map((row) => {
     const useInvoiceShare = Boolean(row._useInvoiceShare);
     return {
@@ -286,7 +274,6 @@ export async function importCommissionCsvToLedger(
       gross_amount: row.package_sale_amount,
       gingr_transaction_url: String(row.gingr_transaction_url ?? ""),
       source: "csv_import" as const,
-      import_batch_id: batch.id,
       internal_notes: row.notes ? String(row.notes) : null,
       allow_duplicate: true,
       ...(useInvoiceShare
@@ -309,8 +296,17 @@ export async function importCommissionCsvToLedger(
     };
   });
 
-  try {
-    const inserted = await insertCommissionRecordsForImport(supabase, actor, createInputs);
+  const records: { id: string }[] = [];
+  let imported = 0;
+  let failed = errors.filter((e) => e.severity === "error").length;
+  let timedOut = false;
+  let batchId = "import";
+
+  const applyInserted = (inserted: {
+    records: { id: string }[];
+    failures: { index: number; message: string }[];
+    timedOut: boolean;
+  }) => {
     timedOut = inserted.timedOut;
     records.push(...inserted.records);
     imported = inserted.records.length;
@@ -334,6 +330,84 @@ export async function importCommissionCsvToLedger(
         severity: "error"
       });
     }
+  };
+
+  if (canListCommissionsViaPostgres()) {
+    try {
+      const inserted = await insertCommissionImportViaPostgres(
+        actor,
+        {
+          filename: input.filename ?? "paste.csv",
+          uploadedBy: actor.adminUserId ?? null,
+          totalRows: parsed.length,
+          warningRows: warnings,
+          failedRows: errors.filter((e) => e.severity === "error").length,
+          duplicateRows: duplicates,
+          grossTotalCents: grossTotal,
+          commissionTotalCents: commissionTotal
+        },
+        createInputs
+      );
+      batchId = inserted.batchId;
+      applyInserted(inserted);
+      return {
+        batchId,
+        imported,
+        failed,
+        warnings,
+        duplicates,
+        skippedDuplicates: duplicates,
+        errors,
+        records,
+        timedOut
+      };
+    } catch (error) {
+      if (isTimeoutLikeError(error)) {
+        timedOut = true;
+        errors.push({ line: 0, message: COMMISSIONS_IMPORT_SLOW_MESSAGE, severity: "error" });
+        return {
+          batchId,
+          imported,
+          failed,
+          warnings,
+          duplicates,
+          skippedDuplicates: duplicates,
+          errors,
+          records,
+          timedOut
+        };
+      }
+      // Connect/schema miss — save via REST instead of failing the whole CSV.
+    }
+  }
+
+  const { data: batch, error: batchError } = await supabase
+    .from("package_commission_import_batches")
+    .insert({
+      original_filename: input.filename ?? "paste.csv",
+      uploaded_by: actor.adminUserId ?? null,
+      mapping_template: { format: "auto_gingr_or_legacy" },
+      total_rows: parsed.length,
+      imported_rows: 0,
+      warning_rows: warnings,
+      failed_rows: errors.filter((e) => e.severity === "error").length,
+      duplicate_rows: duplicates,
+      gross_total_cents: grossTotal,
+      commission_total_cents: commissionTotal,
+      status: "completed"
+    })
+    .select("*")
+    .single();
+  if (batchError) throw new Error(batchError.message);
+  batchId = batch.id;
+
+  try {
+    const inserted = await insertCommissionRecordsForImport(
+      supabase,
+      actor,
+      createInputs.map((row) => ({ ...row, import_batch_id: batch.id }))
+    );
+    applyInserted(inserted);
   } catch (error) {
     if (!isTimeoutLikeError(error)) throw error;
     timedOut = true;
@@ -368,7 +442,7 @@ export async function importCommissionCsvToLedger(
   }
 
   return {
-    batchId: batch.id,
+    batchId,
     imported,
     failed,
     warnings,

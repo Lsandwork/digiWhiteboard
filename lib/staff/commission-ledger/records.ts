@@ -264,7 +264,7 @@ function duplicateInsertMessage(message: string) {
     : message;
 }
 
-function buildCommissionInsertPayload(actor: CommissionActor, input: CreateCommissionInput) {
+export function buildCommissionInsertPayload(actor: CommissionActor, input: CreateCommissionInput) {
   const trainerName = String(input.trainer_name ?? "").trim() || "Unassigned";
   const packageOrClass = String(input.package_or_class ?? "").trim();
   const client = String(input.client_name ?? "").trim();

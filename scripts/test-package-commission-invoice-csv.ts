@@ -132,10 +132,20 @@ assert.equal(legacy[0]?.sale_category, "package");
 
 const importsSrc = readFileSync(resolve(__dirname, "../lib/staff/commission-ledger/imports.ts"), "utf8");
 assert.match(importsSrc, /\.in\("sale_date"/);
-assert.match(importsSrc, /insertCommissionRecordsForImport/);
+assert.match(importsSrc, /insertCommissionImportViaPostgres/);
+assert.match(importsSrc, /loadExistingSameDayDuplicatesViaPostgres/);
 assert.match(importsSrc, /COMMISSIONS_IMPORT_SLOW_MESSAGE/);
 assert.doesNotMatch(importsSrc, /findExistingSameDayDuplicate/);
 assert.doesNotMatch(importsSrc, /allow_duplicate: false/);
+
+const postgresImportSrc = readFileSync(
+  resolve(__dirname, "../lib/staff/commission-ledger/import-via-postgres.ts"),
+  "utf8"
+);
+assert.match(postgresImportSrc, /withCommissionPostgres/);
+assert.match(postgresImportSrc, /DUPLICATE_LOOKUP_TIMEOUT_MS = 2_500/);
+assert.match(postgresImportSrc, /IMPORT_WRITE_TIMEOUT_MS = 15_000/);
+assert.match(postgresImportSrc, /insert into package_commission_records/);
 
 const recordsSrc = readFileSync(resolve(__dirname, "../lib/staff/commission-ledger/records.ts"), "utf8");
 assert.match(recordsSrc, /COMMISSION_IMPORT_INSERT_CHUNK = 25/);
