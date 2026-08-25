@@ -5,11 +5,55 @@ import { runFunctionalHealthChecks } from "@/lib/system-health/health-checks";
 import { sanitizeForUi } from "@/lib/system-health/sanitize";
 import {
   loadSystemHealthSettings,
-  listActiveLiveDebugSessions
+  listActiveLiveDebugSessions,
+  type SystemHealthSettings
 } from "@/lib/system-health/settings";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+
+export const SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS = 8_000;
+export const SYSTEM_HEALTH_SECTION_TIMEOUT_MS = 4_000;
+
+function emptyOverview() {
+  return {
+    services: [],
+    schema: {
+      ready: false,
+      migration: "072_system_health_debugging.sql",
+      present: [],
+      missing: [] as string[],
+      canApplyViaPg: false,
+      detail: "System Health overview timed out."
+    },
+    summary: {
+      systemHealth: "WARNING" as const,
+      errorsToday: 0,
+      warningsToday: 0,
+      failedJobs: 0,
+      integrationFailures: 0,
+      routeAuditFailures: 0,
+      usersActive: 0,
+      releaseVersion: null,
+      lastRouteGeneration: null,
+      lastGingrSync: null,
+      lastSamsaraExport: null,
+      storageBucketsOk: null,
+      queueDepth: null,
+      schemaReady: false
+    }
+  };
+}
+
+async function safeSection<T>(label: string, work: Promise<T>, fallback: T, ms = SYSTEM_HEALTH_SECTION_TIMEOUT_MS) {
+  try {
+    return await withTimeoutFallback(work, ms, fallback);
+  } catch (error) {
+    console.error(`[system-health] ${label} unavailable:`, error);
+    return fallback;
+  }
+}
 
 export async function loadSystemHealthOverview() {
-  const health = await runFunctionalHealthChecks();
+  const health = await safeSection("overview checks", runFunctionalHealthChecks(), emptyOverview(), SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS);
   return sanitizeForUi(health);
 }
 
@@ -33,7 +77,10 @@ export async function loadLiveActivity(params?: {
   if (params?.correlationId) q = q.eq("correlation_id", params.correlationId);
   if (params?.userEmail) q = q.ilike("user_email", `%${params.userEmail}%`);
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/aborted|abort|timed out|timeout/i.test(error.message || "")) return sanitizeForUi([]);
+    throw new Error(error.message);
+  }
   return sanitizeForUi(data ?? []);
 }
 
@@ -48,7 +95,10 @@ export async function loadErrors(params?: { status?: string; limit?: number }) {
     .limit(params?.limit ?? 100);
   if (params?.status) q = q.eq("status", params.status);
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/aborted|abort|timed out|timeout/i.test(error.message || "")) return sanitizeForUi([]);
+    throw new Error(error.message);
+  }
   return sanitizeForUi(data ?? []);
 }
 
@@ -63,7 +113,10 @@ export async function loadRouteAudits(params?: { limit?: number; status?: string
     .limit(params?.limit ?? 50);
   if (params?.status) q = q.eq("status", params.status);
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/aborted|abort|timed out|timeout/i.test(error.message || "")) return sanitizeForUi([]);
+    throw new Error(error.message);
+  }
   return sanitizeForUi(data ?? []);
 }
 
@@ -95,7 +148,10 @@ export async function loadIntegrationCalls(params?: { integration?: string; limi
     .limit(params?.limit ?? 100);
   if (params?.integration) q = q.eq("integration", params.integration);
   const { data, error } = await q;
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/aborted|abort|timed out|timeout/i.test(error.message || "")) return sanitizeForUi([]);
+    throw new Error(error.message);
+  }
   return sanitizeForUi(data ?? []);
 }
 
@@ -108,7 +164,10 @@ export async function loadApiLogs(params?: { limit?: number }) {
     )
     .order("occurred_at", { ascending: false })
     .limit(params?.limit ?? 100);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (/aborted|abort|timed out|timeout/i.test(error.message || "")) return sanitizeForUi([]);
+    throw new Error(error.message);
+  }
   return sanitizeForUi(data ?? []);
 }
 
@@ -217,13 +276,33 @@ export async function loadWhiteboardAuditIssues() {
 
 export async function loadSystemHealthDashboardBundle() {
   const [overview, activity, errors, audits, integrations, settings, liveDebug] = await Promise.all([
-    loadSystemHealthOverview(),
-    loadLiveActivity({ limit: 40 }),
-    loadErrors({ limit: 30 }),
-    loadRouteAudits({ limit: 20 }),
-    loadIntegrationCalls({ limit: 30 }),
-    loadSystemHealthSettings(),
-    listActiveLiveDebugSessions()
+    safeSection("overview", loadSystemHealthOverview(), emptyOverview(), SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS),
+    safeSection("activity", loadLiveActivity({ limit: 40 }), []),
+    safeSection("errors", loadErrors({ limit: 30 }), []),
+    safeSection("audits", loadRouteAudits({ limit: 20 }), []),
+    safeSection("integrations", loadIntegrationCalls({ limit: 30 }), []),
+    safeSection(
+      "settings",
+      loadSystemHealthSettings(),
+      {
+        debugLoggingEnabled: true,
+        verboseLogging: false,
+        routeDecisionTracing: true,
+        apiDiagnostics: true,
+        integrationDiagnostics: true,
+        liveActivityEnabled: true,
+        developerBridgeEnabled: true,
+        cursorBridgeEnabled: true,
+        productionDiagnosticAccess: false,
+        piiMasking: true,
+        healthCheckIntervalSeconds: 300,
+        retentionEventsDays: 90,
+        retentionApiLogsDays: 30,
+        retentionRouteAuditsDays: 365,
+        retentionErrorsDays: 180
+      } satisfies SystemHealthSettings
+    ),
+    safeSection("live debug", listActiveLiveDebugSessions(), [])
   ]);
   return {
     overview,
@@ -233,6 +312,7 @@ export async function loadSystemHealthDashboardBundle() {
     integrations,
     settings,
     liveDebug,
-    schema: (overview as { schema?: unknown })?.schema ?? null
+    schema: (overview as { schema?: unknown })?.schema ?? null,
+    degraded: !(overview as { services?: unknown[] })?.services?.length
   };
 }

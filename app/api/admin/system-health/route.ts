@@ -19,7 +19,8 @@ import {
   loadBackgroundJobs,
   loadStorageHealth,
   loadUserActivity,
-  loadWhiteboardAuditIssues
+  loadWhiteboardAuditIssues,
+  SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS
 } from "@/lib/system-health/dashboard";
 import {
   saveSystemHealthSettings,
@@ -42,8 +43,11 @@ import {
   checkSystemHealthSchema,
   loadSystemHealthMigrationSql
 } from "@/lib/system-health/ensure-schema";
+import { humanizeUnknownError, LIVE_DATA_SLOW_MESSAGE } from "@/lib/safe-url";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 20;
 
 async function requireSystemHealth(
   request: Request,
@@ -52,10 +56,14 @@ async function requireSystemHealth(
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };
   const session = getAdminSessionFromRequest(request);
   if (!session) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS });
+  const fallbackAccess = accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role);
   const access =
-    (await getUserAccess(supabase, session.adminUserId, session.role, session.email)) ??
-    accessFromLegacyRole(null, session.email, session.role);
+    (await withTimeoutFallback(
+      getUserAccess(supabase, session.adminUserId, session.role, session.email),
+      1_200,
+      fallbackAccess
+    )) ?? fallbackAccess;
 
   const elevated: PermissionKey[] = [
     "system_health.developer",
@@ -208,10 +216,42 @@ export async function GET(request: Request) {
       feature: "system_health",
       metadata: { view, error: error instanceof Error ? error.message : String(error) }
     });
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "System Health error" },
-      { status: 500 }
-    );
+    const message = humanizeUnknownError(error, LIVE_DATA_SLOW_MESSAGE);
+    if (view === "dashboard") {
+      // Never leave the System Health shell on a raw AbortError — paint a degraded empty board.
+      return NextResponse.json({
+        overview: {
+          services: [],
+          schema: null,
+          summary: {
+            systemHealth: "WARNING",
+            errorsToday: 0,
+            warningsToday: 0,
+            failedJobs: 0,
+            integrationFailures: 0,
+            routeAuditFailures: 0,
+            usersActive: 0,
+            releaseVersion: null,
+            lastRouteGeneration: null,
+            lastGingrSync: null,
+            lastSamsaraExport: null,
+            storageBucketsOk: null,
+            queueDepth: null,
+            schemaReady: false
+          }
+        },
+        activity: [],
+        errors: [],
+        audits: [],
+        integrations: [],
+        settings: {},
+        liveDebug: [],
+        schema: null,
+        degraded: true,
+        warning: message
+      });
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
