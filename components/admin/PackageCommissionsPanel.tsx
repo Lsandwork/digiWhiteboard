@@ -1150,7 +1150,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
 
             {canManage ? (
               <div className="mb-4 flex flex-wrap gap-2">
-                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void postAction({ action: "approve", id: drawer.record.id }).then(load)}>
+                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void postAction({ action: "approve", id: drawer.record.id }).then(() => void load())}>
                   Approve
                 </button>
                 <button
@@ -1159,15 +1159,15 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
                   onClick={() => {
                     const reason = window.prompt("Rejection reason:") ?? "";
                     if (!reason.trim()) return;
-                    void postAction({ action: "reject", id: drawer.record.id, reason }).then(load);
+                    void postAction({ action: "reject", id: drawer.record.id, reason }).then(() => void load());
                   }}
                 >
                   Reject
                 </button>
-                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void postAction({ action: "ready_for_payroll", id: drawer.record.id }).then(load)}>
+                <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void postAction({ action: "ready_for_payroll", id: drawer.record.id }).then(() => void load())}>
                   Ready for payroll
                 </button>
-                <button type="button" className="crossover-btn crossover-btn--primary" onClick={() => void postAction({ action: "mark_paid", id: drawer.record.id }).then(load)}>
+                <button type="button" className="crossover-btn crossover-btn--primary" onClick={() => void postAction({ action: "mark_paid", id: drawer.record.id }).then(() => void load())}>
                   Mark paid
                 </button>
                 <button

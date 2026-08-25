@@ -11,6 +11,8 @@ import {
   parsePackageCommissionCsv
 } from "../lib/staff/package-commissions";
 import { parseMoneyToCents } from "../lib/staff/commission-ledger/money";
+import { insertCommissionRecordsForImport } from "../lib/staff/commission-ledger/records";
+import type { CommissionActor } from "../lib/staff/commission-ledger/types";
 
 const FIXTURE_PATH = resolve(__dirname, "fixtures/gingr-trainers-invoice-amanda.csv");
 const DESKTOP_SAMPLE_PATH = resolve(
@@ -139,4 +141,82 @@ const recordsSrc = readFileSync(resolve(__dirname, "../lib/staff/commission-ledg
 assert.match(recordsSrc, /COMMISSION_IMPORT_INSERT_CHUNK = 25/);
 assert.match(recordsSrc, /insertCommissionRecordsForImport/);
 
-console.log("package-commission-invoice-csv: all tests passed");
+function fakeLedgerClient(abortOnCall: number) {
+  let calls = 0;
+  return {
+    from() {
+      return {
+        insert(rows: unknown) {
+          const run = async () => {
+            calls += 1;
+            if (calls === abortOnCall) {
+              const error = new Error("The operation was aborted.");
+              error.name = "AbortError";
+              throw error;
+            }
+            const list = Array.isArray(rows) ? rows : [rows];
+            return { data: list.map((_, index) => ({ id: `row-${calls}-${index}` })), error: null };
+          };
+          const thenable = run();
+          return {
+            select() {
+              return Object.assign(thenable, {
+                single: async () => {
+                  const result = await thenable;
+                  return { data: result.data[0], error: result.error };
+                }
+              });
+            }
+          };
+        }
+      };
+    }
+  };
+}
+
+const actor: CommissionActor = {
+  email: "admin@fitdog.example",
+  adminUserId: "admin-1",
+  name: "Admin",
+  role: "owner_admin",
+  roleKey: "super_admin"
+};
+
+const importRows = Array.from({ length: 30 }, (_, index) => ({
+  trainer_name: "Ivonne Campuzano",
+  client_name: "Owner",
+  dog_name: `Dog ${index + 1}`,
+  package_or_class: "Fun & Fit Agility",
+  sale_date: "2026-08-11",
+  gross_amount: "$55.00",
+  allow_duplicate: true,
+  source: "csv_import" as const
+}));
+
+async function assertChunkedImportTimeout() {
+  const partial = await insertCommissionRecordsForImport(
+    fakeLedgerClient(2) as never,
+    actor,
+    importRows
+  );
+  assert.equal(partial.timedOut, true, "second chunk abort should be a partial import");
+  assert.equal(partial.records.length, 25, "first chunk of 25 must stay saved");
+  assert.equal(partial.failures.length, 0);
+
+  const complete = await insertCommissionRecordsForImport(
+    fakeLedgerClient(99) as never,
+    actor,
+    importRows
+  );
+  assert.equal(complete.timedOut, false);
+  assert.equal(complete.records.length, 30);
+}
+
+assertChunkedImportTimeout()
+  .then(() => {
+    console.log("package-commission-invoice-csv: all tests passed");
+  })
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
