@@ -25,6 +25,8 @@ assert.equal(skipHungBoardSnapshots("staff", null), true);
 assert.equal(skipHungBoardSnapshots("staff", "integrations"), false);
 assert.equal(skipHungBoardSnapshots("lobby", "content"), false);
 assert.equal(skipDashboardBackgroundHydrate("staff", "overview"), true);
+assert.equal(skipDashboardBackgroundHydrate("staff", "ops_system_health"), true);
+assert.equal(skipDashboardBackgroundHydrate("staff", "package_commissions"), true);
 assert.equal(skipDashboardBackgroundHydrate("staff", "my_shift"), false);
 assert.equal(skipDashboardBackgroundHydrate("staff", "integrations"), false);
 assert.equal(skipDashboardBackgroundHydrate("marketing", "cast_tv"), true);

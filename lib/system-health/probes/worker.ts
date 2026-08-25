@@ -55,7 +55,7 @@ export async function probeBackgroundWorker(
     try {
       const res = await fetch(`${workerUrl}/health`, {
         method: "GET",
-        signal: AbortSignal.timeout(8_000)
+        signal: AbortSignal.timeout(3_000)
       });
       responseTimeMs = Date.now() - started;
       httpOk = res.ok;

@@ -7,8 +7,12 @@
 import type { HealthStatus } from "@/lib/system-health/types";
 import type { getServiceSupabase } from "@/lib/supabase/server";
 import { supabaseProjectUrl } from "@/lib/system-health/probes/storage";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 
 type Supabase = ReturnType<typeof getServiceSupabase>;
+
+/** Board freshness from hung `live_transition_dogs` must never block System Health. */
+export const REALTIME_BOARD_FRESH_TIMEOUT_MS = 1_200;
 
 export type RealtimeProbeResult = {
   status: HealthStatus;
@@ -51,7 +55,7 @@ async function probeRealtimeHttp(projectUrl: string): Promise<{
           apikey: key,
           Authorization: `Bearer ${key}`
         },
-        signal: AbortSignal.timeout(8_000)
+        signal: AbortSignal.timeout(3_000)
       });
       lastStatus = res.status;
       if (res.status < 500) {
@@ -90,32 +94,59 @@ async function loadBoardFreshest(supabase: Supabase): Promise<{
   error: string | null;
 }> {
   try {
-    // updated_at can lag if some writers only touch last_seen_from_gingr_at
-    const [byUpdated, bySeen] = await Promise.all([
-      supabase
-        .from("live_transition_dogs")
-        .select("updated_at, last_seen_from_gingr_at")
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("live_transition_dogs")
-        .select("updated_at, last_seen_from_gingr_at")
-        .not("last_seen_from_gingr_at", "is", null)
-        .order("last_seen_from_gingr_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    ]);
-    const err = byUpdated.error?.message || bySeen.error?.message || null;
-    const at = freshestIso(
-      byUpdated.data?.updated_at ? String(byUpdated.data.updated_at) : null,
-      byUpdated.data?.last_seen_from_gingr_at
-        ? String(byUpdated.data.last_seen_from_gingr_at)
-        : null,
-      bySeen.data?.updated_at ? String(bySeen.data.updated_at) : null,
-      bySeen.data?.last_seen_from_gingr_at ? String(bySeen.data.last_seen_from_gingr_at) : null
+    // Prefer non-hung evidence first: recent board-related system health events.
+    const eventFresh = await withTimeoutFallback(
+      Promise.resolve(
+        supabase
+          .from("system_health_events")
+          .select("occurred_at")
+          .in("module", ["board", "lobby", "staff_board", "gingr", "whiteboard"])
+          .order("occurred_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ).then((row) => ({
+        data: row.data ? { occurred_at: String(row.data.occurred_at || "") } : null
+      })),
+      REALTIME_BOARD_FRESH_TIMEOUT_MS,
+      { data: null as { occurred_at: string } | null }
     );
-    return { at, error: at ? null : err };
+    if (eventFresh.data?.occurred_at) {
+      return { at: String(eventFresh.data.occurred_at), error: null };
+    }
+
+    // `live_transition_dogs` hangs in production — hard-cap so AbortError never escapes.
+    const hung = await withTimeoutFallback(
+      (async () => {
+        const [byUpdated, bySeen] = await Promise.all([
+          supabase
+            .from("live_transition_dogs")
+            .select("updated_at, last_seen_from_gingr_at")
+            .order("updated_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from("live_transition_dogs")
+            .select("updated_at, last_seen_from_gingr_at")
+            .not("last_seen_from_gingr_at", "is", null)
+            .order("last_seen_from_gingr_at", { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ]);
+        const err = byUpdated.error?.message || bySeen.error?.message || null;
+        const at = freshestIso(
+          byUpdated.data?.updated_at ? String(byUpdated.data.updated_at) : null,
+          byUpdated.data?.last_seen_from_gingr_at
+            ? String(byUpdated.data.last_seen_from_gingr_at)
+            : null,
+          bySeen.data?.updated_at ? String(bySeen.data.updated_at) : null,
+          bySeen.data?.last_seen_from_gingr_at ? String(bySeen.data.last_seen_from_gingr_at) : null
+        );
+        return { at, error: at ? null : err };
+      })(),
+      REALTIME_BOARD_FRESH_TIMEOUT_MS,
+      { at: null, error: "board_freshest_timeout" }
+    );
+    return hung;
   } catch (err) {
     return { at: null, error: err instanceof Error ? err.message : String(err) };
   }

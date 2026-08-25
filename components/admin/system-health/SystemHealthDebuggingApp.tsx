@@ -1,8 +1,9 @@
 "use client";
 
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { humanizeUnknownError, LIVE_DATA_SLOW_MESSAGE } from "@/lib/safe-url";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type SectionId =
   | "overview"
@@ -195,22 +196,36 @@ export function SystemHealthDebuggingApp() {
   const [schemaBusy, setSchemaBusy] = useState(false);
   const [auditBusy, setAuditBusy] = useState(false);
   const [auditIssues, setAuditIssues] = useState<Record<string, unknown> | null>(null);
+  const bundleRef = useRef(bundle);
+  bundleRef.current = bundle;
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15_000);
     try {
       const res = await fetch("/api/admin/system-health?view=dashboard", {
         cache: "no-store",
-        credentials: "same-origin"
+        credentials: "same-origin",
+        signal: controller.signal
       });
       const body = await readResponseJson(res);
       if (!res.ok) throw new Error(body.error || "Failed to load System Health");
       setBundle(body);
       setSettingsDraft((body.settings as Record<string, unknown>) || null);
+      if (body.warning || body.degraded) {
+        setError(typeof body.warning === "string" ? body.warning : LIVE_DATA_SLOW_MESSAGE);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
+      const aborted = (err instanceof DOMException && err.name === "AbortError") || controller.signal.aborted;
+      if (aborted && bundleRef.current) {
+        setError(LIVE_DATA_SLOW_MESSAGE);
+      } else {
+        setError(humanizeUnknownError(err, "Failed to load System Health"));
+      }
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   }, []);
