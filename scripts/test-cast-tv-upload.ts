@@ -24,6 +24,7 @@ import {
   parseCastTvRefreshNonce
 } from "../lib/cast-tv/library-store";
 import { loadSharp } from "../lib/sharp-runtime";
+import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
 import {
   CAST_TV_DUPLICATE_MESSAGE,
