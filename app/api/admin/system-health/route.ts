@@ -20,7 +20,8 @@ import {
   loadStorageHealth,
   loadUserActivity,
   loadWhiteboardAuditIssues,
-  SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS
+  SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS,
+  emptySystemHealthViewPayload
 } from "@/lib/system-health/dashboard";
 import {
   saveSystemHealthSettings,
@@ -172,8 +173,21 @@ export async function GET(request: Request) {
         };
         break;
       case "schema": {
-        const supabase = getServiceSupabase();
-        payload = { data: await checkSystemHealthSchema(supabase) };
+        const supabase = getServiceSupabase({ timeoutMs: SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS });
+        payload = {
+          data: await withTimeoutFallback(
+            checkSystemHealthSchema(supabase),
+            SYSTEM_HEALTH_DASHBOARD_TIMEOUT_MS,
+            {
+              ready: false,
+              migration: "072_system_health_debugging.sql",
+              present: [],
+              missing: [],
+              canApplyViaPg: false,
+              detail: LIVE_DATA_SLOW_MESSAGE
+            }
+          )
+        };
         break;
       }
       case "migration_sql":
@@ -217,41 +231,7 @@ export async function GET(request: Request) {
       metadata: { view, error: error instanceof Error ? error.message : String(error) }
     });
     const message = humanizeUnknownError(error, LIVE_DATA_SLOW_MESSAGE);
-    if (view === "dashboard") {
-      // Never leave the System Health shell on a raw AbortError — paint a degraded empty board.
-      return NextResponse.json({
-        overview: {
-          services: [],
-          schema: null,
-          summary: {
-            systemHealth: "WARNING",
-            errorsToday: 0,
-            warningsToday: 0,
-            failedJobs: 0,
-            integrationFailures: 0,
-            routeAuditFailures: 0,
-            usersActive: 0,
-            releaseVersion: null,
-            lastRouteGeneration: null,
-            lastGingrSync: null,
-            lastSamsaraExport: null,
-            storageBucketsOk: null,
-            queueDepth: null,
-            schemaReady: false
-          }
-        },
-        activity: [],
-        errors: [],
-        audits: [],
-        integrations: [],
-        settings: {},
-        liveDebug: [],
-        schema: null,
-        degraded: true,
-        warning: message
-      });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(emptySystemHealthViewPayload(view, message));
   }
 }
 
@@ -438,7 +418,7 @@ export async function POST(request: Request) {
     void recordApiLog({
       method: "POST",
       endpoint: "/api/admin/system-health",
-      statusCode: 500,
+      statusCode: 503,
       latencyMs: Date.now() - started,
       userId: auth.session?.adminUserId,
       userEmail: auth.session?.email,
@@ -446,9 +426,7 @@ export async function POST(request: Request) {
       feature: "system_health",
       metadata: { action, error: error instanceof Error ? error.message : String(error) }
     });
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "System Health error" },
-      { status: 500 }
-    );
+    const message = humanizeUnknownError(error, LIVE_DATA_SLOW_MESSAGE);
+    return NextResponse.json({ error: message, degraded: true }, { status: 503 });
   }
 }

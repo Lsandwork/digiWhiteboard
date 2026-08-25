@@ -1,4 +1,5 @@
 import type { AdminBoardType } from "@/lib/admin/types";
+import { HUNG_TABLES, isHungQueryError, isHungTableInCooldown, markHungTableTimeout } from "@/lib/hung-table-guard";
 
 export type AdminGlobalSettings = {
   default_board: AdminBoardType;
@@ -88,6 +89,7 @@ function readAdminSettingsRow(data: Record<string, unknown> | null | undefined):
 }
 
 export async function loadAdminSettings(supabase: SupabaseClient): Promise<AdminGlobalSettings> {
+  if (isHungTableInCooldown(HUNG_TABLES.adminSettings)) return DEFAULT_ADMIN_SETTINGS;
   try {
     const { data, error } = await supabase
       .from("admin_settings")
@@ -95,11 +97,16 @@ export async function loadAdminSettings(supabase: SupabaseClient): Promise<Admin
       .eq("id", "default")
       .maybeSingle();
     if (error) {
+      if (isHungQueryError(error)) {
+        markHungTableTimeout(HUNG_TABLES.adminSettings);
+        return DEFAULT_ADMIN_SETTINGS;
+      }
       if (error.code === "42P01") return DEFAULT_ADMIN_SETTINGS;
       throw error;
     }
     return { ...DEFAULT_ADMIN_SETTINGS, ...readAdminSettingsRow(data as Record<string, unknown> | null) };
-  } catch {
+  } catch (error) {
+    if (isHungQueryError(error)) markHungTableTimeout(HUNG_TABLES.adminSettings);
     return DEFAULT_ADMIN_SETTINGS;
   }
 }

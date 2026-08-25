@@ -10,9 +10,13 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { accessFromLegacyRole, hasPermission, hasRole, legacyRoleToRoleKey } from "@/lib/admin/permissions";
 import { getUserAccess } from "@/lib/admin/user-access";
-import { humanizeUnknownError } from "@/lib/safe-url";
+import { humanizeUnknownError, isTimeoutLikeError } from "@/lib/safe-url";
 import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { SERVICE_SUPABASE_TIMEOUT_MS } from "@/lib/supabase/server";
+import {
+  COMMISSIONS_IMPORT_SLOW_MESSAGE,
+  COMMISSIONS_MUTATION_TIMEOUT_MS
+} from "@/lib/staff/commission-ledger/import-timeouts";
 import { listCommissionTrainersFromDb } from "@/lib/staff/commission-ledger/trainers";
 import {
   canListCommissionsViaPostgres,
@@ -556,29 +560,58 @@ export async function POST(request: Request) {
 
     if (action === "import_csv") {
       if (!canManage) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
-      const trainers = await listCommissionTrainersFromDb(supabase);
-      const result = await importCommissionCsvToLedger(supabase, viewer, actor, {
-        csvText: String(body.csv ?? ""),
-        filename: body.filename != null ? String(body.filename) : "upload.csv",
-        trainers,
-        dryRun: body.dry_run === true
-      });
-      await writeAdminAuditLog({
-        actorAdminId: session?.adminUserId ?? null,
-        actorEmail: session?.email ?? null,
-        action: "staff.package_commissions.import",
-        targetType: "package_commissions",
-        details: { imported: result.imported, failed: result.failed, batchId: result.batchId }
-      });
-      return NextResponse.json({
-        ok: true,
-        ...result,
-        rows: result.records,
-        created: result.imported,
-        imported: result.imported,
-        failed: result.failed,
-        errors: result.errors
-      });
+      const mutationSupabase = getServiceSupabase({ timeoutMs: COMMISSIONS_MUTATION_TIMEOUT_MS });
+      try {
+        const trainers = await listCommissionTrainersFromDb(mutationSupabase);
+        const result = await importCommissionCsvToLedger(mutationSupabase, viewer, actor, {
+          csvText: String(body.csv ?? ""),
+          filename: body.filename != null ? String(body.filename) : "upload.csv",
+          trainers,
+          dryRun: body.dry_run === true
+        });
+        try {
+          await writeAdminAuditLog({
+            actorAdminId: session?.adminUserId ?? null,
+            actorEmail: session?.email ?? null,
+            action: "staff.package_commissions.import",
+            targetType: "package_commissions",
+            details: {
+              imported: result.imported,
+              failed: result.failed,
+              batchId: result.batchId,
+              timedOut: Boolean(result.timedOut)
+            }
+          });
+        } catch {
+          // Import already persisted; do not fail the browser response for audit.
+        }
+        return NextResponse.json({
+          ok: !result.timedOut,
+          ...result,
+          rows: result.records,
+          created: result.imported,
+          imported: result.imported,
+          failed: result.failed,
+          errors: result.errors,
+          timedOut: Boolean(result.timedOut),
+          ...(result.timedOut ? { error: COMMISSIONS_IMPORT_SLOW_MESSAGE } : {})
+        });
+      } catch (error) {
+        if (isTimeoutLikeError(error)) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: COMMISSIONS_IMPORT_SLOW_MESSAGE,
+              imported: 0,
+              failed: 0,
+              duplicates: 0,
+              timedOut: true
+            },
+            { status: 503 }
+          );
+        }
+        throw error;
+      }
     }
 
     if (action === "undo_import") {

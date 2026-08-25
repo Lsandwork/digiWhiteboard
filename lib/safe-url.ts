@@ -19,6 +19,14 @@ export function isSafariPatternError(error: unknown): boolean {
   return SAFARI_PATTERN_ERROR.test(errorText(error));
 }
 
+export function isTimeoutLikeError(error: unknown): boolean {
+  if (typeof error === "object" && error !== null && "name" in error) {
+    const name = String((error as { name?: string }).name ?? "");
+    if (name === "AbortError" || name === "TimeoutError") return true;
+  }
+  return TIMEOUT_ERROR.test(errorText(error));
+}
+
 export function isInfrastructureError(error: unknown): boolean {
   const message = errorText(error);
   return (
@@ -37,7 +45,7 @@ export function humanizeUnknownError(error: unknown, fallback: string): string {
   if (HTML_ERROR_PAGE.test(message) || (message.includes("<") && message.includes(">") && message.length > 180)) {
     return LIVE_DATA_UNAVAILABLE_MESSAGE;
   }
-  if (TIMEOUT_ERROR.test(message)) return LIVE_DATA_SLOW_MESSAGE;
+  if (isTimeoutLikeError(error) || TIMEOUT_ERROR.test(message)) return LIVE_DATA_SLOW_MESSAGE;
   if (NETWORK_ERROR.test(message)) return LIVE_DATA_UNAVAILABLE_MESSAGE;
   return message;
 }

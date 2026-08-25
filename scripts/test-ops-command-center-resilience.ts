@@ -76,6 +76,8 @@ async function testJsonReaders() {
 {
   const snapshot = readFileSync("lib/ops-command-center/snapshot.ts", "utf8");
   assert.match(snapshot, /OPS_SNAPSHOT_TIMEOUT_MS/);
+  assert.match(snapshot, /getHungTableSupabase/);
+  assert.match(snapshot, /HUNG_TABLES/);
   assert.match(snapshot, /OPS_SNAPSHOT_BUILD_TIMEOUT_MS/);
   assert.match(snapshot, /last-good|OPS_SNAPSHOT_LAST_GOOD_KEY/);
   assert.match(snapshot, /shouldCacheOpsSnapshot|probeTimedOut|delayedStaffFeed/);

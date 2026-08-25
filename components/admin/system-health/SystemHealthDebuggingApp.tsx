@@ -1,6 +1,7 @@
 "use client";
 
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError, LIVE_DATA_SLOW_MESSAGE } from "@/lib/safe-url";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -156,6 +157,13 @@ function ToolButton({
   );
 }
 
+async function healthJson<T extends Record<string, any>>(
+  input: RequestInfo | URL,
+  init: RequestInit & { timeoutMs?: number } = {}
+) {
+  return fetchAdminJson<T>(input, { credentials: "same-origin", timeoutMs: 12_000, ...init });
+}
+
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
@@ -231,19 +239,23 @@ export function SystemHealthDebuggingApp() {
   }, []);
 
   const loadAuditIssues = useCallback(async () => {
-    const res = await fetch("/api/admin/system-health?view=audit_issues", {
-      cache: "no-store",
-      credentials: "same-origin"
-    });
-    const body = await readResponseJson(res);
-    if (!res.ok) {
-      setError(body.error || "Failed to load audit issues");
+    try {
+      const { ok, body } = await healthJson<Record<string, any>>("/api/admin/system-health?view=audit_issues");
+      if (!ok && !body?.data) {
+        setError(typeof body?.warning === "string" ? body.warning : body?.error || "Failed to load audit issues");
+        return null;
+      }
+      if (body?.warning || body?.degraded) {
+        setError(typeof body.warning === "string" ? body.warning : LIVE_DATA_SLOW_MESSAGE);
+      }
+      const data = (body.data as Record<string, unknown>) || null;
+      setAuditIssues(data);
+      setSectionData(data);
+      return data;
+    } catch (err) {
+      setError(humanizeUnknownError(err, LIVE_DATA_SLOW_MESSAGE));
       return null;
     }
-    const data = (body.data as Record<string, unknown>) || null;
-    setAuditIssues(data);
-    setSectionData(data);
-    return data;
   }, []);
 
   const loadSection = useCallback(
@@ -274,13 +286,22 @@ export function SystemHealthDebuggingApp() {
         params.set("status", opts.jobStatus);
       }
       if (id === "live" && liveSeverity !== "all") params.set("severity", liveSeverity);
-      const res = await fetch(`/api/admin/system-health?${params.toString()}`, {
-        cache: "no-store",
-        credentials: "same-origin"
-      });
-      const body = await readResponseJson(res);
-      if (res.ok) setSectionData(body.data ?? body);
-      else setError(body.error || "Failed to load section");
+      try {
+        const { ok, body } = await healthJson<Record<string, any>>(
+          `/api/admin/system-health?${params.toString()}`
+        );
+        if (ok || body?.data !== undefined) setSectionData(body.data ?? body);
+        if (!ok) {
+          setError(
+            typeof body?.warning === "string" ? body.warning : body?.error || LIVE_DATA_SLOW_MESSAGE
+          );
+        } else if (body?.warning || body?.degraded) {
+          setError(typeof body.warning === "string" ? body.warning : LIVE_DATA_SLOW_MESSAGE);
+        }
+      } catch (err) {
+        setError(humanizeUnknownError(err, LIVE_DATA_SLOW_MESSAGE));
+        setSectionData([]);
+      }
     },
     [liveSeverity, loadAuditIssues]
   );
@@ -313,24 +334,28 @@ export function SystemHealthDebuggingApp() {
     setAuditDetail(undefined);
     setAuditDetailMissing(false);
     void (async () => {
-      const res = await fetch(
-        `/api/admin/system-health?view=route_audit&correlationId=${encodeURIComponent(selectedAudit)}`,
-        { cache: "no-store" }
-      );
-      const body = await readResponseJson(res);
-      if (!res.ok) {
-        setError(body.error || "Failed to load route audit");
+      try {
+        const { ok, body } = await healthJson<Record<string, any>>(
+          `/api/admin/system-health?view=route_audit&correlationId=${encodeURIComponent(selectedAudit)}`
+        );
+        if (!ok) {
+          setError(typeof body?.warning === "string" ? body.warning : body?.error || "Failed to load route audit");
+          setAuditDetail(null);
+          setAuditDetailMissing(true);
+          return;
+        }
+        if (body.data == null) {
+          setAuditDetail(null);
+          setAuditDetailMissing(true);
+          return;
+        }
+        setAuditDetail(body.data as Record<string, unknown>);
+        setAuditDetailMissing(false);
+      } catch (err) {
+        setError(humanizeUnknownError(err, LIVE_DATA_SLOW_MESSAGE));
         setAuditDetail(null);
         setAuditDetailMissing(true);
-        return;
       }
-      if (body.data == null) {
-        setAuditDetail(null);
-        setAuditDetailMissing(true);
-        return;
-      }
-      setAuditDetail(body.data as Record<string, unknown>);
-      setAuditDetailMissing(false);
     })();
   }, [selectedAudit]);
 

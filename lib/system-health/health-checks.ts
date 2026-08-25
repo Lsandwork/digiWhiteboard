@@ -16,6 +16,14 @@ import { probeRouteGenerator } from "@/lib/system-health/probes/route-generator"
 import { checkSystemHealthSchema, SYSTEM_HEALTH_REQUIRED_TABLES } from "@/lib/system-health/ensure-schema";
 import type { SchemaReadiness } from "@/lib/system-health/ensure-schema";
 import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+import {
+  anyHungTableInCooldown,
+  getHungTableSupabase,
+  HUNG_TABLES,
+  isHungQueryError,
+  isHungTableInCooldown,
+  markHungTableTimeout
+} from "@/lib/hung-table-guard";
 
 /** Interactive System Health probes. Hung Gingr tables must not 500 the page. */
 export const SYSTEM_HEALTH_PROBE_TIMEOUT_MS = 3_000;
@@ -75,11 +83,17 @@ export function coerceServiceStatus(status: HealthStatus): HealthStatus {
 }
 
 async function countErrors(supabase: ReturnType<typeof getServiceSupabase>, sinceIso: string) {
-  const { count } = await supabase
-    .from("system_health_errors")
-    .select("id", { count: "exact", head: true })
-    .gte("last_occurrence_at", sinceIso);
-  return count ?? 0;
+  try {
+    const { count, error } = await supabase
+      .from("system_health_errors")
+      .select("id", { count: "exact", head: true })
+      .gte("last_occurrence_at", sinceIso);
+    if (error && isHungQueryError(error)) return 0;
+    return count ?? 0;
+  } catch (error) {
+    if (isHungQueryError(error)) return 0;
+    throw error;
+  }
 }
 
 async function integrationStats(
@@ -87,13 +101,26 @@ async function integrationStats(
   integration: string,
   sinceIso: string
 ) {
-  const { data } = await supabase
-    .from("system_health_integration_calls")
-    .select("success, occurred_at, error_message, latency_ms")
-    .eq("integration", integration)
-    .gte("occurred_at", sinceIso)
-    .order("occurred_at", { ascending: false })
-    .limit(200);
+  let data: Array<{
+    success: boolean | null;
+    occurred_at: string | null;
+    error_message: string | null;
+    latency_ms: number | null;
+  }> | null = null;
+  try {
+    const result = await supabase
+      .from("system_health_integration_calls")
+      .select("success, occurred_at, error_message, latency_ms")
+      .eq("integration", integration)
+      .gte("occurred_at", sinceIso)
+      .order("occurred_at", { ascending: false })
+      .limit(200);
+    if (result.error && isHungQueryError(result.error)) return null;
+    data = result.data;
+  } catch (error) {
+    if (isHungQueryError(error)) return null;
+    throw error;
+  }
   const rows = data ?? [];
   const total = rows.length;
   const failures = rows.filter((r) => r.success === false).length;
@@ -134,7 +161,8 @@ export async function runFunctionalHealthChecks(): Promise<{
     schemaReady: boolean;
   };
 }> {
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: SYSTEM_HEALTH_PROBE_TIMEOUT_MS });
+  const hungSupabase = getHungTableSupabase();
   const started = Date.now();
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -162,21 +190,25 @@ export async function runFunctionalHealthChecks(): Promise<{
       return { data: null as T | null, error: null };
     }
   };
-  /** `live_transition_dogs` / `gingr_webhook_events` hang in production — never block the suite. */
-  const safeHungTable = async <T,>(
-    fn: () => PromiseLike<{ data: T | null; error?: { message?: string } | null }>
+  /** Known-hung tables: abort the fetch at 1.2s and skip while cooling down. */
+  const queryHungRow = async <T,>(
+    table: string,
+    work: () => PromiseLike<{ data: T | null; error?: { message?: string } | null }>
   ): Promise<{ data: T | null; timedOut: boolean }> => {
-    const sentinel = Symbol("hung-table-timeout");
-    const result = await Promise.race([
-      Promise.resolve(fn())
-        .then((row) => ({ data: row.data ?? null, timedOut: false }))
-        .catch(() => ({ data: null as T | null, timedOut: true })),
-      new Promise<{ data: T | null; timedOut: boolean }>((resolve) => {
-        setTimeout(() => resolve({ data: null, timedOut: true }), SYSTEM_HEALTH_HUNG_TABLE_TIMEOUT_MS);
-      })
-    ]);
-    void sentinel;
-    return result;
+    if (isHungTableInCooldown(table)) {
+      return { data: null, timedOut: true };
+    }
+    try {
+      const row = await work();
+      if (row.error && isHungQueryError(row.error)) {
+        markHungTableTimeout(table);
+        return { data: null, timedOut: true };
+      }
+      return { data: row.data ?? null, timedOut: false };
+    } catch (error) {
+      if (isHungQueryError(error)) markHungTableTimeout(table);
+      return { data: null, timedOut: true };
+    }
   };
 
   const [
@@ -203,36 +235,28 @@ export async function runFunctionalHealthChecks(): Promise<{
   ] = await Promise.all([
     (async () => {
       const t0 = Date.now();
-      try {
-        const result = await withTimeoutFallback(
-          Promise.resolve(
-            supabase.from("admin_settings").select("id").eq("id", "default").maybeSingle()
-          ).then((row) => ({
-            data: row.data,
-            error: row.error ? { message: row.error.message } : null
-          })),
-          SYSTEM_HEALTH_PROBE_TIMEOUT_MS,
-          { data: null, error: { message: "Database probe timed out" } }
-        );
-        return { ...result, latencyMs: Date.now() - t0 };
-      } catch {
-        return {
-          data: null,
-          error: { message: "Database probe timed out" },
-          latencyMs: Date.now() - t0
-        };
-      }
+      const row = await queryHungRow<{ id?: string }>(HUNG_TABLES.adminSettings, () =>
+        hungSupabase.from("admin_settings").select("id").eq("id", "default").maybeSingle()
+      );
+      return {
+        data: row.data,
+        error: row.timedOut ? { message: "Database probe timed out" } : null,
+        timedOut: row.timedOut,
+        latencyMs: Date.now() - t0
+      };
     })(),
-    safeHungTable<{ created_at: string | null; processing_error: string | null }>(() =>
-      supabase
-        .from("gingr_webhook_events")
-        .select("created_at, processing_error")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
+    queryHungRow<{ created_at: string | null; processing_error: string | null }>(
+      HUNG_TABLES.gingrWebhookEvents,
+      () =>
+        hungSupabase
+          .from("gingr_webhook_events")
+          .select("created_at, processing_error")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
     ),
-    safeHungTable<{ last_seen_from_gingr_at: string | null }>(() =>
-      supabase
+    queryHungRow<{ last_seen_from_gingr_at: string | null }>(HUNG_TABLES.liveTransitionDogs, () =>
+      hungSupabase
         .from("live_transition_dogs")
         .select("last_seen_from_gingr_at")
         .not("last_seen_from_gingr_at", "is", null)
@@ -243,8 +267,8 @@ export async function runFunctionalHealthChecks(): Promise<{
     withTimeoutFallback(loadSystemHealthAudit(supabase), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, null).catch(
       () => null
     ),
-    countErrors(supabase, hourAgo).catch(() => 0),
-    countErrors(supabase, dayAgo).catch(() => 0),
+    withTimeoutFallback(countErrors(supabase, hourAgo), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, 0).catch(() => 0),
+    withTimeoutFallback(countErrors(supabase, dayAgo), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, 0).catch(() => 0),
     safeCount(() =>
       supabase
         .from("system_health_errors")
@@ -280,9 +304,15 @@ export async function runFunctionalHealthChecks(): Promise<{
         .limit(1)
         .maybeSingle()
     ),
-    integrationStats(supabase, "gingr", dayAgo).catch(() => null),
-    integrationStats(supabase, "samsara", dayAgo).catch(() => null),
-    integrationStats(supabase, "twilio", dayAgo).catch(() => null),
+    withTimeoutFallback(integrationStats(supabase, "gingr", dayAgo), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, null).catch(
+      () => null
+    ),
+    withTimeoutFallback(integrationStats(supabase, "samsara", dayAgo), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, null).catch(
+      () => null
+    ),
+    withTimeoutFallback(integrationStats(supabase, "twilio", dayAgo), SYSTEM_HEALTH_PROBE_TIMEOUT_MS, null).catch(
+      () => null
+    ),
     (async () => {
       try {
         const r = await withTimeoutFallback(
@@ -526,15 +556,19 @@ export async function runFunctionalHealthChecks(): Promise<{
     {
       id: "database",
       label: "Database",
-      status: dbProbe.error ? "FAILED" : "HEALTHY",
+      status: dbProbe.timedOut ? "WARNING" : dbProbe.error ? "FAILED" : "HEALTHY",
       responseTimeMs: dbMs,
-      lastSuccessAt: dbProbe.error ? null : new Date().toISOString(),
-      lastFailureAt: dbProbe.error ? new Date().toISOString() : null,
+      lastSuccessAt: dbProbe.error || dbProbe.timedOut ? null : new Date().toISOString(),
+      lastFailureAt: dbProbe.error || dbProbe.timedOut ? new Date().toISOString() : null,
       lastError: dbProbe.error?.message || null,
       errorsLastHour: 0,
       errorsLast24h: 0,
       successRate24h: null,
-      detail: dbProbe.error ? "Database probe failed." : `admin_settings probe ok (${dbMs} ms).`
+      detail: dbProbe.timedOut
+        ? "admin_settings probe skipped or timed out — not stacking hung JSONB reads this cycle."
+        : dbProbe.error
+          ? "Database probe failed."
+          : `admin_settings probe ok (${dbMs} ms).`
     },
     {
       id: "authentication",
@@ -754,24 +788,27 @@ export async function runFunctionalHealthChecks(): Promise<{
 
   const systemHealth = aggregateSystemHealth(services);
 
-  // Persist latest checks (best-effort)
-  try {
-    const rows = services.map((s) => ({
-      service_id: s.id,
-      status: s.status,
-      response_time_ms: s.responseTimeMs,
-      last_success_at: s.lastSuccessAt,
-      last_failure_at: s.lastFailureAt,
-      last_error: s.lastError,
-      errors_last_hour: s.errorsLastHour,
-      errors_last_24h: s.errorsLast24h,
-      success_rate_24h: s.successRate24h,
-      detail: s.detail,
-      checked_at: new Date().toISOString()
-    }));
-    await supabase.from("system_health_service_checks").insert(rows);
-  } catch {
-    /* ignore */
+  // Persist latest checks (best-effort). Never write while hung tables are
+  // cooling — inserts on a struggling pool are how dashboard polls take every tab down.
+  if (!anyHungTableInCooldown()) {
+    try {
+      const rows = services.map((s) => ({
+        service_id: s.id,
+        status: s.status,
+        response_time_ms: s.responseTimeMs,
+        last_success_at: s.lastSuccessAt,
+        last_failure_at: s.lastFailureAt,
+        last_error: s.lastError,
+        errors_last_hour: s.errorsLastHour,
+        errors_last_24h: s.errorsLast24h,
+        success_rate_24h: s.successRate24h,
+        detail: s.detail,
+        checked_at: new Date().toISOString()
+      }));
+      await supabase.from("system_health_service_checks").insert(rows);
+    } catch {
+      /* ignore */
+    }
   }
 
   const queueDepth =

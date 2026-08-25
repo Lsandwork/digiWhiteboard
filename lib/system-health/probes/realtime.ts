@@ -8,6 +8,13 @@ import type { HealthStatus } from "@/lib/system-health/types";
 import type { getServiceSupabase } from "@/lib/supabase/server";
 import { supabaseProjectUrl } from "@/lib/system-health/probes/storage";
 import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+import {
+  getHungTableSupabase,
+  HUNG_TABLES,
+  isHungQueryError,
+  isHungTableInCooldown,
+  markHungTableTimeout
+} from "@/lib/hung-table-guard";
 
 type Supabase = ReturnType<typeof getServiceSupabase>;
 
@@ -114,39 +121,36 @@ async function loadBoardFreshest(supabase: Supabase): Promise<{
       return { at: String(eventFresh.data.occurred_at), error: null };
     }
 
-    // `live_transition_dogs` hangs in production — hard-cap so AbortError never escapes.
-    const hung = await withTimeoutFallback(
-      (async () => {
-        const [byUpdated, bySeen] = await Promise.all([
-          supabase
-            .from("live_transition_dogs")
-            .select("updated_at, last_seen_from_gingr_at")
-            .order("updated_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from("live_transition_dogs")
-            .select("updated_at, last_seen_from_gingr_at")
-            .not("last_seen_from_gingr_at", "is", null)
-            .order("last_seen_from_gingr_at", { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        ]);
-        const err = byUpdated.error?.message || bySeen.error?.message || null;
-        const at = freshestIso(
-          byUpdated.data?.updated_at ? String(byUpdated.data.updated_at) : null,
-          byUpdated.data?.last_seen_from_gingr_at
-            ? String(byUpdated.data.last_seen_from_gingr_at)
-            : null,
-          bySeen.data?.updated_at ? String(bySeen.data.updated_at) : null,
-          bySeen.data?.last_seen_from_gingr_at ? String(bySeen.data.last_seen_from_gingr_at) : null
-        );
-        return { at, error: at ? null : err };
-      })(),
-      REALTIME_BOARD_FRESH_TIMEOUT_MS,
-      { at: null, error: "board_freshest_timeout" }
-    );
-    return hung;
+    if (isHungTableInCooldown(HUNG_TABLES.liveTransitionDogs)) {
+      return { at: null, error: "board_freshest_skipped" };
+    }
+
+    // Abort the fetch at 1.2s. Racing an 8s client still occupies a Postgres backend.
+    const hungClient = getHungTableSupabase(REALTIME_BOARD_FRESH_TIMEOUT_MS);
+    try {
+      const byUpdated = await hungClient
+        .from("live_transition_dogs")
+        .select("updated_at, last_seen_from_gingr_at")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (byUpdated.error && isHungQueryError(byUpdated.error)) {
+        markHungTableTimeout(HUNG_TABLES.liveTransitionDogs);
+        return { at: null, error: "board_freshest_timeout" };
+      }
+      const at = freshestIso(
+        byUpdated.data?.updated_at ? String(byUpdated.data.updated_at) : null,
+        byUpdated.data?.last_seen_from_gingr_at
+          ? String(byUpdated.data.last_seen_from_gingr_at)
+          : null
+      );
+      return { at, error: at ? null : byUpdated.error?.message || null };
+    } catch (error) {
+      if (isHungQueryError(error)) {
+        markHungTableTimeout(HUNG_TABLES.liveTransitionDogs);
+      }
+      return { at: null, error: "board_freshest_timeout" };
+    }
   } catch (err) {
     return { at: null, error: err instanceof Error ? err.message : String(err) };
   }
