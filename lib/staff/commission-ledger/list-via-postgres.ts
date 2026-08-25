@@ -143,7 +143,26 @@ limit ${param(pageSize)} offset ${param(from)}`;
   return { text, values, page, pageSize, from };
 }
 
-async function connectPg(): Promise<Client> {
+export async function withCommissionPostgres<T>(
+  work: (client: Client) => Promise<T>,
+  options?: { queryTimeoutMs?: number; statementTimeoutMs?: number }
+): Promise<T> {
+  const client = await connectPg(options);
+  try {
+    return await work(client);
+  } finally {
+    try {
+      await client.end();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+async function connectPg(options?: {
+  queryTimeoutMs?: number;
+  statementTimeoutMs?: number;
+}): Promise<Client> {
   const hasPassword = Boolean(
     (process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD)?.trim()
   );
@@ -154,6 +173,8 @@ async function connectPg(): Promise<Client> {
         { usePooler: true, port: "5432" }
       ]
     : [{ usePooler: true }];
+  const queryTimeoutMs = options?.queryTimeoutMs ?? STATEMENT_TIMEOUT_MS;
+  const statementTimeoutMs = options?.statementTimeoutMs ?? STATEMENT_TIMEOUT_MS;
   let lastError: unknown;
   const seen = new Set<string>();
   for (const attempt of attempts) {
@@ -164,12 +185,12 @@ async function connectPg(): Promise<Client> {
       connectionString: databaseUrl,
       ssl: { rejectUnauthorized: false },
       connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
-      query_timeout: STATEMENT_TIMEOUT_MS
+      query_timeout: queryTimeoutMs
     });
     try {
       await client.connect();
       if (attempt.port !== "6543") {
-        await client.query(`set statement_timeout = ${STATEMENT_TIMEOUT_MS}`);
+        await client.query(`set statement_timeout = ${statementTimeoutMs}`);
       }
       return client;
     } catch (error) {

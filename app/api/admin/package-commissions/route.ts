@@ -562,7 +562,14 @@ export async function POST(request: Request) {
       if (!canManage) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
       const mutationSupabase = getServiceSupabase({ timeoutMs: COMMISSIONS_MUTATION_TIMEOUT_MS });
       try {
-        const trainers = await listCommissionTrainersFromDb(mutationSupabase);
+        let trainers: Awaited<ReturnType<typeof listCommissionTrainersFromDb>> = [];
+        try {
+          trainers = await listCommissionTrainersFromDb(
+            getServiceSupabase({ timeoutMs: COMMISSIONS_OPTIONAL_TIMEOUT_MS })
+          );
+        } catch {
+          trainers = [];
+        }
         const result = await importCommissionCsvToLedger(mutationSupabase, viewer, actor, {
           csvText: String(body.csv ?? ""),
           filename: body.filename != null ? String(body.filename) : "upload.csv",
