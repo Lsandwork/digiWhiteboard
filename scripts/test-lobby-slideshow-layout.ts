@@ -117,6 +117,28 @@ assert.match(css, /\.lobby-checkout-showcase\[data-count="2"\]/);
 assert.match(css, /\.lobby-checkout-showcase\[data-count="4"\]/);
 assert.match(css, /\.lobby-checkout-showcase\[data-count="6"\]/);
 
+{
+  const oneDog = ruleBodiesForSelector(css, '.lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog').join("\n");
+  assert.match(oneDog, /flex-direction:\s*column/, "a single checkout dog must fill the TV as a centered hero");
+  assert.doesNotMatch(oneDog, /flex-direction:\s*row/, "a single checkout dog must not park the name in a side column");
+}
+
+{
+  const oneDogMeta = ruleBodiesForSelector(css, '.lobby-checkout-showcase[data-count="1"] .lobby-checkout-dog__meta').join("\n");
+  assert.match(oneDogMeta, /text-align:\s*center/, "single-dog name and status sit under the photo");
+  assert.match(oneDogMeta, /align-items:\s*center/);
+}
+
+{
+  const image = ruleBodiesForSelector(css, ".lobby-checkout-dog__image").join("\n");
+  assert.match(image, /max-width:\s*100%/, "checkout photos must fit the portrait box");
+  assert.match(image, /max-height:\s*100%/, "checkout photos must fit the portrait box");
+  assert.match(image, /min-height:\s*0/, "checkout photos must be allowed to shrink instead of clipping");
+  assert.match(image, /object-position:\s*center bottom/, "visible photo sits on the name, not floating in empty space");
+}
+
+assert.match(board, /checkoutActive \? "grid-cols-1"/, "active checkout must drop the idle two-column grid");
+
 assertObjectFitContain(css, ".lobby-checkout-dog__image");
 assertObjectFitContain(css, ".lobby-checkout-dog__fallback");
 
