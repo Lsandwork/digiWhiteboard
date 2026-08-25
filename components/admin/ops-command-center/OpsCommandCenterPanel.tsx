@@ -272,13 +272,15 @@ export function OpsCommandCenterPanel({
             className={`rounded-full border px-3 py-1 text-xs ${
               data.pending || loading || data.gingrHealth.status === "healthy"
                 ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
-                : data.gingrHealth.status === "degraded"
-                  ? "border-amber-400/40 bg-amber-500/10 text-amber-100"
-                  : "border-red-400/40 bg-red-500/10 text-red-100"
+                : data.gingrHealth.status === "offline"
+                  ? "border-red-400/40 bg-red-500/10 text-red-100"
+                  : "border-amber-400/40 bg-amber-500/10 text-amber-100"
             }`}
             title={data.gingrHealth.detail || undefined}
           >
-            {data.pending || loading ? "Gingr ● Checking…" : data.gingrHealth.label}
+            {data.pending || loading || data.gingrHealth.status === "unknown"
+              ? "Gingr ● Checking…"
+              : data.gingrHealth.label}
           </span>
           <button type="button" className="admin-btn-secondary" onClick={() => void load()}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -294,7 +296,7 @@ export function OpsCommandCenterPanel({
         </div>
       ) : null}
 
-      {!data.pending && !loading && data.gingrHealth.status !== "healthy" && data.gingrHealth.status !== "degraded" ? (
+      {!data.pending && !loading && data.gingrHealth.status === "offline" ? (
         <div className="flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
