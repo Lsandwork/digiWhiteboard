@@ -40,6 +40,20 @@ export async function downloadCastTvStorageFile(
       return { bytes: Buffer.from(await data.arrayBuffer()), bucket: target };
     }
     lastMessage = error?.message || lastMessage;
+
+    const { data: published } = supabase.storage.from(target).getPublicUrl(storagePath);
+    if (!published?.publicUrl) continue;
+    try {
+      const response = await fetch(published.publicUrl, { cache: "no-store" });
+      if (!response.ok) {
+        lastMessage = `Unable to read CAST-TV file (${response.status}).`;
+        continue;
+      }
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length) return { bytes, bucket: target };
+    } catch (caught) {
+      lastMessage = caught instanceof Error && caught.message.trim() ? caught.message.trim() : lastMessage;
+    }
   }
   throw new Error(lastMessage);
 }

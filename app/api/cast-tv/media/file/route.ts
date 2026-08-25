@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isLocalCastTvAsset, transcodeCastTvDisplayImage } from "@/lib/cast-tv/display-image";
+import { isTransientCastTvStorageError } from "@/lib/cast-tv/errors";
 import { loadCastTvLibrary } from "@/lib/cast-tv/library-store";
 import { downloadCastTvStorageFile } from "@/lib/cast-tv/stored-image";
 import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
@@ -45,7 +46,8 @@ export async function GET(request: Request) {
         "X-Content-Type-Options": "nosniff"
       }
     });
-  } catch {
-    return NextResponse.json({ error: "Unable to display this CAST-TV photo." }, { status: 404 });
+  } catch (error) {
+    const status = isTransientCastTvStorageError(error) ? 503 : 404;
+    return NextResponse.json({ error: "Unable to display this CAST-TV photo." }, { status });
   }
 }

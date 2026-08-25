@@ -472,7 +472,12 @@ assert.doesNotMatch(player, /playlist\.map/);
 
 const fileRoute = readFileSync(join(root, "app/api/cast-tv/media/file/route.ts"), "utf8");
 assert.match(fileRoute, /transcodeCastTvDisplayImage/);
+assert.match(fileRoute, /isTransientCastTvStorageError/);
+assert.match(fileRoute, /\? 503 : 404/);
 assert.match(uploadClient, /isDuplicateUploadError/);
+const storedImage = readFileSync(join(root, "lib/cast-tv/stored-image.ts"), "utf8");
+assert.match(storedImage, /getPublicUrl/);
+assert.match(storedImage, /cache: "no-store"/);
 
 const libraryMigration = readFileSync(join(root, "supabase/migrations/088_cast_tv_library_storage.sql"), "utf8");
 assert.match(libraryMigration, /application\/json/);

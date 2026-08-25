@@ -36,6 +36,8 @@ assert.match(read("app/api/cast-tv/media/upload-url/route.ts"), /handleCastTvWri
 assert.match(read("lib/cast-tv/upload-client.ts"), /canFallbackToCastTvServerUpload/);
 assert.match(read("lib/cast-tv/upload-client.ts"), /isDuplicateUploadError/);
 assert.match(read("app/api/cast-tv/media/file/route.ts"), /transcodeCastTvDisplayImage/);
+assert.match(read("app/api/cast-tv/media/file/route.ts"), /isTransientCastTvStorageError/);
+assert.match(read("lib/cast-tv/stored-image.ts"), /getPublicUrl/);
 assert.match(read("next.config.mjs"), /"sharp"/);
 
 console.log("cast-tv access tests passed");
