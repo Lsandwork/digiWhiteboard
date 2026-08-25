@@ -80,6 +80,10 @@ const board = source("components/lobby/LobbyCheckoutBoard.tsx");
 assert.doesNotMatch(board, /LobbyValuesFooter/);
 assert.doesNotMatch(board, /Safe, Loving Environment/);
 assert.match(board, /LobbyClassSchedule band/);
+assert.match(board, /useLayoutEffect/);
+assert.match(css, /\.lobby-has-checkout \.lobby-main-grid/);
+assert.doesNotMatch(board, /LobbyFeaturedCard/);
+assert.doesNotMatch(board, /LobbyQueueList/);
 assert.ok(
   board.indexOf("lobby-main-grid") < board.indexOf("LobbyClassSchedule band"),
   "class schedule must sit below the main slideshow/social grid"
@@ -91,5 +95,34 @@ assert.ok(
 }
 
 assert.match(css, /\.lobby-class-schedule--band \.lobby-class-schedule__footer/);
+
+{
+  const subtitle = ruleBodiesForSelector(css, "html.lobby-tv-display .lobby-header-subtitle").join("\n");
+  assert.match(subtitle, /display:\s*none/, "TV header thank-you line must collapse so slideshow can grow");
+}
+
+{
+  const wordmark = ruleBodiesForSelector(css, "html.lobby-tv-display .lobby-header__wordmark").join("\n");
+  assert.match(wordmark, /1\.85rem/, "TV Fitdog wordmark must stay compact");
+}
+
+{
+  const idleGrid = ruleBodiesForSelector(css, "html.lobby-tv-display .lobby-idle-state .lobby-main-grid").join("\n");
+  assert.match(idleGrid, /1\.12fr/, "idle TV layout must give social moments a wider column");
+}
+
+assert.match(css, /html\.lobby-tv-display \.lobby-has-checkout \.social-moments-card/);
+assert.match(css, /\.lobby-has-checkout \.social-moments-card/);
+assert.match(css, /\.lobby-checkout-showcase\[data-count="2"\]/);
+assert.match(css, /\.lobby-checkout-showcase\[data-count="4"\]/);
+assert.match(css, /\.lobby-checkout-showcase\[data-count="6"\]/);
+
+assertObjectFitContain(css, ".lobby-checkout-dog__image");
+assertObjectFitContain(css, ".lobby-checkout-dog__fallback");
+
+const showcase = source("components/lobby/LobbyCheckoutShowcase.tsx");
+assert.doesNotMatch(showcase, /object-cover/, "checkout portraits must not crop dogs");
+assert.match(showcase, /data-count=\{Math\.min\(dogs\.length, 6\)\}/);
+assert.match(showcase, /Checking out now/);
 
 console.log("lobby slideshow layout tests passed");
