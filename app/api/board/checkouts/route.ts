@@ -7,10 +7,10 @@ import {
   refreshRetiredTransitionKeys,
   sweepExpiredTransitionRows
 } from "@/lib/board-fast-checkout";
-import { FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
+import { fastCheckoutCacheTtlMs, getOrLoadFastCheckoutCache, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
-import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
+import { debugBoardLog, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
 import { shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
       loadFastBoardTransitions(getServiceSupabase({ timeoutMs: FAST_CHECKOUT_QUERY_TIMEOUT_MS }), now);
     const result = fresh
       ? await loadCheckouts()
-      : await getOrLoadTtlCache("board-checkouts:fast", FAST_CHECKOUT_CACHE_TTL_MS, loadCheckouts);
+      : await getOrLoadFastCheckoutCache("board-checkouts:fast", loadCheckouts);
     const durationMs = Date.now() - startedAt;
     const payload = {
       checking_in: result.checking_in,
@@ -63,7 +63,13 @@ export async function GET(request: Request) {
         : {})
     };
 
-    if (fresh) setTtlCache("board-checkouts:fast", result, FAST_CHECKOUT_CACHE_TTL_MS);
+    if (fresh) {
+      setTtlCache(
+        "board-checkouts:fast",
+        result,
+        fastCheckoutCacheTtlMs(result.checking_in.length, result.checking_out.length)
+      );
+    }
     if (result.checking_in.length || result.checking_out.length) {
       setTtlCache(LAST_GOOD_KEY, payload, 120_000);
     }

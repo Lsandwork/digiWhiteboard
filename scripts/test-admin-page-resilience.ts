@@ -33,7 +33,7 @@ assert.equal(skipHungBoardSnapshots("lobby", "content"), false);
 assert.equal(skipDashboardBackgroundHydrate("staff", "overview"), true);
 assert.equal(skipDashboardBackgroundHydrate("staff", "ops_system_health"), true);
 assert.equal(skipDashboardBackgroundHydrate("staff", "package_commissions"), true);
-assert.equal(skipDashboardBackgroundHydrate("staff", "my_shift"), false);
+assert.equal(skipDashboardBackgroundHydrate("staff", "my_shift"), true);
 assert.equal(skipDashboardBackgroundHydrate("staff", "integrations"), false);
 assert.equal(skipDashboardBackgroundHydrate("marketing", "cast_tv"), true);
 assert.equal(OVERVIEW_QUERY_TIMEOUT_MS, 4_000);
@@ -271,6 +271,25 @@ assert.match(liveFleetCron, /ensureLiveFleetSchemaCached/);
 const tlCron = readFileSync("app/api/cron/tl-digi-board-sync/route.ts", "utf8");
 assert.match(tlCron, /SCHEMA_RECHECK_MS/);
 assert.match(tlCron, /maxDuration = 25/);
+
+const snapshotSource = readFileSync("lib/ops-command-center/snapshot.ts", "utf8");
+assert.match(snapshotSource, /loadLatestGingrWebhookEvent/);
+
+const systemHealthSource = readFileSync("lib/ops-command-center/system-health.ts", "utf8");
+assert.match(systemHealthSource, /loadLatestGingrWebhookEvent/);
+
+const healthChecksSource = readFileSync("lib/system-health/health-checks.ts", "utf8");
+assert.match(healthChecksSource, /loadLatestGingrWebhookEvent/);
+
+const settingsJsonStore = readFileSync("lib/admin/settings-json-store.ts", "utf8");
+assert.match(settingsJsonStore, /ADMIN_SETTINGS_KEY_CACHE_TTL_MS/);
+assert.doesNotMatch(settingsJsonStore, /\.from\("admin_settings"\)\s*\.select\("settings"\)/);
+
+const webhookIndexMigration = readFileSync(
+  "supabase/migrations/089_gingr_webhook_and_board_probe_indexes.sql",
+  "utf8"
+);
+assert.match(webhookIndexMigration, /gingr_webhook_events_created_at_idx/);
 
 async function testHtmlGuard() {
   const html = new Response("<!DOCTYPE html><html><title>Error</title>Error code 522</html>", {

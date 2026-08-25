@@ -6,17 +6,18 @@ import {
   BOARD_CHECKOUT_POLL_MS,
   BOARD_REALTIME_CONFIRM_MS
 } from "../lib/board-checkout-merge";
-import { FAST_CHECKOUT_CACHE_TTL_MS, LIVE_BOARD_CACHE_TTL_MS } from "../lib/board-settings-cache";
+import { EMPTY_FAST_CHECKOUT_CACHE_TTL_MS, FAST_CHECKOUT_CACHE_TTL_MS, LIVE_BOARD_CACHE_TTL_MS } from "../lib/board-settings-cache";
 import { getGingrBoardRefreshIntervalMs } from "../lib/gingr-board-refresh";
 
 function source(relativePath: string) {
   return readFileSync(join(process.cwd(), relativePath), "utf8");
 }
 
-assert.equal(BOARD_CHECKOUT_POLL_EMPTY_MS, 500);
+assert.equal(BOARD_CHECKOUT_POLL_EMPTY_MS, 2_000);
 assert.equal(BOARD_CHECKOUT_POLL_MS, 1000);
 assert.equal(BOARD_REALTIME_CONFIRM_MS, 200);
 assert.ok(FAST_CHECKOUT_CACHE_TTL_MS <= 200, "fast checkout TTL must stay well under one poll");
+assert.ok(EMPTY_FAST_CHECKOUT_CACHE_TTL_MS >= BOARD_CHECKOUT_POLL_EMPTY_MS);
 assert.ok(LIVE_BOARD_CACHE_TTL_MS <= 500);
 assert.ok(getGingrBoardRefreshIntervalMs() <= 2000);
 

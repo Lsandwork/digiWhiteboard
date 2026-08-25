@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { resolveActiveCheckinDisplayUntil, shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { resolveActiveCheckoutDisplayUntil, shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
+import { invalidateLatestGingrWebhookCache } from "@/lib/gingr-webhook-latest";
 import { getGingrWebhookSignatureKey } from "@/lib/env";
 import { normalizeDog, resolveActiveBoardWebhookType, verifyGingrSignature, type GingrWebhookPayload } from "@/lib/gingr";
 import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
@@ -72,6 +73,7 @@ async function recordWebhookEvent(
     return null;
   }
 
+  invalidateLatestGingrWebhookCache();
   return data?.id ?? null;
 }
 
@@ -286,6 +288,8 @@ export async function POST(request: Request) {
   if (eventError) {
     return NextResponse.json({ error: "Unable to store webhook event." }, { status: 500 });
   }
+
+  invalidateLatestGingrWebhookCache();
 
   if (!verified) {
     return NextResponse.json({ error: "Invalid webhook signature." }, { status: 403 });

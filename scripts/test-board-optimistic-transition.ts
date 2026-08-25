@@ -12,8 +12,8 @@ import { applyOptimisticLiveBoardTransition } from "../lib/board-optimistic-tran
 import type { LiveBoardResponse, LiveDog } from "../lib/types";
 
 assert.equal(BOARD_CHECKOUT_POLL_MS, 1000);
-assert.equal(BOARD_CHECKOUT_POLL_EMPTY_MS, 500);
-assert.ok(BOARD_CHECKOUT_POLL_EMPTY_MS < BOARD_CHECKOUT_POLL_MS);
+assert.equal(BOARD_CHECKOUT_POLL_EMPTY_MS, 2_000);
+assert.ok(BOARD_CHECKOUT_POLL_EMPTY_MS >= BOARD_CHECKOUT_POLL_MS, "empty board may poll slower than active board");
 assert.equal(BOARD_REALTIME_CONFIRM_MS, 200);
 
 function dog(overrides: Partial<LiveDog>): LiveDog {

@@ -3,6 +3,7 @@ import { isSamsaraLiveConfigured } from "@/lib/route-generator/samsara-live";
 import { getSmsProvider } from "@/lib/integrations/sms/provider";
 import { loadSystemHealthAudit, toOverviewSystemHealth } from "@/lib/admin/system-health-audit";
 import { evaluateGingrHealth } from "@/lib/ops-command-center/gingr-health";
+import { loadLatestGingrWebhookEvent } from "@/lib/gingr-webhook-latest";
 import { probeCloudStorage } from "@/lib/system-health/probes/storage";
 import {
   getHungTableSupabase,
@@ -59,14 +60,18 @@ export async function buildOpsSystemHealth() {
   };
 
   const [webhook, lastDogSeen, audit, boardCount, storage] = await Promise.all([
-    queryHung<{ created_at: string | null; processing_error: string | null }>(HUNG_TABLES.gingrWebhookEvents, () =>
-      hung
-        .from("gingr_webhook_events")
-        .select("created_at, processing_error")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle()
-    ),
+    queryHung<{ created_at: string | null; processing_error: string | null }>(HUNG_TABLES.gingrWebhookEvents, async () => {
+      const { row, timedOut } = await loadLatestGingrWebhookEvent({
+        columns: "created_at, processing_error"
+      });
+      if (timedOut) return { data: null, error: { message: "Database probe timed out" } };
+      return {
+        data: row
+          ? { created_at: row.created_at, processing_error: row.processing_error ?? null }
+          : null,
+        error: null
+      };
+    }),
     queryHung<{ last_seen_from_gingr_at: string | null }>(HUNG_TABLES.liveTransitionDogs, () =>
       hung
         .from("live_transition_dogs")

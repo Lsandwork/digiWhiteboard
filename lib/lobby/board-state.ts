@@ -1,4 +1,8 @@
-import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS } from "@/lib/board-settings-cache";
+import {
+  cachedLoadLobbySettings,
+  getOrLoadLobbyCheckoutCache,
+  lobbyCheckoutCacheTtlMs
+} from "@/lib/board-settings-cache";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { loadLobbyCheckoutDogs, loadLobbyCheckoutDogsFast } from "@/lib/lobby/checkout";
 import { LOBBY_IDLE_SLIDESHOW } from "@/lib/lobby/slideshow";
@@ -94,9 +98,8 @@ export async function buildLobbyBoardState(
   let checkoutError: string | undefined;
   let stale = false;
 
-  const checkoutResult = await getOrLoadTtlCache(
+  const checkoutResult = await getOrLoadLobbyCheckoutCache(
     options.fast ? "lobby-board-state:fast" : "lobby-board-state:full",
-    FAST_CHECKOUT_CACHE_TTL_MS,
     async () => {
       if (options.fast) return loadLobbyCheckoutDogsFast(supabase, now);
       return loadLobbyCheckoutDogs(supabase, settings.max_queue_count, now);
@@ -143,9 +146,16 @@ export async function loadLobbyBoardState(
   const lastGoodKey = `${cacheKey}:last-good`;
 
   try {
-    const payload = await getOrLoadTtlCache(cacheKey, FAST_CHECKOUT_CACHE_TTL_MS, () =>
+    const payload = await getOrLoadTtlCache(cacheKey, lobbyCheckoutCacheTtlMs(0, 0), () =>
       buildLobbyBoardState(supabase, options)
-    );
+    ).then((loaded) => {
+      setTtlCache(
+        cacheKey,
+        loaded,
+        lobbyCheckoutCacheTtlMs(loaded.checkouts.counts.active, loaded.checkouts.counts.queue)
+      );
+      return loaded;
+    });
     if (payload.checkouts.counts.active > 0 || payload.checkouts.basket_filtered) {
       setTtlCache(lastGoodKey, payload, 120_000);
     }
