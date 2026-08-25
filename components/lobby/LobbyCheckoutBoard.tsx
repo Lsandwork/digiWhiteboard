@@ -597,7 +597,7 @@ export function LobbyCheckoutBoard({
           </div>
         ) : null}
 
-        <div className="lobby-main-grid mt-3 grid min-h-0 flex-1 grid-cols-[1.75fr_1fr] gap-4">
+        <div className={`lobby-main-grid mt-3 grid min-h-0 flex-1 ${checkoutActive ? "grid-cols-1" : "grid-cols-[1.75fr_1fr]"} gap-4`}>
           {checkoutActive ? (
             <LobbyCheckoutShowcase dogs={showcaseDogs} />
           ) : (
