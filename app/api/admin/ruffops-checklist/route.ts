@@ -3,7 +3,6 @@ import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth"
 import { canAccessAdminTab, accessFromLegacyRole } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { normalizeAdminUserId } from "@/lib/admin/users";
-import { getRequestUserAccess } from "@/lib/auth/permissions";
 import { parseChecklistItemKey, sourceForParsedKey, sourceIdForParsedKey } from "@/lib/ruffops-checklist/keys";
 import {
   undoChecklistCompletion,
@@ -37,9 +36,7 @@ async function requireChecklistAccess(request: Request) {
   if (!session?.email) {
     return { error: NextResponse.json({ error: "Unauthorized." }, { status: 401 }) };
   }
-  const access =
-    (await getRequestUserAccess(request)) ??
-    accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role);
+  const access = accessFromLegacyRole(session.adminUserId ?? null, session.email, session.role);
   if (!canAccessAdminTab(access, "ruffops_checklist", session.role, "staff")) {
     return { error: NextResponse.json({ error: "You do not have access to the RuffOps Checklist." }, { status: 403 }) };
   }
@@ -51,7 +48,7 @@ export async function GET(request: Request) {
   if (gate.error) return gate.error;
 
   try {
-    const supabase = getServiceSupabase();
+    const supabase = getServiceSupabase({ timeoutMs: 8_000 });
     const state = await loadRuffopsChecklistState(supabase, {
       userId: gate.session.adminUserId,
       legacyRole: gate.session.role,
@@ -76,7 +73,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unknown checklist item." }, { status: 400 });
   }
 
-  const supabase = getServiceSupabase();
+  const supabase = getServiceSupabase({ timeoutMs: 8_000 });
   const actorUserId = normalizeAdminUserId(gate.session.adminUserId);
 
   try {

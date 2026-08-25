@@ -17,8 +17,19 @@ assert.doesNotMatch(loginSource, /LOGIN_VERIFY_TIMEOUT_MS/);
 assert.doesNotMatch(loginSource, /withTimeoutOrThrow/);
 assert.match(loginSource, /const auth = await verifyAdminCredentials\(username, password\);/);
 assert.match(loginSource, /Sign-in is temporarily unavailable/);
+assert.match(loginSource, /auth\.unavailable/);
+assert.doesNotMatch(
+  loginSource,
+  /if \(!auth\.ok\) \{\s*recordFailedLogin/
+);
+
+assert.match(authSource, /unavailable\?: boolean/);
+assert.match(authSource, /findAdminUsersForLogin/);
+assert.match(authSource, /\$\{normalized\}@fitdog\.com/);
 
 assert.match(usersSource, /export async function findAdminUsersByEmails/);
+assert.match(usersSource, /export async function findAdminUsersForLogin/);
+assert.match(usersSource, /ADMIN_LOGIN_USER_COLUMNS/);
 assert.match(usersSource, /\.in\("email", normalized\)/);
 assert.match(
   usersSource,

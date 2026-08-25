@@ -34,6 +34,12 @@ export async function POST(request: Request) {
 
     const auth = await verifyAdminCredentials(username, password);
     if (!auth.ok) {
+      if (auth.unavailable) {
+        return NextResponse.json(
+          { error: "Sign-in is temporarily unavailable. Please try again in a moment." },
+          { status: 503 }
+        );
+      }
       recordFailedLogin(`${clientKey}:${username.toLowerCase()}`);
       return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
     }
