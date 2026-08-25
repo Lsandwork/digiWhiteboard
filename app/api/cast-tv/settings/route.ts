@@ -5,6 +5,7 @@ import { resolveCastTvManager } from "@/lib/cast-tv/api-auth";
 import { castTvErrorMessage } from "@/lib/cast-tv/errors";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
 import { getCastTvSupabase } from "@/lib/cast-tv/supabase";
+import { loadCastHardReloadNonce } from "@/lib/display-sync-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,17 +21,18 @@ export async function GET(request: Request) {
       const message = castTvErrorMessage(error, "Unable to load CAST-TV settings.");
       return NextResponse.json({ error: message, settings: null }, { status: 500 });
     }
+    const castHardReloadNonce = await loadCastHardReloadNonce(supabase).catch(() => 0);
 
     const url = new URL(request.url);
     const includeHeartbeat = url.searchParams.get("heartbeat") === "1";
     if (!includeHeartbeat) {
-      return NextResponse.json({ settings });
+      return NextResponse.json({ settings, castHardReloadNonce });
     }
 
     try {
       const manager = await resolveCastTvManager(request);
       if (!manager) {
-        return NextResponse.json({ settings });
+        return NextResponse.json({ settings, castHardReloadNonce });
       }
 
       const screenId = url.searchParams.get("screen")?.trim() || "default";
@@ -38,6 +40,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         settings,
+        castHardReloadNonce,
         heartbeat: heartbeat
           ? {
               screen_id: heartbeat.screen_id,
@@ -49,6 +52,7 @@ export async function GET(request: Request) {
     } catch {
       return NextResponse.json({
         settings,
+        castHardReloadNonce,
         heartbeat: { screen_id: "default", last_seen_at: null, online: false }
       });
     }

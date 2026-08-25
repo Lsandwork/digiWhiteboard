@@ -5,27 +5,30 @@ import { refreshPairedRemoteCastDisplays } from "@/lib/remote-cast/server";
 
 const CAST_REFRESH_BOARDS: DisplayType[] = ["staff_whiteboard", "lobby_whiteboard"];
 
+/** Admin Refresh must still return if device-queue / remote-cast Postgres hangs. */
+export const CAST_REFRESH_SIGNAL_TIMEOUT_MS = 6_000;
+
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 /**
  * Admin Refresh and Hard Refresh Cast TVs both use this.
- * 1) Bump the live nonce board pages poll.
- * 2) Queue Cast Keeper hard_refresh commands.
- * 3) Send REFRESH to every paired Remote Whiteboard Cast TV app (lobby + staff).
+ * 1) Bump the live nonce board pages poll (Storage, not hanging admin_settings).
+ * 2) Queue Cast Keeper hard_refresh commands (best-effort, do not block the admin button).
+ * 3) Send REFRESH to every paired Remote Whiteboard Cast TV app (best-effort).
  */
 export async function signalCastDisplaysHardRefresh(supabase: SupabaseClient) {
   const nonce = await bumpCastHardReloadNonce(supabase);
-  await queueHardRefreshForKnownDisplays(supabase, CAST_REFRESH_BOARDS, {
+
+  void queueHardRefreshForKnownDisplays(supabase, CAST_REFRESH_BOARDS, {
     reason: "admin_cast_refresh",
     cast_hard_reload_nonce: nonce
+  }).catch((error) => {
+    console.error("[cast-refresh] display command queue failed:", error);
   });
 
-  let remoteCastRefreshed = 0;
-  try {
-    remoteCastRefreshed = (await refreshPairedRemoteCastDisplays(supabase)).refreshed;
-  } catch (error) {
+  void refreshPairedRemoteCastDisplays(supabase).catch((error) => {
     console.error("[cast-refresh] remote cast refresh failed:", error);
-  }
+  });
 
-  return { nonce, remoteCastRefreshed };
+  return { nonce, remoteCastRefreshed: 0 };
 }

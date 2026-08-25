@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { normalizeAdminUserId } from "@/lib/admin/users";
+import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 
 type AuditInput = {
   actorAdminId?: string | null;
@@ -13,14 +14,21 @@ type AuditInput = {
 export async function writeAdminAuditLog(input: AuditInput) {
   try {
     const supabase = getServiceSupabase();
-    await supabase.from("admin_audit_logs").insert({
-      actor_admin_id: normalizeAdminUserId(input.actorAdminId),
-      actor_email: input.actorEmail ?? null,
-      action: input.action,
-      target_type: input.targetType ?? null,
-      target_id: input.targetId ?? null,
-      details: input.details ?? null
-    });
+    await withTimeoutFallback(
+      (async () => {
+        await supabase.from("admin_audit_logs").insert({
+          actor_admin_id: normalizeAdminUserId(input.actorAdminId),
+          actor_email: input.actorEmail ?? null,
+          action: input.action,
+          target_type: input.targetType ?? null,
+          target_id: input.targetId ?? null,
+          details: input.details ?? null
+        });
+        return true;
+      })(),
+      800,
+      false
+    );
   } catch {
     // Audit logging must not block primary operations.
   }

@@ -5,10 +5,17 @@ import {
   cachedUpdateAdminSettings,
   DISPLAY_SYNC_CACHE_TTL_MS
 } from "@/lib/board-settings-cache";
-import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
+import { loadCastTvRefreshNonce, saveCastTvRefreshNonce } from "@/lib/cast-tv/library-store";
+import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import type { DisplaySyncState } from "@/lib/display-sync";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
+
+const CAST_REFRESH_STORAGE_TIMEOUT_MS = 3_000;
+const CAST_REFRESH_POSTGRES_TIMEOUT_MS = 1_200;
+const CAST_REFRESH_NONCE_MEMORY_TTL_MS = 30_000;
+
+let memoryNonce = { value: 0, expiresAt: 0 };
 
 function parseNonce(value: unknown) {
   const nonce = Number(value);
@@ -16,11 +23,46 @@ function parseNonce(value: unknown) {
   return Math.max(0, Math.trunc(nonce));
 }
 
-/** Always read from Postgres so other serverless instances see admin Refresh immediately. */
-export async function loadCastHardReloadNonce(supabase: SupabaseClient): Promise<number> {
+function rememberNonce(nonce: number) {
+  if (nonce <= 0) return;
+  memoryNonce = {
+    value: nonce,
+    expiresAt: Date.now() + CAST_REFRESH_NONCE_MEMORY_TTL_MS
+  };
+}
+
+async function loadPostgresCastHardReloadNonce(supabase: SupabaseClient): Promise<number> {
   const { loadAdminSettingsJsonKey } = await import("@/lib/admin/settings-json-store");
   const nonce = await loadAdminSettingsJsonKey(supabase, "cast_hard_reload_nonce", parseNonce, 0);
   return nonce ?? 0;
+}
+
+/**
+ * Prefer Storage + memory. Production `admin_settings` hangs, which used to
+ * block Refresh / Hard Refresh and the TV nonce poll.
+ */
+export async function loadCastHardReloadNonce(supabase: SupabaseClient): Promise<number> {
+  if (memoryNonce.value > 0 && memoryNonce.expiresAt > Date.now()) {
+    return memoryNonce.value;
+  }
+
+  const stored = await withTimeoutFallback(
+    loadCastTvRefreshNonce(supabase),
+    CAST_REFRESH_STORAGE_TIMEOUT_MS,
+    0
+  );
+  if (stored > 0) {
+    rememberNonce(stored);
+    return stored;
+  }
+
+  const fromDb = await withTimeoutFallback(
+    loadPostgresCastHardReloadNonce(supabase),
+    CAST_REFRESH_POSTGRES_TIMEOUT_MS,
+    0
+  );
+  if (fromDb > 0) rememberNonce(fromDb);
+  return fromDb;
 }
 
 export async function loadDisplaySyncState(supabase: SupabaseClient): Promise<DisplaySyncState> {
@@ -52,15 +94,20 @@ export async function bumpDisplayContentRevision(supabase: SupabaseClient) {
 }
 
 export async function bumpCastHardReloadNonce(supabase: SupabaseClient) {
-  let current = 0;
-  try {
-    current = await loadCastHardReloadNonce(supabase);
-  } catch {
-    const { admin } = await cachedLoadSettingsBundle(supabase);
-    current = admin.cast_hard_reload_nonce ?? 0;
+  let current = memoryNonce.value;
+  if (current <= 0) {
+    current = await withTimeoutFallback(loadCastTvRefreshNonce(supabase), 1_200, 0);
   }
-  const nextNonce = current + 1;
-  await cachedUpdateAdminSettings(supabase, { cast_hard_reload_nonce: nextNonce });
+  const nextNonce = Math.max(Date.now(), current + 1);
+  rememberNonce(nextNonce);
+  invalidateTtlCache("display-sync");
+
+  await withTimeoutFallback(saveCastTvRefreshNonce(supabase, nextNonce), CAST_REFRESH_STORAGE_TIMEOUT_MS, undefined);
+
+  void cachedUpdateAdminSettings(supabase, { cast_hard_reload_nonce: nextNonce }).catch((error) => {
+    console.error("[display-sync] postgres nonce persist failed:", error);
+  });
+
   return nextNonce;
 }
 

@@ -7,6 +7,7 @@ import {
   type CastTvPlaylistItem,
   type CastTvSettings
 } from "@/lib/cast-tv/types";
+import { TV_HARD_REFRESH_ENDPOINT, visitPageAsNewNavigation } from "@/lib/tv-hard-refresh";
 
 const DEFAULT_SETTINGS: CastTvSettings = {
   id: "00000000-0000-4000-8000-00000000c0a7",
@@ -39,10 +40,23 @@ export function useCastTvPlaylist(screenId = "default") {
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const currentIdRef = useRef<string | null>(null);
+  const seenNonceRef = useRef<number | null>(null);
 
   useEffect(() => {
     currentIdRef.current = currentId;
   }, [currentId]);
+
+  const applyRefreshNonce = useCallback((rawNonce: unknown) => {
+    const nonce = Number(rawNonce);
+    if (!Number.isFinite(nonce)) return;
+    if (seenNonceRef.current === null) {
+      seenNonceRef.current = nonce;
+      return;
+    }
+    if (nonce !== seenNonceRef.current) {
+      visitPageAsNewNavigation();
+    }
+  }, []);
 
   const applyPlaylist = useCallback((next: CastTvPlaylistItem[]) => {
     setPlaylist((previous) => {
@@ -71,13 +85,14 @@ export function useCastTvPlaylist(screenId = "default") {
 
       if (settingsResponse.ok && settingsBody.settings) {
         setSettings(settingsBody.settings as CastTvSettings);
+        applyRefreshNonce(settingsBody.castHardReloadNonce);
       }
     } catch {
       // TV display stays quiet on network errors.
     } finally {
       setReady(true);
     }
-  }, [applyPlaylist]);
+  }, [applyPlaylist, applyRefreshNonce]);
 
   const sendHeartbeat = useCallback(async () => {
     try {
@@ -108,6 +123,30 @@ export function useCastTvPlaylist(screenId = "default") {
       window.clearInterval(heartbeatTimer);
     };
   }, [refresh, sendHeartbeat]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkNonce = async () => {
+      try {
+        const response = await fetch(TV_HARD_REFRESH_ENDPOINT, { cache: "no-store" });
+        if (!response.ok || cancelled) return;
+        const body = (await response.json()) as { nonce?: unknown };
+        applyRefreshNonce(body.nonce);
+      } catch {
+        // TV display stays quiet on network errors.
+      }
+    };
+
+    void checkNonce();
+    const timer = window.setInterval(() => {
+      void checkNonce();
+    }, 2_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [applyRefreshNonce]);
 
   const advance = useCallback(() => {
     setPlaylist((items) => {
