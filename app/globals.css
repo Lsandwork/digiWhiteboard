@@ -13315,17 +13315,62 @@ body.cast-tv-root {
 
 .cast-tv-admin-card {
   display: grid;
-  grid-template-columns: auto 120px 1fr;
+  grid-template-columns: auto auto 120px 1fr;
   gap: 0.85rem;
   border: 1px solid rgba(148, 163, 184, 0.2);
   border-radius: 0.85rem;
   padding: 0.75rem;
   background: rgba(8, 17, 28, 0.55);
+  cursor: pointer;
+  user-select: none;
 }
 
 .cast-tv-admin-card.is-selected {
   border-color: rgba(255, 111, 38, 0.7);
   box-shadow: 0 0 0 1px rgba(255, 111, 38, 0.35);
+}
+
+.cast-tv-admin-card.is-dragging {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 111, 38, 0.85);
+  cursor: grabbing;
+}
+
+.cast-tv-admin-card__drag {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin-top: 0.2rem;
+  padding: 0.2rem;
+  border: 0;
+  background: transparent;
+  color: rgba(248, 250, 252, 0.55);
+  cursor: grab;
+  touch-action: none;
+}
+
+.cast-tv-admin-card__drag:hover:not(:disabled),
+.cast-tv-admin-card__drag:focus-visible {
+  color: #ff6f26;
+}
+
+.cast-tv-admin-card__drag:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cast-tv-admin-card__drag.is-spacer {
+  width: 1.25rem;
+}
+
+.cast-tv-admin-card.is-sortable .cast-tv-admin-card__preview {
+  cursor: grab;
+}
+
+.cast-tv-admin__hint {
+  margin: 0.65rem 0 0;
+  color: rgba(248, 250, 252, 0.55);
+  font-size: 0.82rem;
 }
 
 .cast-tv-admin-card__select {
@@ -13393,6 +13438,7 @@ body.cast-tv-root {
   border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 0.5rem;
   color: #fff;
+  user-select: text;
   padding: 0.45rem 0.6rem;
 }
 
@@ -13494,7 +13540,7 @@ body.cast-tv-root {
 
 @media (max-width: 720px) {
   .cast-tv-admin-card {
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto auto 1fr;
   }
 
   .cast-tv-admin-card__preview {
