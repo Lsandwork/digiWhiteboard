@@ -1,11 +1,17 @@
-import { isLocalCastTvAsset } from "@/lib/cast-tv/display-image";
 import type { CastTvMediaRecord } from "@/lib/cast-tv/types";
 
-/** Keep this client-safe — do not import library-store from admin thumbnails. */
+/** Keep this client-safe — do not import display-image (sharp) or library-store. */
 const CAST_TV_PUBLIC_BUCKET = "lobby-slideshow";
 
 export const CAST_TV_THUMB_MAX_EDGE = 320;
 export const CAST_TV_THUMB_QUALITY = 55;
+
+/** Mirrors display-image.isLocalCastTvAsset without pulling Node/sharp into the client. */
+function isLocalCastTvAsset(record: Pick<CastTvMediaRecord, "public_url" | "storage_path" | "bucket">) {
+  const src = String(record.public_url || "");
+  if (src.startsWith("/assets/")) return true;
+  return !record.bucket && String(record.storage_path || "").startsWith("builtin/");
+}
 
 export function castTvStorageThumbUrl(
   record: Pick<CastTvMediaRecord, "id" | "media_type" | "public_url" | "storage_path" | "bucket" | "updated_at" | "storage_missing">
