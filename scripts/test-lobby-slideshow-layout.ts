@@ -131,8 +131,10 @@ assert.match(css, /\.lobby-checkout-showcase\[data-count="6"\]/);
 
 {
   const image = ruleBodiesForSelector(css, ".lobby-checkout-dog__image").join("\n");
-  assert.match(image, /width:\s*100%/, "checkout photos must fill the portrait box");
-  assert.match(image, /height:\s*100%/, "checkout photos must fill the portrait box");
+  assert.match(image, /max-width:\s*100%/, "checkout photos must fit the portrait box");
+  assert.match(image, /max-height:\s*100%/, "checkout photos must fit the portrait box");
+  assert.match(image, /min-height:\s*0/, "checkout photos must be allowed to shrink instead of clipping");
+  assert.match(image, /object-position:\s*center bottom/, "visible photo sits on the name, not floating in empty space");
 }
 
 assert.match(board, /checkoutActive \? "grid-cols-1"/, "active checkout must drop the idle two-column grid");
