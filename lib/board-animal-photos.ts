@@ -2,6 +2,7 @@ import { applyStoredAnimalPhotos, loadStoredAnimalPhotoUrl, persistAnimalPhotoUr
 import { applyCachedBackOfHousePhotos } from "@/lib/board-animal-photo-sources";
 import { resolveDogPhotoUrl } from "@/lib/board-utils";
 import { getGingrAnimalPhotoUrlMap } from "@/lib/gingr-animal-photo";
+import { isLiveTransitionQueryInCooldown } from "@/lib/live-transition-query-guard";
 import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -64,6 +65,7 @@ export async function fillAndPersistMissingAnimalPhotos(
 ) {
   const missing = [...new Set(animalIds.map((id) => id?.trim()).filter(Boolean) as string[])];
   if (!missing.length) return 0;
+  if (isLiveTransitionQueryInCooldown()) return 0;
 
   const photoMap = await getGingrAnimalPhotoUrlMap(missing, { timeoutMs: 4000 });
   let saved = 0;

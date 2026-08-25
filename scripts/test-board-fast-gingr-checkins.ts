@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { loadFastBoardTransitions } from "../lib/board-fast-checkout";
+import {
+  __resetLiveTransitionQueryCooldownForTests,
+  loadFastBoardTransitions,
+  loadFastPromptedCheckouts
+} from "../lib/board-fast-checkout";
 import { setCachedBackOfHouseBoard } from "../lib/gingr-request-guard";
 
 const now = new Date();
@@ -34,6 +38,7 @@ function makeSupabaseStub() {
 }
 
 async function main() {
+  __resetLiveTransitionQueryCooldownForTests();
   const supabase = makeSupabaseStub() as unknown as Parameters<typeof loadFastBoardTransitions>[0];
 
   setCachedBackOfHouseBoard({
@@ -128,6 +133,49 @@ async function main() {
     ["Luna"],
     "a Supabase timeout must still paint the cached Gingr basket checkout"
   );
+
+  const lobbyTimeout = await loadFastPromptedCheckouts(
+    timedOutClient as unknown as Parameters<typeof loadFastPromptedCheckouts>[0],
+    now
+  );
+  assert.equal(lobbyTimeout.supabase_timed_out, true);
+  assert.equal(lobbyTimeout.data_source, "gingr_back_of_house_cache");
+  assert.deepEqual(
+    lobbyTimeout.checking_out.map((dog) => dog.animal_name),
+    ["Luna"],
+    "lobby fast checkouts must use the same Gingr-cache fallback as the staff board"
+  );
+
+  let hungQueries = 0;
+  const hangingClient = {
+    from() {
+      hungQueries += 1;
+      const builder: Record<string, unknown> = {};
+      const chain = () => builder;
+      Object.assign(builder, {
+        select: chain,
+        eq: chain,
+        in: chain,
+        not: chain,
+        gte: chain,
+        neq: chain,
+        order: chain,
+        limit: chain,
+        update: chain,
+        insert: chain,
+        then: () => new Promise(() => undefined)
+      });
+      return builder;
+    }
+  };
+  const started = Date.now();
+  const cooledDown = await loadFastPromptedCheckouts(
+    hangingClient as unknown as Parameters<typeof loadFastPromptedCheckouts>[0],
+    now
+  );
+  assert.equal(hungQueries, 0, "cooldown must skip live_transition_dogs after a timeout");
+  assert.ok(Date.now() - started < 250, "cooldown must not wait on the hung table");
+  assert.deepEqual(cooledDown.checking_out.map((dog) => dog.animal_name), ["Luna"]);
 
   console.log("board fast gingr check-in checks passed");
 }

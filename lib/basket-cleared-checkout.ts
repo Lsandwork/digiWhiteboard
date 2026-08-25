@@ -3,6 +3,7 @@ import { markDogsRetired } from "@/lib/board-retired-keys";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import type { fetchGingrBackOfHouse } from "@/lib/gingr-board-sync";
 import { getCachedBackOfHouseBoard } from "@/lib/gingr-request-guard";
+import { isLiveTransitionQueryInCooldown, markLiveTransitionQueryTimeout } from "@/lib/live-transition-query-guard";
 import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -42,48 +43,57 @@ export async function hideBasketClearedCheckoutRows(
   if (!gingrCheckoutKeys.size) {
     return { hidden_count: 0, skipped_empty_basket: true as const };
   }
-
-  const { data, error } = await supabase
-    .from("live_transition_dogs")
-    .select(
-      "id, gingr_reservation_id, gingr_animal_id, display_status, display_until, status_started_at, completed_at, hidden, raw_payload"
-    )
-    .eq("hidden", false)
-    .eq("display_status", "checking_out");
-
-  if (error) throw error;
-
-  const rows = (data ?? []) as LiveDog[];
-  const clearedIds = rows
-    .filter((row) => {
-      if (isDogInGingrCheckoutBasket(row, gingrCheckoutKeys)) return false;
-      // Keep checkout cards visible for the full configured display window.
-      if (!shouldExpireCheckoutDog(row, now)) return false;
-      return true;
-    })
-    .map((row) => row.id);
-
-  if (!clearedIds.length) {
-    return { hidden_count: 0 };
+  if (isLiveTransitionQueryInCooldown()) {
+    return { hidden_count: 0, skipped: true as const };
   }
 
-  const nowIso = now.toISOString();
-  markDogsRetired(
-    rows.filter((row) => clearedIds.includes(row.id)),
-    now.getTime()
-  );
-  const { error: updateError } = await supabase
-    .from("live_transition_dogs")
-    .update({
-      hidden: true,
-      display_status: "removed",
-      current_status: "basket_cleared",
-      completed_at: nowIso,
-      updated_at: nowIso
-    })
-    .in("id", clearedIds);
+  let rows: LiveDog[] = [];
+  try {
+    const { data, error } = await supabase
+      .from("live_transition_dogs")
+      .select(
+        "id, gingr_reservation_id, gingr_animal_id, display_status, display_until, status_started_at, completed_at, hidden, raw_payload"
+      )
+      .eq("hidden", false)
+      .eq("display_status", "checking_out");
 
-  if (updateError) throw updateError;
+    if (error) throw error;
+    rows = (data ?? []) as LiveDog[];
 
-  return { hidden_count: clearedIds.length };
+    const clearedIds = rows
+      .filter((row) => {
+        if (isDogInGingrCheckoutBasket(row, gingrCheckoutKeys)) return false;
+        // Keep checkout cards visible for the full configured display window.
+        if (!shouldExpireCheckoutDog(row, now)) return false;
+        return true;
+      })
+      .map((row) => row.id);
+
+    if (!clearedIds.length) {
+      return { hidden_count: 0 };
+    }
+
+    const nowIso = now.toISOString();
+    markDogsRetired(
+      rows.filter((row) => clearedIds.includes(row.id)),
+      now.getTime()
+    );
+    const { error: updateError } = await supabase
+      .from("live_transition_dogs")
+      .update({
+        hidden: true,
+        display_status: "removed",
+        current_status: "basket_cleared",
+        completed_at: nowIso,
+        updated_at: nowIso
+      })
+      .in("id", clearedIds);
+
+    if (updateError) throw updateError;
+
+    return { hidden_count: clearedIds.length };
+  } catch {
+    markLiveTransitionQueryTimeout();
+    return { hidden_count: 0, skipped: true as const };
+  }
 }
