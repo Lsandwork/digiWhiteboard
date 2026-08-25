@@ -1,4 +1,10 @@
 import { normalizeAdminUserId } from "@/lib/admin/users";
+import {
+  CAST_TV_DUPLICATE_MESSAGE,
+  castTvImageDisplaySrc,
+  isUuidCastTvFileName,
+  matchCastTvDuplicate
+} from "@/lib/cast-tv/display-image";
 import { validateCastTvUpload } from "@/lib/cast-tv/mime";
 import {
   CAST_TV_LEGACY_MEDIA_BUCKET,
@@ -50,7 +56,8 @@ function sanitizeFileName(name: string) {
 
 function displayNameFromFileName(fileName: string) {
   const base = fileName.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim();
-  return base || "CAST-TV media";
+  if (!base || isUuidCastTvFileName(fileName)) return "CAST-TV photo";
+  return base;
 }
 
 export function buildCastTvStoragePath(fileName: string) {
@@ -76,7 +83,7 @@ export function mediaRecordToPlaylistItem(record: CastTvMediaRecord): CastTvPlay
     id: record.id,
     displayName: record.display_name?.trim() || displayNameFromFileName(record.file_name),
     mediaType: record.media_type,
-    src: record.public_url || "",
+    src: castTvImageDisplaySrc(record),
     imageDisplaySeconds: record.image_display_seconds,
     durationSeconds: record.duration_seconds,
     updatedAt: record.updated_at
@@ -120,7 +127,8 @@ export async function uploadCastTvObject(
   storagePath: string,
   buffer: Buffer | Uint8Array,
   contentType: string,
-  bucket = CAST_TV_BUCKET
+  bucket = CAST_TV_BUCKET,
+  options: { upsert?: boolean } = {}
 ) {
   const bytes = Uint8Array.from(buffer);
   const body = new Blob([bytes], { type: contentType || "application/octet-stream" });
@@ -129,27 +137,37 @@ export async function uploadCastTvObject(
   for (const target of buckets) {
     const { error } = await supabase.storage.from(target).upload(storagePath, body, {
       contentType,
-      upsert: false
+      upsert: Boolean(options.upsert)
     });
     if (!error) return target;
     lastMessage = error.message || lastMessage;
+    if (options.upsert && /already exists|duplicate|resource already/i.test(error.message || "")) {
+      await supabase.storage.from(target).remove([storagePath]);
+      const retry = await supabase.storage.from(target).upload(storagePath, body, {
+        contentType,
+        upsert: true
+      });
+      if (!retry.error) return target;
+      lastMessage = retry.error.message || lastMessage;
+    }
   }
   throw new Error(lastMessage);
 }
 
 export async function findDuplicateCastTvUpload(
   supabase: SupabaseClient,
-  input: { fileName: string; fileSize: number }
+  input: {
+    fileName: string;
+    fileSize?: number | null;
+    contentHash?: string | null;
+    pixelHash?: string | null;
+    originalHash?: string | null;
+    ignoreId?: string | null;
+  }
 ) {
   try {
-    const normalizedName = input.fileName.trim().toLowerCase();
     const existing = await loadCastTvMedia(supabase);
-    return (
-      existing.find(
-        (row) =>
-          row.file_name.trim().toLowerCase() === normalizedName && row.file_size_bytes === input.fileSize
-      ) ?? null
-    );
+    return matchCastTvDuplicate(existing, input);
   } catch {
     return null;
   }
@@ -166,11 +184,10 @@ export async function createCastTvSignedUpload(
   });
 
   const duplicate = await findDuplicateCastTvUpload(supabase, {
-    fileName: input.fileName,
-    fileSize: input.fileSize
+    fileName: input.fileName
   });
   if (duplicate) {
-    throw new Error("This file already exists in the CAST-TV library.");
+    throw new Error(CAST_TV_DUPLICATE_MESSAGE);
   }
 
   const storagePath = buildCastTvStoragePath(input.fileName);
@@ -222,6 +239,10 @@ export async function createCastTvMediaRecord(
     uploadedBy?: string | null;
     uploadedByName?: string | null;
     imageDisplaySeconds?: CastTvImageDuration;
+    contentHash?: string | null;
+    pixelHash?: string | null;
+    originalHash?: string | null;
+    displayReady?: boolean;
   }
 ) {
   const { mediaType, mimeType } = validateCastTvUpload({
@@ -236,13 +257,14 @@ export async function createCastTvMediaRecord(
       return { state: library, result: byPath };
     }
 
-    const duplicate = library.media.find(
-      (row) =>
-        row.file_name.trim().toLowerCase() === input.fileName.trim().toLowerCase() &&
-        row.file_size_bytes === input.fileSize
-    );
+    const duplicate = matchCastTvDuplicate(library.media, {
+      fileName: input.fileName,
+      contentHash: input.contentHash,
+      pixelHash: input.pixelHash,
+      originalHash: input.originalHash
+    });
     if (duplicate) {
-      throw new Error("This file already exists in the CAST-TV library.");
+      throw new Error(CAST_TV_DUPLICATE_MESSAGE);
     }
 
     const now = new Date().toISOString();
@@ -264,7 +286,10 @@ export async function createCastTvMediaRecord(
       uploaded_by: normalizeAdminUserId(input.uploadedBy),
       uploaded_by_name: input.uploadedByName ?? null,
       created_at: now,
-      updated_at: now
+      updated_at: now,
+      content_hash: input.contentHash ?? null,
+      pixel_hash: input.pixelHash ?? null,
+      display_ready: input.displayReady ?? mediaType === "image"
     };
 
     return {
@@ -308,6 +333,10 @@ export async function replaceCastTvMediaFile(
     fileSize: number;
     storagePath: string;
     bucket?: string | null;
+    contentHash?: string | null;
+    pixelHash?: string | null;
+    originalHash?: string | null;
+    displayReady?: boolean;
   }
 ) {
   const { mediaType, mimeType } = validateCastTvUpload({
@@ -320,6 +349,16 @@ export async function replaceCastTvMediaFile(
     const index = library.media.findIndex((item) => item.id === id);
     if (index < 0) throw new Error("Media item not found.");
     const existing = library.media[index];
+    const duplicate = matchCastTvDuplicate(library.media, {
+      fileName: input.fileName,
+      contentHash: input.contentHash,
+      pixelHash: input.pixelHash,
+      originalHash: input.originalHash,
+      ignoreId: id
+    });
+    if (duplicate) {
+      throw new Error(CAST_TV_DUPLICATE_MESSAGE);
+    }
     const now = new Date().toISOString();
     const bucket = input.bucket || existing.bucket || CAST_TV_BUCKET;
     const updated: CastTvMediaRecord = {
@@ -333,7 +372,10 @@ export async function replaceCastTvMediaFile(
       file_size_bytes: input.fileSize,
       duration_seconds: null,
       display_name: existing.display_name || displayNameFromFileName(input.fileName),
-      updated_at: now
+      updated_at: now,
+      content_hash: input.contentHash ?? existing.content_hash ?? null,
+      pixel_hash: input.pixelHash ?? existing.pixel_hash ?? null,
+      display_ready: input.displayReady ?? (mediaType === "image")
     };
     const media = library.media.slice();
     media[index] = updated;
@@ -360,8 +402,11 @@ export async function deleteCastTvMediaRecord(supabase: SupabaseClient, id: stri
     };
   });
 
-  if (existing.storage_path) {
-    await supabase.storage.from(CAST_TV_BUCKET).remove([existing.storage_path]);
+  if (existing.storage_path && !existing.storage_path.startsWith("builtin/")) {
+    await supabase.storage.from(existing.bucket || CAST_TV_BUCKET).remove([existing.storage_path]);
+    if (existing.bucket && existing.bucket !== CAST_TV_BUCKET) {
+      await supabase.storage.from(CAST_TV_BUCKET).remove([existing.storage_path]);
+    }
   }
 
   return existing;

@@ -24,6 +24,12 @@ import {
 } from "../lib/cast-tv/library-store";
 import { LOBBY_IDLE_SLIDESHOW } from "../lib/lobby/slideshow";
 import { mediaRecordToPlaylistItem } from "../lib/cast-tv/media";
+import {
+  CAST_TV_DUPLICATE_MESSAGE,
+  matchCastTvDuplicate,
+  sniffCastTvImageKind,
+  transcodeCastTvDisplayImage
+} from "../lib/cast-tv/display-image";
 
 assert.equal(inferCastTvMimeType("promo.jpg", ""), "image/jpeg");
 assert.equal(inferCastTvMimeType("promo.JPG", "application/octet-stream"), "image/jpeg");
@@ -78,7 +84,7 @@ const parsedLibrary = parseCastTvLibrary({
 });
 assert.equal(parsedLibrary.media.length, 1);
 assert.equal(parsedLibrary.media[0].file_name, "yard.jpg");
-assert.equal(mediaRecordToPlaylistItem(parsedLibrary.media[0]).src, "https://cdn.example/yard.jpg");
+assert.match(mediaRecordToPlaylistItem(parsedLibrary.media[0]).src, /\/api\/cast-tv\/media\/file\?id=slide-1/);
 assert.equal(parseCastTvLibrary(null).media.length, 0);
 assert.equal(emptyCastTvLibrary().settings.default_image_seconds, 10);
 assert.equal(isMissingCastTvStorageObject({ statusCode: "404", message: "Object not found" }), true);
@@ -96,6 +102,27 @@ assert.equal(
   mergeCastTvStorageObjects(recovered.library, [{ name: "library.json" }], () => "").added,
   0
 );
+assert.equal(
+  mergeCastTvStorageObjects(recovered.library, [{ name: "cast-tv/library.json" }], () => "").added,
+  0
+);
+assert.equal(
+  mergeCastTvStorageObjects(recovered.library, [{ name: "slide-9.jpg" }], () => "").added,
+  0,
+  "same storage object must not be recovered twice"
+);
+
+const jsonRejected = sniffCastTvImageKind(Buffer.from('{"media":[]}'));
+assert.equal(jsonRejected, "json");
+
+const duplicateByName = matchCastTvDuplicate(parsedLibrary.media, { fileName: "YARD.JPG" });
+assert.equal(duplicateByName?.id, "slide-1");
+assert.equal(
+  matchCastTvDuplicate(parsedLibrary.media, { fileName: "f0084c59-a850-41e3-b0bd-da0fdb7a75b1.jpg" }),
+  null,
+  "UUID storage names are not duplicate keys"
+);
+assert.match(CAST_TV_DUPLICATE_MESSAGE, /already on CAST-TV/);
 
 const builtins = builtinMarketingCastTvMedia();
 assert.equal(builtins.length, LOBBY_IDLE_SLIDESHOW.length);
@@ -165,7 +192,8 @@ assert.match(uploadUrlRoute, /handleCastTvWrite/);
 
 const uploadCompleteRoute = readFileSync(join(root, "app/api/cast-tv/media/upload-complete/route.ts"), "utf8");
 assert.match(uploadCompleteRoute, /handleCastTvWrite/);
-assert.match(uploadCompleteRoute, /convertStoredCastTvHeicIfNeeded/);
+assert.match(uploadCompleteRoute, /normalizeStoredCastTvImage/);
+assert.doesNotMatch(uploadCompleteRoute, /library save after upload failed/);
 
 const normalizeUpload = readFileSync(join(root, "lib/cast-tv/normalize-upload.ts"), "utf8");
 assert.doesNotMatch(normalizeUpload, /import sharp from/);
@@ -174,6 +202,7 @@ const mediaRoute = readFileSync(join(root, "app/api/cast-tv/media/route.ts"), "u
 assert.match(mediaRoute, /loadCastTvMedia/);
 assert.match(mediaRoute, /playlist/);
 assert.match(mediaRoute, /admin: true/);
+assert.match(mediaRoute, /repairCastTvLibraryImages/);
 assert.doesNotMatch(mediaRoute, /buildCastTvPlaylist/);
 
 const supabaseHelper = readFileSync(join(root, "lib/cast-tv/supabase.ts"), "utf8");
@@ -210,9 +239,21 @@ assert.match(storageProbe, /list\("cast-tv"/);
 
 const panel = readFileSync(join(root, "components/admin/CastTvPanel.tsx"), "utf8");
 assert.doesNotMatch(panel, /postgres_changes/);
+assert.match(panel, /Skipped a duplicate photo/);
+assert.match(panel, /\/api\/cast-tv\/media\/file/);
 const tvPlayer = readFileSync(join(root, "components/cast-tv/useCastTvPlaylist.ts"), "utf8");
 assert.doesNotMatch(tvPlayer, /postgres_changes/);
 assert.match(tvPlayer, /currentIdRef\.current/);
+const imageSlide = readFileSync(join(root, "components/cast-tv/CastTvImageSlide.tsx"), "utf8");
+assert.doesNotMatch(imageSlide, /from "next\/image"/);
+assert.match(imageSlide, /<img/);
+const player = readFileSync(join(root, "components/cast-tv/CastTvPlayer.tsx"), "utf8");
+assert.match(player, /visibleItems/);
+assert.doesNotMatch(player, /playlist\.map/);
+
+const fileRoute = readFileSync(join(root, "app/api/cast-tv/media/file/route.ts"), "utf8");
+assert.match(fileRoute, /transcodeCastTvDisplayImage/);
+assert.match(uploadClient, /isDuplicateUploadError/);
 
 const libraryMigration = readFileSync(join(root, "supabase/migrations/088_cast_tv_library_storage.sql"), "utf8");
 assert.match(libraryMigration, /application\/json/);
@@ -239,6 +280,22 @@ async function testJpegIngest() {
   assert.equal(normalized.mediaType, "image");
   assert.match(normalized.storagePath, /^cast-tv\/.+\.jpg$/);
   assert.ok(normalized.fileSize > 0);
+  assert.equal(normalized.displayReady, true);
+  assert.ok(normalized.contentHash);
+
+  const progressive = await sharp({
+    create: { width: 32, height: 18, channels: 3, background: { r: 12, g: 80, b: 160 } }
+  })
+    .jpeg({ quality: 90, progressive: true, chromaSubsampling: "4:4:4" })
+    .toBuffer();
+  assert.equal((await sharp(progressive).metadata()).isProgressive, true);
+  const transcoded = await transcodeCastTvDisplayImage(progressive);
+  const safeMeta = await sharp(transcoded.buffer).metadata();
+  assert.equal(safeMeta.format, "jpeg");
+  assert.equal(safeMeta.isProgressive, false);
+  assert.equal(safeMeta.chromaSubsampling, "4:2:0");
+
+  await assert.rejects(() => transcodeCastTvDisplayImage(Buffer.from('{"not":"an image"}')), /not a valid photo/i);
 }
 
 void testJpegIngest()

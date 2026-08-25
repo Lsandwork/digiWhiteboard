@@ -1,4 +1,9 @@
 import { getTtlCache, setTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
+import {
+  basenameCastTvFile,
+  dedupeCastTvMedia,
+  originalCastTvFileNameKey
+} from "@/lib/cast-tv/display-image";
 import { inferCastTvMimeType, mediaTypeForMime } from "@/lib/cast-tv/mime";
 import { LOBBY_IDLE_SLIDESHOW } from "@/lib/lobby/slideshow";
 import {
@@ -86,17 +91,18 @@ export function builtinMarketingCastTvMedia(): CastTvMediaRecord[] {
       uploaded_by: null,
       uploaded_by_name: "Fitdog marketing",
       created_at: new Date(0).toISOString(),
-      updated_at: new Date(0).toISOString()
+      updated_at: new Date(0).toISOString(),
+      display_ready: true
     };
   });
 }
 
 function mediaKeys(item: CastTvMediaRecord) {
-  return [
-    `id:${item.id}`,
-    `path:${item.storage_path}`,
-    `file:${item.file_name.toLowerCase()}`
-  ];
+  const keys = [`id:${item.id}`, `path:${item.storage_path}`];
+  const fileKey = originalCastTvFileNameKey(item.file_name);
+  if (fileKey) keys.push(`file:${fileKey}`);
+  if (item.content_hash) keys.push(`hash:${item.content_hash}`);
+  return keys;
 }
 
 export function mergeCastTvLibraries(
@@ -166,7 +172,10 @@ function asMediaRecord(value: unknown): CastTvMediaRecord | null {
     uploaded_by: row.uploaded_by ?? null,
     uploaded_by_name: row.uploaded_by_name ?? null,
     created_at: String(row.created_at || new Date().toISOString()),
-    updated_at: String(row.updated_at || new Date().toISOString())
+    updated_at: String(row.updated_at || new Date().toISOString()),
+    content_hash: typeof row.content_hash === "string" && row.content_hash ? row.content_hash : null,
+    pixel_hash: typeof row.pixel_hash === "string" && row.pixel_hash ? row.pixel_hash : null,
+    display_ready: row.display_ready === true
   };
 }
 
@@ -221,14 +230,15 @@ export function parseCastTvLibrary(value: unknown): CastTvLibraryState {
         .sort((a, b) => a.display_order - b.display_order || a.created_at.localeCompare(b.created_at))
     : [];
   return {
-    media,
+    media: dedupeCastTvMedia(media),
     settings: asSettings(raw.settings),
     heartbeats: parseCastTvHeartbeats(raw.heartbeats)
   };
 }
 
 function isLibrarySidecar(name: string) {
-  return name === "library.json" || name === "heartbeats.json" || name.endsWith(".json");
+  const base = basenameCastTvFile(name).toLowerCase();
+  return base === "library.json" || base === "heartbeats.json" || base.endsWith(".json");
 }
 
 export function mergeCastTvStorageObjects(
@@ -246,28 +256,32 @@ export function mergeCastTvStorageObjects(
   for (const object of objects) {
     const name = String(object.name || "").trim();
     if (!name || isLibrarySidecar(name) || name.endsWith("/")) continue;
+    const baseName = basenameCastTvFile(name);
+    if (!baseName || isLibrarySidecar(baseName)) continue;
     const storagePath =
       prefix === ""
         ? name
         : prefix
-          ? `${prefix}/${name}`
+          ? `${prefix}/${baseName}`
           : name.startsWith("cast-tv/")
             ? name
-            : `cast-tv/${name}`;
+            : `cast-tv/${baseName}`;
     const key = `${bucket}:${storagePath}`;
     if (known.has(key) || known.has(`:${storagePath}`)) continue;
 
-    const mime = inferCastTvMimeType(name, object.metadata?.mimetype);
-    const mediaType = mediaTypeForMime(mime, name);
+    const mime = inferCastTvMimeType(baseName, object.metadata?.mimetype);
+    if (/json|text\/plain/i.test(String(object.metadata?.mimetype || ""))) continue;
+    const mediaType = mediaTypeForMime(mime, baseName);
     if (!mediaType) continue;
 
     const updatedAt = String(object.updated_at || object.created_at || new Date().toISOString());
-    const id = name.replace(/\.[^.]+$/, "") || storagePath;
+    const id = baseName.replace(/\.[^.]+$/, "") || storagePath;
+    if (library.media.some((item) => item.id === id || item.storage_path.endsWith(`/${baseName}`))) continue;
     nextOrder += 1;
     extras.push({
       id,
-      display_name: name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "CAST-TV media",
-      file_name: name,
+      display_name: null,
+      file_name: baseName,
       storage_path: storagePath,
       bucket,
       public_url: publicUrlForPath(storagePath, updatedAt),
@@ -281,7 +295,8 @@ export function mergeCastTvStorageObjects(
       uploaded_by: null,
       uploaded_by_name: null,
       created_at: String(object.created_at || updatedAt),
-      updated_at: updatedAt
+      updated_at: updatedAt,
+      display_ready: false
     });
     known.add(key);
   }
@@ -393,8 +408,7 @@ async function recoverOrphanedCastTvFiles(
 ): Promise<CastTvLibraryState> {
   const scans: Array<{ bucket: string; prefix: string }> = [
     { bucket: CAST_TV_STORAGE_BUCKET, prefix: "cast-tv" },
-    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv" },
-    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "" }
+    { bucket: CAST_TV_LEGACY_MEDIA_BUCKET, prefix: "cast-tv" }
   ];
 
   let current = library;
@@ -442,12 +456,17 @@ function lastGoodLibrary(): CastTvLibraryState | null {
 function hydrateLibraryUrls(supabase: SupabaseClient, library: CastTvLibraryState): CastTvLibraryState {
   return {
     ...library,
-    media: library.media.map((item) => ({
-      ...item,
-      public_url:
-        item.public_url ||
-        publicUrlForCastTvStorage(supabase, item.storage_path, item.updated_at, item.bucket || CAST_TV_STORAGE_BUCKET)
-    }))
+    media: library.media.map((item) => {
+      if (item.public_url?.startsWith("/assets/") || item.storage_path.startsWith("builtin/")) {
+        return item;
+      }
+      return {
+        ...item,
+        public_url:
+          item.public_url ||
+          publicUrlForCastTvStorage(supabase, item.storage_path, item.updated_at, item.bucket || CAST_TV_STORAGE_BUCKET)
+      };
+    })
   };
 }
 
@@ -489,11 +508,16 @@ export async function loadCastTvLibrary(
       added += merged.added;
     }
 
-    library = hydrateLibraryUrls(supabase, library);
+    library = hydrateLibraryUrls(supabase, {
+      ...library,
+      media: dedupeCastTvMedia(library.media)
+    });
     if (added > 0) {
-      void saveCastTvLibrary(supabase, library).catch((error) => {
+      try {
+        await saveCastTvLibrary(supabase, library);
+      } catch (error) {
         console.error("[cast-tv] persist recovered playlist failed:", error);
-      });
+      }
     }
     if (library.media.length) rememberLastGoodLibrary(library);
     else {

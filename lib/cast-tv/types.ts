@@ -26,6 +26,9 @@ export type CastTvMediaRecord = {
   uploaded_by_name: string | null;
   created_at: string;
   updated_at: string;
+  content_hash?: string | null;
+  pixel_hash?: string | null;
+  display_ready?: boolean;
 };
 
 export type CastTvPlaylistItem = {

@@ -34,6 +34,11 @@ function fileMime(file: File) {
   return inferCastTvMimeType(file.name, file.type);
 }
 
+function isDuplicateUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /already on CAST-TV|already exists in the CAST-TV/i.test(message);
+}
+
 function canFallbackToCastTvServerUpload(file: File) {
   try {
     if (file.size <= 0 || file.size > CAST_TV_SERVER_UPLOAD_MAX_BYTES) return false;
@@ -146,6 +151,7 @@ export async function uploadCastTvMedia(file: File, displayName?: string, onProg
     onProgress?.(100);
     return media;
   } catch (error) {
+    if (isDuplicateUploadError(error)) throw error;
     if (canFallbackToCastTvServerUpload(file)) {
       onProgress?.(40);
       const media = await uploadViaServer(file, displayName);
@@ -189,6 +195,7 @@ export async function replaceCastTvMedia(
     onProgress?.(100);
     return body.media;
   } catch (error) {
+    if (isDuplicateUploadError(error)) throw error;
     if (canFallbackToCastTvServerUpload(file)) {
       onProgress?.(40);
       const media = await uploadViaServer(file, undefined, mediaId);

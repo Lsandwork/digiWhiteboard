@@ -32,12 +32,20 @@ export async function POST(request: Request) {
 
     await uploadCastTvObject(supabase, normalized.storagePath, normalized.buffer, normalized.mimeType);
 
+    const hashes = {
+      contentHash: normalized.contentHash,
+      pixelHash: normalized.pixelHash,
+      originalHash: normalized.originalHash,
+      displayReady: normalized.displayReady
+    };
+
     const media = replaceId
       ? await replaceCastTvMediaFile(supabase, replaceId, {
           fileName: normalized.fileName,
           mimeType: normalized.mimeType,
           fileSize: normalized.fileSize,
-          storagePath: normalized.storagePath
+          storagePath: normalized.storagePath,
+          ...hashes
         })
       : await createCastTvMediaRecord(supabase, {
           fileName: normalized.fileName,
@@ -46,7 +54,8 @@ export async function POST(request: Request) {
           storagePath: normalized.storagePath,
           displayName,
           uploadedBy: auth.session?.adminUserId ?? null,
-          uploadedByName: auth.session?.email ?? null
+          uploadedByName: auth.session?.email ?? null,
+          ...hashes
         });
 
     void writeAdminAuditLog({

@@ -47,6 +47,26 @@ function formatDateTime(value: string) {
   return date.toLocaleString();
 }
 
+function thumbSrc(item: CastTvMediaRecord) {
+  if (item.media_type === "video") return item.public_url ?? "";
+  if (item.public_url?.startsWith("/assets/")) return item.public_url;
+  return `/api/cast-tv/media/file?id=${encodeURIComponent(item.id)}&v=${encodeURIComponent(item.updated_at)}`;
+}
+
+function uploadNameKey(name: string) {
+  return name.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function isGeneratedCastTvName(name: string) {
+  const stem = (name.trim().split("/").pop() || name).replace(/\.[^.]+$/, "");
+  return /^[0-9a-f]{8}[- ][0-9a-f]{4}[- ][0-9a-f]{4}[- ][0-9a-f]{4}[- ][0-9a-f]{12}$/i.test(stem);
+}
+
+function isDuplicateUploadError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /already on CAST-TV|already exists in the CAST-TV/i.test(message);
+}
+
 export function CastTvPanel({ onToast }: CastTvPanelProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
@@ -157,41 +177,72 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
     setUploading(true);
     setUploadProgress(0);
     let successCount = 0;
+    let skippedCount = 0;
+    const seenNames = new Set(
+      media
+        .map((item) => uploadNameKey(item.file_name))
+        .filter((name) => name && !isGeneratedCastTvName(name))
+    );
 
     try {
       for (const file of files) {
-        const uploaded = await uploadCastTvMedia(file, undefined, (pct) => setUploadProgress(pct));
-        successCount += 1;
-        if (uploaded?.id) {
-          const now = new Date().toISOString();
-          setMedia((current) => {
-            const nextItem: CastTvMediaRecord = {
-              id: uploaded.id,
-              display_name: uploaded.display_name ?? file.name,
-              file_name: file.name,
-              storage_path: "",
-              public_url: uploaded.public_url ?? "",
-              media_type: uploaded.media_type,
-              mime_type: file.type || null,
-              file_size_bytes: file.size,
-              duration_seconds: null,
-              image_display_seconds: 10,
-              display_order: current.length + 1,
-              is_enabled: true,
-              uploaded_by: null,
-              uploaded_by_name: null,
-              created_at: now,
-              updated_at: now
-            };
-            return [...current.filter((item) => item.id !== uploaded.id), nextItem];
-          });
+        const nameKey = uploadNameKey(file.name);
+        if (nameKey && seenNames.has(nameKey)) {
+          skippedCount += 1;
+          continue;
+        }
+        try {
+          const uploaded = await uploadCastTvMedia(file, undefined, (pct) => setUploadProgress(pct));
+          successCount += 1;
+          if (nameKey) seenNames.add(nameKey);
+          if (uploaded?.id) {
+            const now = new Date().toISOString();
+            setMedia((current) => {
+              const nextItem: CastTvMediaRecord = {
+                id: uploaded.id,
+                display_name: uploaded.display_name ?? file.name,
+                file_name: file.name,
+                storage_path: "",
+                public_url: uploaded.public_url ?? "",
+                media_type: uploaded.media_type,
+                mime_type: file.type || null,
+                file_size_bytes: file.size,
+                duration_seconds: null,
+                image_display_seconds: 10,
+                display_order: current.length + 1,
+                is_enabled: true,
+                uploaded_by: null,
+                uploaded_by_name: null,
+                created_at: now,
+                updated_at: now
+              };
+              return [...current.filter((item) => item.id !== uploaded.id), nextItem];
+            });
+          }
+        } catch (error) {
+          if (isDuplicateUploadError(error)) {
+            skippedCount += 1;
+            if (nameKey) seenNames.add(nameKey);
+            continue;
+          }
+          throw error;
         }
       }
-      onToast(
-        successCount === 1 ? "Media uploaded to CAST-TV." : `Uploaded ${successCount} files to CAST-TV.`,
-        "success"
-      );
-      await loadData();
+      if (successCount > 0) {
+        onToast(
+          successCount === 1 ? "Media uploaded to CAST-TV." : `Uploaded ${successCount} files to CAST-TV.`,
+          "success"
+        );
+      }
+      if (skippedCount > 0) {
+        onToast(
+          skippedCount === 1
+            ? "Skipped a duplicate photo that is already on CAST-TV."
+            : `Skipped ${skippedCount} duplicate photos that are already on CAST-TV.`,
+          successCount > 0 ? "info" : "error"
+        );
+      }
+      if (successCount > 0 || skippedCount > 0) await loadData();
     } catch (error) {
       onToast(error instanceof Error ? error.message : "Upload failed.", "error");
       if (successCount > 0) await loadData();
@@ -315,7 +366,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={item.public_url ?? ""}
+              src={thumbSrc(item)}
               alt={item.display_name ?? item.file_name}
               className="cast-tv-admin-card__thumb"
               referrerPolicy="no-referrer"
@@ -456,7 +507,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
           <div>
             <h3 className="crossover-card__title">Media Upload</h3>
             <p className="crossover-card__subtitle">
-              JPG, JPEG, PNG, WEBP, HEIC, MP4, WEBM, or MOV. Images up to 20MB, videos up to 250MB.
+              JPG, JPEG, PNG, WEBP, HEIC, MP4, WEBM, or MOV. Images up to 20MB, videos up to 250MB. Duplicate photos are skipped.
             </p>
           </div>
         </div>
@@ -617,7 +668,7 @@ export function CastTvPanel({ onToast }: CastTvPanelProps) {
               <video src={previewItem.public_url ?? ""} controls autoPlay muted className="cast-tv-admin__preview-media" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewItem.public_url ?? ""} alt="" className="cast-tv-admin__preview-media" />
+              <img src={thumbSrc(previewItem)} alt="" className="cast-tv-admin__preview-media" />
             )}
           </div>
         ) : null}

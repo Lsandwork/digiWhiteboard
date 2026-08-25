@@ -12,7 +12,6 @@ type CastTvPlayerProps = {
 
 export function CastTvPlayer({ screenId = "default" }: CastTvPlayerProps) {
   const {
-    playlist,
     settings,
     currentItem,
     nextItem,
@@ -74,6 +73,10 @@ export function CastTvPlayer({ screenId = "default" }: CastTvPlayerProps) {
 
   const transitionMs = settings.transition_style === "none" ? 0 : settings.transition_ms;
   const showStandby = ready && (isEmpty || isPaused);
+  const visibleItems = [currentItem, nextItem].filter(
+    (item, index, list): item is NonNullable<typeof item> =>
+      Boolean(item) && list.findIndex((candidate) => candidate?.id === item?.id) === index
+  );
 
   return (
     <main className="cast-tv-player" aria-label="CAST-TV slideshow">
@@ -94,7 +97,7 @@ export function CastTvPlayer({ screenId = "default" }: CastTvPlayerProps) {
       ) : null}
 
       {!showStandby
-        ? playlist.map((item) => {
+        ? visibleItems.map((item) => {
             const active = currentItem?.id === item.id;
             if (item.mediaType === "video") {
               return (

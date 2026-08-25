@@ -1,6 +1,6 @@
-import { convertHeicBufferToJpeg } from "@/lib/cast-tv/convert-heic";
+import { jpegFileNameFrom, transcodeCastTvDisplayImage } from "@/lib/cast-tv/display-image";
 import { buildCastTvStoragePath } from "@/lib/cast-tv/media";
-import { inferCastTvMimeType, isHeicCastTvUpload, validateCastTvUpload } from "@/lib/cast-tv/mime";
+import { validateCastTvUpload } from "@/lib/cast-tv/mime";
 
 export type NormalizedCastTvUpload = {
   buffer: Buffer;
@@ -9,6 +9,10 @@ export type NormalizedCastTvUpload = {
   mediaType: "image" | "video";
   fileSize: number;
   storagePath: string;
+  contentHash?: string | null;
+  pixelHash?: string | null;
+  originalHash?: string | null;
+  displayReady: boolean;
 };
 
 export async function normalizeCastTvUploadBytes(file: {
@@ -27,29 +31,24 @@ export async function normalizeCastTvUploadBytes(file: {
       fileName: file.name,
       mediaType,
       fileSize: input.length,
-      storagePath: buildCastTvStoragePath(file.name)
+      storagePath: buildCastTvStoragePath(file.name),
+      displayReady: true
     };
   }
 
-  if (isHeicCastTvUpload(file.name, mimeType)) {
-    const jpeg = await convertHeicBufferToJpeg(input);
-    const fileName = file.name.replace(/\.[^.]+$/, ".jpg");
-    return {
-      buffer: jpeg,
-      mimeType: "image/jpeg",
-      fileName,
-      mediaType: "image",
-      fileSize: jpeg.length,
-      storagePath: buildCastTvStoragePath(fileName)
-    };
-  }
-
+  const transcoded = await transcodeCastTvDisplayImage(input);
+  const fileName = jpegFileNameFrom(file.name);
   return {
-    buffer: input,
-    mimeType: inferCastTvMimeType(file.name, mimeType),
-    fileName: file.name,
-    mediaType,
-    fileSize: input.length,
-    storagePath: buildCastTvStoragePath(file.name)
+    buffer: transcoded.buffer,
+    mimeType: transcoded.mimeType,
+    fileName,
+    mediaType: "image",
+    fileSize: transcoded.buffer.length,
+    storagePath: buildCastTvStoragePath(fileName),
+    contentHash: transcoded.contentHash,
+    pixelHash: transcoded.pixelHash,
+    originalHash: transcoded.originalHash,
+    displayReady: true
   };
 }
+

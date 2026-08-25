@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { writeAdminAuditLog } from "@/lib/admin/audit";
-import { convertStoredCastTvHeicIfNeeded } from "@/lib/cast-tv/convert-heic";
 import {
   deleteCastTvMediaRecord,
   replaceCastTvMediaFile,
@@ -8,6 +7,7 @@ import {
 } from "@/lib/cast-tv/media";
 import { inferCastTvMimeType } from "@/lib/cast-tv/mime";
 import { handleCastTvWrite } from "@/lib/cast-tv/route-handler";
+import { normalizeStoredCastTvImage } from "@/lib/cast-tv/stored-image";
 import type { CastTvImageDuration } from "@/lib/cast-tv/types";
 import { getCastTvSupabase, CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS } from "@/lib/cast-tv/supabase";
 
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       }
 
       const supabase = getCastTvSupabase(CAST_TV_SUPABASE_UPLOAD_TIMEOUT_MS);
-      const converted = await convertStoredCastTvHeicIfNeeded(supabase, {
+      const converted = await normalizeStoredCastTvImage(supabase, {
         fileName,
         mimeType,
         fileSize,
