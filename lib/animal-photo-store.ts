@@ -1,3 +1,4 @@
+import { isLiveTransitionQueryInCooldown, markLiveTransitionQueryTimeout } from "@/lib/live-transition-query-guard";
 import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
@@ -10,18 +11,25 @@ type StoredAnimalPhoto = {
 export async function loadStoredAnimalPhotoMap(supabase: SupabaseClient, animalIds: Array<string | null | undefined>) {
   const uniqueIds = [...new Set(animalIds.map((id) => id?.trim()).filter(Boolean) as string[])];
   if (!uniqueIds.length) return new Map<string, string>();
+  if (isLiveTransitionQueryInCooldown()) return new Map<string, string>();
 
-  const { data, error } = await supabase
-    .from("live_transition_dogs")
-    .select("gingr_animal_id, photo_url, updated_at")
-    .in("gingr_animal_id", uniqueIds)
-    .not("photo_url", "is", null)
-    .order("updated_at", { ascending: false });
-
-  if (error) throw error;
+  let data: StoredAnimalPhoto[] | null = null;
+  try {
+    const result = await supabase
+      .from("live_transition_dogs")
+      .select("gingr_animal_id, photo_url, updated_at")
+      .in("gingr_animal_id", uniqueIds)
+      .not("photo_url", "is", null)
+      .order("updated_at", { ascending: false });
+    if (result.error) throw result.error;
+    data = (result.data ?? []) as StoredAnimalPhoto[];
+  } catch {
+    markLiveTransitionQueryTimeout();
+    return new Map<string, string>();
+  }
 
   const photoMap = new Map<string, string>();
-  for (const row of (data ?? []) as StoredAnimalPhoto[]) {
+  for (const row of data ?? []) {
     const animalId = row.gingr_animal_id?.trim();
     const photoUrl = row.photo_url?.trim();
     if (animalId && photoUrl && !photoMap.has(animalId)) {
@@ -45,14 +53,19 @@ export async function persistAnimalPhotoUrl(
   const trimmedId = animalId.trim();
   const trimmedUrl = photoUrl.trim();
   if (!trimmedId || !trimmedUrl) return;
+  if (isLiveTransitionQueryInCooldown()) return;
 
-  const { error } = await supabase
-    .from("live_transition_dogs")
-    .update({ photo_url: trimmedUrl, updated_at: new Date().toISOString() })
-    .eq("gingr_animal_id", trimmedId)
-    .is("photo_url", null);
+  try {
+    const { error } = await supabase
+      .from("live_transition_dogs")
+      .update({ photo_url: trimmedUrl, updated_at: new Date().toISOString() })
+      .eq("gingr_animal_id", trimmedId)
+      .is("photo_url", null);
 
-  if (error) throw error;
+    if (error) throw error;
+  } catch {
+    markLiveTransitionQueryTimeout();
+  }
 }
 
 export async function applyStoredAnimalPhotos(supabase: SupabaseClient, dogs: LiveDog[]) {

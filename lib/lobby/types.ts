@@ -57,6 +57,7 @@ export type LobbyCheckoutDebug = {
   used_cached_gingr?: boolean;
   newest_checkout_event_at?: string | null;
   active_checkout_count?: number;
+  supabase_timed_out?: boolean;
 };
 
 export type LobbyCheckoutsResponse = {

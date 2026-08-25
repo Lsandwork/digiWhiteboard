@@ -146,7 +146,23 @@ export async function loadLobbyBoardState(
     const payload = await getOrLoadTtlCache(cacheKey, FAST_CHECKOUT_CACHE_TTL_MS, () =>
       buildLobbyBoardState(supabase, options)
     );
-    setTtlCache(lastGoodKey, payload, 120_000);
+    if (payload.checkouts.counts.active > 0 || payload.checkouts.basket_filtered) {
+      setTtlCache(lastGoodKey, payload, 120_000);
+    }
+    if (
+      payload.checkouts.counts.active === 0 &&
+      !payload.checkouts.basket_filtered &&
+      payload.checkouts.stale
+    ) {
+      const lastGood = getTtlCache<LobbyBoardStatePayload>(lastGoodKey);
+      if (lastGood?.checkouts.counts.active) {
+        return {
+          ...lastGood,
+          checkouts: { ...lastGood.checkouts, stale: true },
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
     return payload;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to load lobby board state.";

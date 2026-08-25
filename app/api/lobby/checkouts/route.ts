@@ -1,6 +1,10 @@
 import { after } from "next/server";
 import { NextResponse } from "next/server";
-import { reconcileCachedBasketClears, sweepExpiredTransitionRows } from "@/lib/board-fast-checkout";
+import {
+  isLiveTransitionQueryInCooldown,
+  reconcileCachedBasketClears,
+  sweepExpiredTransitionRows
+} from "@/lib/board-fast-checkout";
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { cachedLoadLobbySettings, FAST_CHECKOUT_CACHE_TTL_MS, invalidateBoardTransitionCaches } from "@/lib/board-settings-cache";
 import { fillAndPersistMissingAnimalPhotos, collectMissingPhotoAnimalIds } from "@/lib/board-animal-photos";
@@ -69,20 +73,27 @@ export async function GET(request: Request) {
               fetch_completed_at: new Date().toISOString(),
               used_cached_gingr: checkout.used_cached_gingr ?? false,
               newest_checkout_event_at: checkout.lastPromptedAt,
-              active_checkout_count: checkout.activeCount
+              active_checkout_count: checkout.activeCount,
+              supabase_timed_out: checkout.supabase_timed_out ?? false
             }
           }
         : {})
     });
 
     if (fresh) setTtlCache(cacheKey, checkout, FAST_CHECKOUT_CACHE_TTL_MS);
-    setTtlCache(lastGoodKey, payload, 120_000);
+    const hasDogs = payload.counts.active > 0;
+    // Never replace last-good dogs with an empty timeout payload. Idle empty is
+    // stored only when Gingr confirmed the basket is clear.
+    if (hasDogs || payload.basket_filtered) {
+      setTtlCache(lastGoodKey, payload, 120_000);
+    }
 
     if (fast) {
       after(async () => {
-        // Runs after the response — lobby guests never wait on a Gingr round trip.
-        const [, cleared, swept] = await Promise.all([
-          refreshGingrBoardCache().catch(() => null),
+        // Always refresh the shared Gingr cache — lobby guests never wait on it.
+        await refreshGingrBoardCache().catch(() => null);
+        if (isLiveTransitionQueryInCooldown()) return;
+        const [cleared, swept] = await Promise.all([
           reconcileCachedBasketClears(supabase, now).catch(() => ({ hidden_count: 0 })),
           sweepExpiredTransitionRows(supabase, now).catch(() => ({ hidden_count: 0 })),
           fillAndPersistMissingAnimalPhotos(
@@ -107,12 +118,27 @@ export async function GET(request: Request) {
       active: checkout.activeCount
     });
 
+    if (!hasDogs && !payload.basket_filtered && checkout.supabase_timed_out) {
+      const lastGood = getTtlCache<Record<string, unknown>>(lastGoodKey);
+      if (lastGood) {
+        return NextResponse.json(sanitizeLobbyCheckouts({ ...lastGood, stale: true }), {
+          status: 200,
+          headers: {
+            "cache-control": fresh ? "private, no-store, max-age=0" : "private, max-age=1, stale-while-revalidate=4"
+          }
+        });
+      }
+    }
+
     return NextResponse.json(payload, {
       headers: {
         "cache-control": fresh ? "private, no-store, max-age=0" : "private, max-age=1, stale-while-revalidate=4"
       }
     });
   } catch (error) {
+    after(async () => {
+      await refreshGingrBoardCache().catch(() => null);
+    });
     const message = error instanceof Error ? error.message : "Unable to load lobby checkouts.";
     const lastGood = getTtlCache<Record<string, unknown>>(lastGoodKey);
     debugBoardLog(debugBoard, "lobby checkouts failed", {
