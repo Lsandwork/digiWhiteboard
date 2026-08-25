@@ -23,7 +23,6 @@ import { canCallGingrEndpoint, getCachedBackOfHouseBoard } from "@/lib/gingr-req
 import { refreshGingrBoardCache } from "@/lib/gingr-board-refresh";
 import { LIVE_BOARD_CACHE_TTL_MS, liveBoardCacheTtlMs } from "@/lib/board-settings-cache";
 import { debugBoardLog, getOrLoadTtlCache, getTtlCache, setTtlCache } from "@/lib/server-ttl-cache";
-import { shellyCheckinAlertKey, shellyCheckoutAlertKey, triggerShellyAlert } from "@/lib/shelly-alert";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { FAST_CHECKOUT_QUERY_TIMEOUT_MS, VISIBLE_TRANSITION_SELECT } from "@/lib/board-fast-checkout";
@@ -385,14 +384,10 @@ export async function GET(request: Request) {
 
     if (checkingIn.length || checkingOut.length) {
       after(async () => {
-        await Promise.all([
-          fillAndPersistMissingAnimalPhotos(
-            supabase,
-            collectMissingPhotoAnimalIds([...checkingIn, ...checkingOut])
-          ).catch(() => 0),
-          ...checkingIn.map((dog) => triggerShellyAlert("dog_check_in", shellyCheckinAlertKey(dog))),
-          ...checkingOut.map((dog) => triggerShellyAlert("dog_check_out", shellyCheckoutAlertKey(dog)))
-        ]);
+        await fillAndPersistMissingAnimalPhotos(
+          supabase,
+          collectMissingPhotoAnimalIds([...checkingIn, ...checkingOut])
+        ).catch(() => 0);
       });
     }
 
