@@ -145,7 +145,12 @@ limit ${param(pageSize)} offset ${param(from)}`;
 
 export async function withCommissionPostgres<T>(
   work: (client: Client) => Promise<T>,
-  options?: { queryTimeoutMs?: number; statementTimeoutMs?: number }
+  options?: {
+    queryTimeoutMs?: number;
+    statementTimeoutMs?: number;
+    connectionTimeoutMs?: number;
+    preferSession?: boolean;
+  }
 ): Promise<T> {
   const client = await connectPg(options);
   try {
@@ -162,19 +167,28 @@ export async function withCommissionPostgres<T>(
 async function connectPg(options?: {
   queryTimeoutMs?: number;
   statementTimeoutMs?: number;
+  connectionTimeoutMs?: number;
+  preferSession?: boolean;
 }): Promise<Client> {
   const hasPassword = Boolean(
     (process.env.SUPABASE_DB_PASSWORD ?? process.env.POSTGRES_PASSWORD)?.trim()
   );
   // Transaction pooling first (the serverless-safe port), then session pooling.
+  // Import writes prefer session pooling so SET lock_timeout sticks.
   const attempts: Array<{ usePooler: boolean; port?: string }> = hasPassword
-    ? [
-        { usePooler: true, port: "6543" },
-        { usePooler: true, port: "5432" }
-      ]
+    ? options?.preferSession
+      ? [
+          { usePooler: true, port: "5432" },
+          { usePooler: true, port: "6543" }
+        ]
+      : [
+          { usePooler: true, port: "6543" },
+          { usePooler: true, port: "5432" }
+        ]
     : [{ usePooler: true }];
   const queryTimeoutMs = options?.queryTimeoutMs ?? STATEMENT_TIMEOUT_MS;
   const statementTimeoutMs = options?.statementTimeoutMs ?? STATEMENT_TIMEOUT_MS;
+  const connectionTimeoutMs = options?.connectionTimeoutMs ?? CONNECT_TIMEOUT_MS;
   let lastError: unknown;
   const seen = new Set<string>();
   for (const attempt of attempts) {
@@ -184,7 +198,7 @@ async function connectPg(options?: {
     const client = new Client({
       connectionString: databaseUrl,
       ssl: { rejectUnauthorized: false },
-      connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+      connectionTimeoutMillis: connectionTimeoutMs,
       query_timeout: queryTimeoutMs
     });
     try {

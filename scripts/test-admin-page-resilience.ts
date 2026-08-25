@@ -5,7 +5,9 @@ import { readResponseJson } from "../lib/http/read-response-json";
 import { LIVE_DATA_UNAVAILABLE_MESSAGE, LIVE_DATA_SLOW_MESSAGE, isTimeoutLikeError, humanizeUnknownError } from "../lib/safe-url";
 import {
   COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS,
-  COMMISSIONS_MUTATION_TIMEOUT_MS
+  COMMISSIONS_MUTATION_TIMEOUT_MS,
+  COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS,
+  COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS
 } from "../lib/staff/commission-ledger/import-timeouts";
 import { skipDashboardBackgroundHydrate, skipHeavyBoardWidgets, skipHungBoardSnapshots, skipSettingsAndAccess } from "../lib/admin/dashboard-load";
 import { OVERVIEW_QUERY_TIMEOUT_MS, OVERVIEW_SETTINGS_POINTERS, emptyOverviewPayload } from "../lib/admin/overview";
@@ -65,6 +67,9 @@ assert.ok(SERVICE_SUPABASE_CRON_TIMEOUT_MS > SERVICE_SUPABASE_TIMEOUT_MS);
 assert.equal(COMMISSIONS_MUTATION_TIMEOUT_MS, 25_000);
 assert.equal(COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS, 28_000);
 assert.ok(COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS > COMMISSIONS_MUTATION_TIMEOUT_MS);
+assert.equal(COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS, 3_000);
+assert.equal(COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS, 6_000);
+assert.ok(COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS > COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS);
 assert.equal(isTimeoutLikeError({ name: "AbortError", message: "The operation was aborted." }), true);
 assert.equal(
   humanizeUnknownError(new Error("The operation was aborted."), "fallback"),
@@ -99,6 +104,12 @@ assert.match(commissionsRoute, /delayedReason/);
 assert.match(commissionsRoute, /listCommissionTrainersFromDb/);
 assert.match(commissionsRoute, /liveMatrix/);
 assert.match(commissionsRoute, /humanizeUnknownError/);
+assert.match(commissionsRoute, /listPayrollPeriodsViaPostgres/);
+assert.match(commissionsRoute, /listImportBatchesViaPostgres/);
+assert.match(commissionsRoute, /listCommissionRulesViaPostgres/);
+assert.match(commissionsRoute, /loadCommissionSubtabList/);
+assert.match(commissionsRoute, /COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS/);
+assert.match(commissionsRoute, /view === "rules" \|\| view === "report"/);
 assert.doesNotMatch(commissionsRoute, /listAdminUsers/);
 assert.doesNotMatch(commissionsRoute, /getServiceSupabase\(\)/);
 assert.doesNotMatch(commissionsRoute, /Promise\.any/);
@@ -115,7 +126,17 @@ assert.match(panel, /COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS/);
 assert.match(panel, /timeoutMessage: COMMISSIONS_IMPORT_SLOW_MESSAGE/);
 assert.match(panel, /void load\(\{ quiet: true \}\)/);
 assert.match(panel, /if \(!options\?\.quiet\)/);
+assert.match(panel, /COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS/);
+assert.match(panel, /COMMISSIONS_SUBTAB_SLOW_MESSAGE/);
+assert.match(panel, /if \(tab === "rules" \|\| tab === "payroll" \|\| tab === "imports"\)/);
+assert.doesNotMatch(panel, /Payroll load failed/);
+assert.doesNotMatch(panel, /Rules failed/);
 assert.doesNotMatch(panel, /await load\(\{ quiet: true \}\)/);
+
+const payroll = readFileSync("lib/staff/commission-ledger/payroll.ts", "utf8");
+assert.match(payroll, /listPayrollPeriodsViaPostgres/);
+assert.match(payroll, /\.limit\(50\)/);
+assert.match(payroll, /package_commission_payroll_periods/);
 
 const postgresLedger = readFileSync("lib/staff/commission-ledger/list-via-postgres.ts", "utf8");
 assert.match(postgresLedger, /withCommissionPostgres/);

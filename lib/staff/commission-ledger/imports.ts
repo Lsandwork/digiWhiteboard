@@ -3,7 +3,8 @@ import { assertCanManage } from "./auth";
 import { writeCommissionAudit } from "./audit";
 import { insertCommissionRecordsForImport } from "./records";
 import { isTimeoutLikeError } from "@/lib/safe-url";
-import { COMMISSIONS_IMPORT_SLOW_MESSAGE } from "./import-timeouts";
+import { COMMISSIONS_IMPORT_SLOW_MESSAGE, COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS } from "./import-timeouts";
+import { withCommissionPostgres } from "./list-via-postgres";
 import {
   canListCommissionsViaPostgres,
   insertCommissionImportViaPostgres,
@@ -42,40 +43,6 @@ function saleCategoryToType(category: unknown) {
 
 function parseSoldDate(value: unknown): string | null {
   return parseCommissionDate(value);
-}
-
-async function loadExistingSameDayDuplicates(
-  supabase: SupabaseClient,
-  saleDates: string[]
-): Promise<Set<string>> {
-  const uniqueDates = [...new Set(saleDates.filter(Boolean))];
-  const found = new Set<string>();
-  if (!uniqueDates.length) return found;
-
-  const chunkSize = 40;
-  for (let i = 0; i < uniqueDates.length; i += chunkSize) {
-    const chunk = uniqueDates.slice(i, i + chunkSize);
-    const { data, error } = await supabase
-      .from("package_commission_records")
-      .select("sale_date, trainer_name, trainer_user_id, client_name, dog_name, package_or_class")
-      .in("sale_date", chunk)
-      .is("archived_at", null)
-      .limit(400);
-    if (error) throw new Error(error.message);
-    for (const row of data ?? []) {
-      found.add(
-        commissionDedupeKey({
-          trainerName: String(row.trainer_name ?? ""),
-          trainerUserId: (row.trainer_user_id as string) || null,
-          clientName: String(row.client_name ?? ""),
-          dogName: String(row.dog_name ?? ""),
-          packageOrClass: String(row.package_or_class ?? ""),
-          saleDate: String(row.sale_date ?? "").slice(0, 10)
-        })
-      );
-    }
-  }
-  return found;
 }
 
 async function insertImportErrorRows(
@@ -132,11 +99,11 @@ export async function importCommissionCsvToLedger(
     .filter((value): value is string => Boolean(value));
   let existingKeys = new Set<string>();
   try {
-    existingKeys = canListCommissionsViaPostgres()
-      ? await loadExistingSameDayDuplicatesViaPostgres(saleDates)
-      : await loadExistingSameDayDuplicates(supabase, saleDates);
-  } catch (error) {
-    if (!isTimeoutLikeError(error)) throw error;
+    if (canListCommissionsViaPostgres()) {
+      existingKeys = await loadExistingSameDayDuplicatesViaPostgres(saleDates);
+    }
+  } catch {
+    existingKeys = new Set();
   }
 
   for (let i = 0; i < parsed.length; i += 1) {
@@ -350,21 +317,7 @@ export async function importCommissionCsvToLedger(
       );
       batchId = inserted.batchId;
       applyInserted(inserted);
-      return {
-        batchId,
-        imported,
-        failed,
-        warnings,
-        duplicates,
-        skippedDuplicates: duplicates,
-        errors,
-        records,
-        timedOut
-      };
-    } catch (error) {
-      if (isTimeoutLikeError(error)) {
-        timedOut = true;
-        errors.push({ line: 0, message: COMMISSIONS_IMPORT_SLOW_MESSAGE, severity: "error" });
+      if (imported > 0 || !inserted.timedOut) {
         return {
           batchId,
           imported,
@@ -377,7 +330,9 @@ export async function importCommissionCsvToLedger(
           timedOut
         };
       }
-      // Connect/schema miss — save via REST instead of failing the whole CSV.
+      // 0 rows and timed out — try REST instead of returning an empty import.
+    } catch {
+      // Connect/lock/schema miss — save via REST instead of failing the whole CSV.
     }
   }
 
@@ -462,6 +417,25 @@ export async function listImportBatches(supabase: SupabaseClient) {
     .limit(50);
   if (error) throw new Error(error.message);
   return data ?? [];
+}
+
+export async function listImportBatchesViaPostgres(): Promise<Record<string, unknown>[]> {
+  if (!canListCommissionsViaPostgres()) {
+    throw new Error("Direct Postgres is not configured.");
+  }
+  return withCommissionPostgres(
+    async (client) => {
+      const result = await client.query(
+        `select * from package_commission_import_batches order by uploaded_at desc nulls last limit 50`
+      );
+      return result.rows as Record<string, unknown>[];
+    },
+    {
+      queryTimeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS,
+      statementTimeoutMs: COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS,
+      connectionTimeoutMs: 1_200
+    }
+  );
 }
 
 export async function undoImportBatch(

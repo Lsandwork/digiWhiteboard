@@ -69,8 +69,8 @@ async function testJsonReaders() {
   assert.match(panel, /emptyOpsCommandCenterSnapshot/);
   assert.doesNotMatch(panel, /45_000/);
   assert.doesNotMatch(panel, /This page is taking too long to load/);
-  assert.match(panel, /data\.pending/);
-  assert.match(panel, /staffOpsHealth.status === "error"/);
+assert.match(panel, /Gingr ● Checking/);
+assert.match(panel, /gingrHealth.status === "offline"/);
 }
 
 {
@@ -81,6 +81,7 @@ async function testJsonReaders() {
   assert.match(snapshot, /OPS_SNAPSHOT_BUILD_TIMEOUT_MS/);
   assert.match(snapshot, /last-good|OPS_SNAPSHOT_LAST_GOOD_KEY/);
   assert.match(snapshot, /shouldCacheOpsSnapshot|probeTimedOut|delayedStaffFeed/);
+  assert.match(snapshot, /queryError && isHungQueryError/);
 }
 
 void testJsonReaders()

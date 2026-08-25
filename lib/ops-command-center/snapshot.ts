@@ -390,7 +390,8 @@ export async function buildOpsCommandCenterSnapshot(input: {
     }
     try {
       const result = await withTimeoutResult(Promise.resolve(query()), OPS_SNAPSHOT_TIMEOUT_MS, { data: null as T | null });
-      if (result.timedOut) {
+      const queryError = (result.value as { error?: unknown } | null)?.error;
+      if (result.timedOut || (queryError && isHungQueryError(queryError))) {
         markHungTableTimeout(table);
         return { data: null as T | null, timedOut: true };
       }

@@ -4,7 +4,9 @@ import { fetchAdminJson } from "@/lib/http/fetch-admin-json";
 import { humanizeUnknownError } from "@/lib/safe-url";
 import {
   COMMISSIONS_IMPORT_CLIENT_TIMEOUT_MS,
-  COMMISSIONS_IMPORT_SLOW_MESSAGE
+  COMMISSIONS_IMPORT_SLOW_MESSAGE,
+  COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS,
+  COMMISSIONS_SUBTAB_SLOW_MESSAGE
 } from "@/lib/staff/commission-ledger/import-timeouts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -148,6 +150,7 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   const [data, setData] = useState<LedgerPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [subTabTick, setSubTabTick] = useState(0);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkModal, setBulkModal] = useState<{
@@ -271,6 +274,10 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
   }
 
   const load = useCallback(async (options?: { quiet?: boolean }) => {
+    if (tab === "rules" || tab === "payroll" || tab === "imports") {
+      setLoading(false);
+      return;
+    }
     if (!options?.quiet) {
       setLoading(true);
       setLoadError(null);
@@ -288,15 +295,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         if (tab === "approval") params.set("approvalStatus", "pending");
       } else {
         const copied = new URLSearchParams(searchParams.toString());
-        copied.set("view", "ledger");
-        if (tab === "rules" || tab === "payroll" || tab === "imports") {
-          copied.set("view", tab === "rules" ? "rules" : tab === "payroll" ? "payroll" : "imports");
-        }
-        if (tab === "reports") {
-          copied.set("view", "report");
-          copied.set("reportType", reportType);
-          copied.set("pageSize", "5000");
-        }
+        copied.set("view", "report");
+        copied.set("reportType", reportType);
+        copied.set("pageSize", "5000");
         copied.forEach((value, key) => params.set(key, value));
       }
 
@@ -554,7 +555,18 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="crossover-btn crossover-btn--ghost" onClick={() => void load()} disabled={loading}>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--ghost"
+            onClick={() => {
+              if (tab === "payroll" || tab === "rules" || tab === "imports") {
+                setSubTabTick((n) => n + 1);
+                return;
+              }
+              void load();
+            }}
+            disabled={loading}
+          >
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
           {canManage ? (
@@ -1005,9 +1017,9 @@ export function PackageCommissionsPanel({ embedded = false }: { embedded?: boole
         />
       ) : null}
 
-      {tab === "payroll" && canManage ? <PayrollTab onRefresh={() => void load()} /> : null}
-      {tab === "imports" && canManage ? <ImportsTab onOpenImport={() => setShowImport(true)} /> : null}
-      {tab === "rules" && canManage ? <RulesTab trainers={data?.trainers ?? []} /> : null}
+      {tab === "payroll" && !isTrainer ? <PayrollTab refreshTick={subTabTick} /> : null}
+      {tab === "imports" && !isTrainer ? <ImportsTab refreshTick={subTabTick} onOpenImport={() => setShowImport(true)} /> : null}
+      {tab === "rules" && !isTrainer ? <RulesTab refreshTick={subTabTick} trainers={data?.trainers ?? []} /> : null}
 
       {/* Drawer */}
       {drawerId && drawer ? (
@@ -1524,24 +1536,34 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
+function PayrollTab({ refreshTick }: { refreshTick: number }) {
   const { showToast } = useToast();
   const [periods, setPeriods] = useState<Array<Record<string, unknown>>>([]);
+  const [delayed, setDelayed] = useState(false);
   const [name, setName] = useState("");
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
 
   const load = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<{ error?: string; periods?: Array<Record<string, unknown>> }>(
-      "/api/admin/package-commissions?view=payroll"
-    );
-    if (!ok) throw new Error(body.error ?? "Unable to load payroll.");
-    setPeriods(body.periods ?? []);
+    try {
+      const { ok, body } = await fetchAdminJson<{
+        error?: string;
+        periods?: Array<Record<string, unknown>>;
+        delayed?: boolean;
+      }>("/api/admin/package-commissions?view=payroll", {
+        timeoutMs: COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS
+      });
+      setPeriods(body.periods ?? []);
+      setDelayed(!ok || Boolean(body.delayed));
+    } catch {
+      setPeriods([]);
+      setDelayed(true);
+    }
   }, []);
 
   useEffect(() => {
-    void load().catch((error) => showToast(error instanceof Error ? error.message : "Payroll load failed.", "error"));
-  }, [load, showToast]);
+    void load();
+  }, [load, refreshTick]);
 
   return (
     <div className="space-y-4">
@@ -1567,13 +1589,20 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
               showToast("Payroll period created.", "success");
               setName("");
               await load();
-              onRefresh();
             }}
           >
             Create
           </button>
         </div>
       </div>
+      {delayed ? (
+        <p className="text-sm text-admin-muted">
+          {COMMISSIONS_SUBTAB_SLOW_MESSAGE}{" "}
+          <button type="button" className="underline" onClick={() => void load()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
       <div className="overflow-auto rounded-xl border border-[var(--border)]">
         <table className="min-w-full text-sm">
           <thead>
@@ -1630,26 +1659,45 @@ function PayrollTab({ onRefresh }: { onRefresh: () => void }) {
   );
 }
 
-function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
+function ImportsTab({ refreshTick, onOpenImport }: { refreshTick: number; onOpenImport: () => void }) {
   const { showToast } = useToast();
   const [batches, setBatches] = useState<Array<Record<string, unknown>>>([]);
+  const [delayed, setDelayed] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const { ok, body } = await fetchAdminJson<{
+        error?: string;
+        batches?: Array<Record<string, unknown>>;
+        delayed?: boolean;
+      }>("/api/admin/package-commissions?view=imports", {
+        timeoutMs: COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS
+      });
+      setBatches(body.batches ?? []);
+      setDelayed(!ok || Boolean(body.delayed));
+    } catch {
+      setBatches([]);
+      setDelayed(true);
+    }
+  }, []);
 
   useEffect(() => {
-    void fetchAdminJson<{ error?: string; batches?: Array<Record<string, unknown>> }>(
-      "/api/admin/package-commissions?view=imports"
-    )
-      .then(({ ok, body }) => {
-        if (!ok) throw new Error(body.error ?? "Unable to load imports.");
-        setBatches(body.batches ?? []);
-      })
-      .catch((error) => showToast(error instanceof Error ? error.message : "Unable to load imports.", "error"));
-  }, [showToast]);
+    void load();
+  }, [load, refreshTick]);
 
   return (
     <div className="space-y-3">
       <button type="button" className="crossover-btn crossover-btn--primary" onClick={onOpenImport}>
         <Upload className="h-4 w-4" /> Upload new CSV
       </button>
+      {delayed ? (
+        <p className="text-sm text-admin-muted">
+          {COMMISSIONS_SUBTAB_SLOW_MESSAGE}{" "}
+          <button type="button" className="underline" onClick={() => void load()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
       <div className="overflow-auto rounded-xl border border-[var(--border)]">
         <table className="min-w-full text-sm">
           <thead>
@@ -1709,22 +1757,32 @@ function ImportsTab({ onOpenImport }: { onOpenImport: () => void }) {
   );
 }
 
-function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
+function RulesTab({ refreshTick, trainers }: { refreshTick: number; trainers: TrainerOption[] }) {
   const { showToast } = useToast();
   const [rules, setRules] = useState<Array<Record<string, unknown>>>([]);
+  const [delayed, setDelayed] = useState(false);
   const [form, setForm] = useState({ name: "", rate: "50", commission_type: "package_sale", calculation_type: "percentage_of_gross" });
 
   const load = useCallback(async () => {
-    const { ok, body } = await fetchAdminJson<{ error?: string; rules?: Array<Record<string, unknown>> }>(
-      "/api/admin/package-commissions?view=rules"
-    );
-    if (!ok) throw new Error(body.error ?? "Unable to load rules.");
-    setRules(body.rules ?? []);
+    try {
+      const { ok, body } = await fetchAdminJson<{
+        error?: string;
+        rules?: Array<Record<string, unknown>>;
+        delayed?: boolean;
+      }>("/api/admin/package-commissions?view=rules", {
+        timeoutMs: COMMISSIONS_SUBTAB_CLIENT_TIMEOUT_MS
+      });
+      setRules(body.rules ?? []);
+      setDelayed(!ok || Boolean(body.delayed));
+    } catch {
+      setRules([]);
+      setDelayed(true);
+    }
   }, []);
 
   useEffect(() => {
-    void load().catch((error) => showToast(error instanceof Error ? error.message : "Rules failed.", "error"));
-  }, [load, showToast]);
+    void load();
+  }, [load, refreshTick]);
 
   return (
     <div className="space-y-4">
@@ -1762,6 +1820,14 @@ function RulesTab({ trainers }: { trainers: TrainerOption[] }) {
         </div>
         <p className="mt-2 text-xs text-admin-muted">{trainers.length} trainers available for trainer-specific rules.</p>
       </div>
+      {delayed ? (
+        <p className="text-sm text-admin-muted">
+          {COMMISSIONS_SUBTAB_SLOW_MESSAGE}{" "}
+          <button type="button" className="underline" onClick={() => void load()}>
+            Retry
+          </button>
+        </p>
+      ) : null}
       <div className="overflow-auto rounded-xl border border-[var(--border)]">
         <table className="min-w-full text-sm">
           <thead>
