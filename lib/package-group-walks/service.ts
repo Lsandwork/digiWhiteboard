@@ -22,12 +22,6 @@ import {
   type OwnerPackageIndex,
   type ResolvedOwnerPackage
 } from "./gingr-packages";
-import { logPackageGroupWalkEvent } from "./observability";
-import {
-  loadCompletionsForBusinessDate,
-  packageGroupWalkBusinessDate,
-  PackageGroupWalksSchemaMissingError
-} from "./store";
 import type {
   PackageGroupWalkCompletion,
   PackageGroupWalkEligibility,
@@ -36,6 +30,12 @@ import type {
   PackageGroupWalkState,
   PackageGroupWalkSummary
 } from "./types";
+import { logPackageGroupWalkEvent } from "./observability";
+import {
+  loadCompletionsForBusinessDate,
+  packageGroupWalkBusinessDate,
+  PackageGroupWalksSchemaMissingError
+} from "./store";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
