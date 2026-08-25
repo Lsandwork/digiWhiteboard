@@ -48,6 +48,52 @@ export async function loadAdminSettingsJsonKey<T>(
   return parse(raw);
 }
 
+export type AdminSettingsJsonPointer = {
+  alias: string;
+  /** PostgREST jsonb path after `settings->`, e.g. `staff_admin_ops->active_issues`. */
+  path: string;
+};
+
+/**
+ * Read several JSON pointers from the same admin_settings row in one round trip.
+ * Nested paths avoid transferring unused blobs such as 500 crossover messages.
+ */
+export async function loadAdminSettingsJsonPointers(
+  supabase: SupabaseClient,
+  pointers: AdminSettingsJsonPointer[]
+): Promise<Record<string, unknown> | null> {
+  if (!pointers.length) return {};
+
+  const nestedSelect = pointers.map((pointer) => `${pointer.alias}:settings->${pointer.path}`).join(",");
+  const nested = await supabase.from("admin_settings").select(nestedSelect).eq("id", "default").maybeSingle();
+  if (!nested.error) return (nested.data as Record<string, unknown> | null) ?? {};
+  if (isMissingAdminSettingsRelation(nested.error)) return null;
+
+  const topLevelKeys = [...new Set(pointers.map((pointer) => pointer.path.split("->")[0] || pointer.path))];
+  const topSelect = topLevelKeys.map((key) => `${key}:settings->${key}`).join(",");
+  const top = await supabase.from("admin_settings").select(topSelect).eq("id", "default").maybeSingle();
+  if (top.error) {
+    if (isMissingAdminSettingsRelation(top.error)) return null;
+    throw top.error;
+  }
+
+  const row = (top.data as Record<string, unknown> | null) ?? {};
+  const out: Record<string, unknown> = {};
+  for (const pointer of pointers) {
+    const parts = pointer.path.split("->").filter(Boolean);
+    let cursor: unknown = parts.length ? row[parts[0]] : undefined;
+    for (const part of parts.slice(1)) {
+      if (!cursor || typeof cursor !== "object") {
+        cursor = undefined;
+        break;
+      }
+      cursor = (cursor as Record<string, unknown>)[part];
+    }
+    out[pointer.alias] = cursor;
+  }
+  return out;
+}
+
 /**
  * Patch one JSON key via Postgres jsonb_set — no read/modify/write of the full blob.
  * Falls back to read-merge-write when the RPC is not deployed yet.

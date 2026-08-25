@@ -1,10 +1,24 @@
 import type { AdminBoardType } from "@/lib/admin/types";
 
-/** Staff tabs that fetch their own data — skip heavy board widgets on first paint. */
+/** Tabs that fetch their own data — skip promotions / live dogs / webhook dumps on first paint. */
 export function skipHeavyBoardWidgets(board: AdminBoardType, tab: string | null) {
-  if (board !== "staff") return false;
   if (!tab) return false;
-  return tab !== "overview" && tab !== "integrations" && tab !== "logs";
+  if (board === "marketing") {
+    return tab === "cast_tv" || tab === "sa_apps_hub" || tab === "bulk_photo_upload";
+  }
+  if (board !== "staff") return false;
+  return tab !== "integrations" && tab !== "logs";
+}
+
+/**
+ * `live_transition_dogs` and `gingr_webhook_events` hang under SELECT *.
+ * Only Integrations / Logs (and the lobby board) actually render those rows.
+ * Background hydrate omits `tab`, so this must stay true for staff/marketing.
+ */
+export function skipHungBoardSnapshots(board: AdminBoardType, tab: string | null) {
+  if (tab === "integrations" || tab === "logs") return false;
+  if (board === "lobby") return false;
+  return true;
 }
 
 /**
@@ -25,4 +39,12 @@ export function skipSettingsAndAccess(tab: string | null) {
     tab !== "whiteboard_preview" &&
     tab !== "analytics"
   );
+}
+
+/** Tabs with their own data APIs — do not fan out a second full dashboard GET. */
+export function skipDashboardBackgroundHydrate(board: AdminBoardType, tab: string | null) {
+  if (!tab) return false;
+  if (tab === "overview") return true;
+  if (board === "marketing") return skipHeavyBoardWidgets(board, tab);
+  return false;
 }
