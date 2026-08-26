@@ -5,7 +5,7 @@
  */
 import { Client } from "pg";
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { canListCommissionsViaPostgres, buildLedgerDatabaseUrl } from "./list-via-postgres";
+import { canListCommissionsViaPostgres, buildLedgerDatabaseUrl, formatLedgerPostgresTargetDetail, getLedgerPostgresDiagnosticsTargetMeta } from "./list-via-postgres";
 import { listCommissionRecordsViaRest } from "./list-via-rest";
 import type { CommissionViewer } from "./types";
 
@@ -105,6 +105,10 @@ export async function runLedgerDiagnostics(viewer: CommissionViewer) {
       const record = (data ?? {}) as Record<string, unknown>;
       const value = record.package_commissions as { rows?: unknown[] } | undefined;
       return `${Array.isArray(value?.rows) ? value.rows.length : 0} legacy JSON rows`;
+    }),
+
+    timed("direct_postgres_target", async () => {
+      return formatLedgerPostgresTargetDetail(getLedgerPostgresDiagnosticsTargetMeta());
     }),
 
     configured.directPostgresUsable

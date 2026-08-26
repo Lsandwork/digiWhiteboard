@@ -156,8 +156,13 @@ assert.match(restLedger, /package_commission_records/);
 const diagnostics = readFileSync("lib/staff/commission-ledger/diagnostics.ts", "utf8");
 assert.match(diagnostics, /legacy_settings_rows/);
 assert.match(diagnostics, /direct_postgres/);
+assert.match(diagnostics, /direct_postgres_target/);
 assert.match(diagnostics, /rest_exact_count/);
+assert.match(diagnostics, /getLedgerPostgresDiagnosticsTargetMeta/);
+assert.match(diagnostics, /formatLedgerPostgresTargetDetail/);
 assert.match(diagnostics, /PROBE_TIMEOUT_MS = 7_000/);
+assert.match(postgresLedger, /getLedgerPostgresTargetMeta/);
+assert.match(postgresLedger, /resolvePasswordConnectionParts/);
 assert.match(diagnostics, /connectionTimeoutMillis: 4_000/);
 assert.match(diagnostics, /query_timeout: 6_000/);
 assert.match(
@@ -170,6 +175,8 @@ assert.match(
   /The configured Postgres fallback also failed; see direct_postgres/
 );
 assert.doesNotMatch(diagnostics, /select count\(\*\)::text as total from package_commission_records/);
+assert.doesNotMatch(diagnostics, /SUPABASE_DB_PASSWORD\s*\+/);
+assert.doesNotMatch(diagnostics, /buildLedgerDatabaseUrl\(\)[\s\S]{0,80}return.*url/);
 // Serial probes stacked past maxDuration and 504'd the report.
 assert.match(diagnostics, /Promise\.all\(\[/);
 assert.match(diagnostics, /PROBE_TIMEOUT_MS/);
