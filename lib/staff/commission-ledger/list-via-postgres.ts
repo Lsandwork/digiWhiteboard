@@ -9,8 +9,8 @@ import { LEDGER_LIST_COLUMNS, LEDGER_SORTABLE_COLUMNS } from "./records";
 import type { CommissionListFilters, CommissionListResult, CommissionViewer } from "./types";
 
 const PROJECT_REF = "tzkocaucqtmmnrttxira";
-const CONNECT_TIMEOUT_MS = 1_200;
-const STATEMENT_TIMEOUT_MS = 4_000;
+const CONNECT_TIMEOUT_MS = 4_000;
+const STATEMENT_TIMEOUT_MS = 6_000;
 
 const DATE_COLUMNS = new Set(["sale_date", "service_date", "created_at", "confirmed_at", "paid_at"]);
 const TEXT_CAST_COLUMNS = new Set(["sale_date", "service_date", "archived_at", "created_at", "updated_at"]);

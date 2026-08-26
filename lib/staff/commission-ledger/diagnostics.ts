@@ -17,7 +17,7 @@ export type LedgerProbe = {
 };
 
 /** Per-probe cap. Probes run in parallel so the report always beats maxDuration. */
-const PROBE_TIMEOUT_MS = 4_000;
+const PROBE_TIMEOUT_MS = 7_000;
 
 async function timed(name: string, run: () => Promise<string>): Promise<LedgerProbe> {
   const started = Date.now();
@@ -114,15 +114,15 @@ export async function runLedgerDiagnostics(viewer: CommissionViewer) {
           const client = new Client({
             connectionString: url,
             ssl: { rejectUnauthorized: false },
-            connectionTimeoutMillis: 2_000,
-            query_timeout: 3_000
+            connectionTimeoutMillis: 4_000,
+            query_timeout: 6_000
           });
-          await client.connect();
           try {
+            await client.connect();
             const result = await client.query(
-              "select count(*)::text as total from package_commission_records where archived_at is null"
+              "select id from package_commission_records where archived_at is null order by sale_date desc nulls last limit 1"
             );
-            return `${result.rows[0]?.total ?? "0"} live rows via pooler`;
+            return `${result.rows.length} first-page probe row(s) via pooler`;
           } finally {
             await client.end().catch(() => undefined);
           }
@@ -139,9 +139,14 @@ export async function runLedgerDiagnostics(viewer: CommissionViewer) {
   const restReachable = probes.some(
     (probe) => probe.name.startsWith("rest_") && probe.ok
   );
+  const directPostgresProbe = probes.find((probe) => probe.name === "direct_postgres");
   const summary = restReachable
     ? "Supabase REST responded. See probe details for row counts."
-    : "Supabase REST did not respond to any probe. The ledger cannot load until REST recovers or the Postgres fallback is configured.";
+    : !configured.directPostgresUsable
+      ? "Supabase REST did not respond to any probe. The ledger cannot load until REST recovers or the Postgres fallback is configured."
+      : directPostgresProbe?.ok
+        ? "Supabase REST did not respond. Direct Postgres responded; see direct_postgres for details."
+        : "Supabase REST did not respond. The configured Postgres fallback also failed; see direct_postgres for the connection/query failure.";
 
   return { configured, summary, probes };
 }

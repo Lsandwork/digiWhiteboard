@@ -143,6 +143,8 @@ assert.match(postgresLedger, /withCommissionPostgres/);
 assert.match(postgresLedger, /package_commission_records/);
 assert.match(postgresLedger, /6543/);
 assert.match(postgresLedger, /rejectUnauthorized: false/);
+assert.match(postgresLedger, /CONNECT_TIMEOUT_MS = 4_000/);
+assert.match(postgresLedger, /STATEMENT_TIMEOUT_MS = 6_000/);
 // The connection string itself must carry no sslmode (see test:commission-ledger).
 assert.doesNotMatch(postgresLedger, /\$\{database\}\?/);
 assert.doesNotMatch(postgresLedger, /service_date >=/);
@@ -155,6 +157,19 @@ const diagnostics = readFileSync("lib/staff/commission-ledger/diagnostics.ts", "
 assert.match(diagnostics, /legacy_settings_rows/);
 assert.match(diagnostics, /direct_postgres/);
 assert.match(diagnostics, /rest_exact_count/);
+assert.match(diagnostics, /PROBE_TIMEOUT_MS = 7_000/);
+assert.match(diagnostics, /connectionTimeoutMillis: 4_000/);
+assert.match(diagnostics, /query_timeout: 6_000/);
+assert.match(
+  diagnostics,
+  /select id from package_commission_records where archived_at is null order by sale_date desc nulls last limit 1/
+);
+assert.match(diagnostics, /first-page probe row\(s\) via pooler/);
+assert.match(
+  diagnostics,
+  /The configured Postgres fallback also failed; see direct_postgres/
+);
+assert.doesNotMatch(diagnostics, /select count\(\*\)::text as total from package_commission_records/);
 // Serial probes stacked past maxDuration and 504'd the report.
 assert.match(diagnostics, /Promise\.all\(\[/);
 assert.match(diagnostics, /PROBE_TIMEOUT_MS/);
