@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "next/navigation";
 import { PawPrint } from "lucide-react";
 import { BoardDebugPanel } from "@/components/board/BoardDebugPanel";
@@ -27,6 +27,10 @@ import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useStaffBoardOverlays } from "@/hooks/useStaffBoardOverlays";
 import { useSantaMonicaWeather } from "@/hooks/useSantaMonicaWeather";
+import {
+  getStaffWhiteboardTheme,
+  staffWhiteboardThemeCssVars
+} from "@/lib/staff/whiteboard-themes";
 import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
 import { useDogPhotoPreloader } from "@/hooks/useDogPhotoPreloader";
 import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
@@ -219,6 +223,7 @@ export function BoardClient({
     groomingQueue,
     activeTrainerNotice,
     trainerQueue,
+    whiteboardTheme,
     reload: reloadOverlays,
     viewerKey: castViewerKey
   } = useStaffBoardOverlays({
@@ -862,8 +867,15 @@ export function BoardClient({
     activePushNotice && (isEmergencyStaffPush || !hasVisibleDogs)
   );
 
+  const resolvedTheme = getStaffWhiteboardTheme(whiteboardTheme);
+  const themeStyle = staffWhiteboardThemeCssVars(resolvedTheme) as CSSProperties;
+
   return (
-    <main className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""}`}>
+    <main
+      className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""}`}
+      data-staff-wb-theme={resolvedTheme.id}
+      style={themeStyle}
+    >
       <PushNoticeBoardVeil active={pushVeilActive} tone={pushVeilTone} label={pushVeilLabel} />
       {castMode && !staffBoardLayout.showApprovedEmptyState ? (
         <CastModeStatusIndicator status={castHealth} />
@@ -907,6 +919,7 @@ export function BoardClient({
             onRequestWakeLock={() => void requestWakeLock()}
             castKeeperMode={castKeeperMode}
             weather={santaMonicaWeather}
+            whiteboardTheme={resolvedTheme.id}
           />
         ) : null}
 
@@ -1030,10 +1043,12 @@ export function BoardClient({
         )}
 
         {staffBoardLayout.showApprovedEmptyState ? null : (
-          <footer className="mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm text-slate-400 sm:mt-5 sm:text-base">
-            <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
-            <span>Thank you for trusting us with your pups!</span>
-            <PawPrint className="h-4 w-4 text-fitdog-blue/80" />
+          <footer className="staff-wb-footer mt-4 flex shrink-0 items-center justify-center gap-2 py-2 text-sm sm:mt-5 sm:text-base">
+            <PawPrint className="h-4 w-4 text-fitdog-orange" />
+            <span>
+              We don&apos;t just care for dogs—<strong>we elevate their lives.</strong>
+            </span>
+            <PawPrint className="h-4 w-4 text-fitdog-orange" />
           </footer>
         )}
         </div>

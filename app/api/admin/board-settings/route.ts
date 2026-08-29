@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { AdminBoardType } from "@/lib/admin/types";
+import type { AdminBoardType, StaffBoardSettings } from "@/lib/admin/types";
 import { isAdminRequest, blockDemoWrite, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
@@ -45,7 +45,11 @@ export async function PATCH(request: Request) {
       team_reminder: body.team_reminder != null ? String(body.team_reminder) : undefined,
       important_notice: body.important_notice != null ? String(body.important_notice) : undefined,
       show_team_reminders: body.show_team_reminders != null ? Boolean(body.show_team_reminders) : undefined,
-      footer_message: body.footer_message != null ? String(body.footer_message) : undefined
+      footer_message: body.footer_message != null ? String(body.footer_message) : undefined,
+      whiteboard_theme:
+        body.whiteboard_theme != null
+          ? (String(body.whiteboard_theme) as StaffBoardSettings["whiteboard_theme"])
+          : undefined
     });
     await bumpDisplayContentRevision(supabase);
     return NextResponse.json({ board, settings });

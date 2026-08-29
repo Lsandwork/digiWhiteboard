@@ -13,6 +13,7 @@ import { ContentEditor } from "@/components/admin/ContentEditor";
 import { PromotionsManager } from "@/components/admin/PromotionsManager";
 import { ClassScheduleEditor } from "@/components/admin/ClassScheduleEditor";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
+import { StaffWhiteboardThemeSelector } from "@/components/admin/StaffWhiteboardThemeSelector";
 import { PublishPanel } from "@/components/admin/PublishPanel";
 import { SystemInfoPanel } from "@/components/admin/SystemInfoPanel";
 import { AdminLogsPanel } from "@/components/admin/AdminLogsPanel";
@@ -73,6 +74,11 @@ import { LOBBY_CLASS_SCHEDULE } from "@/lib/lobby/class-schedule";
 import { DEFAULT_ADMIN_SETTINGS } from "@/lib/admin/settings";
 import type { AdminBoardType, AdminTab, DashboardPayload, StaffBoardSettings } from "@/lib/admin/types";
 import { ADMIN_TABS } from "@/lib/admin/types";
+import {
+  DEFAULT_STAFF_WHITEBOARD_THEME_ID,
+  normalizeStaffWhiteboardThemeId,
+  type StaffWhiteboardThemeId
+} from "@/lib/staff/whiteboard-themes";
 import { skipDashboardBackgroundHydrate, skipHeavyBoardWidgets, skipSettingsAndAccess } from "@/lib/admin/dashboard-load";
 import { navigateAdminDashboard, useAdminDashboardLocation } from "@/lib/admin/dashboard-nav";
 import { requestCastHardRefreshAllDisplays } from "@/lib/admin/cast-refresh-client";
@@ -120,7 +126,8 @@ const defaultStaff: StaffBoardSettings = {
   footer_message: null,
   published_version: "v1.0.0",
   published_at: null,
-  published_by: null
+  published_by: null,
+  whiteboard_theme: DEFAULT_STAFF_WHITEBOARD_THEME_ID
 };
 
 type SessionBootstrap = {
@@ -195,6 +202,8 @@ export function AdminDashboard() {
   const [castRefreshing, setCastRefreshing] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [themePreviewId, setThemePreviewId] = useState<StaffWhiteboardThemeId | null>(null);
+  const [themeSaving, setThemeSaving] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [confirmResetBoard, setConfirmResetBoard] = useState(false);
   const [navOverride, setNavOverride] = useState<{ board: AdminBoardType; tab: AdminTab } | null>(null);
@@ -498,6 +507,31 @@ export function AdminDashboard() {
     await load(true);
   }
 
+  async function saveStaffWhiteboardTheme(themeId: StaffWhiteboardThemeId) {
+    const next = normalizeStaffWhiteboardThemeId(themeId);
+    setThemePreviewId(next);
+    setThemeSaving(true);
+    try {
+      const response = await fetch(`/api/admin/board-settings?board=staff`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ whiteboard_theme: next })
+      });
+      const body = await readResponseJson(response);
+      if (!response.ok) throw new Error(body.error ?? "Unable to save whiteboard theme.");
+      setLastSavedAt(new Date());
+      const themeName = next === "city" ? "City" : "Clear White";
+      showToast(`Theme updated — Staff whiteboard will now use ${themeName}.`, "success");
+      await load(true);
+      setThemePreviewId(null);
+    } catch (themeError) {
+      setThemePreviewId(null);
+      showToast(humanizeUnknownError(themeError, "Unable to save whiteboard theme."), "error");
+    } finally {
+      setThemeSaving(false);
+    }
+  }
+
   async function resetSettings() {
     const response = await fetch(`/api/admin/board-settings?board=${board}`, { method: "DELETE" });
     if (!response.ok) throw new Error("Unable to reset settings.");
@@ -614,6 +648,9 @@ export function AdminDashboard() {
 
   const lobbySettings = data.lobby_settings;
   const staffSettings = data.staff_settings ?? defaultStaff;
+  const selectedWhiteboardTheme = normalizeStaffWhiteboardThemeId(
+    themePreviewId ?? staffSettings.whiteboard_theme ?? DEFAULT_STAFF_WHITEBOARD_THEME_ID
+  );
   const adminSettings = data.admin_settings ?? DEFAULT_ADMIN_SETTINGS;
   const schedule = lobbySettings.class_schedule ?? LOBBY_CLASS_SCHEDULE;
   const publishMeta = board === "staff" ? staffSettings : lobbySettings;
@@ -681,6 +718,7 @@ export function AdminDashboard() {
       activeCheckouts={data.active_checkouts}
       onFullscreen={() => setPreviewOpen(true)}
       compact={isStaffOverview}
+      previewThemeId={board === "staff" ? selectedWhiteboardTheme : undefined}
     />
   );
   const preview = (
@@ -864,7 +902,15 @@ export function AdminDashboard() {
               staffDogs={data.staff_dogs}
               activeCheckouts={data.active_checkouts}
               onFullscreen={() => setPreviewOpen(true)}
+              previewThemeId={selectedWhiteboardTheme}
             />
+            {board === "staff" ? (
+              <StaffWhiteboardThemeSelector
+                selectedThemeId={selectedWhiteboardTheme}
+                saving={themeSaving}
+                onSelect={(themeId) => void saveStaffWhiteboardTheme(themeId)}
+              />
+            ) : null}
           </div>
         ) : null}
 
@@ -1054,6 +1100,7 @@ export function AdminDashboard() {
         promotions={data.promotions}
         staffDogs={data.staff_dogs}
         activeCheckouts={data.active_checkouts}
+        previewThemeId={board === "staff" ? selectedWhiteboardTheme : undefined}
         onClose={() => setPreviewOpen(false)}
         onOpenLive={() => {
           setPreviewOpen(false);

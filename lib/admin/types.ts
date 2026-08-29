@@ -16,6 +16,8 @@ export type StaffBoardSettings = {
   published_version: string;
   published_at: string | null;
   published_by: string | null;
+  /** Staff Digital Whiteboard visual theme ID (`clear-white` | `city`). */
+  whiteboard_theme: import("@/lib/staff/whiteboard-themes").StaffWhiteboardThemeId;
 };
 
 export type LobbyBoardSettings = LobbySettings & {
