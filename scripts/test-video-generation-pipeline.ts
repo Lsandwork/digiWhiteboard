@@ -14,12 +14,12 @@ import { estimateGenerationCost } from "../lib/video-generation/cost";
 import { endCardUsesRealLogo, renderEndCardVideo } from "../lib/video-generation/end-card";
 import { probeJson, runFfmpeg } from "../lib/video-generation/ffmpeg";
 import { scenePrompt } from "../lib/video-generation/prompts";
+import { describeVeoStartFailure } from "../lib/video-generation/providers/google-veo";
 import { resolveVideoGenerationProvider } from "../lib/video-generation/providers/resolve";
 import { MIRACULOUS_RECOVERY_SCENES, END_CARD_SCENE, targetTimelineSeconds } from "../lib/video-generation/scenes";
 import { stitchLobbyAd } from "../lib/video-generation/stitch";
 import { assertLobbyAdOutput } from "../lib/video-generation/validate";
 import { completedScenePath, promptHash, rememberCompletedScene } from "../lib/video-generation/cache";
-import { readFileSync } from "node:fs";
 
 assert.equal(targetTimelineSeconds(), 20, "4+3+3+4+4+2 = 20s lobby length");
 assert.equal(MIRACULOUS_RECOVERY_SCENES.length, 5);
@@ -90,6 +90,13 @@ assert.equal(
   join(cacheDir, "scene-01.mp4")
 );
 assert.ok(promptHash({ prompt: "a", durationSeconds: 8, resolution: "1080p" }) !== promptHash({ prompt: "b", durationSeconds: 8, resolution: "1080p" }));
+
+const quotaError = describeVeoStartFailure(429, {
+  error: { message: "You exceeded your current quota, please check your plan and billing details." }
+});
+assert.match(quotaError, /HTTP 429/);
+assert.match(quotaError, /free tier/i);
+assert.match(quotaError, /typically not billed/);
 
 function makeClip(path: string, color: string, seconds: number) {
   runFfmpeg(

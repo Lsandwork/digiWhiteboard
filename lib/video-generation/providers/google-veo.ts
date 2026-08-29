@@ -39,6 +39,15 @@ function veoImage(path: string) {
   };
 }
 
+export function describeVeoStartFailure(status: number, body: VeoStartResponse & Record<string, unknown>): string {
+  const detail = body.error?.message || JSON.stringify(body).slice(0, 800);
+  const quotaHint =
+    status === 429 || /RESOURCE_EXHAUSTED|exceeded your current quota|quota exceeded/i.test(detail)
+      ? " Veo video quota is 0 on the Gemini API free tier (same for Gemini Omni). Enable billing / prepaid credits in Google AI Studio, then confirm Veo RPM/RPD at https://ai.dev/rate-limit. A rejected start is typically not billed."
+      : "";
+  return `Veo start failed HTTP ${status}: ${detail}${quotaHint}`;
+}
+
 export class GoogleVeoProvider implements VideoGenerationProvider {
   readonly id = "google-veo";
 
@@ -125,8 +134,7 @@ export class GoogleVeoProvider implements VideoGenerationProvider {
     });
     const body = (await response.json()) as VeoStartResponse & Record<string, unknown>;
     if (!response.ok || !body.name) {
-      const detail = body.error?.message || JSON.stringify(body).slice(0, 800);
-      throw new Error(`Veo start failed HTTP ${response.status}: ${detail}`);
+      throw new Error(describeVeoStartFailure(response.status, body));
     }
     return { jobId: body.name };
   }
