@@ -7,7 +7,8 @@ import type { GroomingPushNotice } from "@/lib/staff/grooming-push-notices";
 import type { StaffPushNotice } from "@/lib/staff/push-notices";
 import type { TrainerPushNotice } from "@/lib/staff/trainer-push-notices";
 
-const BOARD_OVERLAY_POLL_MS = 12_000;
+/** Shared cached API — keep ≥30s so UI refresh does not drive Supabase QPS. */
+const BOARD_OVERLAY_POLL_MS = 30_000;
 const BOARD_OVERLAY_TIMEOUT_MS = 5_000;
 
 export type StaffBoardOverlaysClient = {

@@ -47,6 +47,7 @@
     "test:staff-board-layout": "tsx scripts/test-staff-board-layout.ts",
     "test:staff-board-appear-fast": "tsx scripts/test-staff-board-appear-fast.ts",
     "test:staff-idle-slideshow": "tsx scripts/test-staff-idle-slideshow.ts",
+    "test:staff-heat-alert": "tsx scripts/test-staff-heat-alert.ts",
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",

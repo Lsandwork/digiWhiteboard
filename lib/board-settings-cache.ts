@@ -10,7 +10,8 @@ type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServi
 /** Short TTLs cut Supabase REST storms from board polling without going stale for staff. */
 export const SETTINGS_CACHE_TTL_MS = 30_000;
 export const ADMIN_SETTINGS_KEY_CACHE_TTL_MS = 30_000;
-export const BOARD_OVERLAY_CACHE_TTL_MS = 5_000;
+/** Shared process cache for staff board overlays — screens share one load per TTL. */
+export const BOARD_OVERLAY_CACHE_TTL_MS = 15_000;
 export const FAST_CHECKOUT_CACHE_TTL_MS = 150;
 /** When the board is empty, cache longer so 2s polls do not hit Postgres every tick. */
 export const EMPTY_FAST_CHECKOUT_CACHE_TTL_MS = 2_500;

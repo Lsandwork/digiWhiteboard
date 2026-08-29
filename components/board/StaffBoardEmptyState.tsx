@@ -3,7 +3,9 @@
 import { useEffect, useMemo } from "react";
 import Image from "next/image";
 import { RefreshCw } from "lucide-react";
+import { BoardWeatherChip } from "@/components/board/BoardWeatherChip";
 import { formatBoardTime } from "@/lib/board-utils";
+import type { SantaMonicaWeather } from "@/lib/staff/santa-monica-weather";
 
 const EXACT_MOCKUP = "/assets/fitdog/staff-empty-state/all-clear-mockup.jpg";
 
@@ -14,6 +16,7 @@ type StaffBoardEmptyStateProps = {
   clockTime?: string;
   clockDate?: string;
   lastUpdated?: string;
+  weather?: SantaMonicaWeather | null;
   onSlideshowReady?: () => void;
 };
 
@@ -32,14 +35,15 @@ function liveLabel(connection: ConnectionState) {
 
 /**
  * Staff board empty state — the approved All Clear mockup, rendered exactly.
- * Live clock / sync chip overlay the baked-in header so the TV stays current
- * without drifting from the designed artwork. No media-library slideshow.
+ * Live clock / sync chip overlay (and fully cover) the baked-in header clock
+ * so only one current time is visible. No media-library slideshow.
  */
 export function StaffBoardEmptyState({
   connection = "live",
   clockTime = "--:--",
   clockDate = "",
   lastUpdated,
+  weather = null,
   onSlideshowReady
 }: StaffBoardEmptyStateProps) {
   const { time, meridiem } = useMemo(() => splitClockTime(clockTime), [clockTime]);
@@ -66,6 +70,9 @@ export function StaffBoardEmptyState({
         aria-hidden="true"
       />
 
+      {/* Solid plate hides the baked-in mockup clock so only the live clock shows. */}
+      <div className="staff-all-clear__clock-cover" aria-hidden="true" />
+
       <div className="staff-all-clear__exact-chrome">
         <div className={`staff-all-clear__live ${isHealthy ? "is-live" : "is-down"}`}>
           <span className="staff-all-clear__live-dot" />
@@ -81,11 +88,18 @@ export function StaffBoardEmptyState({
             {meridiem ? <span className="staff-all-clear__time-meridiem">{meridiem}</span> : null}
           </div>
           <div className="staff-all-clear__date">{clockDate}</div>
+          <BoardWeatherChip weather={weather} compact className="staff-all-clear__weather" />
         </div>
 
         <div className="staff-all-clear__updated">
           <RefreshCw className="staff-all-clear__updated-icon" aria-hidden="true" />
-          <span>Last updated {formatBoardTime(lastUpdated)}</span>
+          <span>
+            {lastUpdated
+              ? `Last updated ${formatBoardTime(lastUpdated)}`
+              : isHealthy
+                ? "Waiting for first sync…"
+                : "Sync unavailable"}
+          </span>
         </div>
       </div>
 
