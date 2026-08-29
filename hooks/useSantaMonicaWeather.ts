@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchBoardJson } from "@/lib/board-fetch";
 import type { SantaMonicaWeather } from "@/lib/staff/santa-monica-weather";
 
-const WEATHER_POLL_MS = 5 * 60_000;
+/** Align with server weather cache (15m) so UI refresh does not fan out upstream fetches. */
+const WEATHER_POLL_MS = 12 * 60_000;
 const WEATHER_TIMEOUT_MS = 8_000;
 
 type WeatherResponse = {

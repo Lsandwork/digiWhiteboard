@@ -4,9 +4,18 @@ import { getSmsProvider, normalizeSmsToE164 } from "@/lib/integrations/sms/provi
 import type { SmsCostCategory } from "@/lib/integrations/sms/cost-events";
 import { buildAdminAlertSms } from "@/lib/integrations/sms/templates";
 import { getPublicSiteUrl } from "@/lib/site-url";
+import { getOrLoadTtlCache, invalidateTtlCache } from "@/lib/server-ttl-cache";
 
 /** Default Super Admin SMS recipients when env/staff directory do not override. */
 const SUPER_ADMIN_SMS_FALLBACK_PHONES = ["213-913-1391", "415-250-9297", "404-468-3303"] as const;
+
+/** Cache directory/settings phone lookup — recipients rarely change. */
+export const SUPER_ADMIN_PHONE_CACHE_TTL_MS = 30 * 60_000;
+const SUPER_ADMIN_PHONE_CACHE_KEY = "staff:super-admin-sms-phones";
+
+export function clearSuperAdminPhoneCacheForTests() {
+  invalidateTtlCache(SUPER_ADMIN_PHONE_CACHE_KEY);
+}
 
 export type SuperAdminSmsKind =
   | "fitdog_alert"
@@ -154,6 +163,32 @@ function parsePhoneList(raw: string | undefined): string[] {
   return out;
 }
 
+async function loadSuperAdminPhonesFromSupabase(supabase: SupabaseClient): Promise<string[]> {
+  const { data } = await supabase
+    .from("admin_settings")
+    .select("settings->staff_admin_ops->staff_directory")
+    .eq("id", "default")
+    .maybeSingle();
+  const directoryRaw = (data as Record<string, unknown> | null)?.staff_directory;
+  const directory = Array.isArray(directoryRaw)
+    ? (directoryRaw as Array<{ name?: string; email?: string; phone?: string | null; status?: string }>)
+    : [];
+  const lonnie = directory.find((member) => {
+    const email = String(member.email || "")
+      .trim()
+      .toLowerCase();
+    const name = String(member.name || "")
+      .trim()
+      .toLowerCase();
+    const active = String(member.status || "Active").toLowerCase() !== "inactive";
+    if (!active) return false;
+    return email === SUPER_ADMIN_EMAIL || name.includes("lonnie");
+  });
+  const fromDirectory = normalizeSmsToE164(lonnie?.phone);
+  if (fromDirectory) return [fromDirectory];
+  return SUPER_ADMIN_SMS_FALLBACK_PHONES.map((phone) => normalizeSmsToE164(phone)).filter(Boolean) as string[];
+}
+
 /** All E.164 phones that receive Super Admin / ops SMS alerts. */
 export async function resolveSuperAdminPhones(supabase?: SupabaseClient | null): Promise<string[]> {
   const fromPluralEnv = parsePhoneList(process.env.SUPER_ADMIN_SMS_PHONES);
@@ -164,28 +199,9 @@ export async function resolveSuperAdminPhones(supabase?: SupabaseClient | null):
 
   if (supabase) {
     try {
-      const { data } = await supabase
-        .from("admin_settings")
-        .select("settings->staff_admin_ops->staff_directory")
-        .eq("id", "default")
-        .maybeSingle();
-      const directoryRaw = (data as Record<string, unknown> | null)?.staff_directory;
-      const directory = Array.isArray(directoryRaw)
-        ? (directoryRaw as Array<{ name?: string; email?: string; phone?: string | null; status?: string }>)
-        : [];
-      const lonnie = directory.find((member) => {
-        const email = String(member.email || "")
-          .trim()
-          .toLowerCase();
-        const name = String(member.name || "")
-          .trim()
-          .toLowerCase();
-        const active = String(member.status || "Active").toLowerCase() !== "inactive";
-        if (!active) return false;
-        return email === SUPER_ADMIN_EMAIL || name.includes("lonnie");
-      });
-      const fromDirectory = normalizeSmsToE164(lonnie?.phone);
-      if (fromDirectory) return [fromDirectory];
+      return await getOrLoadTtlCache(SUPER_ADMIN_PHONE_CACHE_KEY, SUPER_ADMIN_PHONE_CACHE_TTL_MS, () =>
+        loadSuperAdminPhonesFromSupabase(supabase)
+      );
     } catch {
       // Fall through to hardcoded recipients.
     }
