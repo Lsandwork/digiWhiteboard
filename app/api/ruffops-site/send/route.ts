@@ -46,5 +46,15 @@ export async function POST(request: Request) {
   if (accept.includes("application/json")) {
     return NextResponse.json({ ok: true, emailed: provider.isConfigured() });
   }
-  return NextResponse.redirect(new URL("/contact?submit=ok", request.url), 302);
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const next = new URL(referer);
+      next.searchParams.set("submit", "ok");
+      return NextResponse.redirect(next, 303);
+    } catch {
+      /* fall through */
+    }
+  }
+  return NextResponse.redirect(new URL("/ruffops-site/contact?submit=ok", request.url), 303);
 }

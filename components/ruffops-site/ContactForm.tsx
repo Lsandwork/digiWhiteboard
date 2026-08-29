@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CircleCheck, Mail, Send, TriangleAlert } from "lucide-react";
 import { BUSINESS_TYPES, SERVICE_OPTIONS, SITE } from "@/lib/ruffops-site/config";
 
@@ -16,6 +16,12 @@ export function ContactForm({
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
   const endpoint = useMemo(() => process.env.NEXT_PUBLIC_FORM_ENDPOINT?.trim() || "/api/ruffops-site/send", []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("submit=ok")) {
+      setStatus("success");
+    }
+  }, []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +67,7 @@ export function ContactForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="card space-y-6 p-6 sm:p-8" noValidate>
+    <form onSubmit={onSubmit} action="/api/ruffops-site/send" method="post" className="card space-y-6 p-6 sm:p-8" noValidate>
       <input type="text" name="company" className="hp-field" tabIndex={-1} autoComplete="off" aria-hidden="true" />
       <input type="hidden" name="form_type" value={defaultFormType} />
       <div className="flex items-start gap-3 rounded-xl border border-ro-electric/30 bg-ro-electric/5 px-4 py-3 text-sm text-slate-200">
@@ -212,7 +218,7 @@ export function ChecklistForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-6 flex flex-wrap gap-3">
+    <form onSubmit={onSubmit} action="/api/ruffops-site/send" method="post" className="mt-6 flex flex-wrap gap-3">
       <input type="text" name="company" className="hp-field" tabIndex={-1} autoComplete="off" aria-hidden="true" />
       <input type="hidden" name="form_type" value="Risk Checklist Request" />
       <input type="email" name="email" required className="field-input min-w-[220px] flex-1" placeholder="Enter your email address" aria-label="Email address" />
