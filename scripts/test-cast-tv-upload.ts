@@ -551,6 +551,12 @@ assert.match(imageSlide, /<img/);
 const player = readFileSync(join(root, "components/cast-tv/CastTvPlayer.tsx"), "utf8");
 assert.match(player, /visibleItems/);
 assert.doesNotMatch(player, /playlist\.map/);
+assert.match(player, /cast-tv-broadcast-brand/);
+assert.match(player, /\/branding\/fitdog-stream\.png/);
+assert.equal(existsSync(join(root, "public/branding/fitdog-stream.png")), true);
+const castTvCss = readFileSync(join(root, "app/globals.css"), "utf8");
+assert.match(castTvCss, /\.cast-tv-broadcast-brand\s*\{[\s\S]*?pointer-events:\s*none/);
+assert.match(castTvCss, /\.cast-tv-broadcast-brand\s*\{[\s\S]*?z-index:\s*10/);
 
 const fileRoute = readFileSync(join(root, "app/api/cast-tv/media/file/route.ts"), "utf8");
 assert.match(fileRoute, /transcodeCastTvDisplayImage/);
