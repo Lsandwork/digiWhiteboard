@@ -126,9 +126,10 @@ export class GoogleVeoProvider implements VideoGenerationProvider {
       },
       body: JSON.stringify(payload)
     });
-    const body = (await response.json()) as VeoStartResponse;
+    const body = (await response.json()) as VeoStartResponse & Record<string, unknown>;
     if (!response.ok || !body.name) {
-      throw new Error(body.error?.message || `Veo start failed HTTP ${response.status}`);
+      const detail = body.error?.message || JSON.stringify(body).slice(0, 800);
+      throw new Error(`Veo start failed HTTP ${response.status}: ${detail}`);
     }
     return { jobId: body.name };
   }
