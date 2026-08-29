@@ -13302,6 +13302,24 @@ body.cast-tv-root {
   color: rgba(255, 255, 255, 0.55);
 }
 
+/* Permanent FitDog Stream network bug — above slides/standby, never blocks media */
+.cast-tv-broadcast-brand {
+  position: absolute;
+  right: clamp(28px, 2.5vw, 48px);
+  bottom: clamp(28px, 2.5vw, 48px);
+  z-index: 10;
+  pointer-events: none;
+  user-select: none;
+}
+
+.cast-tv-broadcast-brand__logo {
+  display: block;
+  width: clamp(140px, 14vw, 280px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+}
+
 .cast-tv-admin__status {
   display: flex;
   flex-direction: column;

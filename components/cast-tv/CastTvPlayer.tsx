@@ -124,6 +124,18 @@ export function CastTvPlayer({ screenId = "default" }: CastTvPlayerProps) {
             );
           })
         : null}
+
+      {/* Permanent broadcast bug — outside slide map so it never remounts with media */}
+      <div className="cast-tv-broadcast-brand" aria-hidden="true">
+        {/* Static public PNG; plain img matches slide media and avoids next/image remount cost */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/branding/fitdog-stream.png"
+          alt=""
+          className="cast-tv-broadcast-brand__logo"
+          draggable={false}
+        />
+      </div>
     </main>
   );
 }
