@@ -80,6 +80,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/heat-alert",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/sms-cost-reconcile",
       "schedule": "*/15 * * * *"
     }

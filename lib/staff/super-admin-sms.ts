@@ -127,14 +127,15 @@ export function sendUrgentAlertSmsFireAndForget(
   if (!isUrgentPushAlert(input)) return;
   const baseKey = `sa-sms:urgent:push:${input.id}`;
   const idempotencyKey = input.resendId ? `${baseKey}:resend:${input.resendId}`.slice(0, 64) : baseKey.slice(0, 64);
+  const isHeatAlert = String(input.source || "").trim().toLowerCase() === "heat_alert";
   sendSuperAdminSmsAlertFireAndForget(
     {
       kind: "urgent_alert",
-      title: `URGENT: ${input.title}`,
+      title: isHeatAlert ? "Heat Alert" : `URGENT: ${input.title}`,
       detail: input.message,
       idempotencyKey,
       adminPath: "/admin?board=admin&tab=emergency_alerts",
-      includeLink: true
+      includeLink: !isHeatAlert
     },
     supabase
   );

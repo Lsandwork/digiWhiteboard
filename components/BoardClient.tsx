@@ -26,6 +26,7 @@ import { useCheckoutDisplayTimers } from "@/hooks/useCheckoutDisplayTimers";
 import { useNewCheckingInAlerts } from "@/hooks/useNewCheckingInAlerts";
 import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useStaffBoardOverlays } from "@/hooks/useStaffBoardOverlays";
+import { useSantaMonicaWeather } from "@/hooks/useSantaMonicaWeather";
 import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
 import { useDogPhotoPreloader } from "@/hooks/useDogPhotoPreloader";
 import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
@@ -227,6 +228,7 @@ export function BoardClient({
     // legacy Chromecast cast-lite path leaves them off (whiteboard-state driven).
     enabled: overlaysActive
   });
+  const santaMonicaWeather = useSantaMonicaWeather({ enabled: overlaysActive || tvMode || castKeeperMode });
   const reloadEmergencyCast = reloadOverlays;
   const reloadCastVideo = reloadOverlays;
   const effectiveGroomingNotice =
@@ -902,6 +904,7 @@ export function BoardClient({
             wakeLockStatus={wakeLockStatus}
             onRequestWakeLock={() => void requestWakeLock()}
             castKeeperMode={castKeeperMode}
+            weather={santaMonicaWeather}
           />
         ) : null}
 
@@ -985,6 +988,7 @@ export function BoardClient({
                   clockTime={dateTime.time}
                   clockDate={dateTime.date}
                   lastUpdated={board.last_updated}
+                  weather={santaMonicaWeather}
                   onSlideshowReady={() => castKeeper?.markDataFresh()}
                 />
               </div>

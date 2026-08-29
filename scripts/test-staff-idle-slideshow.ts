@@ -126,6 +126,8 @@ assert.equal(
   assert.match(emptyState, /All Clear,/);
   assert.match(emptyState, /staff-all-clear/);
   assert.match(emptyState, /all-clear-mockup\.jpg/);
+  assert.match(emptyState, /staff-all-clear__clock-cover/);
+  assert.match(emptyState, /BoardWeatherChip/);
   assert.match(emptyState, /Hydrate\./);
   assert.match(emptyState, /onSlideshowReady/);
   assert.doesNotMatch(emptyState, /\/api\/staff\/idle-slideshow/);

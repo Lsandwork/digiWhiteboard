@@ -8,6 +8,7 @@ import { ClockDate } from "@/components/board/ClockDate";
 import { LiveStatus } from "@/components/board/LiveStatus";
 import { WakeLockStatusChip } from "@/components/board/WakeLockStatusChip";
 import { formatBoardTime } from "@/lib/board-utils";
+import type { SantaMonicaWeather } from "@/lib/staff/santa-monica-weather";
 
 type ConnectionState = "connecting" | "live" | "polling" | "offline";
 
@@ -19,6 +20,7 @@ type BoardHeaderProps = {
   wakeLockStatus: "unsupported" | "active" | "released" | "error" | "idle";
   onRequestWakeLock: () => void;
   castKeeperMode?: boolean;
+  weather?: SantaMonicaWeather | null;
 };
 
 export function BoardHeader({
@@ -28,7 +30,8 @@ export function BoardHeader({
   lastUpdated,
   wakeLockStatus,
   onRequestWakeLock,
-  castKeeperMode = false
+  castKeeperMode = false,
+  weather = null
 }: BoardHeaderProps) {
   const [logoFailed, setLogoFailed] = useState(false);
 
@@ -93,7 +96,7 @@ export function BoardHeader({
           {castKeeperMode ? null : <WakeLockStatusChip status={wakeLockStatus} onRequest={onRequestWakeLock} />}
         </div>
 
-        <ClockDate time={clockTime} date={clockDate} />
+        <ClockDate time={clockTime} date={clockDate} weather={weather} />
 
         <div className="board-chip inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-300">
           <RefreshCw className="h-4 w-4 shrink-0" />
