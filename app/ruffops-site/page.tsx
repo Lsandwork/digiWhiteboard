@@ -15,7 +15,7 @@ import { ContactForm, ChecklistForm } from "@/components/ruffops-site/ContactFor
 import { FinalCta } from "@/components/ruffops-site/PageChrome";
 import { Reveal } from "@/components/ruffops-site/Reveal";
 import { SiteLink } from "@/components/ruffops-site/SiteLink";
-import { PACKAGES, PRIMARY_CTA } from "@/lib/ruffops-site/config";
+import { PACKAGES, PRIMARY_CTA, SITE } from "@/lib/ruffops-site/config";
 
 export const metadata: Metadata = {
   title: `${SITE.name} | Pet Business Consulting in Santa Monica, CA + AI Operations Nationwide`,
