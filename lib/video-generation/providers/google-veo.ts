@@ -32,12 +32,10 @@ function mimeFor(path: string): string {
   return "image/jpeg";
 }
 
-function inlineImage(path: string) {
+function veoImage(path: string) {
   return {
-    inlineData: {
-      mimeType: mimeFor(path),
-      data: readFileSync(path).toString("base64")
-    }
+    mimeType: mimeFor(path),
+    bytesBase64Encoded: readFileSync(path).toString("base64")
   };
 }
 
@@ -98,10 +96,10 @@ export class GoogleVeoProvider implements VideoGenerationProvider {
     const instance: Record<string, unknown> = { prompt: input.prompt };
     if (input.firstFramePath && existsSync(input.firstFramePath)) {
       // First-frame image-to-video. Do not also send referenceImages — Veo ignores them when a start frame is present.
-      instance.image = inlineImage(input.firstFramePath);
+      instance.image = veoImage(input.firstFramePath);
     } else if (input.referenceImagePaths?.length) {
       instance.referenceImages = input.referenceImagePaths.filter((path) => existsSync(path)).map((path) => ({
-        image: inlineImage(path),
+        image: veoImage(path),
         referenceType: "asset"
       }));
     }
@@ -113,7 +111,6 @@ export class GoogleVeoProvider implements VideoGenerationProvider {
         durationSeconds: input.durationSeconds,
         resolution: input.resolution,
         personGeneration: input.personGeneration || (input.firstFramePath ? "allow_adult" : "allow_all"),
-        negativePrompt: input.negativePrompt,
         seed: input.seed
       }
     };
