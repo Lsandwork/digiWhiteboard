@@ -93,7 +93,13 @@ export function StaffBoardEmptyState({
 
         <div className="staff-all-clear__updated">
           <RefreshCw className="staff-all-clear__updated-icon" aria-hidden="true" />
-          <span>Last updated {formatBoardTime(lastUpdated)}</span>
+          <span>
+            {lastUpdated
+              ? `Last updated ${formatBoardTime(lastUpdated)}`
+              : isHealthy
+                ? "Waiting for first sync…"
+                : "Sync unavailable"}
+          </span>
         </div>
       </div>
 

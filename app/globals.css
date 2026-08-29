@@ -247,14 +247,14 @@ body {
   user-select: none;
 }
 
-/* Cover the baked-in mockup clock + LIVE chip so only the live chrome shows. */
+/* Cover the baked-in mockup header chrome (LIVE + clock) completely. */
 .staff-all-clear__clock-cover {
   position: absolute;
   top: 0;
   right: 0;
   z-index: 1;
-  width: clamp(18rem, 38vw, 28rem);
-  height: clamp(10rem, 26vh, 15rem);
+  width: clamp(22rem, 46vw, 34rem);
+  height: clamp(11rem, 28vh, 16rem);
   background: var(--all-clear-bg);
   pointer-events: none;
 }

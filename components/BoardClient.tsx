@@ -865,7 +865,9 @@ export function BoardClient({
   return (
     <main className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden text-white ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""}`}>
       <PushNoticeBoardVeil active={pushVeilActive} tone={pushVeilTone} label={pushVeilLabel} />
-      {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
+      {castMode && !staffBoardLayout.showApprovedEmptyState ? (
+        <CastModeStatusIndicator status={castHealth} />
+      ) : null}
 
       {!tvMode ? (
         <StaffCastButton
