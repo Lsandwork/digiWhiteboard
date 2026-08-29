@@ -109,6 +109,8 @@
     "db:push:query": "tsx scripts/push-supabase-migration-query.ts",
     "db:push:all": "tsx scripts/push-all-supabase-migrations.ts",
     "compress:social-moments": "tsx scripts/compress-social-moments.ts",
+    "generate:lobby-ad": "tsx scripts/generate-miraculous-recovery-ad.ts",
+    "test:video-generation": "tsx scripts/test-video-generation-pipeline.ts",
     "test:blog": "tsx scripts/test-automatic-blog.ts && tsx scripts/test-fitdog-blog-public.ts && tsx scripts/test-blogs-domain-routing.ts && tsx scripts/test-why-fitdog.ts && tsx scripts/test-blog-dashboard.ts && tsx scripts/test-blog-help-guide.ts && tsx scripts/test-blog-posting-social.ts && tsx scripts/test-blog-real-images.ts",
     "test:blog-public": "tsx scripts/test-fitdog-blog-public.ts",
     "blog:activate": "tsx scripts/activate-automatic-blog.ts",
