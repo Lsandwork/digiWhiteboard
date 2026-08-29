@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { accessFromLegacyRole } from "../lib/admin/permissions";
