@@ -1545,6 +1545,28 @@ html.fitdog-tv-active {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   --fitdog-tv-scale: min(100vw / 1920, 100vh / 1080);
+  /* Kill residual WebView/page zoom so Fully Kiosk does not postage-stamp the board. */
+  zoom: 1;
+}
+
+html.fitdog-tv-kiosk,
+html.fitdog-tv-kiosk body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+html.fitdog-tv-kiosk .fitdog-tv-stage {
+  /* Always fill the physical screen; never inherit a zoomed visualViewport corner. */
+  left: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  inset: 0 !important;
 }
 
 html.fitdog-tv-active,
@@ -14039,6 +14061,7 @@ body.cast-tv-root {
 html.lobby-tv-display .lobby-shell--light .lobby-content {
   height: 100%;
   max-height: 100%;
+  min-height: 0;
   overflow: hidden;
   padding: 0;
 }
