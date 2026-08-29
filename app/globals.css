@@ -13305,8 +13305,8 @@ body.cast-tv-root {
 /* Permanent FitDog Stream network bug — above slides/standby, never blocks media */
 .cast-tv-broadcast-brand {
   position: absolute;
-  right: clamp(28px, 2.5vw, 48px);
-  bottom: clamp(28px, 2.5vw, 48px);
+  right: clamp(24px, 2vw, 40px);
+  bottom: clamp(24px, 2vw, 40px);
   z-index: 10;
   pointer-events: none;
   user-select: none;
@@ -13314,10 +13314,12 @@ body.cast-tv-root {
 
 .cast-tv-broadcast-brand__logo {
   display: block;
-  width: clamp(140px, 14vw, 280px);
+  /* Pro TV bug scale: noticeable on 1080p/4K without dominating the frame */
+  width: clamp(88px, 7.5vw, 148px);
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+  opacity: 0.92;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
 }
 
 .cast-tv-admin__status {

@@ -557,6 +557,8 @@ assert.equal(existsSync(join(root, "public/branding/fitdog-stream.png")), true);
 const castTvCss = readFileSync(join(root, "app/globals.css"), "utf8");
 assert.match(castTvCss, /\.cast-tv-broadcast-brand\s*\{[\s\S]*?pointer-events:\s*none/);
 assert.match(castTvCss, /\.cast-tv-broadcast-brand\s*\{[\s\S]*?z-index:\s*10/);
+assert.match(castTvCss, /\.cast-tv-broadcast-brand__logo\s*\{[\s\S]*?clamp\(88px,\s*7\.5vw,\s*148px\)/);
+assert.match(castTvCss, /\.cast-tv-broadcast-brand__logo\s*\{[\s\S]*?opacity:\s*0\.92/);
 
 const fileRoute = readFileSync(join(root, "app/api/cast-tv/media/file/route.ts"), "utf8");
 assert.match(fileRoute, /transcodeCastTvDisplayImage/);
