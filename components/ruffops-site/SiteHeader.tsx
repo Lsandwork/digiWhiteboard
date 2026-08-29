@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowRight, Hexagon, Menu, PawPrint, X } from "lucide-react";
+import { ArrowRight, Hexagon, Menu, PawPrint } from "lucide-react";
 import { NAV, PRIMARY_CTA, SITE } from "@/lib/ruffops-site/config";
 import { SiteLink, isMarketingNavActive } from "@/components/ruffops-site/SiteLink";
 
@@ -23,7 +23,6 @@ function Logo() {
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -33,15 +32,11 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
   const isActive = (href: string) => isMarketingNavActive(pathname || "/", href);
 
   return (
     <header
-      className={`sticky top-0 z-50 transition-colors duration-300 ${
+      className={`relative sticky top-0 z-50 transition-colors duration-300 ${
         scrolled ? "border-b border-ro-line bg-ro-950/85 backdrop-blur-xl" : "bg-transparent"
       }`}
     >
@@ -69,40 +64,35 @@ export function SiteHeader() {
             <ArrowRight className="h-4 w-4" />
           </SiteLink>
         </div>
-        <button
-          type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-ro-line bg-ro-700/60 text-white xl:hidden"
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((value) => !value)}
-        >
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-      </div>
-      {open ? (
-        <div className="border-t border-ro-line bg-ro-950/95 backdrop-blur-xl xl:hidden">
-          <nav aria-label="Mobile" className="container-page flex flex-col gap-1 py-4">
-            {NAV.map((item) => (
-              <SiteLink
-                key={item.href}
-                href={item.href}
-                className={`rounded-lg px-3 py-3 text-base font-medium transition ${
-                  isActive(item.href) ? "bg-ro-700/60 text-white" : "text-slate-300 hover:bg-ro-700/50 hover:text-white"
-                }`}
-              >
-                {item.label}
+        <details className="xl:hidden">
+          <summary className="inline-flex h-10 w-10 list-none items-center justify-center rounded-lg border border-ro-line bg-ro-700/60 text-white [&::-webkit-details-marker]:hidden">
+            <span className="sr-only">Menu</span>
+            <Menu className="h-5 w-5" />
+          </summary>
+          <div className="absolute left-0 right-0 top-16 border-t border-ro-line bg-ro-950/95 backdrop-blur-xl">
+            <nav aria-label="Mobile" className="container-page flex flex-col gap-1 py-4">
+              {NAV.map((item) => (
+                <SiteLink
+                  key={item.href}
+                  href={item.href}
+                  className={`rounded-lg px-3 py-3 text-base font-medium transition ${
+                    isActive(item.href) ? "bg-ro-700/60 text-white" : "text-slate-300 hover:bg-ro-700/50 hover:text-white"
+                  }`}
+                >
+                  {item.label}
+                </SiteLink>
+              ))}
+              <a href={SITE.clientLoginHref} className="btn-secondary mt-3">
+                Client Login
+              </a>
+              <SiteLink href={PRIMARY_CTA.href} className="btn-primary">
+                {PRIMARY_CTA.label}
+                <ArrowRight className="h-4 w-4" />
               </SiteLink>
-            ))}
-            <a href={SITE.clientLoginHref} className="btn-secondary mt-3">
-              Client Login
-            </a>
-            <SiteLink href={PRIMARY_CTA.href} className="btn-primary">
-              {PRIMARY_CTA.label}
-              <ArrowRight className="h-4 w-4" />
-            </SiteLink>
-          </nav>
-        </div>
-      ) : null}
+            </nav>
+          </div>
+        </details>
+      </div>
     </header>
   );
 }

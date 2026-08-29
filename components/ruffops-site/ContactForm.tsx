@@ -9,11 +9,13 @@ const fieldLabel = "mb-1.5 block text-sm font-medium text-slate-300";
 type Status = "idle" | "submitting" | "success" | "error";
 
 export function ContactForm({
-  defaultFormType = "Strategy Call Request"
+  defaultFormType = "Strategy Call Request",
+  initialSuccess = false
 }: {
   defaultFormType?: string;
+  initialSuccess?: boolean;
 }) {
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<Status>(initialSuccess ? "success" : "idle");
   const [error, setError] = useState("");
   const endpoint = useMemo(() => process.env.NEXT_PUBLIC_FORM_ENDPOINT?.trim() || "/api/ruffops-site/send", []);
 

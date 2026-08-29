@@ -33,7 +33,12 @@ const pains = [
   { icon: Target, title: "Operational Gaps", copy: "Growth stalls without strong systems." }
 ];
 
-export default function RuffopsHomePage() {
+export default async function RuffopsHomePage({
+  searchParams
+}: {
+  searchParams: Promise<{ submit?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <>
       <section className="relative overflow-hidden pt-12 sm:pt-16">
@@ -325,7 +330,7 @@ export default function RuffopsHomePage() {
           </p>
         </div>
         <div className="mx-auto mt-10 max-w-3xl">
-          <ContactForm />
+          <ContactForm initialSuccess={params.submit === "ok"} />
         </div>
       </section>
       <FinalCta />

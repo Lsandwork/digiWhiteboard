@@ -8,7 +8,12 @@ export const metadata: Metadata = {
   description: `Request an operations review from RuffOps. ${SITE.phoneDisplay} · ${SITE.email} · Santa Monica on-site and nationwide online.`
 };
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams
+}: {
+  searchParams: Promise<{ submit?: string }>;
+}) {
+  const params = await searchParams;
   return (
     <>
       <PageHero
@@ -44,7 +49,7 @@ export default function ContactPage() {
             <p className="mt-2 text-sm text-slate-500">Phone support is available as part of your operations review follow-up.</p>
           </div>
         </div>
-        <ContactForm />
+        <ContactForm initialSuccess={params.submit === "ok"} />
       </section>
       <FinalCta />
     </>
