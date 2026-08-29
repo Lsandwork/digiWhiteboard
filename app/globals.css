@@ -1540,12 +1540,12 @@ html.staff-tv-display .fitdog-tv-stage--staff {
   background-color: #02060b;
 }
 
-/* Uniform 1920×1080 TV canvas — scales to the *visible* viewport (Hi-Browser fullscreen). */
+/* Uniform 1920×1080 TV canvas — scales to fill the physical TV screen. */
 html.fitdog-tv-active {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   --fitdog-tv-scale: min(100vw / 1920, 100vh / 1080);
-  /* Kill residual WebView/page zoom so Fully Kiosk does not postage-stamp the board. */
+  /* Kill residual WebView/page zoom so kiosk TVs do not crop the board. */
   zoom: 1;
 }
 
@@ -1577,6 +1577,7 @@ html.fitdog-tv-active body {
   margin: 0;
   overscroll-behavior: none;
   touch-action: manipulation;
+  zoom: 1;
 }
 
 .fitdog-tv-stage {

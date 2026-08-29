@@ -11,8 +11,8 @@ export const TV_VIEWPORT_CONTENT =
   "width=device-width, initial-scale=1, minimum-scale=0.25, maximum-scale=5, viewport-fit=cover";
 
 /**
- * Fully Kiosk often applies page zoom. Lock scale once we detect it so the
- * 1920×1080 canvas can fill the physical screen instead of a zoomed corner.
+ * Digital-signage lock: page zoom must stay at 100% so the 1920×1080 canvas
+ * can fill the physical screen instead of a zoomed corner crop.
  */
 export const TV_VIEWPORT_CONTENT_KIOSK_LOCKED =
   "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
@@ -37,7 +37,11 @@ export type ViewportReader = {
   innerHeight: number;
   visualViewport?: VisualViewportReader | null;
   document?: {
-    documentElement?: { clientWidth: number; clientHeight: number } | null;
+    documentElement?: {
+      clientWidth: number;
+      clientHeight: number;
+      style?: { zoom?: string };
+    } | null;
     body?: { style?: { zoom?: string } } | null;
   };
   screen?: {
@@ -66,9 +70,9 @@ export function isHiBrowserTv(win: ViewportReader) {
 }
 
 /**
- * Hi-Browser fullscreen zoom: visualViewport is a tile of the layout viewport
- * (offset + size ≈ inner). Fully Kiosk page zoom: visualViewport is a cropped
- * corner we must NOT stamp into — fill the layout/screen instead.
+ * Page/webview zoom crop: visualViewport is a small corner of the layout.
+ * Stamping the 1920 canvas into that corner (or leaving scale=1 under zoom)
+ * produces the postage-stamp / zoomed-in TV failure.
  */
 export function isCornerCroppedVisualViewport(
   innerW: number,
@@ -83,6 +87,20 @@ export function isCornerCroppedVisualViewport(
     vv.height < innerH * 0.85;
   const scale = vv.scale ?? 1;
   return cropped && scale >= 1;
+}
+
+/**
+ * True when the TV browser is zoomed or Fully Kiosk is present — lock scale
+ * and force the stage to fill the physical screen.
+ */
+export function shouldLockTvKioskViewport(win: ViewportReader) {
+  if (isFullyKioskBrowser(win)) return true;
+  const vv = win.visualViewport;
+  if (!vv) return false;
+  const innerW = Math.max(win.innerWidth || 0, 1);
+  const innerH = Math.max(win.innerHeight || 0, 1);
+  if (isCornerCroppedVisualViewport(innerW, innerH, vv)) return true;
+  return (vv.scale ?? 1) > 1.02;
 }
 
 /** @deprecated kept for tests — prefer isCornerCroppedVisualViewport */
@@ -102,12 +120,20 @@ export function isLayoutTiledVisualViewport(
   return isPartial && coversX && coversY;
 }
 
-/** Best-effort zoom reset for Fully Kiosk / WebView page zoom. */
+/** Best-effort zoom reset for Fully Kiosk / WebView / Hi-Browser page zoom. */
 export function resetTvBrowserZoom(win: ViewportReader) {
   try {
     win.fully?.setScale?.(1);
   } catch {
     // Fully bridge may reject outside lockdown scripts.
+  }
+  try {
+    const rootStyle = win.document?.documentElement?.style;
+    if (rootStyle && "zoom" in rootStyle) {
+      rootStyle.zoom = "1";
+    }
+  } catch {
+    // ignore
   }
   try {
     const bodyStyle = win.document?.body?.style;
@@ -126,18 +152,20 @@ export function measureTvViewport(win: ViewportReader): TvViewportBox {
   const clientH = Math.max(win.document?.documentElement?.clientHeight || 0, innerH);
   const vv = win.visualViewport;
   const fullyKiosk = isFullyKioskBrowser(win);
-  const hiBrowser = isHiBrowserTv(win);
 
   const layoutBox = (): TvViewportBox => {
     let width = Math.min(innerW, clientW);
     let height = Math.min(innerH, clientH);
-    if (fullyKiosk) {
-      const fullyW = Number(win.fully?.getScreenWidth?.() || 0);
-      const fullyH = Number(win.fully?.getScreenHeight?.() || 0);
-      const screenW = Math.max(fullyW, win.screen?.availWidth || 0, win.screen?.width || 0);
-      const screenH = Math.max(fullyH, win.screen?.availHeight || 0, win.screen?.height || 0);
-      if (width < 1280 && screenW >= 1280) width = screenW;
-      if (height < 720 && screenH >= 720) height = screenH;
+    const fullyW = Number(win.fully?.getScreenWidth?.() || 0);
+    const fullyH = Number(win.fully?.getScreenHeight?.() || 0);
+    const screenW = Math.max(fullyW, win.screen?.availWidth || 0, win.screen?.width || 0);
+    const screenH = Math.max(fullyH, win.screen?.availHeight || 0, win.screen?.height || 0);
+    // Prefer physical screen when the WebView under-reports (common on kiosk TVs).
+    if ((fullyKiosk || shouldLockTvKioskViewport(win)) && width < 1280 && screenW >= 1280) {
+      width = screenW;
+    }
+    if ((fullyKiosk || shouldLockTvKioskViewport(win)) && height < 720 && screenH >= 720) {
+      height = screenH;
     }
     return {
       width: Math.max(1, width),
@@ -147,17 +175,14 @@ export function measureTvViewport(win: ViewportReader): TvViewportBox {
     };
   };
 
-  // Fully Kiosk / generic page-zoom crop: fill the physical screen.
-  if (fullyKiosk) return layoutBox();
-  if (
-    vv &&
-    !hiBrowser &&
-    isCornerCroppedVisualViewport(innerW, innerH, vv)
-  ) {
+  // Any page-zoom / corner crop (Fully, Hi-Browser, generic WebView): fill the
+  // physical screen. Never stamp the 1920 canvas into a zoomed VV corner —
+  // that is the "zoomed in / white empty / clipped" lobby TV failure.
+  if (shouldLockTvKioskViewport(win)) {
     return layoutBox();
   }
 
-  // Hi-Browser / generic WebView: visualViewport is the true visible surface.
+  // Unzoomed TV browsers: visualViewport is the true visible surface.
   const visibleW = vv?.width && vv.width > 0 ? vv.width : innerW;
   const visibleH = vv?.height && vv.height > 0 ? vv.height : innerH;
 

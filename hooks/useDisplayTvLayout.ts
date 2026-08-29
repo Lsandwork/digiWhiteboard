@@ -7,9 +7,9 @@ import {
   clearTvDisplayScale,
   clearTvStageBox,
   computeTvDisplayScale,
-  isFullyKioskBrowser,
   measureTvViewport,
   resetTvBrowserZoom,
+  shouldLockTvKioskViewport,
   TV_VIEWPORT_CONTENT,
   TV_VIEWPORT_CONTENT_KIOSK_LOCKED
 } from "@/lib/display-tv-layout";
@@ -27,12 +27,15 @@ export function useDisplayTvLayout(enabled: boolean) {
       try {
         window.scrollTo(0, 0);
       } catch {
-        // Hi-Browser may reject scroll while fullscreen.
+        // Some TV browsers reject scroll while fullscreen.
       }
 
-      const fullyKiosk = isFullyKioskBrowser(window);
-      if (fullyKiosk) {
-        resetTvBrowserZoom(window);
+      // Always attempt zoom reset on TV canvases — Fully / Android WebView /
+      // Hi-Browser page zoom is the root cause of the lobby "zoomed in" crop.
+      resetTvBrowserZoom(window);
+
+      const lockKiosk = shouldLockTvKioskViewport(window);
+      if (lockKiosk) {
         root.classList.add("fitdog-tv-kiosk");
         viewportMeta?.setAttribute("content", TV_VIEWPORT_CONTENT_KIOSK_LOCKED);
       } else {
@@ -52,10 +55,11 @@ export function useDisplayTvLayout(enabled: boolean) {
 
     root.classList.add("fitdog-tv-active");
     updateScale();
-    // Fully Kiosk often reports the wrong size on the first paint / before
+    // TV browsers often report the wrong size on first paint / before
     // fullscreen settles — remeasure shortly after mount.
     remountTimer = setTimeout(updateScale, 250);
     const remountTimer2 = setTimeout(updateScale, 1000);
+    const remountTimer3 = setTimeout(updateScale, 2500);
 
     const visualViewport = window.visualViewport;
     window.addEventListener("resize", updateScale);
@@ -67,6 +71,7 @@ export function useDisplayTvLayout(enabled: boolean) {
     return () => {
       if (remountTimer) clearTimeout(remountTimer);
       clearTimeout(remountTimer2);
+      clearTimeout(remountTimer3);
       window.removeEventListener("resize", updateScale);
       window.removeEventListener("orientationchange", updateScale);
       window.removeEventListener("fullscreenchange", updateScale);

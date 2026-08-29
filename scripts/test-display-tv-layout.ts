@@ -5,6 +5,7 @@ import {
   isFullyKioskBrowser,
   isLayoutTiledVisualViewport,
   measureTvViewport,
+  shouldLockTvKioskViewport,
   TV_DESIGN_HEIGHT,
   TV_DESIGN_WIDTH,
   TV_VIEWPORT_CONTENT,
@@ -33,6 +34,8 @@ assert.equal(fullHd.width, 1920);
 assert.equal(fullHd.height, 1080);
 assert.equal(computeTvDisplayScale(fullHd.width, fullHd.height), 1);
 
+// Hi-Browser / Hisense page zoom: cropped visualViewport must NOT postage-stamp
+// the board into a corner — fill the layout/screen (same as Fully).
 const hiBrowserFullscreen = measureTvViewport({
   innerWidth: 1920,
   innerHeight: 1080,
@@ -42,16 +45,29 @@ const hiBrowserFullscreen = measureTvViewport({
     width: 640,
     height: 360,
     offsetLeft: 1280,
-    offsetTop: 0,
+    offsetTop: 720,
     scale: 3
   }
 });
-assert.equal(hiBrowserFullscreen.width, 640);
-assert.equal(hiBrowserFullscreen.height, 360);
-assert.equal(hiBrowserFullscreen.offsetLeft, 1280);
-assert.ok(
-  computeTvDisplayScale(hiBrowserFullscreen.width, hiBrowserFullscreen.height) < 0.35,
-  "zoomed Hi-Browser visual viewport must shrink the 1920 canvas into the visible corner"
+assert.equal(hiBrowserFullscreen.width, 1920);
+assert.equal(hiBrowserFullscreen.height, 1080);
+assert.equal(hiBrowserFullscreen.offsetLeft, 0);
+assert.equal(hiBrowserFullscreen.offsetTop, 0);
+assert.equal(computeTvDisplayScale(hiBrowserFullscreen.width, hiBrowserFullscreen.height), 1);
+assert.equal(
+  shouldLockTvKioskViewport({
+    innerWidth: 1920,
+    innerHeight: 1080,
+    navigator: { userAgent: "Mozilla/5.0 Hisense HiBrowser" },
+    visualViewport: {
+      width: 640,
+      height: 360,
+      offsetLeft: 1280,
+      offsetTop: 720,
+      scale: 3
+    }
+  }),
+  true
 );
 
 // Unknown WebView with a zoomed corner (Fully-like without UA): fill the screen.
@@ -122,6 +138,25 @@ assert.equal(fullyUnderReported.offsetLeft, 0);
 assert.equal(fullyUnderReported.offsetTop, 0);
 assert.equal(computeTvDisplayScale(fullyUnderReported.width, fullyUnderReported.height), 1);
 
+// Unzoomed Hi-Browser with a full visualViewport still fills normally.
+const hiBrowserUnzoomed = measureTvViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: { userAgent: "Mozilla/5.0 Hisense HiBrowser" },
+  visualViewport: {
+    width: 1920,
+    height: 1080,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 1
+  }
+});
+assert.equal(hiBrowserUnzoomed.width, 1920);
+assert.equal(hiBrowserUnzoomed.height, 1080);
+assert.equal(hiBrowserUnzoomed.offsetLeft, 0);
+assert.equal(hiBrowserUnzoomed.offsetTop, 0);
+
 assert.equal(isFullyKioskBrowser({ innerWidth: 1, innerHeight: 1, fully: {} }), true);
 assert.equal(
   isFullyKioskBrowser({
@@ -146,7 +181,7 @@ assert.match(hook, /visualViewport/);
 assert.match(hook, /fullscreenchange/);
 assert.match(hook, /applyTvStageToVisibleViewport/);
 assert.match(hook, /measureTvViewport/);
-assert.match(hook, /isFullyKioskBrowser/);
+assert.match(hook, /shouldLockTvKioskViewport/);
 assert.match(hook, /resetTvBrowserZoom/);
 assert.match(hook, /TV_VIEWPORT_CONTENT_KIOSK_LOCKED/);
 assert.match(hook, /fitdog-tv-kiosk/);
@@ -156,5 +191,8 @@ assert.match(css, /text-size-adjust:\s*100%/);
 assert.match(css, /--fitdog-tv-scale:\s*min\(100vw \/ 1920/);
 assert.match(css, /html\.fitdog-tv-kiosk/);
 assert.match(css, /zoom:\s*1/);
+
+// sanity: deprecated helper still imported for compatibility
+assert.equal(typeof isLayoutTiledVisualViewport, "function");
 
 console.log("display TV layout tests passed");
