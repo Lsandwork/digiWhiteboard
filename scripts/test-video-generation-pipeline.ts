@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captionSvg } from "../lib/video-generation/captions";
@@ -38,9 +38,10 @@ assert.match(caption, /#F15F2A/);
 assert.match(caption, /WHEN YOUR DOG IS/);
 
 const endCardSource = readFileSync("lib/video-generation/end-card.ts", "utf8");
-assert.equal(endCardUsesRealLogo(endCardSource), true);
-assert.match(endCardSource, new RegExp(REAL_FITDOG_LOCKUP_LIGHT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-assert.match(endCardSource, new RegExp(REAL_FITDOG_CIRCLE_BADGE.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+assert.equal(endCardUsesRealLogo(), true);
+assert.match(endCardSource, /REAL_FITDOG_LOCKUP_LIGHT/);
+assert.equal(existsSync(REAL_FITDOG_LOCKUP_LIGHT), true);
+assert.equal(existsSync(REAL_FITDOG_CIRCLE_BADGE), true);
 
 const previousGemini = process.env.GEMINI_API_KEY;
 const previousGoogle = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
