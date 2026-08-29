@@ -19,6 +19,7 @@
     "test:role-access": "tsx scripts/test-role-access.ts",
     "test:ruffly": "tsx scripts/test-ruffly-core.ts && tsx scripts/test-ruffly-domain-routing.ts",
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
+    "test:ruffops-site": "tsx scripts/test-ruffops-site-domain.ts",
     "test:display-tv-layout": "tsx scripts/test-display-tv-layout.ts",
     "test:lobby-slideshow-layout": "tsx scripts/test-lobby-slideshow-layout.ts",
     "test:lobby-fast-checkout-timeout": "tsx scripts/test-lobby-fast-checkout-timeout.ts",

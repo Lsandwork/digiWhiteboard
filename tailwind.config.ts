@@ -34,6 +34,17 @@ const config: Config = {
           sand: "#F3EBDD",
           muted: "#5B6B82",
           navy: "#102E66"
+        },
+        ro: {
+          950: "#05070d",
+          900: "#080b14",
+          800: "#0c111c",
+          700: "#111827",
+          600: "#1a2231",
+          line: "#1f2a3c",
+          electric: "#38bdf8",
+          accent: "#f97316",
+          "accent-soft": "#fb923c"
         }
       },
       boxShadow: {
