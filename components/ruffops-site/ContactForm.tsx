@@ -15,7 +15,7 @@ export function ContactForm({
 }) {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
-  const endpoint = useMemo(() => process.env.NEXT_PUBLIC_FORM_ENDPOINT?.trim() || "/send.php", []);
+  const endpoint = useMemo(() => process.env.NEXT_PUBLIC_FORM_ENDPOINT?.trim() || "/api/ruffops-site/send", []);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -198,7 +198,7 @@ export function ChecklistForm() {
     }
     setStatus("submitting");
     try {
-      const response = await fetch("/send.php", {
+      const response = await fetch("/api/ruffops-site/send", {
         method: "POST",
         headers: { Accept: "application/json" },
         body: data
