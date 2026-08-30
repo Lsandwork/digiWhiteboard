@@ -1,0 +1,319 @@
+/* Lobby Check-out Spotlight — premium full-screen takeover over the normal board. */
+
+.lobby-checkout-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 1.35rem 1.25rem;
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(244, 106, 39, 0.16), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(27, 175, 200, 0.14), transparent 30%),
+    linear-gradient(160deg, #fbfaf6 0%, #f3ebdd 48%, #eef6f8 100%);
+  color: #102e66;
+  box-shadow: inset 0 0 0 1px rgba(16, 46, 102, 0.08);
+  animation: lobby-spotlight-in 420ms ease both;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-checkout-spotlight {
+    animation: none;
+  }
+}
+
+@keyframes lobby-spotlight-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.lobby-checkout-spotlight__header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-shrink: 0;
+}
+
+.lobby-checkout-spotlight__logo {
+  width: 3.75rem;
+  height: 3.75rem;
+  object-fit: contain;
+  border-radius: 9999px;
+  background: #fff;
+  padding: 0.3rem;
+  box-shadow: 0 10px 28px rgba(16, 46, 102, 0.12);
+}
+
+.lobby-checkout-spotlight__eyebrow {
+  margin: 0;
+  font-size: clamp(1rem, 1.5vw, 1.4rem);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f46a27;
+}
+
+.lobby-checkout-spotlight__sub {
+  margin: 0.1rem 0 0;
+  font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+  font-weight: 650;
+  color: rgba(16, 46, 102, 0.72);
+}
+
+.lobby-checkout-spotlight__stage {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.85rem;
+  overflow: hidden;
+}
+
+.lobby-checkout-spotlight__stage--dual {
+  grid-template-columns: 1fr 1fr;
+}
+
+.lobby-spotlight-dog {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  /* Photo + copy side-by-side so fun facts stay on-screen (never buried under a tall photo). */
+  grid-template-columns: minmax(180px, 0.85fr) minmax(0, 1.25fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0.9rem;
+  padding: 0.85rem;
+  border-radius: 1.15rem;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(16, 46, 102, 0.1);
+  box-shadow: 0 18px 40px rgba(16, 46, 102, 0.08);
+  overflow: hidden;
+}
+
+.lobby-spotlight-dog--dual {
+  grid-template-columns: minmax(140px, 0.75fr) minmax(0, 1.35fr);
+}
+
+.lobby-spotlight-photo {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #102e66;
+  align-self: stretch;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+  height: 100%;
+}
+
+.lobby-spotlight-photo--large {
+  max-height: none;
+}
+
+.lobby-spotlight-dog--dual .lobby-spotlight-photo {
+  max-height: none;
+  aspect-ratio: auto;
+  width: 100%;
+}
+
+.lobby-spotlight-photo__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.lobby-spotlight-photo__fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 18%;
+  background: #fbfaf6;
+}
+
+.lobby-spotlight-dog__copy {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow: hidden;
+}
+
+.lobby-spotlight-dog__status {
+  margin: 0;
+  width: fit-content;
+  border-radius: 9999px;
+  background: rgba(244, 106, 39, 0.14);
+  color: #f46a27;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  flex-shrink: 0;
+}
+
+.lobby-spotlight-dog__name {
+  margin: 0;
+  font-size: clamp(2.1rem, 4.2vw, 4rem);
+  line-height: 0.95;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  color: #102e66;
+  flex-shrink: 0;
+}
+
+.lobby-spotlight-dog--dual .lobby-spotlight-dog__name {
+  font-size: clamp(1.7rem, 2.8vw, 2.7rem);
+}
+
+.lobby-spotlight-dog__breed {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: rgba(16, 46, 102, 0.65);
+  flex-shrink: 0;
+}
+
+.lobby-spotlight-facts {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  overflow: hidden;
+}
+
+.lobby-spotlight-facts__title {
+  margin: 0;
+  font-size: clamp(0.95rem, 1.2vw, 1.15rem);
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #1bafc8;
+  flex-shrink: 0;
+}
+
+.lobby-spotlight-facts__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.4rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lobby-spotlight-facts__list li {
+  position: relative;
+  padding-left: 1rem;
+  font-size: clamp(1rem, 1.25vw, 1.3rem);
+  line-height: 1.3;
+  font-weight: 650;
+  color: #1a2f57;
+}
+
+.lobby-spotlight-facts__list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+  background: #f46a27;
+}
+
+.lobby-spotlight-summary {
+  margin-top: auto;
+  border-radius: 0.9rem;
+  background: rgba(16, 46, 102, 0.04);
+  border: 1px solid rgba(16, 46, 102, 0.08);
+  padding: 0.65rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.lobby-spotlight-summary__label {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f46a27;
+}
+
+.lobby-spotlight-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem 0.65rem;
+}
+
+.lobby-spotlight-summary__grid span {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(16, 46, 102, 0.55);
+}
+
+.lobby-spotlight-summary__grid strong {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: #102e66;
+}
+
+.lobby-spotlight-summary__note {
+  margin: 0.45rem 0 0;
+  font-size: 0.68rem;
+  color: rgba(16, 46, 102, 0.5);
+}
+
+.lobby-content--spotlight .lobby-refresh-banner {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.lobby-spotlight-host {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.lobby-spotlight-host > .lobby-checkout-spotlight {
+  position: absolute;
+  inset: 0;
+}
+
+html.lobby-tv-display .lobby-checkout-spotlight {
+  border-radius: 0;
+  padding: 1.15rem 1.75rem 1.35rem;
+}
+
+html.lobby-tv-display .lobby-spotlight-dog__name {
+  font-size: clamp(2.4rem, 4vw, 4.2rem);
+}
+
+html.lobby-tv-display .lobby-spotlight-facts__list li {
+  font-size: clamp(1.05rem, 1.35vw, 1.4rem);
+}
+
+/* On shorter lobby TVs, keep facts; drop summary if needed. */
+@media (max-height: 820px) {
+  .lobby-spotlight-summary {
+    display: none;
+  }
+}

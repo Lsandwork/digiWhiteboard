@@ -21,6 +21,7 @@
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
     "test:display-tv-layout": "tsx scripts/test-display-tv-layout.ts",
     "test:lobby-slideshow-layout": "tsx scripts/test-lobby-slideshow-layout.ts",
+    "test:lobby-checkout-spotlight": "tsx scripts/test-lobby-checkout-spotlight.ts",
     "test:lobby-fast-checkout-timeout": "tsx scripts/test-lobby-fast-checkout-timeout.ts",
     "test:fitdog-domain": "tsx scripts/test-fitdog-domain-routing.ts",
     "test:admin-session-cookies": "tsx scripts/test-admin-session-cookies.ts",
