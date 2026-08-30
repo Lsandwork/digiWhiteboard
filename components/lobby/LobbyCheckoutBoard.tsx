@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useSearchParams } from "next/navigation";
 import { LobbyClassSchedule } from "@/components/lobby/LobbyClassSchedule";
 import { LobbyCheckoutShowcase } from "@/components/lobby/LobbyCheckoutShowcase";
+import { LobbyCheckoutSpotlight } from "@/components/lobby/LobbyCheckoutSpotlight";
 import { LobbyHeader } from "@/components/lobby/LobbyHeader";
 import { SocialMomentsCarousel } from "@/components/lobby/SocialMomentsCarousel";
 import { TvLayoutCanvas } from "@/components/display/TvLayoutCanvas";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/board-checkout-merge";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { useInFlightPoll } from "@/hooks/useInFlightPoll";
+import { useLobbyCheckoutSpotlight } from "@/hooks/useLobbyCheckoutSpotlight";
 import { startVisibilityAwareInterval } from "@/lib/visibility-poll";
 import {
   areLobbyCheckoutsDisplayEqual,
@@ -54,6 +56,7 @@ import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
 import { useDogPhotoPreloader } from "@/hooks/useDogPhotoPreloader";
 import type { LobbyCheckoutDebug, LobbyCheckoutsResponse, LobbySettings, LobbyStatusResponse } from "@/lib/lobby/types";
+import "@/lib/lobby/checkout-spotlight.css";
 
 const defaultSettings: LobbySettings = getDefaultLobbySettings();
 
@@ -118,7 +121,8 @@ function previewCheckoutDogs(count: number) {
     breed: "Fitdog friend",
     dog_photo_url: PREVIEW_CHECKOUT_PHOTOS[index] ?? PREVIEW_CHECKOUT_PHOTOS[0],
     checkout_status: "Checking out",
-    prompted_at: new Date().toISOString(),
+    // Stable preview timestamps so spotlight dedupe survives remounts within a session.
+    prompted_at: new Date(Date.UTC(2026, 0, 1, 18, index)).toISOString(),
     estimated_ready_at: null,
     display_until: null
   }));
@@ -513,6 +517,8 @@ export function LobbyCheckoutBoard({
     if (previewCheckoutCount > 0) return previewCheckoutDogs(previewCheckoutCount);
     return checkoutActive ? uniqueCheckoutDogs(featured, queue) : [];
   }, [checkoutActive, featured, previewCheckoutCount, queue]);
+  // Reuse the same checkout dogs already on the board — no extra polling/API.
+  const checkoutSpotlight = useLobbyCheckoutSpotlight(showcaseDogs, { enabled: true });
   const activeCheckoutDog = checkoutActive ? showcaseDogs[0] ?? null : null;
   const rawCheckoutCount = checkoutDogsFromResponse(rawCheckouts).length;
   const activeCheckoutStartedAt = activeCheckoutDog?.prompted_at ?? null;
@@ -588,8 +594,10 @@ export function LobbyCheckoutBoard({
       {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
 
       <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby">
-        <div className={`lobby-content relative z-10 flex min-h-screen flex-col px-6 py-4 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""}`}>
-        <LobbyHeader healthy={healthy && !refreshMessage} hasCheckout={checkoutActive} />
+        <div
+          className={`lobby-content relative z-10 flex min-h-screen flex-col px-6 py-4 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""} ${checkoutSpotlight.active ? "lobby-content--spotlight" : ""}`}
+        >
+        <LobbyHeader healthy={healthy && !refreshMessage} hasCheckout={checkoutActive || checkoutSpotlight.active} />
 
         {refreshMessage ? (
           <div className="lobby-refresh-banner mt-2 rounded-lg px-4 py-2 text-center text-sm">
@@ -597,31 +605,40 @@ export function LobbyCheckoutBoard({
           </div>
         ) : null}
 
-        <div className={`lobby-main-grid mt-3 grid min-h-0 flex-1 ${checkoutActive ? "grid-cols-1" : "grid-cols-[1.75fr_1fr]"} gap-4`}>
-          {checkoutActive ? (
-            <LobbyCheckoutShowcase dogs={showcaseDogs} />
-          ) : (
-            <>
-              <div className="lobby-checkout-column flex min-h-0 flex-col gap-3">
-                <section className="lobby-panel lobby-idle-checkout-slot overflow-hidden">
-                  <LobbyIdleSlideshow tvMode={showTvLayout} />
-                </section>
-              </div>
-              {settings.show_promotions ? (
-                <SocialMomentsCarousel paused={idleCarouselPaused} performanceMode={castMode} />
-              ) : (
-                <section className="lobby-panel flex items-center justify-center p-6 text-center text-lobby-navy">
-                  <div>
-                    <LobbyAssetImage src={lobbyLightAssets.dogLogoExact} alt="" width={96} height={96} className="mx-auto h-20 w-20 object-contain" />
-                    <p className="mt-3 font-semibold">Social Media Moments</p>
-                  </div>
-                </section>
-              )}
-            </>
-          )}
+        <div className="lobby-spotlight-host mt-3 min-h-0 flex-1">
+          {checkoutSpotlight.active ? (
+            <LobbyCheckoutSpotlight dogs={checkoutSpotlight.dogs} />
+          ) : null}
+
+          <div
+            className={`lobby-main-grid grid min-h-0 flex-1 ${checkoutActive ? "grid-cols-1" : "grid-cols-[1.75fr_1fr]"} gap-4`}
+            aria-hidden={checkoutSpotlight.active}
+          >
+            {checkoutActive ? (
+              <LobbyCheckoutShowcase dogs={showcaseDogs} />
+            ) : (
+              <>
+                <div className="lobby-checkout-column flex min-h-0 flex-col gap-3">
+                  <section className="lobby-panel lobby-idle-checkout-slot overflow-hidden">
+                    <LobbyIdleSlideshow tvMode={showTvLayout} />
+                  </section>
+                </div>
+                {settings.show_promotions ? (
+                  <SocialMomentsCarousel paused={idleCarouselPaused || checkoutSpotlight.active} performanceMode={castMode} />
+                ) : (
+                  <section className="lobby-panel flex items-center justify-center p-6 text-center text-lobby-navy">
+                    <div>
+                      <LobbyAssetImage src={lobbyLightAssets.dogLogoExact} alt="" width={96} height={96} className="mx-auto h-20 w-20 object-contain" />
+                      <p className="mt-3 font-semibold">Social Media Moments</p>
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
+          </div>
         </div>
 
-        {settings.show_events ? (
+        {settings.show_events && !checkoutSpotlight.active ? (
           <LobbyClassSchedule band compact={checkoutActive} schedule={settings.class_schedule} />
         ) : null}
         </div>
