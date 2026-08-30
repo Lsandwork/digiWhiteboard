@@ -84,7 +84,7 @@ function SpotlightDogPanel({ dog, dual }: { dog: LobbyCheckoutDog; dual: boolean
         <h2 className="lobby-spotlight-dog__name">{dog.dog_name}</h2>
         {dog.breed ? <p className="lobby-spotlight-dog__breed">{dog.breed}</p> : null}
 
-        <div className="lobby-spotlight-facts">
+        <div className="lobby-spotlight-facts" data-testid="checkout-spotlight-fun-facts">
           <h3 className="lobby-spotlight-facts__title">Today&apos;s Fun Facts</h3>
           <ul className="lobby-spotlight-facts__list">
             {facts.map((fact) => (
