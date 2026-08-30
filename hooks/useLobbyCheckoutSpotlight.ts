@@ -7,6 +7,7 @@ import {
   checkoutSpotlightIsActive,
   emptyCheckoutSpotlightState,
   getActiveSpotlightDogs,
+  getCheckoutSpotlightEventKey,
   spotlightRemainingMs,
   syncCheckoutSpotlightQueue,
   type CheckoutSpotlightState
@@ -31,12 +32,8 @@ function readStoredState(): CheckoutSpotlightState | null {
 function writeStoredState(state: CheckoutSpotlightState) {
   if (typeof window === "undefined") return;
   try {
-    // Cap completed keys so sessionStorage stays small on long-running TVs.
     const completedKeys = state.completedKeys.slice(-80);
-    window.sessionStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...state, completedKeys })
-    );
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, completedKeys }));
   } catch {
     // Ignore quota / private mode failures.
   }
@@ -44,6 +41,10 @@ function writeStoredState(state: CheckoutSpotlightState) {
 
 function statesEqual(a: CheckoutSpotlightState, b: CheckoutSpotlightState) {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function dogsSignature(dogs: LobbyCheckoutDog[]) {
+  return dogs.map((dog) => getCheckoutSpotlightEventKey(dog)).join("|");
 }
 
 /**
@@ -56,34 +57,33 @@ export function useLobbyCheckoutSpotlight(
 ) {
   const enabled = options?.enabled !== false;
   const fast = Boolean(options?.fastDurations);
-  const [state, setState] = useState<CheckoutSpotlightState>(() => emptyCheckoutSpotlightState());
+  const signature = dogsSignature(dogs);
+  const dogsRef = useRef(dogs);
+
+  const [state, setState] = useState<CheckoutSpotlightState>(() => {
+    const stored = typeof window !== "undefined" ? readStoredState() : null;
+    if (stored) return advanceCheckoutSpotlightState(stored, Date.now(), { fast });
+    return emptyCheckoutSpotlightState();
+  });
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const hydratedRef = useRef(false);
+  const fastRef = useRef(fast);
 
   useEffect(() => {
-    if (!enabled || hydratedRef.current) return;
-    hydratedRef.current = true;
-    const stored = readStoredState();
-    if (stored) {
-      const advanced = advanceCheckoutSpotlightState(stored, Date.now(), { fast });
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate sessionStorage once on mount
-      setState(advanced);
-      writeStoredState(advanced);
-    }
-  }, [enabled, fast]);
+    dogsRef.current = dogs;
+    fastRef.current = fast;
+  }, [dogs, fast]);
 
   useEffect(() => {
     if (!enabled) return;
     const now = Date.now();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync live checkout dogs into the queue state machine
     setState((prev) => {
-      let next = syncCheckoutSpotlightQueue(prev, dogs, now);
-      next = advanceCheckoutSpotlightState(next, now, { fast });
+      let next = syncCheckoutSpotlightQueue(prev, dogsRef.current, now);
+      next = advanceCheckoutSpotlightState(next, now, { fast: fastRef.current });
       if (statesEqual(prev, next)) return prev;
       writeStoredState(next);
       return next;
     });
-  }, [dogs, enabled, fast]);
+  }, [enabled, signature, fast]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -91,15 +91,15 @@ export function useLobbyCheckoutSpotlight(
       const now = Date.now();
       setNowMs(now);
       setState((prev) => {
-        if (!prev.window) return prev;
-        const next = advanceCheckoutSpotlightState(prev, now, { fast });
+        if (!prev.window && prev.queue.length === 0) return prev;
+        const next = advanceCheckoutSpotlightState(prev, now, { fast: fastRef.current });
         if (statesEqual(prev, next)) return prev;
         writeStoredState(next);
         return next;
       });
     }, TICK_MS);
     return () => window.clearInterval(timer);
-  }, [enabled, fast]);
+  }, [enabled]);
 
   const activeDogs = useMemo(() => getActiveSpotlightDogs(state), [state]);
   const active = enabled && checkoutSpotlightIsActive(state);
@@ -112,11 +112,11 @@ export function useLobbyCheckoutSpotlight(
         ...prev,
         window: { ...prev.window, startedAt: 0, durationMs: 0 }
       };
-      const next = advanceCheckoutSpotlightState(forced, Date.now(), { fast });
+      const next = advanceCheckoutSpotlightState(forced, Date.now(), { fast: fastRef.current });
       writeStoredState(next);
       return next;
     });
-  }, [fast]);
+  }, []);
 
   return {
     active,
