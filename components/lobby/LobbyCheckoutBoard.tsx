@@ -614,34 +614,33 @@ export function LobbyCheckoutBoard({
         <div className="lobby-spotlight-host mt-3 min-h-0 flex-1">
           {checkoutSpotlight.active ? (
             <LobbyCheckoutSpotlight dogs={checkoutSpotlight.dogs} />
-          ) : null}
-
-          <div
-            className={`lobby-main-grid grid min-h-0 flex-1 ${checkoutActive ? "grid-cols-1" : "grid-cols-[1.75fr_1fr]"} gap-4`}
-            aria-hidden={checkoutSpotlight.active}
-          >
-            {checkoutActive ? (
-              <LobbyCheckoutShowcase dogs={showcaseDogs} />
-            ) : (
-              <>
-                <div className="lobby-checkout-column flex min-h-0 flex-col gap-3">
-                  <section className="lobby-panel lobby-idle-checkout-slot overflow-hidden">
-                    <LobbyIdleSlideshow tvMode={showTvLayout} />
-                  </section>
-                </div>
-                {settings.show_promotions ? (
-                  <SocialMomentsCarousel paused={idleCarouselPaused || checkoutSpotlight.active} performanceMode={castMode} />
-                ) : (
-                  <section className="lobby-panel flex items-center justify-center p-6 text-center text-lobby-navy">
-                    <div>
-                      <LobbyAssetImage src={lobbyLightAssets.dogLogoExact} alt="" width={96} height={96} className="mx-auto h-20 w-20 object-contain" />
-                      <p className="mt-3 font-semibold">Social Media Moments</p>
-                    </div>
-                  </section>
-                )}
-              </>
-            )}
-          </div>
+          ) : (
+            <div
+              className={`lobby-main-grid grid min-h-0 flex-1 ${checkoutActive ? "grid-cols-1" : "grid-cols-[1.75fr_1fr]"} gap-4`}
+            >
+              {checkoutActive ? (
+                <LobbyCheckoutShowcase dogs={showcaseDogs} />
+              ) : (
+                <>
+                  <div className="lobby-checkout-column flex min-h-0 flex-col gap-3">
+                    <section className="lobby-panel lobby-idle-checkout-slot overflow-hidden">
+                      <LobbyIdleSlideshow tvMode={showTvLayout} />
+                    </section>
+                  </div>
+                  {settings.show_promotions ? (
+                    <SocialMomentsCarousel paused={idleCarouselPaused} performanceMode={castMode} />
+                  ) : (
+                    <section className="lobby-panel flex items-center justify-center p-6 text-center text-lobby-navy">
+                      <div>
+                        <LobbyAssetImage src={lobbyLightAssets.dogLogoExact} alt="" width={96} height={96} className="mx-auto h-20 w-20 object-contain" />
+                        <p className="mt-3 font-semibold">Social Media Moments</p>
+                      </div>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {settings.show_events && !checkoutSpotlight.active ? (

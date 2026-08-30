@@ -254,7 +254,6 @@
   color: rgba(16, 46, 102, 0.5);
 }
 
-.lobby-content--spotlight .lobby-main-grid,
 .lobby-content--spotlight .lobby-refresh-banner {
   visibility: hidden;
   pointer-events: none;
