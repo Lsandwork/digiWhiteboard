@@ -50,36 +50,40 @@ function statesEqual(a: CheckoutSpotlightState, b: CheckoutSpotlightState) {
  * Checkout spotlight queue controller.
  * Reuses live lobby checkout dogs — no extra polling.
  */
-export function useLobbyCheckoutSpotlight(dogs: LobbyCheckoutDog[], options?: { enabled?: boolean }) {
+export function useLobbyCheckoutSpotlight(
+  dogs: LobbyCheckoutDog[],
+  options?: { enabled?: boolean; fastDurations?: boolean }
+) {
   const enabled = options?.enabled !== false;
+  const fast = Boolean(options?.fastDurations);
   const [state, setState] = useState<CheckoutSpotlightState>(() => emptyCheckoutSpotlightState());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const hydratedRef = useRef(false);
-  const stateRef = useRef(state);
-  stateRef.current = state;
 
   useEffect(() => {
     if (!enabled || hydratedRef.current) return;
     hydratedRef.current = true;
     const stored = readStoredState();
     if (stored) {
-      const advanced = advanceCheckoutSpotlightState(stored, Date.now());
+      const advanced = advanceCheckoutSpotlightState(stored, Date.now(), { fast });
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate sessionStorage once on mount
       setState(advanced);
       writeStoredState(advanced);
     }
-  }, [enabled]);
+  }, [enabled, fast]);
 
   useEffect(() => {
     if (!enabled) return;
     const now = Date.now();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync live checkout dogs into the queue state machine
     setState((prev) => {
       let next = syncCheckoutSpotlightQueue(prev, dogs, now);
-      next = advanceCheckoutSpotlightState(next, now);
+      next = advanceCheckoutSpotlightState(next, now, { fast });
       if (statesEqual(prev, next)) return prev;
       writeStoredState(next);
       return next;
     });
-  }, [dogs, enabled]);
+  }, [dogs, enabled, fast]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -88,14 +92,14 @@ export function useLobbyCheckoutSpotlight(dogs: LobbyCheckoutDog[], options?: { 
       setNowMs(now);
       setState((prev) => {
         if (!prev.window) return prev;
-        const next = advanceCheckoutSpotlightState(prev, now);
+        const next = advanceCheckoutSpotlightState(prev, now, { fast });
         if (statesEqual(prev, next)) return prev;
         writeStoredState(next);
         return next;
       });
     }, TICK_MS);
     return () => window.clearInterval(timer);
-  }, [enabled]);
+  }, [enabled, fast]);
 
   const activeDogs = useMemo(() => getActiveSpotlightDogs(state), [state]);
   const active = enabled && checkoutSpotlightIsActive(state);
@@ -108,11 +112,11 @@ export function useLobbyCheckoutSpotlight(dogs: LobbyCheckoutDog[], options?: { 
         ...prev,
         window: { ...prev.window, startedAt: 0, durationMs: 0 }
       };
-      const next = advanceCheckoutSpotlightState(forced, Date.now());
+      const next = advanceCheckoutSpotlightState(forced, Date.now(), { fast });
       writeStoredState(next);
       return next;
     });
-  }, []);
+  }, [fast]);
 
   return {
     active,

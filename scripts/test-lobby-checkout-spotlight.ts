@@ -271,4 +271,23 @@ run("completed event is not re-queued on later identical poll", () => {
   assert.equal(state.queue.length, 0);
 });
 
+run("preview fast durations shorten windows without changing max visible", () => {
+  assert.equal(spotlightDurationMs(1, { fast: true }), 8_000);
+  assert.equal(spotlightDurationMs(3, { fast: true }), 4_000);
+  const t0 = Date.parse("2026-08-30T18:00:00.000Z");
+  let state = emptyCheckoutSpotlightState();
+  state = syncCheckoutSpotlightQueue(
+    state,
+    [
+      dog({ id: "1", dog_name: "A", prompted_at: "2026-08-30T18:00:01.000Z" }),
+      dog({ id: "2", dog_name: "B", prompted_at: "2026-08-30T18:00:02.000Z" }),
+      dog({ id: "3", dog_name: "C", prompted_at: "2026-08-30T18:00:03.000Z" })
+    ],
+    t0
+  );
+  state = advanceCheckoutSpotlightState(state, t0, { fast: true });
+  assert.equal(state.window?.durationMs, 4_000);
+  assert.equal(getActiveSpotlightDogs(state).length, 2);
+});
+
 console.log("lobby checkout spotlight tests passed");

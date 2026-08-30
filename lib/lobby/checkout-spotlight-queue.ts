@@ -56,7 +56,13 @@ export function sortCheckoutDogsChronologically(dogs: LobbyCheckoutDog[]) {
   });
 }
 
-export function spotlightDurationMs(queueLengthAtWindowStart: number) {
+export function spotlightDurationMs(
+  queueLengthAtWindowStart: number,
+  options?: { fast?: boolean }
+) {
+  if (options?.fast) {
+    return queueLengthAtWindowStart > SPOTLIGHT_MAX_VISIBLE ? 4_000 : 8_000;
+  }
   return queueLengthAtWindowStart > SPOTLIGHT_MAX_VISIBLE
     ? SPOTLIGHT_DURATION_SHORT_MS
     : SPOTLIGHT_DURATION_LONG_MS;
@@ -131,7 +137,8 @@ export function spotlightRemainingMs(state: CheckoutSpotlightState, nowMs = Date
  */
 export function advanceCheckoutSpotlightState(
   state: CheckoutSpotlightState,
-  nowMs = Date.now()
+  nowMs = Date.now(),
+  options?: { fast?: boolean }
 ): CheckoutSpotlightState {
   let next = state;
 
@@ -154,7 +161,7 @@ export function advanceCheckoutSpotlightState(
       window: {
         keys,
         startedAt: nowMs,
-        durationMs: spotlightDurationMs(next.queue.length)
+        durationMs: spotlightDurationMs(next.queue.length, options)
       }
     };
   }

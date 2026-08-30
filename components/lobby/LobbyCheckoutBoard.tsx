@@ -518,7 +518,13 @@ export function LobbyCheckoutBoard({
     return checkoutActive ? uniqueCheckoutDogs(featured, queue) : [];
   }, [checkoutActive, featured, previewCheckoutCount, queue]);
   // Reuse the same checkout dogs already on the board — no extra polling/API.
-  const checkoutSpotlight = useLobbyCheckoutSpotlight(showcaseDogs, { enabled: true });
+  const spotlightFast =
+    previewCheckoutCount > 0 &&
+    (searchParams.get("spotlightFast") === "1" || searchParams.get("spotlightFast") === "true");
+  const checkoutSpotlight = useLobbyCheckoutSpotlight(showcaseDogs, {
+    enabled: true,
+    fastDurations: spotlightFast
+  });
   const activeCheckoutDog = checkoutActive ? showcaseDogs[0] ?? null : null;
   const rawCheckoutCount = checkoutDogsFromResponse(rawCheckouts).length;
   const activeCheckoutStartedAt = activeCheckoutDog?.prompted_at ?? null;
