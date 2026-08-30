@@ -5,6 +5,11 @@ import { loadGroomingPushBoardState, type GroomingPushNotice } from "@/lib/staff
 import { loadCastVideoBoardState, type CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import { loadActiveStaffPushNotice, type StaffPushNotice } from "@/lib/staff/push-notices";
 import { loadTrainerPushBoardState, type TrainerPushNotice } from "@/lib/staff/trainer-push-notices";
+import { loadStaffWhiteboardThemeId } from "@/lib/staff/whiteboard-theme-settings";
+import {
+  DEFAULT_STAFF_WHITEBOARD_THEME_ID,
+  type StaffWhiteboardThemeId
+} from "@/lib/staff/whiteboard-themes";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
@@ -16,6 +21,8 @@ export type StaffBoardOverlays = {
   trainer: { activeNotice: TrainerPushNotice | null; queue: TrainerPushNotice[] };
   castVideo: { activeNotice: CastVideoNotice | null; queue: CastVideoNotice[] };
   emergencyCastVideo: { activeNotice: CastVideoNotice | null; queue: CastVideoNotice[] };
+  /** Selected staff whiteboard visual theme — piggybacks on existing overlay poll (no extra client requests). */
+  whiteboardTheme: StaffWhiteboardThemeId;
   healthy: {
     push: boolean;
     grooming: boolean;
@@ -32,6 +39,7 @@ const emptyOverlays = (): StaffBoardOverlays => ({
   trainer: { activeNotice: null, queue: [] },
   castVideo: { activeNotice: null, queue: [] },
   emergencyCastVideo: { activeNotice: null, queue: [] },
+  whiteboardTheme: DEFAULT_STAFF_WHITEBOARD_THEME_ID,
   healthy: {
     push: false,
     grooming: false,
@@ -77,7 +85,7 @@ export async function loadStaffBoardOverlays(
       queue: [] as CastVideoNotice[]
     };
 
-    const [push, grooming, trainer, castVideo, emergencyCastVideo] = await Promise.all([
+    const [push, grooming, trainer, castVideo, emergencyCastVideo, theme] = await Promise.all([
       safeLoad(
         () => loadActiveStaffPushNotice(supabase, { mutate: false }),
         null as StaffPushNotice | null,
@@ -94,7 +102,8 @@ export async function loadStaffBoardOverlays(
         () => loadCastVideoBoardState(supabase, { department, emergencyOnly: true, mutate: false }),
         emptyCast,
         "emergency-cast-video"
-      )
+      ),
+      safeLoad(() => loadStaffWhiteboardThemeId(supabase), DEFAULT_STAFF_WHITEBOARD_THEME_ID, "whiteboard-theme")
     ]);
 
     return {
@@ -103,6 +112,7 @@ export async function loadStaffBoardOverlays(
       trainer: trainer.value,
       castVideo: castVideo.value,
       emergencyCastVideo: emergencyCastVideo.value,
+      whiteboardTheme: theme.value,
       healthy: {
         push: push.ok,
         grooming: grooming.ok,

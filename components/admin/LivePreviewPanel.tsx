@@ -7,6 +7,10 @@ import type { LobbySettings } from "@/lib/lobby/types";
 import type { StaffBoardSettings } from "@/lib/admin/types";
 import type { LobbyPromotion } from "@/lib/lobby/types";
 import type { LiveDog } from "@/lib/types";
+import {
+  normalizeStaffWhiteboardThemeId,
+  type StaffWhiteboardThemeId
+} from "@/lib/staff/whiteboard-themes";
 
 type LivePreviewPanelProps = {
   board: AdminBoardType;
@@ -18,6 +22,8 @@ type LivePreviewPanelProps = {
   onFullscreen?: () => void;
   /** Match sibling card height on Overview (Publish / System Info). */
   compact?: boolean;
+  /** Optional override for instant theme preview before settings reload. */
+  previewThemeId?: StaffWhiteboardThemeId;
 };
 
 export function LivePreviewPanel({
@@ -28,10 +34,15 @@ export function LivePreviewPanel({
   staffDogs,
   activeCheckouts,
   onFullscreen,
-  compact = false
+  compact = false,
+  previewThemeId
 }: LivePreviewPanelProps) {
   const featuredPromotion = promotions.find((p) => p.active) ?? promotions[0];
   const checkoutDogs = staffDogs.filter((d) => d.display_status === "checking_out").slice(0, 3);
+  const staffTheme = normalizeStaffWhiteboardThemeId(
+    previewThemeId ?? staffSettings.whiteboard_theme
+  );
+  const isCity = staffTheme === "city";
 
   return (
     <section className={`admin-card overflow-hidden ${compact ? "flex h-full min-h-0 flex-col" : ""}`}>
@@ -45,6 +56,7 @@ export function LivePreviewPanel({
           className={`admin-preview-frame ${board === "lobby" ? "admin-preview-frame--lobby" : "admin-preview-frame--staff"} ${
             compact ? "admin-preview-frame--compact" : ""
           }`}
+          data-staff-wb-theme={board === "staff" ? staffTheme : undefined}
         >
           {board === "lobby" ? (
             <>
@@ -67,14 +79,46 @@ export function LivePreviewPanel({
             </>
           ) : (
             <>
-              <p className="text-xs font-black text-white">Staff Digital Whiteboard</p>
-              <div className="mt-2 rounded bg-white/10 p-2 text-[10px] text-white/85">{staffSettings.team_reminder}</div>
-              <div className="mt-2 rounded bg-emerald-500/15 p-2 text-[10px] text-emerald-100">{staffSettings.important_notice}</div>
-              <p className="mt-2 text-[10px] font-bold uppercase text-fitdog-orange">Checking Out ({activeCheckouts})</p>
-              <div className="mt-1 space-y-1">
-                {staffDogs.filter((d) => d.display_status === "checking_out").slice(0, 4).map((dog) => (
-                  <div key={dog.id} className="rounded bg-white/10 px-2 py-1 text-[10px] text-white">{dog.animal_name}</div>
-                ))}
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/assets/fitdog/replace_f-logo.png"
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="rounded-full bg-white p-0.5"
+                />
+                <div>
+                  {isCity ? (
+                    <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-fitdog-orange">Welcome to</p>
+                  ) : null}
+                  <p className={`text-xs font-black ${isCity ? "text-white" : "text-slate-900"}`}>
+                    Fitdog Health & Social Club
+                  </p>
+                </div>
+              </div>
+              <div className={isCity ? "admin-preview-staff-body" : "mt-2"}>
+                <div className={`rounded p-2 text-[10px] ${isCity ? "bg-white/80 text-slate-800" : "bg-slate-900/5 text-slate-700"}`}>
+                  {staffSettings.team_reminder}
+                </div>
+                <div className={`mt-2 rounded p-2 text-[10px] ${isCity ? "bg-emerald-500/10 text-emerald-900" : "bg-emerald-500/10 text-emerald-800"}`}>
+                  {staffSettings.important_notice}
+                </div>
+                <p className="mt-2 text-[10px] font-bold uppercase text-fitdog-orange">
+                  Checking Out ({activeCheckouts})
+                </p>
+                <div className="mt-1 space-y-1">
+                  {staffDogs
+                    .filter((d) => d.display_status === "checking_out")
+                    .slice(0, 4)
+                    .map((dog) => (
+                      <div
+                        key={dog.id}
+                        className={`rounded px-2 py-1 text-[10px] ${isCity ? "bg-white text-slate-800" : "bg-white text-slate-800 shadow-sm"}`}
+                      >
+                        {dog.animal_name}
+                      </div>
+                    ))}
+                </div>
               </div>
             </>
           )}

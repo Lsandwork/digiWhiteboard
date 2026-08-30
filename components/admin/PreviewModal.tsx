@@ -6,6 +6,7 @@ import type { StaffBoardSettings } from "@/lib/admin/types";
 import type { LiveDog } from "@/lib/types";
 import { Modal } from "@/components/admin/ui/Modal";
 import { LivePreviewPanel } from "@/components/admin/LivePreviewPanel";
+import type { StaffWhiteboardThemeId } from "@/lib/staff/whiteboard-themes";
 
 type PreviewModalProps = {
   open: boolean;
@@ -15,6 +16,7 @@ type PreviewModalProps = {
   promotions: LobbyPromotion[];
   staffDogs: LiveDog[];
   activeCheckouts: number;
+  previewThemeId?: StaffWhiteboardThemeId;
   onClose: () => void;
   onOpenLive: () => void;
 };
