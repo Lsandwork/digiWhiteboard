@@ -42,6 +42,7 @@ export function SuperAdminHubPanel({
   const hub = hubDefinitionForTab(hubTab, visibleTabs.length ? visibleTabs : [hubTab], {
     includeRuffly: roleCanSeeRufflyNav(role),
     includeBlog: roleCanSeeBlogNav(role, email, name),
+    includeRouteGenerator: visibleTabs.includes("route_generator"),
     marketingAppsOnly
   });
   if (!hub || !hub.sections.length) {
@@ -138,6 +139,15 @@ function HubAppMark({ link }: { link: SuperAdminHubLink }) {
         aria-hidden
       >
         {isSocial ? "S" : "B"}
+      </span>
+    );
+  } else if (link.id === "gingr-route-generator") {
+    return (
+      <span
+        className="mt-0.5 inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-sm bg-orange-700 text-[10px] font-semibold text-white"
+        aria-hidden
+      >
+        GR
       </span>
     );
   }

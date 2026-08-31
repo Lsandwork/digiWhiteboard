@@ -201,7 +201,12 @@ export function roleUsesHubTab(role: string | null | undefined, tab: string): bo
 export function filterHubDefinition(
   hub: SuperAdminHubDefinition,
   visibleTabs: Iterable<AdminTab>,
-  options?: { includeRuffly?: boolean; includeBlog?: boolean; marketingAppsOnly?: boolean }
+  options?: {
+    includeRuffly?: boolean;
+    includeBlog?: boolean;
+    includeRouteGenerator?: boolean;
+    marketingAppsOnly?: boolean;
+  }
 ): SuperAdminHubDefinition {
   const visible = new Set(visibleTabs);
   const sections = hub.sections
@@ -221,6 +226,9 @@ export function filterHubDefinition(
         if (link.id === "automatic-blog" || link.id === "social-generator") {
           return options?.includeBlog === true;
         }
+        if (link.id === "gingr-route-generator") {
+          return options?.includeRouteGenerator === true;
+        }
         return true;
       })
     }))
@@ -232,7 +240,12 @@ export function filterHubDefinition(
 export function hubDefinitionForTab(
   hubTab: AdminTab,
   visibleTabs: Iterable<AdminTab>,
-  options?: { includeRuffly?: boolean; includeBlog?: boolean; marketingAppsOnly?: boolean }
+  options?: {
+    includeRuffly?: boolean;
+    includeBlog?: boolean;
+    includeRouteGenerator?: boolean;
+    marketingAppsOnly?: boolean;
+  }
 ): SuperAdminHubDefinition | null {
   if (!isSuperAdminHubTab(hubTab)) return null;
   const key = hubTab as (typeof SUPER_ADMIN_HUB_TABS)[number];
