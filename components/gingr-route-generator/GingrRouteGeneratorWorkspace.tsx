@@ -156,13 +156,14 @@ export function GingrRouteGeneratorWorkspace() {
   }, []);
 
   useEffect(() => {
+    // Fetch schedule when the selected date changes (abort in-flight requests on cleanup).
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional data fetch on date change
     void load(dateKey, false);
     return () => abortRef.current?.abort();
   }, [dateKey, load]);
 
-  const dogs = payload?.dogs ?? [];
-
   const filteredDogs = useMemo(() => {
+    const dogs = payload?.dogs ?? [];
     const q = search.trim().toLowerCase();
     return dogs.filter((dog) => {
       if (pickupOnly && !dog.pickup) return false;
@@ -176,7 +177,7 @@ export function GingrRouteGeneratorWorkspace() {
         dog.activityLabels.some((label) => label.toLowerCase().includes(q))
       );
     });
-  }, [activityChip, activityFilter, dogs, dropoffOnly, pickupOnly, search]);
+  }, [activityChip, activityFilter, dropoffOnly, payload?.dogs, pickupOnly, search]);
 
   const routeGroups = useMemo(() => {
     const groups: Array<{
@@ -264,7 +265,7 @@ export function GingrRouteGeneratorWorkspace() {
             <button
               type="button"
               className="grg-refresh-btn"
-              disabled={refreshing || inFlightRef.current}
+              disabled={refreshing || loadState === "loading"}
               onClick={() => void load(dateKey, true)}
             >
               <RefreshCw size={15} className={refreshing ? "grg-spin" : undefined} />
