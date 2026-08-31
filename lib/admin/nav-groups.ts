@@ -11,8 +11,13 @@ export type NavLeaf = {
 
 export type NavRouteLeaf = {
   type: "route";
-  id: "gingr" | "ruffly" | "automatic-blog" | "social-generator";
-  href: "/gingr" | "/ruffly" | "/admin/automatic-blog" | "/admin/automatic-blog?page=social-generator";
+  id: "gingr" | "ruffly" | "automatic-blog" | "social-generator" | "gingr-route-generator";
+  href:
+    | "/gingr"
+    | "/ruffly"
+    | "/admin/automatic-blog"
+    | "/admin/automatic-blog?page=social-generator"
+    | "/admin/gingr-route-generator";
   label: string;
 };
 
@@ -60,6 +65,13 @@ export const SOCIAL_GENERATOR_NAV_ROUTE: NavRouteLeaf = {
   label: "Social Media Generator"
 };
 
+export const GINGR_ROUTE_GENERATOR_NAV_ROUTE: NavRouteLeaf = {
+  type: "route",
+  id: "gingr-route-generator",
+  href: "/admin/gingr-route-generator",
+  label: "Gingr Route Generator"
+};
+
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
   options?: {
@@ -72,7 +84,7 @@ export function appendAuthenticatedGlobalRoutes(
 ): NavEntry[] {
   const globalSection: NavEntry[] = [section("global_apps", "Apps")];
   if (options?.includeRouteGenerator) {
-    globalSection.push(leaf("route_generator"));
+    globalSection.push(leaf("route_generator"), GINGR_ROUTE_GENERATOR_NAV_ROUTE);
   }
   if (options?.includeLiveFleet) {
     globalSection.push(leaf("live_fleet"));

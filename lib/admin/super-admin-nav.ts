@@ -199,6 +199,12 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         links: [
           tabLink("live_fleet", "Live Fleet", "Real-time Fitdog vans on the map with Samsara GPS."),
           tabLink("route_generator", "Route Generator", "Build van routes and Samsara exports."),
+          routeLink(
+            "gingr-route-generator",
+            "/admin/gingr-route-generator",
+            "Gingr Route Generator",
+            "Generate operational routes directly from Gingr schedules."
+          ),
           tabLink("ops_system_health", "System Health & Debugging", "System health, audits, and debug evidence."),
           routeLink(
             "automatic-blog",
