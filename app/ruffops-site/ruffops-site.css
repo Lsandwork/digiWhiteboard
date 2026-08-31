@@ -1,0 +1,168 @@
+.ruffops-site {
+  --font-inter: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+  min-height: 100vh;
+  background-color: #05070d;
+  color: #e8edf6;
+  font-family: var(--font-inter);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.ruffops-site a {
+  text-decoration: none;
+}
+
+.ruffops-site .container-page {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 80rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .ruffops-site .container-page {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.ruffops-site .card {
+  border-radius: 1rem;
+  border: 1px solid #1f2a3c;
+  background-color: rgba(12, 17, 28, 0.7);
+  box-shadow: 0 1px 0 0 hsla(0, 0%, 100%, 0.04) inset, 0 20px 50px -20px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.ruffops-site .card-hover {
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ruffops-site .card-hover:hover {
+  transform: translateY(-0.125rem);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.18), 0 18px 60px -25px rgba(56, 189, 248, 0.45);
+}
+
+.ruffops-site .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid #1f2a3c;
+  background-color: rgba(17, 24, 39, 0.6);
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #38bdf8;
+}
+
+.ruffops-site .btn-primary,
+.ruffops-site .btn-secondary,
+.ruffops-site .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  transition: 0.15s ease;
+}
+
+.ruffops-site .btn-primary {
+  background-color: #f97316;
+  color: #05070d;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.25), 0 18px 60px -25px rgba(249, 115, 22, 0.55);
+}
+
+.ruffops-site .btn-primary:hover {
+  background-color: #fb923c;
+}
+
+.ruffops-site .btn-secondary {
+  border: 1px solid #1f2a3c;
+  background-color: rgba(17, 24, 39, 0.6);
+  color: #fff;
+}
+
+.ruffops-site .btn-secondary:hover {
+  border-color: rgba(56, 189, 248, 0.5);
+  background-color: rgba(26, 34, 49, 0.6);
+}
+
+.ruffops-site .btn-ghost {
+  color: #e2e8f0;
+}
+
+.ruffops-site .text-gradient-accent {
+  background-image: linear-gradient(to right, #fb923c, #f97316, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ruffops-site .bg-grid-faint {
+  background-image:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 0),
+    linear-gradient(180deg, rgba(148, 163, 184, 0.06) 1px, transparent 0);
+  background-size: 46px 46px;
+}
+
+.ruffops-site .bg-radial-accent {
+  background-image: radial-gradient(60% 60% at 50% 0, rgba(249, 115, 22, 0.18) 0, rgba(5, 7, 13, 0) 70%);
+}
+
+.ruffops-site .bg-radial-electric {
+  background-image: radial-gradient(50% 50% at 80% 10%, rgba(56, 189, 248, 0.16) 0, rgba(5, 7, 13, 0) 70%);
+}
+
+.ruffops-site .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.ruffops-site .reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ruffops-site .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+.ruffops-site .field-input {
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid #1f2a3c;
+  background-color: rgba(8, 11, 20, 0.7);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #fff;
+}
+
+.ruffops-site .field-input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.ruffops-site .hp-field {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}

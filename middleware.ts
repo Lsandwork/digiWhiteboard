@@ -18,6 +18,7 @@ import {
   shouldRedirectFitdogRootToLogin
 } from "@/lib/fitdog-domain";
 import { RUFFLY_REWRITE_TARGET, rewriteRufflyPublicPath, shouldRewriteRufflyRoot } from "@/lib/ruffly-domain";
+import { rewriteRuffopsMarketingPath } from "@/lib/ruffops-site-domain";
 import {
   blogsCanonicalRedirectPath,
   legacyBlogRedirectUrl,
@@ -159,6 +160,16 @@ async function runMiddleware(request: NextRequest) {
     if (rufflyPath) {
       const url = request.nextUrl.clone();
       url.pathname = rufflyPath;
+      return NextResponse.rewrite(url);
+    }
+  }
+
+  // Public marketing site (ruffops.com / www.ruffops.com) — never staff.ruffops.com.
+  {
+    const marketingPath = rewriteRuffopsMarketingPath(request.headers.get("host"), pathname);
+    if (marketingPath) {
+      const url = request.nextUrl.clone();
+      url.pathname = marketingPath;
       return NextResponse.rewrite(url);
     }
   }
@@ -361,6 +372,12 @@ export const config = {
     "/admin/:path*",
     "/gingr",
     "/ruffly",
-    "/ruffly/:path*"
+    "/ruffly/:path*",
+    "/ruffops-site",
+    "/ruffops-site/:path*",
+    "/send.php",
+    "/services.html",
+    "/online-courses.html",
+    "/dog-behavior-ai.html"
   ]
 };
