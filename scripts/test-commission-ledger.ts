@@ -22,9 +22,13 @@ import {
 } from "../lib/staff/commission-ledger";
 import {
   buildCommissionLedgerSelect,
-  buildLedgerDatabaseUrl
+  buildLedgerDatabaseUrl,
+  formatLedgerPostgresTargetDetail,
+  getLedgerPostgresDiagnosticsTargetMeta
 } from "../lib/staff/commission-ledger/list-via-postgres";
 import { buildCommissionLedgerRestPath } from "../lib/staff/commission-ledger/list-via-rest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // Money (integer cents)
 assert.equal(parseMoneyToCents("$1,200.50"), 120050);
@@ -242,13 +246,67 @@ assert.equal(restPath.pageSize, 25);
 // overrides the client's ssl options, which rejected Supabase's pooler chain
 // with "self-signed certificate in certificate chain".
 const previousPassword = process.env.SUPABASE_DB_PASSWORD;
+const previousUser = process.env.SUPABASE_DB_USER;
+const previousDatabaseUrl = process.env.DATABASE_URL;
+const previousSupabaseDbUrl = process.env.SUPABASE_DB_URL;
+const previousPostgresUrl = process.env.POSTGRES_URL;
+const previousPostgresPassword = process.env.POSTGRES_PASSWORD;
+delete process.env.SUPABASE_DB_USER;
+delete process.env.DATABASE_URL;
+delete process.env.SUPABASE_DB_URL;
+delete process.env.POSTGRES_URL;
+delete process.env.POSTGRES_PASSWORD;
 process.env.SUPABASE_DB_PASSWORD = "p@ss:word/1";
+
 const pooledUrl = buildLedgerDatabaseUrl();
 assert.ok(pooledUrl, "pooler URL should build when a password is set");
 assert.doesNotMatch(pooledUrl, /sslmode/);
 assert.match(pooledUrl, /@aws-0-us-east-1\.pooler\.supabase\.com:6543\/postgres$/);
 assert.match(pooledUrl, /p%40ss%3Aword%2F1/);
+assert.match(pooledUrl, /postgresql:\/\/postgres\.tzkocaucqtmmnrttxira:/);
+
+const defaultTarget = getLedgerPostgresDiagnosticsTargetMeta();
+assert.equal(defaultTarget.mode, "password");
+assert.equal(defaultTarget.host, "aws-0-us-east-1.pooler.supabase.com");
+assert.equal(defaultTarget.port, "6543");
+assert.equal(defaultTarget.database, "postgres");
+assert.equal(defaultTarget.user, "postgres.tzkocaucqtmmnrttxira");
+assert.equal(defaultTarget.passwordConfigured, true);
+assert.equal(defaultTarget.supabaseDbUserConfigured, false);
+assert.equal(defaultTarget.connectionUrlConfigured, false);
+
+const defaultDetail = formatLedgerPostgresTargetDetail(defaultTarget);
+assert.match(defaultDetail, /user=postgres\.tzkocaucqtmmnrttxira/);
+assert.match(defaultDetail, /supabaseDbUserConfigured=false/);
+assert.doesNotMatch(defaultDetail, /p@ss:word\/1/);
+assert.doesNotMatch(defaultDetail, /postgresql:\/\//);
+assert.doesNotMatch(defaultDetail, /SUPABASE_DB_PASSWORD=/);
+assert.doesNotMatch(defaultDetail, /DATABASE_URL=/);
+
+process.env.SUPABASE_DB_USER = "custom-ledger-user";
+const overridden = getLedgerPostgresDiagnosticsTargetMeta();
+assert.equal(overridden.user, "custom-ledger-user");
+assert.equal(overridden.supabaseDbUserConfigured, true);
+const overriddenUrl = buildLedgerDatabaseUrl();
+assert.match(overriddenUrl ?? "", /postgresql:\/\/custom-ledger-user:/);
+assert.match(overriddenUrl ?? "", /@aws-0-us-east-1\.pooler\.supabase\.com:6543\/postgres$/);
+
+const diagnosticsSource = readFileSync(join(process.cwd(), "lib/staff/commission-ledger/diagnostics.ts"), "utf8");
+assert.match(diagnosticsSource, /direct_postgres_target/);
+assert.match(diagnosticsSource, /getLedgerPostgresDiagnosticsTargetMeta/);
+assert.doesNotMatch(diagnosticsSource, /formatLedgerPostgresTargetDetail\([^\)]*password/);
+
 if (previousPassword === undefined) delete process.env.SUPABASE_DB_PASSWORD;
 else process.env.SUPABASE_DB_PASSWORD = previousPassword;
+if (previousUser === undefined) delete process.env.SUPABASE_DB_USER;
+else process.env.SUPABASE_DB_USER = previousUser;
+if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+else process.env.DATABASE_URL = previousDatabaseUrl;
+if (previousSupabaseDbUrl === undefined) delete process.env.SUPABASE_DB_URL;
+else process.env.SUPABASE_DB_URL = previousSupabaseDbUrl;
+if (previousPostgresUrl === undefined) delete process.env.POSTGRES_URL;
+else process.env.POSTGRES_URL = previousPostgresUrl;
+if (previousPostgresPassword === undefined) delete process.env.POSTGRES_PASSWORD;
+else process.env.POSTGRES_PASSWORD = previousPostgresPassword;
 
 console.log("commission ledger: ok");
