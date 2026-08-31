@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { blogActor, requireBlogPermission } from "@/lib/blog/api-auth";
 import { publishBlogArticle, rescoreArticle, transitionArticleStatus, writeBlogAudit } from "@/lib/blog/service";
+import { addArticleHeadingIds } from "@/lib/blog/utils/article-preview-html";
+import { markdownToSimpleHtml } from "@/lib/blog/utils/markdown";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +105,10 @@ export async function POST(request: Request) {
           "robots"
         ]) {
           if (key in patch) allowed[key] = patch[key];
+        }
+        // Keep published HTML in sync with the markdown editors actually edit.
+        if (typeof allowed.body_markdown === "string" && String(allowed.body_markdown).trim()) {
+          allowed.body_html = addArticleHeadingIds(markdownToSimpleHtml(String(allowed.body_markdown)));
         }
         allowed.updated_at = new Date().toISOString();
         const { data, error } = await supabase
