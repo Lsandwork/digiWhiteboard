@@ -6,6 +6,8 @@ import {
   matchGingrRouteActivity
 } from "@/lib/gingr-route-generator/activities";
 
+export type GingrRouteAddressStatus = "ok" | "missing" | "incomplete";
+
 export type GingrRouteDog = {
   id: string;
   animalId: number | null;
@@ -20,6 +22,16 @@ export type GingrRouteDog = {
   scheduledTimeLabel: string | null;
   notes: string | null;
   reservationIds: number[];
+  /** Full owner/home postal address when transport is required. */
+  homeAddress: string | null;
+  homeStreet1: string | null;
+  homeStreet2: string | null;
+  homeCity: string | null;
+  homeState: string | null;
+  homePostalCode: string | null;
+  ownerPhone: string | null;
+  ownerFullName: string | null;
+  addressStatus: GingrRouteAddressStatus;
 };
 
 export type GingrRouteSchedulePayload = {
@@ -220,6 +232,96 @@ function collectServiceNames(reservation: GingrReservation): string[] {
   return names;
 }
 
+
+function ownerFullName(reservation: GingrReservation): string | null {
+  const owner = asRecord(reservation.owner || reservation.client || reservation.customer);
+  const first = pickString(owner.first_name, reservation.a_o_first_name, reservation.owner_first_name);
+  const last = pickString(owner.last_name, reservation.a_o_last_name, reservation.owner_last_name);
+  if (first && last) return `${first} ${last}`;
+  return pickString(owner.full_name, reservation.owner_name, reservation.client_name, first, last);
+}
+
+function ownerPhone(reservation: GingrReservation): string | null {
+  const owner = asRecord(reservation.owner || reservation.client || reservation.customer);
+  return pickString(
+    owner.cell_phone,
+    owner.mobile_phone,
+    owner.home_phone,
+    owner.phone,
+    reservation.phone,
+    reservation.owner_phone,
+    reservation.a_o_mobile
+  );
+}
+
+export type ExtractedHomeAddress = {
+  street1: string | null;
+  street2: string | null;
+  city: string | null;
+  state: string | null;
+  postalCode: string | null;
+  fullAddress: string | null;
+  status: GingrRouteAddressStatus;
+};
+
+/** Pull owner/home postal fields from a Gingr reservation without extra API calls. */
+export function extractHomeAddressFromReservation(reservation: GingrReservation): ExtractedHomeAddress {
+  const owner = asRecord(reservation.owner || reservation.client || reservation.customer);
+  const address = asRecord(reservation.address || reservation.pickup_address || reservation.location);
+  const street1 = pickString(
+    owner.address_1,
+    owner.address1,
+    owner.street,
+    address.address_1,
+    address.address1,
+    address.address,
+    address.street,
+    address.line1,
+    reservation.address_line_1,
+    reservation.street
+  );
+  const street2 = pickString(
+    owner.address_2,
+    owner.address2,
+    address.address_2,
+    address.address2,
+    address.unit,
+    address.line2
+  );
+  const city = pickString(owner.city, address.city, reservation.city);
+  const state = pickString(owner.state, address.state, reservation.state) || (street1 || city ? "CA" : null);
+  const postalCode = pickString(
+    owner.postal,
+    owner.postcode,
+    address.zip,
+    address.postcode,
+    address.postal_code,
+    reservation.zip,
+    reservation.postcode
+  );
+  const hasStreet = Boolean(street1);
+  const hasLocality = Boolean(city || postalCode);
+  let status: GingrRouteAddressStatus = "ok";
+  if (!hasStreet && !hasLocality) status = "missing";
+  else if (!hasStreet || !hasLocality) status = "incomplete";
+
+  const street = [street1, street2].filter(Boolean).join(", ") || null;
+  const localityParts = [city, [state, postalCode].filter(Boolean).join(" ")].filter(Boolean);
+  const locality = localityParts.join(", ") || null;
+  const fullAddress =
+    status === "ok" ? [street, locality, "USA"].filter(Boolean).join(", ") : null;
+
+  return { street1, street2, city, state, postalCode, fullAddress, status };
+}
+
+function preferAddress(current: ExtractedHomeAddress, next: ExtractedHomeAddress): ExtractedHomeAddress {
+  const rank = { ok: 2, incomplete: 1, missing: 0 } as const;
+  if (rank[next.status] > rank[current.status]) return next;
+  if (rank[next.status] < rank[current.status]) return current;
+  if ((next.fullAddress || "").length > (current.fullAddress || "").length) return next;
+  return current;
+}
+
 type Acc = {
   id: string;
   animalId: number | null;
@@ -234,6 +336,15 @@ type Acc = {
   notes: string | null;
   reservationIds: Set<number>;
   hasEligibleActivity: boolean;
+  homeStreet1: string | null;
+  homeStreet2: string | null;
+  homeCity: string | null;
+  homeState: string | null;
+  homePostalCode: string | null;
+  homeAddress: string | null;
+  ownerPhone: string | null;
+  ownerFullName: string | null;
+  addressStatus: GingrRouteAddressStatus;
 };
 
 /**
@@ -265,7 +376,16 @@ export function normalizeGingrRouteReservations(
         scheduledTime: null,
         notes: null,
         reservationIds: new Set(),
-        hasEligibleActivity: false
+        hasEligibleActivity: false,
+        homeStreet1: null,
+        homeStreet2: null,
+        homeCity: null,
+        homeState: null,
+        homePostalCode: null,
+        homeAddress: null,
+        ownerPhone: null,
+        ownerFullName: null,
+        addressStatus: "missing"
       };
       byAnimal.set(key, acc);
     }
@@ -307,6 +427,27 @@ export function normalizeGingrRouteReservations(
       const notes = extractNotes(reservation);
       if (notes) acc.notes = notes;
     }
+
+    const nextAddress = extractHomeAddressFromReservation(reservation);
+    const currentAddress = {
+      street1: acc.homeStreet1,
+      street2: acc.homeStreet2,
+      city: acc.homeCity,
+      state: acc.homeState,
+      postalCode: acc.homePostalCode,
+      fullAddress: acc.homeAddress,
+      status: acc.addressStatus
+    };
+    const chosen = preferAddress(currentAddress, nextAddress);
+    acc.homeStreet1 = chosen.street1;
+    acc.homeStreet2 = chosen.street2;
+    acc.homeCity = chosen.city;
+    acc.homeState = chosen.state;
+    acc.homePostalCode = chosen.postalCode;
+    acc.homeAddress = chosen.fullAddress;
+    acc.addressStatus = chosen.status;
+    if (!acc.ownerPhone) acc.ownerPhone = ownerPhone(reservation);
+    if (!acc.ownerFullName) acc.ownerFullName = ownerFullName(reservation);
   }
 
   const dogs: GingrRouteDog[] = [];
@@ -315,6 +456,7 @@ export function normalizeGingrRouteReservations(
     if (!acc.imageUrl && acc.animalId) {
       acc.imageUrl = `/api/gingr/animal-photo/image?animalId=${acc.animalId}`;
     }
+    const needsTransport = acc.pickup || acc.dropoff;
     dogs.push({
       id: acc.id,
       animalId: acc.animalId,
@@ -328,7 +470,16 @@ export function normalizeGingrRouteReservations(
       scheduledTime: acc.scheduledTime,
       scheduledTimeLabel: formatTimeLabel(acc.scheduledTime),
       notes: acc.notes,
-      reservationIds: Array.from(acc.reservationIds)
+      reservationIds: Array.from(acc.reservationIds),
+      homeAddress: needsTransport ? acc.homeAddress : null,
+      homeStreet1: needsTransport ? acc.homeStreet1 : null,
+      homeStreet2: needsTransport ? acc.homeStreet2 : null,
+      homeCity: needsTransport ? acc.homeCity : null,
+      homeState: needsTransport ? acc.homeState : null,
+      homePostalCode: needsTransport ? acc.homePostalCode : null,
+      ownerPhone: needsTransport ? acc.ownerPhone : null,
+      ownerFullName: needsTransport ? acc.ownerFullName : null,
+      addressStatus: needsTransport ? acc.addressStatus : "ok"
     });
   }
 

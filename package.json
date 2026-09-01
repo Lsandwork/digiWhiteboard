@@ -54,6 +54,7 @@
     "test:staff-checkout-types": "tsx scripts/test-staff-checkout-reservation-types.ts",
     "test:package-commissions": "tsx scripts/test-package-commissions-access.ts",
     "test:fitdog-ai-commissions": "tsx scripts/test-fitdog-ai-commission-answer.ts",
+    "test:gingr-samsara-export": "tsx scripts/test-gingr-samsara-export.ts",
     "test:route-generator": "tsx scripts/test-route-generator.ts",
     "test:live-fleet": "tsx scripts/test-live-fleet.ts",
     "test:sms-cost": "tsx scripts/test-sms-cost-phase1.ts && tsx scripts/test-super-admin-sms.ts",
