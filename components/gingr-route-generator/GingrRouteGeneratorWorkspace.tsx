@@ -15,6 +15,7 @@ import {
   Printer,
   RefreshCw,
   Search,
+  StickyNote,
   Truck,
   Waves,
   X
@@ -208,6 +209,23 @@ export function GingrRouteGeneratorWorkspace() {
 
   const totalPickups = filteredDogs.filter((d) => d.pickup).length;
   const totalDropoffs = filteredDogs.filter((d) => d.dropoff).length;
+
+  /** RSVP-style subject groups — each dog under their primary subject once. */
+  const dogsBySubject = useMemo(() => {
+    const buckets = new Map<string, { activityId: GingrRouteActivityId | null; label: string; dogs: GingrRouteDog[] }>();
+    for (const activity of GINGR_ROUTE_ACTIVITIES) {
+      buckets.set(activity.id, { activityId: activity.id, label: activity.label, dogs: [] });
+    }
+    const other = { activityId: null as GingrRouteActivityId | null, label: "Other", dogs: [] as GingrRouteDog[] };
+    for (const dog of filteredDogs) {
+      const primary = dog.activities[0];
+      if (primary && buckets.has(primary)) buckets.get(primary)!.dogs.push(dog);
+      else other.dogs.push(dog);
+    }
+    const groups = Array.from(buckets.values()).filter((g) => g.dogs.length > 0);
+    if (other.dogs.length) groups.push(other);
+    return groups;
+  }, [filteredDogs]);
   const hasFilters = Boolean(search || activityFilter !== "all" || activityChip !== "all" || pickupOnly || dropoffOnly);
 
   function clearFilters() {
@@ -343,9 +361,10 @@ export function GingrRouteGeneratorWorkspace() {
               className="grg-refresh-btn"
               disabled={refreshing || loadState === "loading"}
               onClick={() => void load(dateKey, true)}
+              title="Pull the latest dogs and bookings from Gingr"
             >
               <RefreshCw size={15} className={refreshing ? "grg-spin" : undefined} />
-              Refresh Gingr Data
+              Refresh
             </button>
             {updatedLabel ? (
               <div className="grg-updated">
@@ -498,10 +517,32 @@ export function GingrRouteGeneratorWorkspace() {
               ))}
             </div>
 
-            <p className="grg-transport-legend">
-              Only dogs marked Pick Up or Drop Off require a FitDog transportation stop.
-            </p>
+            <div className="grg-list-toolbar">
+              <p className="grg-transport-legend">
+                Only dogs marked Pick Up or Drop Off require a FitDog transportation stop.
+              </p>
+              <button
+                type="button"
+                className="grg-refresh-btn grg-refresh-btn--compact"
+                disabled={refreshing || loadState === "loading"}
+                onClick={() => void load(dateKey, true)}
+                title="Pull newly added dogs from Gingr"
+              >
+                <RefreshCw size={14} className={refreshing ? "grg-spin" : undefined} />
+                {refreshing ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
             <div className="grg-dog-list">
+              <div className="grg-dog-columns" aria-hidden={loadState !== "ready"}>
+                <span className="grg-col-spacer" />
+                <span>Dog / Owner</span>
+                <span>Subject</span>
+                <span>Transport</span>
+                <span>Client Notes</span>
+                <span>Pick Up Instructions</span>
+                <span>Time</span>
+              </div>
+
               {loadState === "loading" && !payload
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="grg-dog-row grg-dog-row--skeleton">
@@ -520,57 +561,115 @@ export function GingrRouteGeneratorWorkspace() {
                 </div>
               ) : null}
 
-              {filteredDogs.map((dog) => {
-                const primaryActivity = dog.activities[0];
+              {dogsBySubject.map((group) => {
+                const meta = group.activityId ? GINGR_ROUTE_ACTIVITY_BY_ID[group.activityId] : null;
                 return (
-                  <article key={dog.id} className="grg-dog-row">
-                    <DogAvatar dog={dog} />
-                    <div className="grg-dog-identity">
-                      <div className="grg-dog-name">{dog.name}</div>
-                      <div className="grg-dog-owner">{dog.owner}</div>
-                    </div>
-                    <div className="grg-dog-activity">
-                      {primaryActivity ? <ActivityBadge activityId={primaryActivity} /> : null}
-                      {dog.activities.length > 1 ? (
-                        <span className="grg-more-activities">+{dog.activities.length - 1}</span>
-                      ) : null}
-                    </div>
-                    <div className="grg-dog-transport">
-                      {dog.pickup ? (
-                        <span className="grg-transport-badge grg-transport-badge--pickup" title="FitDog driver picks up from home">
-                          <Truck size={12} />
-                          <span className="grg-transport-badge-text">
-                            <strong>PICK UP</strong>
-                            <em>From Home</em>
-                          </span>
-                        </span>
-                      ) : null}
-                      {dog.dropoff ? (
-                        <span className="grg-transport-badge grg-transport-badge--dropoff" title="FitDog driver drops off to home">
-                          <MapPin size={12} />
-                          <span className="grg-transport-badge-text">
-                            <strong>DROP OFF</strong>
-                            <em>To Home</em>
-                          </span>
-                        </span>
-                      ) : null}
-                      {(dog.pickup || dog.dropoff) && dog.addressStatus !== "ok" ? (
-                        <span className="grg-transport-badge grg-transport-badge--address" title="Customer home address required for Samsara export">
-                          Address Required
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="grg-dog-meta">
-                      {dog.scheduledTimeLabel ? (
-                        <span className="grg-dog-time">
-                          <Clock size={12} />
-                          {dog.scheduledTimeLabel}
-                        </span>
-                      ) : null}
-                      {dog.notes ? <span className="grg-dog-notes">{dog.notes}</span> : null}
-                    </div>
-                    <ChevronRight className="grg-row-chevron" size={16} aria-hidden />
-                  </article>
+                  <section key={group.label} className="grg-subject-group">
+                    <header
+                      className="grg-subject-header"
+                      style={
+                        meta
+                          ? {
+                              background: meta.accentSoft,
+                              color: meta.accentText,
+                              borderColor: `${meta.accent}33`
+                            }
+                          : undefined
+                      }
+                    >
+                      <span className="grg-subject-title">{group.label}</span>
+                      <span className="grg-subject-count">{group.dogs.length}</span>
+                    </header>
+
+                    {group.dogs.map((dog) => (
+                      <article key={dog.id} className="grg-dog-row">
+                        <DogAvatar dog={dog} />
+                        <div className="grg-dog-identity">
+                          <div className="grg-dog-name">{dog.name}</div>
+                          <div className="grg-dog-owner">{dog.owner}</div>
+                        </div>
+                        <div className="grg-dog-activity" title={dog.activityLabels.join(", ")}>
+                          {dog.activities.map((activityId) => (
+                            <ActivityBadge key={activityId} activityId={activityId} />
+                          ))}
+                          {!dog.activities.length && dog.activityLabels.length
+                            ? dog.activityLabels.map((label) => (
+                                <span key={label} className="grg-activity-badge grg-activity-badge--plain">
+                                  {label}
+                                </span>
+                              ))
+                            : null}
+                        </div>
+                        <div className="grg-dog-transport">
+                          {dog.pickup ? (
+                            <span
+                              className="grg-transport-badge grg-transport-badge--pickup"
+                              title="FitDog driver picks up from home"
+                            >
+                              <Truck size={12} />
+                              <span className="grg-transport-badge-text">
+                                <strong>PICK UP</strong>
+                                <em>From Home</em>
+                              </span>
+                            </span>
+                          ) : null}
+                          {dog.dropoff ? (
+                            <span
+                              className="grg-transport-badge grg-transport-badge--dropoff"
+                              title="FitDog driver drops off to home"
+                            >
+                              <MapPin size={12} />
+                              <span className="grg-transport-badge-text">
+                                <strong>DROP OFF</strong>
+                                <em>To Home</em>
+                              </span>
+                            </span>
+                          ) : null}
+                          {(dog.pickup || dog.dropoff) && dog.addressStatus !== "ok" ? (
+                            <span
+                              className="grg-transport-badge grg-transport-badge--address"
+                              title="Customer home address required for Samsara export"
+                            >
+                              Address Required
+                            </span>
+                          ) : null}
+                          {!dog.pickup && !dog.dropoff ? (
+                            <span className="grg-transport-empty">Owner transport</span>
+                          ) : null}
+                        </div>
+                        <div className="grg-dog-client-notes" title={dog.notes || undefined}>
+                          {dog.notes ? (
+                            <>
+                              <StickyNote size={12} aria-hidden />
+                              <span>{dog.notes}</span>
+                            </>
+                          ) : (
+                            <span className="grg-cell-empty">—</span>
+                          )}
+                        </div>
+                        <div
+                          className="grg-dog-pickup-instructions"
+                          title={dog.pickupInstructions || undefined}
+                        >
+                          {dog.pickupInstructions ? (
+                            <span>{dog.pickupInstructions}</span>
+                          ) : (
+                            <span className="grg-cell-empty">—</span>
+                          )}
+                        </div>
+                        <div className="grg-dog-meta">
+                          {dog.scheduledTimeLabel ? (
+                            <span className="grg-dog-time">
+                              <Clock size={12} />
+                              {dog.scheduledTimeLabel}
+                            </span>
+                          ) : (
+                            <span className="grg-cell-empty">—</span>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </section>
                 );
               })}
             </div>

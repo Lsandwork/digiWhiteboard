@@ -125,7 +125,28 @@ assert.equal(mochi!.dropoff, true, "dropoff merges onto activity dog");
 assert.equal(biscuit!.activities.length, 1, "no duplicate activity ids");
 assert.equal(biscuit!.activities[0], "adventure_hike");
 assert.equal(mochi!.activities[0], "beach_excursion");
+
 assert.ok(!merged.dogs.some((d) => d.name === "Rex"), "daycare-only dog excluded");
+
+// Client-visible notes + booking comments → Pick Up Instructions
+const notesReservation = reservation({
+  id: "4001",
+  animal_id: 55,
+  a_name: "Pepper",
+  a_o_first_name: "Kim",
+  a_o_last_name: "Nguyen",
+  type: "Canine Fitness",
+  notes: { reservation_notes: "Client note: soft mouth" },
+  r_comments: "Gate code 9988 — leave in side yard",
+  services: [{ name: "Canine Fitness" }, { name: "Pick Up" }]
+});
+const notesMerged = normalizeGingrRouteReservations([notesReservation], date);
+const pepper = notesMerged.dogs.find((d) => d.name === "Pepper");
+assert.ok(pepper, "Pepper should be present");
+assert.equal(pepper!.notes, "Client note: soft mouth");
+assert.equal(pepper!.pickupInstructions, "Gate code 9988 — leave in side yard");
+assert.ok(pepper!.activityLabels.includes("Canine Fitness"));
+
 
 assert.equal(merged.stats.dogsScheduled, 2);
 assert.equal(merged.stats.adventureHike, 1);

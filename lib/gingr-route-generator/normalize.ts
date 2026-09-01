@@ -15,12 +15,16 @@ export type GingrRouteDog = {
   owner: string;
   imageUrl: string | null;
   activities: GingrRouteActivityId[];
+  /** Subject labels for RSVP-style columns (Canine Fitness, Adventure Hike, etc.). */
   activityLabels: string[];
   pickup: boolean;
   dropoff: boolean;
   scheduledTime: string | null;
   scheduledTimeLabel: string | null;
+  /** Notes visible to the client on the reservation. */
   notes: string | null;
+  /** Booking comments visible to the client — shown as Pick Up Instructions. */
+  pickupInstructions: string | null;
   reservationIds: number[];
   /** Full owner/home postal address when transport is required. */
   homeAddress: string | null;
@@ -187,21 +191,58 @@ function formatTimeLabel(iso: string | null): string | null {
   return `${h12}:${min} ${ampm}`;
 }
 
-function extractNotes(reservation: GingrReservation): string | null {
+function clipText(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(0, max - 1))}…`;
+}
+
+/** Notes marked/stored as visible to the client on the Gingr reservation. */
+function extractClientNotes(reservation: GingrReservation): string | null {
   const notesObj = asRecord(reservation.notes);
   const raw = stripHtml(
     pickString(
+      notesObj.owner_notes,
+      notesObj.client_notes,
+      notesObj.public_notes,
       notesObj.reservation_notes,
+      reservation.owner_notes,
+      reservation.client_notes,
+      reservation.public_notes,
+      reservation.o_notes,
       reservation.reservation_notes,
       reservation.r_notes,
-      reservation.r_instructions,
       reservation.a_notes,
-      reservation.r_comments,
       typeof reservation.notes === "string" ? reservation.notes : null
     )
   );
   if (!raw) return null;
-  return raw.length > 120 ? `${raw.slice(0, 117)}…` : raw;
+  return clipText(raw, 280);
+}
+
+/**
+ * Comments the client enters when booking (visible to them) —
+ * mapped to the Pick Up Instructions column for drivers.
+ */
+function extractPickupInstructions(reservation: GingrReservation): string | null {
+  const notesObj = asRecord(reservation.notes);
+  const raw = stripHtml(
+    pickString(
+      notesObj.comments,
+      notesObj.booking_comments,
+      notesObj.owner_comments,
+      notesObj.instructions,
+      notesObj.pickup_instructions,
+      reservation.r_comments,
+      reservation.comments,
+      reservation.booking_comments,
+      reservation.owner_comments,
+      reservation.r_instructions,
+      reservation.pickup_instructions,
+      reservation.special_instructions
+    )
+  );
+  if (!raw) return null;
+  return clipText(raw, 400);
 }
 
 function animalKey(reservation: GingrReservation): string {
@@ -334,6 +375,7 @@ type Acc = {
   dropoff: boolean;
   scheduledTime: string | null;
   notes: string | null;
+  pickupInstructions: string | null;
   reservationIds: Set<number>;
   hasEligibleActivity: boolean;
   homeStreet1: string | null;
@@ -375,6 +417,7 @@ export function normalizeGingrRouteReservations(
         dropoff: false,
         scheduledTime: null,
         notes: null,
+        pickupInstructions: null,
         reservationIds: new Set(),
         hasEligibleActivity: false,
         homeStreet1: null,
@@ -412,8 +455,6 @@ export function normalizeGingrRouteReservations(
     if (matchGingrRouteActivity(typeName)) {
       const t = extractTimeIso(reservation);
       if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
-      const notes = extractNotes(reservation);
-      if (notes && !acc.notes) acc.notes = notes;
     }
 
     for (const service of services) {
@@ -423,9 +464,15 @@ export function normalizeGingrRouteReservations(
       if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
     }
 
-    if (!acc.notes) {
-      const notes = extractNotes(reservation);
-      if (notes) acc.notes = notes;
+    const clientNotes = extractClientNotes(reservation);
+    if (clientNotes && !acc.notes) acc.notes = clientNotes;
+    const pickupInstructions = extractPickupInstructions(reservation);
+    if (pickupInstructions && !acc.pickupInstructions) {
+      acc.pickupInstructions = pickupInstructions;
+    }
+    // Avoid duplicating the same text across both columns.
+    if (acc.notes && acc.pickupInstructions && acc.notes === acc.pickupInstructions) {
+      acc.notes = null;
     }
 
     const nextAddress = extractHomeAddressFromReservation(reservation);
@@ -470,6 +517,7 @@ export function normalizeGingrRouteReservations(
       scheduledTime: acc.scheduledTime,
       scheduledTimeLabel: formatTimeLabel(acc.scheduledTime),
       notes: acc.notes,
+      pickupInstructions: acc.pickupInstructions,
       reservationIds: Array.from(acc.reservationIds),
       homeAddress: needsTransport ? acc.homeAddress : null,
       homeStreet1: needsTransport ? acc.homeStreet1 : null,
