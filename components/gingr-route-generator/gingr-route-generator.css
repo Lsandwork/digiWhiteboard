@@ -1170,3 +1170,27 @@
   padding: 0.4rem 0.7rem;
   font-size: 0.75rem;
 }
+
+.grg-export-vehicle select {
+  appearance: none;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--grg-border, #d1d5db);
+  border-radius: var(--grg-radius-sm, 8px);
+  background: #fff;
+  color: #111827;
+  font-size: 0.75rem;
+  font-weight: 600;
+  max-width: 11.5rem;
+}
+
+.grg-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

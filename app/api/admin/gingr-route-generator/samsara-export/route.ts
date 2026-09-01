@@ -34,6 +34,7 @@ async function requireGingrRouteAccess(request: Request) {
 
 /**
  * GET /api/admin/gingr-route-generator/samsara-export?date=YYYY-MM-DD
+ * Optional: &vehicle=Van%2001|02|03|05|06 (depot bookends depend on van)
  * Optional: &download=1 to return CSV attachment (default JSON summary + csv text).
  *
  * Uses Digi's exact Samsara bulk-upload headers from lib/route-generator/samsara-csv.ts.
@@ -46,12 +47,14 @@ export async function GET(request: Request) {
   const dateParam = url.searchParams.get("date")?.trim() || todayPacificDateKey();
   const download = url.searchParams.get("download") === "1";
   const refresh = url.searchParams.get("refresh") === "1";
+  const vehicleParam = url.searchParams.get("vehicle")?.trim() || "Van 01";
 
   try {
     const payload = await loadGingrRouteSchedule({ date: dateParam, refresh });
     const result = await buildGingrSamsaraExport({
       date: payload.date,
-      dogs: payload.dogs
+      dogs: payload.dogs,
+      vehicleName: vehicleParam
     });
 
     if (!result.ok) {
