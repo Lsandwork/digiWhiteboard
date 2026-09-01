@@ -944,3 +944,90 @@
 .grg-route-section--skeleton {
   pointer-events: none;
 }
+
+
+.grg-transport-badge-text {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.05;
+  gap: 0.05rem;
+}
+
+.grg-transport-badge-text strong {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.grg-transport-badge-text em {
+  font-style: normal;
+  font-size: 0.55rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.grg-transport-badge--address {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fdba74;
+}
+
+.grg-transport-legend {
+  margin: 0 0 0.65rem;
+  padding: 0 0.15rem;
+  font-size: 0.72rem;
+  color: var(--grg-muted);
+}
+
+.grg-route-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.grg-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid #1f2937;
+  border-radius: var(--grg-radius-sm);
+  background: #fff;
+  color: #111827;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.grg-export-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.grg-export-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.grg-export-status {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  color: #065f46;
+}
+
+.grg-export-warning {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.72rem;
+  color: #9a3412;
+}
+
+@media print {
+  .grg-export-btn,
+  .grg-export-status,
+  .grg-export-warning,
+  .grg-transport-legend {
+    display: none !important;
+  }
+}

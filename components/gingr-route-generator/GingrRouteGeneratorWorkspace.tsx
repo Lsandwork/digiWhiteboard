@@ -11,6 +11,7 @@ import {
   MapPin,
   Mountain,
   PawPrint,
+  Download,
   Printer,
   RefreshCw,
   Search,
@@ -105,6 +106,10 @@ export function GingrRouteGeneratorWorkspace() {
   const [dropoffOnly, setDropoffOnly] = useState(false);
   const [activityChip, setActivityChip] = useState<GingrRouteActivityId | "all">("all");
 
+  const [exportingSamsara, setExportingSamsara] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportWarning, setExportWarning] = useState<string | null>(null);
+
   const requestSeq = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   const inFlightRef = useRef(false);
@@ -184,17 +189,18 @@ export function GingrRouteGeneratorWorkspace() {
       activityId: GingrRouteActivityId;
       pickups: GingrRouteDog[];
       dropoffs: GingrRouteDog[];
-      selfDropoffs: GingrRouteDog[];
     }> = [];
 
     for (const activity of GINGR_ROUTE_ACTIVITIES) {
       const inActivity = filteredDogs.filter((d) => d.activities.includes(activity.id));
-      if (!inActivity.length) continue;
+      const pickups = inActivity.filter((d) => d.pickup);
+      const dropoffs = inActivity.filter((d) => d.dropoff);
+      // Route Plan shows FitDog transportation stops only — owner-transport dogs are omitted.
+      if (!pickups.length && !dropoffs.length) continue;
       groups.push({
         activityId: activity.id,
-        pickups: inActivity.filter((d) => d.pickup),
-        dropoffs: inActivity.filter((d) => d.dropoff),
-        selfDropoffs: inActivity.filter((d) => !d.pickup && !d.dropoff)
+        pickups,
+        dropoffs
       });
     }
     return groups;
@@ -214,6 +220,76 @@ export function GingrRouteGeneratorWorkspace() {
 
   function printRoute() {
     window.print();
+  }
+
+  const exportEligibleCount = useMemo(
+    () => filteredDogs.filter((d) => d.pickup || d.dropoff).length,
+    [filteredDogs]
+  );
+
+  const missingAddressDogs = useMemo(
+    () =>
+      filteredDogs.filter(
+        (d) => (d.pickup || d.dropoff) && d.addressStatus && d.addressStatus !== "ok"
+      ),
+    [filteredDogs]
+  );
+
+  async function exportSamsaraCsv() {
+    if (exportingSamsara || exportEligibleCount === 0) return;
+    setExportingSamsara(true);
+    setExportMessage(null);
+    setExportWarning(null);
+    try {
+      const params = new URLSearchParams({ date: dateKey });
+      const res = await fetch(`/api/admin/gingr-route-generator/samsara-export?${params.toString()}`, {
+        credentials: "same-origin",
+        cache: "no-store"
+      });
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        csv?: string;
+        summary?: {
+          fileName: string;
+          stopCount: number;
+          pickupCount: number;
+          dropoffCount: number;
+          excludedMissingAddress: number;
+        };
+        missingAddressStops?: Array<{ dogName: string; ownerName: string; kind: string }>;
+      };
+      if (!res.ok || !data.ok || !data.csv || !data.summary) {
+        const missing = data.missingAddressStops?.length
+          ? ` Missing addresses: ${data.missingAddressStops
+              .map((s) => `${s.dogName} (${s.kind.replace("_", " ")})`)
+              .join(", ")}.`
+          : "";
+        setExportWarning((data.error || "Unable to export Samsara CSV.") + missing);
+        return;
+      }
+      const blob = new Blob([data.csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.summary.fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setExportMessage(
+        `Samsara CSV ready — ${data.summary.stopCount} transportation stops (${data.summary.pickupCount} pickups, ${data.summary.dropoffCount} drop-offs).`
+      );
+      if (data.summary.excludedMissingAddress > 0) {
+        setExportWarning(
+          `${data.summary.excludedMissingAddress} stop(s) excluded due to missing addresses.`
+        );
+      }
+    } catch {
+      setExportWarning("Unable to export Samsara CSV. Please try again.");
+    } finally {
+      setExportingSamsara(false);
+    }
   }
 
   const stats = payload?.stats;
@@ -422,6 +498,9 @@ export function GingrRouteGeneratorWorkspace() {
               ))}
             </div>
 
+            <p className="grg-transport-legend">
+              Only dogs marked Pick Up or Drop Off require a FitDog transportation stop.
+            </p>
             <div className="grg-dog-list">
               {loadState === "loading" && !payload
                 ? Array.from({ length: 6 }).map((_, i) => (
@@ -458,15 +537,26 @@ export function GingrRouteGeneratorWorkspace() {
                     </div>
                     <div className="grg-dog-transport">
                       {dog.pickup ? (
-                        <span className="grg-transport-badge grg-transport-badge--pickup">
+                        <span className="grg-transport-badge grg-transport-badge--pickup" title="FitDog driver picks up from home">
                           <Truck size={12} />
-                          Pick Up
+                          <span className="grg-transport-badge-text">
+                            <strong>PICK UP</strong>
+                            <em>From Home</em>
+                          </span>
                         </span>
                       ) : null}
                       {dog.dropoff ? (
-                        <span className="grg-transport-badge grg-transport-badge--dropoff">
+                        <span className="grg-transport-badge grg-transport-badge--dropoff" title="FitDog driver drops off to home">
                           <MapPin size={12} />
-                          Drop Off
+                          <span className="grg-transport-badge-text">
+                            <strong>DROP OFF</strong>
+                            <em>To Home</em>
+                          </span>
+                        </span>
+                      ) : null}
+                      {(dog.pickup || dog.dropoff) && dog.addressStatus !== "ok" ? (
+                        <span className="grg-transport-badge grg-transport-badge--address" title="Customer home address required for Samsara export">
+                          Address Required
                         </span>
                       ) : null}
                     </div>
@@ -515,8 +605,7 @@ export function GingrRouteGeneratorWorkspace() {
                 const count =
                   new Set([
                     ...group.pickups.map((d) => d.id),
-                    ...group.dropoffs.map((d) => d.id),
-                    ...group.selfDropoffs.map((d) => d.id)
+                    ...group.dropoffs.map((d) => d.id)
                   ]).size;
                 return (
                   <section key={group.activityId} className="grg-route-section">
@@ -534,7 +623,7 @@ export function GingrRouteGeneratorWorkspace() {
                       <div className="grg-route-group">
                         <div className="grg-route-group-label">
                           <Truck size={12} />
-                          PICK UP
+                          PICK UP (FROM HOME)
                         </div>
                         <ol>
                           {group.pickups.map((dog, index) => (
@@ -553,31 +642,11 @@ export function GingrRouteGeneratorWorkspace() {
                       </div>
                     ) : null}
 
-                    {group.selfDropoffs.length ? (
-                      <div className="grg-route-group">
-                        <div className="grg-route-group-label">SELF DROP-OFF</div>
-                        <ol>
-                          {group.selfDropoffs.map((dog, index) => (
-                            <li key={`self-${dog.id}`}>
-                              <span className="grg-route-index">{index + 1}.</span>
-                              <div>
-                                <div className="grg-route-dog-name">{dog.name}</div>
-                                <div className="grg-route-dog-owner">{dog.owner}</div>
-                                {dog.scheduledTimeLabel ? (
-                                  <div className="grg-route-dog-time">{dog.scheduledTimeLabel}</div>
-                                ) : null}
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    ) : null}
-
                     {group.dropoffs.length ? (
                       <div className="grg-route-group">
                         <div className="grg-route-group-label">
                           <MapPin size={12} />
-                          DROP OFF AFTER ACTIVITY
+                          DROP OFF (TO HOME)
                         </div>
                         <ol>
                           {group.dropoffs.map((dog, index) => (
@@ -604,17 +673,49 @@ export function GingrRouteGeneratorWorkspace() {
               <div className="grg-route-totals">
                 <div>
                   <Truck size={14} />
-                  Total Pick Ups <strong>{totalPickups}</strong>
+                  Pick Ups <strong>{totalPickups}</strong>
                 </div>
                 <div>
                   <MapPin size={14} />
-                  Total Drop Offs <strong>{totalDropoffs}</strong>
+                  Drop Offs <strong>{totalDropoffs}</strong>
                 </div>
               </div>
-              <button type="button" className="grg-print-btn" onClick={printRoute}>
-                <Printer size={15} />
-                Print Route
-              </button>
+              <div className="grg-route-actions">
+                <button
+                  type="button"
+                  className="grg-export-btn"
+                  onClick={() => void exportSamsaraCsv()}
+                  disabled={exportingSamsara || exportEligibleCount === 0}
+                  title={
+                    exportEligibleCount === 0
+                      ? "No FitDog transportation stops to export"
+                      : "Download Samsara bulk-upload CSV for home transportation stops"
+                  }
+                >
+                  <Download size={15} />
+                  {exportingSamsara ? "Preparing…" : "Export for Samsara"}
+                </button>
+                <button type="button" className="grg-print-btn" onClick={printRoute}>
+                  <Printer size={15} />
+                  Print Route
+                </button>
+              </div>
+              {exportMessage ? <p className="grg-export-status" role="status">{exportMessage}</p> : null}
+              {exportWarning ? <p className="grg-export-warning" role="status">{exportWarning}</p> : null}
+              {missingAddressDogs.length ? (
+                <p className="grg-export-warning" role="status">
+                  Address missing:{" "}
+                  {missingAddressDogs
+                    .map((d) => {
+                      const kinds = [
+                        d.pickup ? "Pick Up From Home" : null,
+                        d.dropoff ? "Drop Off To Home" : null
+                      ].filter(Boolean);
+                      return `${d.name} — ${kinds.join(" & ")}`;
+                    })
+                    .join("; ")}
+                </p>
+              ) : null}
             </footer>
           </aside>
         </div>
