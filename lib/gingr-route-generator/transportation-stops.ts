@@ -75,7 +75,9 @@ function makeStop(
     kind,
     activityLabels: [...dog.activityLabels],
     scheduledTime: dog.scheduledTime,
-    notes: dog.notes,
+    notes: [dog.pickupInstructions ? `Pick Up Instructions: ${dog.pickupInstructions}` : null, dog.notes]
+      .filter(Boolean)
+      .join(" | ") || null,
     homeAddress: dog.homeAddress,
     homeStreet1: dog.homeStreet1,
     homeStreet2: dog.homeStreet2,
@@ -89,7 +91,12 @@ function makeStop(
 function mergeActivityLabels(target: TransportationStop, incoming: TransportationStop) {
   const set = new Set([...target.activityLabels, ...incoming.activityLabels]);
   target.activityLabels = Array.from(set);
-  if (!target.notes && incoming.notes) target.notes = incoming.notes;
+  if (incoming.notes) {
+    if (!target.notes) target.notes = incoming.notes;
+    else if (!target.notes.includes(incoming.notes)) {
+      target.notes = `${target.notes} | ${incoming.notes}`;
+    }
+  }
   if (!target.scheduledTime && incoming.scheduledTime) {
     target.scheduledTime = incoming.scheduledTime;
   }
