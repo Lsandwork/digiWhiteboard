@@ -14,6 +14,7 @@ import {
 } from "@/lib/route-generator/geocode";
 import {
   DEFAULT_FITDOG_LOCATIONS,
+  resolveRouteEndpoints,
   type FitdogBaseKey
 } from "@/lib/route-generator/locations";
 import {
@@ -52,34 +53,32 @@ export function vanKeyFromSamsaraVehicleName(vehicleName: string): string {
 }
 
 /**
- * Gingr home-transport depot bookends (reuses Digi Hub/Club coordinates).
+ * Gingr home-transport depot bookends (reuses Digi Hub/Club/trail locations).
  *
  * Rules:
- * - Van 1 / 2 / 3 drop-offs: last stop is the Hub
+ * - Van 1 / 2 / 3 pickups: end at Kenneth Hahn Trail (Culver City)
+ * - Van 3 pickups on Mon/Wed/Fri: end at Huntington Dog Beach
+ * - Van 1 / 2 / 3 drop-offs: end at Fitdog Westwood Hub (only Hub bookend)
  * - Van 5 / 6: always start and end at Fitdog Club (pickup + drop-off)
- * - Van 1 / 2 / 3 pickups: end at Club (dogs delivered for activities)
+ *
+ * Start bases follow Digi’s outing schedule (Hub → trail for pickup;
+ * trail → Hub for drop-off) via resolveRouteEndpoints.
  */
 export function gingrDepotPlan(
   vanKey: string,
-  direction: "pickup" | "dropoff"
+  direction: "pickup" | "dropoff",
+  operatingDate?: string | null
 ): { start: FitdogBaseKey | null; end: FitdogBaseKey | null } {
   if (vanKey === "van_5" || vanKey === "van_6") {
     return { start: "club", end: "club" };
   }
 
-  if (vanKey === "van_1" || vanKey === "van_2" || vanKey === "van_3") {
-    if (direction === "dropoff") {
-      // Leave Club with dogs → home drop-offs → return to Hub
-      return { start: "club", end: "hub" };
-    }
-    // Morning home pickups → deliver dogs to Club
-    return { start: null, end: "club" };
-  }
-
-  // Safe fallback matches outing-van drop-off / pickup behavior
-  return direction === "dropoff"
-    ? { start: "club", end: "hub" }
-    : { start: null, end: "club" };
+  const resolved = resolveRouteEndpoints({
+    vanKey,
+    direction,
+    operatingDate
+  });
+  return { start: resolved.startKey, end: resolved.endKey };
 }
 
 export type MissingAddressStopInfo = {
@@ -129,7 +128,27 @@ export type GeocodeLookup = (addresses: string[]) => Promise<Map<string, Geocode
 
 const DEFAULT_VEHICLE_INPUT = "Van 1";
 
-const FACILITY_STOP_NAME_RE = /Fitdog Club|Fitdog Westwood Hub|Westwood Hub/i;
+const FACILITY_STOP_NAME_RE =
+  /Fitdog Club|Fitdog Westwood Hub|Westwood Hub|Kenneth Hahn|Huntington Dog Beach|Huntington/i;
+
+const FACILITY_FALLBACKS: Record<FitdogBaseKey, { name: string; address: string }> = {
+  hub: {
+    name: "Fitdog Westwood Hub",
+    address: "2140 Westwood Blvd, West Los Angeles, CA 90025"
+  },
+  club: {
+    name: "Fitdog Club",
+    address: "1712 21st St, Santa Monica, CA 90404"
+  },
+  kenneth_hahn: {
+    name: "Kenneth Hahn Trail",
+    address: "Kenneth Hahn State Recreation Area, Los Angeles, CA 90008"
+  },
+  huntington: {
+    name: "Huntington Dog Beach",
+    address: "Huntington Dog Beach, Huntington Beach, CA 92648"
+  }
+};
 
 function exportFileName(date: string): string {
   return `fitdog-samsara-routes-${date}.csv`;
@@ -137,14 +156,10 @@ function exportFileName(date: string): string {
 
 function facilityDepot(baseKey: FitdogBaseKey) {
   const loc = DEFAULT_FITDOG_LOCATIONS[baseKey];
-  const fallbackName = baseKey === "hub" ? "Fitdog Westwood Hub" : "Fitdog Club";
-  const fallbackAddress =
-    baseKey === "hub"
-      ? "2140 Westwood Blvd, West Los Angeles, CA 90025"
-      : "1712 21st St, Santa Monica, CA 90404";
+  const fallback = FACILITY_FALLBACKS[baseKey];
   return {
-    name: sanitizeSamsaraText(loc.name) || fallbackName,
-    address: sanitizeSamsaraText(loc.address) || fallbackAddress,
+    name: sanitizeSamsaraText(loc.name) || fallback.name,
+    address: sanitizeSamsaraText(loc.address) || fallback.address,
     latitude: formatSamsaraCoordinate(loc.latitude),
     longitude: formatSamsaraCoordinate(loc.longitude)
   };
@@ -155,7 +170,8 @@ function facilityNotes(
   role: "start" | "end",
   direction: "pickup" | "dropoff"
 ): string {
-  const label = baseKey === "hub" ? "Fitdog Westwood Hub" : "Fitdog Club";
+  const label =
+    sanitizeSamsaraText(DEFAULT_FITDOG_LOCATIONS[baseKey].name) || FACILITY_FALLBACKS[baseKey].name;
   if (role === "start") {
     return sanitizeSamsaraNotes(
       direction === "dropoff"
@@ -164,6 +180,9 @@ function facilityNotes(
     );
   }
   if (direction === "pickup") {
+    if (baseKey === "kenneth_hahn" || baseKey === "huntington") {
+      return sanitizeSamsaraNotes(`END: Deliver dogs to ${label} after home pickups.`);
+    }
     return sanitizeSamsaraNotes(
       baseKey === "club"
         ? `END: Return dogs to ${label} after home pickups.`
@@ -233,6 +252,7 @@ function emptySummary(
  * Map transportation stops → Digi ExportStopRow[] using the exact Samsara schema.
  *
  * Depot bookends (van-aware):
+ * - Van 1/2/3 pickups end at Kenneth Hahn (Van 3 Mon/Wed/Fri → Huntington)
  * - Van 1/2/3 drop-offs end at the Hub
  * - Van 5/6 always start and end at Fitdog Club
  */
@@ -256,7 +276,7 @@ export function mapTransportationStopsToExportRows(params: {
   ) => {
     if (!waveStops.length) return;
 
-    const plan = gingrDepotPlan(vanKey, direction);
+    const plan = gingrDepotPlan(vanKey, direction, params.date);
     const routeName = sanitizeSamsaraText(
       buildRouteName({
         date: params.date,

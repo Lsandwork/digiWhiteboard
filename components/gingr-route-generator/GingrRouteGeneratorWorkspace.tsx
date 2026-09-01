@@ -688,11 +688,11 @@ export function GingrRouteGeneratorWorkspace() {
                     value={exportVehicle}
                     onChange={(e) => setExportVehicle(e.target.value)}
                     aria-label="Samsara van for export"
-                    title="Van 1–3 drop-offs end at Hub. Van 5–6 start and end at Club."
+                    title="Van 1–3: pickups end at Kenneth Hahn (Van 3 Mon/Wed/Fri → Huntington); drop-offs end at Hub. Van 5–6: Club start/end."
                   >
-                    <option value="Van 01">Van 01 (ends at Hub)</option>
-                    <option value="Van 02">Van 02 (ends at Hub)</option>
-                    <option value="Van 03">Van 03 (ends at Hub)</option>
+                    <option value="Van 01">Van 01 (Hahn / Hub)</option>
+                    <option value="Van 02">Van 02 (Hahn / Hub)</option>
+                    <option value="Van 03">Van 03 (Beach·Hahn / Hub)</option>
                     <option value="Van 05">Van 05 (Club start/end)</option>
                     <option value="Van 06">Van 06 (Club start/end)</option>
                   </select>
