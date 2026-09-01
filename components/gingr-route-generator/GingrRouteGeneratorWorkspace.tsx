@@ -109,6 +109,7 @@ export function GingrRouteGeneratorWorkspace() {
   const [exportingSamsara, setExportingSamsara] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportWarning, setExportWarning] = useState<string | null>(null);
+  const [exportVehicle, setExportVehicle] = useState("Van 01");
 
   const requestSeq = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -241,7 +242,7 @@ export function GingrRouteGeneratorWorkspace() {
     setExportMessage(null);
     setExportWarning(null);
     try {
-      const params = new URLSearchParams({ date: dateKey });
+      const params = new URLSearchParams({ date: dateKey, vehicle: exportVehicle });
       const res = await fetch(`/api/admin/gingr-route-generator/samsara-export?${params.toString()}`, {
         credentials: "same-origin",
         cache: "no-store"
@@ -681,6 +682,21 @@ export function GingrRouteGeneratorWorkspace() {
                 </div>
               </div>
               <div className="grg-route-actions">
+                <label className="grg-export-vehicle">
+                  <span className="grg-sr-only">Samsara van</span>
+                  <select
+                    value={exportVehicle}
+                    onChange={(e) => setExportVehicle(e.target.value)}
+                    aria-label="Samsara van for export"
+                    title="Van 1–3 drop-offs end at Hub. Van 5–6 start and end at Club."
+                  >
+                    <option value="Van 01">Van 01 (ends at Hub)</option>
+                    <option value="Van 02">Van 02 (ends at Hub)</option>
+                    <option value="Van 03">Van 03 (ends at Hub)</option>
+                    <option value="Van 05">Van 05 (Club start/end)</option>
+                    <option value="Van 06">Van 06 (Club start/end)</option>
+                  </select>
+                </label>
                 <button
                   type="button"
                   className="grg-export-btn"
@@ -689,7 +705,7 @@ export function GingrRouteGeneratorWorkspace() {
                   title={
                     exportEligibleCount === 0
                       ? "No FitDog transportation stops to export"
-                      : "Download Samsara bulk-upload CSV for home transportation stops"
+                      : `Download Samsara CSV for ${exportVehicle}`
                   }
                 >
                   <Download size={15} />

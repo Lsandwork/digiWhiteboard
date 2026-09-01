@@ -12,7 +12,10 @@ import {
   isGeocodingConfigured,
   type GeocodeResult
 } from "@/lib/route-generator/geocode";
-import { DEFAULT_FITDOG_LOCATIONS } from "@/lib/route-generator/locations";
+import {
+  DEFAULT_FITDOG_LOCATIONS,
+  type FitdogBaseKey
+} from "@/lib/route-generator/locations";
 import {
   SAMSARA_BULK_UPLOAD_HEADERS,
   buildCsv,
@@ -38,6 +41,47 @@ import {
 export const GINGR_SAMSARA_SCHEMA_SOURCE =
   "lib/route-generator/samsara-csv.ts (SAMSARA_BULK_UPLOAD_HEADERS) — FitDog Digi Route Generator production bulk-upload schema";
 
+/** Convert Samsara vehicle label ("Van 01") → Digi van key ("van_1"). */
+export function vanKeyFromSamsaraVehicleName(vehicleName: string): string {
+  const normalized = normalizeSamsaraVehicleName(vehicleName);
+  const match = normalized.match(/van\s*0*([1-9]\d*)/i);
+  if (!match) return "van_1";
+  const n = Number(match[1]);
+  if (n === 4) throw new Error("Van 4 must never appear in Samsara exports.");
+  return `van_${n}`;
+}
+
+/**
+ * Gingr home-transport depot bookends (reuses Digi Hub/Club coordinates).
+ *
+ * Rules:
+ * - Van 1 / 2 / 3 drop-offs: last stop is the Hub
+ * - Van 5 / 6: always start and end at Fitdog Club (pickup + drop-off)
+ * - Van 1 / 2 / 3 pickups: end at Club (dogs delivered for activities)
+ */
+export function gingrDepotPlan(
+  vanKey: string,
+  direction: "pickup" | "dropoff"
+): { start: FitdogBaseKey | null; end: FitdogBaseKey | null } {
+  if (vanKey === "van_5" || vanKey === "van_6") {
+    return { start: "club", end: "club" };
+  }
+
+  if (vanKey === "van_1" || vanKey === "van_2" || vanKey === "van_3") {
+    if (direction === "dropoff") {
+      // Leave Club with dogs → home drop-offs → return to Hub
+      return { start: "club", end: "hub" };
+    }
+    // Morning home pickups → deliver dogs to Club
+    return { start: null, end: "club" };
+  }
+
+  // Safe fallback matches outing-van drop-off / pickup behavior
+  return direction === "dropoff"
+    ? { start: "club", end: "hub" }
+    : { start: null, end: "club" };
+}
+
 export type MissingAddressStopInfo = {
   dogName: string;
   ownerName: string;
@@ -47,7 +91,7 @@ export type MissingAddressStopInfo = {
 export type GingrSamsaraExportSummary = {
   date: string;
   fileName: string;
-  /** Customer home stops only (excludes Club bookends). */
+  /** Customer home stops only (excludes Club/Hub facility bookends). */
   stopCount: number;
   pickupCount: number;
   dropoffCount: number;
@@ -85,18 +129,52 @@ export type GeocodeLookup = (addresses: string[]) => Promise<Map<string, Geocode
 
 const DEFAULT_VEHICLE_INPUT = "Van 1";
 
+const FACILITY_STOP_NAME_RE = /Fitdog Club|Fitdog Westwood Hub|Westwood Hub/i;
+
 function exportFileName(date: string): string {
   return `fitdog-samsara-routes-${date}.csv`;
 }
 
-function clubDepot() {
-  const club = DEFAULT_FITDOG_LOCATIONS.club;
+function facilityDepot(baseKey: FitdogBaseKey) {
+  const loc = DEFAULT_FITDOG_LOCATIONS[baseKey];
+  const fallbackName = baseKey === "hub" ? "Fitdog Westwood Hub" : "Fitdog Club";
+  const fallbackAddress =
+    baseKey === "hub"
+      ? "2140 Westwood Blvd, West Los Angeles, CA 90025"
+      : "1712 21st St, Santa Monica, CA 90404";
   return {
-    name: sanitizeSamsaraText(club.name) || "Fitdog Club",
-    address: sanitizeSamsaraText(club.address) || "1712 21st St, Santa Monica, CA 90404",
-    latitude: formatSamsaraCoordinate(club.latitude),
-    longitude: formatSamsaraCoordinate(club.longitude)
+    name: sanitizeSamsaraText(loc.name) || fallbackName,
+    address: sanitizeSamsaraText(loc.address) || fallbackAddress,
+    latitude: formatSamsaraCoordinate(loc.latitude),
+    longitude: formatSamsaraCoordinate(loc.longitude)
   };
+}
+
+function facilityNotes(
+  baseKey: FitdogBaseKey,
+  role: "start" | "end",
+  direction: "pickup" | "dropoff"
+): string {
+  const label = baseKey === "hub" ? "Fitdog Westwood Hub" : "Fitdog Club";
+  if (role === "start") {
+    return sanitizeSamsaraNotes(
+      direction === "dropoff"
+        ? `START: Vehicle is expected to already be at ${label} when the drop-off route begins.`
+        : `START: Vehicle is expected to already be at ${label} when the pickup route begins.`
+    );
+  }
+  if (direction === "pickup") {
+    return sanitizeSamsaraNotes(
+      baseKey === "club"
+        ? `END: Return dogs to ${label} after home pickups.`
+        : `END: Return to ${label} after home pickups.`
+    );
+  }
+  return sanitizeSamsaraNotes(`END: Return to ${label} after home drop-offs.`);
+}
+
+export function isFacilityStopName(stopName: string): boolean {
+  return FACILITY_STOP_NAME_RE.test(stopName);
 }
 
 function resolveStopAddress(stop: TransportationStop): string | null {
@@ -153,8 +231,10 @@ function emptySummary(
 
 /**
  * Map transportation stops → Digi ExportStopRow[] using the exact Samsara schema.
- * Pickups and dropoffs become separate routes, each bookended with Fitdog Club
- * so Samsara receives ≥2 stops per route.
+ *
+ * Depot bookends (van-aware):
+ * - Van 1/2/3 drop-offs end at the Hub
+ * - Van 5/6 always start and end at Fitdog Club
  */
 export function mapTransportationStopsToExportRows(params: {
   date: string;
@@ -163,7 +243,7 @@ export function mapTransportationStopsToExportRows(params: {
   vehicleName?: string;
 }): { rows: ExportStopRow[]; skippedGeocode: TransportationStop[] } {
   const vehicleName = normalizeSamsaraVehicleName(params.vehicleName || DEFAULT_VEHICLE_INPUT);
-  const depot = clubDepot();
+  const vanKey = vanKeyFromSamsaraVehicleName(vehicleName);
   const skippedGeocode: TransportationStop[] = [];
   const rows: ExportStopRow[] = [];
 
@@ -176,6 +256,7 @@ export function mapTransportationStopsToExportRows(params: {
   ) => {
     if (!waveStops.length) return;
 
+    const plan = gingrDepotPlan(vanKey, direction);
     const routeName = sanitizeSamsaraText(
       buildRouteName({
         date: params.date,
@@ -185,8 +266,8 @@ export function mapTransportationStopsToExportRows(params: {
     );
     const routeNotes = sanitizeSamsaraNotes(
       direction === "pickup"
-        ? "Gingr Route Generator | AM home pickups | vehicleAlreadyAtFirstStop=true"
-        : "Gingr Route Generator | PM home drop-offs | vehicleAlreadyAtFirstStop=true"
+        ? `Gingr Route Generator | AM home pickups | ${vanKey} | vehicleAlreadyAtFirstStop=true`
+        : `Gingr Route Generator | PM home drop-offs | ${vanKey} | vehicleAlreadyAtFirstStop=true`
     );
 
     const customerRows: Array<{
@@ -219,12 +300,11 @@ export function mapTransportationStopsToExportRows(params: {
     };
     const sequenced: SeqItem[] = [];
 
-    if (direction === "dropoff") {
+    if (plan.start) {
+      const depot = facilityDepot(plan.start);
       sequenced.push({
         stopName: depot.name,
-        notes: sanitizeSamsaraNotes(
-          "START: Vehicle is expected to already be at Fitdog Club when the drop-off route begins."
-        ),
+        notes: facilityNotes(plan.start, "start", direction),
         address: depot.address,
         latitude: depot.latitude,
         longitude: depot.longitude
@@ -241,16 +321,18 @@ export function mapTransportationStopsToExportRows(params: {
       });
     }
 
-    if (direction === "pickup") {
+    if (plan.end) {
+      const depot = facilityDepot(plan.end);
       sequenced.push({
         stopName: depot.name,
-        notes: sanitizeSamsaraNotes("END: Return dogs to Fitdog Club after home pickups."),
+        notes: facilityNotes(plan.end, "end", direction),
         address: depot.address,
         latitude: depot.latitude,
         longitude: depot.longitude
       });
     }
 
+    // Samsara routes need ≥2 stops; if only one customer stop and no bookend, fail closed later.
     sequenced.forEach((item, index) => {
       const schedule = synthesizeStopSchedule({
         operatingDate: params.date,
@@ -385,7 +467,7 @@ export async function buildGingrSamsaraExport(params: {
     };
   }
 
-  const customerStopCount = rows.filter((r) => !/Fitdog Club/i.test(r.stopName)).length;
+  const customerStopCount = rows.filter((r) => !isFacilityStopName(r.stopName)).length;
   const routeCount = new Set(rows.map((r) => r.routeName)).size;
 
   return {

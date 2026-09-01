@@ -14,7 +14,10 @@ import {
 import { normalizeGingrRouteReservations } from "../lib/gingr-route-generator/normalize";
 import {
   GINGR_SAMSARA_SCHEMA_SOURCE,
-  buildGingrSamsaraCsvFromStops
+  buildGingrSamsaraCsvFromStops,
+  gingrDepotPlan,
+  isFacilityStopName,
+  vanKeyFromSamsaraVehicleName
 } from "../lib/gingr-route-generator/samsara-export";
 import {
   buildTransportationStops,
@@ -67,7 +70,7 @@ function makeStop(
 }
 
 function customerRows(rows: Array<{ stopName: string }>) {
-  return rows.filter((r) => !/Fitdog Club/i.test(r.stopName));
+  return rows.filter((r) => !isFacilityStopName(r.stopName));
 }
 
 function ownerWithAddress(extra?: Record<string, unknown>) {
@@ -333,5 +336,50 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
   // Driver username blank when assigning by vehicle
   assert.equal(data[1], "");
 }
+
+
+// --- Van depot bookends ---
+assert.equal(vanKeyFromSamsaraVehicleName("Van 01"), "van_1");
+assert.equal(vanKeyFromSamsaraVehicleName("Van 5"), "van_5");
+assert.deepEqual(gingrDepotPlan("van_1", "dropoff"), { start: "club", end: "hub" });
+assert.deepEqual(gingrDepotPlan("van_2", "dropoff"), { start: "club", end: "hub" });
+assert.deepEqual(gingrDepotPlan("van_3", "dropoff"), { start: "club", end: "hub" });
+assert.deepEqual(gingrDepotPlan("van_5", "pickup"), { start: "club", end: "club" });
+assert.deepEqual(gingrDepotPlan("van_5", "dropoff"), { start: "club", end: "club" });
+assert.deepEqual(gingrDepotPlan("van_6", "pickup"), { start: "club", end: "club" });
+assert.deepEqual(gingrDepotPlan("van_6", "dropoff"), { start: "club", end: "club" });
+
+{
+  const address = "123 Main St, Santa Monica, CA 90401, USA";
+  const stops = [
+    makeStop({ dogId: "v", dogName: "Charlie", kind: "PICK_UP", homeAddress: address }),
+    makeStop({ dogId: "v", dogName: "Charlie", kind: "DROP_OFF", homeAddress: address })
+  ];
+  const geocoded = new Map([[address, geoFor(address)]]);
+
+  // Van 1/2/3 drop-offs end at Hub
+  for (const van of ["Van 01", "Van 02", "Van 03"] as const) {
+    const built = buildGingrSamsaraCsvFromStops({ date, stops, geocoded, vehicleName: van });
+    assert.equal(built.validation.ok, true, van + " validation");
+    const drop = built.rows.filter((r) => /Drop/i.test(r.routeName));
+    assert.ok(drop.length >= 2, van + " dropoff stops");
+    assert.match(drop[0]!.stopName, /Fitdog Club/i, van + " dropoff starts at Club");
+    assert.match(drop[drop.length - 1]!.stopName, /Hub/i, van + " dropoff ends at Hub");
+  }
+
+  // Van 5/6 always start and end at Club
+  for (const van of ["Van 05", "Van 06"] as const) {
+    const built = buildGingrSamsaraCsvFromStops({ date, stops, geocoded, vehicleName: van });
+    assert.equal(built.validation.ok, true, van + " validation");
+    const pick = built.rows.filter((r) => /Pickup|Pick-Up|Pick Up/i.test(r.routeName));
+    const drop = built.rows.filter((r) => /Drop/i.test(r.routeName));
+    assert.match(pick[0]!.stopName, /Fitdog Club/i, van + " pickup starts Club");
+    assert.match(pick[pick.length - 1]!.stopName, /Fitdog Club/i, van + " pickup ends Club");
+    assert.match(drop[0]!.stopName, /Fitdog Club/i, van + " dropoff starts Club");
+    assert.match(drop[drop.length - 1]!.stopName, /Fitdog Club/i, van + " dropoff ends Club");
+    assert.ok(!drop.some((r) => /Hub/i.test(r.stopName)), van + " must not visit Hub");
+  }
+}
+
 
 console.log("test-gingr-samsara-export: all assertions passed");
