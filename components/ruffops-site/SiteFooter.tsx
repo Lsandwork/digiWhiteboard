@@ -1,148 +1,65 @@
-import { Hexagon, PawPrint } from "lucide-react";
-import { SITE } from "@/lib/ruffops-site/config";
+import { Cloud, MonitorPlay, Megaphone, Users } from "lucide-react";
+import { BrandLogo } from "@/components/ruffops-site/BrandLogo";
 import { SiteLink } from "@/components/ruffops-site/SiteLink";
+import { FOOTER_PRODUCT_LINKS, SITE } from "@/lib/ruffops-site/config";
+
+const featureIcons = [Cloud, MonitorPlay, Megaphone, Users] as const;
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
+
   return (
-    <footer className="border-t border-ro-line bg-ro-950">
-      <div className="container-page grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-6">
-        <div className="lg:col-span-2">
-          <SiteLink href="/" className="inline-flex items-center gap-2.5" aria-label={`${SITE.name} home`}>
-            <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ro-line bg-ro-700/70">
-              <Hexagon className="absolute h-9 w-9 text-ro-electric/30" strokeWidth={1.2} />
-              <PawPrint className="h-4 w-4 text-ro-accent" />
-            </span>
-            <span className="flex flex-col leading-none">
-              <span className="text-sm font-bold text-white">{SITE.name}</span>
-              <span className="mt-1 text-[10px] font-medium uppercase tracking-[0.22em] text-ro-electric/80">
-                {SITE.lockup}
-              </span>
-            </span>
-          </SiteLink>
-          <p className="mt-4 max-w-xs text-sm text-slate-400">{SITE.tagline}</p>
-          <p className="mt-3 text-sm text-slate-400">{SITE.serviceArea}</p>
-          <p className="mt-4 space-x-2 text-sm">
-            <a className="text-ro-accent-soft hover:underline" href={SITE.phoneHref}>
-              {SITE.phoneDisplay}
-            </a>
-            <span className="text-slate-600">·</span>
-            <a className="text-ro-accent-soft hover:underline" href={`mailto:${SITE.email}`}>
-              {SITE.email}
-            </a>
-          </p>
-        </div>
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Product</h2>
-          <ul className="mt-4 space-y-2 text-sm text-slate-300">
-            <li>
-              <SiteLink className="hover:text-white" href="/ai-platform">
-                Operations Platform
+    <footer className="ro-footer">
+      <div className="ro-footer-features">
+        <div className="container-page grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {FOOTER_PRODUCT_LINKS.map((link, index) => {
+            const Icon = featureIcons[index] ?? Cloud;
+            return (
+              <SiteLink key={link.href} href={link.href} className="ro-footer-feature">
+                <span className="ro-footer-feature-icon">
+                  <Icon className="h-4 w-4" aria-hidden />
+                </span>
+                <span>{link.label}</span>
               </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/services">
-                Custom Kiosk Whiteboards
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/attune">
-                Attune™
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/contact">
-                Book a Demo
-              </SiteLink>
-            </li>
-          </ul>
-        </div>
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Whiteboards</h2>
-          <ul className="mt-4 space-y-2 text-sm text-slate-300">
-            <li>
-              <SiteLink className="hover:text-white" href="/services">
-                Lobby TV Boards
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/services">
-                Staff Department Boards
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/services">
-                Brand-Matched Themes
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/contact">
-                Request a Mockup
-              </SiteLink>
-            </li>
-          </ul>
-        </div>
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Industries</h2>
-          <ul className="mt-4 space-y-2 text-sm text-slate-300">
-            <li>
-              <SiteLink className="hover:text-white" href="/industries">
-                Dog Daycares
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/industries">
-                Dog Boarding
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/industries">
-                Multi-Service Facilities
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/industries">
-                All Industries
-              </SiteLink>
-            </li>
-          </ul>
-        </div>
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Company</h2>
-          <ul className="mt-4 space-y-2 text-sm text-slate-300">
-            <li>
-              <SiteLink className="hover:text-white" href="/about">
-                About
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/resources">
-                Resources
-              </SiteLink>
-            </li>
-            <li>
-              <SiteLink className="hover:text-white" href="/insights">
-                Insights
-              </SiteLink>
-            </li>
-            <li>
-              <a className="hover:text-white" href={SITE.clientLoginHref}>
-                Client Login
-              </a>
-            </li>
-          </ul>
+            );
+          })}
         </div>
       </div>
-      <div className="border-t border-ro-line">
+
+      <div className="container-page flex flex-col gap-6 py-10 md:flex-row md:items-center md:justify-between">
+        <div>
+          <SiteLink href="/" aria-label={`${SITE.name} home`}>
+            <BrandLogo variant="dark" />
+          </SiteLink>
+          <p className="mt-3 max-w-sm text-sm text-slate-500">{SITE.tagline}</p>
+        </div>
+
+        <div className="text-sm text-slate-500 md:text-right">
+          <p className="font-semibold uppercase tracking-[0.16em] text-slate-400">Follow us</p>
+          <p className="mt-2 max-w-xs md:ml-auto">
+            Official social channels will appear here when published. Reach us at{" "}
+            <a className="text-orange-600 hover:underline" href={`mailto:${SITE.email}`}>
+              {SITE.email}
+            </a>{" "}
+            or{" "}
+            <a className="text-orange-600 hover:underline" href={SITE.phoneHref}>
+              {SITE.phoneDisplay}
+            </a>
+            .
+          </p>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200">
         <div className="container-page flex flex-col gap-3 py-5 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {year} {SITE.name}. All rights reserved.
+            © {year} {SITE.name}. All rights reserved. {SITE.location}.
           </p>
-          <p className="flex gap-4">
-            <SiteLink className="hover:text-white" href="/privacy">
+          <p className="flex flex-wrap gap-4">
+            <SiteLink className="hover:text-slate-800" href="/privacy">
               Privacy Policy
             </SiteLink>
-            <SiteLink className="hover:text-white" href="/terms">
+            <SiteLink className="hover:text-slate-800" href="/terms">
               Terms of Use
             </SiteLink>
           </p>

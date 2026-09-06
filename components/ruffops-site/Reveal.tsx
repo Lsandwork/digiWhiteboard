@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /**
  * Fade/slide reveal. Starts visible after a short fallback so content never
- * appears "blank" or distorted if IntersectionObserver is delayed.
+ * appears blank if IntersectionObserver is delayed.
  */
 export function Reveal({
   children,
@@ -51,7 +51,7 @@ export function Reveal({
   }, [delay]);
 
   return (
-    <div ref={ref} id={id} className={`reveal ${visible ? "is-visible" : ""} ${className}`}>
+    <div ref={ref} id={id} className={`reveal ${visible ? "is-visible" : ""} ${className}`.trim()}>
       {children}
     </div>
   );

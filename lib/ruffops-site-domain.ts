@@ -35,6 +35,16 @@ const STAFF_AND_APP_PREFIXES = [
 /** Public path (no trailing slash) → path under /ruffops-site. */
 export const RUFFOPS_MARKETING_PAGES: Record<string, string> = {
   "/": "/",
+  // New production IA
+  "/solutions": "/solutions",
+  "/solutions/management-platform": "/solutions/management-platform",
+  "/solutions/digital-whiteboards": "/solutions/digital-whiteboards",
+  "/solutions/advertising": "/solutions/advertising",
+  "/why-ruffops": "/why-ruffops",
+  "/pricing": "/pricing",
+  "/support": "/support",
+  "/get-started": "/get-started",
+  // Legacy paths kept live for back-compat
   "/services": "/services",
   "/services.html": "/services",
   "/ai-platform": "/ai-platform",
@@ -57,12 +67,12 @@ export const RUFFOPS_MARKETING_PAGES: Record<string, string> = {
   "/terms": "/terms",
   "/blog": "/insights",
   "/insights": "/insights",
-  "/faq": "/resources"
+  "/faq": "/support"
 };
 
 export function normalizeHostname(host: string | null | undefined): string {
   if (!host) return "";
-  return host.trim().toLowerCase().split(":", 1)[0];
+  return host.trim().toLowerCase().split(":")[0];
 }
 
 export function isRuffopsMarketingHostname(host: string | null | undefined): boolean {

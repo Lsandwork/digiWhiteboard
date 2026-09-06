@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { CircleCheck, Mail, Send, TriangleAlert } from "lucide-react";
-import { BUSINESS_TYPES, SERVICE_OPTIONS, SITE } from "@/lib/ruffops-site/config";
+import { BUSINESS_TYPES, INTEREST_OPTIONS, SERVICE_OPTIONS, SITE } from "@/lib/ruffops-site/config";
 
 const fieldLabel = "mb-1.5 block text-sm font-medium text-slate-300";
 
@@ -10,10 +10,12 @@ type Status = "idle" | "submitting" | "success" | "error";
 
 export function ContactForm({
   defaultFormType = "Product Demo Request",
-  initialSuccess = false
+  initialSuccess = false,
+  submitLabel = "Request My Review"
 }: {
   defaultFormType?: string;
   initialSuccess?: boolean;
+  submitLabel?: string;
 }) {
   const [status, setStatus] = useState<Status>(initialSuccess ? "success" : "idle");
   const [error, setError] = useState("");
@@ -59,7 +61,7 @@ export function ContactForm({
         <h3 className="text-xl font-semibold text-white">Thank you. We received your request.</h3>
         <p className="max-w-md text-sm text-slate-400">
           We will review your business details and follow up within one business day. You can also call{" "}
-          <a className="text-ro-accent-soft hover:underline" href={SITE.phoneHref}>
+          <a className="text-orange-300 hover:underline" href={SITE.phoneHref}>
             {SITE.phoneDisplay}
           </a>{" "}
           or email {SITE.email}.
@@ -72,8 +74,8 @@ export function ContactForm({
     <form onSubmit={onSubmit} action="/api/ruffops-site/send" method="post" className="card space-y-6 p-6 sm:p-8" noValidate>
       <input type="text" name="company" className="hp-field" tabIndex={-1} autoComplete="off" aria-hidden="true" />
       <input type="hidden" name="form_type" value={defaultFormType} />
-      <div className="flex items-start gap-3 rounded-xl border border-ro-electric/30 bg-ro-electric/5 px-4 py-3 text-sm text-slate-200">
-        <Mail className="mt-0.5 h-4 w-4 shrink-0 text-ro-electric" />
+      <div className="flex items-start gap-3 rounded-xl border border-sky-400/30 bg-sky-400/5 px-4 py-3 text-sm text-slate-200">
+        <Mail className="mt-0.5 h-4 w-4 shrink-0 text-sky-400" />
         <span>
           We reply within one business day at {SITE.email} or {SITE.phoneDisplay}. Santa Monica on-site, nationwide online.
         </span>
@@ -90,61 +92,50 @@ export function ContactForm({
       ) : null}
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
-          <label htmlFor="name" className={fieldLabel}>
-            Name
-          </label>
+          <label htmlFor="name" className={fieldLabel}>Name</label>
           <input id="name" name="name" required className="field-input" placeholder="Your name" />
         </div>
         <div>
-          <label htmlFor="business_name" className={fieldLabel}>
-            Business name
-          </label>
+          <label htmlFor="business_name" className={fieldLabel}>Business name</label>
           <input id="business_name" name="business_name" className="field-input" placeholder="Facility name" />
         </div>
         <div>
-          <label htmlFor="business_type" className={fieldLabel}>
-            Business type
-          </label>
+          <label htmlFor="email" className={fieldLabel}>Email</label>
+          <input id="email" name="email" type="email" required className="field-input" placeholder="you@business.com" />
+        </div>
+        <div>
+          <label htmlFor="phone" className={fieldLabel}>Phone (optional)</label>
+          <input id="phone" name="phone" type="tel" className="field-input" placeholder="(855) 783-3677" />
+        </div>
+        <div>
+          <label htmlFor="business_type" className={fieldLabel}>Business type</label>
           <select id="business_type" name="business_type" className="field-input" defaultValue="">
-            <option value="" disabled>
-              Select type
-            </option>
+            <option value="" disabled>Select type</option>
             {BUSINESS_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
+              <option key={type} value={type}>{type}</option>
             ))}
           </select>
         </div>
         <div>
-          <label htmlFor="location" className={fieldLabel}>
-            Location
-          </label>
+          <label htmlFor="locations" className={fieldLabel}>Number of locations</label>
+          <input id="locations" name="locations" className="field-input" placeholder="e.g. 1" />
+        </div>
+        <div className="sm:col-span-2">
+          <label htmlFor="primary_interest" className={fieldLabel}>Primary interest</label>
+          <select id="primary_interest" name="primary_interest" className="field-input" defaultValue="">
+            <option value="" disabled>Select interest</option>
+            {INTEREST_OPTIONS.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="location" className={fieldLabel}>Location</label>
           <input id="location" name="location" className="field-input" placeholder="City, State" />
         </div>
         <div>
-          <label htmlFor="email" className={fieldLabel}>
-            Email
-          </label>
-          <input id="email" name="email" type="email" required className="field-input" placeholder="you@business.com" />
-        </div>
-        <div>
-          <label htmlFor="phone" className={fieldLabel}>
-            Phone
-          </label>
-          <input id="phone" name="phone" type="tel" className="field-input" placeholder="(855) 783-3677" />
-        </div>
-        <div>
-          <label htmlFor="dogs_per_day" className={fieldLabel}>
-            Number of dogs per day
-          </label>
+          <label htmlFor="dogs_per_day" className={fieldLabel}>Dogs per day (optional)</label>
           <input id="dogs_per_day" name="dogs_per_day" className="field-input" placeholder="e.g. 60" />
-        </div>
-        <div>
-          <label htmlFor="current_software" className={fieldLabel}>
-            Current software used
-          </label>
-          <input id="current_software" name="current_software" className="field-input" placeholder="Gingr, DaySmart, spreadsheets…" />
         </div>
       </div>
       <fieldset>
@@ -152,37 +143,19 @@ export function ContactForm({
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {SERVICE_OPTIONS.map((service) => (
             <label key={service} className="flex items-center gap-2 rounded-lg border border-ro-line bg-ro-900/50 px-3 py-2 text-sm text-slate-300">
-              <input type="checkbox" name="services_offered" value={service} className="accent-ro-accent" />
+              <input type="checkbox" name="services_offered" value={service} className="accent-orange-500" />
               {service}
             </label>
           ))}
         </div>
       </fieldset>
       <div>
-        <label htmlFor="challenge" className={fieldLabel}>
-          Biggest operational challenge
-        </label>
-        <textarea
-          id="challenge"
-          name="biggest_challenge"
-          rows={4}
-          className="field-input"
-          placeholder="Tell us briefly what you'd like help with"
-        />
-      </div>
-      <div>
-        <label htmlFor="preferred_contact" className={fieldLabel}>
-          Preferred contact method
-        </label>
-        <select id="preferred_contact" name="preferred_contact" className="field-input" defaultValue="Email">
-          <option>Email</option>
-          <option>Phone</option>
-          <option>Text</option>
-        </select>
+        <label htmlFor="message" className={fieldLabel}>Message</label>
+        <textarea id="message" name="message" rows={4} className="field-input" placeholder="Tell us briefly what you’d like help with" />
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button className="btn-primary" type="submit" disabled={status === "submitting"}>
-          {status === "submitting" ? "Sending…" : "Request My Review"}
+          {status === "submitting" ? "Sending…" : submitLabel}
           <Send className="h-4 w-4" />
         </button>
         <a className="btn-secondary" href={SITE.phoneHref}>
@@ -235,3 +208,4 @@ export function ChecklistForm() {
     </form>
   );
 }
+
