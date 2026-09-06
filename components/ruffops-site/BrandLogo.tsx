@@ -8,12 +8,11 @@ type BrandLogoProps = {
 };
 
 /**
- * Official ruffOPS wordmark treatment from the brand brief:
- * "ruff" in light tone · "OPS" in brand orange · orange paw mark.
+ * Mockup wordmark: "ruff" in brand orange · "OPS" in light/dark tone · orange paw.
  * Uses the real Fitdog orange paw asset already in the repo.
  */
 export function BrandLogo({ variant = "light", showLockup = true, className = "" }: BrandLogoProps) {
-  const ruffColor = variant === "light" ? "text-white" : "text-slate-950";
+  const opsColor = variant === "light" ? "text-white" : "text-slate-950";
   const lockupColor = variant === "light" ? "text-white/55" : "text-slate-500";
 
   return (
@@ -28,15 +27,13 @@ export function BrandLogo({ variant = "light", showLockup = true, className = ""
         />
       </span>
       <span className="flex flex-col leading-none">
-        <span
-          className={`font-[family-name:var(--font-ro-display)] text-[1.15rem] font-extrabold tracking-[-0.03em] ${ruffColor}`}
-        >
-          <span>ruff</span>
-          <span className="text-orange-500">OPS</span>
+        <span className={`font-[family-name:var(--font-ro-display)] text-[1.2rem] font-extrabold tracking-[-0.03em] ${opsColor}`}>
+          <span className="text-orange-500">ruff</span>
+          <span>OPS</span>
         </span>
         {showLockup ? (
-          <span className={`mt-1 text-[9px] font-semibold uppercase tracking-[0.2em] ${lockupColor}`}>
-            {SITE.lockup}
+          <span className={`mt-1 text-[8px] font-semibold uppercase tracking-[0.18em] ${lockupColor}`}>
+            {SITE.lockup.toUpperCase()}
           </span>
         ) : null}
       </span>

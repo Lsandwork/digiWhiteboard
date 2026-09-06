@@ -33,27 +33,30 @@ export function SiteHeader() {
           : "border-b border-transparent bg-transparent"
       }`}
     >
-      <div className="container-page flex h-[4.25rem] items-center justify-between gap-4">
+      <div className="container-page flex h-[4.5rem] items-center justify-between gap-4">
         <SiteLink href="/" className="relative z-10" aria-label={`${SITE.name} home`}>
           <BrandLogo />
         </SiteLink>
 
-        <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
+        <nav aria-label="Primary" className="hidden items-center gap-0.5 lg:flex">
           {NAV.map((item) => (
             <SiteLink
               key={item.href}
               href={item.href}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              className={`relative rounded-lg px-3 py-2 text-sm font-medium transition ${
                 isActive(item.href) ? "text-white" : "text-slate-300 hover:text-white"
               }`}
             >
               {item.label}
+              {isActive(item.href) ? (
+                <span className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-orange-500" aria-hidden />
+              ) : null}
             </SiteLink>
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <a href={SECONDARY_CTA.href} className="btn-ghost text-sm">
+        <div className="hidden items-center gap-2.5 lg:flex">
+          <a href={SECONDARY_CTA.href} className="btn-outline text-sm">
             {SECONDARY_CTA.label}
           </a>
           <SiteLink href={PRIMARY_CTA.href} className="btn-primary text-sm">
@@ -88,7 +91,7 @@ export function SiteHeader() {
                 {item.label}
               </SiteLink>
             ))}
-            <a href={SECONDARY_CTA.href} className="btn-secondary mt-3">
+            <a href={SECONDARY_CTA.href} className="btn-outline mt-3">
               {SECONDARY_CTA.label}
             </a>
             <SiteLink href={PRIMARY_CTA.href} className="btn-primary">

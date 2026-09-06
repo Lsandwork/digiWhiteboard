@@ -46,6 +46,8 @@
 
 .ruffops-site .btn-primary,
 .ruffops-site .btn-secondary,
+.ruffops-site .btn-outline,
+.ruffops-site .btn-video,
 .ruffops-site .btn-ghost {
   display: inline-flex;
   align-items: center;
@@ -79,6 +81,40 @@
 .ruffops-site .btn-secondary:hover {
   border-color: rgba(249, 115, 22, 0.55);
   background: rgba(249, 115, 22, 0.1);
+}
+
+/* Mockup: outlined Login + Watch Video controls */
+.ruffops-site .btn-outline {
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+  color: #fff;
+}
+
+.ruffops-site .btn-outline:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ruffops-site .btn-video {
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: rgba(7, 9, 15, 0.25);
+  color: #fff;
+  backdrop-filter: blur(8px);
+}
+
+.ruffops-site .btn-video:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ruffops-site .btn-video-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .ruffops-site .btn-ghost {
@@ -174,8 +210,16 @@
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(105deg, rgba(7, 9, 15, 0.92) 8%, rgba(7, 9, 15, 0.72) 48%, rgba(7, 9, 15, 0.45) 100%),
-    radial-gradient(700px 420px at 80% 20%, rgba(249, 115, 22, 0.28), transparent 65%);
+    linear-gradient(100deg, rgba(12, 14, 18, 0.88) 0%, rgba(12, 14, 18, 0.55) 42%, rgba(12, 14, 18, 0.28) 72%, rgba(12, 14, 18, 0.45) 100%),
+    linear-gradient(180deg, rgba(12, 14, 18, 0.55) 0%, transparent 28%, transparent 70%, rgba(12, 14, 18, 0.65) 100%);
+}
+
+.ruffops-site .ro-hero-copy .eyebrow {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .ruffops-site .ro-hero-grid {
@@ -301,10 +345,10 @@
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  overflow: hidden;
   border-radius: 1.4rem;
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #fff;
-  padding: 1.5rem;
   box-shadow: 0 18px 50px -34px rgba(15, 23, 42, 0.35);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -315,8 +359,27 @@
   box-shadow: 0 26px 60px -30px rgba(249, 115, 22, 0.35);
 }
 
+.ruffops-site .ro-solution-card-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: #e2e8f0;
+}
+
+.ruffops-site .ro-solution-card-media img {
+  object-fit: cover;
+  object-position: top center;
+}
+
+.ruffops-site .ro-solution-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 1.35rem 1.4rem 1.5rem;
+}
+
 .ruffops-site .ro-solution-card .meta {
-  color: #c2410c;
+  color: #ea580c;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -324,11 +387,26 @@
 }
 
 .ruffops-site .ro-solution-card h3 {
-  margin-top: 0.7rem;
-  font-size: 1.35rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  font-size: 1.28rem;
   font-weight: 750;
   letter-spacing: -0.02em;
   color: #0b1220;
+  line-height: 1.25;
+}
+
+.ruffops-site .ro-paw {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-top: 0.28rem;
+  flex-shrink: 0;
+  background-color: #f97316;
+  -webkit-mask: url("/assets/fitdog/paw-outline-orange.svg") center / contain no-repeat;
+  mask: url("/assets/fitdog/paw-outline-orange.svg") center / contain no-repeat;
 }
 
 .ruffops-site .ro-solution-card p {
@@ -598,6 +676,45 @@
   color: #94a3b8;
   font-size: 0.95rem;
   line-height: 1.6;
+}
+
+/* Light footer matching mockup */
+.ruffops-site .ro-footer {
+  background: #fff;
+  color: #0b1220;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.ruffops-site .ro-footer-features {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 1.35rem 0;
+  background: #fafafa;
+}
+
+.ruffops-site .ro-footer-feature {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  color: #334155;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.ruffops-site .ro-footer-feature:hover {
+  color: #ea580c;
+}
+
+.ruffops-site .ro-footer-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.15rem;
+  height: 2.15rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #fff;
+  color: #ea580c;
 }
 
 @media (max-width: 640px) {

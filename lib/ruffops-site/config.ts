@@ -1,7 +1,7 @@
 export const SITE = {
   name: "ruffOPS",
   shortName: "ruffOPS",
-  lockup: "Operations Platform",
+  lockup: "Connected spaces. Happier pets.", // rendered uppercase in BrandLogo to match mockup
   tagline: "The ultimate operations platform for pet businesses.",
   description:
     "ruffOPS is the all-in-one operations platform for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities — connecting management and staff, powering custom lobby and department digital whiteboards, and keeping clients engaged from anywhere.",
@@ -58,16 +58,18 @@ export const PACKAGES = [
     summary:
       "One operations command center for owners, managers, and staff — live status, schedules, handoffs, alerts, and department workflows in one place.",
     bullets: [
-      "Management dashboards and staff workspaces",
-      "Live check-in / check-out status and facility visibility",
-      "Shift handoffs, alerts, and task clarity",
+      "Real-time check-ins & status",
+      "Staff communication & scheduling",
+      "Reports & analytics",
+      "Works from any device",
       "Department workflows for front desk, yard, boarding, grooming, and transport",
-      "Role-based access for leadership and floor teams",
-      "Multi-device access for office, lobby, and floor"
+      "Role-based access for leadership and floor teams"
     ],
     note: "Built for facilities that need the whole team aligned — not another forgotten login.",
     cta: "Explore the Platform",
-    href: "/solutions/management-platform"
+    href: "/solutions/management-platform",
+    image: "/assets/crossover-dashboard/hero-mockup-reference.png",
+    imageAlt: "ruffOPS management platform on desktop and mobile"
   },
   {
     id: "kiosk-whiteboards",
@@ -79,16 +81,18 @@ export const PACKAGES = [
     summary:
       "Fully custom digital whiteboards for lobby TVs and staff kiosks — designed for your brand, rooms, and daily flow.",
     bullets: [
-      "Lobby check-in / check-out showcase boards",
-      "Live dog information and lobby activity displays",
+      "Fully custom, branded for your business",
+      "Synced with your platform in real-time",
+      "Engage clients while they wait",
+      "Drive a better client experience",
       "Staff whiteboards for every department",
-      "Brand-matched themes, motion, and content zones",
-      "Cast-ready layouts for TV, tablet, and kiosk hardware",
-      "Always-on displays readable across the room"
+      "Cast-ready layouts for TV, tablet, and kiosk hardware"
     ],
     note: "The board guests see in the lobby — and the boards your team actually runs from.",
     cta: "See Whiteboard Solutions",
-    href: "/solutions/digital-whiteboards"
+    href: "/solutions/digital-whiteboards",
+    image: "/assets/lobby-whiteboard/light-v2/reference/Fitdog-Lobby-Whiteboard-Light-Approved-Mockup.png",
+    imageAlt: "Custom lobby digital whiteboard showing facility activities"
   },
   {
     id: "advertising-screens",
@@ -100,15 +104,17 @@ export const PACKAGES = [
     summary:
       "Deploy branded display screens with remote content updates, advertising management, and setup consulting for pet facilities.",
     bullets: [
-      "Screen deployment and mounting guidance",
-      "Remote content and advertising updates",
-      "Content scheduling for lobby and waiting areas",
-      "Equipment recommendations and support",
-      "Setup consulting for single or multi-location facilities"
+      "Turnkey rental service (equipment + support)",
+      "Full ad creation & management",
+      "Direct partnership with your business",
+      "Consulting & setup options",
+      "Content scheduling for lobby and waiting areas"
     ],
     note: "Ideal when you want premium lobby screens without building the display stack alone.",
     cta: "Talk About Screens",
-    href: "/solutions/advertising"
+    href: "/solutions/advertising",
+    image: "/assets/fitdog-lobby-whiteboard/slideshow/14-show-off-your-dog.png",
+    imageAlt: "Lobby advertising display with branded pet facility content"
   }
 ] as const;
 
@@ -158,6 +164,8 @@ export const PRODUCT_SHOTS = {
     "/assets/fitdog-lobby-whiteboard/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png",
   dashboardHero: "/assets/crossover-dashboard/hero-mockup-reference.png",
   heroDogs: "/assets/login/fitdog-login-dogs.webp",
+  heroComposite: "/assets/fitdog/blog-help/hero-composite.png",
+  advertisingBoard: "/assets/fitdog-lobby-whiteboard/slideshow/14-show-off-your-dog.png",
   pawOrange: "/assets/fitdog/paw-outline-orange.svg",
   staffPreview: "/assets/fitdog/staff-whiteboard/themes/clear-white-preview.png"
 } as const;
