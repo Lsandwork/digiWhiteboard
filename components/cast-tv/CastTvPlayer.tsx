@@ -5,6 +5,7 @@ import Image from "next/image";
 import { CastTvImageSlide } from "@/components/cast-tv/CastTvImageSlide";
 import { CastTvVideoSlide } from "@/components/cast-tv/CastTvVideoSlide";
 import { useCastTvPlaylist } from "@/components/cast-tv/useCastTvPlaylist";
+import { KioskDebugOverlay } from "@/components/display/KioskDebugOverlay";
 
 type CastTvPlayerProps = {
   screenId?: string;
@@ -80,6 +81,12 @@ export function CastTvPlayer({ screenId = "default" }: CastTvPlayerProps) {
 
   return (
     <main className="cast-tv-player" aria-label="CAST-TV slideshow">
+      {/* Temporary Fully/TV diagnostic — enable with ?kioskDebug=true */}
+      <KioskDebugOverlay
+        surface="casttv"
+        canvasSelector=".cast-tv-player"
+        stageSelector="body"
+      />
       {showStandby ? (
         <div className="cast-tv-standby">
           {settings.show_standby_logo ? (
