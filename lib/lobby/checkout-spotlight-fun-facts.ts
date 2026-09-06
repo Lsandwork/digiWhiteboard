@@ -3,6 +3,8 @@
  * Rotates by dog name + Pacific day so the same dog isn't stuck with one set forever.
  */
 
+import { selectCheckoutFunFacts } from "@/lib/lobby/checkout-fun-fact-select";
+
 export type CheckoutFunFactCategory =
   | "corporate_promotion"
   | "breaking_news"
@@ -109,6 +111,10 @@ function pickIndexed<T>(items: readonly T[], seed: number, salt: number): T {
   return items[index]!;
 }
 
+export function getClassicCheckoutFunFactTemplates() {
+  return TEMPLATES;
+}
+
 export function buildCheckoutFunFacts(input: {
   dogName: string;
   animalId?: string | null;
@@ -116,29 +122,15 @@ export function buildCheckoutFunFacts(input: {
   count?: number;
   now?: Date;
 }): string[] {
-  const name = String(input.dogName || "This dog").trim() || "This dog";
-  const seed = hashString(
-    `${name}|${input.animalId || ""}|${input.breed || ""}|${pacificDateKey(input.now)}`
-  );
-  const categories = Object.keys(TEMPLATES) as CheckoutFunFactCategory[];
-  const count = Math.min(6, Math.max(4, input.count ?? 5));
-  const facts: string[] = [];
-  const usedCategories = new Set<CheckoutFunFactCategory>();
-
-  for (let i = 0; i < count; i += 1) {
-    let category = pickIndexed(categories, seed, i + 1);
-    let guard = 0;
-    while (usedCategories.has(category) && guard < categories.length) {
-      category = pickIndexed(categories, seed, i + 1 + guard * 3);
-      guard += 1;
-    }
-    usedCategories.add(category);
-    const templates = TEMPLATES[category];
-    const template = pickIndexed(templates, seed, i * 11 + 5);
-    facts.push(template(name));
-  }
-
-  return facts;
+  return selectCheckoutFunFacts({
+    dogName: input.dogName,
+    animalId: input.animalId,
+    breed: input.breed,
+    count: input.count,
+    now: input.now,
+    classicTemplates: TEMPLATES,
+    recent: []
+  }).texts;
 }
 
 export function buildCheckoutDaySummary(input: {
