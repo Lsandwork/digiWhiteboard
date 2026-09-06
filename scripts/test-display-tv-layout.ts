@@ -4,6 +4,7 @@ import {
   computeTvDisplayScale,
   isFullyKioskBrowser,
   isLayoutTiledVisualViewport,
+  measureTvFitViewport,
   measureTvViewport,
   shouldLockTvKioskViewport,
   TV_DESIGN_HEIGHT,
@@ -34,9 +35,8 @@ assert.equal(fullHd.width, 1920);
 assert.equal(fullHd.height, 1080);
 assert.equal(computeTvDisplayScale(fullHd.width, fullHd.height), 1);
 
-// Hi-Browser / Hisense page zoom: cropped visualViewport must NOT postage-stamp
-// the board into a corner — fill the layout/screen (same as Fully).
-const hiBrowserFullscreen = measureTvViewport({
+// Hi-Browser / Hisense page zoom: stage stays full-bleed (casttv pattern).
+const hiBrowserStage = measureTvViewport({
   innerWidth: 1920,
   innerHeight: 1080,
   document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
@@ -49,11 +49,10 @@ const hiBrowserFullscreen = measureTvViewport({
     scale: 3
   }
 });
-assert.equal(hiBrowserFullscreen.width, 1920);
-assert.equal(hiBrowserFullscreen.height, 1080);
-assert.equal(hiBrowserFullscreen.offsetLeft, 0);
-assert.equal(hiBrowserFullscreen.offsetTop, 0);
-assert.equal(computeTvDisplayScale(hiBrowserFullscreen.width, hiBrowserFullscreen.height), 1);
+assert.equal(hiBrowserStage.width, 1920);
+assert.equal(hiBrowserStage.height, 1080);
+assert.equal(hiBrowserStage.offsetLeft, 0);
+assert.equal(hiBrowserStage.offsetTop, 0);
 assert.equal(
   shouldLockTvKioskViewport({
     innerWidth: 1920,
@@ -70,8 +69,29 @@ assert.equal(
   true
 );
 
-// Unknown WebView with a zoomed corner (Fully-like without UA): fill the screen.
-const genericCornerZoom = measureTvViewport({
+// Same zoomed Hi-Browser: FIT viewport must use the visible CSS area so scale
+// shrinks (scale=1 against layout was the Fully/lobby zoomed-in failure).
+const hiBrowserFit = measureTvFitViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: { userAgent: "Mozilla/5.0 Hisense HiBrowser" },
+  visualViewport: {
+    width: 640,
+    height: 360,
+    offsetLeft: 1280,
+    offsetTop: 720,
+    scale: 3
+  }
+});
+assert.equal(hiBrowserFit.width, 640);
+assert.equal(hiBrowserFit.height, 360);
+assert.equal(hiBrowserFit.offsetLeft, 0);
+assert.equal(hiBrowserFit.offsetTop, 0);
+assert.equal(computeTvDisplayScale(hiBrowserFit.width, hiBrowserFit.height), 640 / 1920);
+
+// Unknown WebView with a zoomed corner (Fully-like without UA): fit visible area.
+const genericCornerFit = measureTvFitViewport({
   innerWidth: 1920,
   innerHeight: 1080,
   document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
@@ -84,14 +104,12 @@ const genericCornerZoom = measureTvViewport({
     scale: 2.5
   }
 });
-assert.equal(genericCornerZoom.width, 1920);
-assert.equal(genericCornerZoom.height, 1080);
-assert.equal(genericCornerZoom.offsetLeft, 0);
-assert.equal(genericCornerZoom.offsetTop, 0);
+assert.equal(genericCornerFit.width, 720);
+assert.equal(genericCornerFit.height, 405);
+assert.equal(computeTvDisplayScale(genericCornerFit.width, genericCornerFit.height), 720 / 1920);
 
-// Fully Kiosk page zoom: visualViewport is a cropped corner that does NOT tile
-// the layout. Must fill the full screen — never postage-stamp the board.
-const fullyCornerZoom = measureTvViewport({
+// Fully Kiosk page zoom: stage full screen, fit uses visible CSS pixels.
+const fullyCornerStage = measureTvViewport({
   innerWidth: 1920,
   innerHeight: 1080,
   document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
@@ -108,13 +126,35 @@ const fullyCornerZoom = measureTvViewport({
     scale: 2.5
   }
 });
-assert.equal(fullyCornerZoom.width, 1920);
-assert.equal(fullyCornerZoom.height, 1080);
-assert.equal(fullyCornerZoom.offsetLeft, 0);
-assert.equal(fullyCornerZoom.offsetTop, 0);
-assert.equal(computeTvDisplayScale(fullyCornerZoom.width, fullyCornerZoom.height), 1);
+assert.equal(fullyCornerStage.width, 1920);
+assert.equal(fullyCornerStage.height, 1080);
+assert.equal(fullyCornerStage.offsetLeft, 0);
+assert.equal(fullyCornerStage.offsetTop, 0);
 
-// Fully Kiosk under-reports a phone-sized WebView on a Full HD TV.
+const fullyCornerFit = measureTvFitViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: { userAgent: "Mozilla/5.0 FullyKioskBrowser/1.50" },
+  fully: {
+    getScreenWidth: () => 1920,
+    getScreenHeight: () => 1080
+  },
+  visualViewport: {
+    width: 720,
+    height: 405,
+    offsetLeft: 1100,
+    offsetTop: 600,
+    scale: 2.5
+  }
+});
+assert.equal(fullyCornerFit.width, 720);
+assert.equal(fullyCornerFit.height, 405);
+assert.equal(fullyCornerFit.offsetLeft, 0);
+assert.equal(fullyCornerFit.offsetTop, 0);
+assert.equal(computeTvDisplayScale(fullyCornerFit.width, fullyCornerFit.height), 720 / 1920);
+
+// Fully Kiosk under-reports a phone-sized WebView on a Full HD TV (no page zoom).
 const fullyUnderReported = measureTvViewport({
   innerWidth: 980,
   innerHeight: 551,
@@ -125,11 +165,11 @@ const fullyUnderReported = measureTvViewport({
     getScreenHeight: () => 1080
   },
   visualViewport: {
-    width: 400,
-    height: 225,
-    offsetLeft: 500,
-    offsetTop: 300,
-    scale: 2
+    width: 980,
+    height: 551,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 1
   }
 });
 assert.equal(fullyUnderReported.width, 1920);
@@ -138,8 +178,28 @@ assert.equal(fullyUnderReported.offsetLeft, 0);
 assert.equal(fullyUnderReported.offsetTop, 0);
 assert.equal(computeTvDisplayScale(fullyUnderReported.width, fullyUnderReported.height), 1);
 
+const fullyUnderReportedFit = measureTvFitViewport({
+  innerWidth: 980,
+  innerHeight: 551,
+  document: { documentElement: { clientWidth: 980, clientHeight: 551 } },
+  navigator: { userAgent: "FullyKioskBrowser" },
+  fully: {
+    getScreenWidth: () => 1920,
+    getScreenHeight: () => 1080
+  },
+  visualViewport: {
+    width: 980,
+    height: 551,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 1
+  }
+});
+assert.equal(fullyUnderReportedFit.width, 1920);
+assert.equal(fullyUnderReportedFit.height, 1080);
+
 // Unzoomed Hi-Browser with a full visualViewport still fills normally.
-const hiBrowserUnzoomed = measureTvViewport({
+const hiBrowserUnzoomed = measureTvFitViewport({
   innerWidth: 1920,
   innerHeight: 1080,
   document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
@@ -154,8 +214,11 @@ const hiBrowserUnzoomed = measureTvViewport({
 });
 assert.equal(hiBrowserUnzoomed.width, 1920);
 assert.equal(hiBrowserUnzoomed.height, 1080);
-assert.equal(hiBrowserUnzoomed.offsetLeft, 0);
-assert.equal(hiBrowserUnzoomed.offsetTop, 0);
+
+// Narrow / tall / 4K sanity for the pure scale math (casttv-equivalent letterbox).
+assert.equal(computeTvDisplayScale(1280, 720), 1280 / 1920);
+assert.equal(computeTvDisplayScale(1080, 1920), 1080 / 1920);
+assert.equal(computeTvDisplayScale(3840, 2160), 2);
 
 assert.equal(isFullyKioskBrowser({ innerWidth: 1, innerHeight: 1, fully: {} }), true);
 assert.equal(
@@ -181,16 +244,25 @@ assert.match(hook, /visualViewport/);
 assert.match(hook, /fullscreenchange/);
 assert.match(hook, /applyTvStageToVisibleViewport/);
 assert.match(hook, /measureTvViewport/);
+assert.match(hook, /measureTvFitViewport/);
 assert.match(hook, /shouldLockTvKioskViewport/);
 assert.match(hook, /resetTvBrowserZoom/);
 assert.match(hook, /TV_VIEWPORT_CONTENT_KIOSK_LOCKED/);
 assert.match(hook, /fitdog-tv-kiosk/);
+assert.match(hook, /tvDebug/);
+assert.match(hook, /logTvLayoutDiagnostics/);
 
 const css = readFileSync("app/globals.css", "utf8");
 assert.match(css, /text-size-adjust:\s*100%/);
 assert.match(css, /--fitdog-tv-scale:\s*min\(100vw \/ 1920/);
 assert.match(css, /html\.fitdog-tv-kiosk/);
 assert.match(css, /zoom:\s*1/);
+
+const lobbyLayout = readFileSync("app/lobby/layout.tsx", "utf8");
+assert.match(lobbyLayout, /export const viewport/);
+assert.match(lobbyLayout, /maximumScale:\s*1/);
+assert.match(lobbyLayout, /userScalable:\s*false/);
+assert.match(lobbyLayout, /setScale\(1\)/);
 
 // sanity: deprecated helper still imported for compatibility
 assert.equal(typeof isLayoutTiledVisualViewport, "function");
