@@ -1,7 +1,7 @@
 export const SITE = {
   name: "ruffOPS",
   shortName: "ruffOPS",
-  lockup: "Connected spaces. Happier pets.", // rendered uppercase in BrandLogo to match mockup
+  lockup: "Connected spaces. Happier pets.",
   tagline: "The ultimate operations platform for pet businesses.",
   description:
     "ruffOPS is the all-in-one operations platform for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities — connecting management and staff, powering custom lobby and department digital whiteboards, and keeping clients engaged from anywhere.",

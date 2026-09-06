@@ -190,7 +190,8 @@
   overflow: hidden;
   isolation: isolate;
   min-height: min(92vh, 54rem);
-  padding: 2.5rem 0 4rem;
+  margin-top: -4.5rem; /* sit under sticky header like mockup */
+  padding: 7rem 0 4rem;
   color: #fff;
 }
 
@@ -724,6 +725,6 @@
 
   .ruffops-site .ro-hero {
     min-height: auto;
-    padding-top: 1.5rem;
+    padding-top: 6rem;
   }
 }
