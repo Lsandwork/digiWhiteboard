@@ -140,7 +140,7 @@ export function HrHubPanel({
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
+        const response = await fetch("/api/admin/staff-operations?roster=1", { cache: "no-store" });
         if (!response.ok) return;
         const body = await readResponseJson(response);
         if (cancelled) return;

@@ -1,5 +1,15 @@
 import type { AdminUserRole } from "@/lib/admin/users";
-import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
+import { isAdminUserUuid, updateAdminUser } from "@/lib/admin/users";
+import { invalidateTtlCache } from "@/lib/server-ttl-cache";
+import { toPublicStaffDirectoryMember, isPlaceholderDirectoryMember } from "@/lib/staff/directory-persistence";
+import {
+  archiveStaffDirectoryRecord,
+  findStaffDirectoryRecordById,
+  insertStaffDirectoryRecord,
+  listVisibleStaffDirectory,
+  reviveMatchingArchivedStaff,
+  updateStaffDirectoryRecord
+} from "@/lib/staff/directory-store";
 import { displayActorLabel, buildActorNameLookup } from "@/lib/admin/actor-display";
 import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
 import {
@@ -241,6 +251,7 @@ export const STAFF_MEMBERS = [
   "Rebecca"
 ] as const;
 
+/** Historical placeholder names. Never used as a live fallback roster. */
 export const DEFAULT_STAFF_DIRECTORY: StaffDirectoryMember[] = STAFF_MEMBERS.map((name, index) => ({
   id: `default-staff-${index + 1}`,
   name,
@@ -347,7 +358,7 @@ function emptyState(): StaffOpsState {
     owner_follow_ups: [],
     active_issues: [],
     activity_logs: [],
-    staff_directory: DEFAULT_STAFF_DIRECTORY,
+    staff_directory: [],
     notifications: []
   };
 }
@@ -426,7 +437,7 @@ function sortNewest<T extends { created_at: string }>(items: T[]) {
 function parseState(value: unknown): StaffOpsState {
   if (!value || typeof value !== "object") return emptyState();
   const state = value as Partial<StaffOpsState>;
-  const directory = Array.isArray(state.staff_directory) ? state.staff_directory : DEFAULT_STAFF_DIRECTORY;
+  const directory = Array.isArray(state.staff_directory) ? state.staff_directory : [];
   return {
     crossover_messages: sortNewest(Array.isArray(state.crossover_messages) ? state.crossover_messages : []).slice(
       0,
@@ -436,7 +447,7 @@ function parseState(value: unknown): StaffOpsState {
     owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
     active_issues: sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
     activity_logs: sortNewest(Array.isArray(state.activity_logs) ? state.activity_logs : []).slice(0, 100),
-    staff_directory: directory.map(normalizeStaffDirectoryMember),
+    staff_directory: directory.filter((member) => !isPlaceholderDirectoryMember(member)).map(normalizeStaffDirectoryMember),
     notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : []).slice(0, MAX_NOTIFICATIONS)
   };
 }
@@ -448,7 +459,36 @@ async function loadStateFromAdminSettings(supabase: SupabaseClient) {
 }
 
 async function saveStateToAdminSettings(supabase: SupabaseClient, state: StaffOpsState) {
-  return saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState(state));
+  const parsed = parseState(state);
+  const payload = { ...parsed, staff_directory: [] };
+  const { error: preserveError } = await supabase.rpc("patch_staff_admin_ops_preserve_directory", {
+    p_value: payload
+  });
+  if (!preserveError) {
+    invalidateTtlCache("settings:");
+    invalidateTtlCache("admin-settings:key:");
+    invalidateTtlCache("staff-ops:");
+    invalidateTtlCache("staff-directory:");
+    return true;
+  }
+
+  const missingPreserveRpc =
+    preserveError.code === "PGRST202" || preserveError.message?.includes("patch_staff_admin_ops_preserve_directory");
+  if (!missingPreserveRpc) {
+    if (preserveError.message?.includes("schema cache") || preserveError.code === "PGRST205") return false;
+    throw preserveError;
+  }
+
+  const { data } = await supabase
+    .from("admin_settings")
+    .select("settings->staff_admin_ops->staff_directory")
+    .eq("id", "default")
+    .maybeSingle();
+  const existingDirectory = (data as Record<string, unknown> | null)?.staff_directory;
+  return saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, {
+    ...payload,
+    staff_directory: Array.isArray(existingDirectory) ? existingDirectory : []
+  });
 }
 
 async function loadStateFromActivityLog(supabase: SupabaseClient) {
@@ -510,7 +550,16 @@ export function capStaffOpsListPayload(state: StaffOpsState): StaffOpsState {
 
 export async function listStaffOps(supabase: SupabaseClient): Promise<StaffOpsState> {
   const state = parseState(await loadState(supabase));
-  return enrichStaffOpsActorLabels(supabase, state);
+  let directory = state.staff_directory;
+  try {
+    directory = await listVisibleStaffDirectory(supabase, {
+      jsonMembers: state.staff_directory,
+      activityLogs: state.activity_logs
+    });
+  } catch (error) {
+    console.warn("[staff-directory] persistent roster load failed:", error instanceof Error ? error.message : error);
+  }
+  return enrichStaffOpsActorLabels(supabase, { ...state, staff_directory: directory });
 }
 
 /** Rewrite display fields so emails never appear as the submitter/author label. Ownership identity stays on created_by. */
@@ -1622,8 +1671,12 @@ export async function createStaffDirectoryMember(
     },
     actorAdminId ?? null
   );
+  const revived = await reviveMatchingArchivedStaff(supabase, {
+    email,
+    admin_user_id: login.admin_user_id
+  });
   const member: StaffDirectoryMember = {
-    id: newId(),
+    id: revived?.id ?? newId(),
     name,
     role: optionalString(input.role),
     department,
@@ -1634,13 +1687,21 @@ export async function createStaffDirectoryMember(
     checklist_items: normalizeChecklistItems(input.checklist_items),
     admin_user_id: login.admin_user_id,
     dashboard_role: login.dashboard_role,
-    created_at: now,
+    created_at: revived?.created_at ?? now,
     updated_at: now
   };
+  await insertStaffDirectoryRecord(supabase, member);
+  if (login.admin_user_id && isAdminUserUuid(login.admin_user_id) && member.status === "Active") {
+    try {
+      await updateAdminUser(supabase, login.admin_user_id, { status: "active" });
+    } catch {
+      // Directory row is the source of truth even if login status cannot be flipped.
+    }
+  }
   const state = await loadState(supabase);
-  const next = createActivityLog({ ...state, staff_directory: sortNewest([member, ...state.staff_directory]) }, {
-    activity_type: "staff_directory.created",
-    title: `Added staff member: ${member.name}`,
+  const next = createActivityLog(state, {
+    activity_type: revived ? "staff_directory.restored" : "staff_directory.created",
+    title: revived ? `Restored staff member: ${member.name}` : `Added staff member: ${member.name}`,
     description: member.department,
     source_table: "staff_directory",
     source_id: member.id,
@@ -1659,7 +1720,11 @@ export async function updateStaffDirectoryMember(
 ) {
   const now = nowIso();
   const state = await loadState(supabase);
-  const existing = state.staff_directory.find((member) => member.id === id);
+  const persisted = await findStaffDirectoryRecordById(supabase, id);
+  const existing =
+    persisted && !persisted.deleted_at
+      ? (toPublicStaffDirectoryMember(persisted) as StaffDirectoryMember)
+      : state.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
 
   const nextName = patch.name !== undefined ? cleanString(patch.name) : existing.name;
@@ -1685,32 +1750,23 @@ export async function updateStaffDirectoryMember(
     actorAdminId ?? null
   );
 
-  let updated: StaffDirectoryMember | null = null;
-  const updatedState: StaffOpsState = {
-    ...state,
-    staff_directory: state.staff_directory.map((member) => {
-      if (member.id !== id) return member;
-      updated = {
-        ...member,
-        name: nextName,
-        role: patch.role !== undefined ? optionalString(patch.role) : member.role,
-        department: nextDepartment,
-        email: nextEmail,
-        phone: patch.phone !== undefined ? optionalString(patch.phone) : member.phone,
-        status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : member.status,
-        notes: patch.notes !== undefined ? optionalString(patch.notes) : member.notes,
-        checklist_items: patch.checklist_items !== undefined ? normalizeChecklistItems(patch.checklist_items) : member.checklist_items ?? null,
-        admin_user_id: login.admin_user_id,
-        dashboard_role: login.dashboard_role,
-        updated_at: now
-      };
-      return updated;
-    })
+  const updatedRecord: StaffDirectoryMember = {
+    ...existing,
+    name: nextName,
+    role: patch.role !== undefined ? optionalString(patch.role) : existing.role,
+    department: nextDepartment,
+    email: nextEmail,
+    phone: patch.phone !== undefined ? optionalString(patch.phone) : existing.phone,
+    status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : existing.status,
+    notes: patch.notes !== undefined ? optionalString(patch.notes) : existing.notes,
+    checklist_items: patch.checklist_items !== undefined ? normalizeChecklistItems(patch.checklist_items) : existing.checklist_items ?? null,
+    admin_user_id: login.admin_user_id,
+    dashboard_role: login.dashboard_role,
+    updated_at: now
   };
-  if (!updated) throw new Error("Staff member not found.");
-  const updatedRecord = updated as StaffDirectoryMember;
   if (!updatedRecord.name) throw new Error("Staff member name is required.");
-  const next = createActivityLog(updatedState, {
+  await updateStaffDirectoryRecord(supabase, updatedRecord);
+  const next = createActivityLog(state, {
     activity_type: "staff_directory.updated",
     title: `Updated staff member: ${updatedRecord.name}`,
     description: updatedRecord.status,
@@ -1724,24 +1780,43 @@ export async function updateStaffDirectoryMember(
 
 export async function deleteStaffDirectoryMember(supabase: SupabaseClient, id: string, actor: string | null) {
   const state = await loadState(supabase);
-  const existing = state.staff_directory.find((member) => member.id === id);
+  const persisted = await findStaffDirectoryRecordById(supabase, id);
+  const existing =
+    persisted && !persisted.deleted_at
+      ? persisted
+      : state.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
 
-  // Staff directory delete must free the dashboard login email so the person can be re-added.
+  if (!persisted) {
+    await insertStaffDirectoryRecord(supabase, {
+      id: existing.id,
+      name: existing.name,
+      role: existing.role,
+      department: existing.department,
+      email: existing.email,
+      phone: existing.phone,
+      status: existing.status === "Inactive" ? "Inactive" : "Active",
+      notes: existing.notes,
+      checklist_items: existing.checklist_items ?? null,
+      admin_user_id: existing.admin_user_id,
+      dashboard_role: existing.dashboard_role as StaffDirectoryMember["dashboard_role"],
+      created_at: existing.created_at,
+      updated_at: existing.updated_at
+    });
+  }
+  await archiveStaffDirectoryRecord(supabase, id, actor);
+
   if (existing.admin_user_id && isAdminUserUuid(existing.admin_user_id)) {
     try {
-      await deleteAdminUser(supabase, existing.admin_user_id);
+      await updateAdminUser(supabase, existing.admin_user_id, { status: "disabled" });
     } catch {
-      // Fall through to email-based cleanup below.
+      // Archiving the directory row must succeed even if login disable fails.
     }
   }
-  if (existing.email) {
-    await deleteAdminUserByEmail(supabase, existing.email);
-  }
 
-  const next = createActivityLog({ ...state, staff_directory: state.staff_directory.filter((member) => member.id !== id) }, {
+  const next = createActivityLog(state, {
     activity_type: "staff_directory.deleted",
-    title: `Deleted staff member: ${existing.name}`,
+    title: `Archived staff member: ${existing.name}`,
     description: existing.department,
     source_table: "staff_directory",
     source_id: existing.id,

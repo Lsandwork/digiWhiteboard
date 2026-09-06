@@ -23,8 +23,10 @@ assert.doesNotMatch(
 assert.match(directoryLoginSource, /"marketing"/);
 assert.match(directoryLoginSource, /createAdminUser/);
 assert.match(directoryLoginSource, /deleteAdminUserByEmail/);
-assert.match(adminOpsSource, /deleteAdminUserByEmail/);
-assert.match(adminOpsSource, /deleteStaffDirectoryMember[\s\S]*?deleteAdminUserByEmail/);
+assert.doesNotMatch(adminOpsSource, /deleteStaffDirectoryMember[\s\S]*?deleteAdminUserByEmail/);
+assert.match(adminOpsSource, /archiveStaffDirectoryRecord/);
+assert.match(adminOpsSource, /status: "disabled"/);
+assert.match(adminOpsSource, /patch_staff_admin_ops_preserve_directory/);
 
 console.log("directory login tests passed");
 
