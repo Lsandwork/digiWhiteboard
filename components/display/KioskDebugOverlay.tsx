@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 /** Fixed lobby/staff design canvas — kept here so the overlay shows the math. */
 const DESIGN_W = 1920;
@@ -171,6 +171,7 @@ function captureSnapshot(
     computedZoom: canvasBox.zoom,
     cssVarFitdogTvScale:
       getComputedStyle(document.documentElement).getPropertyValue("--fitdog-tv-scale").trim() ||
+      getComputedStyle(document.documentElement).getPropertyValue("--fitdog-tv-scale").trim() ||
       "(unset)",
     scaleFromInner: scaleLabel(window.innerWidth, window.innerHeight),
     scaleFromClient: scaleLabel(
@@ -226,11 +227,14 @@ export function KioskDebugOverlay({
   canvasSelector,
   stageSelector = "body"
 }: KioskDebugOverlayProps) {
-  const enabled = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return isKioskDebugEnabled(window.location.search);
-  }, []);
+  // Must detect query on the client after mount — useMemo(window) during SSR
+  // locks enabled=false for the lifetime of the component.
+  const [enabled, setEnabled] = useState(false);
   const [snap, setSnap] = useState<KioskDebugSnapshot | null>(null);
+
+  useEffect(() => {
+    setEnabled(isKioskDebugEnabled(window.location.search));
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
