@@ -171,7 +171,6 @@ function captureSnapshot(
     computedZoom: canvasBox.zoom,
     cssVarFitdogTvScale:
       getComputedStyle(document.documentElement).getPropertyValue("--fitdog-tv-scale").trim() ||
-      getComputedStyle(document.documentElement).getPropertyValue("--fitdog-tv-scale").trim() ||
       "(unset)",
     scaleFromInner: scaleLabel(window.innerWidth, window.innerHeight),
     scaleFromClient: scaleLabel(
@@ -371,7 +370,7 @@ export function KioskDebugOverlay({
       }}
     >
       <div style={{ fontWeight: 700, marginBottom: 6, color: "#fdba74" }}>
-        kioskDebug · {surface} (temporary — compare with casttv)
+        kioskDebug · {surface} (temporary — compare lobby vs casttv)
       </div>
       <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <tbody>
