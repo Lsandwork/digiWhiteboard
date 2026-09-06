@@ -1,93 +1,91 @@
 export const SITE = {
   name: "RuffOps",
   shortName: "RuffOps",
-  lockup: "Dog Operations Consulting",
-  tagline: "AI-powered operations consulting for modern dog businesses.",
+  lockup: "Operations Platform",
+  tagline: "The operations platform and digital whiteboard system for modern dog facilities.",
   description:
-    "AI-powered dog business consulting for dog daycares, boarding facilities, dog hotels, rescues, grooming centers, and animal care businesses. Improve operations, staff systems, safety, client communication, revenue, and facility performance.",
+    "RuffOps is the SaaS operations platform for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities. Give management and staff one command center — plus fully custom kiosk digital whiteboards for lobby TVs and every department.",
   url: "https://www.ruffops.com",
   email: "hello@ruffops.com",
   phoneDisplay: "(855) 783-3677",
   phoneHref: "tel:+18557833677",
   location: "Santa Monica, CA",
   serviceArea:
-    "On-site pet business consulting in Santa Monica, CA and within 10 miles · Online consulting nationwide across the USA",
+    "Built for dog facilities nationwide · On-site support in Santa Monica, CA and within 10 miles",
   clientLoginHref: "https://www.ruffops.com/client-login.html",
   attuneDemoHref: "https://www.ruffops.com/attune/demo/",
   behaviorAddonHref: "/assets/downloads/ruffops-dog-behavior-ai-addon.zip"
 } as const;
 
+/** Primary header nav — kept short so the bar never collapses into distortion. */
 export const NAV = [
-  { label: "Home", href: "/" },
-  { label: "Services", href: "/services" },
-  { label: "AI Platform", href: "/ai-platform" },
-  { label: "Attune™", href: "/attune" },
+  { label: "Platform", href: "/ai-platform" },
+  { label: "Whiteboards", href: "/services" },
   { label: "Industries", href: "/industries" },
-  { label: "Resources", href: "/resources" },
+  { label: "Attune™", href: "/attune" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" }
 ] as const;
 
 export const PRIMARY_CTA = {
-  label: "Request an Operations Review",
+  label: "Book a Product Demo",
   href: "/contact"
 } as const;
 
 export const PACKAGES = [
   {
-    id: "ai-starter-intensive",
-    tag: "Best for Quick Wins",
-    featured: false,
-    name: "AI Starter Intensive",
-    price: "Starting at $1,997",
+    id: "ops-platform",
+    tag: "SaaS Core",
+    featured: true,
+    name: "RuffOps Platform",
+    price: "Custom facility pricing",
     summary:
-      "A focused 2-week sprint for dog businesses that need immediate help with messy workflows, slow follow-up, staff confusion, owner communication, or manual admin work.",
+      "One operations command center for owners, managers, and staff — schedules, handoffs, alerts, SOPs, and live facility status in one place.",
     bullets: [
-      "Operations, software, forms, and workflow audit",
-      "Custom AI tools, GPTs, scripts, SOPs, and templates",
-      "Lead follow-up system to reduce missed inquiries",
-      "Staff workflow cleanup for front desk, daycare, grooming, boarding, or transport",
-      "Quick-win action plan your team can actually use"
+      "Management dashboards and staff workspaces",
+      "Live alerts, shift handoffs, and task clarity",
+      "Department workflows for front desk, yard, boarding, grooming, and transport",
+      "Owner communication and follow-up systems",
+      "Role-based access for leadership and floor teams"
     ],
-    note: "Best if things are messy and you need fast improvement without a long-term commitment.",
-    cta: "Fix My Workflow"
+    note: "Built for facilities that need the whole team aligned — not another forgotten login.",
+    cta: "See the Platform"
   },
   {
-    id: "operational-mastermind",
-    tag: "Most Popular",
-    featured: true,
-    name: "Operational Mastermind",
-    price: "Starting at $497/month",
+    id: "kiosk-whiteboards",
+    tag: "Signature Product",
+    featured: false,
+    name: "Custom Kiosk Whiteboards",
+    price: "Lobby + department displays",
     summary:
-      "Ongoing consulting and AI implementation for dog businesses that want RuffOps involved month after month — improving systems, staff execution, revenue, owner communication, and daily decision-making.",
+      "Fully custom digital whiteboards for lobby TVs and staff kiosks — designed for your brand, your rooms, and your daily flow.",
     bullets: [
-      "Monthly operations coaching and strategy calls",
-      "Custom AI tools, SOPs, checklists, scripts, and workflow library",
-      "Support for daycare, boarding, grooming, training, transport, and rescue operations",
-      "Revenue improvement opportunities and smarter service packaging",
-      "Live Q&A and implementation support",
-      "Priority support by phone, email, or video"
+      "Lobby check-in / check-out showcase boards",
+      "Staff whiteboards for every department",
+      "Cast-ready layouts for TV, tablet, and kiosk hardware",
+      "Brand-matched themes, motions, and content zones",
+      "Always-on displays that stay readable across the room"
     ],
-    note: "For businesses that want a real operations partner — not another software login collecting dust.",
-    cta: "Build My Ops System"
+    note: "The board guests see in the lobby — and the boards your team actually runs from.",
+    cta: "Design My Boards"
   },
   {
     id: "strategy-session",
-    tag: "Strategic Clarity",
+    tag: "Fast Clarity",
     featured: false,
-    name: "1:1 Strategy Session",
+    name: "Operations + Display Review",
     price: "$497 per session",
     summary:
-      "A private strategy session for owners who need a clear outside perspective on one major operational problem, growth decision, staffing issue, software mess, or revenue opportunity.",
+      "A focused working session to map your facility flow, staff needs, and which RuffOps boards + platform modules will create the fastest lift.",
     bullets: [
-      "90-minute private strategy session",
-      "Review of your biggest operational bottleneck",
-      "Custom recommendations based on your business model",
-      "Clear action roadmap after the call",
-      "Best next-step plan for systems, staffing, AI, or revenue"
+      "90-minute private review",
+      "Lobby and staff display recommendations",
+      "Ops bottlenecks and staffing friction audit",
+      "Clear rollout roadmap",
+      "Best next-step plan for software, boards, or both"
     ],
-    note: "Perfect when you need clarity before spending more money, hiring more people, or changing systems.",
-    cta: "Book My Strategy Call"
+    note: "Ideal before you invest in screens, hardware, or a full rollout.",
+    cta: "Book My Review"
   }
 ] as const;
 
@@ -116,3 +114,15 @@ export const SERVICE_OPTIONS = [
   "Retail",
   "Other"
 ] as const;
+
+/** Product imagery — always render inside fixed aspect frames (never stretch). */
+export const PRODUCT_SHOTS = {
+  lobbyBoard:
+    "/assets/lobby-whiteboard/light-v2/reference/Fitdog-Lobby-Whiteboard-Light-Approved-Mockup.png",
+  lobbyCheckout:
+    "/assets/fitdog-lobby-whiteboard/09-mockup-reference/fitdog-lobby-checkout-board-layout-reference-with-provided-logo.png",
+  lobbyCoastal:
+    "/assets/fitdog-lobby-whiteboard/02-backgrounds/fitdog-lobby-tv-bg-coastal-light-1920x1080.png",
+  lobbyDark:
+    "/assets/fitdog-lobby-whiteboard/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png"
+} as const;

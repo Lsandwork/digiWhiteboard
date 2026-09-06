@@ -1,5 +1,5 @@
-import { ArrowRight } from "lucide-react";
-import { PRIMARY_CTA } from "@/lib/ruffops-site/config";
+import { ArrowRight, Hexagon, PawPrint } from "lucide-react";
+import { PRIMARY_CTA, SITE } from "@/lib/ruffops-site/config";
 import { Reveal } from "@/components/ruffops-site/Reveal";
 import { SiteLink } from "@/components/ruffops-site/SiteLink";
 
@@ -55,9 +55,9 @@ export function PageHero({
 }
 
 export function MidCta({
-  title = "Your Dog Business Already Has the Data. We Help You Turn It Into Better Decisions.",
-  description = "Get a focused operations review and a clear plan for where AI-powered systems and real-world consulting make the fastest impact.",
-  secondaryLabel = "See the AI Platform",
+  title = "See the platform and the boards your facility would actually run.",
+  description = "We’ll map management views, staff department boards, and lobby kiosk layouts to your rooms, brand, and daily flow.",
+  secondaryLabel = "Explore the Platform",
   secondaryHref = "/ai-platform"
 }: {
   title?: string;
@@ -89,10 +89,10 @@ export function FinalCta() {
     <section className="container-page pb-20">
       <div className="card border-ro-accent/40 bg-radial-accent p-8 text-center sm:p-14">
         <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          Ready to see what AI can fix in your facility?
+          Ready for a lobby board that wows — and staff boards that stick?
         </h2>
         <p className="mx-auto mt-4 max-w-xl text-slate-400">
-          Get a focused operations review and a prioritized plan for your dog business.
+          Book a product demo to see RuffOps for management, staff, and fully custom kiosk whiteboards.
         </p>
         <SiteLink href={PRIMARY_CTA.href} className="btn-primary mt-8">
           {PRIMARY_CTA.label}
@@ -100,5 +100,21 @@ export function FinalCta() {
         </SiteLink>
       </div>
     </section>
+  );
+}
+
+/** Shared brand mark used by header/footer. */
+export function BrandMark() {
+  return (
+    <>
+      <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ro-line bg-ro-700/70 shadow-[0_0_0_1px_rgba(56,189,248,0.18),0_18px_60px_-25px_rgba(56,189,248,0.45)]">
+        <Hexagon className="absolute h-9 w-9 text-ro-electric/30" strokeWidth={1.2} />
+        <PawPrint className="h-4 w-4 text-ro-accent" />
+      </span>
+      <span className="flex flex-col leading-none">
+        <span className="text-sm font-bold tracking-tight text-white">{SITE.name}</span>
+        <span className="text-[10px] font-medium uppercase tracking-[0.22em] text-ro-electric/80">{SITE.lockup}</span>
+      </span>
+    </>
   );
 }
