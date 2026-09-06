@@ -1,91 +1,114 @@
 export const SITE = {
-  name: "RuffOps",
-  shortName: "RuffOps",
+  name: "ruffOPS",
+  shortName: "ruffOPS",
   lockup: "Operations Platform",
-  tagline: "The operations platform and digital whiteboard system for modern dog facilities.",
+  tagline: "The ultimate operations platform for pet businesses.",
   description:
-    "RuffOps is the SaaS operations platform for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities. Give management and staff one command center — plus fully custom kiosk digital whiteboards for lobby TVs and every department.",
+    "ruffOPS is the all-in-one operations platform for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities — connecting management and staff, powering custom lobby and department digital whiteboards, and keeping clients engaged from anywhere.",
   url: "https://www.ruffops.com",
   email: "hello@ruffops.com",
   phoneDisplay: "(855) 783-3677",
   phoneHref: "tel:+18557833677",
   location: "Santa Monica, CA",
   serviceArea:
-    "Built for dog facilities nationwide · On-site support in Santa Monica, CA and within 10 miles",
-  clientLoginHref: "https://www.ruffops.com/client-login.html",
-  attuneDemoHref: "https://www.ruffops.com/attune/demo/",
-  behaviorAddonHref: "/assets/downloads/ruffops-dog-behavior-ai-addon.zip"
+    "Built for pet facilities nationwide · On-site support in Santa Monica, CA and within 10 miles",
+  /** Real staff Digi-Board authentication — not a fake marketing login. */
+  loginHref: "https://staff.ruffops.com/admin/login",
+  /** @deprecated Prefer loginHref — kept for older chrome references. */
+  clientLoginHref: "https://staff.ruffops.com/admin/login",
+  attuneDemoHref: "https://www.ruffops.com/attune/demo/"
 } as const;
 
-/** Primary header nav — kept short so the bar never collapses into distortion. */
+/** Global marketing navigation matching the production redesign. */
 export const NAV = [
-  { label: "Platform", href: "/ai-platform" },
-  { label: "Whiteboards", href: "/services" },
-  { label: "Industries", href: "/industries" },
-  { label: "Attune™", href: "/attune" },
+  { label: "Home", href: "/" },
+  { label: "Solutions", href: "/solutions" },
+  { label: "Why ruffOPS", href: "/why-ruffops" },
+  { label: "Pricing", href: "/pricing" },
   { label: "About", href: "/about" },
-  { label: "Contact", href: "/contact" }
+  { label: "Support", href: "/support" }
 ] as const;
 
 export const PRIMARY_CTA = {
-  label: "Book a Product Demo",
-  href: "/contact"
+  label: "Get Started",
+  href: "/get-started"
 } as const;
 
+export const SECONDARY_CTA = {
+  label: "Login",
+  href: "https://staff.ruffops.com/admin/login"
+} as const;
+
+export const FOOTER_PRODUCT_LINKS = [
+  { label: "Powerful SaaS Platform", href: "/solutions/management-platform" },
+  { label: "Digital Whiteboards", href: "/solutions/digital-whiteboards" },
+  { label: "Advertising Screens", href: "/solutions/advertising" },
+  { label: "Expert Support", href: "/support" }
+] as const;
+
+/** Consultative pricing — no invented monthly rates. */
 export const PACKAGES = [
   {
     id: "ops-platform",
-    tag: "SaaS Core",
+    tag: "SaaS Platform",
     featured: true,
-    name: "RuffOps Platform",
+    name: "Custom SaaS Management Platform",
     price: "Custom facility pricing",
+    audience: "For managers & staff",
     summary:
-      "One operations command center for owners, managers, and staff — schedules, handoffs, alerts, SOPs, and live facility status in one place.",
+      "One operations command center for owners, managers, and staff — live status, schedules, handoffs, alerts, and department workflows in one place.",
     bullets: [
       "Management dashboards and staff workspaces",
-      "Live alerts, shift handoffs, and task clarity",
+      "Live check-in / check-out status and facility visibility",
+      "Shift handoffs, alerts, and task clarity",
       "Department workflows for front desk, yard, boarding, grooming, and transport",
-      "Owner communication and follow-up systems",
-      "Role-based access for leadership and floor teams"
+      "Role-based access for leadership and floor teams",
+      "Multi-device access for office, lobby, and floor"
     ],
     note: "Built for facilities that need the whole team aligned — not another forgotten login.",
-    cta: "See the Platform"
+    cta: "Explore the Platform",
+    href: "/solutions/management-platform"
   },
   {
     id: "kiosk-whiteboards",
-    tag: "Signature Product",
+    tag: "Digital Whiteboards",
     featured: false,
-    name: "Custom Kiosk Whiteboards",
+    name: "Custom Kiosk Digital Whiteboards",
     price: "Lobby + department displays",
+    audience: "For lobby activities",
     summary:
-      "Fully custom digital whiteboards for lobby TVs and staff kiosks — designed for your brand, your rooms, and your daily flow.",
+      "Fully custom digital whiteboards for lobby TVs and staff kiosks — designed for your brand, rooms, and daily flow.",
     bullets: [
       "Lobby check-in / check-out showcase boards",
+      "Live dog information and lobby activity displays",
       "Staff whiteboards for every department",
+      "Brand-matched themes, motion, and content zones",
       "Cast-ready layouts for TV, tablet, and kiosk hardware",
-      "Brand-matched themes, motions, and content zones",
-      "Always-on displays that stay readable across the room"
+      "Always-on displays readable across the room"
     ],
     note: "The board guests see in the lobby — and the boards your team actually runs from.",
-    cta: "Design My Boards"
+    cta: "See Whiteboard Solutions",
+    href: "/solutions/digital-whiteboards"
   },
   {
-    id: "strategy-session",
-    tag: "Fast Clarity",
+    id: "advertising-screens",
+    tag: "Advertising",
     featured: false,
-    name: "Operations + Display Review",
-    price: "$497 per session",
+    name: "Remote Digital Whiteboard Advertising",
+    price: "Rental or consulting",
+    audience: "Rental or consulting services",
     summary:
-      "A focused working session to map your facility flow, staff needs, and which RuffOps boards + platform modules will create the fastest lift.",
+      "Deploy branded display screens with remote content updates, advertising management, and setup consulting for pet facilities.",
     bullets: [
-      "90-minute private review",
-      "Lobby and staff display recommendations",
-      "Ops bottlenecks and staffing friction audit",
-      "Clear rollout roadmap",
-      "Best next-step plan for software, boards, or both"
+      "Screen deployment and mounting guidance",
+      "Remote content and advertising updates",
+      "Content scheduling for lobby and waiting areas",
+      "Equipment recommendations and support",
+      "Setup consulting for single or multi-location facilities"
     ],
-    note: "Ideal before you invest in screens, hardware, or a full rollout.",
-    cta: "Book My Review"
+    note: "Ideal when you want premium lobby screens without building the display stack alone.",
+    cta: "Talk About Screens",
+    href: "/solutions/advertising"
   }
 ] as const;
 
@@ -115,7 +138,15 @@ export const SERVICE_OPTIONS = [
   "Other"
 ] as const;
 
-/** Product imagery — always render inside fixed aspect frames (never stretch). */
+export const INTEREST_OPTIONS = [
+  "SaaS Management Platform",
+  "Custom Kiosk Digital Whiteboards",
+  "Advertising / Display Screens",
+  "Operations + Display Review",
+  "Not sure — need guidance"
+] as const;
+
+/** Real product imagery from this repository — never invent fake dashboards. */
 export const PRODUCT_SHOTS = {
   lobbyBoard:
     "/assets/lobby-whiteboard/light-v2/reference/Fitdog-Lobby-Whiteboard-Light-Approved-Mockup.png",
@@ -124,5 +155,12 @@ export const PRODUCT_SHOTS = {
   lobbyCoastal:
     "/assets/fitdog-lobby-whiteboard/02-backgrounds/fitdog-lobby-tv-bg-coastal-light-1920x1080.png",
   lobbyDark:
-    "/assets/fitdog-lobby-whiteboard/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png"
+    "/assets/fitdog-lobby-whiteboard/02-backgrounds/fitdog-lobby-tv-bg-dark-active-1920x1080.png",
+  dashboardHero: "/assets/crossover-dashboard/hero-mockup-reference.png",
+  heroDogs: "/assets/login/fitdog-login-dogs.webp",
+  pawOrange: "/assets/fitdog/paw-outline-orange.svg",
+  staffPreview: "/assets/fitdog/staff-whiteboard/themes/clear-white-preview.png"
 } as const;
+
+/** @deprecated aliases */
+export const PRODUCT_SHOTS_LEGACY = PRODUCT_SHOTS;

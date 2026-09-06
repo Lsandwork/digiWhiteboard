@@ -21,6 +21,15 @@ assert.equal(ruffopsMarketingRewriteTarget("/"), RUFFOPS_SITE_PREFIX);
 assert.equal(ruffopsMarketingRewriteTarget("/services"), "/ruffops-site/services");
 assert.equal(ruffopsMarketingRewriteTarget("/dog-behavior-ai.html"), "/ruffops-site/attune");
 assert.equal(ruffopsMarketingRewriteTarget("/online-courses.html"), "/ruffops-site/resources");
+assert.equal(ruffopsMarketingRewriteTarget("/solutions"), "/ruffops-site/solutions");
+assert.equal(ruffopsMarketingRewriteTarget("/get-started"), "/ruffops-site/get-started");
+assert.equal(ruffopsMarketingRewriteTarget("/why-ruffops"), "/ruffops-site/why-ruffops");
+assert.equal(ruffopsMarketingRewriteTarget("/pricing"), "/ruffops-site/pricing");
+assert.equal(ruffopsMarketingRewriteTarget("/support"), "/ruffops-site/support");
+assert.equal(
+  ruffopsMarketingRewriteTarget("/solutions/management-platform"),
+  "/ruffops-site/solutions/management-platform"
+);
 
 assert.equal(rewriteRuffopsMarketingPath("ruffops.com", "/"), "/ruffops-site");
 assert.equal(rewriteRuffopsMarketingPath("www.ruffops.com", "/contact"), "/ruffops-site/contact");
