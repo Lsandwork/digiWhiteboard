@@ -164,15 +164,21 @@ function parsePhoneList(raw: string | undefined): string[] {
 }
 
 async function loadSuperAdminPhonesFromSupabase(supabase: SupabaseClient): Promise<string[]> {
-  const { data } = await supabase
-    .from("admin_settings")
-    .select("settings->staff_admin_ops->staff_directory")
-    .eq("id", "default")
-    .maybeSingle();
-  const directoryRaw = (data as Record<string, unknown> | null)?.staff_directory;
-  const directory = Array.isArray(directoryRaw)
-    ? (directoryRaw as Array<{ name?: string; email?: string; phone?: string | null; status?: string }>)
-    : [];
+  const { listVisibleStaffDirectory } = await import("@/lib/staff/directory-store");
+  let directory: Array<{ name?: string; email?: string | null; phone?: string | null; status?: string }> = [];
+  try {
+    directory = await listVisibleStaffDirectory(supabase);
+  } catch {
+    const { data } = await supabase
+      .from("admin_settings")
+      .select("settings->staff_admin_ops->staff_directory")
+      .eq("id", "default")
+      .maybeSingle();
+    const directoryRaw = (data as Record<string, unknown> | null)?.staff_directory;
+    directory = Array.isArray(directoryRaw)
+      ? (directoryRaw as Array<{ name?: string; email?: string; phone?: string | null; status?: string }>)
+      : [];
+  }
   const lonnie = directory.find((member) => {
     const email = String(member.email || "")
       .trim()

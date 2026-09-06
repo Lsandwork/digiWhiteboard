@@ -128,7 +128,7 @@ export function StaffDirectoryPanel() {
     else setLoading(true);
 
     try {
-      const response = await fetch("/api/admin/staff-operations", { cache: "no-store" });
+      const response = await fetch("/api/admin/staff-operations?roster=1", { cache: "no-store" });
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load staff directory.");
       setData(body as StaffDirectoryPayload);
@@ -234,8 +234,8 @@ export function StaffDirectoryPanel() {
           <h2 className="crossover-dashboard__page-title">Staff Directory</h2>
           <p className="crossover-dashboard__page-subtitle">
             {canManageDirectory
-              ? "Manage staff assignments, contact details, and dashboard login access in one place."
-              : "View staff assignments, contact details, and dashboard roles. Only full admins can add or edit entries."}
+              ? "Persistent roster of every staff member. Inactive people stay listed. Only an explicit admin archive removes someone."
+              : "View every non-archived staff member, including inactive assignments. Only full admins can add, edit, or archive entries."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -278,7 +278,9 @@ export function StaffDirectoryPanel() {
             <div>
               <h3 className="crossover-card__title">Directory</h3>
               <p className="crossover-card__subtitle">
-                {canManageDirectory ? "Search, edit, activate, deactivate, or delete staff entries." : "Search and review staff directory records."}
+                {canManageDirectory
+                  ? "Search, edit, or deactivate staff. Inactive staff remain in All staff. Archive only with confirmation."
+                  : "Search and review staff directory records. Inactive staff are included unless you filter them out."}
               </p>
             </div>
             <button type="button" className="crossover-btn crossover-btn--outline" onClick={() => void load(true)} disabled={loading || refreshing}>
@@ -296,7 +298,7 @@ export function StaffDirectoryPanel() {
               />
             </label>
             <FilterButtonGroup label="Department" value={department} options={["", ...STAFF_DEPARTMENTS]} allLabel="All departments" onChange={setDepartment} />
-            <FilterButtonGroup label="Status" value={status} options={["", ...staffStatusOptions]} allLabel="All statuses" onChange={setStatus} />
+            <FilterButtonGroup label="Status" value={status} options={["", ...staffStatusOptions]} allLabel="All staff" onChange={setStatus} />
           </div>
 
           <div className="crossover-table-wrap hidden md:block">
@@ -537,9 +539,9 @@ export function StaffDirectoryPanel() {
 
           <ConfirmDialog
             open={Boolean(deleteMember)}
-            title="Delete staff member?"
-            description={`This removes ${deleteMember?.name ?? "this staff member"} from assignment dropdowns. Existing records will keep their saved assignment text.`}
-            confirmLabel="Delete staff member"
+            title="Archive this staff member?"
+            description={`This is the only way to remove ${deleteMember?.name ?? "this staff member"} from the Staff Directory. Inactive status does not remove them. Existing logs keep their saved assignment text.`}
+            confirmLabel="Archive staff member"
             danger
             busy={busy}
             onCancel={() => setDeleteMember(null)}

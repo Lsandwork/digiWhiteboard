@@ -37,6 +37,7 @@ import {
   updateStaffDirectoryMember,
   updateOwnerFollowUp
 } from "@/lib/staff/admin-ops";
+import { listVisibleStaffDirectory } from "@/lib/staff/directory-store";
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
@@ -123,26 +124,55 @@ export async function GET(request: Request) {
   }
 
   try {
+    const url = new URL(request.url);
+    const rosterRequest = url.searchParams.get("roster") === "1";
+    const supabase = getServiceSupabase({ timeoutMs: STAFF_OPS_LOAD_TIMEOUT_MS });
+    const directoryPromise = listVisibleStaffDirectory(supabase).catch((error) => {
+      console.warn("[staff-directory] list failed:", error instanceof Error ? error.message : error);
+      return null;
+    });
     const state = await withTimeoutFallback(
-      getOrLoadTtlCache("staff-ops:list", STAFF_OPS_CACHE_TTL_MS, () =>
-        listStaffOps(getServiceSupabase({ timeoutMs: STAFF_OPS_LOAD_TIMEOUT_MS }))
-      ),
+      getOrLoadTtlCache("staff-ops:list", STAFF_OPS_CACHE_TTL_MS, () => listStaffOps(supabase)),
       STAFF_OPS_LOAD_TIMEOUT_MS,
       null
     );
-    if (!state) {
-      return NextResponse.json(
-        { error: "Team Log is taking too long to load. Retry in a moment." },
-        { status: 503 }
-      );
-    }
+    const directoryFromTable = await directoryPromise;
+    const directory = state ? state.staff_directory : directoryFromTable ?? [];
     const readerSession = {
       email: session?.email ?? null,
       adminUserId: session?.adminUserId ?? null,
       role: role ?? null
     };
+    if (!state) {
+      if (rosterRequest) {
+        return NextResponse.json({
+          crossover_messages: [],
+          crossover_message_replies: [],
+          owner_follow_ups: [],
+          active_issues: [],
+          activity_logs: [],
+          staff_directory: directory,
+          notifications: [],
+          currentUser: {
+            email: readerSession.email,
+            adminUserId: readerSession.adminUserId,
+            role: readerSession.role
+          },
+          permissions: {
+            canCreate: canCreateShiftLogEntry(role),
+            canEdit: canMutateFrontDeskLog(role),
+            canView: canUseFrontDeskLog(role, session)
+          }
+        });
+      }
+      return NextResponse.json(
+        { error: "Team Log is taking too long to load. Retry in a moment." },
+        { status: 503 }
+      );
+    }
     return NextResponse.json({
       ...capStaffOpsListPayload(state),
+      staff_directory: directory,
       // Never expose other users' notifications in the payload.
       notifications: notificationsForSession(state, readerSession),
       currentUser: {
@@ -346,6 +376,13 @@ export async function POST(request: Request) {
     });
 
     invalidateTtlCache("staff-ops:");
+    if (
+      action === "create_staff_member" ||
+      action === "update_staff_member" ||
+      action === "delete_staff_member"
+    ) {
+      invalidateTtlCache("staff-directory:");
+    }
 
     return NextResponse.json({ ok: true, result });
   } catch (error) {
