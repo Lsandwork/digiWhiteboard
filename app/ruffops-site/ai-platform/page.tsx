@@ -4,9 +4,9 @@ import { Reveal } from "@/components/ruffops-site/Reveal";
 import { SiteLink } from "@/components/ruffops-site/SiteLink";
 
 export const metadata: Metadata = {
-  title: "AI Software for Dog Daycares — The AI Dog Operations Command Center",
+  title: "Operations Platform for Dog Facilities — Management & Staff Command Center",
   description:
-    "The RuffOps AI Dog Operations Command Center: one operational picture across dogs, staff, services, transportation, bookings, incidents, and revenue."
+    "RuffOps operations platform: one command center for management and staff across dogs, services, transportation, bookings, incidents, and revenue — built to power lobby and department kiosk whiteboards."
 };
 
 const features = [
@@ -26,9 +26,9 @@ export default function AiPlatformPage() {
   return (
     <>
       <PageHero
-        eyebrow="AI Operations Platform"
-        title="The AI Dog Operations Command Center"
-        description="Built around the real daily pressure of dog facilities, not generic business software."
+        eyebrow="SaaS Operations Platform"
+        title="The command center for management and staff"
+        description="One operations system for owners, managers, and floor teams — built for dog facilities, and ready to drive custom lobby and department kiosk whiteboards."
       />
       <section className="container-page grid items-start gap-10 pb-10 lg:grid-cols-[1.2fr_1fr]">
         <Reveal>

@@ -9,7 +9,7 @@ const fieldLabel = "mb-1.5 block text-sm font-medium text-slate-300";
 type Status = "idle" | "submitting" | "success" | "error";
 
 export function ContactForm({
-  defaultFormType = "Strategy Call Request",
+  defaultFormType = "Product Demo Request",
   initialSuccess = false
 }: {
   defaultFormType?: string;

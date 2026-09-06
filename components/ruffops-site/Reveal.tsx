@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+/**
+ * Fade/slide reveal. Starts visible after a short fallback so content never
+ * appears "blank" or distorted if IntersectionObserver is delayed.
+ */
 export function Reveal({
   children,
   delay = 0,
@@ -11,7 +15,6 @@ export function Reveal({
   children: ReactNode;
   delay?: number;
   className?: string;
-  as?: never;
   id?: string;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -20,28 +23,35 @@ export function Reveal({
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
+
+    const show = () => setVisible(true);
+    const fallback = window.setTimeout(show, 900 + delay);
+
+    if (typeof IntersectionObserver === "undefined") {
+      show();
+      return () => window.clearTimeout(fallback);
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            setVisible(true);
+            window.setTimeout(show, delay);
             observer.unobserve(entry.target);
           }
         });
       },
-      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+      { threshold: 0.08, rootMargin: "0px 0px -8% 0px" }
     );
     observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      window.clearTimeout(fallback);
+      observer.disconnect();
+    };
+  }, [delay]);
 
   return (
-    <div
-      ref={ref}
-      id={id}
-      className={`reveal ${visible ? "is-visible" : ""} ${className}`}
-      style={{ transitionDelay: `${delay}ms` }}
-    >
+    <div ref={ref} id={id} className={`reveal ${visible ? "is-visible" : ""} ${className}`}>
       {children}
     </div>
   );
