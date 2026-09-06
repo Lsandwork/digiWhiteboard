@@ -70,8 +70,8 @@ export default function ServicesPage() {
         eyebrow="Custom Kiosk Whiteboards"
         title="Lobby boards that wow. Staff boards that stick."
         description="Fully custom digital whiteboards for lobby TVs and every department kiosk — designed for your brand, rooms, and daily flow."
-        secondaryLabel="Book a product demo"
-        secondaryHref="/contact"
+        secondaryLabel="Explore the platform"
+        secondaryHref="/ai-platform"
       />
 
       <section className="container-page pb-10">

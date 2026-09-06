@@ -199,8 +199,8 @@ export default async function RuffopsHomePage({
               <div className="ro-device-frame ro-device-frame--offset">
                 <div className="ro-device-bezel">
                   <Image
-                    src={PRODUCT_SHOTS.lobbyDark}
-                    alt="RuffOps dark lobby television theme"
+                    src={PRODUCT_SHOTS.lobbyCoastal}
+                    alt="RuffOps coastal lobby television theme"
                     fill
                     className="ro-device-screen"
                     sizes="(max-width: 1024px) 100vw, 40vw"
@@ -235,8 +235,8 @@ export default async function RuffopsHomePage({
           <Reveal className="ro-cinema">
             <div className="ro-cinema-bezel">
               <Image
-                src={PRODUCT_SHOTS.lobbyCoastal}
-                alt="RuffOps coastal light lobby television background"
+                src={PRODUCT_SHOTS.lobbyDark}
+                alt="RuffOps dark active lobby television theme"
                 fill
                 className="ro-device-screen"
                 sizes="100vw"
