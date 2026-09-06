@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { toDisplayPhotoUrl } from "@/lib/gingr-photo-display";
 import { lobbyLightAssets } from "@/lib/lobby/assets";
 import {
@@ -57,7 +57,7 @@ function SpotlightDogPhoto({
 }
 
 function SpotlightDogPanel({ dog, dual }: { dog: LobbyCheckoutDog; dual: boolean }) {
-  const facts = useMemo(
+  const fallbackFacts = useMemo(
     () =>
       buildCheckoutFunFacts({
         dogName: dog.dog_name,
@@ -67,6 +67,39 @@ function SpotlightDogPanel({ dog, dual }: { dog: LobbyCheckoutDog; dual: boolean
       }),
     [dog.breed, dog.dog_name, dog.gingr_animal_id, dual]
   );
+  const [facts, setFacts] = useState<string[]>(fallbackFacts);
+
+  useEffect(() => {
+    setFacts(fallbackFacts);
+    const params = new URLSearchParams({
+      dogName: dog.dog_name,
+      count: dual ? "4" : "5"
+    });
+    if (dog.gingr_animal_id) params.set("animalId", dog.gingr_animal_id);
+    if (dog.breed) params.set("breed", dog.breed);
+
+    const controller = new AbortController();
+    const headers: HeadersInit = {};
+    if (typeof window !== "undefined") {
+      const token = new URLSearchParams(window.location.search).get("token")?.trim();
+      if (token) headers["x-lobby-display-token"] = token;
+    }
+    void fetch(`/api/lobby/checkout-fun-facts?${params.toString()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers
+    })
+      .then(async (response) => {
+        if (!response.ok) return;
+        const body = (await response.json()) as { facts?: string[] };
+        if (Array.isArray(body.facts) && body.facts.length) setFacts(body.facts);
+      })
+      .catch(() => {
+        // Keep deterministic fallback so the lobby TV never blanks.
+      });
+
+    return () => controller.abort();
+  }, [dog.breed, dog.dog_name, dog.gingr_animal_id, dual, fallbackFacts]);
   const summary = useMemo(
     () =>
       buildCheckoutDaySummary({
