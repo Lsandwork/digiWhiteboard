@@ -1,9 +1,10 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
 import type { NormalizedReportItem } from "@/lib/route-generator/parser";
 import { formatStopDisplayName, groupHouseholds } from "@/lib/route-generator/households";
-import { groupHouseholdsWithFacilities } from "@/lib/route-generator/facility";
+import { groupHouseholdsWithFacilities, isFacilityHouseholdKey, facilityBaseKeyFromHousehold } from "@/lib/route-generator/facility";
 import {
   DEFAULT_FITDOG_LOCATIONS,
+  FITDOG_CLUB_STOP_NAME,
   type FitdogLocationsConfig
 } from "@/lib/route-generator/locations";
 import { buildCustomerStopNotes, formatPhoneForDriver } from "@/lib/route-generator/stop-notes";
@@ -307,20 +308,34 @@ export async function applyItemsToExistingPlan(params: {
         const size = (item.dogSize as "Small" | "Medium" | "Large" | "Extra Large" | "Unknown" | null) ?? "Unknown";
         load += resolveLoadUnits(size, sizeLoads).units;
       }
+      const isClubDropoff =
+        direction === "dropoff" && facilityBaseKeyFromHousehold(group.householdKey) === "club";
       const notes = buildCustomerStopNotes({
         items: group.items,
         direction,
-        isFacility: group.householdKey.startsWith("facility:"),
+        isFacility: isFacilityHouseholdKey(group.householdKey),
         facilityLabel: group.address
       });
 
-      const { data: existingStop } = await supabase
+      let existingStop: Record<string, unknown> | null = null;
+      const { data: exactStop } = await supabase
         .from("route_plan_stops")
         .select("*")
         .eq("route_id", route.id)
         .eq("household_key", group.householdKey)
         .eq("stop_kind", "customer")
         .maybeSingle();
+      existingStop = (exactStop as Record<string, unknown> | null) ?? null;
+      if (!existingStop && isClubDropoff) {
+        const { data: clubStops } = await supabase
+          .from("route_plan_stops")
+          .select("*")
+          .eq("route_id", route.id)
+          .eq("stop_kind", "customer")
+          .like("household_key", "facility:club%")
+          .limit(1);
+        existingStop = ((clubStops ?? [])[0] as Record<string, unknown> | undefined) ?? null;
+      }
 
       let stopId = existingStop?.id as string | undefined;
       if (existingStop) {
@@ -329,7 +344,9 @@ export async function applyItemsToExistingPlan(params: {
         const patch: Record<string, unknown> = {
           dog_count: nextDogCount,
           load_units: nextLoad,
-          owner_name: formatStopDisplayName([
+          owner_name: isClubDropoff
+            ? FITDOG_CLUB_STOP_NAME
+            : formatStopDisplayName([
             // Rebuild label from stop items + new dogs after insert below; use group for now.
             ...group.items
           ]),
@@ -394,7 +411,9 @@ export async function applyItemsToExistingPlan(params: {
             route_id: route.id,
             sequence: 9000 + dogsAdded,
             stop_kind: "customer",
-            owner_name: group.ownerName || formatStopDisplayName(group.items),
+            owner_name: isClubDropoff
+              ? FITDOG_CLUB_STOP_NAME
+              : group.ownerName || formatStopDisplayName(group.items),
             address: group.address || donorAddress || "",
             latitude,
             longitude,

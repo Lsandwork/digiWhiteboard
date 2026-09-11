@@ -302,12 +302,20 @@ export function ensureScheduleOnOperatingDate(params: {
   stopIndex: number;
   stopCount: number;
   vanKey?: string | null;
+  /** Starting stop: leave arrival blank so Samsara treats the vehicle as already there. */
+  preserveBlankArrival?: boolean;
 }): { arrival: string; departure: string; realigned: boolean } {
+  const preserveBlankArrival = Boolean(params.preserveBlankArrival) && !params.arrival.trim();
   const arrivalOk =
-    !params.arrival.trim() || samsaraCsvDateTimeMatchesOperatingDate(params.arrival, params.operatingDate);
+    preserveBlankArrival ||
+    !params.arrival.trim() ||
+    samsaraCsvDateTimeMatchesOperatingDate(params.arrival, params.operatingDate);
   const departureOk =
     !params.departure.trim() ||
     samsaraCsvDateTimeMatchesOperatingDate(params.departure, params.operatingDate);
+  if (preserveBlankArrival && departureOk && params.departure.trim()) {
+    return { arrival: "", departure: params.departure, realigned: false };
+  }
   if (arrivalOk && departureOk && params.arrival.trim() && params.departure.trim()) {
     return { arrival: params.arrival, departure: params.departure, realigned: false };
   }
@@ -318,7 +326,11 @@ export function ensureScheduleOnOperatingDate(params: {
     stopCount: params.stopCount,
     vanKey: params.vanKey
   });
-  return { arrival: synthesized.arrival, departure: synthesized.departure, realigned: true };
+  return {
+    arrival: preserveBlankArrival ? "" : synthesized.arrival,
+    departure: synthesized.departure,
+    realigned: true
+  };
 }
 
 /** Parse `m/d/yyyy H:mm` used in our Samsara CSV cells (also accepts zero-padded). */
@@ -402,6 +414,16 @@ export function enforceMonotonicRouteSchedule(rows: ExportStopRow[]): {
     let previousBase: WallClock | null = null;
 
     for (const stop of ordered) {
+      const isStartingStop = previousDepartureMinutes == null && previousBase == null;
+      const arrivalBlank = !String(stop.scheduledArrival || "").trim();
+      if (isStartingStop && arrivalBlank) {
+        const departureOnly = parseWallClock(stop.scheduledDeparture);
+        if (!departureOnly) continue;
+        previousDepartureMinutes = departureOnly.minutes;
+        previousBase = departureOnly;
+        continue;
+      }
+
       const arrival = parseWallClock(stop.scheduledArrival);
       const departure = parseWallClock(stop.scheduledDeparture);
       const base: WallClock | null = arrival ?? departure ?? previousBase;
@@ -632,10 +654,16 @@ export function validateExport(params: {
         `Stop Name too long on ${row.routeName} ("${row.stopName.slice(0, 40)}…", ${row.stopName.length} chars).`
       );
     }
-    if (!row.scheduledArrival?.trim() || !row.scheduledDeparture?.trim()) {
-      errors.push(`Missing scheduled arrival/departure on route ${row.routeName} stop "${row.stopName}"`);
-    } else {
-      if (!datetimeRe.test(row.scheduledArrival.trim()) || !datetimeRe.test(row.scheduledDeparture.trim())) {
+    const arrivalBlank = !row.scheduledArrival?.trim();
+    const departureBlank = !row.scheduledDeparture?.trim();
+    if (departureBlank) {
+      errors.push(`Missing scheduled departure on route ${row.routeName} stop "${row.stopName}"`);
+    } else if (!datetimeRe.test(row.scheduledDeparture.trim())) {
+      errors.push(
+        `Datetime must be m/d/yyyy H:mm (Samsara sample style) on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledArrival}" / "${row.scheduledDeparture}").`
+      );
+    } else if (!arrivalBlank) {
+      if (!datetimeRe.test(row.scheduledArrival.trim())) {
         errors.push(
           `Datetime must be m/d/yyyy H:mm (Samsara sample style) on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledArrival}" / "${row.scheduledDeparture}").`
         );
@@ -662,6 +690,10 @@ export function validateExport(params: {
           );
         }
       }
+    } else if (params.operatingDate && !samsaraCsvDateTimeMatchesOperatingDate(row.scheduledDeparture, params.operatingDate)) {
+      errors.push(
+        `Departure date must be ${params.operatingDate} on ${row.routeName} stop "${row.stopName}" (got "${row.scheduledDeparture}").`
+      );
     }
     // Raw lat/lng mode: Samsara bulk upload often 500s when any of these are missing.
     if (!row.stopAddress?.trim() || !row.latitude?.trim() || !row.longitude?.trim()) {
@@ -744,6 +776,18 @@ export function validateExport(params: {
     if (orders.join(",") !== sortedOrders.join(",")) {
       warnings.push(`Route ${routeName} stop order was resorted for validation.`);
     }
+    const starting = ordered[0];
+    if (starting && !starting.scheduledArrival?.trim() && !starting.scheduledDeparture?.trim()) {
+      errors.push(`Missing scheduled departure on starting stop of ${routeName} ("${starting.stopName}").`);
+    }
+    for (let i = 1; i < ordered.length; i += 1) {
+      const later = ordered[i]!;
+      if (!later.scheduledArrival?.trim()) {
+        errors.push(
+          `Missing scheduled arrival on ${routeName} stop "${later.stopName}" — only the starting stop may omit arrival (vehicle already at stop).`
+        );
+      }
+    }
     for (let i = 1; i < ordered.length; i += 1) {
       const prev = ordered[i - 1]!;
       const cur = ordered[i]!;
@@ -773,6 +817,7 @@ export function validateExport(params: {
       `CSV row count mismatch (file has ${dataLines.length} data rows, exporter built ${params.rows.length}).`
     );
   }
+  const seenRouteStart = new Set<string>();
   for (let i = 0; i < dataLines.length; i += 1) {
     const cells = parseCsvLine(dataLines[i]!, params.template.delimiter);
     if (cells.length !== SAMSARA_BULK_UPLOAD_HEADERS.length) {
@@ -803,7 +848,11 @@ export function validateExport(params: {
     if (!isAllowedSamsaraVehicleName(vehicle || "")) {
       errors.push(`CSV line ${i + 2}: vehicle "${vehicle}" is not on the Samsara roster.`);
     }
-    if (!datetimeRe.test(String(arrival || "").trim()) || !datetimeRe.test(String(departure || "").trim())) {
+    const isStartingRow = Boolean(routeName) && !seenRouteStart.has(String(routeName));
+    if (routeName) seenRouteStart.add(String(routeName));
+    const arrivalText = String(arrival || "").trim();
+    const departureText = String(departure || "").trim();
+    if (!datetimeRe.test(departureText) || (arrivalText ? !datetimeRe.test(arrivalText) : !isStartingRow)) {
       errors.push(`CSV line ${i + 2}: bad arrival/departure datetime format.`);
     }
     if (!/^-?\d+(\.\d+)?$/.test(String(lat || "").trim()) || !/^-?\d+(\.\d+)?$/.test(String(lng || "").trim())) {
