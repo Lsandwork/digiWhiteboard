@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCardStudioPermission, cardStudioActor } from "@/lib/card-studio/access";
 import { dashboardStats, ensureDefaultTemplates, refreshDiscoveredPrinters } from "@/lib/card-studio/store";
-import { writeCardStudioAudit } from "@/lib/card-studio/audit";
 
 export const dynamic = "force-dynamic";
 
