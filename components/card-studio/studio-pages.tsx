@@ -41,7 +41,7 @@ export function TemplateLibrary() {
       <div className="cs-page-title">
         <div>
           <h1>Templates</h1>
-          <p>Versioned CR80 artwork. Historical versions stay attached to issued cards.</p>
+          <p>Versioned CR80 artwork. The Club + Sports VIP template is print-ready: edit the dog name and replace the top-left photo.</p>
         </div>
         <Link className="cs-btn cs-btn--primary" href={CARD_STUDIO_PATHS.designer}>New template</Link>
       </div>
@@ -137,8 +137,11 @@ export function IssueWizard() {
 
   useEffect(() => {
     fetch("/api/card-studio/templates?status=active", { credentials: "same-origin" }).then((r) => r.json()).then((j) => {
-      setTemplates(j.templates ?? []);
-      if (j.templates?.[0]) setTemplateId(j.templates[0].id);
+      const list = j.templates ?? [];
+      setTemplates(list);
+      const club = list.find((tpl: { name?: string }) => String(tpl.name).includes("Club + Sports"));
+      if (club) setTemplateId(club.id);
+      else if (list[0]) setTemplateId(list[0].id);
     });
     fetch("/api/card-studio/printers", { credentials: "same-origin" }).then((r) => r.json()).then((j) => {
       const list = j.printers ?? [];
@@ -223,7 +226,48 @@ export function IssueWizard() {
           </button>
         ))}
       </div>
-      {member ? <p>Selected {String(member.name)} / {String(member.dogName)}</p> : null}
+      {member ? (
+        <div className="cs-quick-edit" style={{ marginTop: 12 }}>
+          <div>
+            <strong>Easy edit</strong>
+            <p>Selected {String(member.name)} — update the dog name and top-left photo for this print.</p>
+          </div>
+          <label className="cs-field">
+            Dog name
+            <input
+              value={String(member.dogName ?? "")}
+              onChange={(e) => setMember({ ...member, dogName: e.target.value })}
+              aria-label="Dog name"
+            />
+          </label>
+          <div className="cs-actions">
+            <label className="cs-btn cs-btn--primary">
+              Replace photo
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (!file || !member) return;
+                  const reader = new FileReader();
+                  reader.onload = () => setMember({ ...member, photoUrl: String(reader.result ?? "") });
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+            {member.photoUrl ? (
+              <button className="cs-btn" type="button" onClick={() => setMember({ ...member, photoUrl: "" })}>Clear photo</button>
+            ) : null}
+          </div>
+          {member.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={String(member.photoUrl)} alt="Card photo preview" className="cs-photo-preview" />
+          ) : (
+            <p>No photo yet. Upload one for the top-left frame.</p>
+          )}
+        </div>
+      ) : null}
       <div className="cs-actions" style={{ marginTop: 12 }}>
         <select className="cs-search" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
           {templates.map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}

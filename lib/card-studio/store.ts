@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { parseTemplateDocument } from "@/lib/card-studio/template-schema";
-import { createFitdogVipTemplateDocument } from "@/lib/card-studio/vip-template";
+import { CLUB_SPORTS_VIP_TEMPLATE_NAME, createClubSportsVipTemplateDocument } from "@/lib/card-studio/club-sports-vip-template";
 import { DEFAULT_CARD_STUDIO_SETTINGS } from "@/lib/card-studio/settings";
 import { formatCardNumber, formatJobId } from "@/lib/card-studio/job-ids";
 import { signVerificationToken } from "@/lib/card-studio/verify";
@@ -41,15 +41,16 @@ export async function saveCardStudioSettings(settings: Partial<CardStudioSetting
 
 export async function ensureDefaultTemplates(actor: Actor) {
   const supabase = db();
-  const { count } = await supabase.from("card_studio_templates").select("id", { count: "exact", head: true });
-  if ((count ?? 0) > 0) return;
+  const { data: existing } = await supabase.from("card_studio_templates").select("id, name");
+  const names = new Set((existing ?? []).map((row) => String(row.name)));
+  if (names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) return;
   await createTemplate(
     {
-      name: "Fitdog VIP",
-      description: "Premium CR80 Fitdog VIP membership card.",
-      category: "vip_member",
+      name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
+      description: "Print-ready CR80 Club + Sports VIP. Edit the dog name and replace the top-left photo.",
+      category: "club_sports_vip",
       status: "active",
-      document: createFitdogVipTemplateDocument()
+      document: createClubSportsVipTemplateDocument()
     },
     actor
   );

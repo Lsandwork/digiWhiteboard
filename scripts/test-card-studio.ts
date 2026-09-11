@@ -11,6 +11,7 @@ import { roleCanSeeCardStudioNav, CARD_STUDIO_NAV_ROUTE, buildStaffPanelNav } fr
 import { CR80_PX, cr80AspectRatio, DEFAULT_DPI, CR80_MM, CR80_INCHES } from "../lib/card-studio/constants";
 import { createElement, emptyTemplateDocument, parseTemplateDocument } from "../lib/card-studio/template-schema";
 import { createFitdogVipTemplateDocument } from "../lib/card-studio/vip-template";
+import { CLUB_SPORTS_VIP_TEMPLATE_NAME, createClubSportsVipTemplateDocument } from "../lib/card-studio/club-sports-vip-template";
 import { resolveTemplateString, unresolvedDynamicFields } from "../lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "../lib/card-studio/dynamic-fields";
 import { validateCardForPrint, validateTemplateDocument } from "../lib/card-studio/validation";
@@ -87,6 +88,25 @@ assert.ok(vip.front.elements.some((el) => el.type === "logo" && String(el.proper
 assert.ok(vip.front.elements.some((el) => el.type === "member_photo"));
 assert.ok(vip.back.elements.some((el) => el.type === "barcode"));
 assert.equal(validateTemplateDocument(vip).filter((i) => i.severity === "critical").length, 0);
+
+const clubSports = createClubSportsVipTemplateDocument();
+assert.equal(CLUB_SPORTS_VIP_TEMPLATE_NAME, "Fitdog Club + Sports VIP");
+assert.equal(clubSports.front.width, CR80_PX.width);
+assert.equal(clubSports.front.height, CR80_PX.height);
+const clubPhoto = clubSports.front.elements.find((el) => el.id === "cs_vip_photo");
+assert.ok(clubPhoto);
+assert.equal(clubPhoto?.type, "member_photo");
+assert.ok((clubPhoto?.x ?? 99) < 40 && (clubPhoto?.y ?? 99) < 40);
+assert.equal(String(clubPhoto?.properties.src), "{{member.photo}}");
+assert.equal(clubPhoto?.locked, false);
+const clubDog = clubSports.front.elements.find((el) => el.id === "cs_vip_dog_name");
+assert.equal(String(clubDog?.properties.text), "{{member.dog_name}}");
+assert.equal(clubDog?.locked, false);
+assert.ok(clubSports.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.logoBadge256));
+assert.ok(String(clubSports.front.elements.find((el) => el.id === "cs_front_panel")?.properties.markup ?? "").includes("#F37021"));
+assert.ok(clubSports.back.elements.some((el) => el.type === "barcode"));
+assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
+assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContext(), dogName: "Bailey" }), "Bailey");
 
 const member = {
   ...emptyMemberContext(),

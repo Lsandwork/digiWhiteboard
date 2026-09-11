@@ -263,6 +263,44 @@
   padding: 6px 8px;
 }
 
+.cs-quick-edit {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(160px, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(243, 112, 33, 0.45);
+  background: rgba(243, 112, 33, 0.08);
+  border-radius: 12px;
+}
+
+.cs-quick-edit strong {
+  display: block;
+  color: #ffd7bf;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cs-quick-edit p {
+  margin: 4px 0 0;
+  color: #c5d4e6;
+  font-size: 13px;
+}
+
+.cs-photo-preview {
+  width: 72px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #F37021;
+}
+
+.cs-el.is-locked {
+  outline: 1px dashed rgba(148, 163, 184, 0.25);
+}
+
 .cs-empty {
   padding: 32px;
   text-align: center;

@@ -45,7 +45,7 @@ export function CardStudioDashboard() {
       <div className="cs-page-title">
         <div>
           <h1>Card Studio</h1>
-          <p>Fitdog ID card design, issuance, and printing.</p>
+          <p>Fitdog ID card design, issuance, and printing. Club + Sports VIP is the print-ready template — change the dog name and top-left photo, then print.</p>
         </div>
         <div className="cs-actions">
           <Link className="cs-btn cs-btn--primary" href={CARD_STUDIO_PATHS.create}>Create Card</Link>

@@ -61,31 +61,42 @@ function renderElement(
       return options?.qrSvg?.[el.id] ?? `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">QR</text>`;
     case "barcode":
       return options?.barcodeSvg?.[el.id] ?? `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">BARCODE</text>`;
+    case "svg":
+    case "icon": {
+      const markup = String(el.properties.markup ?? "");
+      if (markup) return markup;
+      const src = resolveTemplateString(String(el.properties.src ?? ""), member);
+      if (!src) return "";
+      return `<image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="xMidYMid meet" />`;
+    }
     case "member_photo":
     case "image":
     case "logo":
-    case "svg":
-    case "icon":
     case "signature":
     case "watermark":
     case "ghost_photo": {
       const src = resolveTemplateString(String(el.properties.src ?? ""), member);
+      const rx = radius || (el.type === "member_photo" ? 16 : 0);
       if (!src) {
-        return `<rect width="${el.width}" height="${el.height}" rx="${radius || 12}" fill="#1e293b" /><text x="12" y="${el.height / 2}" fill="#94a3b8" font-size="12">Photo</text>`;
+        return `<rect width="${el.width}" height="${el.height}" rx="${rx}" fill="#e8e8e8" stroke="#F37021" stroke-width="2"/><text x="${el.width / 2}" y="${el.height / 2}" text-anchor="middle" fill="#1F2D3D" font-size="14" font-weight="700">Replace photo</text>`;
       }
-      return `<image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="${el.properties.fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"}" />`;
+      const clipId = `clip_${el.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+      const ratio = el.properties.fit === "contain" ? "xMidYMid meet" : "xMidYMid slice";
+      return `<defs><clipPath id="${clipId}"><rect width="${el.width}" height="${el.height}" rx="${rx}"/></clipPath></defs><image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="${ratio}" clip-path="url(#${clipId})"/>`;
     }
     default: {
       const raw = String(el.properties.text ?? "");
-      const text = resolveTemplateString(raw, member);
+      let text = resolveTemplateString(raw, member);
+      if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
       const size = Number(el.properties.fontSize ?? 16);
       const weight = Number(el.properties.fontWeight ?? 600);
       const color = String(el.properties.color ?? "#f8fafc");
+      const italic = el.properties.italic ? "italic" : "normal";
       const anchor =
         el.properties.textAlign === "center" ? "middle" : el.properties.textAlign === "right" ? "end" : "start";
       const x = el.properties.textAlign === "center" ? el.width / 2 : el.properties.textAlign === "right" ? el.width : 0;
       const y = el.height / 2 + size / 3;
-      return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}">${esc(text)}</text>`;
+      return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-style="${italic}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}">${esc(text)}</text>`;
     }
   }
 }
