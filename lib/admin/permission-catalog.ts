@@ -304,6 +304,21 @@ export const PERMISSION_CATEGORIES: PermissionCategory[] = [
       p("blog.view_analytics", "View Blog Analytics", "View verified blog analytics."),
       p("blog.view_audit_log", "View Blog Audit Log", "View Blog Generator audit history.")
     ]
+  },
+  {
+    key: "card_studio",
+    label: "Card Studio",
+    permissions: [
+      p("card_studio.view", "View Card Studio", "Open Card Studio dashboards, templates, and history."),
+      p("card_studio.design", "Design Cards", "Create and edit card templates and artwork."),
+      p("card_studio.issue", "Issue Cards", "Generate and issue membership ID cards."),
+      p("card_studio.print", "Print Cards", "Submit print jobs and reprints."),
+      p("card_studio.manage_assets", "Manage Card Assets", "Upload and approve logos, photos, and brand assets."),
+      p("card_studio.delete_templates", "Delete Templates", "Archive or delete card templates (Admin)."),
+      p("card_studio.manage_printers", "Manage Printers", "Configure printers, calibration, and hardware settings."),
+      p("card_studio.manage_settings", "Card Studio Settings", "Change Card Studio system and security settings."),
+      p("card_studio.revoke", "Revoke Cards", "Revoke or replace issued ID cards.")
+    ]
   }
 ];
 

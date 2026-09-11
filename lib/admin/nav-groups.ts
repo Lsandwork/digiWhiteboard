@@ -11,13 +11,14 @@ export type NavLeaf = {
 
 export type NavRouteLeaf = {
   type: "route";
-  id: "gingr" | "ruffly" | "automatic-blog" | "social-generator" | "gingr-route-generator";
+  id: "gingr" | "ruffly" | "automatic-blog" | "social-generator" | "gingr-route-generator" | "card-studio";
   href:
     | "/gingr"
     | "/ruffly"
     | "/admin/automatic-blog"
     | "/admin/automatic-blog?page=social-generator"
-    | "/admin/gingr-route-generator";
+    | "/admin/gingr-route-generator"
+    | "/card-studio";
   label: string;
 };
 
@@ -72,6 +73,13 @@ export const GINGR_ROUTE_GENERATOR_NAV_ROUTE: NavRouteLeaf = {
   label: "Gingr Route Generator"
 };
 
+export const CARD_STUDIO_NAV_ROUTE: NavRouteLeaf = {
+  type: "route",
+  id: "card-studio",
+  href: "/card-studio",
+  label: "Card Studio"
+};
+
 export function appendAuthenticatedGlobalRoutes(
   entries: NavEntry[],
   options?: {
@@ -80,6 +88,7 @@ export function appendAuthenticatedGlobalRoutes(
     includeLiveFleet?: boolean;
     includeSystemHealth?: boolean;
     includeBlog?: boolean;
+    includeCardStudio?: boolean;
   }
 ): NavEntry[] {
   const globalSection: NavEntry[] = [section("global_apps", "Apps")];
@@ -94,6 +103,9 @@ export function appendAuthenticatedGlobalRoutes(
   }
   if (options?.includeBlog) {
     globalSection.push(AUTOMATIC_BLOG_NAV_ROUTE, SOCIAL_GENERATOR_NAV_ROUTE);
+  }
+  if (options?.includeCardStudio) {
+    globalSection.push(CARD_STUDIO_NAV_ROUTE);
   }
   globalSection.push(GINGR_NAV_ROUTE);
   if (options?.includeRuffly !== false) {
@@ -233,7 +245,8 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   sa_floor_hub: "Open floor command centers, operations tools, photos, and cameras from one place.",
   sa_whiteboard_hub: "Push notices, preview the board, and manage TV / cast setup.",
   sa_people_hub: "Staff directory, HR records, write-ups, and PIP tracking.",
-  sa_apps_hub: "Live Fleet, Route Generator, System Health, Blog Generator, Social Media Generator, Gingr, and Ruffly.",
+  sa_apps_hub:
+    "Live Fleet, Route Generator, System Health, Blog Generator, Social Media Generator, Card Studio, Gingr, and Ruffly.",
   sa_admin_hub: "Overview, analytics, settings, logs, integrations, and admin utilities.",
   content: "Edit the messages guests and staff see on the whiteboard.",
   admin_trainer_entries: "View all shift log entries submitted through Trainer's Entry.",
@@ -388,6 +401,7 @@ export function buildMarketingAdminNav(visibleTabs: AdminTab[]): NavEntry[] {
     "marketing_board",
     "CAST-TV",
     compactEntries([
+      CARD_STUDIO_NAV_ROUTE,
       ...singles(
         MARKETING_BOARD_NAV_TABS.filter((tab) => tab !== "settings" && tab !== "help"),
         visible
@@ -772,6 +786,18 @@ export function roleCanSeeBlogNav(role?: string | null, email?: string | null, n
   );
 }
 
+/** Card Studio — Admin and Marketing only. Never show the nav item to other roles. */
+export function roleCanSeeCardStudioNav(role?: string | null) {
+  if (!role) return false;
+  return (
+    role === "owner_admin" ||
+    role === "manager_admin" ||
+    role === "super_admin" ||
+    role === "admin" ||
+    role === "marketing"
+  );
+}
+
 /**
  * Hub-based staff sidebar for a role: max 10 primary tabs/icons.
  * Demoted tools remain reachable from hub pages (permissions unchanged).
@@ -818,7 +844,8 @@ export function buildStaffPanelNav(
     includeRouteGenerator: visibleTabs.includes("route_generator"),
     includeLiveFleet: visibleTabs.includes("live_fleet"),
     includeSystemHealth: visibleTabs.includes("ops_system_health"),
-    includeBlog: roleCanSeeBlogNav(role, identity?.email, identity?.name)
+    includeBlog: roleCanSeeBlogNav(role, identity?.email, identity?.name),
+    includeCardStudio: roleCanSeeCardStudioNav(role)
   });
 }
 
@@ -889,7 +916,9 @@ export function findNavSectionIdForPath(entries: NavEntry[], path: string | null
       currentSectionId = entry.id;
       continue;
     }
-    if (entry.type === "route" && entry.href === path) return currentSectionId;
+    if (entry.type === "route" && (entry.href === path || path.startsWith(`${entry.href}/`))) {
+      return currentSectionId;
+    }
   }
 
   return null;
