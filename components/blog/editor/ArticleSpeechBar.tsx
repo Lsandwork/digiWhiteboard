@@ -7,6 +7,7 @@ type Props = {
   status: ArticleSpeechStatus;
   voiceLabel: string;
   progress: { chunk: number; total: number };
+  error?: string | null;
   canPlay: boolean;
   canPause: boolean;
   canStop: boolean;
@@ -15,7 +16,18 @@ type Props = {
   onStop: () => void;
 };
 
-export function ArticleSpeechBar({ status, voiceLabel, progress, canPlay, canPause, canStop, onPlay, onPause, onStop }: Props) {
+export function ArticleSpeechBar({
+  status,
+  voiceLabel,
+  progress,
+  error,
+  canPlay,
+  canPause,
+  canStop,
+  onPlay,
+  onPause,
+  onStop
+}: Props) {
   const statusLabel =
     status === "loading"
       ? "Preparing natural voice…"
@@ -56,6 +68,11 @@ export function ArticleSpeechBar({ status, voiceLabel, progress, canPlay, canPau
           Stop
         </button>
       </div>
+      {error ? (
+        <p className="blog-editor-speech__error" role="status">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
