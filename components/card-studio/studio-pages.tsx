@@ -29,7 +29,8 @@ export function TemplateLibrary() {
   async function load() {
     const res = await fetch(`/api/card-studio/templates?status=${status}`, { credentials: "same-origin" });
     const json = await res.json();
-    setTemplates(json.templates ?? []);
+    const rows = json.templates ?? [];
+    setTemplates(rows);
   }
 
   useEffect(() => {
@@ -43,7 +44,7 @@ export function TemplateLibrary() {
           <h1>Templates</h1>
           <p>Versioned CR80 artwork. The Club + Sports VIP template is print-ready: edit the dog name and replace the top-left photo.</p>
         </div>
-        <Link className="cs-btn cs-btn--primary" href={CARD_STUDIO_PATHS.designer}>New template</Link>
+        <Link className="cs-btn cs-btn--primary" href={`${CARD_STUDIO_PATHS.designer}?new=1`}>New template</Link>
       </div>
       <select className="cs-search" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Filter status">
         <option value="all">All</option>

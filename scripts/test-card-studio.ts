@@ -11,7 +11,7 @@ import { roleCanSeeCardStudioNav, CARD_STUDIO_NAV_ROUTE, buildStaffPanelNav } fr
 import { CR80_PX, cr80AspectRatio, DEFAULT_DPI, CR80_MM, CR80_INCHES } from "../lib/card-studio/constants";
 import { createElement, emptyTemplateDocument, parseTemplateDocument } from "../lib/card-studio/template-schema";
 import { createFitdogVipTemplateDocument } from "../lib/card-studio/vip-template";
-import { CLUB_SPORTS_VIP_TEMPLATE_NAME, createClubSportsVipTemplateDocument } from "../lib/card-studio/club-sports-vip-template";
+import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_TEMPLATE_NAME, createClubSportsVipTemplateDocument } from "../lib/card-studio/club-sports-vip-template";
 import { resolveTemplateString, unresolvedDynamicFields } from "../lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "../lib/card-studio/dynamic-fields";
 import { validateCardForPrint, validateTemplateDocument } from "../lib/card-studio/validation";
@@ -107,6 +107,9 @@ assert.ok(String(clubSports.front.elements.find((el) => el.id === "cs_front_pane
 assert.ok(clubSports.back.elements.some((el) => el.type === "barcode"));
 assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
 assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContext(), dogName: "Bailey" }), "Bailey");
+const builtin = builtinClubSportsVipTemplate();
+assert.equal(builtin.id, CLUB_SPORTS_VIP_BUILTIN_ID);
+assert.equal(builtin.document.front.elements[0]?.id, clubSports.front.elements[0]?.id);
 
 const member = {
   ...emptyMemberContext(),

@@ -6,6 +6,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CR80_PX, DEFAULT_DPI, FITDOG_APPROVED_LOGO, mmToPx } from "@/lib/card-studio/constants";
 import { cloneDocument, createElement, emptyTemplateDocument, parseTemplateDocument } from "@/lib/card-studio/template-schema";
+import {
+  CLUB_SPORTS_VIP_BUILTIN_ID,
+  CLUB_SPORTS_VIP_TEMPLATE_NAME,
+  createClubSportsVipTemplateDocument,
+  isClubSportsVipBuiltinId
+} from "@/lib/card-studio/club-sports-vip-template";
 import type { CardElement, CardElementType, CardSide, CardTemplateDocument } from "@/lib/card-studio/types";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "@/lib/card-studio/dynamic-fields";
@@ -39,16 +45,17 @@ const TOOLS: { type: CardElementType; label: string }[] = [
 export function CardDesigner() {
   const params = useSearchParams();
   const templateId = params.get("id");
-  const [doc, setDoc] = useState<CardTemplateDocument>(emptyTemplateDocument());
-  const [name, setName] = useState("Untitled template");
+  const isNew = params.get("new") === "1";
+  const [doc, setDoc] = useState<CardTemplateDocument>(() => createClubSportsVipTemplateDocument());
+  const [name, setName] = useState(CLUB_SPORTS_VIP_TEMPLATE_NAME);
   const [side, setSide] = useState<CardSide>("front");
   const [selected, setSelected] = useState<string[]>([]);
-  const [zoom, setZoom] = useState(0.7);
+  const [zoom, setZoom] = useState(0.55);
   const [grid, setGrid] = useState(true);
   const [guides, setGuides] = useState(true);
   const [snap, setSnap] = useState(true);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "unsaved">("saved");
-  const [id, setId] = useState<string | null>(templateId);
+  const [id, setId] = useState<string | null>(templateId || CLUB_SPORTS_VIP_BUILTIN_ID);
   const history = useRef<CardTemplateDocument[]>([]);
   const future = useRef<CardTemplateDocument[]>([]);
   const skipAutosave = useRef(false);
@@ -73,7 +80,14 @@ export function CardDesigner() {
   }, [doc]);
 
   useEffect(() => {
-    if (templateId) {
+    if (isNew) {
+      setId(null);
+      setName("Untitled template");
+      setDoc(emptyTemplateDocument());
+      setSaveState("saved");
+      return;
+    }
+    if (templateId && !isClubSportsVipBuiltinId(templateId)) {
       fetch(`/api/card-studio/templates?id=${templateId}`, { credentials: "same-origin" })
         .then((res) => res.json())
         .then((json) => {
@@ -90,18 +104,31 @@ export function CardDesigner() {
     fetch("/api/card-studio/templates?status=active", { credentials: "same-origin" })
       .then((res) => res.json())
       .then(async (json) => {
-        const club = (json.templates ?? []).find((tpl: { name?: string }) => String(tpl.name).includes("Club + Sports"));
-        if (!club?.id) return;
-        const detail = await fetch(`/api/card-studio/templates?id=${club.id}`, { credentials: "same-origin" }).then((r) => r.json());
-        if (detail.template) {
-          setId(detail.template.id);
-          setName(detail.template.name);
-          setDoc(parseTemplateDocument(detail.template.document));
-          setSaveState("saved");
+        const club = (json.templates ?? []).find((tpl: { id?: string; name?: string }) => {
+          return String(tpl.name).includes("Club + Sports") && tpl.id && !isClubSportsVipBuiltinId(String(tpl.id));
+        });
+        if (club?.id) {
+          const detail = await fetch(`/api/card-studio/templates?id=${club.id}`, { credentials: "same-origin" }).then((r) => r.json());
+          if (detail.template) {
+            setId(detail.template.id);
+            setName(detail.template.name);
+            setDoc(parseTemplateDocument(detail.template.document));
+            setSaveState("saved");
+            return;
+          }
         }
+        setId(CLUB_SPORTS_VIP_BUILTIN_ID);
+        setName(CLUB_SPORTS_VIP_TEMPLATE_NAME);
+        setDoc(createClubSportsVipTemplateDocument());
+        setSaveState("saved");
       })
-      .catch(() => undefined);
-  }, [templateId]);
+      .catch(() => {
+        setId(CLUB_SPORTS_VIP_BUILTIN_ID);
+        setName(CLUB_SPORTS_VIP_TEMPLATE_NAME);
+        setDoc(createClubSportsVipTemplateDocument());
+        setSaveState("saved");
+      });
+  }, [templateId, isNew]);
 
   useEffect(() => {
     if (saveState !== "unsaved" || skipAutosave.current) return;
@@ -114,18 +141,16 @@ export function CardDesigner() {
 
   async function save(bumpVersion: boolean) {
     setSaveState("saving");
-    const payload = {
-      id,
-      name,
-      document: doc,
-      bumpVersion,
-      status: "draft"
-    };
+    const persistNew = !id || isClubSportsVipBuiltinId(id);
     const res = await fetch("/api/card-studio/templates", {
-      method: id ? "PATCH" : "POST",
+      method: persistNew ? "POST" : "PATCH",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(id ? payload : { name, document: doc, category: "vip_member" })
+      body: JSON.stringify(
+        persistNew
+          ? { name, document: doc, category: "club_sports_vip", status: "active" }
+          : { id, name, document: doc, bumpVersion, status: "active" }
+      )
     });
     const json = await res.json();
     if (json.template?.id) setId(json.template.id);

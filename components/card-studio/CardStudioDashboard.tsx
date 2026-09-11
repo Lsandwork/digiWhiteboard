@@ -48,8 +48,9 @@ export function CardStudioDashboard() {
           <p>Fitdog ID card design, issuance, and printing. Club + Sports VIP is the print-ready template — change the dog name and top-left photo, then print.</p>
         </div>
         <div className="cs-actions">
-          <Link className="cs-btn cs-btn--primary" href={CARD_STUDIO_PATHS.create}>Create Card</Link>
-          <Link className="cs-btn" href={CARD_STUDIO_PATHS.designer}>Create Template</Link>
+          <Link className="cs-btn cs-btn--primary" href={CARD_STUDIO_PATHS.designer}>Open Club + Sports VIP</Link>
+          <Link className="cs-btn" href={CARD_STUDIO_PATHS.create}>Create Card</Link>
+          <Link className="cs-btn" href={`${CARD_STUDIO_PATHS.designer}?new=1`}>Create Template</Link>
           <Link className="cs-btn" href={CARD_STUDIO_PATHS.printCenter}>Print Card</Link>
           <Link className="cs-btn" href={CARD_STUDIO_PATHS.batch}>Batch Print</Link>
           <Link className="cs-btn" href={CARD_STUDIO_PATHS.printers}>Manage Printers</Link>
