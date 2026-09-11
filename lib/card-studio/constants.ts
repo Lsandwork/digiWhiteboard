@@ -138,6 +138,15 @@ export const FITDOG_CARD_COLORS = {
   gold: "#d4af37"
 } as const;
 
+/** Print-ready Club + Sports VIP palette from the Fitdog membership-card spec. */
+export const FITDOG_PRINT_COLORS = {
+  orange: "#F37021",
+  blue: "#0EA5E9",
+  slate: "#1F2D3D",
+  gray: "#E8E8E8",
+  white: "#FFFFFF"
+} as const;
+
 export const DYNAMIC_FIELD_KEYS = [
   "member.name",
   "member.first_name",

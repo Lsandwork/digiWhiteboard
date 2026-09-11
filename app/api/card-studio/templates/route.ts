@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCardStudioPermission, cardStudioActor } from "@/lib/card-studio/access";
-import { archiveTemplate, createTemplate, duplicateTemplate, getTemplate, listTemplates, saveTemplateVersion } from "@/lib/card-studio/store";
+import { archiveTemplate, createTemplate, duplicateTemplate, ensureDefaultTemplates, getTemplate, listTemplates, saveTemplateVersion } from "@/lib/card-studio/store";
 import { emptyTemplateDocument } from "@/lib/card-studio/template-schema";
 import { writeCardStudioAudit } from "@/lib/card-studio/audit";
 import { blockDemoWrite } from "@/lib/admin/api-auth";
@@ -18,6 +18,7 @@ export async function GET(request: Request) {
       if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
       return NextResponse.json({ ok: true, template });
     }
+    await ensureDefaultTemplates(cardStudioActor(auth.session, auth.role));
     const status = url.searchParams.get("status") as "draft" | "active" | "archived" | "all" | null;
     const templates = await listTemplates({ status: status ?? "all" });
     return NextResponse.json({ ok: true, templates });

@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CR80_PX, DEFAULT_DPI, FITDOG_APPROVED_LOGO, mmToPx } from "@/lib/card-studio/constants";
 import { cloneDocument, createElement, emptyTemplateDocument, parseTemplateDocument } from "@/lib/card-studio/template-schema";
@@ -52,7 +52,18 @@ export function CardDesigner() {
   const history = useRef<CardTemplateDocument[]>([]);
   const future = useRef<CardTemplateDocument[]>([]);
   const skipAutosave = useRef(false);
-  const previewMember = useMemo(() => ({ ...emptyMemberContext(), name: "Alex Rivera", dogName: "Golden", membershipType: "VIP Member", memberNumber: "FIT-00018429", expirationDate: "2027-09-01", photoUrl: "", cardUuid: "preview" }), []);
+  const [previewMember, setPreviewMember] = useState(() => ({
+    ...emptyMemberContext(),
+    name: "Alex Rivera",
+    dogName: "Bailey",
+    membershipType: "Club + Sports Member",
+    memberNumber: "FD-00001",
+    location: "SANTA MONICA, CA",
+    expirationDate: "2027-09-01",
+    photoUrl: "",
+    cardUuid: "preview"
+  }));
+  const photoInput = useRef<HTMLInputElement>(null);
 
   const pushHistory = useCallback((next: CardTemplateDocument) => {
     history.current = [...history.current.slice(-49), cloneDocument(doc)];
@@ -62,14 +73,30 @@ export function CardDesigner() {
   }, [doc]);
 
   useEffect(() => {
-    if (!templateId) return;
-    fetch(`/api/card-studio/templates?id=${templateId}`, { credentials: "same-origin" })
+    if (templateId) {
+      fetch(`/api/card-studio/templates?id=${templateId}`, { credentials: "same-origin" })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.template) {
+            setId(json.template.id);
+            setName(json.template.name);
+            setDoc(parseTemplateDocument(json.template.document));
+            setSaveState("saved");
+          }
+        })
+        .catch(() => undefined);
+      return;
+    }
+    fetch("/api/card-studio/templates?status=active", { credentials: "same-origin" })
       .then((res) => res.json())
-      .then((json) => {
-        if (json.template) {
-          setId(json.template.id);
-          setName(json.template.name);
-          setDoc(parseTemplateDocument(json.template.document));
+      .then(async (json) => {
+        const club = (json.templates ?? []).find((tpl: { name?: string }) => String(tpl.name).includes("Club + Sports"));
+        if (!club?.id) return;
+        const detail = await fetch(`/api/card-studio/templates?id=${club.id}`, { credentials: "same-origin" }).then((r) => r.json());
+        if (detail.template) {
+          setId(detail.template.id);
+          setName(detail.template.name);
+          setDoc(parseTemplateDocument(detail.template.document));
           setSaveState("saved");
         }
       })
@@ -133,9 +160,9 @@ export function CardDesigner() {
   }
 
   function onPointerDown(event: React.PointerEvent, el: CardElement) {
+    setSelected([el.id]);
     if (el.locked) return;
     event.preventDefault();
-    setSelected([el.id]);
     const startX = event.clientX;
     const startY = event.clientY;
     const origX = el.x;
@@ -189,6 +216,47 @@ export function CardDesigner() {
           <span>{saveState === "saving" ? "Saving…" : saveState === "saved" ? "Saved" : "Unsaved changes"}</span>
         </div>
       </div>
+      {doc.front.elements.some((el) => el.type === "member_photo" || String(el.properties.text ?? "").includes("member.dog_name")) ? (
+        <div className="cs-quick-edit">
+          <div>
+            <strong>Easy edit</strong>
+            <p>Change the dog’s name and replace the top-left photo. Brand artwork stays locked.</p>
+          </div>
+          <label className="cs-field">
+            Dog name
+            <input
+              value={previewMember.dogName ?? ""}
+              onChange={(e) => setPreviewMember((m) => ({ ...m, dogName: e.target.value }))}
+              aria-label="Dog name"
+            />
+          </label>
+          <div className="cs-actions">
+            <input
+              ref={photoInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () => {
+                  setPreviewMember((m) => ({ ...m, photoUrl: String(reader.result ?? "") }));
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+            <button className="cs-btn cs-btn--primary" type="button" onClick={() => photoInput.current?.click()}>
+              Replace photo
+            </button>
+            {previewMember.photoUrl ? (
+              <button className="cs-btn" type="button" onClick={() => setPreviewMember((m) => ({ ...m, photoUrl: "" }))}>
+                Clear photo
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <div className="cs-designer">
         <div className="cs-designer__toolbar">
           <button className="cs-btn" onClick={() => { const prev = history.current.pop(); if (prev) { future.current.push(cloneDocument(doc)); setDoc(prev); } }}>Undo</button>
@@ -256,7 +324,7 @@ export function CardDesigner() {
               {design.elements.map((el) => (
                 <div
                   key={el.id}
-                  className={`cs-el ${selected.includes(el.id) ? "is-selected" : ""}`}
+                  className={`cs-el ${selected.includes(el.id) ? "is-selected" : ""} ${el.locked ? "is-locked" : ""}`}
                   hidden={el.hidden}
                   style={{
                     left: el.x,
@@ -336,7 +404,14 @@ export function CardDesigner() {
 }
 
 function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<typeof emptyMemberContext> }) {
-  const text = resolveTemplateString(String(el.properties.text ?? el.type), member);
+  let text = resolveTemplateString(String(el.properties.text ?? el.type), member);
+  if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
+  if (el.type === "svg" || el.type === "icon") {
+    const markup = String(el.properties.markup ?? "");
+    if (markup) {
+      return <div style={{ width: "100%", height: "100%", overflow: "hidden" }} dangerouslySetInnerHTML={{ __html: markup }} />;
+    }
+  }
   if (el.type === "member_photo" || el.type === "logo" || el.type === "image") {
     const src = resolveTemplateString(String(el.properties.src ?? ""), member) || (el.type === "logo" ? FITDOG_APPROVED_LOGO : "");
     const radius = el.properties.frame === "circle" ? "50%" : `${Number(el.properties.borderRadius ?? 16)}px`;
@@ -373,6 +448,7 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
       color: String(el.properties.color ?? "#fff"),
       fontSize: Number(el.properties.fontSize ?? 16),
       fontWeight: Number(el.properties.fontWeight ?? 600),
+      fontStyle: el.properties.italic ? "italic" : "normal",
       display: "flex",
       alignItems: String(el.properties.verticalAlign ?? "middle") === "top" ? "flex-start" : String(el.properties.verticalAlign) === "bottom" ? "flex-end" : "center",
       justifyContent: String(el.properties.textAlign ?? "left") === "center" ? "center" : String(el.properties.textAlign) === "right" ? "flex-end" : "flex-start"
