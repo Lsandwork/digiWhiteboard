@@ -1,7 +1,12 @@
 import { randomUUID } from "crypto";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { parseTemplateDocument } from "@/lib/card-studio/template-schema";
-import { CLUB_SPORTS_VIP_TEMPLATE_NAME, createClubSportsVipTemplateDocument } from "@/lib/card-studio/club-sports-vip-template";
+import {
+  builtinClubSportsVipTemplate,
+  CLUB_SPORTS_VIP_TEMPLATE_NAME,
+  createClubSportsVipTemplateDocument,
+  isClubSportsVipBuiltinId
+} from "@/lib/card-studio/club-sports-vip-template";
 import { DEFAULT_CARD_STUDIO_SETTINGS } from "@/lib/card-studio/settings";
 import { formatCardNumber, formatJobId } from "@/lib/card-studio/job-ids";
 import { signVerificationToken } from "@/lib/card-studio/verify";
@@ -40,36 +45,50 @@ export async function saveCardStudioSettings(settings: Partial<CardStudioSetting
 }
 
 export async function ensureDefaultTemplates(actor: Actor) {
-  const supabase = db();
-  const { data: existing } = await supabase.from("card_studio_templates").select("id, name");
-  const names = new Set((existing ?? []).map((row) => String(row.name)));
-  if (names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) return;
-  await createTemplate(
-    {
-      name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
-      description: "Print-ready CR80 Club + Sports VIP. Edit the dog name and replace the top-left photo.",
-      category: "club_sports_vip",
-      status: "active",
-      document: createClubSportsVipTemplateDocument()
-    },
-    actor
-  );
+  try {
+    const supabase = db();
+    const { data: existing, error } = await supabase.from("card_studio_templates").select("id, name");
+    if (error) return;
+    const names = new Set((existing ?? []).map((row) => String(row.name)));
+    if (names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) return;
+    await createTemplate(
+      {
+        name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
+        description: "Print-ready CR80 Club + Sports VIP. Edit the dog name and replace the top-left photo.",
+        category: "club_sports_vip",
+        status: "active",
+        document: createClubSportsVipTemplateDocument()
+      },
+      actor
+    );
+  } catch {
+    // Card Studio still shows the built-in Club + Sports VIP artwork if the table is missing.
+  }
 }
 
 export async function listTemplates(options?: { status?: TemplateState | "all"; limit?: number }) {
-  const supabase = db();
-  let query = supabase
-    .from("card_studio_templates")
-    .select("id, name, description, category, status, current_version_id, created_by, created_at, updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(Math.min(100, options?.limit ?? 50));
-  if (options?.status && options.status !== "all") query = query.eq("status", options.status);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const builtin = builtinClubSportsVipTemplate();
+  try {
+    const supabase = db();
+    let query = supabase
+      .from("card_studio_templates")
+      .select("id, name, description, category, status, current_version_id, created_by, created_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(Math.min(100, options?.limit ?? 50));
+    if (options?.status && options.status !== "all") query = query.eq("status", options.status);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    if (rows.some((row) => row.name === CLUB_SPORTS_VIP_TEMPLATE_NAME)) return rows;
+    if (options?.status && options.status !== "all" && options.status !== "active") return rows;
+    return [builtin, ...rows];
+  } catch {
+    return [builtin];
+  }
 }
 
 export async function getTemplate(id: string) {
+  if (isClubSportsVipBuiltinId(id)) return builtinClubSportsVipTemplate();
   const supabase = db();
   const { data: template, error } = await supabase.from("card_studio_templates").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
@@ -514,8 +533,20 @@ export async function submitPrintJob(input: {
     }
   }
   const settings = await loadCardStudioSettings();
-  const template = await getTemplate(input.templateId);
+  let template = await getTemplate(input.templateId);
   if (!template) throw new Error("Template not found.");
+  if (isClubSportsVipBuiltinId(template.id)) {
+    template = await createTemplate(
+      {
+        name: template.name,
+        description: template.description,
+        category: template.category,
+        status: "active",
+        document: template.document
+      },
+      actor
+    );
+  }
   const printer = await getPrinter(input.printerId);
   if (!printer) throw new Error("Printer not found.");
   const adapter = adapterForPrinter(printer);

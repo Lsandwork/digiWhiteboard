@@ -3,6 +3,29 @@ import { createElement, emptyTemplateDocument } from "@/lib/card-studio/template
 import type { CardElement, CardTemplateDocument } from "@/lib/card-studio/types";
 
 export const CLUB_SPORTS_VIP_TEMPLATE_NAME = "Fitdog Club + Sports VIP";
+export const CLUB_SPORTS_VIP_BUILTIN_ID = "builtin-club-sports-vip";
+
+export function isClubSportsVipBuiltinId(id?: string | null) {
+  return id === CLUB_SPORTS_VIP_BUILTIN_ID;
+}
+
+export function builtinClubSportsVipTemplate() {
+  return {
+    id: CLUB_SPORTS_VIP_BUILTIN_ID,
+    name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
+    description: "Print-ready CR80 Club + Sports VIP. Edit the dog name and replace the top-left photo.",
+    category: "club_sports_vip" as const,
+    status: "active" as const,
+    builtin: true,
+    current_version_id: null,
+    created_by: null,
+    created_at: "2026-09-11T00:00:00.000Z",
+    updated_at: "2026-09-11T00:00:00.000Z",
+    version: 1,
+    versionId: null,
+    document: createClubSportsVipTemplateDocument()
+  };
+}
 
 const C = FITDOG_PRINT_COLORS;
 

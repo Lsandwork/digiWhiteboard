@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     name?: string;
     description?: string;
     category?: string;
+    status?: "draft" | "active" | "archived";
     document?: unknown;
     duplicateOf?: string;
   };
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
             name: body.name?.trim() || "Untitled template",
             description: body.description ?? "",
             category: body.category ?? "standard_member",
-            status: "draft",
+            status: body.status ?? "draft",
             document: (body.document as never) ?? emptyTemplateDocument()
           },
           actor
