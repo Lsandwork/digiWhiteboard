@@ -165,7 +165,16 @@ export type PermissionKey =
   | "blog.manage_automation"
   | "blog.view_costs"
   | "blog.view_analytics"
-  | "blog.view_audit_log";
+  | "blog.view_audit_log"
+  | "card_studio.view"
+  | "card_studio.design"
+  | "card_studio.issue"
+  | "card_studio.print"
+  | "card_studio.manage_assets"
+  | "card_studio.delete_templates"
+  | "card_studio.manage_printers"
+  | "card_studio.manage_settings"
+  | "card_studio.revoke";
 
 export type RoleKey =
   | "super_admin"
@@ -397,7 +406,16 @@ const ALL_PERMISSIONS = Object.freeze([
   "blog.manage_automation",
   "blog.view_costs",
   "blog.view_analytics",
-  "blog.view_audit_log"
+  "blog.view_audit_log",
+  "card_studio.view",
+  "card_studio.design",
+  "card_studio.issue",
+  "card_studio.print",
+  "card_studio.manage_assets",
+  "card_studio.delete_templates",
+  "card_studio.manage_printers",
+  "card_studio.manage_settings",
+  "card_studio.revoke"
 ] as const satisfies readonly PermissionKey[]);
 
 /** Permissions reserved for Super Admin — Admin cannot receive these by default. */
@@ -684,6 +702,12 @@ const MARKETING_PERMISSIONS: PermissionKey[] = [
   "blog.manage_brand",
   "blog.view_analytics",
   "view_my_shift",
+  "card_studio.view",
+  "card_studio.design",
+  "card_studio.issue",
+  "card_studio.print",
+  "card_studio.manage_assets",
+  "card_studio.revoke"
 ];
 
 /** Transportation / Driver-Hiker Route Generator operations (no settings). */
@@ -1403,6 +1427,54 @@ export function canAccessBlogGenerator(
     return true;
   }
   return false;
+}
+
+const CARD_STUDIO_ADMIN_ROLES = new Set([
+  "owner_admin",
+  "manager_admin",
+  "super_admin",
+  "admin",
+  "marketing"
+]);
+
+/**
+ * Card Studio — Admin (including Super Admin) and Marketing only.
+ * Other RuffOps roles must not receive access via the default matrix.
+ */
+export function canAccessCardStudio(access?: UserAccess | null, legacyRole?: string | null): boolean {
+  if (legacyRole && CARD_STUDIO_ADMIN_ROLES.has(legacyRole)) return true;
+  if (isMarketingLegacyRole(legacyRole) || isFullAdminLegacyRole(legacyRole) || isSuperAdminLegacyRole(legacyRole)) {
+    return true;
+  }
+  if (hasPermission(access, "card_studio.view")) return true;
+  if (isSuperAdminAccess(access) || hasAnyRole(access, ["super_admin", "admin", "marketing"])) {
+    return true;
+  }
+  return false;
+}
+
+export function canManageCardStudioPrinters(access?: UserAccess | null, legacyRole?: string | null): boolean {
+  if (!canAccessCardStudio(access, legacyRole)) return false;
+  if (isFullAdminLegacyRole(legacyRole) || isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
+    return true;
+  }
+  return hasPermission(access, "card_studio.manage_printers");
+}
+
+export function canManageCardStudioSettings(access?: UserAccess | null, legacyRole?: string | null): boolean {
+  if (!canAccessCardStudio(access, legacyRole)) return false;
+  if (isFullAdminLegacyRole(legacyRole) || isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
+    return true;
+  }
+  return hasPermission(access, "card_studio.manage_settings");
+}
+
+export function canDeleteCardStudioTemplates(access?: UserAccess | null, legacyRole?: string | null): boolean {
+  if (!canAccessCardStudio(access, legacyRole)) return false;
+  if (isFullAdminLegacyRole(legacyRole) || isSuperAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) {
+    return true;
+  }
+  return hasPermission(access, "card_studio.delete_templates");
 }
 
 /** Dog Handler + Driver/Hiker — same staff Digi-board pages and permissions. */

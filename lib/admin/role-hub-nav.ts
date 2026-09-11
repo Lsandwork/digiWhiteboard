@@ -219,6 +219,7 @@ export function filterHubDefinition(
           if (link.id === "automatic-blog" || link.id === "social-generator") {
             return options?.includeBlog === true;
           }
+          if (link.id === "card-studio") return true;
           return link.id === "gingr";
         }
         if (link.kind === "tab") return visible.has(link.tab);

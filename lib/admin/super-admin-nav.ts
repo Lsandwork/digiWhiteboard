@@ -217,6 +217,12 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
             "/admin/automatic-blog?page=social-generator",
             "Social Media Generator",
             "Create social posts from Fitdog blog content."
+          ),
+          routeLink(
+            "card-studio",
+            "/card-studio",
+            "Card Studio",
+            "Design, issue, and print Fitdog ID cards (Admin and Marketing)."
           )
         ]
       },

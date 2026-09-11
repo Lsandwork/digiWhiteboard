@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, getSessionSecret } from "@/lib/admin/session-constants";
 import { verifyAdminSessionTokenEdge } from "@/lib/admin/session-edge";
 import {
+  canAccessCardStudio,
   firstAccessibleAdminTab,
   isAdminOrManagementLegacyRole,
   isFullAdminLegacyRole,
@@ -352,6 +353,28 @@ async function runMiddleware(request: NextRequest) {
     }
   }
 
+  const isCardStudioVerify =
+    pathname.startsWith("/card-studio/verify") || pathname.startsWith("/api/card-studio/verify");
+  if ((pathname === "/card-studio" || pathname.startsWith("/card-studio/")) && !isCardStudioVerify) {
+    if (!session) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
+    if (session.mustChangePassword) {
+      const loginUrl = new URL("/admin/login", request.url);
+      loginUrl.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+      return NextResponse.redirect(loginUrl);
+    }
+    // Unauthorized roles must see a 403, not a silent dashboard redirect.
+    if (!canAccessCardStudio(null, session.role)) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/card-studio/forbidden";
+      url.search = "";
+      return NextResponse.rewrite(url);
+    }
+  }
+
   return NextResponse.next();
 }
 
@@ -371,6 +394,8 @@ export const config = {
     "/admin",
     "/admin/:path*",
     "/gingr",
+    "/card-studio",
+    "/card-studio/:path*",
     "/ruffly",
     "/ruffly/:path*",
     "/ruffops-site",

@@ -1,0 +1,95 @@
+import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
+import type { CardElement, CardSideDesign, MemberCardContext } from "@/lib/card-studio/types";
+import { publicVerificationPath } from "@/lib/card-studio/verify";
+
+function esc(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function fillOf(el: CardElement, fallback = "#4da3ff") {
+  return String(el.properties.fill ?? el.properties.background ?? fallback);
+}
+
+export function verificationUrlFor(member: MemberCardContext, baseUrl: string) {
+  const token = member.cardUuid ?? "";
+  const origin = baseUrl.replace(/\/$/, "");
+  return `${origin}${publicVerificationPath(token)}`;
+}
+
+export function renderSideSvg(
+  side: CardSideDesign,
+  member: MemberCardContext,
+  options?: { verificationBaseUrl?: string; qrSvg?: Record<string, string>; barcodeSvg?: Record<string, string> }
+): string {
+  const parts: string[] = [];
+  const bg = side.background ?? "#0b1b2b";
+  parts.push(`<rect width="${side.width}" height="${side.height}" fill="${esc(bg)}" />`);
+
+  for (const el of side.elements) {
+    if (el.hidden) continue;
+    const transform = `translate(${el.x} ${el.y}) rotate(${el.rotation} ${el.width / 2} ${el.height / 2})`;
+    parts.push(`<g transform="${transform}" opacity="${Number(el.properties.opacity ?? 1)}">`);
+    parts.push(renderElement(el, member, options));
+    parts.push(`</g>`);
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${side.width}" height="${side.height}" viewBox="0 0 ${side.width} ${side.height}">${parts.join("")}</svg>`;
+}
+
+function renderElement(
+  el: CardElement,
+  member: MemberCardContext,
+  options?: { verificationBaseUrl?: string; qrSvg?: Record<string, string>; barcodeSvg?: Record<string, string> }
+) {
+  const radius = Number(el.properties.borderRadius ?? (el.type === "circle" ? el.width / 2 : 0));
+  switch (el.type) {
+    case "background":
+    case "rectangle":
+    case "rounded_rectangle":
+    case "shape":
+    case "guilloche":
+      return `<rect width="${el.width}" height="${el.height}" rx="${radius}" fill="${esc(fillOf(el))}" stroke="${esc(String(el.properties.borderColor ?? "none"))}" stroke-width="${Number(el.properties.borderWidth ?? 0)}" />`;
+    case "circle":
+      return `<ellipse cx="${el.width / 2}" cy="${el.height / 2}" rx="${el.width / 2}" ry="${el.height / 2}" fill="${esc(fillOf(el))}" />`;
+    case "line":
+      return `<rect width="${el.width}" height="${Math.max(1, el.height)}" fill="${esc(String(el.properties.borderColor ?? "#4da3ff"))}" />`;
+    case "qr_code":
+      return options?.qrSvg?.[el.id] ?? `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">QR</text>`;
+    case "barcode":
+      return options?.barcodeSvg?.[el.id] ?? `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">BARCODE</text>`;
+    case "member_photo":
+    case "image":
+    case "logo":
+    case "svg":
+    case "icon":
+    case "signature":
+    case "watermark":
+    case "ghost_photo": {
+      const src = resolveTemplateString(String(el.properties.src ?? ""), member);
+      if (!src) {
+        return `<rect width="${el.width}" height="${el.height}" rx="${radius || 12}" fill="#1e293b" /><text x="12" y="${el.height / 2}" fill="#94a3b8" font-size="12">Photo</text>`;
+      }
+      return `<image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="${el.properties.fit === "contain" ? "xMidYMid meet" : "xMidYMid slice"}" />`;
+    }
+    default: {
+      const raw = String(el.properties.text ?? "");
+      const text = resolveTemplateString(raw, member);
+      const size = Number(el.properties.fontSize ?? 16);
+      const weight = Number(el.properties.fontWeight ?? 600);
+      const color = String(el.properties.color ?? "#f8fafc");
+      const anchor =
+        el.properties.textAlign === "center" ? "middle" : el.properties.textAlign === "right" ? "end" : "start";
+      const x = el.properties.textAlign === "center" ? el.width / 2 : el.properties.textAlign === "right" ? el.width : 0;
+      const y = el.height / 2 + size / 3;
+      return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}">${esc(text)}</text>`;
+    }
+  }
+}
+
+export function cr80ViewBox(width: number, height: number) {
+  return { width, height, aspect: width / height };
+}
