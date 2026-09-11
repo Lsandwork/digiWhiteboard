@@ -388,6 +388,30 @@ export function CardDesigner() {
                   <label className="cs-field">Color<input type="color" value={String(selectedEl.properties.color ?? "#ffffff")} onChange={(e) => updateSelected({ properties: { color: e.target.value } })} /></label>
                 </>
               ) : null}
+              {selectedEl.type === "barcode" ? (
+                <>
+                  <label className="cs-field">Barcode type
+                    <select value={String(selectedEl.properties.symbology ?? "code128")} onChange={(e) => updateSelected({ properties: { symbology: e.target.value } })}>
+                      <option value="code128">Code 128</option>
+                      <option value="code39">Code 39</option>
+                    </select>
+                  </label>
+                  <label className="cs-field">Source
+                    <select value={String(selectedEl.properties.source ?? "gingr_animal_id")} onChange={(e) => updateSelected({ properties: { source: e.target.value } })}>
+                      <option value="gingr_animal_id">Gingr pet / animal ID</option>
+                      <option value="gingr_owner_id">Gingr client / owner ID</option>
+                      <option value="gingr_owner_barcode">Gingr owner barcode field</option>
+                      <option value="card_number">RuffOps card number (FIT-)</option>
+                      <option value="custom">Custom value</option>
+                    </select>
+                  </label>
+                  <p className="cs-id-note">Type: {String(selectedEl.properties.symbology ?? "code128")}</p>
+                  <p className="cs-id-note">Source: {String(selectedEl.properties.source ?? "gingr_animal_id")} — production VIP cards use Gingr animal ID.</p>
+                  <p className="cs-id-note">Value: {resolveTemplateString("{{member.barcode}}", previewMember) || "(no Gingr ID on preview member)"}</p>
+                  <p className="cs-id-note">Human-readable: {resolveTemplateString("{{member.barcode}}", previewMember) || "—"}</p>
+                  <p className="cs-id-note">Validation: {selectedEl.width < 180 || selectedEl.height < 48 ? "BARCODE TOO SMALL" : selectedEl.x < 12 ? "BARCODE TOO CLOSE TO EDGE" : resolveTemplateString("{{member.barcode}}", previewMember) ? "LOCAL dimensions OK — Gingr scanner check-in is not claimed until a physical scan succeeds." : "INVALID GINGR BARCODE VALUE"}</p>
+                </>
+              ) : null}
               {selectedEl.type === "member_photo" ? (
                 <>
                   <label className="cs-field">Frame

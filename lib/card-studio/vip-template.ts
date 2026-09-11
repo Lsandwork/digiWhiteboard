@@ -199,6 +199,7 @@ export function createFitdogVipTemplateDocument(): CardTemplateDocument {
       height: 72,
       properties: {
         symbology: "code128",
+        source: "gingr_animal_id",
         value: "{{member.barcode}}",
         humanReadable: true,
         quietZone: 10,

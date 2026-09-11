@@ -127,6 +127,7 @@ export function CardStudioShell({
                 canManagePrinters={canManageCardStudioPrinters(effectiveAccess, role)}
                 canManageSettings={canManageCardStudioSettings(effectiveAccess, role)}
                 canDeleteTemplates={canDeleteCardStudioTemplates(effectiveAccess, role)}
+                showInternalIds={canManageCardStudioPrinters(effectiveAccess, role)}
               >
                 {children}
               </CardStudioAccess>

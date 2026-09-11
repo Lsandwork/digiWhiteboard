@@ -30,14 +30,17 @@ export async function renderPopulatedArtwork(
         );
       }
       if (el.type === "barcode") {
+        const source = String(el.properties.source ?? member.barcodeSource ?? "gingr_animal_id");
         const raw = resolveTemplateString(String(el.properties.value ?? "{{member.barcode}}"), member);
-        const value = gingrBarcodeValue(member) || normalizeGingrAnimalId(raw);
+        const value =
+          gingrBarcodeValue(member, source, String(el.properties.customValue ?? member.customField ?? "")) ||
+          normalizeGingrAnimalId(raw);
         if (!value) {
           if (el.properties.keepArtworkWhenEmpty) continue;
           throw new Error("Cannot encode a Gingr barcode without a Gingr animal ID.");
         }
         barcodeSvg[el.id] = await renderBarcodeSvg({
-          symbology: "code128",
+          symbology: (el.properties.symbology as "code128") || "code128",
           value,
           width: el.width,
           height: el.height,

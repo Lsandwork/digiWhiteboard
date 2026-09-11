@@ -142,11 +142,14 @@ export type MemberCardContext = {
   fitdogOwnerId: string | null;
   fitdogDogId: string | null;
   gingrAnimalId: string | null;
+  gingrOwnerId: string | null;
+  gingrOwnerBarcode: string | null;
   opsDogId: string | null;
   name: string;
   firstName: string;
   lastName: string;
   email: string | null;
+  phone: string | null;
   memberNumber: string | null;
   membershipType: string | null;
   location: string | null;
@@ -157,7 +160,10 @@ export type MemberCardContext = {
   issueDate: string | null;
   expirationDate: string | null;
   cardUuid: string | null;
+  cardNumber: string | null;
   customField: string | null;
+  barcodeSource: string | null;
+  barcodeValue: string | null;
 };
 
 export type PrintMode = "front" | "back" | "duplex";

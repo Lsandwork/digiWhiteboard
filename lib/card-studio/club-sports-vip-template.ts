@@ -269,6 +269,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       barcode.height,
       {
         symbology: "code128",
+        source: "gingr_animal_id",
         value: "{{member.barcode}}",
         humanReadable: true,
         quietZone: 12,

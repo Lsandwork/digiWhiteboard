@@ -289,6 +289,61 @@
   font-size: 13px;
 }
 
+.cs-id-panel {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border, #263445);
+  border-radius: 12px;
+  background: #0b1520;
+}
+
+.cs-id-panel strong {
+  display: block;
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 12px;
+  color: #7dd3fc;
+}
+
+.cs-id-panel dl {
+  display: grid;
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.cs-id-panel dl div {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cs-id-panel dt {
+  color: #94a3b8;
+}
+
+.cs-id-panel dd {
+  margin: 0;
+}
+
+.cs-id-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+}
+
+.cs-id-lookup {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-border, #263445);
+}
+
+.cs-id-note {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #c5d4e6;
+}
+
 .cs-gingr-missing {
   color: #fecaca;
   font-weight: 600;

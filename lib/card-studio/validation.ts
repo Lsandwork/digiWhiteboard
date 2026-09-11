@@ -1,6 +1,6 @@
 import { CR80_PX, DEFAULT_DPI, mmToPx } from "@/lib/card-studio/constants";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
-import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
+import { gingrBarcodeValue, isPrintableGingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
 import type {
   CardElement,
   CardTemplateDocument,
@@ -72,16 +72,21 @@ export function validateCardForPrint(options: {
   if (!member.name && !member.dogName) {
     issues.push(issue("critical", "MEMBER", "A member or dog must be selected before printing.", false));
   }
-  const hasBarcode = [...template.front.elements, ...template.back.elements].some((el) => el.type === "barcode" && !el.hidden);
-  if (hasBarcode && !gingrBarcodeValue(member)) {
-    issues.push(
-      issue(
-        "critical",
-        "GINGR_BARCODE",
-        "This dog has no Gingr animal ID. The barcode would not check in through Gingr. Link the dog in Gingr before printing.",
-        false
-      )
-    );
+  const barcodeEls = [...template.front.elements, ...template.back.elements].filter((el) => el.type === "barcode" && !el.hidden);
+  if (barcodeEls.length) {
+    const source = String(barcodeEls[0]?.properties.source ?? member.barcodeSource ?? "gingr_animal_id");
+    const value = gingrBarcodeValue(member, source, String(barcodeEls[0]?.properties.customValue ?? member.customField ?? ""));
+    if (!value || !isPrintableGingrBarcodeValue(value)) {
+      issues.push(
+        issue(
+          "critical",
+          "GINGR_BARCODE",
+          "Gingr identification data is missing for this member. The card cannot be printed until the member's Gingr identification data is available.",
+          false
+        )
+      );
+      issues.push(issue("critical", "INVALID_GINGR_BARCODE", "INVALID GINGR BARCODE VALUE", false, barcodeEls[0]?.id));
+    }
   }
   if (!template) {
     issues.push(issue("critical", "TEMPLATE", "A template version is required.", false));
@@ -188,7 +193,10 @@ function validateElement(
 
   if (el.type === "barcode") {
     if (el.x < 12 || el.x + el.width > canvasW - 12) {
-      issues.push(issue("warning", "BARCODE_EDGE", "Barcode is too close to the card edge for a quiet zone.", true, el.id));
+      issues.push(issue("warning", "BARCODE_EDGE", "BARCODE TOO CLOSE TO EDGE", true, el.id));
+    }
+    if (el.width < 180 || el.height < 48) {
+      issues.push(issue("warning", "BARCODE_TOO_SMALL", "BARCODE TOO SMALL", true, el.id));
     }
     if (el.height < 40) {
       issues.push(issue("warning", "BARCODE_HEIGHT", "Barcode height may not meet readability requirements.", true, el.id));

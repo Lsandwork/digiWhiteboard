@@ -595,8 +595,10 @@ export async function submitPrintJob(input: {
   member.cardUuid = cardUuid;
   const gingrId = gingrBarcodeValue(member);
   if (gingrId) {
-    member.gingrAnimalId = gingrId;
+    member.gingrAnimalId = member.gingrAnimalId || gingrId;
     member.memberNumber = gingrId;
+    member.barcodeSource = member.barcodeSource || "gingr_animal_id";
+    member.barcodeValue = gingrId;
   }
   const cardNumber = formatCardNumber(seq.cardSeq);
   const jobId = formatJobId(new Date(), seq.jobSeq);
@@ -607,30 +609,42 @@ export async function submitPrintJob(input: {
     if (existing) return { ok: true as const, job: existing, issues: [], idempotent: true };
   }
 
-  const { data: card, error: cardError } = await supabase
-    .from("card_studio_cards")
-    .insert({
-      card_uuid: cardUuid,
-      card_number: cardNumber,
-      status: "queued",
-      member_name: member.name,
-      dog_name: member.dogName,
-      membership_type: member.membershipType,
-      fitdog_owner_id: member.fitdogOwnerId,
-      fitdog_dog_id: member.fitdogDogId,
-      gingr_animal_id: member.gingrAnimalId,
-      ops_dog_id: member.opsDogId,
-      member_snapshot: member,
-      template_id: template.id,
-      template_version_id: template.versionId,
-      template_version: template.version,
-      printer_id: printer.id,
-      operator_admin_id: actor.adminUserId ?? null,
-      expiration_at: member.expirationDate
-    })
-    .select("*")
-    .single();
+  const cardPayload = {
+    card_uuid: cardUuid,
+    card_number: cardNumber,
+    status: "queued",
+    member_name: member.name,
+    dog_name: member.dogName,
+    membership_type: member.membershipType,
+    fitdog_owner_id: member.fitdogOwnerId,
+    fitdog_dog_id: member.fitdogDogId,
+    gingr_animal_id: member.gingrAnimalId,
+    gingr_owner_id: member.gingrOwnerId,
+    barcode_source: member.barcodeSource,
+    barcode_value: member.barcodeValue,
+    barcode_symbology: "code128",
+    ops_dog_id: member.opsDogId,
+    member_snapshot: member,
+    template_id: template.id,
+    template_version_id: template.versionId,
+    template_version: template.version,
+    printer_id: printer.id,
+    operator_admin_id: actor.adminUserId ?? null,
+    expiration_at: member.expirationDate
+  };
+  let { data: card, error: cardError } = await supabase.from("card_studio_cards").insert(cardPayload).select("*").single();
+  if (cardError && /gingr_owner_id|barcode_source|barcode_value|barcode_symbology/.test(cardError.message)) {
+    const fallback = { ...cardPayload } as Record<string, unknown>;
+    delete fallback.gingr_owner_id;
+    delete fallback.barcode_source;
+    delete fallback.barcode_value;
+    delete fallback.barcode_symbology;
+    const retry = await supabase.from("card_studio_cards").insert(fallback).select("*").single();
+    card = retry.data;
+    cardError = retry.error;
+  }
   if (cardError) throw new Error(cardError.message);
+  if (!card) throw new Error("Card row was not created.");
 
   const { data: job, error: jobError } = await supabase
     .from("card_studio_print_jobs")

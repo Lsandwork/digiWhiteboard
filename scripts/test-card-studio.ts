@@ -35,6 +35,12 @@ import {
   normalizeGingrAnimalId
 } from "../lib/card-studio/gingr-barcode";
 import { renderPopulatedArtwork } from "../lib/card-studio/render/artwork";
+import {
+  barcodeCompatibilityNote,
+  DEFAULT_PRODUCTION_BARCODE_SOURCE,
+  extractGingrOwnerBarcode,
+  resolveBarcodeFromSource
+} from "../lib/card-studio/gingr-identity";
 import { photoQualityWarning, wouldUpscale } from "../lib/card-studio/photo/quality";
 import { FITDOG_BRAND } from "../lib/fitdog-dashboard/assets";
 import { createPrintBridgeToken, verifyPrintBridgeToken } from "../lib/card-studio/printers/bridge-protocol";
@@ -137,6 +143,7 @@ const clubBarcode = clubSports.back.elements.find((el) => el.type === "barcode")
 assert.ok(clubBarcode);
 assert.equal(String(clubBarcode?.properties.value), "{{member.barcode}}");
 assert.equal(String(clubBarcode?.properties.symbology), "code128");
+assert.equal(String(clubBarcode?.properties.source), "gingr_animal_id");
 assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
 assert.ok(validateTemplateDocument(clubSports).some((i) => i.code === "ARTWORK_ASPECT"));
 assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContext(), dogName: "Bailey" }), "Bailey");
@@ -206,6 +213,13 @@ assert.equal(gingrBarcodeValue({ gingrAnimalId: null, memberNumber: "FIT-0001842
 assert.equal(gingrBarcodeValue({ gingrAnimalId: null, memberNumber: "FD-88" }), "88");
 assert.equal(barcodeValueLooksLikeInternalCardNumber("FIT-00018429"), true);
 assert.equal(isGingrCompatibleBarcodePayload("115"), true);
+assert.equal(DEFAULT_PRODUCTION_BARCODE_SOURCE, "gingr_animal_id");
+assert.equal(extractGingrOwnerBarcode({ barcode: "TAG-991" }), "TAG-991");
+assert.equal(extractGingrOwnerBarcode({ id: "12" }), null);
+assert.equal(resolveBarcodeFromSource({ gingrAnimalId: "115", memberNumber: null }, "gingr_animal_id").value, "115");
+assert.equal(resolveBarcodeFromSource({ gingrAnimalId: "115", memberNumber: null, cardNumber: "FIT-00018429" }, "card_number").value, null);
+assert.ok(barcodeCompatibilityNote("gingr_animal_id").includes("Dashboard Search"));
+assert.ok(barcodeCompatibilityNote("gingr_owner_barcode").includes("PER OWNER") || barcodeCompatibilityNote("gingr_owner_barcode").includes("owner"));
 
 assert.equal(resolveTemplateString("{{member.barcode}} {{member.member_number}} {{member.gingr_animal_id}}", gingrMember), "115 115 115");
 assert.equal(resolveTemplateString("{{member.barcode}}", member), "");

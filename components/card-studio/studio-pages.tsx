@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CARD_STUDIO_PATHS, TEMPLATE_CATEGORY_LABELS } from "@/lib/card-studio/constants";
 import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
+import { GingrIdentityPanel } from "@/components/card-studio/GingrIdentityPanel";
 import { useCardStudioAccess } from "@/components/card-studio/CardStudioAccess";
 import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
 import type { MemberCardContext, PrintMode } from "@/lib/card-studio/types";
@@ -124,6 +125,7 @@ export function MemberPicker({ onSelect }: { onSelect?: (member: Record<string, 
 }
 
 export function IssueWizard() {
+  const { showInternalIds } = useCardStudioAccess();
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Array<Record<string, unknown>>>([]);
   const [member, setMember] = useState<Record<string, unknown> | null>(null);
@@ -217,10 +219,10 @@ export function IssueWizard() {
       <div className="cs-page-title">
         <div>
           <h1>Create / Print Card</h1>
-          <p>Meantime: print CR80 at actual size on a normal office printer through this computer’s print dialog. The barcode is the Gingr animal ID (Code 128) so a scanner types it into Gingr Dashboard Search.</p>
+          <p>Meantime: print CR80 at actual size on a normal office printer. The barcode encodes the Gingr animal ID from RuffOps sync (Code 128) so a wedge scanner types it into Gingr Dashboard Search. That is not the official owner key-tag field unless Gingr’s owner Barcode field matches.</p>
         </div>
       </div>
-      <input className="cs-search" placeholder="Search dog, owner, or Gingr animal ID" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="cs-search" placeholder="Search dog, owner, phone, email, or Gingr ID" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="cs-card" style={{ marginTop: 12 }}>
         {hits.map((hit, i) => {
           const gingrId = gingrBarcodeValue(hit as unknown as MemberCardContext);
@@ -238,9 +240,9 @@ export function IssueWizard() {
             <strong>Easy edit</strong>
             <p>Selected {String(member.name)} — overlay dog name and photo on the exact VIP artwork. Leave them unchanged to keep the supplied Bailey art.</p>
             {gingrBarcodeValue(member as unknown as MemberCardContext) ? (
-              <p>Gingr barcode will encode animal ID <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong>. Scan into Gingr Dashboard Search to check in.</p>
+              <p>Visible member ID and barcode value: Gingr animal ID <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong>.</p>
             ) : (
-              <p className="cs-gingr-missing">No Gingr animal ID on this dog. Printing is blocked until the dog is linked in Gingr — a Fitdog-only ID will not check in.</p>
+              <p className="cs-gingr-missing">Gingr identification data is missing for this member. The card cannot be printed until the member&apos;s Gingr identification data is available.</p>
             )}
           </div>
           <label className="cs-field">
@@ -278,6 +280,13 @@ export function IssueWizard() {
             <p>No photo yet. Upload one for the top-left frame.</p>
           )}
         </div>
+      ) : null}
+      {member ? (
+        <GingrIdentityPanel
+          member={member as unknown as MemberCardContext}
+          showInternalIds={showInternalIds}
+          onMemberPatch={(patch) => setMember({ ...member, ...patch })}
+        />
       ) : null}
       <div className="cs-actions" style={{ marginTop: 12 }}>
         <select className="cs-search" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
