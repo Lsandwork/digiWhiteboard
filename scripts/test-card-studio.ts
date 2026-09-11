@@ -24,7 +24,14 @@ import { buildOsPrintHtml, osPrintUsesDialog } from "../lib/card-studio/render/o
 import { zebraAdapter } from "../lib/card-studio/printers/manufacturers";
 import { listPrinterAdapters } from "../lib/card-studio/printers/registry";
 import { qrPayload } from "../lib/card-studio/codes/qr";
-import { suggestedSymbologies, barcodeReadableWarning } from "../lib/card-studio/codes/barcode";
+import { suggestedSymbologies, barcodeReadableWarning, renderBarcodeSvg } from "../lib/card-studio/codes/barcode";
+import {
+  barcodeValueLooksLikeInternalCardNumber,
+  gingrBarcodeValue,
+  isGingrCompatibleBarcodePayload,
+  normalizeGingrAnimalId
+} from "../lib/card-studio/gingr-barcode";
+import { renderPopulatedArtwork } from "../lib/card-studio/render/artwork";
 import { photoQualityWarning, wouldUpscale } from "../lib/card-studio/photo/quality";
 import { FITDOG_BRAND } from "../lib/fitdog-dashboard/assets";
 import { createPrintBridgeToken, verifyPrintBridgeToken } from "../lib/card-studio/printers/bridge-protocol";
@@ -87,6 +94,10 @@ const vip = createFitdogVipTemplateDocument();
 assert.ok(vip.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.logoBadge256));
 assert.ok(vip.front.elements.some((el) => el.type === "member_photo"));
 assert.ok(vip.back.elements.some((el) => el.type === "barcode"));
+const vipBarcode = vip.back.elements.find((el) => el.type === "barcode");
+assert.equal(String(vipBarcode?.properties.value), "{{member.barcode}}");
+assert.equal(String(vipBarcode?.properties.symbology), "code128");
+assert.ok(!String(vip.back.elements.find((el) => el.id === "vip_back_barcode")?.properties.value ?? "").includes("FD-"));
 assert.equal(validateTemplateDocument(vip).filter((i) => i.severity === "critical").length, 0);
 
 const clubSports = createClubSportsVipTemplateDocument();
@@ -104,7 +115,12 @@ assert.equal(String(clubDog?.properties.text), "{{member.dog_name}}");
 assert.equal(clubDog?.locked, false);
 assert.ok(clubSports.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.logoBadge256));
 assert.ok(String(clubSports.front.elements.find((el) => el.id === "cs_front_panel")?.properties.markup ?? "").includes("#F37021"));
-assert.ok(clubSports.back.elements.some((el) => el.type === "barcode"));
+const clubBarcode = clubSports.back.elements.find((el) => el.type === "barcode");
+assert.ok(clubBarcode);
+assert.equal(String(clubBarcode?.properties.value), "{{member.barcode}}");
+assert.equal(String(clubBarcode?.properties.symbology), "code128");
+assert.ok((clubBarcode?.width ?? 0) >= 480);
+assert.ok((clubBarcode?.height ?? 0) >= 72);
 assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
 assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContext(), dogName: "Bailey" }), "Bailey");
 const builtin = builtinClubSportsVipTemplate();
@@ -122,6 +138,7 @@ const member = {
   cardUuid: "abc",
   expirationDate: "2027-01-01"
 };
+const gingrMember = { ...member, gingrAnimalId: "115", memberNumber: "115" };
 assert.equal(resolveTemplateString("Hello {{member.name}}", member), "Hello Alex Rivera");
 assert.deepEqual(unresolvedDynamicFields("{{member.missing}}", member), ["member.missing"]);
 
@@ -151,6 +168,47 @@ const issues = validateCardForPrint({
   }
 });
 assert.ok(issues.some((i) => i.code === "PRINTER_OFFLINE"));
+assert.ok(issues.some((i) => i.code === "GINGR_BARCODE"), "FIT- card numbers must not print as Gingr barcodes");
+
+assert.equal(normalizeGingrAnimalId("FD-115"), "115");
+assert.equal(normalizeGingrAnimalId("115"), "115");
+assert.equal(normalizeGingrAnimalId("FIT-00018429"), null);
+assert.equal(normalizeGingrAnimalId("FD-FD-115"), null);
+assert.equal(gingrBarcodeValue({ gingrAnimalId: "FD-115", memberNumber: "FIT-00018429" }), "115");
+assert.equal(gingrBarcodeValue({ gingrAnimalId: null, memberNumber: "FIT-00018429" }), null);
+assert.equal(gingrBarcodeValue({ gingrAnimalId: null, memberNumber: "FD-88" }), "88");
+assert.equal(barcodeValueLooksLikeInternalCardNumber("FIT-00018429"), true);
+assert.equal(isGingrCompatibleBarcodePayload("115"), true);
+
+assert.equal(resolveTemplateString("{{member.barcode}} {{member.member_number}} {{member.gingr_animal_id}}", gingrMember), "115 115 115");
+assert.equal(resolveTemplateString("{{member.barcode}}", member), "");
+
+const gingrPrintIssues = validateCardForPrint({
+  member: gingrMember,
+  template: clubSports,
+  sides: "duplex",
+  printerOnline: true,
+  capabilities: {
+    color: true,
+    monochrome: true,
+    duplex: false,
+    automaticDuplex: false,
+    manualFlip: true,
+    edgeToEdge: true,
+    resolution: 300,
+    uv: false,
+    lamination: false,
+    magneticStripe: false,
+    smartCard: false,
+    contactless: false,
+    usb: false,
+    ethernet: false,
+    wifi: false,
+    osDriver: true,
+    nativeIntegration: false
+  }
+});
+assert.equal(gingrPrintIssues.some((i) => i.code === "GINGR_BARCODE"), false);
 
 assert.equal(formatCardNumber(18429), "FIT-00018429");
 assert.equal(formatJobId(new Date("2026-09-10T00:00:00Z"), 184), "JOB-20260910-000184");
@@ -229,6 +287,44 @@ const qr = qrPayload({
 assert.ok(qr.includes("/card-studio/verify/abc"));
 assert.deepEqual(suggestedSymbologies("1234567890128").includes("ean13"), true);
 assert.ok(barcodeReadableWarning("code128", 80, 20, 2));
+
+const barcodeSvg = await renderBarcodeSvg({
+  symbology: "code128",
+  value: "115",
+  width: 520,
+  height: 96,
+  humanReadable: true
+});
+assert.ok(barcodeSvg.includes("data:image/png;base64,"));
+assert.ok(barcodeSvg.includes("<title>115</title>"));
+assert.ok(!barcodeSvg.includes("FD-115"));
+await assert.rejects(
+  () =>
+    renderBarcodeSvg({
+      symbology: "code128",
+      value: "   ",
+      width: 200,
+      height: 64,
+      humanReadable: true
+    }),
+  /empty/i
+);
+
+const artwork = await renderPopulatedArtwork(clubSports, gingrMember, "https://staff.ruffops.com");
+assert.ok(artwork.backSvg.includes("<title>115</title>"));
+assert.ok(!artwork.backSvg.includes("FD-115"));
+assert.ok(!artwork.backSvg.includes("FIT-00018429"));
+await assert.rejects(
+  () => renderPopulatedArtwork(clubSports, member, "https://staff.ruffops.com"),
+  /Gingr animal ID/
+);
+
+const prefixed = createFitdogVipTemplateDocument();
+const prefixedBarcode = prefixed.back.elements.find((el) => el.type === "barcode");
+if (prefixedBarcode) prefixedBarcode.properties.value = "FD-{{member.member_number}}";
+const strippedArtwork = await renderPopulatedArtwork(prefixed, { ...gingrMember, memberNumber: "FD-115" }, "https://staff.ruffops.com");
+assert.ok(strippedArtwork.backSvg.includes("<title>115</title>"));
+assert.ok(!strippedArtwork.backSvg.includes("FD-115"));
 
 assert.ok(photoQualityWarning(80, 168, 300));
 assert.equal(wouldUpscale(80, 168), true);

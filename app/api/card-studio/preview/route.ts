@@ -61,12 +61,28 @@ export async function POST(request: Request) {
     printerOnline,
     capabilities
   });
-  const artwork = await renderPopulatedArtwork(document, member, settings.verificationBaseUrl);
-  return NextResponse.json({
-    ok: true,
-    issues,
-    capabilities,
-    ...artwork,
-    aspect: artwork.width / artwork.height
-  });
+  try {
+    const artwork = await renderPopulatedArtwork(document, member, settings.verificationBaseUrl);
+    return NextResponse.json({
+      ok: issues.every((item) => item.severity !== "critical"),
+      issues,
+      capabilities,
+      ...artwork,
+      aspect: artwork.width / artwork.height
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not encode a Gingr barcode.";
+    issues.push({
+      severity: "critical",
+      code: "BARCODE_ENCODE",
+      message,
+      overrideable: false
+    });
+    return NextResponse.json({
+      ok: false,
+      issues,
+      capabilities,
+      error: message
+    });
+  }
 }

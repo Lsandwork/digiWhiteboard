@@ -289,6 +289,11 @@
   font-size: 13px;
 }
 
+.cs-gingr-missing {
+  color: #fecaca;
+  font-weight: 600;
+}
+
 .cs-photo-preview {
   width: 72px;
   height: 90px;

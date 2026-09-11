@@ -64,7 +64,8 @@ export function CardDesigner() {
     name: "Alex Rivera",
     dogName: "Bailey",
     membershipType: "Club + Sports Member",
-    memberNumber: "FD-00001",
+    memberNumber: "115",
+    gingrAnimalId: "115",
     location: "SANTA MONICA, CA",
     expirationDate: "2027-09-01",
     photoUrl: "",
@@ -461,7 +462,12 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
     );
   }
   if (el.type === "qr_code" || el.type === "barcode") {
-    return <div style={{ width: "100%", height: "100%", background: "#fff", color: "#0b1b2b", display: "grid", placeItems: "center", fontSize: 10 }}>{el.type === "qr_code" ? "QR" : "BARCODE"}</div>;
+    const gingrId = resolveTemplateString("{{member.barcode}}", member);
+    return (
+      <div style={{ width: "100%", height: "100%", background: "#fff", color: "#0b1b2b", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center", padding: 4 }}>
+        {el.type === "qr_code" ? "QR" : gingrId ? `Code 128 · Gingr ${gingrId}` : "Gingr barcode (needs animal ID)"}
+      </div>
+    );
   }
   if (el.type === "rectangle" || el.type === "rounded_rectangle" || el.type === "circle" || el.type === "background" || el.type === "shape") {
     return <div style={{ width: "100%", height: "100%", background: String(el.properties.fill ?? "#4da3ff"), borderRadius: el.type === "circle" ? "50%" : Number(el.properties.borderRadius ?? 0) }} />;

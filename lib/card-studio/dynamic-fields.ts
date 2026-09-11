@@ -1,4 +1,5 @@
 import { DYNAMIC_FIELD_KEYS } from "@/lib/card-studio/constants";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
 import type { MemberCardContext } from "@/lib/card-studio/types";
 
 const TOKEN_RE = /\{\{\s*([a-z0-9_.]+)\s*\}\}/gi;
@@ -32,14 +33,15 @@ export function contextToFieldMap(member: MemberCardContext, extras?: Record<str
     "member.name": member.name,
     "member.first_name": member.firstName,
     "member.last_name": member.lastName,
-    "member.member_number": member.memberNumber ?? "",
+    "member.member_number": gingrBarcodeValue(member) || member.memberNumber || "",
     "member.membership_type": member.membershipType ?? "",
     "member.location": member.location ?? "",
     "member.issue_date": member.issueDate ?? "",
     "member.expiration_date": member.expirationDate ?? "",
     "member.photo": member.photoUrl ?? "",
     "member.qr_code": member.cardUuid ?? "",
-    "member.barcode": member.memberNumber ?? "",
+    "member.barcode": gingrBarcodeValue(member) ?? "",
+    "member.gingr_animal_id": gingrBarcodeValue(member) ?? "",
     "member.card_uuid": member.cardUuid ?? "",
     "member.status": member.status,
     "member.dog_name": member.dogName ?? "",

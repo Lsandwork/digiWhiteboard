@@ -159,6 +159,7 @@ export const DYNAMIC_FIELD_KEYS = [
   "member.photo",
   "member.qr_code",
   "member.barcode",
+  "member.gingr_animal_id",
   "member.card_uuid",
   "member.status",
   "member.dog_name",

@@ -150,7 +150,7 @@ export function defaultProperties(type: CardElementType): Record<string, unknown
     case "barcode":
       return {
         symbology: "code128",
-        value: "FD-{{member.member_number}}",
+        value: "{{member.barcode}}",
         humanReadable: true,
         quietZone: 8,
         foreground: "#0b1b2b",

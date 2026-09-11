@@ -1,8 +1,9 @@
 import { renderSideSvg } from "@/lib/card-studio/render/svg";
 import { qrPayload, renderQrSvg } from "@/lib/card-studio/codes/qr";
 import { renderBarcodeSvg } from "@/lib/card-studio/codes/barcode";
+import { gingrBarcodeValue, normalizeGingrAnimalId } from "@/lib/card-studio/gingr-barcode";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
-import type { BarcodeSymbology, CardTemplateDocument, MemberCardContext, QrContentType } from "@/lib/card-studio/types";
+import type { CardTemplateDocument, MemberCardContext, QrContentType } from "@/lib/card-studio/types";
 
 export async function renderPopulatedArtwork(
   template: CardTemplateDocument,
@@ -29,12 +30,17 @@ export async function renderPopulatedArtwork(
         );
       }
       if (el.type === "barcode") {
+        const raw = resolveTemplateString(String(el.properties.value ?? "{{member.barcode}}"), member);
+        const value = gingrBarcodeValue(member) || normalizeGingrAnimalId(raw);
+        if (!value) {
+          throw new Error("Cannot encode a Gingr barcode without a Gingr animal ID.");
+        }
         barcodeSvg[el.id] = await renderBarcodeSvg({
-          symbology: (el.properties.symbology as BarcodeSymbology) || "code128",
-          value: resolveTemplateString(String(el.properties.value ?? ""), member),
+          symbology: "code128",
+          value,
           width: el.width,
           height: el.height,
-          humanReadable: Boolean(el.properties.humanReadable)
+          humanReadable: el.properties.humanReadable !== false
         });
       }
     }

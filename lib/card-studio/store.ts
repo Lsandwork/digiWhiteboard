@@ -8,6 +8,7 @@ import {
   isClubSportsVipBuiltinId
 } from "@/lib/card-studio/club-sports-vip-template";
 import { DEFAULT_CARD_STUDIO_SETTINGS } from "@/lib/card-studio/settings";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
 import { formatCardNumber, formatJobId } from "@/lib/card-studio/job-ids";
 import { signVerificationToken } from "@/lib/card-studio/verify";
 import { classifyPrintOutcome, retryWouldDuplicate } from "@/lib/card-studio/printers/duplicate-protection";
@@ -576,7 +577,12 @@ export async function submitPrintJob(input: {
   const seq = await nextSequences();
   const cardUuid = randomUUID();
   member.cardUuid = cardUuid;
-  member.memberNumber = member.memberNumber || formatCardNumber(seq.cardSeq);
+  const gingrId = gingrBarcodeValue(member);
+  if (gingrId) {
+    member.gingrAnimalId = gingrId;
+    member.memberNumber = gingrId;
+  }
+  const cardNumber = formatCardNumber(seq.cardSeq);
   const jobId = formatJobId(new Date(), seq.jobSeq);
   const supabase = db();
 
@@ -589,7 +595,7 @@ export async function submitPrintJob(input: {
     .from("card_studio_cards")
     .insert({
       card_uuid: cardUuid,
-      card_number: member.memberNumber,
+      card_number: cardNumber,
       status: "queued",
       member_name: member.name,
       dog_name: member.dogName,
@@ -669,9 +675,29 @@ export async function submitPrintJob(input: {
     await supabase.from("card_studio_cards").update({ status: "draft", print_job_id: job.id }).eq("id", card.id);
   }
 
-  const artwork = osPrintUsesDialog(printer)
-    ? await renderPopulatedArtwork(template.document, member, settings.verificationBaseUrl)
-    : null;
+  let artwork = null;
+  if (osPrintUsesDialog(printer)) {
+    try {
+      artwork = await renderPopulatedArtwork(template.document, member, settings.verificationBaseUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not encode a Gingr barcode.";
+      await supabase
+        .from("card_studio_print_jobs")
+        .update({
+          status: "failed",
+          error_message: message,
+          completed_at: new Date().toISOString()
+        })
+        .eq("id", job.id);
+      return {
+        ok: false as const,
+        issues: [
+          ...issues,
+          { severity: "critical" as const, code: "BARCODE_ENCODE", message, overrideable: false }
+        ]
+      };
+    }
+  }
 
   return {
     ok: true as const,

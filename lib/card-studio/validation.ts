@@ -1,5 +1,6 @@
 import { CR80_PX, DEFAULT_DPI, mmToPx } from "@/lib/card-studio/constants";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
 import type {
   CardElement,
   CardTemplateDocument,
@@ -49,6 +50,17 @@ export function validateCardForPrint(options: {
 
   if (!member.name && !member.dogName) {
     issues.push(issue("critical", "MEMBER", "A member or dog must be selected before printing.", false));
+  }
+  const hasBarcode = [...template.front.elements, ...template.back.elements].some((el) => el.type === "barcode" && !el.hidden);
+  if (hasBarcode && !gingrBarcodeValue(member)) {
+    issues.push(
+      issue(
+        "critical",
+        "GINGR_BARCODE",
+        "This dog has no Gingr animal ID. The barcode would not check in through Gingr. Link the dog in Gingr before printing.",
+        false
+      )
+    );
   }
   if (!template) {
     issues.push(issue("critical", "TEMPLATE", "A template version is required.", false));

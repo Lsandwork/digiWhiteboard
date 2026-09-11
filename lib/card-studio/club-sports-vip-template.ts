@@ -385,15 +385,15 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
     editable(
       "barcode",
       "cs_vip_barcode",
-      300,
-      500,
-      410,
-      72,
+      250,
+      488,
+      520,
+      96,
       {
         symbology: "code128",
-        value: "{{member.member_number}}",
+        value: "{{member.barcode}}",
         humanReadable: true,
-        quietZone: 8,
+        quietZone: 12,
         foreground: C.slate,
         background: C.white
       },

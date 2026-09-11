@@ -7,9 +7,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CARD_STUDIO_PATHS, TEMPLATE_CATEGORY_LABELS } from "@/lib/card-studio/constants";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
 import { useCardStudioAccess } from "@/components/card-studio/CardStudioAccess";
 import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
-import type { PrintMode } from "@/lib/card-studio/types";
+import type { MemberCardContext, PrintMode } from "@/lib/card-studio/types";
 
 type TemplateRow = {
   id: string;
@@ -216,22 +217,31 @@ export function IssueWizard() {
       <div className="cs-page-title">
         <div>
           <h1>Create / Print Card</h1>
-          <p>Meantime: print CR80 at actual size on a normal office printer through this computer’s print dialog. Native ID-card adapters are not required.</p>
+          <p>Meantime: print CR80 at actual size on a normal office printer through this computer’s print dialog. The barcode is the Gingr animal ID (Code 128) so a scanner types it into Gingr Dashboard Search.</p>
         </div>
       </div>
-      <input className="cs-search" placeholder="Search members" value={q} onChange={(e) => setQ(e.target.value)} />
+      <input className="cs-search" placeholder="Search dog, owner, or Gingr animal ID" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="cs-card" style={{ marginTop: 12 }}>
-        {hits.map((hit, i) => (
-          <button key={i} className="cs-btn" style={{ margin: 4 }} onClick={() => setMember(hit)}>
-            {String(hit.name)} · {String(hit.dogName ?? "")}
-          </button>
-        ))}
+        {hits.map((hit, i) => {
+          const gingrId = gingrBarcodeValue(hit as unknown as MemberCardContext);
+          return (
+            <button key={i} className="cs-btn" style={{ margin: 4 }} onClick={() => setMember(hit)}>
+              {String(hit.name)} · {String(hit.dogName ?? "")}
+              {gingrId ? ` · Gingr ${gingrId}` : " · no Gingr ID"}
+            </button>
+          );
+        })}
       </div>
       {member ? (
         <div className="cs-quick-edit" style={{ marginTop: 12 }}>
           <div>
             <strong>Easy edit</strong>
             <p>Selected {String(member.name)} — update the dog name and top-left photo for this print.</p>
+            {gingrBarcodeValue(member as unknown as MemberCardContext) ? (
+              <p>Gingr barcode will encode animal ID <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong>. Scan into Gingr Dashboard Search to check in.</p>
+            ) : (
+              <p className="cs-gingr-missing">No Gingr animal ID on this dog. Printing is blocked until the dog is linked in Gingr — a Fitdog-only ID will not check in.</p>
+            )}
           </div>
           <label className="cs-field">
             Dog name
@@ -303,7 +313,11 @@ export function IssueWizard() {
         </div>
       ) : null}
       <div className="cs-actions" style={{ marginTop: 16 }}>
-        <button className="cs-btn cs-btn--primary" disabled={!member || !templateId} onClick={() => void printCard()}>
+        <button
+          className="cs-btn cs-btn--primary"
+          disabled={!member || !templateId || !gingrBarcodeValue((member ?? {}) as unknown as MemberCardContext)}
+          onClick={() => void printCard()}
+        >
           {printerId === "os-office" ? "Print on this computer" : "Print Cards"}
         </button>
       </div>
@@ -311,6 +325,13 @@ export function IssueWizard() {
       {result ? (
         <div className="cs-card" style={{ marginTop: 16 }}>
           <h3>{result.ok ? (result.osPrint ? "Print dialog opened" : "Result") : "Print blocked"}</h3>
+          {Array.isArray(result.issues) ? (
+            <div>
+              {(result.issues as Array<{ message?: string; severity?: string }>).map((issue, i) => (
+                <p key={i}>{issue.severity}: {issue.message}</p>
+              ))}
+            </div>
+          ) : null}
           {result.osPrint ? (
             <div className="cs-actions">
               <button className="cs-btn cs-btn--primary" onClick={() => void confirmOs(true)}>Card printed successfully</button>
@@ -326,9 +347,9 @@ export function IssueWizard() {
                 })}>Print again</button>
               ) : null}
             </div>
-          ) : (
-            <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.print ?? result, null, 2)}</pre>
-          )}
+          ) : result.print ? (
+            <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.print, null, 2)}</pre>
+          ) : null}
         </div>
       ) : null}
     </div>
