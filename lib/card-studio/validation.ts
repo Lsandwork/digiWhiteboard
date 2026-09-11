@@ -33,6 +33,27 @@ export function validateTemplateDocument(doc: CardTemplateDocument): ValidationI
   if (doc.dpi < DEFAULT_DPI) {
     issues.push(issue("warning", "DPI", `Template DPI is ${doc.dpi}. Print quality requires at least 300 DPI.`, true));
   }
+  for (const side of [doc.front, doc.back] as const) {
+    for (const el of side.elements) {
+      if (!el.properties.exactArtwork) continue;
+      const nativeW = Number(el.properties.nativeWidth ?? 0);
+      const nativeH = Number(el.properties.nativeHeight ?? 0);
+      if (!nativeW || !nativeH) continue;
+      const nativeAspect = nativeW / nativeH;
+      const canvasAspect = side.width / side.height;
+      if (Math.abs(nativeAspect - canvasAspect) > 0.02) {
+        issues.push(
+          issue(
+            "warning",
+            "ARTWORK_ASPECT",
+            `Exact artwork is ${nativeW}×${nativeH} and will be letterboxed on CR80 ${side.width}×${side.height}. It will not be stretched.`,
+            true,
+            el.id
+          )
+        );
+      }
+    }
+  }
   return issues;
 }
 

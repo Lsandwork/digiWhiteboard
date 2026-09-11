@@ -1,0 +1,33 @@
+{
+  "package": "Fitdog VIP Exact Artwork \u2014 Card Studio",
+  "version": "2.0.0",
+  "source_of_truth": "MASTER_EXACT/FITDOG_VIP_MASTER_EXACT.png",
+  "source_master_dimensions_px": [
+    1585,
+    992
+  ],
+  "front_crop_box_px": [
+    154,
+    39,
+    1129,
+    494
+  ],
+  "back_crop_box_px": [
+    154,
+    526,
+    1129,
+    944
+  ],
+  "front_dimensions_px": [
+    975,
+    455
+  ],
+  "back_dimensions_px": [
+    975,
+    418
+  ],
+  "design_change": false,
+  "logo_recreated": false,
+  "photo_regenerated": false,
+  "artwork_distorted": false
+}

@@ -33,6 +33,7 @@ export async function renderPopulatedArtwork(
         const raw = resolveTemplateString(String(el.properties.value ?? "{{member.barcode}}"), member);
         const value = gingrBarcodeValue(member) || normalizeGingrAnimalId(raw);
         if (!value) {
+          if (el.properties.keepArtworkWhenEmpty) continue;
           throw new Error("Cannot encode a Gingr barcode without a Gingr animal ID.");
         }
         barcodeSvg[el.id] = await renderBarcodeSvg({

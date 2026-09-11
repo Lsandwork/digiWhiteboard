@@ -236,7 +236,7 @@ export function IssueWizard() {
         <div className="cs-quick-edit" style={{ marginTop: 12 }}>
           <div>
             <strong>Easy edit</strong>
-            <p>Selected {String(member.name)} — update the dog name and top-left photo for this print.</p>
+            <p>Selected {String(member.name)} — overlay dog name and photo on the exact VIP artwork. Leave them unchanged to keep the supplied Bailey art.</p>
             {gingrBarcodeValue(member as unknown as MemberCardContext) ? (
               <p>Gingr barcode will encode animal ID <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong>. Scan into Gingr Dashboard Search to check in.</p>
             ) : (

@@ -60,7 +60,9 @@ function renderElement(
     case "qr_code":
       return options?.qrSvg?.[el.id] ?? `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">QR</text>`;
     case "barcode":
-      return options?.barcodeSvg?.[el.id] ?? `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">BARCODE</text>`;
+      if (options?.barcodeSvg?.[el.id]) return options.barcodeSvg[el.id];
+      if (el.properties.keepArtworkWhenEmpty) return "";
+      return `<rect width="${el.width}" height="${el.height}" fill="#fff" /><text x="8" y="${el.height / 2}" font-size="10" fill="#0b1b2b">BARCODE</text>`;
     case "svg":
     case "icon": {
       const markup = String(el.properties.markup ?? "");
@@ -78,6 +80,7 @@ function renderElement(
       const src = resolveTemplateString(String(el.properties.src ?? ""), member);
       const rx = radius || (el.type === "member_photo" ? 16 : 0);
       if (!src) {
+        if (el.properties.keepArtworkWhenEmpty) return "";
         return `<rect width="${el.width}" height="${el.height}" rx="${rx}" fill="#e8e8e8" stroke="#F37021" stroke-width="2"/><text x="${el.width / 2}" y="${el.height / 2}" text-anchor="middle" fill="#1F2D3D" font-size="14" font-weight="700">Replace photo</text>`;
       }
       const clipId = `clip_${el.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
@@ -88,6 +91,7 @@ function renderElement(
       const raw = String(el.properties.text ?? "");
       let text = resolveTemplateString(raw, member);
       if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
+      if (!text && el.properties.keepArtworkWhenEmpty) return "";
       const size = Number(el.properties.fontSize ?? 16);
       const weight = Number(el.properties.fontWeight ?? 600);
       const color = String(el.properties.color ?? "#f8fafc");
@@ -96,7 +100,8 @@ function renderElement(
         el.properties.textAlign === "center" ? "middle" : el.properties.textAlign === "right" ? "end" : "start";
       const x = el.properties.textAlign === "center" ? el.width / 2 : el.properties.textAlign === "right" ? el.width : 0;
       const y = el.height / 2 + size / 3;
-      return `<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-style="${italic}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}">${esc(text)}</text>`;
+      const fill = el.properties.background ? `<rect width="${el.width}" height="${el.height}" fill="${esc(String(el.properties.background))}" />` : "";
+      return `${fill}<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-style="${italic}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}">${esc(text)}</text>`;
     }
   }
 }

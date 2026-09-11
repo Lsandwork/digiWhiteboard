@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync, existsSync } from "node:fs";
+import path from "node:path";
 import {
   accessFromLegacyRole,
   canAccessCardStudio,
@@ -11,7 +14,7 @@ import { roleCanSeeCardStudioNav, CARD_STUDIO_NAV_ROUTE, buildStaffPanelNav } fr
 import { CR80_PX, cr80AspectRatio, DEFAULT_DPI, CR80_MM, CR80_INCHES } from "../lib/card-studio/constants";
 import { createElement, emptyTemplateDocument, parseTemplateDocument } from "../lib/card-studio/template-schema";
 import { createFitdogVipTemplateDocument } from "../lib/card-studio/vip-template";
-import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_TEMPLATE_NAME, createClubSportsVipTemplateDocument } from "../lib/card-studio/club-sports-vip-template";
+import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_EXACT_ARTWORK, CLUB_SPORTS_VIP_TEMPLATE_NAME, containRect, createClubSportsVipTemplateDocument, documentUsesExactClubSportsArtwork } from "../lib/card-studio/club-sports-vip-template";
 import { resolveTemplateString, unresolvedDynamicFields } from "../lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "../lib/card-studio/dynamic-fields";
 import { validateCardForPrint, validateTemplateDocument } from "../lib/card-studio/validation";
@@ -104,28 +107,52 @@ const clubSports = createClubSportsVipTemplateDocument();
 assert.equal(CLUB_SPORTS_VIP_TEMPLATE_NAME, "Fitdog Club + Sports VIP");
 assert.equal(clubSports.front.width, CR80_PX.width);
 assert.equal(clubSports.front.height, CR80_PX.height);
+assert.equal(documentUsesExactClubSportsArtwork(clubSports), true);
+const clubFrontArt = clubSports.front.elements.find((el) => el.id === "cs_front_exact_art");
+const clubBackArt = clubSports.back.elements.find((el) => el.id === "cs_back_exact_art");
+assert.equal(String(clubFrontArt?.properties.src), CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc);
+assert.equal(String(clubBackArt?.properties.src), CLUB_SPORTS_VIP_EXACT_ARTWORK.backSrc);
+assert.equal(clubFrontArt?.locked, true);
+assert.equal(clubBackArt?.locked, true);
+assert.equal(String(clubFrontArt?.properties.fit), "contain");
+assert.equal(clubSports.front.elements.some((el) => el.type === "logo"), false, "exact artwork already includes the Fitdog logo");
+assert.equal(clubSports.front.elements.some((el) => el.id === "cs_front_panel"), false);
 const clubPhoto = clubSports.front.elements.find((el) => el.id === "cs_vip_photo");
 assert.ok(clubPhoto);
 assert.equal(clubPhoto?.type, "member_photo");
-assert.ok((clubPhoto?.x ?? 99) < 40 && (clubPhoto?.y ?? 99) < 40);
 assert.equal(String(clubPhoto?.properties.src), "{{member.photo}}");
+assert.equal(clubPhoto?.properties.keepArtworkWhenEmpty, true);
 assert.equal(clubPhoto?.locked, false);
 const clubDog = clubSports.front.elements.find((el) => el.id === "cs_vip_dog_name");
 assert.equal(String(clubDog?.properties.text), "{{member.dog_name}}");
 assert.equal(clubDog?.locked, false);
-assert.ok(clubSports.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.logoBadge256));
-assert.ok(String(clubSports.front.elements.find((el) => el.id === "cs_front_panel")?.properties.markup ?? "").includes("#F37021"));
+const placedFront = containRect(
+  CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.width,
+  CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.height,
+  CR80_PX.width,
+  CR80_PX.height
+);
+assert.ok(Math.abs(placedFront.width / placedFront.height - CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.width / CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.height) < 0.0001);
 const clubBarcode = clubSports.back.elements.find((el) => el.type === "barcode");
 assert.ok(clubBarcode);
 assert.equal(String(clubBarcode?.properties.value), "{{member.barcode}}");
 assert.equal(String(clubBarcode?.properties.symbology), "code128");
-assert.ok((clubBarcode?.width ?? 0) >= 480);
-assert.ok((clubBarcode?.height ?? 0) >= 72);
 assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
+assert.ok(validateTemplateDocument(clubSports).some((i) => i.code === "ARTWORK_ASPECT"));
 assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContext(), dogName: "Bailey" }), "Bailey");
 const builtin = builtinClubSportsVipTemplate();
 assert.equal(builtin.id, CLUB_SPORTS_VIP_BUILTIN_ID);
 assert.equal(builtin.document.front.elements[0]?.id, clubSports.front.elements[0]?.id);
+
+for (const [rel, sha] of [
+  ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_FRONT_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSha256],
+  ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_BACK_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.backSha256],
+  ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_MASTER_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.masterSha256]
+] as const) {
+  const abs = path.join(process.cwd(), rel);
+  assert.equal(existsSync(abs), true, rel);
+  assert.equal(createHash("sha256").update(readFileSync(abs)).digest("hex"), sha, rel);
+}
 
 const member = {
   ...emptyMemberContext(),
@@ -311,13 +338,16 @@ await assert.rejects(
 );
 
 const artwork = await renderPopulatedArtwork(clubSports, gingrMember, "https://staff.ruffops.com");
+assert.ok(artwork.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));
+assert.ok(artwork.backSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.backSrc));
 assert.ok(artwork.backSvg.includes("<title>115</title>"));
 assert.ok(!artwork.backSvg.includes("FD-115"));
 assert.ok(!artwork.backSvg.includes("FIT-00018429"));
-await assert.rejects(
-  () => renderPopulatedArtwork(clubSports, member, "https://staff.ruffops.com"),
-  /Gingr animal ID/
-);
+
+const exactOnly = await renderPopulatedArtwork(clubSports, emptyMemberContext(), "https://staff.ruffops.com");
+assert.ok(exactOnly.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));
+assert.ok(exactOnly.backSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.backSrc));
+assert.ok(!exactOnly.backSvg.includes("<title>115</title>"));
 
 const prefixed = createFitdogVipTemplateDocument();
 const prefixedBarcode = prefixed.back.elements.find((el) => el.type === "barcode");

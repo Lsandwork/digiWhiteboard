@@ -62,10 +62,10 @@ export function CardDesigner() {
   const [previewMember, setPreviewMember] = useState(() => ({
     ...emptyMemberContext(),
     name: "Alex Rivera",
-    dogName: "Bailey",
+    dogName: "",
     membershipType: "Club + Sports Member",
-    memberNumber: "115",
-    gingrAnimalId: "115",
+    memberNumber: "",
+    gingrAnimalId: "",
     location: "SANTA MONICA, CA",
     expirationDate: "2027-09-01",
     photoUrl: "",
@@ -246,7 +246,7 @@ export function CardDesigner() {
         <div className="cs-quick-edit">
           <div>
             <strong>Easy edit</strong>
-            <p>Change the dog’s name and replace the top-left photo. Brand artwork stays locked.</p>
+            <p>Exact VIP artwork is locked. Overlay a dog name and photo for this print; leave them empty to keep the supplied Bailey artwork.</p>
           </div>
           <label className="cs-field">
             Dog name
@@ -432,6 +432,7 @@ export function CardDesigner() {
 function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<typeof emptyMemberContext> }) {
   let text = resolveTemplateString(String(el.properties.text ?? el.type), member);
   if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
+  if (!text && el.properties.keepArtworkWhenEmpty && el.properties.text) return null;
   if (el.type === "svg" || el.type === "icon") {
     const markup = String(el.properties.markup ?? "");
     if (markup) {
@@ -440,9 +441,10 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
   }
   if (el.type === "member_photo" || el.type === "logo" || el.type === "image") {
     const src = resolveTemplateString(String(el.properties.src ?? ""), member) || (el.type === "logo" ? FITDOG_APPROVED_LOGO : "");
+    if (!src && el.properties.keepArtworkWhenEmpty) return null;
     const radius = el.properties.frame === "circle" ? "50%" : `${Number(el.properties.borderRadius ?? 16)}px`;
     return (
-      <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: radius, background: "#1e293b" }}>
+      <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: el.properties.exactArtwork ? 0 : radius, background: el.properties.exactArtwork ? "transparent" : "#1e293b" }}>
         {src ? (
           <img
             src={src}
@@ -463,6 +465,7 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
   }
   if (el.type === "qr_code" || el.type === "barcode") {
     const gingrId = resolveTemplateString("{{member.barcode}}", member);
+    if (el.type === "barcode" && el.properties.keepArtworkWhenEmpty && !gingrId) return null;
     return (
       <div style={{ width: "100%", height: "100%", background: "#fff", color: "#0b1b2b", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center", padding: 4 }}>
         {el.type === "qr_code" ? "QR" : gingrId ? `Code 128 · Gingr ${gingrId}` : "Gingr barcode (needs animal ID)"}
@@ -480,6 +483,7 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
       fontSize: Number(el.properties.fontSize ?? 16),
       fontWeight: Number(el.properties.fontWeight ?? 600),
       fontStyle: el.properties.italic ? "italic" : "normal",
+      background: String(el.properties.background ?? "transparent"),
       display: "flex",
       alignItems: String(el.properties.verticalAlign ?? "middle") === "top" ? "flex-start" : String(el.properties.verticalAlign) === "bottom" ? "flex-end" : "center",
       justifyContent: String(el.properties.textAlign ?? "left") === "center" ? "center" : String(el.properties.textAlign) === "right" ? "flex-end" : "flex-start"

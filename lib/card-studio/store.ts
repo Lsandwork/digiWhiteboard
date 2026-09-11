@@ -4,6 +4,7 @@ import { parseTemplateDocument } from "@/lib/card-studio/template-schema";
 import {
   builtinClubSportsVipTemplate,
   CLUB_SPORTS_VIP_TEMPLATE_NAME,
+  documentUsesExactClubSportsArtwork,
   createClubSportsVipTemplateDocument,
   isClubSportsVipBuiltinId
 } from "@/lib/card-studio/club-sports-vip-template";
@@ -51,17 +52,32 @@ export async function ensureDefaultTemplates(actor: Actor) {
     const { data: existing, error } = await supabase.from("card_studio_templates").select("id, name");
     if (error) return;
     const names = new Set((existing ?? []).map((row) => String(row.name)));
-    if (names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) return;
-    await createTemplate(
-      {
-        name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
-        description: "Print-ready CR80 Club + Sports VIP. Edit the dog name and replace the top-left photo.",
-        category: "club_sports_vip",
+    const exactDoc = createClubSportsVipTemplateDocument();
+    const description =
+      "Exact Fitdog VIP raster artwork (Club + Sports). Logo, layout, and sample photo are locked. Overlay only the dog photo, name, member number, and Gingr barcode when issuing a card.";
+    if (!names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) {
+      await createTemplate(
+        {
+          name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
+          description,
+          category: "club_sports_vip",
+          status: "active",
+          document: exactDoc
+        },
+        actor
+      );
+      return;
+    }
+    const row = (existing ?? []).find((item) => String(item.name) === CLUB_SPORTS_VIP_TEMPLATE_NAME);
+    if (!row?.id) return;
+    const current = await getTemplate(String(row.id));
+    if (current && !documentUsesExactClubSportsArtwork(current.document)) {
+      await saveTemplateVersion(String(row.id), exactDoc, actor, {
+        description,
         status: "active",
-        document: createClubSportsVipTemplateDocument()
-      },
-      actor
-    );
+        bumpVersion: true
+      });
+    }
   } catch {
     // Card Studio still shows the built-in Club + Sports VIP artwork if the table is missing.
   }
