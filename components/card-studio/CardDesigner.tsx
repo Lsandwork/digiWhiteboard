@@ -9,6 +9,7 @@ import { cloneDocument, createElement, emptyTemplateDocument, parseTemplateDocum
 import type { CardElement, CardElementType, CardSide, CardTemplateDocument } from "@/lib/card-studio/types";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "@/lib/card-studio/dynamic-fields";
+import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
 
 const TOOLS: { type: CardElementType; label: string }[] = [
   { type: "text", label: "Text" },
@@ -194,6 +195,36 @@ export function CardDesigner() {
           <button className="cs-btn" onClick={() => { const next = future.current.pop(); if (next) { history.current.push(cloneDocument(doc)); setDoc(next); } }}>Redo</button>
           <button className="cs-btn" onClick={() => void save(false)}>Save</button>
           <button className="cs-btn" onClick={() => void save(true)}>Save As version</button>
+          <button
+            className="cs-btn"
+            onClick={() => {
+              void (async () => {
+                const res = await fetch("/api/card-studio/preview", {
+                  method: "POST",
+                  credentials: "same-origin",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({
+                    document: doc,
+                    member: previewMember,
+                    mode: "duplex",
+                    printerId: "os-office"
+                  })
+                });
+                const json = await res.json();
+                if (!json.frontSvg) throw new Error(json.error || "Could not render a print proof.");
+                openOsPrintDialog({
+                  frontSvg: json.frontSvg,
+                  backSvg: json.backSvg,
+                  mode: "duplex",
+                  jobId: "DESIGNER-PROOF",
+                  cardNumber: previewMember.memberNumber,
+                  memberName: previewMember.name
+                });
+              })();
+            }}
+          >
+            Print on this computer
+          </button>
           <button className={`cs-btn ${side === "front" ? "cs-btn--primary" : ""}`} onClick={() => setSide("front")}>Front</button>
           <button className={`cs-btn ${side === "back" ? "cs-btn--primary" : ""}`} onClick={() => setSide("back")}>Back</button>
           <label>Zoom <input type="range" min={0.35} max={1.4} step={0.05} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} /></label>

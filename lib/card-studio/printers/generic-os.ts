@@ -1,11 +1,24 @@
-import type { CalibrationProfile, PrinterAdapter, PrinterInfo, PrintPayload } from "@/lib/card-studio/printers/adapter";
 import { DEFAULT_OS_CAPABILITIES, UNSUPPORTED } from "@/lib/card-studio/printers/adapter";
+import type { CalibrationProfile, PrinterAdapter, PrinterInfo, PrintPayload } from "@/lib/card-studio/printers/adapter";
 import type { PrintAdapterResult } from "@/lib/card-studio/types";
 
+export const OFFICE_PRINTER_ID = "os-office";
+
+export const OFFICE_PRINTER: PrinterInfo = {
+  id: OFFICE_PRINTER_ID,
+  name: "This computer (normal printer)",
+  manufacturer: "OS",
+  model: "Installed system printer",
+  connection: "os",
+  adapterId: "generic-os",
+  nativeIntegration: false
+};
+
 /**
- * Generic OS driver adapter. The browser never talks to USB printers.
- * Actual OS printing happens on the Print Bridge host. This adapter
- * records the intent and does not claim hardware success.
+ * Generic OS driver adapter.
+ * Meantime path: the browser opens the operating-system print dialog so any
+ * installed office printer can print CR80 artwork at actual size.
+ * This is not a native ID-card SDK and does not claim USB control.
  */
 export class GenericOsPrinterAdapter implements PrinterAdapter {
   id = "generic-os";
@@ -14,7 +27,7 @@ export class GenericOsPrinterAdapter implements PrinterAdapter {
   installed = true;
 
   async discover(): Promise<PrinterInfo[]> {
-    return [];
+    return [{ ...OFFICE_PRINTER }];
   }
 
   async connect() {}
@@ -22,16 +35,26 @@ export class GenericOsPrinterAdapter implements PrinterAdapter {
 
   async getStatus(printer: PrinterInfo) {
     return {
-      code: "unknown" as const,
-      message: `OS Driver Mode for “${printer.name}”. Status is only known when the Print Bridge is connected.`,
+      code: "online" as const,
+      message: `OS Driver Mode — “${printer.name}” prints through this computer’s print dialog. Choose any installed printer. This is not a native ID-card adapter.`,
       ribbonRemainingPct: null,
       cardStockRemaining: null,
-      warnings: ["Native manufacturer adapter is not installed."]
+      warnings: [
+        "OS DRIVER MODE",
+        "Artwork is CR80 actual size (3.375 in × 2.125 in) on letter/A4 with crop marks unless the driver supports custom card stock."
+      ]
     };
   }
 
   async getCapabilities() {
-    return { ...DEFAULT_OS_CAPABILITIES };
+    return {
+      ...DEFAULT_OS_CAPABILITIES,
+      duplex: true,
+      automaticDuplex: false,
+      manualFlip: true,
+      osDriver: true,
+      nativeIntegration: false
+    };
   }
 
   async getPrinterInfo(printer: PrinterInfo) {
@@ -39,18 +62,16 @@ export class GenericOsPrinterAdapter implements PrinterAdapter {
   }
 
   async print(_printer: PrinterInfo, payload: PrintPayload): Promise<PrintAdapterResult> {
-    if (!process.env.CARD_STUDIO_PRINT_BRIDGE_URL) {
-      return {
-        status: "unknown",
-        message:
-          "OS Driver Mode queued the artwork, but no Print Bridge is connected. The card was NOT marked as printed.",
-        raw: { jobId: payload.jobId, mode: "os-driver" }
-      };
-    }
     return {
       status: "unknown",
-      message: "Print was sent to the Print Bridge. Confirm the physical result before issuing a reprint.",
-      raw: { jobId: payload.jobId, mode: "os-driver" }
+      message:
+        "Artwork is ready for this computer’s print dialog. The card is NOT marked issued until you confirm the physical print.",
+      raw: {
+        jobId: payload.jobId,
+        mode: payload.mode,
+        delivery: "os-print-dialog",
+        paper: "letter-with-cr80-crop-marks"
+      }
     };
   }
 
@@ -70,10 +91,10 @@ export class GenericOsPrinterAdapter implements PrinterAdapter {
     return this.print(printer, { jobId: "JOB-TEST", cardId: "test", mode: "front", dpi: 300, copies: 1, color: true });
   }
   async getRibbonStatus() {
-    return { remainingPct: null, message: "Ribbon status is not provided by the OS driver." };
+    return { remainingPct: null, message: "Ribbon status is not provided by a normal office printer driver." };
   }
   async getCardStatus() {
-    return { remaining: null, message: "Card stock status is not provided by the OS driver." };
+    return { remaining: null, message: "Card stock status is not provided by a normal office printer driver." };
   }
   async configure(): Promise<PrintAdapterResult> {
     return { status: "success", message: "OS driver preferences stored in the printer profile." };

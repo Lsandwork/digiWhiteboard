@@ -18,7 +18,8 @@ import { formatCardNumber, formatJobId } from "../lib/card-studio/job-ids";
 import { publicCardStatusLabel, signVerificationToken, verifySignedToken, createVerificationSecret } from "../lib/card-studio/verify";
 import { classifyPrintOutcome, retryWouldDuplicate } from "../lib/card-studio/printers/duplicate-protection";
 import { SimulatorPrinterAdapter } from "../lib/card-studio/printers/simulator";
-import { genericOsAdapter } from "../lib/card-studio/printers/generic-os";
+import { genericOsAdapter, OFFICE_PRINTER, OFFICE_PRINTER_ID } from "../lib/card-studio/printers/generic-os";
+import { buildOsPrintHtml, osPrintUsesDialog } from "../lib/card-studio/render/os-print-sheet";
 import { zebraAdapter } from "../lib/card-studio/printers/manufacturers";
 import { listPrinterAdapters } from "../lib/card-studio/printers/registry";
 import { qrPayload } from "../lib/card-studio/codes/qr";
@@ -159,11 +160,35 @@ assert.equal(classifyPrintOutcome({ status: "unknown", message: "timeout" }).job
 assert.equal(retryWouldDuplicate("unknown"), true);
 assert.equal(retryWouldDuplicate("failed"), false);
 
+const osPrinters = await genericOsAdapter.discover();
+assert.ok(osPrinters.some((p) => p.id === OFFICE_PRINTER_ID));
+assert.equal(OFFICE_PRINTER.id, "os-office");
+const officeStatus = await genericOsAdapter.getStatus(OFFICE_PRINTER);
+assert.equal(officeStatus.code, "online");
+const osCaps = await genericOsAdapter.getCapabilities(OFFICE_PRINTER);
+assert.equal(osCaps.osDriver, true);
+assert.equal(osCaps.automaticDuplex, false);
+assert.equal(osCaps.nativeIntegration, false);
 const osPrint = await genericOsAdapter.print(
   { id: "os", name: "Office Printer", manufacturer: "Generic", model: "OS", connection: "os", adapterId: "generic-os", nativeIntegration: false },
   { jobId: "JOB-4", cardId: "c", mode: "front", dpi: 300, copies: 1, color: true }
 );
 assert.equal(osPrint.status, "unknown");
+assert.equal((osPrint.raw as { delivery?: string }).delivery, "os-print-dialog");
+assert.equal(classifyPrintOutcome(osPrint).cardIssued, false);
+assert.equal(osPrintUsesDialog({ id: OFFICE_PRINTER_ID, adapter_id: "generic-os" }), true);
+const sheet = buildOsPrintHtml({
+  frontSvg: `<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="638"></svg>`,
+  backSvg: `<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="638"></svg>`,
+  mode: "duplex",
+  jobId: "JOB-OS",
+  cardNumber: "FIT-1",
+  memberName: "Alex Rivera"
+});
+assert.ok(sheet.includes("3.375in"));
+assert.ok(sheet.includes("2.125in"));
+assert.ok(sheet.includes("Actual size / 100%"));
+assert.ok(sheet.includes("BACK — flip the sheet"));
 assert.equal(zebraAdapter.installed, false);
 const zebraPrint = await zebraAdapter.print(
   { id: "z", name: "Zebra", manufacturer: "Zebra", model: "ZC300", connection: "usb", adapterId: "zebra", nativeIntegration: false },

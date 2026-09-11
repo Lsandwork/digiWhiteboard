@@ -7,7 +7,10 @@ import { formatCardNumber, formatJobId } from "@/lib/card-studio/job-ids";
 import { signVerificationToken } from "@/lib/card-studio/verify";
 import { classifyPrintOutcome, retryWouldDuplicate } from "@/lib/card-studio/printers/duplicate-protection";
 import { adapterForPrinter, discoverAllPrinters } from "@/lib/card-studio/printers/registry";
+import { OFFICE_PRINTER, OFFICE_PRINTER_ID } from "@/lib/card-studio/printers/generic-os";
 import { validateCardForPrint } from "@/lib/card-studio/validation";
+import { renderPopulatedArtwork } from "@/lib/card-studio/render/artwork";
+import { osPrintUsesDialog } from "@/lib/card-studio/render/os-print-sheet";
 import type { CardStudioSettings, MemberCardContext, PrintMode, ReprintReason, TemplateCategory, TemplateState } from "@/lib/card-studio/types";
 import type { CardTemplateDocument } from "@/lib/card-studio/types";
 
@@ -197,10 +200,58 @@ export async function archiveTemplate(templateId: string, actor: Actor) {
 }
 
 export async function listPrinters() {
-  const supabase = db();
-  const { data, error } = await supabase.from("card_studio_printers").select("*").order("name");
-  if (error) throw new Error(error.message);
-  return data ?? [];
+  const office = officePrinterRow();
+  try {
+    const supabase = db();
+    const { data, error } = await supabase.from("card_studio_printers").select("*").order("name");
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    if (!rows.some((row) => pId(row) === OFFICE_PRINTER_ID)) return [office, ...rows];
+    return rows;
+  } catch {
+    return [office];
+  }
+}
+
+function pId(row: { id?: string }) {
+  return String(row.id ?? "");
+}
+
+function officePrinterRow() {
+  return {
+    id: OFFICE_PRINTER.id,
+    name: OFFICE_PRINTER.name,
+    manufacturer: OFFICE_PRINTER.manufacturer,
+    model: OFFICE_PRINTER.model,
+    adapter_id: OFFICE_PRINTER.adapterId,
+    connection: OFFICE_PRINTER.connection,
+    native_integration: false,
+    ip_address: null,
+    serial_number: null,
+    firmware: null,
+    capabilities: {
+      color: true,
+      monochrome: true,
+      duplex: true,
+      automaticDuplex: false,
+      manualFlip: true,
+      edgeToEdge: false,
+      resolution: 300,
+      uv: false,
+      lamination: false,
+      magneticStripe: false,
+      smartCard: false,
+      contactless: false,
+      usb: false,
+      ethernet: false,
+      wifi: false,
+      osDriver: true,
+      nativeIntegration: false
+    },
+    status_code: "online",
+    status_message: "Ready for this computer’s print dialog (normal office printer).",
+    last_seen_at: new Date().toISOString()
+  };
 }
 
 export async function refreshDiscoveredPrinters() {
@@ -232,6 +283,19 @@ export async function refreshDiscoveredPrinters() {
 }
 
 export async function getPrinter(id: string) {
+  if (id === OFFICE_PRINTER_ID) {
+    try {
+      const supabase = db();
+      const { data } = await supabase.from("card_studio_printers").select("*").eq("id", id).maybeSingle();
+      if (data) {
+        const { data: profiles } = await supabase.from("card_studio_printer_profiles").select("*").eq("printer_id", id);
+        return { ...data, profiles: profiles ?? [] };
+      }
+    } catch {
+      // Fall through to the built-in office printer so printing still works before migration.
+    }
+    return { ...officePrinterRow(), profiles: [] };
+  }
   const supabase = db();
   const { data } = await supabase.from("card_studio_printers").select("*").eq("id", id).maybeSingle();
   if (!data) return null;
@@ -408,6 +472,25 @@ export async function nextSequences() {
   return { cardSeq, jobSeq };
 }
 
+async function ensureOfficePrinterRecord() {
+  const row = officePrinterRow();
+  const supabase = db();
+  await supabase.from("card_studio_printers").upsert({
+    id: row.id,
+    name: row.name,
+    manufacturer: row.manufacturer,
+    model: row.model,
+    adapter_id: row.adapter_id,
+    connection: row.connection,
+    native_integration: row.native_integration,
+    capabilities: row.capabilities,
+    status_code: row.status_code,
+    status_message: row.status_message,
+    last_seen_at: row.last_seen_at,
+    updated_at: new Date().toISOString()
+  });
+}
+
 export async function submitPrintJob(input: {
   member: MemberCardContext;
   templateId: string;
@@ -418,6 +501,17 @@ export async function submitPrintJob(input: {
   batchId?: string | null;
   idempotencyKey?: string;
 }, actor: Actor) {
+  if (input.printerId === OFFICE_PRINTER_ID) {
+    try {
+      await ensureOfficePrinterRecord();
+    } catch {
+      try {
+        await refreshDiscoveredPrinters();
+      } catch {
+        // Office printer still works via getPrinter fallback if the table is missing.
+      }
+    }
+  }
   const settings = await loadCardStudioSettings();
   const template = await getTemplate(input.templateId);
   if (!template) throw new Error("Template not found.");
@@ -543,14 +637,53 @@ export async function submitPrintJob(input: {
     await supabase.from("card_studio_cards").update({ status: "draft", print_job_id: job.id }).eq("id", card.id);
   }
 
+  const artwork = osPrintUsesDialog(printer)
+    ? await renderPopulatedArtwork(template.document, member, settings.verificationBaseUrl)
+    : null;
+
   return {
     ok: true as const,
     issues,
     job: { ...job, job_id: jobId, status: outcome.jobState },
     card: { ...card, card_uuid: cardUuid, status: outcome.cardIssued ? "active" : "draft" },
     print: { ...outcome, raw: printResult },
+    artwork,
+    osPrint: osPrintUsesDialog(printer),
     verificationUrl: `${settings.verificationBaseUrl.replace(/\/$/, "")}/card-studio/verify/${cardUuid}`
   };
+}
+
+export async function confirmOsPrint(jobRowId: string, printed: boolean, actor: Actor) {
+  const supabase = db();
+  const { data: job } = await supabase.from("card_studio_print_jobs").select("*").eq("id", jobRowId).maybeSingle();
+  if (!job) throw new Error("Print job not found.");
+  if (printed) {
+    await supabase
+      .from("card_studio_print_jobs")
+      .update({
+        status: "completed",
+        error_message: null,
+        duplicate_risk: false,
+        completed_at: new Date().toISOString()
+      })
+      .eq("id", job.id);
+    if (job.card_id) {
+      await supabase
+        .from("card_studio_cards")
+        .update({ status: "active", issued_at: new Date().toISOString(), print_job_id: job.id })
+        .eq("id", job.card_id);
+    }
+    return { ok: true as const, printed: true, actor };
+  }
+  await supabase
+    .from("card_studio_print_jobs")
+    .update({
+      status: "cancelled",
+      error_message: "Operator reported the normal printer did not produce a card.",
+      completed_at: new Date().toISOString()
+    })
+    .eq("id", job.id);
+  return { ok: true as const, printed: false, actor };
 }
 
 export async function retryPrintJob(jobRowId: string, confirmDuplicate: boolean, actor: Actor) {

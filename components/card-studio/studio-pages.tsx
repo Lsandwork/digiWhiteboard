@@ -8,6 +8,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CARD_STUDIO_PATHS, TEMPLATE_CATEGORY_LABELS } from "@/lib/card-studio/constants";
 import { useCardStudioAccess } from "@/components/card-studio/CardStudioAccess";
+import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
+import type { PrintMode } from "@/lib/card-studio/types";
 
 type TemplateRow = {
   id: string;
@@ -126,18 +128,23 @@ export function IssueWizard() {
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; status: string }>>([]);
   const [templateId, setTemplateId] = useState("");
   const [printers, setPrinters] = useState<Array<Record<string, unknown>>>([]);
-  const [printerId, setPrinterId] = useState("sim-cr80");
+  const [printerId, setPrinterId] = useState("os-office");
   const [mode, setMode] = useState("duplex");
   const [preview, setPreview] = useState<{ frontSvg?: string; backSvg?: string; issues?: Array<{ message: string; severity: string }>; capabilities?: Record<string, boolean> } | null>(null);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [override, setOverride] = useState(false);
+  const [printError, setPrintError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/card-studio/templates?status=active", { credentials: "same-origin" }).then((r) => r.json()).then((j) => {
       setTemplates(j.templates ?? []);
       if (j.templates?.[0]) setTemplateId(j.templates[0].id);
     });
-    fetch("/api/card-studio/printers", { credentials: "same-origin" }).then((r) => r.json()).then((j) => setPrinters(j.printers ?? []));
+    fetch("/api/card-studio/printers", { credentials: "same-origin" }).then((r) => r.json()).then((j) => {
+      const list = j.printers ?? [];
+      setPrinters(list);
+      if (list.some((p: { id?: string }) => p.id === "os-office")) setPrinterId("os-office");
+    });
   }, []);
 
   useEffect(() => {
@@ -163,11 +170,39 @@ export function IssueWizard() {
   }
 
   async function printCard() {
+    setPrintError(null);
     const res = await fetch("/api/card-studio/print-jobs", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ member, templateId, printerId, mode, overrideWarnings: override })
+    });
+    const json = await res.json();
+    setResult(json);
+    if (json.osPrint && json.artwork) {
+      try {
+        openOsPrintDialog({
+          frontSvg: json.artwork.frontSvg,
+          backSvg: json.artwork.backSvg,
+          mode: mode as PrintMode,
+          jobId: json.job?.job_id,
+          cardNumber: json.card?.card_number,
+          memberName: String(member?.name ?? "")
+        });
+      } catch (error) {
+        setPrintError(error instanceof Error ? error.message : "Could not open the print dialog.");
+      }
+    }
+  }
+
+  async function confirmOs(printed: boolean) {
+    const jobId = (result as { job?: { id?: string } } | null)?.job?.id;
+    if (!jobId) return;
+    const res = await fetch("/api/card-studio/print-jobs", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: jobId, action: "confirm-os-print", printed })
     });
     setResult(await res.json());
   }
@@ -177,7 +212,7 @@ export function IssueWizard() {
       <div className="cs-page-title">
         <div>
           <h1>Create / Print Card</h1>
-          <p>Search a member, choose a template, validate, then send a print job.</p>
+          <p>Meantime: print CR80 at actual size on a normal office printer through this computer’s print dialog. Native ID-card adapters are not required.</p>
         </div>
       </div>
       <input className="cs-search" placeholder="Search members" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -196,15 +231,19 @@ export function IssueWizard() {
         <select className="cs-search" value={printerId} onChange={(e) => setPrinterId(e.target.value)}>
           {printers.map((p) => <option key={String(p.id)} value={String(p.id)}>{String(p.name)} · {String(p.mode ?? p.adapter_id)}</option>)}
         </select>
-        <select className="cs-search" value={mode} onChange={(e) => setMode(e.target.value)} disabled={caps.automaticDuplex === false && mode === "duplex"}>
+        <select className="cs-search" value={mode} onChange={(e) => setMode(e.target.value)}>
           <option value="front">Front only</option>
           <option value="back">Back only</option>
-          <option value="duplex">Front + Back</option>
+          <option value="duplex">Front + Back (manual flip on a normal printer)</option>
         </select>
         <button className="cs-btn" onClick={() => void runPreview()}>Preview / Validate</button>
+        <button className="cs-btn" onClick={() => setPrinterId("os-office")}>Use normal printer</button>
       </div>
       {caps.automaticDuplex === false ? (
-        <p>This printer does not support automatic duplex printing. Manual back-side printing is available.</p>
+        <p>This printer does not support automatic duplex printing. Manual back-side printing is available — print FRONT, flip the sheet, then print BACK.</p>
+      ) : null}
+      {printerId === "os-office" ? (
+        <p>OS Driver Mode: the system print dialog will open. Set scale to <strong>Actual size / 100%</strong>. Cut on the crop marks. The card is not issued until you confirm it printed.</p>
       ) : null}
       {preview?.issues?.length ? (
         <div className="cs-card">
@@ -219,12 +258,32 @@ export function IssueWizard() {
         </div>
       ) : null}
       <div className="cs-actions" style={{ marginTop: 16 }}>
-        <button className="cs-btn cs-btn--primary" disabled={!member || !templateId} onClick={() => void printCard()}>Print Cards</button>
+        <button className="cs-btn cs-btn--primary" disabled={!member || !templateId} onClick={() => void printCard()}>
+          {printerId === "os-office" ? "Print on this computer" : "Print Cards"}
+        </button>
       </div>
+      {printError ? <p>{printError}</p> : null}
       {result ? (
         <div className="cs-card" style={{ marginTop: 16 }}>
-          <h3>{result.ok ? "Result" : "Print blocked"}</h3>
-          <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.print ?? result, null, 2)}</pre>
+          <h3>{result.ok ? (result.osPrint ? "Print dialog opened" : "Result") : "Print blocked"}</h3>
+          {result.osPrint ? (
+            <div className="cs-actions">
+              <button className="cs-btn cs-btn--primary" onClick={() => void confirmOs(true)}>Card printed successfully</button>
+              <button className="cs-btn" onClick={() => void confirmOs(false)}>It did not print</button>
+              {result.artwork ? (
+                <button className="cs-btn" onClick={() => openOsPrintDialog({
+                  frontSvg: (result.artwork as { frontSvg?: string }).frontSvg,
+                  backSvg: (result.artwork as { backSvg?: string }).backSvg,
+                  mode: mode as PrintMode,
+                  jobId: String((result.job as { job_id?: string } | undefined)?.job_id ?? ""),
+                  cardNumber: String((result.card as { card_number?: string } | undefined)?.card_number ?? ""),
+                  memberName: String(member?.name ?? "")
+                })}>Print again</button>
+              ) : null}
+            </div>
+          ) : (
+            <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(result.print ?? result, null, 2)}</pre>
+          )}
         </div>
       ) : null}
     </div>
@@ -240,11 +299,13 @@ export function PrintQueueView() {
   }
   useEffect(() => { void load(); }, []);
   async function act(id: string, action: string, confirmDuplicate = false) {
+    const body: Record<string, unknown> = { id, action, confirmDuplicate };
+    if (action === "confirm-os-print") body.printed = true;
     await fetch("/api/card-studio/print-jobs", {
       method: "PATCH",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ id, action, confirmDuplicate })
+      body: JSON.stringify(body)
     });
     void load();
   }
@@ -261,6 +322,19 @@ export function PrintQueueView() {
               <td>{String(job.printer_id)}</td>
               <td>{String(job.error_message ?? "")}</td>
               <td className="cs-actions">
+                {job.printer_id === "os-office" && job.status === "unknown" ? (
+                  <>
+                    <button className="cs-btn cs-btn--primary" onClick={() => void act(String(job.id), "confirm-os-print", false)}>Card printed</button>
+                    <button className="cs-btn" onClick={() => {
+                      fetch("/api/card-studio/print-jobs", {
+                        method: "PATCH",
+                        credentials: "same-origin",
+                        headers: { "content-type": "application/json" },
+                        body: JSON.stringify({ id: job.id, action: "confirm-os-print", printed: false })
+                      }).then(() => void load());
+                    }}>Did not print</button>
+                  </>
+                ) : null}
                 <button className="cs-btn" onClick={() => void act(String(job.id), "pause")}>Pause</button>
                 <button className="cs-btn" onClick={() => void act(String(job.id), "resume")}>Resume</button>
                 <button className="cs-btn" onClick={() => void act(String(job.id), "retry")}>Retry</button>
@@ -298,7 +372,7 @@ export function PrinterManager() {
       <div className="cs-page-title">
         <div>
           <h1>Printers</h1>
-          <p>Capabilities come from the adapter. Native SDK integrations are not faked.</p>
+          <p>Meantime printing uses This computer (normal printer) in OS Driver Mode. Native ID-card SDKs are not faked.</p>
         </div>
         {canManagePrinters ? (
           <button className="cs-btn" onClick={() => fetch("/api/card-studio/printers", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "discover" }) }).then(load)}>Refresh / Discover</button>

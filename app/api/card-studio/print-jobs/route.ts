@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCardStudioPermission, cardStudioActor } from "@/lib/card-studio/access";
-import { listPrintJobs, retryPrintJob, submitPrintJob, updatePrintJobStatus } from "@/lib/card-studio/store";
+import { listPrintJobs, retryPrintJob, submitPrintJob, updatePrintJobStatus, confirmOsPrint } from "@/lib/card-studio/store";
 import { writeCardStudioAudit } from "@/lib/card-studio/audit";
 import { blockDemoWrite } from "@/lib/admin/api-auth";
 import type { MemberCardContext, PrintMode } from "@/lib/card-studio/types";
@@ -106,9 +106,21 @@ export async function PATCH(request: Request) {
   const demo = blockDemoWrite(request);
   if (demo) return demo;
   const actor = cardStudioActor(auth.session, auth.role);
-  const body = (await request.json()) as { id: string; action: "pause" | "resume" | "cancel" | "retry"; confirmDuplicate?: boolean };
+  const body = (await request.json()) as { id: string; action: "pause" | "resume" | "cancel" | "retry" | "confirm-os-print"; confirmDuplicate?: boolean; printed?: boolean };
   if (!body.id) return NextResponse.json({ error: "Job id is required." }, { status: 400 });
   try {
+    if (body.action === "confirm-os-print") {
+      const result = await confirmOsPrint(body.id, Boolean(body.printed), actor);
+      await writeCardStudioAudit({
+        actorAdminId: actor.adminUserId,
+        actorEmail: actor.email,
+        role: actor.role,
+        action: body.printed ? "print.os_confirmed" : "print.os_not_printed",
+        resourceType: "print_job",
+        resourceId: body.id
+      });
+      return NextResponse.json(result);
+    }
     if (body.action === "retry") {
       const result = await retryPrintJob(body.id, Boolean(body.confirmDuplicate), actor);
       return NextResponse.json(result);

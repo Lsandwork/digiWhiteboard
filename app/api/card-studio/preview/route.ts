@@ -1,14 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireCardStudioPermission } from "@/lib/card-studio/access";
-import { getTemplate } from "@/lib/card-studio/store";
+import { getPrinter, getTemplate, loadCardStudioSettings } from "@/lib/card-studio/store";
 import { validateCardForPrint } from "@/lib/card-studio/validation";
-import { renderSideSvg } from "@/lib/card-studio/render/svg";
-import { qrPayload, renderQrSvg } from "@/lib/card-studio/codes/qr";
-import { renderBarcodeSvg } from "@/lib/card-studio/codes/barcode";
-import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
-import { loadCardStudioSettings } from "@/lib/card-studio/store";
-import type { BarcodeSymbology, MemberCardContext, PrintMode, QrContentType } from "@/lib/card-studio/types";
-import { getPrinter } from "@/lib/card-studio/store";
+import { renderPopulatedArtwork } from "@/lib/card-studio/render/artwork";
+import { parseTemplateDocument } from "@/lib/card-studio/template-schema";
+import type { CardTemplateDocument, MemberCardContext, PrintMode } from "@/lib/card-studio/types";
 import { adapterForPrinter } from "@/lib/card-studio/printers/registry";
 
 export const dynamic = "force-dynamic";
@@ -17,13 +13,21 @@ export async function POST(request: Request) {
   const auth = await requireCardStudioPermission(request, "card_studio.view");
   if (!auth.ok) return auth.response;
   const body = (await request.json()) as {
-    templateId: string;
+    templateId?: string;
+    document?: CardTemplateDocument;
     member: MemberCardContext;
     mode?: PrintMode;
     printerId?: string;
   };
-  const template = await getTemplate(body.templateId);
-  if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
+  let document: CardTemplateDocument | null = null;
+  if (body.document) {
+    document = parseTemplateDocument(body.document);
+  } else if (body.templateId) {
+    const template = await getTemplate(body.templateId);
+    if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
+    document = template.document;
+  }
+  if (!document) return NextResponse.json({ error: "Template not found." }, { status: 404 });
   const settings = await loadCardStudioSettings();
   let printerOnline = true;
   let capabilities = null;
@@ -52,49 +56,17 @@ export async function POST(request: Request) {
   };
   const issues = validateCardForPrint({
     member,
-    template: template.document,
+    template: document,
     sides: body.mode ?? "duplex",
     printerOnline,
     capabilities
   });
-
-  async function codesFor(side: "front" | "back") {
-    const qrSvg: Record<string, string> = {};
-    const barcodeSvg: Record<string, string> = {};
-    for (const el of template.document[side].elements) {
-      if (el.type === "qr_code") {
-        const payload = qrPayload({
-          contentType: (el.properties.contentType as QrContentType) || "verification_url",
-          value: String(el.properties.value ?? ""),
-          member,
-          verificationBaseUrl: settings.verificationBaseUrl
-        });
-        qrSvg[el.id] = await renderQrSvg(payload, el.width, String(el.properties.foreground ?? "#0b1b2b"), String(el.properties.background ?? "#ffffff"));
-      }
-      if (el.type === "barcode") {
-        barcodeSvg[el.id] = await renderBarcodeSvg({
-          symbology: (el.properties.symbology as BarcodeSymbology) || "code128",
-          value: resolveTemplateString(String(el.properties.value ?? ""), member),
-          width: el.width,
-          height: el.height,
-          humanReadable: Boolean(el.properties.humanReadable)
-        });
-      }
-    }
-    return { qrSvg, barcodeSvg };
-  }
-
-  const frontCodes = await codesFor("front");
-  const backCodes = await codesFor("back");
+  const artwork = await renderPopulatedArtwork(document, member, settings.verificationBaseUrl);
   return NextResponse.json({
     ok: true,
     issues,
     capabilities,
-    frontSvg: renderSideSvg(template.document.front, member, { verificationBaseUrl: settings.verificationBaseUrl, ...frontCodes }),
-    backSvg: renderSideSvg(template.document.back, member, { verificationBaseUrl: settings.verificationBaseUrl, ...backCodes }),
-    width: template.document.front.width,
-    height: template.document.front.height,
-    dpi: template.document.dpi,
-    aspect: template.document.front.width / template.document.front.height
+    ...artwork,
+    aspect: artwork.width / artwork.height
   });
 }

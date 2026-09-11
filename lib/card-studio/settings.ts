@@ -6,7 +6,7 @@ export const DEFAULT_CARD_STUDIO_SETTINGS: CardStudioSettings = {
   defaultDpi: 300,
   defaultSafeMm: 3,
   defaultBleedMm: 3,
-  defaultPrinterId: "sim-cr80",
+  defaultPrinterId: "os-office",
   defaultTemplateId: null,
   verificationBaseUrl: "https://staff.ruffops.com",
   barcodeDefaultSymbology: "code128",
