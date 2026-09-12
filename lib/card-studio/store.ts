@@ -11,8 +11,10 @@ import {
 } from "@/lib/card-studio/club-sports-vip-template";
 import {
   builtinSkyBlueVipTemplate,
-  createSkyBlueVipTemplateDocument,
+  documentUsesExactSkyBlueArtwork,
   isSkyBlueVipBuiltinId,
+  isSkyBlueVipTemplate,
+  productionSkyBlueVipDocument,
   SKY_BLUE_VIP_TEMPLATE_NAME
 } from "@/lib/card-studio/sky-blue-vip-template";
 import { DEFAULT_CARD_STUDIO_SETTINGS } from "@/lib/card-studio/settings";
@@ -114,10 +116,30 @@ export async function ensureDefaultTemplates(actor: Actor) {
           description: builtinSkyBlueVipTemplate().description,
           category: "vip_member",
           status: "active",
-          document: createSkyBlueVipTemplateDocument()
+          document: productionSkyBlueVipDocument()
         },
         actor
       );
+    } else {
+      const row = (existing ?? []).find((item) => String(item.name) === SKY_BLUE_VIP_TEMPLATE_NAME);
+      if (row?.id) {
+        const supabaseRow = await supabase.from("card_studio_templates").select("current_version_id").eq("id", row.id).maybeSingle();
+        const { data: version } = supabaseRow.data?.current_version_id
+          ? await supabase
+              .from("card_studio_template_versions")
+              .select("document")
+              .eq("id", supabaseRow.data.current_version_id)
+              .maybeSingle()
+          : { data: null };
+        const stored = parseTemplateDocument(version?.document);
+        if (!documentUsesExactSkyBlueArtwork(stored)) {
+          await saveTemplateVersion(String(row.id), productionSkyBlueVipDocument(), actor, {
+            description: builtinSkyBlueVipTemplate().description,
+            status: "active",
+            bumpVersion: true
+          });
+        }
+      }
     }
   } catch {
     // Card Studio still shows built-in templates if the table is missing.
@@ -161,7 +183,9 @@ export async function getTemplate(id: string) {
     versionId: version?.id ?? null,
     document: isClubSportsVipTemplate({ id: String(template.id), name: String(template.name), document: parsed })
       ? productionClubSportsVipDocument()
-      : parsed
+      : isSkyBlueVipTemplate({ id: String(template.id), name: String(template.name), document: parsed })
+        ? productionSkyBlueVipDocument()
+        : parsed
   };
 }
 

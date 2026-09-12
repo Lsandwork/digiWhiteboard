@@ -589,6 +589,7 @@ function ElementPreview({ el, member }: { el: CardElement; member: MemberCardCon
   if (el.type === "qr_code" || el.type === "barcode") {
     const barcode = gingrBarcodeValue(member);
     if (el.type === "barcode" && el.properties.keepArtworkWhenEmpty && !barcode) return null;
+    if (el.type === "qr_code" && el.properties.keepArtworkWhenEmpty && !member.cardUuid) return null;
     return (
       <div style={{ width: "100%", height: "100%", background: "#fff", color: "#0b1b2b", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center", padding: 4 }}>
         {el.type === "qr_code" ? "QR" : barcode ? `Barcode · ${barcode}` : "Type a Member ID"}
