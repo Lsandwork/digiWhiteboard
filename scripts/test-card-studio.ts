@@ -369,8 +369,11 @@ assert.ok(sheet.includes("2.125in"));
 assert.ok(sheet.includes("Actual size / 100%"));
 assert.ok(sheet.includes(">BACK<"));
 assert.ok(!sheet.includes("not duplex"));
-assert.ok(sheet.includes("cm-h cm-tl"));
+assert.ok(sheet.includes("tick tick-h tl"));
 assert.ok(!sheet.includes("crop-tl"));
+assert.ok(!sheet.includes("cm-h cm-tl"));
+assert.ok(!sheet.includes("border: 1px"));
+assert.ok(!sheet.includes("#4da3ff"));
 assert.equal(zebraAdapter.installed, false);
 const zebraPrint = await zebraAdapter.print(
   { id: "z", name: "Zebra", manufacturer: "Zebra", model: "ZC300", connection: "usb", adapterId: "zebra", nativeIntegration: false },
@@ -480,6 +483,15 @@ assert.equal(JSON.stringify(createClubSportsVipTemplateDocument()), JSON.stringi
 const exactOnly = await renderPopulatedArtwork(clubSports, emptyMemberContext(), "https://staff.ruffops.com");
 assert.ok(exactOnly.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));
 assert.equal(exactOnly.frontSvg.includes('stroke="#4da3ff"'), false, "print proof must not draw the cyan bleed box");
+const proof = buildOsPrintHtml({
+  frontSvg: exactOnly.frontSvg,
+  backSvg: exactOnly.backSvg,
+  mode: "duplex",
+  jobId: "JOB-BLEED"
+});
+assert.equal(proof.includes("#4da3ff"), false, "OS print HTML must not include designer bleed-guide cyan");
+assert.equal(proof.includes("crop-tl"), false);
+assert.ok(proof.includes("tick tick-h tl"));
 assert.ok(exactOnly.backSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.backSrc));
 assert.ok(!exactOnly.backSvg.includes(`<title>${ownerUpc}</title>`));
 

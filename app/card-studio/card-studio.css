@@ -246,6 +246,16 @@
   border: 1px dashed rgba(125, 211, 252, 0.45);
 }
 
+@media print {
+  .cs-guide,
+  .cs-canvas-wrap {
+    background-image: none !important;
+  }
+  .cs-guide {
+    display: none !important;
+  }
+}
+
 .cs-field {
   display: grid;
   gap: 4px;
