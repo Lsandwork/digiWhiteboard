@@ -1,10 +1,12 @@
 import { CR80_INCHES, CR80_PX } from "@/lib/card-studio/constants";
 import type { PrintMode } from "@/lib/card-studio/types";
 
-/** Hairline trim ticks. Offset so they never draw a rectangle around the card. */
-const MARK = "0.22in";
-const GAP = "0.125in";
-const OUT = `calc(${MARK} + ${GAP})`;
+/** Hairline trim ticks. Use plain inch offsets — `left: -calc(...)` is invalid CSS. */
+const MARK_IN = 0.22;
+const GAP_IN = 0.125;
+const OUT_IN = Number((MARK_IN + GAP_IN).toFixed(3));
+const MARK = `${MARK_IN}in`;
+const OUT = `${OUT_IN}in`;
 
 export function buildOsPrintHtml(options: {
   frontSvg?: string | null;

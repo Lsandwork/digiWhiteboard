@@ -374,6 +374,8 @@ assert.ok(!sheet.includes("crop-tl"));
 assert.ok(!sheet.includes("cm-h cm-tl"));
 assert.ok(!sheet.includes("border: 1px"));
 assert.ok(!sheet.includes("#4da3ff"));
+assert.ok(!sheet.includes("-calc("));
+assert.ok(sheet.includes("left: -0.345in"));
 assert.equal(zebraAdapter.installed, false);
 const zebraPrint = await zebraAdapter.print(
   { id: "z", name: "Zebra", manufacturer: "Zebra", model: "ZC300", connection: "usb", adapterId: "zebra", nativeIntegration: false },
