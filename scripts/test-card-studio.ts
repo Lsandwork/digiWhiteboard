@@ -174,6 +174,11 @@ assert.equal(String(clubBarcode?.properties.value), "{{member.barcode}}");
 assert.equal(String(clubBarcode?.properties.symbology), "code128");
 assert.equal(String(clubBarcode?.properties.source), "custom");
 assert.equal(clubBarcode?.id, OWNER_BARCODE_SLOT_ID);
+assert.equal(Number(clubBarcode?.properties.quietZone), 8);
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.barcode.x >= 390, "barcode must sit in the artwork barcode island");
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.barcode.x + CLUB_SPORTS_VIP_NATIVE_SLOTS.barcode.width <= 690);
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.barcode.width <= 300, "barcode overlay must not be a wide white plate");
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.barcode.height <= 70);
 assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
 assert.ok(validateTemplateDocument(clubSports).some((i) => i.code === "ARTWORK_ASPECT"));
 assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContext(), dogName: "Bailey" }), "Bailey");
@@ -424,6 +429,7 @@ const barcodeSvg = await renderBarcodeSvg({
 });
 assert.ok(barcodeSvg.includes("data:image/png;base64,"));
 assert.ok(barcodeSvg.includes(`<title>${ownerUpc}</title>`));
+assert.ok(barcodeSvg.includes('x="0" y="0" width="520" height="96"'));
 assert.ok(!barcodeSvg.includes("FD-115"));
 await assert.rejects(
   () =>

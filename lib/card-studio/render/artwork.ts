@@ -41,7 +41,7 @@ export async function renderPopulatedArtwork(
           width: el.width,
           height: el.height,
           humanReadable: el.properties.humanReadable !== false,
-          quietZone: Number(el.properties.quietZone ?? 16),
+          quietZone: Number(el.properties.quietZone ?? 8),
           foreground: String(el.properties.foreground ?? "#1F2D3D"),
           background: String(el.properties.background ?? "#ffffff")
         });

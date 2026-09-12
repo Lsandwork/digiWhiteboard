@@ -55,7 +55,8 @@ function pngSize(png: Buffer) {
 
 /**
  * Standards-compliant barcode via bwip-js.
- * UPC-A is letterboxed in the slot (uniform scale). Never a decorative fake barcode.
+ * Stretches to fill the slot so bars stay as wide as the artwork window.
+ * Quiet zone is a thin spec margin, not a letterboxed white plate.
  */
 export async function renderBarcodeSvg(options: {
   symbology: BarcodeSymbology;
@@ -78,18 +79,19 @@ export async function renderBarcodeSvg(options: {
       throw new Error(upc.message);
     }
   }
-  const quiet = Math.max(10, Number(options.quietZone ?? 12));
+  const scale = 8;
+  const quiet = Math.max(8, Number(options.quietZone ?? 8));
   const bwip = await import("bwip-js");
   const png = await bwip.toBuffer({
     bcid: BWIP_MAP[symbology] || "code128",
     text: symbology === "upca" ? evaluateUpcA(text).value! : text,
-    scale: 8,
-    height: Math.max(16, Math.round((options.height / 8) * 0.55)),
+    scale,
+    height: Math.max(18, Math.round((options.height / scale) * 0.72)),
     includetext: options.humanReadable,
     textxalign: "center",
-    textsize: 11,
-    paddingwidth: Math.max(12, Math.round(quiet / 2)),
-    paddingheight: 8,
+    textsize: 10,
+    paddingwidth: Math.max(1, Math.round(quiet / scale)),
+    paddingheight: 1,
     backgroundcolor: (options.background ?? "#ffffff").replace("#", ""),
     barcolor: (options.foreground ?? "#1F2D3D").replace("#", ""),
     parsefnc: false
@@ -100,13 +102,10 @@ export async function renderBarcodeSvg(options: {
   }
   const size = pngSize(png);
   const title = escapeXml(symbology === "upca" ? evaluateUpcA(text).value! : text);
+  const dw = options.width;
+  const dh = options.height;
   if (size && size.width > 0 && size.height > 0) {
-    const scale = Math.min(options.width / size.width, options.height / size.height);
-    const dw = size.width * scale;
-    const dh = size.height * scale;
-    const dx = (options.width - dw) / 2;
-    const dy = (options.height - dh) / 2;
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}"><rect width="${options.width}" height="${options.height}" fill="${escapeXml(options.background ?? "#ffffff")}"/><image href="data:image/png;base64,${b64}" x="${dx}" y="${dy}" width="${dw}" height="${dh}" preserveAspectRatio="none" /><title>${title}</title></svg>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${dw}" height="${dh}" viewBox="0 0 ${dw} ${dh}"><rect width="${dw}" height="${dh}" fill="${escapeXml(options.background ?? "#ffffff")}"/><image href="data:image/png;base64,${b64}" x="0" y="0" width="${dw}" height="${dh}" preserveAspectRatio="none" /><title>${title}</title></svg>`;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}"><image href="data:image/png;base64,${b64}" width="${options.width}" height="${options.height}" preserveAspectRatio="xMidYMid meet" /><title>${title}</title></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${dw}" height="${dh}" viewBox="0 0 ${dw} ${dh}"><image href="data:image/png;base64,${b64}" x="0" y="0" width="${dw}" height="${dh}" preserveAspectRatio="none" /><title>${title}</title></svg>`;
 }

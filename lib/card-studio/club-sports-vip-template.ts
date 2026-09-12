@@ -119,12 +119,13 @@ function locked(
  * Name / Member ID boxes cover the sample *values* only so the orange NAME: and
  * MEMBER NO.: labels in the artwork stay visible.
  * Photo covers the full ID window (inner frame included) so Bailey never shows through.
+ * Barcode fills the artwork white barcode island only (no oversized white plate).
  */
 export const CLUB_SPORTS_VIP_NATIVE_SLOTS = {
   photo: { x: 22, y: 20, width: 296, height: 311 },
   nameValue: { x: 36, y: 406, width: 210, height: 28 },
   memberValue: { x: 268, y: 410, width: 155, height: 24 },
-  barcode: { x: 225, y: 304, width: 460, height: 95 }
+  barcode: { x: 398, y: 335, width: 286, height: 63 }
 } as const;
 
 /**
@@ -264,7 +265,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
         source: "custom",
         value: "{{member.barcode}}",
         humanReadable: true,
-        quietZone: 16,
+        quietZone: 8,
         foreground: C.slate,
         background: C.white,
         keepArtworkWhenEmpty: true
