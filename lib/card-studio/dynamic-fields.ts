@@ -29,7 +29,7 @@ export function emptyMemberContext(): MemberCardContext {
     cardUuid: null,
     cardNumber: null,
     customField: null,
-    barcodeSource: "gingr_owner_barcode",
+    barcodeSource: "custom",
     barcodeValue: null
   };
 }
@@ -41,7 +41,7 @@ export function contextToFieldMap(member: MemberCardContext, extras?: Record<str
     "member.name": member.name,
     "member.first_name": member.firstName,
     "member.last_name": member.lastName,
-    "member.member_number": animalId || "",
+    "member.member_number": gingrBarcodeValue(member) ?? member.memberNumber ?? "",
     "member.membership_type": member.membershipType ?? "",
     "member.location": member.location ?? "",
     "member.issue_date": member.issueDate ?? "",

@@ -10,8 +10,7 @@ import {
   productionClubSportsVipDocument
 } from "@/lib/card-studio/club-sports-vip-template";
 import { DEFAULT_CARD_STUDIO_SETTINGS } from "@/lib/card-studio/settings";
-import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
-import { DEFAULT_PRODUCTION_BARCODE_SOURCE, DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY } from "@/lib/card-studio/gingr-identity";
+import { gingrBarcodeValue, barcodeSymbologyForValue } from "@/lib/card-studio/gingr-barcode";
 import { formatCardNumber, formatJobId } from "@/lib/card-studio/job-ids";
 import { signVerificationToken } from "@/lib/card-studio/verify";
 import { classifyPrintOutcome, retryWouldDuplicate } from "@/lib/card-studio/printers/duplicate-protection";
@@ -56,7 +55,7 @@ export async function ensureDefaultTemplates(actor: Actor) {
     const names = new Set((existing ?? []).map((row) => String(row.name)));
     const exactDoc = productionClubSportsVipDocument();
     const description =
-      "Production Club + Sports VIP template. Locked artwork plus dynamic slots for member photo, dog name, member ID, and the Gingr owner UPC-A barcode.";
+      "Production Club + Sports VIP template. Type the Member ID number to print it on the card and generate the barcode.";
     if (!names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) {
       await createTemplate(
         {
@@ -84,8 +83,8 @@ export async function ensureDefaultTemplates(actor: Actor) {
     const barcode = [...stored.front.elements, ...stored.back.elements].find((el) => el.type === "barcode");
     const needsProductionDoc =
       !documentUsesExactClubSportsArtwork(stored) ||
-      String(barcode?.properties.symbology) !== "upca" ||
-      String(barcode?.properties.source) !== "gingr_owner_barcode";
+      String(barcode?.properties.symbology) !== "code128" ||
+      String(barcode?.properties.source) !== "custom";
     if (needsProductionDoc) {
       await saveTemplateVersion(String(row.id), exactDoc, actor, {
         description,
@@ -611,13 +610,12 @@ export async function submitPrintJob(input: {
   const seq = await nextSequences();
   const cardUuid = randomUUID();
   member.cardUuid = cardUuid;
-  const gingrOwnerBarcode = gingrBarcodeValue(member);
-  if (gingrOwnerBarcode) {
-    member.barcodeSource = DEFAULT_PRODUCTION_BARCODE_SOURCE;
-    member.barcodeValue = gingrOwnerBarcode;
-    member.gingrOwnerBarcode = member.gingrOwnerBarcode || gingrOwnerBarcode;
+  const printedBarcode = gingrBarcodeValue(member);
+  if (printedBarcode) {
+    member.memberNumber = printedBarcode;
+    member.barcodeSource = "custom";
+    member.barcodeValue = printedBarcode;
   }
-  member.memberNumber = member.gingrAnimalId || member.memberNumber;
   const cardNumber = formatCardNumber(seq.cardSeq);
   const jobId = formatJobId(new Date(), seq.jobSeq);
   const supabase = db();
@@ -640,7 +638,7 @@ export async function submitPrintJob(input: {
     gingr_owner_id: member.gingrOwnerId,
     barcode_source: member.barcodeSource,
     barcode_value: member.barcodeValue,
-    barcode_symbology: DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY,
+    barcode_symbology: printedBarcode ? barcodeSymbologyForValue(printedBarcode) : "code128",
     ops_dog_id: member.opsDogId,
     member_snapshot: member,
     template_id: template.id,

@@ -75,7 +75,7 @@ export function builtinClubSportsVipTemplate() {
     id: CLUB_SPORTS_VIP_BUILTIN_ID,
     name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
     description:
-      "Production Club + Sports VIP template. Locked artwork plus dynamic slots for member photo, dog name, member ID, and the Gingr owner UPC-A barcode.",
+      "Production Club + Sports VIP template. Type the Member ID number to print it on the card and generate the barcode.",
     category: "club_sports_vip" as const,
     status: "active" as const,
     builtin: true,
@@ -251,8 +251,8 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       barcode.width,
       barcode.height,
       {
-        symbology: "upca",
-        source: "gingr_owner_barcode",
+        symbology: "code128",
+        source: "custom",
         value: "{{member.barcode}}",
         humanReadable: true,
         quietZone: 16,
@@ -260,7 +260,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
         background: C.white,
         keepArtworkWhenEmpty: true
       },
-      { name: "Owner UPC-A barcode" }
+      { name: "Member ID barcode" }
     )
   ];
 

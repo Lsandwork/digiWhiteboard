@@ -31,8 +31,8 @@ export const BARCODE_SOURCES = [
 
 export type BarcodeSource = (typeof BARCODE_SOURCES)[number];
 
-export const DEFAULT_PRODUCTION_BARCODE_SOURCE: BarcodeSource = "gingr_owner_barcode";
-export const DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY = "upca" as const;
+export const DEFAULT_PRODUCTION_BARCODE_SOURCE: BarcodeSource = "custom";
+export const DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY = "code128" as const;
 
 export const BARCODE_SOURCE_LABELS: Record<BarcodeSource, string> = {
   gingr_owner_barcode: "Gingr owner barcode field (owner.barcode)",
@@ -133,23 +133,43 @@ export function resolveBarcodeFromSource(
 }
 
 /**
- * Production encoder: Gingr owner.barcode only.
- * Never falls back to animal ID, owner ID, email, phone, name, or FIT- numbers.
+ * The number the admin types into Member ID. That exact value is the barcode payload.
+ * FIT- card serials are rejected. FD-/GINGR- prefixes are stripped. Leading zeros are kept.
+ */
+export function typedMemberId(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (barcodeValueLooksLikeInternalCardNumber(trimmed)) return null;
+  const stripped = trimmed.replace(FD_PREFIX, "").trim();
+  if (!stripped) return null;
+  if (stripped.length > 64) return null;
+  return stripped;
+}
+
+export function barcodeSymbologyForValue(value: string): "upca" | "code128" {
+  return evaluateUpcA(value).status === "VALID" ? "upca" : "code128";
+}
+
+/**
+ * Production encoder: the typed Member ID number.
+ * Does not invent a number from animal ID, owner ID, email, phone, or name.
  */
 export function gingrBarcodeValue(
   member: Pick<MemberCardContext, "gingrAnimalId" | "memberNumber"> & Partial<MemberCardContext>,
-  source?: BarcodeSource | string | null,
+  _source?: BarcodeSource | string | null,
   customValue?: string | null
 ): string | null {
-  const resolved = source ?? member.barcodeSource ?? DEFAULT_PRODUCTION_BARCODE_SOURCE;
-  if (resolved === "custom") {
-    return resolveBarcodeFromSource(member, "custom", customValue).value;
-  }
-  return resolveBarcodeFromSource(member, "gingr_owner_barcode", customValue).value;
+  return (
+    typedMemberId(member.memberNumber) ||
+    typedMemberId(customValue) ||
+    typedMemberId(member.customField) ||
+    typedMemberId(member.gingrOwnerBarcode)
+  );
 }
 
 export function isPrintableGingrBarcodeValue(value: string | null | undefined): boolean {
-  return evaluateUpcA(value).status === "VALID";
+  return Boolean(typedMemberId(value));
 }
 
 export function barcodeCompatibilityNote(source: BarcodeSource): string {
@@ -165,7 +185,7 @@ export function barcodeCompatibilityNote(source: BarcodeSource): string {
   if (source === "card_number") {
     return "RuffOps FIT- card number. This will not identify a Gingr record.";
   }
-  return "Custom payload. Only use if it matches a value already stored in Gingr owner.barcode.";
+  return "The barcode is generated from the Member ID number typed in Card Studio. UPC-A is used when that number is a valid 12-digit UPC-A; otherwise Code 128 encodes the exact number.";
 }
 
 export type GingrLookupKind = "none" | "local_cache" | "gingr_api";

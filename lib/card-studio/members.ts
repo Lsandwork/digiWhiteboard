@@ -5,7 +5,8 @@ import {
   DEFAULT_PRODUCTION_BARCODE_SOURCE,
   extractGingrOwnerBarcode,
   gingrBarcodeValue,
-  normalizeGingrNumericId
+  normalizeGingrNumericId,
+  typedMemberId
 } from "@/lib/card-studio/gingr-identity";
 import { createGingrClient, unwrapGingrData } from "@/lib/integrations/gingr/client";
 import type { MemberCardContext } from "@/lib/card-studio/types";
@@ -31,7 +32,7 @@ function withBarcode(member: MemberCardContext): MemberCardContext {
     ...member,
     gingrAnimalId: animalId,
     gingrOwnerId: normalizeGingrNumericId(member.gingrOwnerId),
-    memberNumber: animalId,
+    memberNumber: typedMemberId(member.memberNumber) ?? typedMemberId(member.gingrOwnerBarcode),
     barcodeSource: DEFAULT_PRODUCTION_BARCODE_SOURCE,
     barcodeValue: gingrBarcodeValue({ ...member, gingrAnimalId: animalId })
   };

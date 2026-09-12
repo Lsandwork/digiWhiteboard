@@ -7,7 +7,6 @@ import {
   gingrBarcodeValue,
   type BarcodeSource
 } from "@/lib/card-studio/gingr-identity";
-import { evaluateUpcA } from "@/lib/card-studio/upc-a";
 import type { MemberCardContext } from "@/lib/card-studio/types";
 
 type Lookup = {
@@ -33,8 +32,7 @@ export function GingrIdentityPanel({
   const [lookup, setLookup] = useState<Lookup | null>(null);
   const [busy, setBusy] = useState(false);
   const barcode = gingrBarcodeValue(member);
-  const upc = evaluateUpcA(barcode);
-  const source = (member.barcodeSource || "gingr_owner_barcode") as BarcodeSource;
+  const source = (member.barcodeSource || "custom") as BarcodeSource;
 
   async function runLookup(live: boolean) {
     setBusy(true);
@@ -56,8 +54,7 @@ export function GingrIdentityPanel({
         onMemberPatch?.({
           gingrOwnerId: next.gingrOwnerId ?? member.gingrOwnerId,
           gingrOwnerBarcode: next.gingrOwnerBarcode ?? member.gingrOwnerBarcode,
-          barcodeSource: "gingr_owner_barcode",
-          barcodeValue: next.gingrOwnerBarcode ?? member.gingrOwnerBarcode
+          memberNumber: member.memberNumber || next.gingrOwnerBarcode || member.memberNumber
         });
       }
     } finally {
@@ -92,11 +89,11 @@ export function GingrIdentityPanel({
           </>
         ) : null}
         <div><dt>Barcode source</dt><dd>{BARCODE_SOURCE_LABELS[source] || source}</dd></div>
+        <div><dt>Member ID (typed)</dt><dd className="cs-id-value">{member.memberNumber || "MISSING"}</dd></div>
         <div><dt>Printed barcode value</dt><dd className="cs-id-value">{barcode || "MISSING"}</dd></div>
-        <div><dt>UPC-A status</dt><dd className={`cs-upc cs-upc--${upc.status.toLowerCase()}`}>{upc.status}</dd></div>
       </dl>
-      <p>{upc.message}</p>
-      <p>{barcodeCompatibilityNote("gingr_owner_barcode")}</p>
+      <p>{barcode ? `Barcode encodes Member ID ${barcode}.` : "Type a Member ID number to generate the barcode."}</p>
+      <p>{barcodeCompatibilityNote("custom")}</p>
       <div className="cs-actions">
         <button className="cs-btn" type="button" disabled={busy || (!member.gingrAnimalId && !member.gingrOwnerId)} onClick={() => void runLookup(false)}>
           Local cache lookup
@@ -109,7 +106,7 @@ export function GingrIdentityPanel({
         <div className="cs-id-lookup">
           <p><strong>{lookup.kind === "gingr_api" ? "GINGR RECORD VERIFICATION" : lookup.kind === "local_cache" ? "LOCAL GINGR CACHE" : "NOT FOUND"}</strong></p>
           <p>Raw owner.barcode: {lookup.gingrOwnerBarcode || member.gingrOwnerBarcode || "MISSING"}</p>
-          <p>Printed UPC-A: {gingrBarcodeValue({ ...member, gingrOwnerBarcode: lookup.gingrOwnerBarcode ?? member.gingrOwnerBarcode }) || "MISSING"}</p>
+          <p>Printed barcode: {gingrBarcodeValue({ ...member, memberNumber: member.memberNumber || lookup.gingrOwnerBarcode }) || "MISSING"}</p>
           <p>Owner: {lookup.ownerName || member.name || "—"} · Animal: {lookup.dogName || member.dogName || "—"}</p>
           <p>{lookup.message}</p>
         </div>

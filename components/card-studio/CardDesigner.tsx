@@ -19,7 +19,6 @@ import { emptyMemberContext } from "@/lib/card-studio/dynamic-fields";
 import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
 import { pruneStackedMemberPhotos, replaceMemberPhoto } from "@/lib/card-studio/photo-slot";
 import { gingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
-import { evaluateUpcA } from "@/lib/card-studio/upc-a";
 
 const TOOLS: { type: CardElementType; label: string }[] = [
   { type: "text", label: "Text" },
@@ -287,7 +286,7 @@ export function CardDesigner() {
         <div className="cs-quick-edit">
           <div>
             <strong>Easy edit</strong>
-            <p>Locked Club + Sports VIP template. Select a member to fill photo, name, member ID, and owner UPC-A. Replacing a photo updates the photo slot only.</p>
+            <p>Type the Member ID number. That same number prints on the front and becomes the barcode on the back.</p>
           </div>
           <label className="cs-field">
             Search member
@@ -311,7 +310,7 @@ export function CardDesigner() {
                       ...hit,
                       dogName: hit.dogName ?? "",
                       gingrAnimalId: hit.gingrAnimalId ?? "",
-                      memberNumber: hit.memberNumber ?? hit.gingrAnimalId ?? "",
+                      memberNumber: previewMember.memberNumber || hit.gingrOwnerBarcode || "",
                       photoUrl: hit.photoUrl ?? "",
                       cardUuid: "preview"
                     });
@@ -325,6 +324,30 @@ export function CardDesigner() {
               ))}
             </div>
           ) : null}
+          <label className="cs-field">
+            Member ID
+            <input
+              value={previewMember.memberNumber ?? ""}
+              onChange={(e) => {
+                const memberNumber = e.target.value;
+                setPreviewMember((m) => ({
+                  ...m,
+                  memberNumber,
+                  barcodeSource: "custom",
+                  barcodeValue: memberNumber
+                }));
+              }}
+              placeholder="Type the member ID number"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="Member ID number"
+            />
+          </label>
+          <p className="cs-id-note">
+            {gingrBarcodeValue(previewMember)
+              ? `Barcode will encode: ${gingrBarcodeValue(previewMember)}`
+              : "Enter a Member ID to generate the barcode."}
+          </p>
           <label className="cs-field">
             Dog name
             <input
@@ -471,27 +494,9 @@ export function CardDesigner() {
               ) : null}
               {selectedEl.type === "barcode" ? (
                 <>
-                  <label className="cs-field">Barcode type
-                    <select value={String(selectedEl.properties.symbology ?? "upca")} onChange={(e) => updateSelected({ properties: { symbology: e.target.value } })}>
-                      <option value="upca">UPC-A</option>
-                      <option value="code128">Code 128</option>
-                      <option value="code39">Code 39</option>
-                    </select>
-                  </label>
-                  <label className="cs-field">Source
-                    <select value={String(selectedEl.properties.source ?? "gingr_owner_barcode")} onChange={(e) => updateSelected({ properties: { source: e.target.value } })}>
-                      <option value="gingr_owner_barcode">Gingr owner barcode (owner.barcode)</option>
-                      <option value="gingr_owner_id">Gingr client / owner ID</option>
-                      <option value="gingr_animal_id">Gingr pet / animal ID (not used on production cards)</option>
-                      <option value="card_number">RuffOps card number (FIT-)</option>
-                      <option value="custom">Custom value</option>
-                    </select>
-                  </label>
-                  <p className="cs-id-note">Type: UPC-A (production)</p>
-                  <p className="cs-id-note">Source: Gingr owner.barcode — never animal ID</p>
-                  <p className="cs-id-note">Value: {gingrBarcodeValue(previewMember) || "(no Gingr owner barcode)"}</p>
+                  <p className="cs-id-note">Barcode is generated from the Member ID field.</p>
+                  <p className="cs-id-note">Value: {gingrBarcodeValue(previewMember) || "(type a Member ID)"}</p>
                   <p className="cs-id-note">Human-readable: {gingrBarcodeValue(previewMember) || "—"}</p>
-                  <p className="cs-id-note">Validation: {evaluateUpcA(gingrBarcodeValue(previewMember)).status} — {evaluateUpcA(gingrBarcodeValue(previewMember)).message}</p>
                 </>
               ) : null}
               {selectedEl.type === "member_photo" ? (
@@ -571,11 +576,10 @@ function ElementPreview({ el, member }: { el: CardElement; member: MemberCardCon
   }
   if (el.type === "qr_code" || el.type === "barcode") {
     const barcode = gingrBarcodeValue(member);
-    const upc = evaluateUpcA(barcode);
-    if (el.type === "barcode" && el.properties.keepArtworkWhenEmpty && upc.status !== "VALID") return null;
+    if (el.type === "barcode" && el.properties.keepArtworkWhenEmpty && !barcode) return null;
     return (
       <div style={{ width: "100%", height: "100%", background: "#fff", color: "#0b1b2b", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center", padding: 4 }}>
-        {el.type === "qr_code" ? "QR" : barcode ? `UPC-A · ${barcode}` : "Owner UPC-A (needs Gingr owner.barcode)"}
+        {el.type === "qr_code" ? "QR" : barcode ? `Barcode · ${barcode}` : "Type a Member ID"}
       </div>
     );
   }

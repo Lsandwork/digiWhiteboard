@@ -1,10 +1,8 @@
 import { renderSideSvg } from "@/lib/card-studio/render/svg";
 import { qrPayload, renderQrSvg } from "@/lib/card-studio/codes/qr";
 import { renderBarcodeSvg } from "@/lib/card-studio/codes/barcode";
-import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
-import { DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY } from "@/lib/card-studio/gingr-identity";
-import { evaluateUpcA } from "@/lib/card-studio/upc-a";
-import type { BarcodeSymbology, CardTemplateDocument, MemberCardContext, QrContentType } from "@/lib/card-studio/types";
+import { gingrBarcodeValue, barcodeSymbologyForValue } from "@/lib/card-studio/gingr-barcode";
+import type { CardTemplateDocument, MemberCardContext, QrContentType } from "@/lib/card-studio/types";
 
 export async function renderPopulatedArtwork(
   template: CardTemplateDocument,
@@ -32,17 +30,11 @@ export async function renderPopulatedArtwork(
       }
       if (el.type === "barcode") {
         const value = gingrBarcodeValue(member);
-        const symbology = (el.properties.symbology as BarcodeSymbology) || DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY;
         if (!value) {
           if (el.properties.keepArtworkWhenEmpty) continue;
-          throw new Error("Cannot encode a barcode without the Gingr owner barcode field (owner.barcode).");
+          throw new Error("Type a Member ID number to generate the barcode.");
         }
-        if (symbology === "upca") {
-          const upc = evaluateUpcA(value);
-          if (upc.status !== "VALID" || !upc.value) {
-            throw new Error(upc.message);
-          }
-        }
+        const symbology = barcodeSymbologyForValue(value);
         barcodeSvg[el.id] = await renderBarcodeSvg({
           symbology,
           value,

@@ -219,17 +219,16 @@ export function IssueWizard() {
       <div className="cs-page-title">
         <div>
           <h1>Create / Print Card</h1>
-          <p>Meantime: print CR80 at actual size. The barcode is UPC-A of the Gingr owner Key Tag field (owner.barcode). It is not the animal ID.</p>
+          <p>Type the Member ID number. That number prints on the card and generates the barcode.</p>
         </div>
       </div>
       <input className="cs-search" placeholder="Search dog, owner, phone, email, or Gingr ID" value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="cs-card" style={{ marginTop: 12 }}>
         {hits.map((hit, i) => {
-          const gingrId = gingrBarcodeValue(hit as unknown as MemberCardContext);
           return (
-            <button key={i} className="cs-btn" style={{ margin: 4 }} onClick={() => setMember(hit)}>
+            <button key={i} className="cs-btn" style={{ margin: 4 }} onClick={() => setMember({ ...hit, memberNumber: String(member?.memberNumber ?? hit.gingrOwnerBarcode ?? "") })}>
               {String(hit.name)} · {String(hit.dogName ?? "")}
-              {gingrBarcodeValue(hit as unknown as MemberCardContext) ? ` · UPC ${gingrBarcodeValue(hit as unknown as MemberCardContext)}` : " · owner barcode missing"}
+              {String(hit.memberNumber ?? hit.gingrOwnerBarcode ?? "") ? ` · ID ${String(hit.memberNumber ?? hit.gingrOwnerBarcode ?? "")}` : ""}
             </button>
           );
         })}
@@ -238,13 +237,24 @@ export function IssueWizard() {
         <div className="cs-quick-edit" style={{ marginTop: 12 }}>
           <div>
             <strong>Easy edit</strong>
-            <p>Selected {String(member.name)} — member data fills the locked Club + Sports VIP slots. The template itself is not overwritten.</p>
+            <p>Selected {String(member.name)}. Type the Member ID — that number becomes the barcode.</p>
             {gingrBarcodeValue(member as unknown as MemberCardContext) ? (
-              <p>Printed barcode (Gingr owner.barcode UPC-A): <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong></p>
+              <p>Barcode will encode Member ID <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong>.</p>
             ) : (
-              <p className="cs-gingr-missing">MISSING or INVALID Gingr owner barcode. The card cannot be printed until owner.barcode is a valid 12-digit UPC-A.</p>
+              <p className="cs-gingr-missing">Type a Member ID number to generate the barcode.</p>
             )}
           </div>
+          <label className="cs-field">
+            Member ID
+            <input
+              value={String(member.memberNumber ?? "")}
+              onChange={(e) => setMember({ ...member, memberNumber: e.target.value, barcodeValue: e.target.value, barcodeSource: "custom" })}
+              placeholder="Type the member ID number"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="Member ID number"
+            />
+          </label>
           <label className="cs-field">
             Dog name
             <input

@@ -148,8 +148,8 @@ assert.ok(Math.abs(placedFront.width / placedFront.height - CLUB_SPORTS_VIP_EXAC
 const clubBarcode = clubSports.back.elements.find((el) => el.type === "barcode");
 assert.ok(clubBarcode);
 assert.equal(String(clubBarcode?.properties.value), "{{member.barcode}}");
-assert.equal(String(clubBarcode?.properties.symbology), "upca");
-assert.equal(String(clubBarcode?.properties.source), "gingr_owner_barcode");
+assert.equal(String(clubBarcode?.properties.symbology), "code128");
+assert.equal(String(clubBarcode?.properties.source), "custom");
 assert.equal(clubBarcode?.id, OWNER_BARCODE_SLOT_ID);
 assert.equal(validateTemplateDocument(clubSports).filter((i) => i.severity === "critical").length, 0);
 assert.ok(validateTemplateDocument(clubSports).some((i) => i.code === "ARTWORK_ASPECT"));
@@ -185,7 +185,8 @@ const ownerMember = {
   ...gingrMember,
   gingrOwnerId: "88",
   gingrOwnerBarcode: ownerUpc,
-  barcodeSource: "gingr_owner_barcode",
+  memberNumber: ownerUpc,
+  barcodeSource: "custom",
   barcodeValue: ownerUpc
 };
 assert.equal(resolveTemplateString("Hello {{member.name}}", member), "Hello Alex Rivera");
@@ -225,13 +226,15 @@ assert.equal(normalizeGingrAnimalId("FIT-00018429"), null);
 assert.equal(normalizeGingrAnimalId("FD-FD-115"), null);
 assert.equal(gingrBarcodeValue({ gingrAnimalId: "FD-115", memberNumber: "FIT-00018429" }), null);
 assert.equal(gingrBarcodeValue({ gingrAnimalId: null, memberNumber: "FIT-00018429" }), null);
-assert.equal(gingrBarcodeValue({ gingrAnimalId: null, memberNumber: "FD-88" }), null);
-assert.equal(gingrBarcodeValue({ gingrAnimalId: "115", memberNumber: "115", gingrOwnerBarcode: ownerUpc }), ownerUpc);
-assert.equal(gingrBarcodeValue({ gingrAnimalId: "115", memberNumber: "115", gingrOwnerBarcode: ownerUpc, email: "a@b.com", phone: "555" }), ownerUpc);
+assert.equal(gingrBarcodeValue({ gingrAnimalId: "999", memberNumber: "FD-88" }), "88");
+assert.equal(gingrBarcodeValue({ gingrAnimalId: "115", memberNumber: "115" }), "115");
+assert.equal(gingrBarcodeValue({ gingrAnimalId: "115", memberNumber: "00012" }), "00012");
+assert.equal(gingrBarcodeValue({ gingrAnimalId: "115", memberNumber: ownerUpc }), ownerUpc);
+assert.equal(gingrBarcodeValue({ gingrAnimalId: "115", memberNumber: "115", email: "a@b.com", phone: "555" }), "115");
 assert.equal(barcodeValueLooksLikeInternalCardNumber("FIT-00018429"), true);
-assert.equal(isGingrCompatibleBarcodePayload("115"), false);
+assert.equal(isGingrCompatibleBarcodePayload("115"), true);
 assert.equal(isGingrCompatibleBarcodePayload(ownerUpc), true);
-assert.equal(DEFAULT_PRODUCTION_BARCODE_SOURCE, "gingr_owner_barcode");
+assert.equal(DEFAULT_PRODUCTION_BARCODE_SOURCE, "custom");
 assert.equal(extractGingrOwnerBarcode({ barcode: "TAG-991" }), "TAG-991");
 assert.equal(extractGingrOwnerBarcode({ barcode: "012345678905" }), "012345678905");
 assert.equal(extractGingrOwnerBarcode({ id: "12" }), null);
@@ -245,8 +248,8 @@ assert.equal(evaluateUpcA("012345678906").status, "INVALID");
 assert.equal(evaluateUpcA("").status, "MISSING");
 assert.equal(evaluateUpcA("012345678905").raw, "012345678905");
 
-assert.equal(resolveTemplateString("{{member.barcode}} {{member.member_number}} {{member.gingr_animal_id}}", ownerMember), `${ownerUpc} 115 115`);
-assert.equal(resolveTemplateString("{{member.barcode}}", gingrMember), "");
+assert.equal(resolveTemplateString("{{member.barcode}} {{member.member_number}} {{member.gingr_animal_id}}", ownerMember), `${ownerUpc} ${ownerUpc} 115`);
+assert.equal(resolveTemplateString("{{member.barcode}}", gingrMember), "115");
 assert.equal(resolveTemplateString("{{member.barcode}}", member), "");
 
 const gingrPrintIssues = validateCardForPrint({
@@ -274,7 +277,7 @@ const gingrPrintIssues = validateCardForPrint({
     nativeIntegration: false
   }
 });
-assert.equal(gingrPrintIssues.some((i) => i.code === "GINGR_BARCODE"), true, "animal ID must not satisfy the owner UPC-A barcode requirement");
+assert.equal(gingrPrintIssues.some((i) => i.code === "GINGR_BARCODE"), false, "typed Member ID 115 must generate a barcode");
 
 const ownerPrintIssues = validateCardForPrint({
   member: ownerMember,
@@ -413,6 +416,18 @@ await assert.rejects(
     }),
   /empty/i
 );
+
+const typedIdSvg = await renderBarcodeSvg({
+  symbology: "code128",
+  value: "115",
+  width: 520,
+  height: 96,
+  humanReadable: true
+});
+assert.ok(typedIdSvg.includes("<title>115</title>"));
+
+const artworkFromTypedId = await renderPopulatedArtwork(clubSports, gingrMember, "https://staff.ruffops.com");
+assert.ok(artworkFromTypedId.backSvg.includes("<title>115</title>"));
 
 const artwork = await renderPopulatedArtwork(clubSports, ownerMember, "https://staff.ruffops.com");
 assert.ok(artwork.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));

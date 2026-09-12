@@ -71,7 +71,7 @@ export async function renderBarcodeSvg(options: {
   if (!text) {
     throw new Error("Barcode value is empty. Gingr will not check in this card.");
   }
-  const symbology = options.symbology || "upca";
+  const symbology = options.symbology || "code128";
   if (symbology === "upca") {
     const upc = evaluateUpcA(text);
     if (upc.status !== "VALID" || !upc.value) {
@@ -81,7 +81,7 @@ export async function renderBarcodeSvg(options: {
   const quiet = Math.max(10, Number(options.quietZone ?? 12));
   const bwip = await import("bwip-js");
   const png = await bwip.toBuffer({
-    bcid: BWIP_MAP[symbology] || "upca",
+    bcid: BWIP_MAP[symbology] || "code128",
     text: symbology === "upca" ? evaluateUpcA(text).value! : text,
     scale: 8,
     height: Math.max(16, Math.round((options.height / 8) * 0.55)),

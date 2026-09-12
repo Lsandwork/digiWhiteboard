@@ -1,7 +1,6 @@
 import { CR80_PX, DEFAULT_DPI, mmToPx } from "@/lib/card-studio/constants";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
-import { gingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
-import { evaluateUpcA } from "@/lib/card-studio/upc-a";
+import { gingrBarcodeValue, typedMemberId } from "@/lib/card-studio/gingr-identity";
 import type {
   CardElement,
   CardTemplateDocument,
@@ -76,19 +75,15 @@ export function validateCardForPrint(options: {
   const barcodeEls = [...template.front.elements, ...template.back.elements].filter((el) => el.type === "barcode" && !el.hidden);
   if (barcodeEls.length) {
     const value = gingrBarcodeValue(member);
-    const upc = evaluateUpcA(value);
-    if (upc.status === "MISSING") {
+    if (!typedMemberId(value)) {
       issues.push(
         issue(
           "critical",
           "GINGR_BARCODE",
-          "MISSING: Gingr owner barcode (owner.barcode) is not available. Card Studio will not encode the animal ID, owner ID, email, or phone.",
+          "Type a Member ID number. That number is encoded as the barcode. FIT- card serials are not used.",
           false
         )
       );
-    } else if (upc.status === "INVALID") {
-      issues.push(issue("critical", "GINGR_BARCODE", upc.message, false, barcodeEls[0]?.id));
-      issues.push(issue("critical", "INVALID_GINGR_BARCODE", "INVALID: owner barcode cannot be rendered as UPC-A.", false, barcodeEls[0]?.id));
     }
   }
   if (!template) {
