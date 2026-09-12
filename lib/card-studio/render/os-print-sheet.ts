@@ -1,4 +1,4 @@
-import { CR80_INCHES, CR80_PX } from "@/lib/card-studio/constants";
+import { CR80_INCHES, CR80_PX, DEFAULT_DPI } from "@/lib/card-studio/constants";
 import type { PrintMode } from "@/lib/card-studio/types";
 
 /** Hairline trim ticks. Use plain inch offsets — `left: -calc(...)` is invalid CSS. */
@@ -38,8 +38,6 @@ export function buildOsPrintHtml(options: {
     h1 { font-size: 11px; margin: 0 0 6px; letter-spacing: 0.12em; font-weight: 700; }
     .meta { font-size: 11px; color: #444; margin-bottom: 12px; }
     .frame {
-      width: ${CR80_INCHES.width}in;
-      height: ${CR80_INCHES.height}in;
       position: relative;
       display: inline-block;
       margin: ${OUT} auto 0;
@@ -62,8 +60,6 @@ export function buildOsPrintHtml(options: {
     .tick-h.br { bottom: 0; right: -${OUT}; }
     .tick-v.br { right: 0; bottom: -${OUT}; }
     .art {
-      width: ${CR80_INCHES.width}in;
-      height: ${CR80_INCHES.height}in;
       overflow: hidden;
       border: 0;
       background: transparent;
@@ -104,15 +100,26 @@ function trimMarks() {
     .join("");
 }
 
+function svgPrintSize(svg: string) {
+  const w = Number(svg.match(/\bwidth="([\d.]+)"/)?.[1]);
+  const h = Number(svg.match(/\bheight="([\d.]+)"/)?.[1]);
+  if (!w || !h) return { widthIn: CR80_INCHES.width, heightIn: CR80_INCHES.height };
+  return {
+    widthIn: Number((w / DEFAULT_DPI).toFixed(4)),
+    heightIn: Number((h / DEFAULT_DPI).toFixed(4))
+  };
+}
+
 function cardPage(label: string, svg: string, options: { jobId?: string; cardNumber?: string | null; memberName?: string | null }) {
+  const { widthIn, heightIn } = svgPrintSize(svg);
   return `<section class="sheet">
     <h1>${escapeHtml(label)}</h1>
     <div class="meta">${escapeHtml([options.memberName, options.cardNumber, options.jobId].filter(Boolean).join(" · "))}</div>
-    <div class="frame">
+    <div class="frame" style="width:${widthIn}in;height:${heightIn}in">
       ${trimMarks()}
-      <div class="art">${stripPrintChrome(svg)}</div>
+      <div class="art" style="width:${widthIn}in;height:${heightIn}in">${stripPrintChrome(svg)}</div>
     </div>
-    <p class="note">CR80 / ID-1 · ${CR80_INCHES.width} in × ${CR80_INCHES.height} in · do not scale in the printer dialog (set Actual size / 100%).</p>
+    <p class="note">${widthIn} in × ${heightIn} in · CR80 / ID-1 stock is ${CR80_INCHES.width} in × ${CR80_INCHES.height} in · do not scale in the printer dialog (set Actual size / 100%).</p>
   </section>`;
 }
 

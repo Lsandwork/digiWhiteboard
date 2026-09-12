@@ -20,14 +20,30 @@ export function verificationUrlFor(member: MemberCardContext, baseUrl: string) {
   return `${origin}${publicVerificationPath(token)}`;
 }
 
+function exactArtBox(side: CardSideDesign) {
+  const art = side.elements.find((el) => Boolean(el.properties.exactArtwork) && !el.hidden);
+  if (!art) return null;
+  return { x: art.x, y: art.y, width: art.width, height: art.height };
+}
+
 export function renderSideSvg(
   side: CardSideDesign,
   member: MemberCardContext,
-  options?: { verificationBaseUrl?: string; qrSvg?: Record<string, string>; barcodeSvg?: Record<string, string> }
+  options?: {
+    verificationBaseUrl?: string;
+    qrSvg?: Record<string, string>;
+    barcodeSvg?: Record<string, string>;
+    trimToExactArt?: boolean;
+  }
 ): string {
   const parts: string[] = [];
   const bg = side.background ?? "#0b1b2b";
-  parts.push(`<rect width="${side.width}" height="${side.height}" fill="${esc(bg)}" />`);
+  const trim = options?.trimToExactArt === false ? null : exactArtBox(side);
+  const originX = trim?.x ?? 0;
+  const originY = trim?.y ?? 0;
+  const width = trim?.width ?? side.width;
+  const height = trim?.height ?? side.height;
+  parts.push(`<rect x="${originX}" y="${originY}" width="${width}" height="${height}" fill="${esc(bg)}" />`);
 
   for (const el of side.elements) {
     if (el.hidden) continue;
@@ -37,7 +53,7 @@ export function renderSideSvg(
     parts.push(`</g>`);
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${side.width}" height="${side.height}" viewBox="0 0 ${side.width} ${side.height}">${parts.join("")}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${originX} ${originY} ${width} ${height}">${parts.join("")}</svg>`;
 }
 
 function renderElement(

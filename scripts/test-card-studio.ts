@@ -364,8 +364,8 @@ const sheet = buildOsPrintHtml({
   cardNumber: "FIT-1",
   memberName: "Alex Rivera"
 });
-assert.ok(sheet.includes("3.375in"));
-assert.ok(sheet.includes("2.125in"));
+assert.ok(sheet.includes("3.375"));
+assert.ok(sheet.includes("2.125"));
 assert.ok(sheet.includes("Actual size / 100%"));
 assert.ok(sheet.includes(">BACK<"));
 assert.ok(!sheet.includes("not duplex"));
@@ -485,6 +485,8 @@ assert.equal(JSON.stringify(createClubSportsVipTemplateDocument()), JSON.stringi
 const exactOnly = await renderPopulatedArtwork(clubSports, emptyMemberContext(), "https://staff.ruffops.com");
 assert.ok(exactOnly.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));
 assert.equal(exactOnly.frontSvg.includes('stroke="#4da3ff"'), false, "print proof must not draw the cyan bleed box");
+assert.ok(exactOnly.frontSvg.includes('viewBox="0 83 1011 472"'), "print SVG must trim to the exact artwork, not the letterboxed CR80 plate");
+assert.ok(exactOnly.frontSvg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="472"'));
 const proof = buildOsPrintHtml({
   frontSvg: exactOnly.frontSvg,
   backSvg: exactOnly.backSvg,

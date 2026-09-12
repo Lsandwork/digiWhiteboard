@@ -53,8 +53,8 @@ export async function renderPopulatedArtwork(
   const frontCodes = await codesFor("front");
   const backCodes = await codesFor("back");
   return {
-    frontSvg: renderSideSvg(template.front, member, { verificationBaseUrl, ...frontCodes }),
-    backSvg: renderSideSvg(template.back, member, { verificationBaseUrl, ...backCodes }),
+    frontSvg: renderSideSvg(template.front, member, { verificationBaseUrl, trimToExactArt: true, ...frontCodes }),
+    backSvg: renderSideSvg(template.back, member, { verificationBaseUrl, trimToExactArt: true, ...backCodes }),
     width: template.front.width,
     height: template.front.height,
     dpi: template.dpi
