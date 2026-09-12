@@ -28,6 +28,7 @@ export const SKY_BLUE_VIP_EXACT_ARTWORK = {
 
 const INK = "#1C4E76";
 const WHITE = "#FFFFFF";
+const BAR = "#111111";
 
 export function isSkyBlueVipBuiltinId(id?: string | null) {
   return id === SKY_BLUE_VIP_BUILTIN_ID;
@@ -100,15 +101,15 @@ function locked(
  * Photo covers the dog window so the sample retriever never prints through.
  */
 export const SKY_BLUE_VIP_NATIVE_SLOTS = {
-  photo: { x: 534, y: 98, width: 310, height: 318 },
-  ownerValue: { x: 340, y: 168, width: 186, height: 24 },
-  dogValue: { x: 340, y: 214, width: 186, height: 24 },
-  memberValue: { x: 340, y: 282, width: 186, height: 24 },
-  typeValue: { x: 340, y: 330, width: 186, height: 22 },
-  expValue: { x: 340, y: 374, width: 186, height: 22 },
-  qr: { x: 846, y: 136, width: 142, height: 142 },
-  qrCaption: { x: 848, y: 288, width: 148, height: 24 },
-  frontBarcode: { x: 48, y: 396, width: 340, height: 80 },
+  photo: { x: 538, y: 106, width: 304, height: 318 },
+  ownerValue: { x: 336, y: 172, width: 198, height: 20 },
+  dogValue: { x: 336, y: 220, width: 198, height: 20 },
+  memberValue: { x: 336, y: 284, width: 198, height: 20 },
+  typeValue: { x: 336, y: 332, width: 198, height: 18 },
+  expValue: { x: 336, y: 376, width: 198, height: 18 },
+  qr: { x: 858, y: 144, width: 120, height: 114 },
+  qrCaption: { x: 850, y: 262, width: 140, height: 22 },
+  frontBarcode: { x: 56, y: 400, width: 328, height: 78 },
   backBarcode: { x: 599, y: 327, width: 283, height: 80 }
 } as const;
 
@@ -133,7 +134,7 @@ function barcodeProps() {
     value: "{{member.barcode}}",
     humanReadable: true,
     quietZone: 8,
-    foreground: INK,
+    foreground: BAR,
     background: WHITE,
     keepArtworkWhenEmpty: true
   };
@@ -258,7 +259,7 @@ export function createSkyBlueVipTemplateDocument(): CardTemplateDocument {
         contentType: "verification_url",
         value: "{{member.card_uuid}}",
         errorCorrection: "M",
-        foreground: INK,
+        foreground: BAR,
         background: WHITE,
         keepArtworkWhenEmpty: true
       },
