@@ -14,7 +14,7 @@ import { roleCanSeeCardStudioNav, CARD_STUDIO_NAV_ROUTE, buildStaffPanelNav } fr
 import { CR80_PX, cr80AspectRatio, DEFAULT_DPI, CR80_MM, CR80_INCHES } from "../lib/card-studio/constants";
 import { createElement, emptyTemplateDocument, parseTemplateDocument } from "../lib/card-studio/template-schema";
 import { createFitdogVipTemplateDocument } from "../lib/card-studio/vip-template";
-import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_EXACT_ARTWORK, CLUB_SPORTS_VIP_TEMPLATE_NAME, containRect, createClubSportsVipTemplateDocument, documentUsesExactClubSportsArtwork } from "../lib/card-studio/club-sports-vip-template";
+import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_EXACT_ARTWORK, CLUB_SPORTS_VIP_NATIVE_SLOTS, CLUB_SPORTS_VIP_TEMPLATE_NAME, containRect, createClubSportsVipTemplateDocument, documentUsesExactClubSportsArtwork, mapNativeBox } from "../lib/card-studio/club-sports-vip-template";
 import { resolveTemplateString, unresolvedDynamicFields } from "../lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "../lib/card-studio/dynamic-fields";
 import { validateCardForPrint, validateTemplateDocument } from "../lib/card-studio/validation";
@@ -43,6 +43,7 @@ import {
 } from "../lib/card-studio/gingr-identity";
 import { MEMBER_DOG_NAME_SLOT_ID, MEMBER_ID_SLOT_ID, OWNER_BARCODE_SLOT_ID } from "../lib/card-studio/club-sports-vip-template";
 import { MEMBER_PHOTO_SLOT_ID, countMemberPhotoSlots, pruneStackedMemberPhotos, replaceMemberPhoto } from "../lib/card-studio/photo-slot";
+import { fitFontSize } from "../lib/card-studio/render/text-fit";
 import { evaluateUpcA } from "../lib/card-studio/upc-a";
 import { photoQualityWarning, wouldUpscale } from "../lib/card-studio/photo/quality";
 import { FITDOG_BRAND } from "../lib/fitdog-dashboard/assets";
@@ -135,18 +136,38 @@ assert.equal(clubPhoto?.id, MEMBER_PHOTO_SLOT_ID);
 assert.equal(String(clubPhoto?.properties.src), "{{member.photo}}");
 assert.equal(clubPhoto?.properties.keepArtworkWhenEmpty, true);
 assert.equal(clubPhoto?.locked, true);
+assert.equal(String(clubPhoto?.properties.fit), "cover");
+assert.equal(Number(clubPhoto?.properties.zoom ?? 0), 1);
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.nameValue.y >= 405, "name value must sit below the NAME: label");
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.memberValue.y >= 408, "member value must sit below the MEMBER NO.: label");
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.photo.x <= 24);
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.photo.y <= 22);
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.photo.x + CLUB_SPORTS_VIP_NATIVE_SLOTS.photo.width >= 316);
+assert.ok(CLUB_SPORTS_VIP_NATIVE_SLOTS.photo.y + CLUB_SPORTS_VIP_NATIVE_SLOTS.photo.height >= 328);
 assert.equal(countMemberPhotoSlots(clubSports), 1);
-const clubDog = clubSports.front.elements.find((el) => el.id === MEMBER_DOG_NAME_SLOT_ID);
-assert.equal(String(clubDog?.properties.text), "{{member.dog_name}}");
-assert.equal(clubDog?.locked, true);
-assert.ok(clubSports.front.elements.some((el) => el.id === MEMBER_ID_SLOT_ID));
 const placedFront = containRect(
   CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.width,
   CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.height,
   CR80_PX.width,
   CR80_PX.height
 );
+const clubDog = clubSports.front.elements.find((el) => el.id === MEMBER_DOG_NAME_SLOT_ID);
+assert.equal(String(clubDog?.properties.text), "{{member.dog_name}}");
+assert.equal(clubDog?.locked, true);
+assert.equal(String(clubDog?.properties.verticalAlign), "bottom");
+const nameLabelBottom = Math.round(placedFront.y + 398 * placedFront.scale);
+assert.ok((clubDog?.y ?? 0) >= nameLabelBottom, "dog name overlay must not cover NAME:");
+const clubNumber = clubSports.front.elements.find((el) => el.id === MEMBER_ID_SLOT_ID);
+const memberLabelBottom = Math.round(placedFront.y + 405 * placedFront.scale);
+assert.ok((clubNumber?.y ?? 0) >= memberLabelBottom, "member ID overlay must not cover MEMBER NO.:");
+assert.ok(clubSports.front.elements.some((el) => el.id === MEMBER_ID_SLOT_ID));
+assert.equal(fitFontSize("BAILEY", 210, 20), 20);
+assert.ok(fitFontSize("SHIVA SANDOVAVL THE THIRD", 210, 20) < 16);
 assert.ok(Math.abs(placedFront.width / placedFront.height - CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.width / CLUB_SPORTS_VIP_EXACT_ARTWORK.frontNative.height) < 0.0001);
+const mappedPhoto = mapNativeBox(CLUB_SPORTS_VIP_NATIVE_SLOTS.photo, placedFront);
+assert.equal(clubPhoto?.x, mappedPhoto.x);
+assert.equal(clubPhoto?.width, mappedPhoto.width);
+assert.equal(clubPhoto?.height, mappedPhoto.height);
 const clubBarcode = clubSports.back.elements.find((el) => el.type === "barcode");
 assert.ok(clubBarcode);
 assert.equal(String(clubBarcode?.properties.value), "{{member.barcode}}");
@@ -451,6 +472,7 @@ assert.equal((artwork.frontSvg.match(/memberPhotoSlot|clip_memberPhotoSlot/g) ||
 const photoA = await renderPopulatedArtwork(clubSports, { ...ownerMember, photoUrl: "data:image/png;base64,AAA" }, "https://staff.ruffops.com");
 const photoB = await renderPopulatedArtwork(clubSports, { ...ownerMember, photoUrl: "data:image/png;base64,BBB" }, "https://staff.ruffops.com");
 assert.equal(photoA.frontSvg.includes("data:image/png;base64,AAA"), true);
+assert.equal(photoA.frontSvg.includes('preserveAspectRatio="xMidYMid slice"'), true);
 assert.equal(photoA.frontSvg.includes("data:image/png;base64,BBB"), false);
 assert.equal(photoB.frontSvg.includes("data:image/png;base64,BBB"), true);
 assert.equal(photoB.frontSvg.includes("data:image/png;base64,AAA"), false);
@@ -464,6 +486,9 @@ assert.equal(countMemberPhotoSlots(stacked), 1);
 assert.equal(stacked.front.elements.some((el) => el.id === "extra_photo"), false);
 assert.equal(stacked.front.elements.some((el) => el.id === "pasted_photo"), false);
 assert.equal(String(stacked.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.src), "{{member.photo}}");
+assert.equal(String(stacked.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.fit), "cover");
+assert.equal(Number(stacked.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.zoom), 1);
+assert.equal(Number(stacked.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.cropX), 50);
 let replaced = replaceMemberPhoto(ownerMember, "data:image/png;base64,EEE");
 replaced = replaceMemberPhoto(replaced, "data:image/png;base64,FFF");
 replaced = replaceMemberPhoto(replaced, "data:image/png;base64,GGG");
@@ -481,6 +506,13 @@ assert.ok(card3.frontSvg.includes("REX"));
 assert.ok(!card2.frontSvg.includes("REX"));
 assert.ok(!card3.frontSvg.includes("MAPLE"));
 assert.equal(JSON.stringify(createClubSportsVipTemplateDocument()), JSON.stringify(createClubSportsVipTemplateDocument()));
+const longName = await renderPopulatedArtwork(
+  createClubSportsVipTemplateDocument(),
+  { ...ownerMember, dogName: "Shiva Sandovavl Extremely Long", photoUrl: "data:image/png;base64,LLL", gingrOwnerBarcode: ownerUpc },
+  "https://staff.ruffops.com"
+);
+assert.ok(longName.frontSvg.includes("SHIVA SANDOVAVL EXTREMELY LONG"));
+assert.ok(/font-size="1[0-6](\.\d)?"/.test(longName.frontSvg), "long names must shrink to stay in the value slot");
 
 const exactOnly = await renderPopulatedArtwork(clubSports, emptyMemberContext(), "https://staff.ruffops.com");
 assert.ok(exactOnly.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));

@@ -48,7 +48,11 @@ export function pruneStackedMemberPhotos(doc: CardTemplateDocument): CardTemplat
             ...el.properties,
             slotId: MEMBER_PHOTO_SLOT_ID,
             src: "{{member.photo}}",
-            fit: el.properties.fit ?? "cover"
+            fit: "cover",
+            cropX: 50,
+            cropY: 50,
+            zoom: 1,
+            rotate: 0
           }
         };
       });

@@ -11,6 +11,7 @@ import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
 import { GingrIdentityPanel } from "@/components/card-studio/GingrIdentityPanel";
 import { useCardStudioAccess } from "@/components/card-studio/CardStudioAccess";
 import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
+import { replaceMemberPhoto } from "@/lib/card-studio/photo-slot";
 import type { MemberCardContext, PrintMode } from "@/lib/card-studio/types";
 
 type TemplateRow = {
@@ -274,20 +275,20 @@ export function IssueWizard() {
                   const file = event.target.files?.[0];
                   if (!file || !member) return;
                   const reader = new FileReader();
-                  reader.onload = () => setMember({ ...member, photoUrl: String(reader.result ?? "") });
+                  reader.onload = () => setMember(replaceMemberPhoto(member, String(reader.result ?? "")));
                   reader.readAsDataURL(file);
                 }}
               />
             </label>
             {member.photoUrl ? (
-              <button className="cs-btn" type="button" onClick={() => setMember({ ...member, photoUrl: "" })}>Clear photo</button>
+              <button className="cs-btn" type="button" onClick={() => setMember(replaceMemberPhoto(member, null))}>Clear photo</button>
             ) : null}
           </div>
           {member.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={String(member.photoUrl)} alt="Card photo preview" className="cs-photo-preview" />
           ) : (
-            <p>No photo yet. Upload one for the top-left frame.</p>
+            <p>No photo yet. Replace photo fills the ID frame at the correct size — you do not need to crop or stretch it.</p>
           )}
         </div>
       ) : null}

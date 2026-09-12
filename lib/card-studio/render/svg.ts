@@ -1,4 +1,5 @@
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
+import { fitFontSize } from "@/lib/card-studio/render/text-fit";
 import type { CardElement, CardSideDesign, MemberCardContext } from "@/lib/card-studio/types";
 import { publicVerificationPath } from "@/lib/card-studio/verify";
 
@@ -101,30 +102,52 @@ function renderElement(
         if (el.properties.keepArtworkWhenEmpty) return "";
         return `<rect width="${el.width}" height="${el.height}" rx="${rx}" fill="#e8e8e8" stroke="#F37021" stroke-width="2"/><text x="${el.width / 2}" y="${el.height / 2}" text-anchor="middle" fill="#1F2D3D" font-size="14" font-weight="700">Replace photo</text>`;
       }
-      const clipId = `clip_${el.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
-      const ratio = el.properties.fit === "contain" ? "xMidYMid meet" : "xMidYMid slice";
-      const cover = el.type === "member_photo"
-        ? `<rect width="${el.width}" height="${el.height}" rx="${rx}" fill="#ffffff"/>`
-        : "";
-      return `${cover}<defs><clipPath id="${clipId}"><rect width="${el.width}" height="${el.height}" rx="${rx}"/></clipPath></defs><image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="${ratio}" clip-path="url(#${clipId})"/>`;
+      return framedCoverImage(el, src, rx);
     }
     default: {
       const raw = String(el.properties.text ?? "");
       let text = resolveTemplateString(raw, member);
       if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
       if (!text && el.properties.keepArtworkWhenEmpty) return "";
-      const size = Number(el.properties.fontSize ?? 16);
+      const requested = Number(el.properties.fontSize ?? 16);
+      const size = fitFontSize(text, Math.max(8, el.width - 4), requested);
       const weight = Number(el.properties.fontWeight ?? 600);
       const color = String(el.properties.color ?? "#f8fafc");
       const italic = el.properties.italic ? "italic" : "normal";
       const anchor =
         el.properties.textAlign === "center" ? "middle" : el.properties.textAlign === "right" ? "end" : "start";
       const x = el.properties.textAlign === "center" ? el.width / 2 : el.properties.textAlign === "right" ? el.width : 0;
-      const y = el.height / 2 + size / 3;
-      const fill = el.properties.background ? `<rect width="${el.width}" height="${el.height}" fill="${esc(String(el.properties.background))}" />` : "";
-      return `${fill}<text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-style="${italic}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}">${esc(text)}</text>`;
+      const valign = String(el.properties.verticalAlign ?? "middle");
+      const y =
+        valign === "bottom"
+          ? el.height - Math.max(2, size * 0.18)
+          : valign === "top"
+            ? size
+            : el.height / 2 + size / 3;
+      const clipId = `clip_text_${el.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+      const fill = el.properties.background
+        ? `<rect width="${el.width}" height="${el.height}" fill="${esc(String(el.properties.background))}" />`
+        : "";
+      return `${fill}<defs><clipPath id="${clipId}"><rect width="${el.width}" height="${el.height}"/></clipPath></defs><text x="${x}" y="${y}" font-size="${size}" font-weight="${weight}" font-style="${italic}" font-family="${esc(String(el.properties.fontFamily ?? "Arial, Helvetica, sans-serif"))}" fill="${esc(color)}" text-anchor="${anchor}" clip-path="url(#${clipId})">${esc(text)}</text>`;
     }
   }
+}
+
+function framedCoverImage(el: CardElement, src: string, rx: number) {
+  const clipId = `clip_${el.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const zoom = el.type === "member_photo" ? Math.max(1, Number(el.properties.zoom ?? 1)) : Number(el.properties.zoom ?? 1) || 1;
+  const cropX = Number(el.properties.cropX ?? 50);
+  const cropY = Number(el.properties.cropY ?? 50);
+  const ratio = el.properties.fit === "contain" && el.type !== "member_photo" ? "xMidYMid meet" : "xMidYMid slice";
+  const iw = el.width * zoom;
+  const ih = el.height * zoom;
+  const ix = zoom > 1 ? -((cropX / 100) * (iw - el.width)) : 0;
+  const iy = zoom > 1 ? -((cropY / 100) * (ih - el.height)) : 0;
+  const under =
+    el.type === "member_photo"
+      ? `<rect width="${el.width}" height="${el.height}" rx="${rx}" fill="#ffffff"/>`
+      : "";
+  return `${under}<defs><clipPath id="${clipId}"><rect width="${el.width}" height="${el.height}" rx="${rx}"/></clipPath></defs><image href="${esc(src)}" x="${ix}" y="${iy}" width="${iw}" height="${ih}" preserveAspectRatio="${ratio}" clip-path="url(#${clipId})"/>`;
 }
 
 export function cr80ViewBox(width: number, height: number) {

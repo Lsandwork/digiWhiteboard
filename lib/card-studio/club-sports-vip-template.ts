@@ -114,11 +114,18 @@ function locked(
   });
 }
 
-/** Native-pixel overlay boxes on FRONT_EXACT / BACK_EXACT (not CR80). */
-const FRONT_PHOTO_NATIVE = { x: 34, y: 26, width: 282, height: 292 };
-const FRONT_NAME_NATIVE = { x: 36, y: 398, width: 220, height: 36 };
-const FRONT_NUMBER_NATIVE = { x: 276, y: 398, width: 220, height: 36 };
-const BACK_BARCODE_NATIVE = { x: 225, y: 304, width: 460, height: 95 };
+/**
+ * Native-pixel overlay boxes on FRONT_EXACT / BACK_EXACT (not CR80).
+ * Name / Member ID boxes cover the sample *values* only so the orange NAME: and
+ * MEMBER NO.: labels in the artwork stay visible.
+ * Photo covers the full ID window (inner frame included) so Bailey never shows through.
+ */
+export const CLUB_SPORTS_VIP_NATIVE_SLOTS = {
+  photo: { x: 22, y: 20, width: 296, height: 311 },
+  nameValue: { x: 36, y: 406, width: 210, height: 28 },
+  memberValue: { x: 268, y: 410, width: 155, height: 24 },
+  barcode: { x: 225, y: 304, width: 460, height: 95 }
+} as const;
 
 /**
  * Exact supplied PNGs as locked artwork. Member overlays cover only Bailey / FD-0001 / sample barcode
@@ -141,10 +148,10 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
     CR80_PX.width,
     CR80_PX.height
   );
-  const photo = mapNativeBox(FRONT_PHOTO_NATIVE, frontPlace);
-  const name = mapNativeBox(FRONT_NAME_NATIVE, frontPlace);
-  const number = mapNativeBox(FRONT_NUMBER_NATIVE, frontPlace);
-  const barcode = mapNativeBox(BACK_BARCODE_NATIVE, backPlace);
+  const photo = mapNativeBox(CLUB_SPORTS_VIP_NATIVE_SLOTS.photo, frontPlace);
+  const name = mapNativeBox(CLUB_SPORTS_VIP_NATIVE_SLOTS.nameValue, frontPlace);
+  const number = mapNativeBox(CLUB_SPORTS_VIP_NATIVE_SLOTS.memberValue, frontPlace);
+  const barcode = mapNativeBox(CLUB_SPORTS_VIP_NATIVE_SLOTS.barcode, backPlace);
 
   doc.front.elements = [
     locked("background", "cs_front_bg", 0, 0, CR80_PX.width, CR80_PX.height, { fill: C.white, opacity: 1, borderWidth: 0, borderColor: "none" }),
@@ -178,7 +185,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
         fit: "cover",
         frame: "rounded_id",
         cropX: 50,
-        cropY: 42,
+        cropY: 50,
         zoom: 1,
         borderRadius: Math.round(18 * frontPlace.scale),
         opacity: 1,
@@ -195,11 +202,12 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       name.height,
       {
         text: "{{member.dog_name}}",
-        fontSize: Math.round(22 * frontPlace.scale),
+        fontSize: Math.round(20 * frontPlace.scale),
         fontWeight: 800,
-        letterSpacing: 0.6,
+        letterSpacing: 0.4,
         color: C.slate,
         textTransform: "uppercase",
+        verticalAlign: "bottom",
         background: C.white,
         keepArtworkWhenEmpty: true
       },
@@ -214,9 +222,10 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       number.height,
       {
         text: "{{member.member_number}}",
-        fontSize: Math.round(16 * frontPlace.scale),
+        fontSize: Math.round(15 * frontPlace.scale),
         fontWeight: 800,
         color: C.slate,
+        verticalAlign: "bottom",
         background: C.white,
         keepArtworkWhenEmpty: true
       },

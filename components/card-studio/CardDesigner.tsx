@@ -286,7 +286,7 @@ export function CardDesigner() {
         <div className="cs-quick-edit">
           <div>
             <strong>Easy edit</strong>
-            <p>Type the Member ID number. That same number prints on the front and becomes the barcode on the back.</p>
+            <p>Type the Member ID number. That same number prints on the front and becomes the barcode on the back. Replace photo fills the ID frame — you do not need to resize it.</p>
           </div>
           <label className="cs-field">
             Search member
@@ -368,7 +368,11 @@ export function CardDesigner() {
                 const reader = new FileReader();
                 reader.onload = () => {
                   setPreviewMember((m) => replaceMemberPhoto(m, String(reader.result ?? "")));
-                  setDoc((current) => pruneStackedMemberPhotos(current));
+                  setDoc((current) =>
+                    isClubSportsVipTemplate({ id, name, document: current })
+                      ? createClubSportsVipTemplateDocument()
+                      : pruneStackedMemberPhotos(current)
+                  );
                   if (photoInput.current) photoInput.current.value = "";
                 };
                 reader.readAsDataURL(file);
@@ -479,11 +483,17 @@ export function CardDesigner() {
           <h3>Properties</h3>
           {!selectedEl ? <p>Select an element.</p> : (
             <>
-              <label className="cs-field">X<input type="number" value={selectedEl.x} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
-              <label className="cs-field">Y<input type="number" value={selectedEl.y} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
-              <label className="cs-field">Width<input type="number" value={selectedEl.width} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
-              <label className="cs-field">Height<input type="number" value={selectedEl.height} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
-              <label className="cs-field">Rotation<input type="number" value={selectedEl.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /></label>
+              {selectedEl.locked ? (
+                <p className="cs-id-note">This slot is locked to the template. Replace photo fills the ID frame at the correct size.</p>
+              ) : (
+                <>
+                  <label className="cs-field">X<input type="number" value={selectedEl.x} onChange={(e) => updateSelected({ x: Number(e.target.value) })} /></label>
+                  <label className="cs-field">Y<input type="number" value={selectedEl.y} onChange={(e) => updateSelected({ y: Number(e.target.value) })} /></label>
+                  <label className="cs-field">Width<input type="number" value={selectedEl.width} onChange={(e) => updateSelected({ width: Number(e.target.value) })} /></label>
+                  <label className="cs-field">Height<input type="number" value={selectedEl.height} onChange={(e) => updateSelected({ height: Number(e.target.value) })} /></label>
+                  <label className="cs-field">Rotation<input type="number" value={selectedEl.rotation} onChange={(e) => updateSelected({ rotation: Number(e.target.value) })} /></label>
+                </>
+              )}
               {"text" in selectedEl.properties ? (
                 <>
                   <label className="cs-field">Text<textarea value={String(selectedEl.properties.text ?? "")} onChange={(e) => updateSelected({ properties: { text: e.target.value } })} /></label>
@@ -499,7 +509,7 @@ export function CardDesigner() {
                   <p className="cs-id-note">Human-readable: {gingrBarcodeValue(previewMember) || "—"}</p>
                 </>
               ) : null}
-              {selectedEl.type === "member_photo" ? (
+              {selectedEl.type === "member_photo" && !selectedEl.locked ? (
                 <>
                   <label className="cs-field">Frame
                     <select value={String(selectedEl.properties.frame ?? "rounded_id")} onChange={(e) => updateSelected({ properties: { frame: e.target.value } })}>
@@ -554,6 +564,8 @@ function ElementPreview({ el, member }: { el: CardElement; member: MemberCardCon
     const src = resolveTemplateString(String(el.properties.src ?? ""), member) || (el.type === "logo" ? FITDOG_APPROVED_LOGO : "");
     if (!src && el.properties.keepArtworkWhenEmpty) return null;
     const radius = el.properties.frame === "circle" ? "50%" : `${Number(el.properties.borderRadius ?? 16)}px`;
+    const zoom = el.type === "member_photo" ? Math.max(1, Number(el.properties.zoom ?? 1)) : Number(el.properties.zoom ?? 1);
+    const fit = el.type === "member_photo" ? "cover" : el.properties.fit === "contain" ? "contain" : "cover";
     return (
       <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: el.properties.exactArtwork ? 0 : radius, background: el.type === "member_photo" && src ? "#ffffff" : el.properties.exactArtwork ? "transparent" : "#1e293b" }}>
         {src ? (
@@ -563,9 +575,9 @@ function ElementPreview({ el, member }: { el: CardElement; member: MemberCardCon
             style={{
               width: "100%",
               height: "100%",
-              objectFit: el.properties.fit === "contain" ? "contain" : "cover",
+              objectFit: fit,
               objectPosition: `${Number(el.properties.cropX ?? 50)}% ${Number(el.properties.cropY ?? 50)}%`,
-              transform: `scale(${Number(el.properties.zoom ?? 1)}) rotate(${Number(el.properties.rotate ?? 0)}deg)`
+              transform: `scale(${zoom}) rotate(${Number(el.properties.rotate ?? 0)}deg)`
             }}
           />
         ) : (
