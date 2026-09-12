@@ -106,7 +106,12 @@ export function backWedgeMarkup() {
 
 export function vipScriptMarkup() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="210" viewBox="0 0 250 210">
-  <path d="M86 18 L102 34 L118 18 L132 32 C118 28 108 40 124 52 L92 44 C78 58 64 40 78 30 Z" fill="${SKY.lagoon}"/>
+  <g fill="${SKY.lagoon}">
+    <path d="M78 40 L88 18 L108 40 L125 8 L142 40 L162 18 L172 40 L168 52 L82 52 Z"/>
+    <circle cx="88" cy="16" r="6"/>
+    <circle cx="125" cy="6" r="7"/>
+    <circle cx="162" cy="16" r="6"/>
+  </g>
   <text x="8" y="148" font-family="Georgia, 'Palatino Linotype', Palatino, Times, serif" font-size="118" font-style="italic" font-weight="700" fill="${SKY.vip}">VIP</text>
 </svg>`;
 }
@@ -136,10 +141,16 @@ export const SERVICE_ICONS = {
     `<circle cx="44" cy="44" r="10" fill="none" stroke="${SKY.ink}" stroke-width="3"/><g stroke="${SKY.ink}" stroke-width="3" stroke-linecap="round"><path d="M44 28 V24"/><path d="M44 64 V60"/><path d="M28 44 H24"/><path d="M64 44 H60"/><path d="M33 33 L30 30"/><path d="M55 55 L58 58"/><path d="M55 33 L58 30"/><path d="M33 55 L30 58"/></g>`
   ),
   boarding: iconCircle(
-    `<rect x="30" y="38" width="28" height="16" rx="3" fill="none" stroke="${SKY.ink}" stroke-width="3"/><path d="M30 42 H58" stroke="${SKY.ink}" stroke-width="3"/><circle cx="36" cy="50" r="1.6" fill="${SKY.ink}"/><circle cx="52" cy="50" r="1.6" fill="${SKY.ink}"/>`
+    `<path d="M28 54 H60" stroke="${SKY.ink}" stroke-width="3" stroke-linecap="round"/>
+     <path d="M32 54 V46 C32 40 56 40 56 46 V54" fill="none" stroke="${SKY.ink}" stroke-width="3"/>
+     <path d="M30 46 H58" stroke="${SKY.ink}" stroke-width="3" stroke-linecap="round"/>`
   ),
   training: iconCircle(
-    `<rect x="32" y="40" width="24" height="10" rx="2" fill="none" stroke="${SKY.ink}" stroke-width="3"/><circle cx="30" cy="45" r="5" fill="none" stroke="${SKY.ink}" stroke-width="3"/><circle cx="58" cy="45" r="5" fill="none" stroke="${SKY.ink}" stroke-width="3"/>`
+    `<path d="M24 44 H64" stroke="${SKY.ink}" stroke-width="3.2" stroke-linecap="round"/>
+     <rect x="30" y="36" width="8" height="16" rx="1.5" fill="none" stroke="${SKY.ink}" stroke-width="3"/>
+     <rect x="50" y="36" width="8" height="16" rx="1.5" fill="none" stroke="${SKY.ink}" stroke-width="3"/>
+     <rect x="22" y="38" width="6" height="12" rx="1" fill="${SKY.ink}"/>
+     <rect x="60" y="38" width="6" height="12" rx="1" fill="${SKY.ink}"/>`
   ),
   hikes: iconCircle(
     `<path d="M22 58 L38 34 L48 46 L58 30 L70 58 Z" fill="none" stroke="${SKY.ink}" stroke-width="3" stroke-linejoin="round"/>`

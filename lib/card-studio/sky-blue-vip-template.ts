@@ -1,4 +1,4 @@
-import { CR80_PX, FITDOG_APPROVED_LOGO, FITDOG_APPROVED_WORDMARK } from "@/lib/card-studio/constants";
+import { CR80_PX, FITDOG_APPROVED_LOGO } from "@/lib/card-studio/constants";
 import { MEMBER_PHOTO_SLOT_ID } from "@/lib/card-studio/photo-slot";
 import {
   SERVICE_ICONS,
@@ -65,7 +65,8 @@ function layer(
   y: number,
   width: number,
   height: number,
-  properties: Record<string, unknown>
+  properties: Record<string, unknown>,
+  extra?: Partial<CardElement>
 ): CardElement {
   return createElement(type, {
     id,
@@ -75,7 +76,8 @@ function layer(
     width,
     height,
     locked: false,
-    properties
+    properties,
+    ...extra
   });
 }
 
@@ -126,26 +128,28 @@ export function createSkyBlueVipTemplateDocument(): CardTemplateDocument {
     layer("svg", "sky_front_wave", "16_DECORATIVE_WAVE", 0, 500, CR80_PX.width, 160, {
       markup: waveAccentMarkup()
     }),
-    layer("logo", "sky_front_logo", "04_FITDOG_LOGO", 36, 28, 92, 92, {
+    layer("logo", "sky_front_logo", "04_FITDOG_LOGO", 36, 24, 100, 100, {
       src: FITDOG_APPROVED_LOGO,
       fit: "contain"
     }),
-    layer("logo", "sky_front_wordmark", "04_FITDOG_WORDMARK", 140, 30, 300, 48, {
-      src: FITDOG_APPROVED_WORDMARK,
-      fit: "contain"
-    }),
-    layer("text", "sky_front_club", "04_CLUB_LINE", 140, 80, 300, 18, copy("HEALTH & SOCIAL CLUB", {
+    layer("text", "sky_front_wordmark", "04_FITDOG_WORDMARK", 150, 30, 320, 44, copy("FITDOG", {
+      fontSize: 34,
+      fontWeight: 800,
+      letterSpacing: 1.2,
+      color: SKY.orange
+    })),
+    layer("text", "sky_front_club", "04_CLUB_LINE", 150, 76, 320, 18, copy("HEALTH & SOCIAL CLUB", {
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: 1.4,
       color: SKY.ink
     })),
-    layer("text", "sky_front_city_line", "15_LOCATION_HEADER", 140, 98, 240, 16, copy("SANTA MONICA, CA", {
+    layer("text", "sky_front_city_line", "15_LOCATION_HEADER", 150, 94, 240, 16, copy("SANTA MONICA, CA", {
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: 1.1
     })),
-    layer("rectangle", "sky_front_city_rule", "15_LOCATION_RULE", 140, 116, 118, 3, {
+    layer("rectangle", "sky_front_city_rule", "15_LOCATION_RULE", 150, 112, 118, 3, {
       fill: SKY.ink,
       borderWidth: 0
     }),
@@ -261,7 +265,7 @@ export function createSkyBlueVipTemplateDocument(): CardTemplateDocument {
       textAlign: "center",
       color: SKY.ink
     })),
-    layer("barcode", SKY_FRONT_BARCODE_ID, "13_BARCODE", 40, 488, 420, 92, barcodeProps()),
+    layer("barcode", SKY_FRONT_BARCODE_ID, "13_BARCODE", 40, 500, 380, 86, barcodeProps()),
     layer("text", "sky_front_sm", "15_LOCATION", 760, 548, 220, 52, copy("Santa Monica CA", {
       fontFamily: SCRIPT,
       fontSize: 20,
@@ -294,25 +298,27 @@ export function createSkyBlueVipTemplateDocument(): CardTemplateDocument {
     layer("svg", "sky_back_wedge", "18_ORANGE_ACCENT_WEDGE", 731, 0, 280, CR80_PX.height, {
       markup: backWedgeMarkup()
     }),
-    layer("logo", "sky_back_logo", "03_FITDOG_LOGO", 36, 28, 92, 92, {
+    layer("logo", "sky_back_logo", "03_FITDOG_LOGO", 36, 24, 100, 100, {
       src: FITDOG_APPROVED_LOGO,
       fit: "contain"
     }),
-    layer("logo", "sky_back_wordmark", "03_FITDOG_WORDMARK", 140, 30, 300, 48, {
-      src: FITDOG_APPROVED_WORDMARK,
-      fit: "contain"
-    }),
-    layer("text", "sky_back_club", "03_CLUB_LINE", 140, 80, 300, 18, copy("HEALTH & SOCIAL CLUB", {
+    layer("text", "sky_back_wordmark", "03_FITDOG_WORDMARK", 150, 30, 320, 44, copy("FITDOG", {
+      fontSize: 34,
+      fontWeight: 800,
+      letterSpacing: 1.2,
+      color: SKY.orange
+    })),
+    layer("text", "sky_back_club", "03_CLUB_LINE", 150, 76, 320, 18, copy("HEALTH & SOCIAL CLUB", {
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: 1.4
     })),
-    layer("text", "sky_back_city_line", "13_LOCATION_HEADER", 140, 98, 240, 16, copy("SANTA MONICA, CA", {
+    layer("text", "sky_back_city_line", "13_LOCATION_HEADER", 150, 94, 240, 16, copy("SANTA MONICA, CA", {
       fontSize: 11,
       fontWeight: 700,
       letterSpacing: 1.1
     })),
-    layer("rectangle", "sky_back_city_rule", "13_LOCATION_RULE", 140, 116, 118, 3, {
+    layer("rectangle", "sky_back_city_rule", "13_LOCATION_RULE", 150, 112, 118, 3, {
       fill: SKY.ink,
       borderWidth: 0
     }),
@@ -363,19 +369,19 @@ export function createSkyBlueVipTemplateDocument(): CardTemplateDocument {
     })),
     layer("svg", "sky_back_swoosh", "18_ORANGE_ACCENT", 40, 528, 220, 16, { markup: orangeSwooshMarkup() }),
     layer("svg", "sky_back_pin", "13_LOCATION_PIN", 300, 502, 22, 28, { markup: pinMarkup() }),
-    layer("location", "sky_back_location", "13_LOCATION", 328, 504, 220, 24, copy("SANTA MONICA, CA", {
-      fontSize: 13,
+    layer("location", "sky_back_location", "13_LOCATION", 328, 504, 200, 24, copy("SANTA MONICA, CA", {
+      fontSize: 12,
       fontWeight: 800
     })),
-    layer("barcode", SKY_BACK_BARCODE_ID, "15_BARCODE", 430, 478, 300, 88, barcodeProps()),
-    layer("text", "sky_back_verify", "14_VERIFICATION_LABEL", 820, 430, 160, 90, copy("Scan for Exclusive Perks", {
+    layer("barcode", SKY_BACK_BARCODE_ID, "15_BARCODE", 500, 478, 240, 88, barcodeProps()),
+    layer("text", "sky_back_verify", "14_VERIFICATION_LABEL", 790, 470, 180, 80, copy("Scan for Exclusive Perks", {
       fontFamily: SCRIPT,
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: 700,
       italic: true,
       color: SKY.white,
       textAlign: "center"
-    })),
+    }), { rotation: -18 }),
     layer("svg", "sky_back_wedge_paw", "17_WEDGE_PAW", 868, 390, 48, 48, { markup: pawAccentMarkup(SKY.white) })
   ];
 
