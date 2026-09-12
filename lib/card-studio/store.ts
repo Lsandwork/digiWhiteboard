@@ -9,6 +9,12 @@ import {
   isClubSportsVipTemplate,
   productionClubSportsVipDocument
 } from "@/lib/card-studio/club-sports-vip-template";
+import {
+  builtinSkyBlueVipTemplate,
+  createSkyBlueVipTemplateDocument,
+  isSkyBlueVipBuiltinId,
+  SKY_BLUE_VIP_TEMPLATE_NAME
+} from "@/lib/card-studio/sky-blue-vip-template";
 import { DEFAULT_CARD_STUDIO_SETTINGS } from "@/lib/card-studio/settings";
 import { gingrBarcodeValue, barcodeSymbologyForValue } from "@/lib/card-studio/gingr-barcode";
 import { formatCardNumber, formatJobId } from "@/lib/card-studio/job-ids";
@@ -47,6 +53,14 @@ export async function saveCardStudioSettings(settings: Partial<CardStudioSetting
   return next;
 }
 
+function builtinTemplateFallbacks(rows: Array<{ name?: string | null }>, status?: TemplateState | "all") {
+  if (status && status !== "all" && status !== "active") return [];
+  const extras = [];
+  if (!rows.some((row) => String(row.name) === CLUB_SPORTS_VIP_TEMPLATE_NAME)) extras.push(builtinClubSportsVipTemplate());
+  if (!rows.some((row) => String(row.name) === SKY_BLUE_VIP_TEMPLATE_NAME)) extras.push(builtinSkyBlueVipTemplate());
+  return extras;
+}
+
 export async function ensureDefaultTemplates(actor: Actor) {
   try {
     const supabase = db();
@@ -54,51 +68,63 @@ export async function ensureDefaultTemplates(actor: Actor) {
     if (error) return;
     const names = new Set((existing ?? []).map((row) => String(row.name)));
     const exactDoc = productionClubSportsVipDocument();
-    const description =
+    const clubDescription =
       "Production Club + Sports VIP template. Type the Member ID number to print it on the card and generate the barcode.";
     if (!names.has(CLUB_SPORTS_VIP_TEMPLATE_NAME)) {
       await createTemplate(
         {
           name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
-          description,
+          description: clubDescription,
           category: "club_sports_vip",
           status: "active",
           document: exactDoc
         },
         actor
       );
-      return;
+    } else {
+      const row = (existing ?? []).find((item) => String(item.name) === CLUB_SPORTS_VIP_TEMPLATE_NAME);
+      if (row?.id) {
+        const supabaseRow = await supabase.from("card_studio_templates").select("current_version_id").eq("id", row.id).maybeSingle();
+        const { data: version } = supabaseRow.data?.current_version_id
+          ? await supabase
+              .from("card_studio_template_versions")
+              .select("document")
+              .eq("id", supabaseRow.data.current_version_id)
+              .maybeSingle()
+          : { data: null };
+        const stored = parseTemplateDocument(version?.document);
+        const barcode = [...stored.front.elements, ...stored.back.elements].find((el) => el.type === "barcode");
+        const needsProductionDoc =
+          !documentUsesExactClubSportsArtwork(stored) ||
+          String(barcode?.properties.symbology) !== "code128" ||
+          String(barcode?.properties.source) !== "custom";
+        if (needsProductionDoc) {
+          await saveTemplateVersion(String(row.id), exactDoc, actor, {
+            description: clubDescription,
+            status: "active",
+            bumpVersion: true
+          });
+        }
+      }
     }
-    const row = (existing ?? []).find((item) => String(item.name) === CLUB_SPORTS_VIP_TEMPLATE_NAME);
-    if (!row?.id) return;
-    const supabaseRow = await supabase.from("card_studio_templates").select("current_version_id").eq("id", row.id).maybeSingle();
-    const { data: version } = supabaseRow.data?.current_version_id
-      ? await supabase
-          .from("card_studio_template_versions")
-          .select("document")
-          .eq("id", supabaseRow.data.current_version_id)
-          .maybeSingle()
-      : { data: null };
-    const stored = parseTemplateDocument(version?.document);
-    const barcode = [...stored.front.elements, ...stored.back.elements].find((el) => el.type === "barcode");
-    const needsProductionDoc =
-      !documentUsesExactClubSportsArtwork(stored) ||
-      String(barcode?.properties.symbology) !== "code128" ||
-      String(barcode?.properties.source) !== "custom";
-    if (needsProductionDoc) {
-      await saveTemplateVersion(String(row.id), exactDoc, actor, {
-        description,
-        status: "active",
-        bumpVersion: true
-      });
+    if (!names.has(SKY_BLUE_VIP_TEMPLATE_NAME)) {
+      await createTemplate(
+        {
+          name: SKY_BLUE_VIP_TEMPLATE_NAME,
+          description: builtinSkyBlueVipTemplate().description,
+          category: "vip_member",
+          status: "active",
+          document: createSkyBlueVipTemplateDocument()
+        },
+        actor
+      );
     }
   } catch {
-    // Card Studio still shows the built-in Club + Sports VIP artwork if the table is missing.
+    // Card Studio still shows built-in templates if the table is missing.
   }
 }
 
 export async function listTemplates(options?: { status?: TemplateState | "all"; limit?: number }) {
-  const builtin = builtinClubSportsVipTemplate();
   try {
     const supabase = db();
     let query = supabase
@@ -110,16 +136,15 @@ export async function listTemplates(options?: { status?: TemplateState | "all"; 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     const rows = data ?? [];
-    if (rows.some((row) => row.name === CLUB_SPORTS_VIP_TEMPLATE_NAME)) return rows;
-    if (options?.status && options.status !== "all" && options.status !== "active") return rows;
-    return [builtin, ...rows];
+    return [...builtinTemplateFallbacks(rows, options?.status), ...rows];
   } catch {
-    return [builtin];
+    return builtinTemplateFallbacks([], options?.status);
   }
 }
 
 export async function getTemplate(id: string) {
   if (isClubSportsVipBuiltinId(id)) return builtinClubSportsVipTemplate();
+  if (isSkyBlueVipBuiltinId(id)) return builtinSkyBlueVipTemplate();
   const supabase = db();
   const { data: template, error } = await supabase.from("card_studio_templates").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);

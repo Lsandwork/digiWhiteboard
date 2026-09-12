@@ -14,7 +14,8 @@ import { roleCanSeeCardStudioNav, CARD_STUDIO_NAV_ROUTE, buildStaffPanelNav } fr
 import { CR80_PX, cr80AspectRatio, DEFAULT_DPI, CR80_MM, CR80_INCHES } from "../lib/card-studio/constants";
 import { createElement, emptyTemplateDocument, parseTemplateDocument } from "../lib/card-studio/template-schema";
 import { createFitdogVipTemplateDocument } from "../lib/card-studio/vip-template";
-import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_EXACT_ARTWORK, CLUB_SPORTS_VIP_NATIVE_SLOTS, CLUB_SPORTS_VIP_TEMPLATE_NAME, containRect, createClubSportsVipTemplateDocument, documentUsesExactClubSportsArtwork, mapNativeBox } from "../lib/card-studio/club-sports-vip-template";
+import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_EXACT_ARTWORK, CLUB_SPORTS_VIP_NATIVE_SLOTS, CLUB_SPORTS_VIP_TEMPLATE_NAME, containRect, createClubSportsVipTemplateDocument, documentUsesExactClubSportsArtwork, mapNativeBox, MEMBER_DOG_NAME_SLOT_ID, MEMBER_ID_SLOT_ID, OWNER_BARCODE_SLOT_ID } from "../lib/card-studio/club-sports-vip-template";
+import { builtinSkyBlueVipTemplate, createSkyBlueVipTemplateDocument, SKY_BLUE_VIP_BUILTIN_ID, SKY_BLUE_VIP_TEMPLATE_NAME, SKY_BLUE_VIP_VERSION, SKY_BACK_BARCODE_ID, SKY_FRONT_BARCODE_ID, SKY_FRONT_QR_ID } from "../lib/card-studio/sky-blue-vip-template";
 import { resolveTemplateString, unresolvedDynamicFields } from "../lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "../lib/card-studio/dynamic-fields";
 import { validateCardForPrint, validateTemplateDocument } from "../lib/card-studio/validation";
@@ -41,7 +42,6 @@ import {
   extractGingrOwnerBarcode,
   resolveBarcodeFromSource
 } from "../lib/card-studio/gingr-identity";
-import { MEMBER_DOG_NAME_SLOT_ID, MEMBER_ID_SLOT_ID, OWNER_BARCODE_SLOT_ID } from "../lib/card-studio/club-sports-vip-template";
 import { MEMBER_PHOTO_SLOT_ID, countMemberPhotoSlots, pruneStackedMemberPhotos, replaceMemberPhoto } from "../lib/card-studio/photo-slot";
 import { fitFontSize } from "../lib/card-studio/render/text-fit";
 import { evaluateUpcA } from "../lib/card-studio/upc-a";
@@ -180,6 +180,38 @@ assert.equal(resolveTemplateString("{{member.dog_name}}", { ...emptyMemberContex
 const builtin = builtinClubSportsVipTemplate();
 assert.equal(builtin.id, CLUB_SPORTS_VIP_BUILTIN_ID);
 assert.equal(builtin.document.front.elements[0]?.id, clubSports.front.elements[0]?.id);
+
+const skyBlue = createSkyBlueVipTemplateDocument();
+assert.equal(SKY_BLUE_VIP_TEMPLATE_NAME, "Fitdog VIP — Sky Blue");
+assert.equal(SKY_BLUE_VIP_VERSION, 1);
+assert.equal(skyBlue.front.width, CR80_PX.width);
+assert.equal(skyBlue.front.height, CR80_PX.height);
+assert.equal(skyBlue.back.width, CR80_PX.width);
+assert.equal(skyBlue.dpi, DEFAULT_DPI);
+assert.ok(skyBlue.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.logoBadge256));
+assert.ok(skyBlue.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.wordmark));
+assert.ok(skyBlue.front.elements.some((el) => el.id === MEMBER_PHOTO_SLOT_ID));
+assert.equal(String(skyBlue.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.src), "{{member.photo}}");
+assert.ok(skyBlue.front.elements.some((el) => el.id === SKY_FRONT_QR_ID));
+assert.equal(String(skyBlue.front.elements.find((el) => el.id === SKY_FRONT_QR_ID)?.properties.contentType), "verification_url");
+const skyFrontBarcode = skyBlue.front.elements.find((el) => el.id === SKY_FRONT_BARCODE_ID);
+const skyBackBarcode = skyBlue.back.elements.find((el) => el.id === SKY_BACK_BARCODE_ID);
+assert.equal(String(skyFrontBarcode?.properties.value), "{{member.barcode}}");
+assert.equal(String(skyBackBarcode?.properties.value), "{{member.barcode}}");
+assert.equal(String(skyFrontBarcode?.properties.symbology), "code128");
+assert.equal(String(skyBackBarcode?.properties.source), "custom");
+assert.ok(!JSON.stringify(skyBlue).includes("FD-0001"));
+assert.ok(!JSON.stringify(skyBlue).includes("Bailey"));
+assert.ok(!skyBlue.front.elements.some((el) => String(el.properties.src ?? "").includes("FITDOG_VIP_FRONT_EXACT")));
+assert.ok(skyBlue.front.elements.some((el) => el.name === "07_DOG_NAME"));
+assert.ok(skyBlue.back.elements.some((el) => el.name === "05_DAYCARE_ICON"));
+assert.ok(skyBlue.back.elements.some((el) => String(el.properties.text ?? "").includes("CLUB + SPORTS MEMBER")));
+assert.equal(validateTemplateDocument(skyBlue).filter((i) => i.severity === "critical").length, 0);
+assert.equal(countMemberPhotoSlots(skyBlue), 1);
+const skyBuiltin = builtinSkyBlueVipTemplate();
+assert.equal(skyBuiltin.id, SKY_BLUE_VIP_BUILTIN_ID);
+assert.equal(skyBuiltin.category, "vip_member");
+assert.ok(skyBlue.front.elements.every((el) => el.locked !== true), "sky blue layers stay independently editable");
 
 for (const [rel, sha] of [
   ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_FRONT_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSha256],
@@ -477,6 +509,18 @@ assert.equal(photoA.frontSvg.includes("data:image/png;base64,BBB"), false);
 assert.equal(photoB.frontSvg.includes("data:image/png;base64,BBB"), true);
 assert.equal(photoB.frontSvg.includes("data:image/png;base64,AAA"), false);
 assert.equal(countMemberPhotoSlots(clubSports), 1);
+
+const skyArt = await renderPopulatedArtwork(skyBlue, ownerMember, "https://staff.ruffops.com");
+assert.ok(skyArt.frontSvg.includes(FITDOG_BRAND.logoBadge256));
+assert.ok(skyArt.frontSvg.includes(`<title>${ownerUpc}</title>`));
+assert.ok(skyArt.backSvg.includes(`<title>${ownerUpc}</title>`));
+assert.ok(skyArt.frontSvg.includes("Happy Dogs."));
+assert.ok(skyArt.backSvg.includes("DAYCARE"));
+assert.ok(!skyArt.frontSvg.includes("FD-0001"));
+assert.ok(skyArt.frontSvg.includes("Maple"));
+assert.equal(skyArt.width, CR80_PX.width);
+const skyPhoto = await renderPopulatedArtwork(skyBlue, { ...ownerMember, photoUrl: "data:image/png;base64,SKY" }, "https://staff.ruffops.com");
+assert.equal(skyPhoto.frontSvg.includes("data:image/png;base64,SKY"), true);
 
 let stacked = createClubSportsVipTemplateDocument();
 stacked.front.elements.push(createElement("member_photo", { id: "extra_photo", properties: { src: "data:image/png;base64,CCC" } }));
