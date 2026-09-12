@@ -123,6 +123,8 @@ assert.equal(String(clubFrontArt?.properties.src), CLUB_SPORTS_VIP_EXACT_ARTWORK
 assert.equal(String(clubBackArt?.properties.src), CLUB_SPORTS_VIP_EXACT_ARTWORK.backSrc);
 assert.equal(clubFrontArt?.locked, true);
 assert.equal(clubBackArt?.locked, true);
+const clubFrontBg = clubSports.front.elements.find((el) => el.id === "cs_front_bg");
+assert.equal(Number(clubFrontBg?.properties.borderWidth ?? 1), 0);
 assert.equal(String(clubFrontArt?.properties.fit), "contain");
 assert.equal(clubSports.front.elements.some((el) => el.type === "logo"), false, "exact artwork already includes the Fitdog logo");
 assert.equal(clubSports.front.elements.some((el) => el.id === "cs_front_panel"), false);
@@ -365,7 +367,10 @@ const sheet = buildOsPrintHtml({
 assert.ok(sheet.includes("3.375in"));
 assert.ok(sheet.includes("2.125in"));
 assert.ok(sheet.includes("Actual size / 100%"));
-assert.ok(sheet.includes("BACK — flip the sheet"));
+assert.ok(sheet.includes(">BACK<"));
+assert.ok(!sheet.includes("not duplex"));
+assert.ok(sheet.includes("cm-h cm-tl"));
+assert.ok(!sheet.includes("crop-tl"));
 assert.equal(zebraAdapter.installed, false);
 const zebraPrint = await zebraAdapter.print(
   { id: "z", name: "Zebra", manufacturer: "Zebra", model: "ZC300", connection: "usb", adapterId: "zebra", nativeIntegration: false },
@@ -474,6 +479,7 @@ assert.equal(JSON.stringify(createClubSportsVipTemplateDocument()), JSON.stringi
 
 const exactOnly = await renderPopulatedArtwork(clubSports, emptyMemberContext(), "https://staff.ruffops.com");
 assert.ok(exactOnly.frontSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSrc));
+assert.equal(exactOnly.frontSvg.includes('stroke="#4da3ff"'), false, "print proof must not draw the cyan bleed box");
 assert.ok(exactOnly.backSvg.includes(CLUB_SPORTS_VIP_EXACT_ARTWORK.backSrc));
 assert.ok(!exactOnly.backSvg.includes(`<title>${ownerUpc}</title>`));
 

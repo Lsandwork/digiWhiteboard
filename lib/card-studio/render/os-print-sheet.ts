@@ -14,7 +14,7 @@ export function buildOsPrintHtml(options: {
     pages.push(cardPage("FRONT", options.frontSvg, options));
   }
   if (options.mode !== "front" && options.backSvg) {
-    pages.push(cardPage("BACK — flip the sheet if this printer is not duplex", options.backSvg, options));
+    pages.push(cardPage("BACK", options.backSvg, options));
   }
   return `<!doctype html>
 <html>
@@ -24,6 +24,7 @@ export function buildOsPrintHtml(options: {
   <style>
     @page { size: letter portrait; margin: 0.5in; }
     html, body { margin: 0; background: #fff; color: #111; font-family: Arial, Helvetica, sans-serif; }
+    * { outline: none !important; }
     .sheet { page-break-after: always; }
     .sheet:last-child { page-break-after: auto; }
     h1 { font-size: 12px; margin: 0 0 8px; letter-spacing: 0.08em; }
@@ -32,25 +33,33 @@ export function buildOsPrintHtml(options: {
       width: ${CR80_INCHES.width}in;
       height: ${CR80_INCHES.height}in;
       position: relative;
-      margin: 24px auto 0;
+      margin: 0.45in auto 0;
+      border: 0;
+      background: transparent;
     }
-    .crop {
+    .cm {
       position: absolute;
-      width: 10px;
-      height: 10px;
-      border-color: #111;
-      border-style: solid;
+      background: #111;
+      pointer-events: none;
     }
-    .crop-tl { top: -10px; left: -10px; border-width: 1px 0 0 1px; }
-    .crop-tr { top: -10px; right: -10px; border-width: 1px 1px 0 0; }
-    .crop-bl { bottom: -10px; left: -10px; border-width: 0 0 1px 1px; }
-    .crop-br { bottom: -10px; right: -10px; border-width: 0 1px 1px 0; }
+    .cm-h { height: 0.6pt; width: 0.22in; }
+    .cm-v { width: 0.6pt; height: 0.22in; }
+    .cm-h.cm-tl { top: 0; left: -0.28in; }
+    .cm-v.cm-tl { left: 0; top: -0.28in; }
+    .cm-h.cm-tr { top: 0; right: -0.28in; }
+    .cm-v.cm-tr { right: 0; top: -0.28in; }
+    .cm-h.cm-bl { bottom: 0; left: -0.28in; }
+    .cm-v.cm-bl { left: 0; bottom: -0.28in; }
+    .cm-h.cm-br { bottom: 0; right: -0.28in; }
+    .cm-v.cm-br { right: 0; bottom: -0.28in; }
     .art {
       width: ${CR80_INCHES.width}in;
       height: ${CR80_INCHES.height}in;
       overflow: hidden;
+      border: 0;
+      box-shadow: none;
     }
-    .art svg { width: 100%; height: 100%; display: block; }
+    .art svg { width: 100%; height: 100%; display: block; border: 0; }
     .note { font-size: 11px; margin-top: 18px; text-align: center; color: #333; }
     @media print {
       .no-print { display: none !important; }
@@ -59,10 +68,14 @@ export function buildOsPrintHtml(options: {
   </style>
 </head>
 <body>
-  <p class="no-print" style="padding:12px;font-size:13px;">Choose your normal office printer in the dialog. Paper: Letter. Card size is true CR80 (${CR80_INCHES.width} in × ${CR80_INCHES.height}in / ${CR80_PX.width}×${CR80_PX.height}px at 300 DPI). Cut on the crop marks.</p>
+  <p class="no-print" style="padding:12px;font-size:13px;">Choose your normal office printer in the dialog. Paper: Letter. Card size is true CR80 (${CR80_INCHES.width} in × ${CR80_INCHES.height}in / ${CR80_PX.width}×${CR80_PX.height}px at 300 DPI). Cut on the crop marks at the card corners.</p>
   ${pages.join("")}
 </body>
 </html>`;
+}
+
+function cropMarks() {
+  return `<span class="cm cm-h cm-tl"></span><span class="cm cm-v cm-tl"></span><span class="cm cm-h cm-tr"></span><span class="cm cm-v cm-tr"></span><span class="cm cm-h cm-bl"></span><span class="cm cm-v cm-bl"></span><span class="cm cm-h cm-br"></span><span class="cm cm-v cm-br"></span>`;
 }
 
 function cardPage(label: string, svg: string, options: { jobId?: string; cardNumber?: string | null; memberName?: string | null }) {
@@ -70,10 +83,7 @@ function cardPage(label: string, svg: string, options: { jobId?: string; cardNum
     <h1>${escapeHtml(label)}</h1>
     <div class="meta">${escapeHtml([options.memberName, options.cardNumber, options.jobId].filter(Boolean).join(" · "))}</div>
     <div class="frame">
-      <span class="crop crop-tl"></span>
-      <span class="crop crop-tr"></span>
-      <span class="crop crop-bl"></span>
-      <span class="crop crop-br"></span>
+      ${cropMarks()}
       <div class="art">${svg}</div>
     </div>
     <p class="note">CR80 / ID-1 · ${CR80_INCHES.width} in × ${CR80_INCHES.height} in · do not scale in the printer dialog (set Actual size / 100%).</p>

@@ -168,8 +168,8 @@ export function defaultProperties(type: CardElementType): Record<string, unknown
     case "uv_indicator":
       return {
         fill: type === "background" ? "#0b1b2b" : "rgba(77,163,255,0.18)",
-        borderColor: "#4da3ff",
-        borderWidth: type === "line" ? 2 : 1,
+        borderColor: type === "background" ? "none" : "#4da3ff",
+        borderWidth: type === "background" ? 0 : type === "line" ? 2 : 1,
         borderRadius: type === "rounded_rectangle" ? 16 : 0,
         opacity: 1,
         shadow: false

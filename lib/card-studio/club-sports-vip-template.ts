@@ -147,7 +147,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
   const barcode = mapNativeBox(BACK_BARCODE_NATIVE, backPlace);
 
   doc.front.elements = [
-    locked("background", "cs_front_bg", 0, 0, CR80_PX.width, CR80_PX.height, { fill: C.white, opacity: 1 }),
+    locked("background", "cs_front_bg", 0, 0, CR80_PX.width, CR80_PX.height, { fill: C.white, opacity: 1, borderWidth: 0, borderColor: "none" }),
     locked(
       "image",
       "cs_front_exact_art",
@@ -225,7 +225,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
   ];
 
   doc.back.elements = [
-    locked("background", "cs_back_bg", 0, 0, CR80_PX.width, CR80_PX.height, { fill: C.orange, opacity: 1 }),
+    locked("background", "cs_back_bg", 0, 0, CR80_PX.width, CR80_PX.height, { fill: C.orange, opacity: 1, borderWidth: 0, borderColor: "none" }),
     locked(
       "image",
       "cs_back_exact_art",

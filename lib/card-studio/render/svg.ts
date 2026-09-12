@@ -52,7 +52,9 @@ function renderElement(
     case "rounded_rectangle":
     case "shape":
     case "guilloche":
-      return `<rect width="${el.width}" height="${el.height}" rx="${radius}" fill="${esc(fillOf(el))}" stroke="${esc(String(el.properties.borderColor ?? "none"))}" stroke-width="${Number(el.properties.borderWidth ?? 0)}" />`;
+      const strokeWidth = el.type === "background" ? 0 : Number(el.properties.borderWidth ?? 0);
+      const stroke = strokeWidth > 0 ? esc(String(el.properties.borderColor ?? "none")) : "none";
+      return `<rect width="${el.width}" height="${el.height}" rx="${radius}" fill="${esc(fillOf(el))}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
     case "circle":
       return `<ellipse cx="${el.width / 2}" cy="${el.height / 2}" rx="${el.width / 2}" ry="${el.height / 2}" fill="${esc(fillOf(el))}" />`;
     case "line":
