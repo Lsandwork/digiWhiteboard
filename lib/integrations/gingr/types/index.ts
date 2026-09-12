@@ -5,6 +5,8 @@ export type GingrOwner = {
   email?: string;
   phone?: string;
   cell_phone?: string;
+  /** Gingr Key Tag Barcode field on the owner record (GET /api/v1/owners sample). */
+  barcode?: string | null;
   [key: string]: unknown;
 };
 

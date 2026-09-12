@@ -149,8 +149,8 @@ export function defaultProperties(type: CardElementType): Record<string, unknown
       };
     case "barcode":
       return {
-        symbology: "code128",
-        source: "gingr_animal_id",
+        symbology: "upca",
+        source: "gingr_owner_barcode",
         value: "{{member.barcode}}",
         humanReadable: true,
         quietZone: 8,

@@ -32,8 +32,8 @@ function withBarcode(member: MemberCardContext): MemberCardContext {
     gingrAnimalId: animalId,
     gingrOwnerId: normalizeGingrNumericId(member.gingrOwnerId),
     memberNumber: animalId,
-    barcodeSource: member.barcodeSource || DEFAULT_PRODUCTION_BARCODE_SOURCE,
-    barcodeValue: gingrBarcodeValue(member)
+    barcodeSource: DEFAULT_PRODUCTION_BARCODE_SOURCE,
+    barcodeValue: gingrBarcodeValue({ ...member, gingrAnimalId: animalId })
   };
 }
 
@@ -196,10 +196,40 @@ export async function searchCardStudioMembers(query: string, limit = 20): Promis
     if (!hit.gingrAnimalId) continue;
     const linked = owners.get(hit.gingrAnimalId);
     if (linked?.gingrOwnerId) hit.gingrOwnerId = linked.gingrOwnerId;
+  }
+  await attachGingrOwnerBarcodes(hits);
+  for (const hit of hits) {
+    hit.barcodeSource = DEFAULT_PRODUCTION_BARCODE_SOURCE;
     hit.barcodeValue = gingrBarcodeValue(hit);
   }
 
   return hits.slice(0, pageSize);
+}
+
+async function attachGingrOwnerBarcodes(hits: MemberSearchHit[]) {
+  const ownerIds = [...new Set(hits.map((hit) => hit.gingrOwnerId).filter((id): id is string => Boolean(id)))];
+  if (!ownerIds.length || !process.env.GINGR_API_KEY?.trim()) return;
+  try {
+    const client = createGingrClient();
+    const barcodes = new Map<string, string>();
+    await Promise.all(
+      ownerIds.slice(0, 12).map(async (ownerId) => {
+        try {
+          const barcode = extractGingrOwnerBarcode(unwrapGingrData(await client.getOwner(ownerId)));
+          if (barcode) barcodes.set(ownerId, barcode);
+        } catch {
+          // Live Gingr lookup is best-effort during search; print still requires a valid owner barcode.
+        }
+      })
+    );
+    for (const hit of hits) {
+      if (hit.gingrOwnerId && barcodes.has(hit.gingrOwnerId)) {
+        hit.gingrOwnerBarcode = barcodes.get(hit.gingrOwnerId) ?? null;
+      }
+    }
+  } catch {
+    return;
+  }
 }
 
 export async function lookupGingrRecord(input: {
@@ -266,12 +296,12 @@ export async function lookupGingrRecord(input: {
           const first = String(row.first_name ?? row.o_first ?? "");
           const last = String(row.last_name ?? row.o_last ?? "");
           ownerName = `${first} ${last}`.trim() || ownerName;
-          gingrOwnerBarcode = extractGingrOwnerBarcode(row);
+          gingrOwnerBarcode = extractGingrOwnerBarcode(owner) ?? extractGingrOwnerBarcode(row);
         }
       }
       return {
         kind: "gingr_api" as const,
-        ok: Boolean(dogName || ownerName),
+        ok: Boolean(dogName || ownerName || gingrOwnerBarcode),
         dogName,
         ownerName,
         gingrAnimalId: animalId,

@@ -1,6 +1,7 @@
 import { CR80_PX, DEFAULT_DPI, mmToPx } from "@/lib/card-studio/constants";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
-import { gingrBarcodeValue, isPrintableGingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
+import { evaluateUpcA } from "@/lib/card-studio/upc-a";
 import type {
   CardElement,
   CardTemplateDocument,
@@ -74,18 +75,20 @@ export function validateCardForPrint(options: {
   }
   const barcodeEls = [...template.front.elements, ...template.back.elements].filter((el) => el.type === "barcode" && !el.hidden);
   if (barcodeEls.length) {
-    const source = String(barcodeEls[0]?.properties.source ?? member.barcodeSource ?? "gingr_animal_id");
-    const value = gingrBarcodeValue(member, source, String(barcodeEls[0]?.properties.customValue ?? member.customField ?? ""));
-    if (!value || !isPrintableGingrBarcodeValue(value)) {
+    const value = gingrBarcodeValue(member);
+    const upc = evaluateUpcA(value);
+    if (upc.status === "MISSING") {
       issues.push(
         issue(
           "critical",
           "GINGR_BARCODE",
-          "Gingr identification data is missing for this member. The card cannot be printed until the member's Gingr identification data is available.",
+          "MISSING: Gingr owner barcode (owner.barcode) is not available. Card Studio will not encode the animal ID, owner ID, email, or phone.",
           false
         )
       );
-      issues.push(issue("critical", "INVALID_GINGR_BARCODE", "INVALID GINGR BARCODE VALUE", false, barcodeEls[0]?.id));
+    } else if (upc.status === "INVALID") {
+      issues.push(issue("critical", "GINGR_BARCODE", upc.message, false, barcodeEls[0]?.id));
+      issues.push(issue("critical", "INVALID_GINGR_BARCODE", "INVALID: owner barcode cannot be rendered as UPC-A.", false, barcodeEls[0]?.id));
     }
   }
   if (!template) {

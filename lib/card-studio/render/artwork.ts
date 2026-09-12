@@ -1,9 +1,10 @@
 import { renderSideSvg } from "@/lib/card-studio/render/svg";
 import { qrPayload, renderQrSvg } from "@/lib/card-studio/codes/qr";
 import { renderBarcodeSvg } from "@/lib/card-studio/codes/barcode";
-import { gingrBarcodeValue, normalizeGingrAnimalId } from "@/lib/card-studio/gingr-barcode";
-import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
-import type { CardTemplateDocument, MemberCardContext, QrContentType } from "@/lib/card-studio/types";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-barcode";
+import { DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY } from "@/lib/card-studio/gingr-identity";
+import { evaluateUpcA } from "@/lib/card-studio/upc-a";
+import type { BarcodeSymbology, CardTemplateDocument, MemberCardContext, QrContentType } from "@/lib/card-studio/types";
 
 export async function renderPopulatedArtwork(
   template: CardTemplateDocument,
@@ -30,21 +31,27 @@ export async function renderPopulatedArtwork(
         );
       }
       if (el.type === "barcode") {
-        const source = String(el.properties.source ?? member.barcodeSource ?? "gingr_animal_id");
-        const raw = resolveTemplateString(String(el.properties.value ?? "{{member.barcode}}"), member);
-        const value =
-          gingrBarcodeValue(member, source, String(el.properties.customValue ?? member.customField ?? "")) ||
-          normalizeGingrAnimalId(raw);
+        const value = gingrBarcodeValue(member);
+        const symbology = (el.properties.symbology as BarcodeSymbology) || DEFAULT_PRODUCTION_BARCODE_SYMBOLOGY;
         if (!value) {
           if (el.properties.keepArtworkWhenEmpty) continue;
-          throw new Error("Cannot encode a Gingr barcode without a Gingr animal ID.");
+          throw new Error("Cannot encode a barcode without the Gingr owner barcode field (owner.barcode).");
+        }
+        if (symbology === "upca") {
+          const upc = evaluateUpcA(value);
+          if (upc.status !== "VALID" || !upc.value) {
+            throw new Error(upc.message);
+          }
         }
         barcodeSvg[el.id] = await renderBarcodeSvg({
-          symbology: (el.properties.symbology as "code128") || "code128",
+          symbology,
           value,
           width: el.width,
           height: el.height,
-          humanReadable: el.properties.humanReadable !== false
+          humanReadable: el.properties.humanReadable !== false,
+          quietZone: Number(el.properties.quietZone ?? 16),
+          foreground: String(el.properties.foreground ?? "#1F2D3D"),
+          background: String(el.properties.background ?? "#ffffff")
         });
       }
     }

@@ -1,6 +1,11 @@
 import { CR80_PX, FITDOG_PRINT_COLORS } from "@/lib/card-studio/constants";
+import { MEMBER_PHOTO_SLOT_ID } from "@/lib/card-studio/photo-slot";
 import { createElement, emptyTemplateDocument } from "@/lib/card-studio/template-schema";
 import type { CardElement, CardTemplateDocument } from "@/lib/card-studio/types";
+
+export const MEMBER_DOG_NAME_SLOT_ID = "memberDogNameSlot";
+export const MEMBER_ID_SLOT_ID = "memberIdSlot";
+export const OWNER_BARCODE_SLOT_ID = "ownerBarcodeSlot";
 
 export const CLUB_SPORTS_VIP_TEMPLATE_NAME = "Fitdog Club + Sports VIP";
 export const CLUB_SPORTS_VIP_BUILTIN_ID = "builtin-club-sports-vip";
@@ -70,7 +75,7 @@ export function builtinClubSportsVipTemplate() {
     id: CLUB_SPORTS_VIP_BUILTIN_ID,
     name: CLUB_SPORTS_VIP_TEMPLATE_NAME,
     description:
-      "Exact Fitdog VIP raster artwork (Club + Sports). Logo, layout, and sample photo are locked. Overlay only the dog photo, name, member number, and Gingr barcode when issuing a card.",
+      "Production Club + Sports VIP template. Locked artwork plus dynamic slots for member photo, dog name, member ID, and the Gingr owner UPC-A barcode.",
     category: "club_sports_vip" as const,
     status: "active" as const,
     builtin: true,
@@ -103,29 +108,6 @@ function locked(
     width,
     height,
     locked: true,
-    name: extra?.name,
-    properties,
-    ...extra
-  });
-}
-
-function editable(
-  type: CardElement["type"],
-  id: string,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  properties: Record<string, unknown>,
-  extra?: Partial<CardElement>
-): CardElement {
-  return createElement(type, {
-    id,
-    x,
-    y,
-    width,
-    height,
-    locked: false,
     name: extra?.name,
     properties,
     ...extra
@@ -183,15 +165,16 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       },
       { name: "Exact front artwork" }
     ),
-    editable(
+    locked(
       "member_photo",
-      "cs_vip_photo",
+      MEMBER_PHOTO_SLOT_ID,
       photo.x,
       photo.y,
       photo.width,
       photo.height,
       {
         src: "{{member.photo}}",
+        slotId: MEMBER_PHOTO_SLOT_ID,
         fit: "cover",
         frame: "rounded_id",
         cropX: 50,
@@ -201,11 +184,11 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
         opacity: 1,
         keepArtworkWhenEmpty: true
       },
-      { name: "Member photo" }
+      { name: "Member photo slot" }
     ),
-    editable(
+    locked(
       "dynamic_field",
-      "cs_vip_dog_name",
+      MEMBER_DOG_NAME_SLOT_ID,
       name.x,
       name.y,
       name.width,
@@ -222,9 +205,9 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       },
       { name: "Dog name" }
     ),
-    editable(
+    locked(
       "member_number",
-      "cs_vip_member_number",
+      MEMBER_ID_SLOT_ID,
       number.x,
       number.y,
       number.width,
@@ -237,7 +220,7 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
         background: C.white,
         keepArtworkWhenEmpty: true
       },
-      { name: "Member number" }
+      { name: "Member ID" }
     )
   ];
 
@@ -260,26 +243,40 @@ export function createClubSportsVipTemplateDocument(): CardTemplateDocument {
       },
       { name: "Exact back artwork" }
     ),
-    editable(
+    locked(
       "barcode",
-      "cs_vip_barcode",
+      OWNER_BARCODE_SLOT_ID,
       barcode.x,
       barcode.y,
       barcode.width,
       barcode.height,
       {
-        symbology: "code128",
-        source: "gingr_animal_id",
+        symbology: "upca",
+        source: "gingr_owner_barcode",
         value: "{{member.barcode}}",
         humanReadable: true,
-        quietZone: 12,
+        quietZone: 16,
         foreground: C.slate,
         background: C.white,
         keepArtworkWhenEmpty: true
       },
-      { name: "Barcode" }
+      { name: "Owner UPC-A barcode" }
     )
   ];
 
   return doc;
+}
+
+export function isClubSportsVipTemplate(template: { id?: string | null; name?: string | null; document?: CardTemplateDocument | null }) {
+  return (
+    isClubSportsVipBuiltinId(template.id) ||
+    String(template.name ?? "") === CLUB_SPORTS_VIP_TEMPLATE_NAME ||
+    String(template.name ?? "").includes("Club + Sports VIP") ||
+    documentUsesExactClubSportsArtwork(template.document)
+  );
+}
+
+/** Always the designed production document. Member data is bound at render time, never written into this template. */
+export function productionClubSportsVipDocument(_existing?: CardTemplateDocument | null): CardTemplateDocument {
+  return createClubSportsVipTemplateDocument();
 }

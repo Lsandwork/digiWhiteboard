@@ -9,7 +9,7 @@ export const DEFAULT_CARD_STUDIO_SETTINGS: CardStudioSettings = {
   defaultPrinterId: "os-office",
   defaultTemplateId: null,
   verificationBaseUrl: "https://staff.ruffops.com",
-  barcodeDefaultSymbology: "code128",
+  barcodeDefaultSymbology: "upca",
   printBridgeRequired: false
 };
 

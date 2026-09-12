@@ -10,12 +10,16 @@ import {
   CLUB_SPORTS_VIP_BUILTIN_ID,
   CLUB_SPORTS_VIP_TEMPLATE_NAME,
   createClubSportsVipTemplateDocument,
-  isClubSportsVipBuiltinId
+  isClubSportsVipBuiltinId,
+  isClubSportsVipTemplate
 } from "@/lib/card-studio/club-sports-vip-template";
-import type { CardElement, CardElementType, CardSide, CardTemplateDocument } from "@/lib/card-studio/types";
+import type { CardElement, CardElementType, CardSide, CardTemplateDocument, MemberCardContext } from "@/lib/card-studio/types";
 import { resolveTemplateString } from "@/lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "@/lib/card-studio/dynamic-fields";
 import { openOsPrintDialog } from "@/components/card-studio/open-os-print";
+import { pruneStackedMemberPhotos, replaceMemberPhoto } from "@/lib/card-studio/photo-slot";
+import { gingrBarcodeValue } from "@/lib/card-studio/gingr-identity";
+import { evaluateUpcA } from "@/lib/card-studio/upc-a";
 
 const TOOLS: { type: CardElementType; label: string }[] = [
   { type: "text", label: "Text" },
@@ -59,7 +63,7 @@ export function CardDesigner() {
   const history = useRef<CardTemplateDocument[]>([]);
   const future = useRef<CardTemplateDocument[]>([]);
   const skipAutosave = useRef(false);
-  const [previewMember, setPreviewMember] = useState(() => ({
+  const [previewMember, setPreviewMember] = useState<MemberCardContext>(() => ({
     ...emptyMemberContext(),
     name: "Alex Rivera",
     dogName: "",
@@ -71,6 +75,8 @@ export function CardDesigner() {
     photoUrl: "",
     cardUuid: "preview"
   }));
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberHits, setMemberHits] = useState<MemberCardContext[]>([]);
   const photoInput = useRef<HTMLInputElement>(null);
 
   const pushHistory = useCallback((next: CardTemplateDocument) => {
@@ -95,7 +101,12 @@ export function CardDesigner() {
           if (json.template) {
             setId(json.template.id);
             setName(json.template.name);
-            setDoc(parseTemplateDocument(json.template.document));
+            const loaded = parseTemplateDocument(json.template.document);
+            setDoc(
+              isClubSportsVipTemplate({ id: json.template.id, name: json.template.name, document: loaded })
+                ? createClubSportsVipTemplateDocument()
+                : pruneStackedMemberPhotos(loaded)
+            );
             setSaveState("saved");
           }
         })
@@ -113,7 +124,12 @@ export function CardDesigner() {
           if (detail.template) {
             setId(detail.template.id);
             setName(detail.template.name);
-            setDoc(parseTemplateDocument(detail.template.document));
+            const loaded = parseTemplateDocument(detail.template.document);
+            setDoc(
+              isClubSportsVipTemplate({ id: detail.template.id, name: detail.template.name, document: loaded })
+                ? createClubSportsVipTemplateDocument()
+                : pruneStackedMemberPhotos(loaded)
+            );
             setSaveState("saved");
             return;
           }
@@ -132,6 +148,19 @@ export function CardDesigner() {
   }, [templateId, isNew]);
 
   useEffect(() => {
+    if (memberQuery.trim().length < 2) {
+      setMemberHits([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      fetch(`/api/card-studio/members?q=${encodeURIComponent(memberQuery)}`, { credentials: "same-origin" })
+        .then((res) => res.json())
+        .then((json) => setMemberHits(json.members ?? []));
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, [memberQuery]);
+
+  useEffect(() => {
     if (saveState !== "unsaved" || skipAutosave.current) return;
     const timer = window.setTimeout(() => {
       void save(false);
@@ -143,14 +172,17 @@ export function CardDesigner() {
   async function save(bumpVersion: boolean) {
     setSaveState("saving");
     const persistNew = !id || isClubSportsVipBuiltinId(id);
+    const documentToSave = isClubSportsVipTemplate({ id, name, document: doc })
+      ? createClubSportsVipTemplateDocument()
+      : pruneStackedMemberPhotos(doc);
     const res = await fetch("/api/card-studio/templates", {
       method: persistNew ? "POST" : "PATCH",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(
         persistNew
-          ? { name, document: doc, category: "club_sports_vip", status: "active" }
-          : { id, name, document: doc, bumpVersion, status: "active" }
+          ? { name, document: documentToSave, category: "club_sports_vip", status: "active" }
+          : { id, name, document: documentToSave, bumpVersion, status: "active" }
       )
     });
     const json = await res.json();
@@ -177,6 +209,15 @@ export function CardDesigner() {
   }
 
   function addTool(type: CardElementType) {
+    if (type === "member_photo") {
+      const next = pruneStackedMemberPhotos(doc);
+      const existing = next[side].elements.find((el) => el.type === "member_photo");
+      if (existing) {
+        setDoc(next);
+        setSelected([existing.id]);
+        return;
+      }
+    }
     const el = createElement(type);
     if (type === "logo") el.properties.src = FITDOG_APPROVED_LOGO;
     const next = cloneDocument(doc);
@@ -246,8 +287,44 @@ export function CardDesigner() {
         <div className="cs-quick-edit">
           <div>
             <strong>Easy edit</strong>
-            <p>Exact VIP artwork is locked. Overlay a dog name and photo for this print; leave them empty to keep the supplied Bailey artwork.</p>
+            <p>Locked Club + Sports VIP template. Select a member to fill photo, name, member ID, and owner UPC-A. Replacing a photo updates the photo slot only.</p>
           </div>
+          <label className="cs-field">
+            Search member
+            <input
+              value={memberQuery}
+              onChange={(e) => setMemberQuery(e.target.value)}
+              placeholder="Dog, owner, phone, email"
+              aria-label="Search member"
+            />
+          </label>
+          {memberHits.length ? (
+            <div className="cs-actions">
+              {memberHits.slice(0, 8).map((hit, index) => (
+                <button
+                  key={String(hit.opsDogId || hit.fitdogDogId || index)}
+                  className="cs-btn"
+                  type="button"
+                  onClick={() => {
+                    setPreviewMember({
+                      ...emptyMemberContext(),
+                      ...hit,
+                      dogName: hit.dogName ?? "",
+                      gingrAnimalId: hit.gingrAnimalId ?? "",
+                      memberNumber: hit.memberNumber ?? hit.gingrAnimalId ?? "",
+                      photoUrl: hit.photoUrl ?? "",
+                      cardUuid: "preview"
+                    });
+                    setDoc(createClubSportsVipTemplateDocument());
+                    setMemberQuery("");
+                    setMemberHits([]);
+                  }}
+                >
+                  {hit.name} · {hit.dogName || "dog"}
+                </button>
+              ))}
+            </div>
+          ) : null}
           <label className="cs-field">
             Dog name
             <input
@@ -267,7 +344,9 @@ export function CardDesigner() {
                 if (!file) return;
                 const reader = new FileReader();
                 reader.onload = () => {
-                  setPreviewMember((m) => ({ ...m, photoUrl: String(reader.result ?? "") }));
+                  setPreviewMember((m) => replaceMemberPhoto(m, String(reader.result ?? "")));
+                  setDoc((current) => pruneStackedMemberPhotos(current));
+                  if (photoInput.current) photoInput.current.value = "";
                 };
                 reader.readAsDataURL(file);
               }}
@@ -276,7 +355,7 @@ export function CardDesigner() {
               Replace photo
             </button>
             {previewMember.photoUrl ? (
-              <button className="cs-btn" type="button" onClick={() => setPreviewMember((m) => ({ ...m, photoUrl: "" }))}>
+              <button className="cs-btn" type="button" onClick={() => setPreviewMember((m) => replaceMemberPhoto(m, null))}>
                 Clear photo
               </button>
             ) : null}
@@ -298,7 +377,9 @@ export function CardDesigner() {
                   credentials: "same-origin",
                   headers: { "content-type": "application/json" },
                   body: JSON.stringify({
-                    document: doc,
+                    document: isClubSportsVipTemplate({ id, name, document: doc })
+                      ? createClubSportsVipTemplateDocument()
+                      : pruneStackedMemberPhotos(doc),
                     member: previewMember,
                     mode: "duplex",
                     printerId: "os-office"
@@ -391,25 +472,26 @@ export function CardDesigner() {
               {selectedEl.type === "barcode" ? (
                 <>
                   <label className="cs-field">Barcode type
-                    <select value={String(selectedEl.properties.symbology ?? "code128")} onChange={(e) => updateSelected({ properties: { symbology: e.target.value } })}>
+                    <select value={String(selectedEl.properties.symbology ?? "upca")} onChange={(e) => updateSelected({ properties: { symbology: e.target.value } })}>
+                      <option value="upca">UPC-A</option>
                       <option value="code128">Code 128</option>
                       <option value="code39">Code 39</option>
                     </select>
                   </label>
                   <label className="cs-field">Source
-                    <select value={String(selectedEl.properties.source ?? "gingr_animal_id")} onChange={(e) => updateSelected({ properties: { source: e.target.value } })}>
-                      <option value="gingr_animal_id">Gingr pet / animal ID</option>
+                    <select value={String(selectedEl.properties.source ?? "gingr_owner_barcode")} onChange={(e) => updateSelected({ properties: { source: e.target.value } })}>
+                      <option value="gingr_owner_barcode">Gingr owner barcode (owner.barcode)</option>
                       <option value="gingr_owner_id">Gingr client / owner ID</option>
-                      <option value="gingr_owner_barcode">Gingr owner barcode field</option>
+                      <option value="gingr_animal_id">Gingr pet / animal ID (not used on production cards)</option>
                       <option value="card_number">RuffOps card number (FIT-)</option>
                       <option value="custom">Custom value</option>
                     </select>
                   </label>
-                  <p className="cs-id-note">Type: {String(selectedEl.properties.symbology ?? "code128")}</p>
-                  <p className="cs-id-note">Source: {String(selectedEl.properties.source ?? "gingr_animal_id")} — production VIP cards use Gingr animal ID.</p>
-                  <p className="cs-id-note">Value: {resolveTemplateString("{{member.barcode}}", previewMember) || "(no Gingr ID on preview member)"}</p>
-                  <p className="cs-id-note">Human-readable: {resolveTemplateString("{{member.barcode}}", previewMember) || "—"}</p>
-                  <p className="cs-id-note">Validation: {selectedEl.width < 180 || selectedEl.height < 48 ? "BARCODE TOO SMALL" : selectedEl.x < 12 ? "BARCODE TOO CLOSE TO EDGE" : resolveTemplateString("{{member.barcode}}", previewMember) ? "LOCAL dimensions OK — Gingr scanner check-in is not claimed until a physical scan succeeds." : "INVALID GINGR BARCODE VALUE"}</p>
+                  <p className="cs-id-note">Type: UPC-A (production)</p>
+                  <p className="cs-id-note">Source: Gingr owner.barcode — never animal ID</p>
+                  <p className="cs-id-note">Value: {gingrBarcodeValue(previewMember) || "(no Gingr owner barcode)"}</p>
+                  <p className="cs-id-note">Human-readable: {gingrBarcodeValue(previewMember) || "—"}</p>
+                  <p className="cs-id-note">Validation: {evaluateUpcA(gingrBarcodeValue(previewMember)).status} — {evaluateUpcA(gingrBarcodeValue(previewMember)).message}</p>
                 </>
               ) : null}
               {selectedEl.type === "member_photo" ? (
@@ -453,7 +535,7 @@ export function CardDesigner() {
   );
 }
 
-function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<typeof emptyMemberContext> }) {
+function ElementPreview({ el, member }: { el: CardElement; member: MemberCardContext }) {
   let text = resolveTemplateString(String(el.properties.text ?? el.type), member);
   if (el.properties.textTransform === "uppercase") text = text.toUpperCase();
   if (!text && el.properties.keepArtworkWhenEmpty && el.properties.text) return null;
@@ -468,7 +550,7 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
     if (!src && el.properties.keepArtworkWhenEmpty) return null;
     const radius = el.properties.frame === "circle" ? "50%" : `${Number(el.properties.borderRadius ?? 16)}px`;
     return (
-      <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: el.properties.exactArtwork ? 0 : radius, background: el.properties.exactArtwork ? "transparent" : "#1e293b" }}>
+      <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: el.properties.exactArtwork ? 0 : radius, background: el.type === "member_photo" && src ? "#ffffff" : el.properties.exactArtwork ? "transparent" : "#1e293b" }}>
         {src ? (
           <img
             src={src}
@@ -488,11 +570,12 @@ function ElementPreview({ el, member }: { el: CardElement; member: ReturnType<ty
     );
   }
   if (el.type === "qr_code" || el.type === "barcode") {
-    const gingrId = resolveTemplateString("{{member.barcode}}", member);
-    if (el.type === "barcode" && el.properties.keepArtworkWhenEmpty && !gingrId) return null;
+    const barcode = gingrBarcodeValue(member);
+    const upc = evaluateUpcA(barcode);
+    if (el.type === "barcode" && el.properties.keepArtworkWhenEmpty && upc.status !== "VALID") return null;
     return (
       <div style={{ width: "100%", height: "100%", background: "#fff", color: "#0b1b2b", display: "grid", placeItems: "center", fontSize: 10, textAlign: "center", padding: 4 }}>
-        {el.type === "qr_code" ? "QR" : gingrId ? `Code 128 · Gingr ${gingrId}` : "Gingr barcode (needs animal ID)"}
+        {el.type === "qr_code" ? "QR" : barcode ? `UPC-A · ${barcode}` : "Owner UPC-A (needs Gingr owner.barcode)"}
       </div>
     );
   }

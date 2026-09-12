@@ -85,7 +85,10 @@ function renderElement(
       }
       const clipId = `clip_${el.id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
       const ratio = el.properties.fit === "contain" ? "xMidYMid meet" : "xMidYMid slice";
-      return `<defs><clipPath id="${clipId}"><rect width="${el.width}" height="${el.height}" rx="${rx}"/></clipPath></defs><image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="${ratio}" clip-path="url(#${clipId})"/>`;
+      const cover = el.type === "member_photo"
+        ? `<rect width="${el.width}" height="${el.height}" rx="${rx}" fill="#ffffff"/>`
+        : "";
+      return `${cover}<defs><clipPath id="${clipId}"><rect width="${el.width}" height="${el.height}" rx="${rx}"/></clipPath></defs><image href="${esc(src)}" width="${el.width}" height="${el.height}" preserveAspectRatio="${ratio}" clip-path="url(#${clipId})"/>`;
     }
     default: {
       const raw = String(el.properties.text ?? "");

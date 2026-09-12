@@ -1,4 +1,5 @@
 import type { BarcodeSymbology } from "@/lib/card-studio/types";
+import { evaluateUpcA } from "@/lib/card-studio/upc-a";
 
 export const BARCODE_LABELS: Record<BarcodeSymbology, string> = {
   code128: "Code 128",
@@ -47,9 +48,14 @@ function escapeXml(value: string) {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+function pngSize(png: Buffer) {
+  if (png.length < 24 || png.toString("ascii", 1, 4) !== "PNG") return null;
+  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20) };
+}
+
 /**
- * Real Code 128 (or requested symbology) via bwip-js.
- * Never draws a decorative fake barcode — Gingr scanners would reject it.
+ * Standards-compliant barcode via bwip-js.
+ * UPC-A is letterboxed in the slot (uniform scale). Never a decorative fake barcode.
  */
 export async function renderBarcodeSvg(options: {
   symbology: BarcodeSymbology;
@@ -59,22 +65,31 @@ export async function renderBarcodeSvg(options: {
   humanReadable: boolean;
   foreground?: string;
   background?: string;
+  quietZone?: number;
 }) {
   const text = options.value.trim();
   if (!text) {
     throw new Error("Barcode value is empty. Gingr will not check in this card.");
   }
+  const symbology = options.symbology || "upca";
+  if (symbology === "upca") {
+    const upc = evaluateUpcA(text);
+    if (upc.status !== "VALID" || !upc.value) {
+      throw new Error(upc.message);
+    }
+  }
+  const quiet = Math.max(10, Number(options.quietZone ?? 12));
   const bwip = await import("bwip-js");
   const png = await bwip.toBuffer({
-    bcid: BWIP_MAP[options.symbology] || "code128",
-    text,
-    scale: 4,
-    height: Math.max(12, options.height / 6),
+    bcid: BWIP_MAP[symbology] || "upca",
+    text: symbology === "upca" ? evaluateUpcA(text).value! : text,
+    scale: 8,
+    height: Math.max(16, Math.round((options.height / 8) * 0.55)),
     includetext: options.humanReadable,
     textxalign: "center",
-    textsize: 10,
-    paddingwidth: 12,
-    paddingheight: 6,
+    textsize: 11,
+    paddingwidth: Math.max(12, Math.round(quiet / 2)),
+    paddingheight: 8,
     backgroundcolor: (options.background ?? "#ffffff").replace("#", ""),
     barcolor: (options.foreground ?? "#1F2D3D").replace("#", ""),
     parsefnc: false
@@ -83,5 +98,15 @@ export async function renderBarcodeSvg(options: {
   if (!b64 || png.length < 80) {
     throw new Error("Barcode encoder produced an empty image. The card was not marked printed.");
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}"><image href="data:image/png;base64,${b64}" width="${options.width}" height="${options.height}" preserveAspectRatio="xMidYMid meet" /><title>${escapeXml(text)}</title></svg>`;
+  const size = pngSize(png);
+  const title = escapeXml(symbology === "upca" ? evaluateUpcA(text).value! : text);
+  if (size && size.width > 0 && size.height > 0) {
+    const scale = Math.min(options.width / size.width, options.height / size.height);
+    const dw = size.width * scale;
+    const dh = size.height * scale;
+    const dx = (options.width - dw) / 2;
+    const dy = (options.height - dh) / 2;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}"><rect width="${options.width}" height="${options.height}" fill="${escapeXml(options.background ?? "#ffffff")}"/><image href="data:image/png;base64,${b64}" x="${dx}" y="${dy}" width="${dw}" height="${dh}" preserveAspectRatio="none" /><title>${title}</title></svg>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${options.width}" height="${options.height}" viewBox="0 0 ${options.width} ${options.height}"><image href="data:image/png;base64,${b64}" width="${options.width}" height="${options.height}" preserveAspectRatio="xMidYMid meet" /><title>${title}</title></svg>`;
 }

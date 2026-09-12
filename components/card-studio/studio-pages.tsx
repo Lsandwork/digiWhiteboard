@@ -219,7 +219,7 @@ export function IssueWizard() {
       <div className="cs-page-title">
         <div>
           <h1>Create / Print Card</h1>
-          <p>Meantime: print CR80 at actual size on a normal office printer. The barcode encodes the Gingr animal ID from RuffOps sync (Code 128) so a wedge scanner types it into Gingr Dashboard Search. That is not the official owner key-tag field unless Gingr’s owner Barcode field matches.</p>
+          <p>Meantime: print CR80 at actual size. The barcode is UPC-A of the Gingr owner Key Tag field (owner.barcode). It is not the animal ID.</p>
         </div>
       </div>
       <input className="cs-search" placeholder="Search dog, owner, phone, email, or Gingr ID" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -229,7 +229,7 @@ export function IssueWizard() {
           return (
             <button key={i} className="cs-btn" style={{ margin: 4 }} onClick={() => setMember(hit)}>
               {String(hit.name)} · {String(hit.dogName ?? "")}
-              {gingrId ? ` · Gingr ${gingrId}` : " · no Gingr ID"}
+              {gingrBarcodeValue(hit as unknown as MemberCardContext) ? ` · UPC ${gingrBarcodeValue(hit as unknown as MemberCardContext)}` : " · owner barcode missing"}
             </button>
           );
         })}
@@ -238,11 +238,11 @@ export function IssueWizard() {
         <div className="cs-quick-edit" style={{ marginTop: 12 }}>
           <div>
             <strong>Easy edit</strong>
-            <p>Selected {String(member.name)} — overlay dog name and photo on the exact VIP artwork. Leave them unchanged to keep the supplied Bailey art.</p>
+            <p>Selected {String(member.name)} — member data fills the locked Club + Sports VIP slots. The template itself is not overwritten.</p>
             {gingrBarcodeValue(member as unknown as MemberCardContext) ? (
-              <p>Visible member ID and barcode value: Gingr animal ID <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong>.</p>
+              <p>Printed barcode (Gingr owner.barcode UPC-A): <strong>{gingrBarcodeValue(member as unknown as MemberCardContext)}</strong></p>
             ) : (
-              <p className="cs-gingr-missing">Gingr identification data is missing for this member. The card cannot be printed until the member&apos;s Gingr identification data is available.</p>
+              <p className="cs-gingr-missing">MISSING or INVALID Gingr owner barcode. The card cannot be printed until owner.barcode is a valid 12-digit UPC-A.</p>
             )}
           </div>
           <label className="cs-field">

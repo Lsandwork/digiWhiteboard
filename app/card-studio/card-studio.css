@@ -344,10 +344,10 @@
   color: #c5d4e6;
 }
 
-.cs-gingr-missing {
-  color: #fecaca;
-  font-weight: 600;
-}
+.cs-upc--valid { color: #86efac; font-weight: 800; }
+.cs-upc--invalid { color: #fecaca; font-weight: 800; }
+.cs-upc--missing { color: #fde68a; font-weight: 800; }
+
 
 .cs-photo-preview {
   width: 72px;
