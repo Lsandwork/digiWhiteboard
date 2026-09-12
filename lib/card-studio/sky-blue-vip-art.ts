@@ -75,7 +75,7 @@ export function pawPatternMarkup() {
 </svg>`;
 }
 
-export function pawAccentMarkup(fill = SKY.ink) {
+export function pawAccentMarkup(fill: string = SKY.ink) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
   <g fill="${fill}">
     <ellipse cx="24" cy="30" rx="10" ry="8"/>
