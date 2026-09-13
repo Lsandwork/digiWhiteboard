@@ -15,7 +15,7 @@ import { CR80_PX, cr80AspectRatio, DEFAULT_DPI, CR80_MM, CR80_INCHES } from "../
 import { createElement, emptyTemplateDocument, parseTemplateDocument } from "../lib/card-studio/template-schema";
 import { createFitdogVipTemplateDocument } from "../lib/card-studio/vip-template";
 import { builtinClubSportsVipTemplate, CLUB_SPORTS_VIP_BUILTIN_ID, CLUB_SPORTS_VIP_EXACT_ARTWORK, CLUB_SPORTS_VIP_NATIVE_SLOTS, CLUB_SPORTS_VIP_TEMPLATE_NAME, containRect, createClubSportsVipTemplateDocument, documentUsesExactClubSportsArtwork, mapNativeBox, MEMBER_DOG_NAME_SLOT_ID, MEMBER_ID_SLOT_ID, OWNER_BARCODE_SLOT_ID } from "../lib/card-studio/club-sports-vip-template";
-import { builtinSkyBlueVipTemplate, createSkyBlueVipTemplateDocument, SKY_BLUE_VIP_BUILTIN_ID, SKY_BLUE_VIP_TEMPLATE_NAME, SKY_BLUE_VIP_VERSION, SKY_BACK_BARCODE_ID, SKY_FRONT_BARCODE_ID, SKY_FRONT_QR_ID } from "../lib/card-studio/sky-blue-vip-template";
+import { builtinSkyBlueVipTemplate, createSkyBlueVipTemplateDocument, documentUsesExactSkyBlueArtwork, SKY_BLUE_VIP_BUILTIN_ID, SKY_BLUE_VIP_EXACT_ARTWORK, SKY_BLUE_VIP_NATIVE_SLOTS, SKY_BLUE_VIP_TEMPLATE_NAME, SKY_BLUE_VIP_VERSION, SKY_BACK_BARCODE_ID, SKY_FRONT_BARCODE_ID, SKY_FRONT_QR_ID } from "../lib/card-studio/sky-blue-vip-template";
 import { resolveTemplateString, unresolvedDynamicFields } from "../lib/card-studio/dynamic-fields";
 import { emptyMemberContext } from "../lib/card-studio/dynamic-fields";
 import { validateCardForPrint, validateTemplateDocument } from "../lib/card-studio/validation";
@@ -183,15 +183,22 @@ assert.equal(builtin.document.front.elements[0]?.id, clubSports.front.elements[0
 
 const skyBlue = createSkyBlueVipTemplateDocument();
 assert.equal(SKY_BLUE_VIP_TEMPLATE_NAME, "Fitdog VIP — Sky Blue");
-assert.equal(SKY_BLUE_VIP_VERSION, 1);
+assert.equal(SKY_BLUE_VIP_VERSION, 2);
+assert.equal(documentUsesExactSkyBlueArtwork(skyBlue), true);
 assert.equal(skyBlue.front.width, CR80_PX.width);
 assert.equal(skyBlue.front.height, CR80_PX.height);
 assert.equal(skyBlue.back.width, CR80_PX.width);
 assert.equal(skyBlue.dpi, DEFAULT_DPI);
-assert.ok(skyBlue.front.elements.some((el) => el.type === "logo" && String(el.properties.src) === FITDOG_BRAND.logoBadge256));
-assert.ok(skyBlue.front.elements.some((el) => el.id === "sky_front_wordmark" && String(el.properties.text) === "FITDOG"));
+const skyFrontArt = skyBlue.front.elements.find((el) => el.id === "sky_front_exact_art");
+const skyBackArt = skyBlue.back.elements.find((el) => el.id === "sky_back_exact_art");
+assert.equal(String(skyFrontArt?.properties.src), SKY_BLUE_VIP_EXACT_ARTWORK.frontSrc);
+assert.equal(String(skyBackArt?.properties.src), SKY_BLUE_VIP_EXACT_ARTWORK.backSrc);
+assert.equal(skyFrontArt?.locked, true);
+assert.equal(skyBackArt?.locked, true);
+assert.equal(skyBlue.front.elements.some((el) => el.type === "logo"), false, "exact artwork already includes the Fitdog wordmark");
 assert.ok(skyBlue.front.elements.some((el) => el.id === MEMBER_PHOTO_SLOT_ID));
 assert.equal(String(skyBlue.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.src), "{{member.photo}}");
+assert.equal(skyBlue.front.elements.find((el) => el.id === MEMBER_PHOTO_SLOT_ID)?.properties.keepArtworkWhenEmpty, true);
 assert.ok(skyBlue.front.elements.some((el) => el.id === SKY_FRONT_QR_ID));
 assert.equal(String(skyBlue.front.elements.find((el) => el.id === SKY_FRONT_QR_ID)?.properties.contentType), "verification_url");
 const skyFrontBarcode = skyBlue.front.elements.find((el) => el.id === SKY_FRONT_BARCODE_ID);
@@ -200,23 +207,28 @@ assert.equal(String(skyFrontBarcode?.properties.value), "{{member.barcode}}");
 assert.equal(String(skyBackBarcode?.properties.value), "{{member.barcode}}");
 assert.equal(String(skyFrontBarcode?.properties.symbology), "code128");
 assert.equal(String(skyBackBarcode?.properties.source), "custom");
+assert.equal(skyFrontBarcode?.properties.keepArtworkWhenEmpty, true);
+assert.equal(skyBackBarcode?.properties.keepArtworkWhenEmpty, true);
 assert.ok(!JSON.stringify(skyBlue).includes("FD-0001"));
 assert.ok(!JSON.stringify(skyBlue).includes("Bailey"));
-assert.ok(!skyBlue.front.elements.some((el) => String(el.properties.src ?? "").includes("FITDOG_VIP_FRONT_EXACT")));
 assert.ok(skyBlue.front.elements.some((el) => el.name === "07_DOG_NAME"));
-assert.ok(skyBlue.back.elements.some((el) => el.name === "05_DAYCARE_ICON"));
-assert.ok(skyBlue.back.elements.some((el) => String(el.properties.text ?? "").includes("CLUB + SPORTS MEMBER")));
+assert.ok(SKY_BLUE_VIP_NATIVE_SLOTS.ownerValue.x >= 330, "value overlays must sit on Bailey, not MEMBER NAME");
+assert.ok(SKY_BLUE_VIP_NATIVE_SLOTS.memberValue.y >= 270, "member ID overlay must sit on FD-0001, not MEMBER NO.");
+assert.ok(SKY_BLUE_VIP_NATIVE_SLOTS.backBarcode.width >= 270, "back barcode must fill the white island");
 assert.equal(validateTemplateDocument(skyBlue).filter((i) => i.severity === "critical").length, 0);
 assert.equal(countMemberPhotoSlots(skyBlue), 1);
 const skyBuiltin = builtinSkyBlueVipTemplate();
 assert.equal(skyBuiltin.id, SKY_BLUE_VIP_BUILTIN_ID);
 assert.equal(skyBuiltin.category, "vip_member");
-assert.ok(skyBlue.front.elements.every((el) => el.locked !== true), "sky blue layers stay independently editable");
+assert.ok(skyBlue.front.elements.every((el) => el.locked === true), "exact sky blue artwork stays locked");
+assert.ok(skyBlue.back.elements.every((el) => el.locked === true), "exact sky blue back stays locked");
 
 for (const [rel, sha] of [
   ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_FRONT_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.frontSha256],
   ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_BACK_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.backSha256],
-  ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_MASTER_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.masterSha256]
+  ["public/assets/fitdog/card-studio/exact-vip/FITDOG_VIP_MASTER_EXACT.png", CLUB_SPORTS_VIP_EXACT_ARTWORK.masterSha256],
+  ["public/assets/fitdog/card-studio/sky-blue-vip/FITDOG_VIP_SKY_BLUE_FRONT.png", SKY_BLUE_VIP_EXACT_ARTWORK.frontSha256],
+  ["public/assets/fitdog/card-studio/sky-blue-vip/FITDOG_VIP_SKY_BLUE_BACK.png", SKY_BLUE_VIP_EXACT_ARTWORK.backSha256]
 ] as const) {
   const abs = path.join(process.cwd(), rel);
   assert.equal(existsSync(abs), true, rel);
@@ -511,12 +523,11 @@ assert.equal(photoB.frontSvg.includes("data:image/png;base64,AAA"), false);
 assert.equal(countMemberPhotoSlots(clubSports), 1);
 
 const skyArt = await renderPopulatedArtwork(skyBlue, ownerMember, "https://staff.ruffops.com");
-assert.ok(skyArt.frontSvg.includes(FITDOG_BRAND.logoBadge256));
+assert.ok(skyArt.frontSvg.includes(SKY_BLUE_VIP_EXACT_ARTWORK.frontSrc));
+assert.ok(skyArt.backSvg.includes(SKY_BLUE_VIP_EXACT_ARTWORK.backSrc));
 assert.ok(skyArt.frontSvg.includes(`<title>${ownerUpc}</title>`));
 assert.ok(skyArt.backSvg.includes(`<title>${ownerUpc}</title>`));
-assert.ok(skyArt.frontSvg.includes("Happy Dogs."));
 assert.ok(skyArt.frontSvg.includes("<path") || skyArt.frontSvg.includes("M0 "), "QR must be a real generated matrix, not an empty box");
-assert.ok(skyArt.backSvg.includes("DAYCARE"));
 assert.ok(!skyArt.frontSvg.includes("FD-0001"));
 assert.ok(skyArt.frontSvg.includes("Maple"));
 assert.equal(skyArt.width, CR80_PX.width);
