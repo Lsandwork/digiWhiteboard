@@ -46,8 +46,37 @@ type GingrApiResponse<T> = {
 type ReservationType = {
   id: string | number;
   name?: string;
+  type?: string;
+  reservation_type?: string;
   active?: boolean | string;
+  status?: boolean | string | number;
 };
+
+/**
+ * Fitdog "Training & Classes" / "Training Only" stay bookable as Business Only
+ * (Gingr status=0) and are omitted from Gingr's default back_of_house time window.
+ * Always request these IDs and merge a full-day Training feed into the board.
+ */
+export const FITDOG_TRAINING_TYPE_IDS = ["26", "20"] as const;
+
+export function isTrainingReservationType(
+  typeName?: string | null,
+  typeId?: string | number | null
+) {
+  if (typeId != null && FITDOG_TRAINING_TYPE_IDS.includes(String(typeId) as (typeof FITDOG_TRAINING_TYPE_IDS)[number])) {
+    return true;
+  }
+  const token = String(typeName ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
+  if (!token) return false;
+  return token.includes("training") || /\bclasses\b/.test(token);
+}
+
+function uniqueTypeIds(ids: Array<string | number | null | undefined>) {
+  return [...new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean))];
+}
 
 function getGingrConfig() {
   const subdomain = process.env.GINGR_SUBDOMAIN ?? "fitdog";
@@ -111,37 +140,48 @@ let cachedAllTypeIds: string[] | null = null;
 let cachedActiveTypeIdsAt = 0;
 let cachedAllTypeIdsAt = 0;
 
+function trainingTypeIdsFromCatalog(types: ReservationType[] | null | undefined) {
+  const discovered = (types ?? [])
+    .filter((type) =>
+      isTrainingReservationType(type.name ?? type.type ?? type.reservation_type ?? null, type.id)
+    )
+    .map((type) => String(type.id));
+  return uniqueTypeIds([...FITDOG_TRAINING_TYPE_IDS, ...discovered]);
+}
+
 async function getReservationTypeIds(
   subdomain: string,
   apiKey: string,
   configuredTypeIds?: string[],
   options?: { includeInactiveTypes?: boolean }
 ) {
-  if (configuredTypeIds?.length) return configuredTypeIds;
-
   const now = Date.now();
   const includeInactiveTypes = Boolean(options?.includeInactiveTypes);
   const cachedIds = includeInactiveTypes ? cachedAllTypeIds : cachedActiveTypeIds;
   const cachedAt = includeInactiveTypes ? cachedAllTypeIdsAt : cachedActiveTypeIdsAt;
 
+  if (configuredTypeIds?.length) {
+    // Never let a partial GINGR_TYPE_IDS allowlist drop Training & Classes.
+    return uniqueTypeIds([...configuredTypeIds, ...FITDOG_TRAINING_TYPE_IDS]);
+  }
+
   if (cachedIds && now - cachedAt < 10 * 60 * 1000) {
-    return cachedIds;
+    return uniqueTypeIds([...cachedIds, ...FITDOG_TRAINING_TYPE_IDS]);
   }
 
   if (!canCallGingrEndpoint("reservation_types") && cachedIds) {
-    return cachedIds;
+    return uniqueTypeIds([...cachedIds, ...FITDOG_TRAINING_TYPE_IDS]);
   }
 
   const url = gingrUrl(subdomain, "/api/v1/reservation_types", {
     key: apiKey,
+    // Boards always need Business Only / inactive bookable types (Training & Classes).
     active_only: includeInactiveTypes ? "false" : "true"
   });
   const types = await fetchGingrJson<ReservationType[]>(url, "reservation_types");
-  const ids = (types ?? [])
-    .map((type) => String(type.id))
-    .filter(Boolean);
+  const ids = (types ?? []).map((type) => String(type.id)).filter(Boolean);
+  const resolvedIds = uniqueTypeIds([...(ids.length ? ids : ["1"]), ...trainingTypeIdsFromCatalog(types)]);
 
-  const resolvedIds = ids.length ? ids : ["1"];
   if (includeInactiveTypes) {
     cachedAllTypeIds = resolvedIds;
     cachedAllTypeIdsAt = now;
@@ -151,6 +191,58 @@ async function getReservationTypeIds(
   }
 
   return resolvedIds;
+}
+
+function bohRecordKey(record: GingrBackOfHouseRecord) {
+  if (record.id != null && String(record.id).trim()) return `res:${record.id}`;
+  if (record.animal_id != null && String(record.animal_id).trim()) return `animal:${record.animal_id}`;
+  return null;
+}
+
+/** Prefer live-window rows, then fill any missing Training & Classes full-day rows. */
+export function mergeBackOfHouseRecords(
+  primary: GingrBackOfHouseRecord[],
+  secondary: GingrBackOfHouseRecord[]
+) {
+  const merged = new Map<string, GingrBackOfHouseRecord>();
+  for (const record of [...primary, ...secondary]) {
+    const key = bohRecordKey(record);
+    if (!key) continue;
+    if (!merged.has(key)) {
+      merged.set(key, record);
+      continue;
+    }
+    merged.set(key, { ...merged.get(key), ...record });
+  }
+  return [...merged.values()];
+}
+
+async function fetchTrainingFullDayBoard(params: {
+  subdomain: string;
+  apiKey: string;
+  locationId: string;
+  trainingTypeIds: string[];
+}) {
+  const typeIds = uniqueTypeIds(params.trainingTypeIds);
+  if (!typeIds.length) return { checking_in: [] as GingrBackOfHouseRecord[], checking_out: [] as GingrBackOfHouseRecord[] };
+
+  const url = gingrUrl(params.subdomain, "/api/v1/back_of_house", {
+    key: params.apiKey,
+    location_id: params.locationId,
+    type_ids: typeIds,
+    // Gingr's default window omits evening Training class checkouts; full_day keeps them.
+    full_day: "true"
+  });
+
+  const data = await fetchGingrJson<{
+    checking_in?: GingrBackOfHouseRecord[];
+    checking_out?: GingrBackOfHouseRecord[];
+  }>(url, "back_of_house");
+
+  return {
+    checking_in: data?.checking_in ?? [],
+    checking_out: data?.checking_out ?? []
+  };
 }
 
 function photoUrlFromRecord(record: GingrBackOfHouseRecord) {
@@ -182,25 +274,36 @@ export async function fetchGingrBackOfHouse(options?: FetchGingrBackOfHouseOptio
     };
   }
 
+  // Always discover inactive/business-only types so Training & Classes is present.
   const typeIds = await getReservationTypeIds(subdomain, apiKey, options?.allReservationTypes ? [] : configuredTypeIds, {
-    includeInactiveTypes: options?.allReservationTypes
+    includeInactiveTypes: true
   });
+  const trainingTypeIds = uniqueTypeIds([...FITDOG_TRAINING_TYPE_IDS]);
+
   const url = gingrUrl(subdomain, "/api/v1/back_of_house", {
     key: apiKey,
     location_id: locationId,
     type_ids: typeIds
   });
 
-  const data = await fetchGingrJson<{
-    checking_in?: GingrBackOfHouseRecord[];
-    checking_out?: GingrBackOfHouseRecord[];
-  }>(url, "back_of_house");
+  const [data, trainingFullDay] = await Promise.all([
+    fetchGingrJson<{
+      checking_in?: GingrBackOfHouseRecord[];
+      checking_out?: GingrBackOfHouseRecord[];
+    }>(url, "back_of_house"),
+    fetchTrainingFullDayBoard({
+      subdomain,
+      apiKey,
+      locationId,
+      trainingTypeIds
+    }).catch(() => ({ checking_in: [] as GingrBackOfHouseRecord[], checking_out: [] as GingrBackOfHouseRecord[] }))
+  ]);
 
-  const checkingIn = (data?.checking_in ?? []).map((record) => ({
+  const checkingIn = mergeBackOfHouseRecords(data?.checking_in ?? [], trainingFullDay.checking_in).map((record) => ({
     ...record,
     photo_url: photoUrlFromRecord(record)
   }));
-  const checkingOut = (data?.checking_out ?? []).map((record) => ({
+  const checkingOut = mergeBackOfHouseRecords(data?.checking_out ?? [], trainingFullDay.checking_out).map((record) => ({
     ...record,
     photo_url: photoUrlFromRecord(record)
   }));
@@ -253,8 +356,16 @@ function isSameActiveTransition(existing: LiveDog | null | undefined, direction:
 }
 
 function isActiveCheckinRecord(record: GingrBackOfHouseRecord) {
-  const status = record.status_string?.trim().toLowerCase();
-  return Boolean(record.check_in_stamp) || status === "checked in" || status === "checked_in";
+  const status = record.status_string?.trim().toLowerCase() ?? "";
+  if (Boolean(record.check_in_stamp) || status === "checked in" || status === "checked_in") {
+    return true;
+  }
+  // Training & Classes arrivals often sit as "Checking In Soon" without a stamp;
+  // still show them so the whiteboard matches today's training schedule.
+  if (isTrainingReservationType(record.type, record.type_id) && status.includes("checking in")) {
+    return true;
+  }
+  return false;
 }
 
 export function mapGingrBoardToLiveDogs(board: Awaited<ReturnType<typeof fetchGingrBackOfHouse>>) {
