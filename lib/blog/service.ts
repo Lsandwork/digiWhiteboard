@@ -10,6 +10,8 @@ import {
 import { orchestrateArticleGeneration } from "@/lib/blog/pipeline/orchestrate";
 import { publishArticle } from "@/lib/blog/publishing/adapters";
 import { BLOG_SEED_TOPICS } from "@/lib/blog/topics/seed-topics";
+import { addArticleHeadingIds } from "@/lib/blog/utils/article-preview-html";
+import { markdownToSimpleHtml } from "@/lib/blog/utils/markdown";
 import { slugifyBlogTitle } from "@/lib/blog/utils/slug";
 import { publicBlogHref } from "@/lib/blog/public-path";
 import { randomUUID } from "crypto";
@@ -478,13 +480,17 @@ export async function publishBlogArticle(articleId: string, actor?: string) {
   const idempotencyKey = `blog-publish-${articleId}-${article.version || 1}`;
   // Always publish to native Fitdog blog first; WordPress is a mirror.
   const destination = "native";
+  const markdown = String(article.body_markdown || "").trim();
+  const html = markdown
+    ? addArticleHeadingIds(markdownToSimpleHtml(markdown))
+    : String(article.body_html || "");
   const result = await publishArticle(
     destination,
     {
       title: String(article.title),
       slug: String(article.slug),
       excerpt: String(article.excerpt || ""),
-      html: String(article.body_html || ""),
+      html,
       seoTitle: article.seo_title,
       metaDescription: article.meta_description,
       publishedAt: new Date().toISOString(),
