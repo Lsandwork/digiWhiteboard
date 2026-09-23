@@ -13,6 +13,8 @@ import {
   measureTvViewport,
   resetTvBrowserZoom,
   shouldLockTvKioskViewport,
+  isGoogleTvStreamerBrowser,
+  isTvDisplayBrowser,
   TV_VIEWPORT_CONTENT,
   TV_VIEWPORT_CONTENT_KIOSK_LOCKED
 } from "@/lib/display-tv-layout";
@@ -56,12 +58,15 @@ export function useDisplayTvLayout(enabled: boolean) {
       resetTvBrowserZoom(window);
 
       const lockKiosk = shouldLockTvKioskViewport(window);
+      const googleTv = isGoogleTvStreamerBrowser(window) || isTvDisplayBrowser(window);
       if (lockKiosk) {
         root.classList.add("fitdog-tv-kiosk");
+        root.classList.remove("fitdog-tv-google-tv");
         viewportMeta?.setAttribute("content", TV_VIEWPORT_CONTENT_KIOSK_LOCKED);
       } else {
         root.classList.remove("fitdog-tv-kiosk");
         viewportMeta?.setAttribute("content", TV_VIEWPORT_CONTENT);
+        root.classList.toggle("fitdog-tv-google-tv", googleTv);
       }
 
       // Stage: full-bleed shell (casttv inset:0 pattern under kiosk CSS).
@@ -112,6 +117,7 @@ export function useDisplayTvLayout(enabled: boolean) {
       visualViewport?.removeEventListener("scroll", updateScale);
       root.classList.remove("fitdog-tv-active");
       root.classList.remove("fitdog-tv-kiosk");
+      root.classList.remove("fitdog-tv-google-tv");
       clearTvDisplayScale();
       document.querySelectorAll<HTMLElement>(".fitdog-tv-stage").forEach(clearTvStageBox);
       if (previousViewport) {

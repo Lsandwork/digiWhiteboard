@@ -3,9 +3,12 @@ import { readFileSync } from "node:fs";
 import {
   computeTvDisplayScale,
   isFullyKioskBrowser,
+  isGoogleTvStreamerBrowser,
   isLayoutTiledVisualViewport,
+  isTvDisplayBrowser,
   measureTvFitViewport,
   measureTvViewport,
+  shouldFillTvStageFullBleed,
   shouldLockTvKioskViewport,
   TV_DESIGN_HEIGHT,
   TV_DESIGN_WIDTH,
@@ -215,6 +218,78 @@ const hiBrowserUnzoomed = measureTvFitViewport({
 assert.equal(hiBrowserUnzoomed.width, 1920);
 assert.equal(hiBrowserUnzoomed.height, 1080);
 
+const streamerUa = {
+  userAgent:
+    "Mozilla/5.0 (Linux; Android 14; TV Streamer Build/UTT1.240305.001.A5; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/125.0.6422.165 Mobile Safari/537.36"
+};
+
+assert.equal(isGoogleTvStreamerBrowser({ innerWidth: 1, innerHeight: 1, navigator: streamerUa }), true);
+assert.equal(isTvDisplayBrowser({ innerWidth: 1, innerHeight: 1, navigator: streamerUa }), true);
+assert.equal(
+  isGoogleTvStreamerBrowser({
+    innerWidth: 1,
+    innerHeight: 1,
+    navigator: { userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/125.0.0.0 Mobile Safari/537.36" }
+  }),
+  false
+);
+
+assert.equal(
+  shouldLockTvKioskViewport({
+    innerWidth: 1920,
+    innerHeight: 1080,
+    navigator: streamerUa,
+    visualViewport: { width: 1280, height: 720, offsetLeft: 0, offsetTop: 0, scale: 1.5 }
+  }),
+  false,
+  "Google Streamer Internet app must keep remote zoom working"
+);
+assert.equal(
+  shouldFillTvStageFullBleed({
+    innerWidth: 1920,
+    innerHeight: 1080,
+    navigator: streamerUa,
+    visualViewport: { width: 1280, height: 720, offsetLeft: 0, offsetTop: 0, scale: 1.5 }
+  }),
+  true
+);
+
+const streamerZoomedFit = measureTvFitViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: streamerUa,
+  visualViewport: {
+    width: 1280,
+    height: 720,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 1.5
+  }
+});
+assert.equal(streamerZoomedFit.width, 1280);
+assert.equal(streamerZoomedFit.height, 720);
+assert.equal(streamerZoomedFit.offsetLeft, 0);
+assert.equal(computeTvDisplayScale(streamerZoomedFit.width, streamerZoomedFit.height), 1280 / 1920);
+
+const streamerNarrowLayout = measureTvFitViewport({
+  innerWidth: 960,
+  innerHeight: 540,
+  document: { documentElement: { clientWidth: 960, clientHeight: 540 } },
+  navigator: streamerUa,
+  screen: { width: 1920, height: 1080 },
+  visualViewport: {
+    width: 960,
+    height: 540,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 1
+  }
+});
+assert.equal(streamerNarrowLayout.width, 960);
+assert.equal(streamerNarrowLayout.height, 540);
+assert.equal(computeTvDisplayScale(streamerNarrowLayout.width, streamerNarrowLayout.height), 0.5);
+
 // Narrow / tall / 4K sanity for the pure scale math (casttv-equivalent letterbox).
 assert.equal(computeTvDisplayScale(1280, 720), 1280 / 1920);
 assert.equal(computeTvDisplayScale(1080, 1920), 1080 / 1920);
@@ -251,6 +326,8 @@ assert.match(hook, /TV_VIEWPORT_CONTENT_KIOSK_LOCKED/);
 assert.match(hook, /fitdog-tv-kiosk/);
 assert.match(hook, /tvDebug/);
 assert.match(hook, /logTvLayoutDiagnostics/);
+assert.match(hook, /fitdog-tv-google-tv/);
+assert.match(hook, /isGoogleTvStreamerBrowser/);
 
 const css = readFileSync("app/globals.css", "utf8");
 assert.match(css, /text-size-adjust:\s*100%/);

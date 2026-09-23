@@ -5,18 +5,21 @@ import { BoardClient } from "@/components/BoardClient";
 import { CastKeeperProvider } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { DisplayClosedHoursGate } from "@/components/display/DisplayClosedHoursGate";
+import { useTvDisplayBrowser } from "@/hooks/useTvDisplayBrowser";
 
 /**
  * Staff board — same rich layout everywhere (laptop, cast target, direct display URL).
  * Every staff whiteboard URL listens for admin Refresh / Hard Refresh Cast TVs.
  * Cast/TV additionally wraps the board in Cast Keeper for wake-lock and heartbeats.
+ * Google Streamer Internet app is treated as a TV even when the URL has no ?display=tv.
  */
 export function StaffBoardPageClient() {
   const searchParams = useSearchParams();
+  const tvBrowser = useTvDisplayBrowser();
   const chromecastReceiver = searchParams.get("chromecast") === "1";
   const tvDisplay = searchParams.get("display") === "tv";
   const castMode = searchParams.get("castMode") === "1";
-  const castDisplayMode = chromecastReceiver || tvDisplay || castMode;
+  const castDisplayMode = chromecastReceiver || tvDisplay || castMode || tvBrowser;
 
   useDisplaySync({ enabled: castDisplayMode ? false : true });
 

@@ -35,6 +35,7 @@ import { useCastModeRuntime } from "@/hooks/useCastModeRuntime";
 import { useDogPhotoPreloader } from "@/hooks/useDogPhotoPreloader";
 import { unlockStaffPushNoticeAudio } from "@/lib/staff/push-notice-alarm";
 import { useStaffTvCast } from "@/hooks/useStaffTvCast";
+import { useTvDisplayBrowser } from "@/hooks/useTvDisplayBrowser";
 import { useCastKeeperContext } from "@/hooks/useCastKeeper";
 import { useDisplaySync } from "@/hooks/useDisplaySync";
 import { fetchBoardJson } from "@/lib/board-fetch";
@@ -178,7 +179,8 @@ export function BoardClient({
   const castKeeper = useCastKeeperContext();
   const overlaysActive = overlaysEnabled ?? !castKeeperMode;
   const staffMode = !castKeeperMode && searchParams.get("staff") === "1";
-  const tvMode = castKeeperMode || searchParams.get("display") === "tv";
+  const tvBrowser = useTvDisplayBrowser();
+  const tvMode = castKeeperMode || searchParams.get("display") === "tv" || tvBrowser;
   const debugBoard = searchParams.get("debugBoard") === "1";
   const castMode = castKeeperMode || tvMode || searchParams.get("castMode") === "1" || searchParams.get("chromecast") === "1";
   const displayToken = searchParams.get("token")?.trim() ?? "";

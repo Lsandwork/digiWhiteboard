@@ -54,7 +54,7 @@ export function buildCastLiteQuery(options: Partial<CastLiteOptions> = {}) {
 
 export function buildStaffCastUrl(origin?: string) {
   const base = (origin ?? (typeof window !== "undefined" ? window.location.origin : "")).replace(/\/$/, "");
-  return `${base}/`;
+  return `${base}/?display=tv&castMode=1`;
 }
 
 export function buildLobbyCastUrl(origin?: string) {

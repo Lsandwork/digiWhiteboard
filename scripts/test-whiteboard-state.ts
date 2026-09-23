@@ -27,7 +27,7 @@ assert.deepEqual(parseCastLiteOptions(fullParams), {
 });
 
 const staffUrl = buildStaffCastUrl("https://example.com");
-assert.equal(staffUrl, "https://example.com/");
+assert.equal(staffUrl, "https://example.com/?display=tv&castMode=1");
 
 const lobbyUrl = buildLobbyCastUrl("https://example.com");
 assert.equal(lobbyUrl, "https://example.com/lobby/checkouts");

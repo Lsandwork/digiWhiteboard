@@ -72,6 +72,19 @@ export function isHiBrowserTv(win: ViewportReader) {
   return /HiBrowser|Hisense|VIDAA/i.test(ua);
 }
 
+/** Google TV Streamer (and the built-in Internet app) / Android TV / Chromecast. */
+export function isGoogleTvStreamerBrowser(win: ViewportReader) {
+  const ua = win.navigator?.userAgent ?? "";
+  return /TV Streamer|Google TV Streamer|GoogleTV|Google TV|Android TV|AndroidTV|; TV;|CrKey/i.test(ua);
+}
+
+/** Any TV / signage browser that should use the 1920×1080 fit canvas. */
+export function isTvDisplayBrowser(win: ViewportReader) {
+  if (isFullyKioskBrowser(win) || isHiBrowserTv(win) || isGoogleTvStreamerBrowser(win)) return true;
+  const ua = win.navigator?.userAgent ?? "";
+  return /SMART-TV|SmartTV|SMART TV|Tizen|Web0S|WebOS|BRAVIA|AFT[A-Z0-9]|Chromecast|HbbTV|NetCast|VIZIO/i.test(ua);
+}
+
 /**
  * Page/webview zoom crop: visualViewport is a small corner of the layout.
  * Stamping the 1920 canvas into that corner (or leaving scale=1 under zoom)
@@ -93,17 +106,30 @@ export function isCornerCroppedVisualViewport(
 }
 
 /**
- * True when the TV browser is zoomed or Fully Kiosk is present — lock scale
- * and force the stage to fill the physical screen (casttv-style inset:0).
+ * Fully Kiosk / Hi-Browser: pin page zoom so the first paint is not a cropped
+ * zoomed frame. Google Streamer Internet app must keep zoom working — locking
+ * `user-scalable=no` is why TV remote zoom in/out does nothing there.
  */
 export function shouldLockTvKioskViewport(win: ViewportReader) {
+  if (isGoogleTvStreamerBrowser(win)) return false;
   if (isFullyKioskBrowser(win)) return true;
+  if (!isHiBrowserTv(win)) return false;
   const vv = win.visualViewport;
   if (!vv) return false;
   const innerW = Math.max(win.innerWidth || 0, 1);
   const innerH = Math.max(win.innerHeight || 0, 1);
   if (isCornerCroppedVisualViewport(innerW, innerH, vv)) return true;
   return (vv.scale ?? 1) > 1.02;
+}
+
+/**
+ * Full-bleed stage (inset:0) without necessarily disabling user zoom.
+ * Google Streamer still needs this so a zoomed visualViewport is not stamped
+ * into a corner of the 1920 canvas.
+ */
+export function shouldFillTvStageFullBleed(win: ViewportReader) {
+  if (isFullyKioskBrowser(win) || isTvDisplayBrowser(win)) return true;
+  return shouldLockTvKioskViewport(win);
 }
 
 /** @deprecated kept for tests — prefer isCornerCroppedVisualViewport */
@@ -141,6 +167,14 @@ function readPageZoomScale(win: ViewportReader) {
 
 /** Best-effort zoom reset for Fully Kiosk / WebView / Hi-Browser page zoom. */
 export function resetTvBrowserZoom(win: ViewportReader) {
+  if (isGoogleTvStreamerBrowser(win)) {
+    try {
+      win.scrollTo?.(0, 0);
+    } catch {
+      // Some TV browsers reject scroll while fullscreen.
+    }
+    return;
+  }
   try {
     win.fully?.setScale?.(1);
   } catch {
@@ -181,7 +215,6 @@ function readLayoutScreenBox(win: ViewportReader): TvViewportBox {
   const clientH = Math.max(win.document?.documentElement?.clientHeight || 0, innerH);
   const pageZoom = readPageZoomScale(win);
   const fullyKiosk = isFullyKioskBrowser(win);
-  const lockKiosk = shouldLockTvKioskViewport(win);
 
   let width = Math.min(innerW, clientW);
   let height = Math.min(innerH, clientH);
@@ -190,12 +223,13 @@ function readLayoutScreenBox(win: ViewportReader): TvViewportBox {
   const screenW = Math.max(fullyW, win.screen?.availWidth || 0, win.screen?.width || 0);
   const screenH = Math.max(fullyH, win.screen?.availHeight || 0, win.screen?.height || 0);
 
-  // Prefer physical screen when the WebView under-reports (common on kiosk TVs).
-  // Only bump when page zoom is ~1 — if Fully is zoomed, screen px ≠ CSS layout px.
-  if ((fullyKiosk || lockKiosk) && pageZoom <= 1.02 && width < 1280 && screenW >= 1280) {
+  // Prefer physical screen when Fully under-reports a phone-sized WebView.
+  // Do not bump Google Streamer / Android TV Internet — those browsers often
+  // report ~960–1280 CSS px and then zoom; filling 1920 at scale 1 crops.
+  if (fullyKiosk && pageZoom <= 1.02 && width < 1280 && screenW >= 1280) {
     width = screenW;
   }
-  if ((fullyKiosk || lockKiosk) && pageZoom <= 1.02 && height < 720 && screenH >= 720) {
+  if (fullyKiosk && pageZoom <= 1.02 && height < 720 && screenH >= 720) {
     height = screenH;
   }
 
@@ -216,7 +250,7 @@ function readLayoutScreenBox(win: ViewportReader): TvViewportBox {
 export function measureTvViewport(win: ViewportReader): TvViewportBox {
   const vv = win.visualViewport;
 
-  if (shouldLockTvKioskViewport(win)) {
+  if (shouldFillTvStageFullBleed(win)) {
     return readLayoutScreenBox(win);
   }
 
@@ -253,12 +287,18 @@ export function measureTvFitViewport(win: ViewportReader): TvViewportBox {
   const innerW = Math.max(win.innerWidth || 0, 1);
   const innerH = Math.max(win.innerHeight || 0, 1);
 
-  if (pageZoom > 1.02 && vv && vv.width > 0 && vv.height > 0) {
-    const zoomCompensatedW = stageBox.width / pageZoom;
-    const zoomCompensatedH = stageBox.height / pageZoom;
+  const visiblySmaller =
+    Boolean(vv && vv.width > 0 && vv.height > 0) &&
+    (pageZoom > 1.02 || vv!.width < innerW * 0.98 || vv!.height < innerH * 0.98);
+
+  if (visiblySmaller && vv) {
+    const width =
+      pageZoom > 1.02 ? Math.min(vv.width, innerW / pageZoom) : Math.min(vv.width, stageBox.width);
+    const height =
+      pageZoom > 1.02 ? Math.min(vv.height, innerH / pageZoom) : Math.min(vv.height, stageBox.height);
     return {
-      width: Math.max(1, Math.min(vv.width, zoomCompensatedW)),
-      height: Math.max(1, Math.min(vv.height, zoomCompensatedH)),
+      width: Math.max(1, width),
+      height: Math.max(1, height),
       offsetLeft: 0,
       offsetTop: 0
     };
