@@ -8,6 +8,9 @@ import {
   isTvDisplayBrowser,
   measureTvFitViewport,
   measureTvViewport,
+  measureVisibleCssBox,
+  parseCssZoom,
+  readEffectivePageZoom,
   shouldFillTvStageFullBleed,
   shouldLockTvKioskViewport,
   TV_DESIGN_HEIGHT,
@@ -272,6 +275,110 @@ assert.equal(streamerZoomedFit.height, 720);
 assert.equal(streamerZoomedFit.offsetLeft, 0);
 assert.equal(computeTvDisplayScale(streamerZoomedFit.width, streamerZoomedFit.height), 1280 / 1920);
 
+const streamerZoomedStage = measureTvViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: streamerUa,
+  visualViewport: {
+    width: 1280,
+    height: 720,
+    offsetLeft: 40,
+    offsetTop: 20,
+    scale: 1.5
+  }
+});
+assert.equal(streamerZoomedStage.width, 1280);
+assert.equal(streamerZoomedStage.height, 720);
+assert.equal(streamerZoomedStage.offsetLeft, 40);
+assert.equal(streamerZoomedStage.offsetTop, 20);
+
+// Streamer reports scale but leaves visualViewport at layout size.
+const streamerScaleOnly = measureTvFitViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: streamerUa,
+  visualViewport: {
+    width: 1920,
+    height: 1080,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 2
+  }
+});
+assert.equal(streamerScaleOnly.width, 960);
+assert.equal(streamerScaleOnly.height, 540);
+assert.equal(computeTvDisplayScale(streamerScaleOnly.width, streamerScaleOnly.height), 0.5);
+
+assert.equal(parseCssZoom("150%"), 1.5);
+assert.equal(parseCssZoom("1.5"), 1.5);
+assert.equal(readEffectivePageZoom({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080, style: { zoom: "150%" } } }
+}), 1.5);
+
+const cssZoomedFit = measureVisibleCssBox({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080, style: { zoom: "150%" } } },
+  navigator: streamerUa,
+  visualViewport: {
+    width: 1920,
+    height: 1080,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 1
+  }
+});
+assert.equal(cssZoomedFit.width, 1280);
+assert.equal(cssZoomedFit.height, 720);
+assert.equal(computeTvDisplayScale(cssZoomedFit.width, cssZoomedFit.height), 1280 / 1920);
+
+const zoomedOutFit = measureTvFitViewport({
+  innerWidth: 1920,
+  innerHeight: 1080,
+  document: { documentElement: { clientWidth: 1920, clientHeight: 1080 } },
+  navigator: streamerUa,
+  visualViewport: {
+    width: 2560,
+    height: 1440,
+    offsetLeft: 0,
+    offsetTop: 0,
+    scale: 0.75
+  }
+});
+assert.equal(zoomedOutFit.width, 2560);
+assert.equal(zoomedOutFit.height, 1440);
+assert.equal(computeTvDisplayScale(zoomedOutFit.width, zoomedOutFit.height), 2560 / 1920);
+
+const genericAndroidTvWebView = {
+  userAgent:
+    "Mozilla/5.0 (Linux; Android 14; Build/UTT1.240305.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/125.0.6422.165 Mobile Safari/537.36"
+};
+assert.equal(
+  isGoogleTvStreamerBrowser({
+    innerWidth: 1920,
+    innerHeight: 1080,
+    screen: { width: 1920, height: 1080 },
+    navigator: genericAndroidTvWebView
+  }),
+  true
+);
+assert.equal(
+  isGoogleTvStreamerBrowser({
+    innerWidth: 412,
+    innerHeight: 915,
+    screen: { width: 412, height: 915 },
+    navigator: {
+      userAgent:
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/125.0.6422.165 Mobile Safari/537.36"
+    }
+  }),
+  false
+);
+
 const streamerNarrowLayout = measureTvFitViewport({
   innerWidth: 960,
   innerHeight: 540,
@@ -327,13 +434,15 @@ assert.match(hook, /fitdog-tv-kiosk/);
 assert.match(hook, /tvDebug/);
 assert.match(hook, /logTvLayoutDiagnostics/);
 assert.match(hook, /fitdog-tv-google-tv/);
-assert.match(hook, /isGoogleTvStreamerBrowser/);
+assert.match(hook, /computeTvDisplayScale\(fitBox\.width, fitBox\.height\)/);
 
 const css = readFileSync("app/globals.css", "utf8");
 assert.match(css, /text-size-adjust:\s*100%/);
-assert.match(css, /--fitdog-tv-scale:\s*min\(100vw \/ 1920/);
+assert.match(css, /--fitdog-tv-scale:\s*min\(100dvw \/ 1920/);
 assert.match(css, /html\.fitdog-tv-kiosk/);
 assert.match(css, /zoom:\s*1/);
+assert.match(css, /html\.fitdog-tv-google-tv \.fitdog-tv-canvas/);
+assert.match(css, /transform-origin:\s*top left/);
 
 const lobbyLayout = readFileSync("app/lobby/layout.tsx", "utf8");
 assert.match(lobbyLayout, /export const viewport/);

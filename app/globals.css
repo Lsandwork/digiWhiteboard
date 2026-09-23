@@ -1624,7 +1624,7 @@ html.staff-tv-display .fitdog-tv-stage--staff {
 html.fitdog-tv-active {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  --fitdog-tv-scale: min(100vw / 1920, 100vh / 1080);
+  --fitdog-tv-scale: min(100dvw / 1920, 100dvh / 1080);
 }
 
 html.fitdog-tv-kiosk,
@@ -1663,6 +1663,12 @@ html.fitdog-tv-google-tv,
 html.fitdog-tv-google-tv body {
   touch-action: manipulation;
   -ms-touch-action: manipulation;
+}
+
+/* Streamer / zoomable TVs: origin top-left so a scaled 1920 canvas fills the
+   visible stage instead of sitting centered in a cropped 1920 layout box. */
+html.fitdog-tv-google-tv .fitdog-tv-canvas {
+  transform-origin: top left;
 }
 
 .fitdog-tv-stage {

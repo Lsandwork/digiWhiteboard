@@ -69,22 +69,19 @@ export function useDisplayTvLayout(enabled: boolean) {
         root.classList.toggle("fitdog-tv-google-tv", googleTv);
       }
 
-      // Stage: full-bleed shell (casttv inset:0 pattern under kiosk CSS).
+      // Stage: visible CSS box on zoomable TVs; full-bleed layout on kiosk lock.
       const stageBox = measureTvViewport(window);
       const stage = document.querySelector<HTMLElement>(".fitdog-tv-stage");
       if (stage) applyTvStageToVisibleViewport(stage, stageBox);
 
-      // Fit: largest 16:9 canvas that fits the *visible* area (handles Fully zoom).
+      // Fit: always the pixels currently on screen, independent of page zoom.
       const fitBox = measureTvFitViewport(window);
-      const stageW = stage?.clientWidth || stageBox.width;
-      const stageH = stage?.clientHeight || stageBox.height;
-      // Prefer the smaller of painted stage vs fit box so we never overflow.
-      const scaleW = Math.min(stageW, fitBox.width);
-      const scaleH = Math.min(stageH, fitBox.height);
-      const scale = computeTvDisplayScale(scaleW, scaleH);
+      const scale = computeTvDisplayScale(fitBox.width, fitBox.height);
       applyTvDisplayScale(scale);
 
       if (debug) {
+        const stageW = stage?.clientWidth || stageBox.width;
+        const stageH = stage?.clientHeight || stageBox.height;
         logTvLayoutDiagnostics(
           collectTvLayoutDiagnostics(window, stageW, stageH, fitBox, scale)
         );
