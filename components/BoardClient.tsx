@@ -260,7 +260,10 @@ export function BoardClient({
     activePushNotice ? `push:${activePushNotice.id}` :
     null;
   const isEmergencyStaffPush = Boolean(
-    activePushNotice && (activePushNotice.priority === "urgent" || activePushNotice.display_mode === "urgent")
+    activePushNotice &&
+      (activePushNotice.priority === "urgent" ||
+        activePushNotice.display_mode === "urgent" ||
+        Boolean(activePushNotice.image_url?.trim()))
   );
   const [minimizedCastIds, setMinimizedCastIds] = useState<string[]>(() => readMinimizedCastIds());
 

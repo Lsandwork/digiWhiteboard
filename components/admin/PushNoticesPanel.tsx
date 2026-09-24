@@ -849,7 +849,7 @@ function NoticeForm({
               </button>
             ) : null}
           </div>
-          <p className="mt-2 text-xs text-admin-muted">JPG, PNG, WEBP, or GIF up to 5 MB.</p>
+          <p className="mt-2 text-xs text-admin-muted">JPG, PNG, WEBP, or GIF up to 3.5 MB.</p>
         </div>
       </Field>
       <div className="grid gap-4 md:grid-cols-4">
