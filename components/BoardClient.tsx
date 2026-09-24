@@ -874,7 +874,7 @@ export function BoardClient({
 
   return (
     <main
-      className={`board-shell kennel-lines flex min-h-screen flex-col overflow-hidden ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""}`}
+      className={`board-shell kennel-lines flex flex-col overflow-hidden ${tvMode ? "h-full min-h-0" : "min-h-screen"} ${castKeeperMode ? "cast-keeper-board" : ""} ${castMode ? "fitdog-cast-board" : ""}`}
       data-staff-wb-theme={resolvedTheme.id}
       style={themeStyle}
     >

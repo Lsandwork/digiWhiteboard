@@ -317,36 +317,14 @@ export function resetTvBrowserZoom(win: ViewportReader) {
 }
 
 /**
- * Full-bleed stage for kiosk-locked browsers: the CSS layout viewport only.
- * Offsets stay 0 so we never stamp into a zoomed visualViewport corner.
- * Do not substitute screen/Fully physical pixels — those must not drive layout.
- */
-function readKioskFullBleedStage(win: ViewportReader): TvViewportBox {
-  const innerW = Math.max(win.innerWidth || 0, 1);
-  const innerH = Math.max(win.innerHeight || 0, 1);
-  const clientW = Math.max(win.document?.documentElement?.clientWidth || 0, innerW);
-  const clientH = Math.max(win.document?.documentElement?.clientHeight || 0, innerH);
-
-  return {
-    width: Math.max(1, Math.min(innerW, clientW)),
-    height: Math.max(1, Math.min(innerH, clientH)),
-    offsetLeft: 0,
-    offsetTop: 0
-  };
-}
-
-/**
  * Stage geometry for the outer `.fitdog-tv-stage` shell.
  *
- * Kiosk-locked Fully / Hi-Browser: full-bleed CSS layout box (zoom is reset;
- * CSS also forces inset:0). Google Streamer and other zoomable TVs: pin the
- * stage to the *visible* CSS box so a zoomed screen still shows the whole
- * 1920×1080 board instead of a cropped corner.
+ * Always the CSS pixels currently on screen (visualViewport when present),
+ * including offsets under residual page zoom — same surface casttv paints into.
+ * Kiosk zoom reset still runs first; if zoom remains, we follow the visible box
+ * instead of stamping a 1920 layout corner.
  */
 export function measureTvViewport(win: ViewportReader): TvViewportBox {
-  if (shouldLockTvKioskViewport(win)) {
-    return readKioskFullBleedStage(win);
-  }
   return measureVisibleCssBox(win);
 }
 

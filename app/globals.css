@@ -1610,8 +1610,10 @@ html.staff-tv-display .staff-cast-control {
 }
 
 html.staff-tv-display .board-shell {
-  height: 100vh;
-  height: 100dvh;
+  /* Document shell only — the fixed TV stage paints the board. Do not size the
+     board content to the browser viewport (that fights the 1920×1080 canvas). */
+  height: 100%;
+  min-height: 100%;
   overflow: hidden;
   background: transparent;
 }
@@ -1641,14 +1643,10 @@ html.fitdog-tv-kiosk body {
 }
 
 html.fitdog-tv-kiosk .fitdog-tv-stage {
-  /* Always fill the physical screen; never inherit a zoomed visualViewport corner. */
-  left: 0 !important;
-  top: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  inset: 0 !important;
+  /* Full-bleed of the *visible* stage box set by JS (visualViewport / CSS px).
+     Do not force inset:0 of the layout viewport — that fought VV offsets under
+     residual Fully page-zoom and left the scaled canvas in the wrong corner. */
+  overflow: hidden;
 }
 
 html.fitdog-tv-active,
@@ -12147,6 +12145,37 @@ html.fitdog-cast-mode .fitdog-lobby-canvas-inner {
   aspect-ratio: 16 / 9;
 }
 
+/*
+ * CRITICAL: when the 1920×1080 TV canvas is active, cast-mode must NOT force
+ * viewport units (100vw/100vh) onto the stage or canvas inner. That double-applies
+ * viewport sizing on top of transform:scale and makes the staff board look zoomed
+ * in (design laid out at ~viewport width inside a 1920 canvas, then scaled again).
+ * Fill the design canvas instead — one authoritative scale owns the fit.
+ */
+html.fitdog-tv-active.fitdog-cast-mode .fitdog-tv-stage--staff,
+html.fitdog-tv-active.fitdog-cast-mode .fitdog-tv-stage--lobby {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  height: 100%;
+  aspect-ratio: auto;
+  contain: none;
+}
+
+html.fitdog-tv-active.fitdog-cast-mode .fitdog-board-canvas-inner,
+html.fitdog-tv-active.fitdog-cast-mode .fitdog-lobby-canvas-inner,
+html.fitdog-tv-active .fitdog-board-canvas-inner,
+html.fitdog-tv-active .fitdog-lobby-canvas-inner {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: auto;
+  contain: layout paint;
+}
+
 html.fitdog-cast-mode img,
 html.fitdog-cast-mode video {
   transform: translateZ(0);
@@ -12254,6 +12283,14 @@ html.fitdog-cast-mode .staff-push-notice__flash-layer {
   html.fitdog-cast-mode .fitdog-lobby-canvas-inner {
     max-height: 100vh;
     max-height: 100dvh;
+  }
+
+  /* TV canvas owns height — never clamp the design inner to the viewport. */
+  html.fitdog-tv-active.fitdog-cast-mode .fitdog-board-canvas-inner,
+  html.fitdog-tv-active.fitdog-cast-mode .fitdog-lobby-canvas-inner,
+  html.fitdog-tv-active .fitdog-board-canvas-inner,
+  html.fitdog-tv-active .fitdog-lobby-canvas-inner {
+    max-height: none;
   }
 }
 
