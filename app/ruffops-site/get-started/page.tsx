@@ -5,11 +5,11 @@ import { SITE } from "@/lib/ruffops-site/config";
 
 export const metadata: Metadata = {
   title: "Get Started",
-  description: `Start with ruffOPS — tell us about your pet facility and priorities. ${SITE.phoneDisplay} · ${SITE.email}.`,
+  description: `Start with ruffOPS — tell us about your pet facility and what hurts. ${SITE.phoneDisplay} · ${SITE.email}.`,
   openGraph: {
     title: `Get Started | ${SITE.name}`,
     description:
-      "Request a tailored recommendation for the ruffOPS management platform, digital whiteboards, or advertising displays."
+      "Ask for a recommendation on the ruffOPS management platform, digital whiteboards, or advertising displays."
   }
 };
 
@@ -24,8 +24,8 @@ export default async function GetStartedPage({
     <>
       <PageHero
         eyebrow="Get Started"
-        title="Tell us about your facility"
-        description="Share a few details about your business and what you want to improve. We will review your operation and follow up with the next best step — platform, whiteboards, advertising screens, or a focused operations review."
+        title="Tell us how the place actually runs"
+        description="A few details on your business and what you want to fix. We’ll look at the operation and come back with a next step — platform, whiteboards, advertising screens, or a focused ops review."
         secondaryLabel={`Call ${SITE.phoneDisplay}`}
         secondaryHref={SITE.phoneHref}
       />
@@ -35,9 +35,9 @@ export default async function GetStartedPage({
           <div className="card p-6">
             <h2 className="font-semibold text-white">What happens next</h2>
             <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm text-slate-400">
-              <li>We review your facility type, locations, and primary interest.</li>
-              <li>We identify the highest-impact starting point for your team and screens.</li>
-              <li>We follow up within one business day with a clear recommendation.</li>
+              <li>We read your facility type, locations, and what you care about first.</li>
+              <li>We point at the highest-impact starting move for your team and screens.</li>
+              <li>We follow up within one business day with a clear recommendation — not a fog machine.</li>
             </ol>
           </div>
           <div className="card p-6">

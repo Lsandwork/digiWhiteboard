@@ -7,37 +7,37 @@ import { PRODUCT_SHOTS, SITE } from "@/lib/ruffops-site/config";
 export const metadata: Metadata = {
   title: "Why ruffOPS",
   description:
-    "Why pet businesses choose ruffOPS — built specifically for dog daycares, boarding, grooming, and multi-service facilities with real operational expertise and a connected display ecosystem.",
+    "Why pet facilities choose ruffOPS — built for dog daycares, boarding, grooming, and multi-service ops with a connected display stack, not generic SaaS with a pet filter.",
   openGraph: {
     title: `Why ruffOPS | ${SITE.name}`,
-    description: "Built for pet facility operations — not generic SaaS bolted onto a different industry."
+    description: "Built for pet facility operations — not office software wearing a leash."
   }
 };
 
 const pillars = [
   {
-    title: "Built specifically for pet businesses",
-    copy: "Dog daycares, boarding hotels, grooming, training, transport, and multi-service facilities have workflows generic software never modeled. ruffOPS starts from that reality."
+    title: "Built for pet facilities, period",
+    copy: "Daycare, boarding, grooming, training, transport, multi-service — workflows generic software never bothered to model. We started there."
   },
   {
-    title: "Operational expertise",
-    copy: "The product is shaped by people who understand front desk pressure, yard tempo, boarding handoffs, incidents, and client expectations — not slide-deck theory."
+    title: "People who’ve worked the floor",
+    copy: "Front desk crush, yard tempo, boarding handoffs, incidents, the client who wants an update right now. Not slide-deck empathy."
   },
   {
-    title: "Connected ecosystem",
-    copy: "Management tools, staff boards, lobby TVs, and department displays work as one system so guests and teams see the same operational truth."
+    title: "One connected stack",
+    copy: "Management tools, staff boards, lobby TVs, department displays — same operational truth, different rooms."
   },
   {
-    title: "Custom solutions",
-    copy: "Themes, content zones, department layouts, and platform modules are tailored to how your facility actually runs."
+    title: "Custom where it counts",
+    copy: "Themes, content zones, department layouts, platform modules shaped around how your building actually moves dogs."
   },
   {
-    title: "Customizable whiteboards",
-    copy: "Lobby and staff boards are cast-ready, brand-matched, and designed to stay readable across the room during real rush periods."
+    title: "Whiteboards that survive rush hour",
+    copy: "Lobby and staff boards are cast-ready, brand-matched, and readable from across the room when six cars pull up at once."
   },
   {
-    title: "Modern technology with restraint",
-    copy: "We use modern tooling where it helps operators move faster — without inventing flashy features that do not survive a busy Saturday."
+    title: "Modern tech with a governor",
+    copy: "We use new tooling when it helps operators move faster — not to invent demos that die on a busy Saturday."
   }
 ];
 
@@ -46,8 +46,8 @@ export default function WhyRuffopsPage() {
     <>
       <PageHero
         eyebrow="Why ruffOPS"
-        title="Because pet facilities are not generic offices"
-        description="ruffOPS exists to connect the people running the facility with the screens clients and staff rely on — using systems shaped by real dog-business operations."
+        title="Because a dog facility is not a quiet office with snacks"
+        description="ruffOPS exists to put the people running the place and the screens clients stare at on the same page — with systems shaped by real dog-business days."
         secondaryLabel="About the Company"
         secondaryHref="/about"
       />
@@ -70,16 +70,16 @@ export default function WhyRuffopsPage() {
           <Reveal>
             <p className="eyebrow eyebrow--light">The problem we solve</p>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-              Operations fall apart in the gaps between tools
+              Ops dies in the gaps between tools
             </h2>
             <p className="mt-4 text-slate-600">
-              Booking software may capture appointments. Chat apps may carry messages. Spreadsheets may hold notes. None of
-              that guarantees the lobby board, the floor team, and leadership are aligned when the next dog walks through
-              the door.
+              Booking software holds appointments. Chat apps hold opinions. Spreadsheets hold notes someone meant to
+              update. None of that guarantees the lobby board, the floor team, and leadership agree when the next dog
+              walks in.
             </p>
             <p className="mt-4 text-slate-600">
-              ruffOPS closes those gaps with a management platform and custom digital whiteboards designed around pet
-              facility rhythm — not borrowed from another industry.
+              ruffOPS closes those gaps with a management platform and custom digital whiteboards built around pet
+              facility rhythm — not borrowed from another industry and hoped.
             </p>
           </Reveal>
           <Reveal delay={80} className="ro-shot">
