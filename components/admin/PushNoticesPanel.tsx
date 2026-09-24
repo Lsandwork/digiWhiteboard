@@ -2,8 +2,8 @@
 
 import { readResponseJson } from "@/lib/http/read-response-json";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BellRing, Download, Lightbulb, Pencil, Plus, PowerOff, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BellRing, Download, ImagePlus, Lightbulb, Pencil, Plus, PowerOff, RotateCcw, Send, ShieldAlert, Trash2, UserRound, XCircle } from "lucide-react";
 import { ConfirmDialog } from "@/components/admin/ui/ConfirmDialog";
 import { DailyRemindersSection } from "@/components/admin/DailyRemindersSection";
 import { Modal } from "@/components/admin/ui/Modal";
@@ -41,6 +41,7 @@ type PushNoticesPayload = {
 type NoticeFormState = {
   title: string;
   message: string;
+  image_url: string;
   priority: StaffPushNoticePriority;
   display_mode: StaffPushNoticeDisplayMode;
   expires_at: string;
@@ -53,6 +54,7 @@ type NoticeFormState = {
 const emptyForm: NoticeFormState = {
   title: "",
   message: "",
+  image_url: "",
   priority: "normal",
   display_mode: "normal",
   expires_at: "",
@@ -121,6 +123,7 @@ export function PushNoticesPanel() {
   const [complaintCategoryError, setComplaintCategoryError] = useState("");
   const [editingNotice, setEditingNotice] = useState<StaffPushNotice | null>(null);
   const [deleteNotice, setDeleteNotice] = useState<StaffPushNotice | null>(null);
+  const [formUploading, setFormUploading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -506,15 +509,15 @@ export function PushNoticesPanel() {
         <div className="crossover-card p-5">
           <h3 className="crossover-card__title">Manual Push Notices</h3>
           <p className="crossover-card__subtitle mb-4">Create a custom staff alert and push it live immediately or save it for later.</p>
-          <NoticeForm form={form} onChange={setForm} />
+          <NoticeForm form={form} onChange={setForm} uploading={formUploading} onUploadingChange={setFormUploading} />
           <div className="mt-4 flex flex-wrap justify-end gap-2">
-            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void saveCustom()}>
+            <button type="button" className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2" disabled={busy || formUploading || !canManage} onClick={() => void saveCustom()}>
               <Plus className="h-4 w-4" /> Save Custom
             </button>
-            <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy || !canManage || !form.scheduled_at} onClick={() => void scheduleCustom()}>
+            <button type="button" className="crossover-btn crossover-btn--outline inline-flex items-center gap-2" disabled={busy || formUploading || !canManage || !form.scheduled_at} onClick={() => void scheduleCustom()}>
               <BellRing className="h-4 w-4" /> Schedule Notice
             </button>
-            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" disabled={busy || !canManage} onClick={() => void pushCustom()}>
+            <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" disabled={busy || formUploading || !canManage} onClick={() => void pushCustom()}>
               <Send className="h-4 w-4" /> Push Notice
             </button>
           </div>
@@ -758,7 +761,45 @@ export function PushNoticesPanel() {
   );
 }
 
-function NoticeForm({ form, onChange }: { form: NoticeFormState; onChange: (form: NoticeFormState) => void }) {
+function NoticeForm({
+  form,
+  onChange,
+  uploading = false,
+  onUploadingChange
+}: {
+  form: NoticeFormState;
+  onChange: (form: NoticeFormState) => void;
+  uploading?: boolean;
+  onUploadingChange?: (busy: boolean) => void;
+}) {
+  const { showToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleImageSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    onUploadingChange?.(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const response = await fetch("/api/admin/push-notices/upload-image", {
+        method: "POST",
+        body
+      });
+      const payload = await readResponseJson(response);
+      if (!response.ok) throw new Error(payload.error ?? "Unable to upload image.");
+      const imageUrl = typeof payload.image_url === "string" ? payload.image_url : "";
+      if (!imageUrl) throw new Error("Upload did not return an image URL.");
+      onChange({ ...form, image_url: imageUrl });
+      showToast("Image added to this notice.", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to upload image.", "error");
+    } finally {
+      onUploadingChange?.(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
   return (
     <div className="grid gap-4">
       <Field label="Notice title">
@@ -766,6 +807,50 @@ function NoticeForm({ form, onChange }: { form: NoticeFormState; onChange: (form
       </Field>
       <Field label="Notice message">
         <textarea className="admin-input min-h-[110px]" value={form.message} maxLength={600} onChange={(event) => onChange({ ...form, message: event.target.value })} />
+      </Field>
+      <Field label="Optional image">
+        <div className="rounded-2xl border border-admin-border bg-white/[0.03] p-4">
+          {form.image_url ? (
+            <div className="mb-3 overflow-hidden rounded-xl border border-admin-border bg-black/20">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={form.image_url} alt="Notice preview" className="max-h-48 w-full object-contain" />
+            </div>
+          ) : (
+            <p className="mb-3 text-sm text-admin-muted">
+              Attach a photo to show on the Staff Digital Whiteboard with this push notice.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif"
+              className="hidden"
+              onChange={(event) => void handleImageSelected(event)}
+            />
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--outline inline-flex items-center gap-2"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImagePlus className="h-4 w-4" />
+              {uploading ? "Uploading…" : form.image_url ? "Replace image" : "Upload image"}
+            </button>
+            {form.image_url ? (
+              <button
+                type="button"
+                className="crossover-btn crossover-btn--ghost inline-flex items-center gap-2"
+                disabled={uploading}
+                onClick={() => onChange({ ...form, image_url: "" })}
+              >
+                <Trash2 className="h-4 w-4" />
+                Remove image
+              </button>
+            ) : null}
+          </div>
+          <p className="mt-2 text-xs text-admin-muted">JPG, PNG, WEBP, or GIF up to 5 MB.</p>
+        </div>
       </Field>
       <div className="grid gap-4 md:grid-cols-4">
         <Field label="Priority level">
@@ -843,6 +928,12 @@ function ActiveNoticePreview({ notice }: { notice: StaffPushNotice }) {
         <p className="mt-2 text-lg font-bold text-amber-200">Dog Handler: {notice.dog_handler_name}</p>
       ) : null}
       {notice.message ? <p className="mt-3 text-sm text-admin-muted">{notice.message}</p> : null}
+      {notice.image_url ? (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-admin-border bg-black/20">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={notice.image_url} alt={notice.title} className="max-h-56 w-full object-contain" />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -864,6 +955,7 @@ function EditNoticeModal({
   onSave: (payload: NoticeFormState) => Promise<void>;
 }) {
   const [form, setForm] = useState<NoticeFormState>(emptyForm);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!notice) return;
@@ -871,6 +963,7 @@ function EditNoticeModal({
       setForm({
         title: notice.title,
         message: notice.message ?? "",
+        image_url: notice.image_url ?? "",
         priority: notice.priority,
         display_mode: notice.display_mode,
         expires_at: toLocalDateTimeInput(notice.expires_at),
@@ -891,14 +984,14 @@ function EditNoticeModal({
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" className="admin-btn-secondary" onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="button" className="admin-btn-primary" disabled={busy} onClick={() => void onSave(form)}>
+          <button type="button" className="admin-btn-secondary" onClick={onClose} disabled={busy || uploading}>Cancel</button>
+          <button type="button" className="admin-btn-primary" disabled={busy || uploading} onClick={() => void onSave(form)}>
             {busy ? "Saving…" : "Save notice"}
           </button>
         </div>
       }
     >
-      <NoticeForm form={form} onChange={setForm} />
+      <NoticeForm form={form} onChange={setForm} uploading={uploading} onUploadingChange={setUploading} />
     </Modal>
   );
 }

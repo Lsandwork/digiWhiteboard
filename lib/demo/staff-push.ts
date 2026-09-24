@@ -57,6 +57,7 @@ function buildNotice(
     id: id ?? demoNoticeId(),
     title: normalized.title,
     message: normalized.message,
+    image_url: normalized.image_url,
     priority: normalized.priority,
     display_mode: normalized.display_mode,
     is_active: active,

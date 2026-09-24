@@ -1,6 +1,7 @@
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
 import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+import { normalizePushNoticeImageUrl } from "@/lib/staff/push-notice-image-upload";
 
 export type StaffPushNoticePriority = "normal" | "important" | "urgent";
 export type StaffPushNoticeDisplayMode = "normal" | "urgent";
@@ -40,6 +41,8 @@ export type StaffPushNotice = {
   id: string;
   title: string;
   message: string | null;
+  /** Optional image shown on the Staff Digital Whiteboard OpsAlert card. */
+  image_url?: string | null;
   priority: StaffPushNoticePriority;
   display_mode: StaffPushNoticeDisplayMode;
   is_active: boolean;
@@ -72,6 +75,7 @@ export type StaffPushNotice = {
 export type StaffPushNoticeInput = {
   title?: unknown;
   message?: unknown;
+  image_url?: unknown;
   priority?: unknown;
   display_mode?: unknown;
   expires_at?: unknown;
@@ -278,6 +282,7 @@ function addRecurrenceDate(value: string, recurrence: StaffPushNoticeRecurrence)
 export function normalizeNoticeInput(input: StaffPushNoticeInput) {
   const title = String(input.title ?? "").trim().slice(0, MAX_TITLE_LENGTH);
   const message = String(input.message ?? "").trim().slice(0, MAX_MESSAGE_LENGTH);
+  const image_url = normalizePushNoticeImageUrl(input.image_url);
   const priority = normalizePriority(input.priority);
   const recurrence = normalizeRecurrence(input.recurrence);
   const scheduled_at = normalizeOptionalDate(input.scheduled_at);
@@ -315,6 +320,7 @@ export function normalizeNoticeInput(input: StaffPushNoticeInput) {
   return {
     title,
     message: message || null,
+    image_url,
     priority,
     display_mode: normalizeDisplayMode(input.display_mode, priority),
     expires_at: normalizeOptionalDate(input.expires_at),

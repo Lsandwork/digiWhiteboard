@@ -100,6 +100,7 @@
     "test:shelly-alert": "tsx scripts/test-shelly-alert.ts",
     "test:daily-reminders": "tsx scripts/test-daily-reminders.ts",
     "test:ops-alert": "tsx scripts/test-ops-alert.ts",
+    "test:push-notice-image-upload": "tsx scripts/test-push-notice-image-upload.ts",
     "test:write-up-access": "tsx scripts/test-write-up-access.ts",
     "test:hr-upload-write-up": "tsx scripts/test-hr-upload-write-up.ts",
     "test:hr-consult-upload-scan": "tsx scripts/test-hr-consult-upload-scan.ts",

@@ -45,6 +45,7 @@ export type CastLitePushNotice = {
   id: string;
   title: string;
   message: string | null;
+  image_url?: string | null;
   priority: StaffPushNotice["priority"];
   display_mode: StaffPushNotice["display_mode"];
   notice_type?: StaffPushNotice["notice_type"];
@@ -144,6 +145,7 @@ function toCastLitePushNotice(notice: StaffPushNotice | null): CastLitePushNotic
     id: notice.id,
     title: notice.title,
     message: notice.message,
+    image_url: optimizeCastPhotoUrl(notice.image_url),
     priority: notice.priority,
     display_mode: notice.display_mode,
     notice_type: notice.notice_type,

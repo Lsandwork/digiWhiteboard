@@ -120,7 +120,9 @@ export function opsAlertFromStaffPushNotice(notice: StaffPushNotice): OpsAlertVi
           : null,
     footer: isDailyReminder
       ? notice.daily_reminder_footer ?? DEFAULT_DAILY_REMINDER_FOOTER
-      : null
+      : null,
+    mediaUrl: notice.image_url ?? null,
+    mediaAlt: notice.image_url ? notice.title : null
   };
 }
 
@@ -184,6 +186,8 @@ export function opsAlertFromActiveAlert(alert: StaffActiveAlert): OpsAlertViewMo
         : null,
     footer: isDailyReminder
       ? alert.dailyReminderMeta?.footer ?? DEFAULT_DAILY_REMINDER_FOOTER
-      : null
+      : null,
+    mediaUrl: alert.imageUrl ?? null,
+    mediaAlt: alert.imageUrl ? alert.title : null
   };
 }
