@@ -8,6 +8,7 @@ import { writeAdminAuditLog } from "@/lib/admin/audit";
 import { accessFromLegacyRole, canUseStandardOrEmergencyPush } from "@/lib/admin/permissions";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
+import { asCastTvFormFile } from "@/lib/cast-tv/form-file";
 import { getEffectiveDemoRole, isDemoSession } from "@/lib/demo/session";
 import {
   assertPushNoticeImageUpload,
@@ -44,8 +45,9 @@ export async function POST(request: Request) {
 
   try {
     const form = await request.formData();
-    const file = form.get("file");
-    if (!(file instanceof File)) {
+    // Duck-type FormData files — File realm checks fail across Node/undici on Vercel.
+    const file = asCastTvFormFile(form.get("file"));
+    if (!file) {
       return NextResponse.json({ error: "Choose an image to upload." }, { status: 400 });
     }
 
@@ -88,9 +90,8 @@ export async function POST(request: Request) {
       storage_path: uploaded.storage_path
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: humanizeUnknownError(error, "Unable to upload notice image.") },
-      { status: 400 }
-    );
+    const message = humanizeUnknownError(error, "Unable to upload notice image.");
+    const status = /too large|413/i.test(message) ? 413 : 400;
+    return NextResponse.json({ error: message }, { status });
   }
 }

@@ -3,7 +3,8 @@ import { LOBBY_SLIDESHOW_BUCKET } from "@/lib/lobby/slideshow-uploads";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-export const PUSH_NOTICE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+/** Stay under Vercel’s ~4.5MB request body limit after multipart overhead. */
+export const PUSH_NOTICE_IMAGE_MAX_BYTES = 3_500_000;
 export const PUSH_NOTICE_IMAGE_MAX_URL_LENGTH = 2000;
 
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -63,7 +64,7 @@ export function assertPushNoticeImageUpload(input: {
     throw new Error("Choose an image to upload.");
   }
   if (size > PUSH_NOTICE_IMAGE_MAX_BYTES) {
-    throw new Error("Notice images must be 5 MB or smaller.");
+    throw new Error("Notice images must be 3.5 MB or smaller.");
   }
   const contentType = inferPushNoticeImageContentType(input.name, input.type);
   if (!contentType) {
@@ -79,14 +80,17 @@ export function normalizePushNoticeImageUrl(value: unknown): string | null {
   if (value == null || value === "") return null;
   const raw = String(value).trim();
   if (!raw) return null;
-  if (raw.length > PUSH_NOTICE_IMAGE_MAX_URL_LENGTH) {
-    throw new Error("Image URL is too long.");
-  }
+
+  // Data URLs are preview-only (demo) — allow them past the short https URL length cap.
   if (raw.startsWith("data:image/")) {
     if (raw.length > 400_000) {
       throw new Error("Inline image is too large. Upload the file instead.");
     }
     return raw;
+  }
+
+  if (raw.length > PUSH_NOTICE_IMAGE_MAX_URL_LENGTH) {
+    throw new Error("Image URL is too long.");
   }
   if (raw.startsWith("/") && !raw.startsWith("//")) {
     return raw.slice(0, PUSH_NOTICE_IMAGE_MAX_URL_LENGTH);
@@ -118,10 +122,13 @@ export async function uploadPushNoticeImage(
   }
 ) {
   const storagePath = buildStoragePath(input.filename, input.contentType);
-  const body = new Blob([Uint8Array.from(input.bytes)], { type: input.contentType });
+  // Fresh Uint8Array + Blob — same pattern as photo-upload-queue (avoids Buffer corruption).
+  const bytes = Uint8Array.from(input.bytes);
+  const body = new Blob([bytes], { type: input.contentType });
   const { error } = await supabase.storage.from(LOBBY_SLIDESHOW_BUCKET).upload(storagePath, body, {
     contentType: input.contentType,
-    upsert: false
+    upsert: false,
+    cacheControl: "3600"
   });
   if (error) {
     throw new Error(error.message || "Unable to upload notice image.");

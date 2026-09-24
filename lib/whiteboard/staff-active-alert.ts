@@ -174,15 +174,16 @@ export function resolveStaffCastDisplay(
   payload: StaffWhiteboardStatePayload,
   options: { noVideo?: boolean } = {}
 ): StaffCastDisplayMode {
-  // Match laptop board: only urgent / owner-complaint pushes take over the full screen.
-  // Routine notices must not hide checkout dogs on the casted TV.
+  // Match laptop board: urgent / owner-complaint / image notices take over the full screen.
+  // Routine text-only notices must not hide checkout dogs on the casted TV.
   if (payload.activePushNotice) {
     const notice = payload.activePushNotice;
     const isUrgent =
       notice.priority === "urgent" ||
       notice.display_mode === "urgent" ||
       notice.notice_type === "owner_complaint_dog_handler" ||
-      Boolean(notice.complaint_category);
+      Boolean(notice.complaint_category) ||
+      Boolean(notice.image_url?.trim());
     if (isUrgent) {
       return { mode: "push_takeover", alert: castPushToActiveAlert(notice) };
     }
