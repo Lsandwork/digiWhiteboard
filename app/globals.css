@@ -1625,6 +1625,8 @@ html.fitdog-tv-active {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   --fitdog-tv-scale: min(100dvw / 1920, 100dvh / 1080);
+  --fitdog-tv-offset-x: 0px;
+  --fitdog-tv-offset-y: 0px;
 }
 
 html.fitdog-tv-kiosk,
@@ -1659,24 +1661,17 @@ html.fitdog-tv-active body {
   touch-action: manipulation;
 }
 
+/* Streamer / zoomable TVs share the same top-left + offset centering system. */
 html.fitdog-tv-google-tv,
 html.fitdog-tv-google-tv body {
   touch-action: manipulation;
   -ms-touch-action: manipulation;
 }
 
-/* Streamer / zoomable TVs: origin top-left so a scaled 1920 canvas fills the
-   visible stage instead of sitting centered in a cropped 1920 layout box. */
-html.fitdog-tv-google-tv .fitdog-tv-canvas {
-  transform-origin: top left;
-}
-
 .fitdog-tv-stage {
   position: fixed;
   inset: 0;
   z-index: 1;
-  display: grid;
-  place-items: center;
   overflow: hidden;
   background: #02060b;
 }
@@ -1686,11 +1681,17 @@ html.fitdog-tv-google-tv .fitdog-tv-canvas {
 }
 
 .fitdog-tv-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 1920px;
   height: 1080px;
   flex-shrink: 0;
-  transform: scale(var(--fitdog-tv-scale, 1));
-  transform-origin: center center;
+  /* ONE scale, top-left origin, explicit letterbox offsets — never
+     transform-origin:center on a top-left layout box (shifts content down/right). */
+  transform: translate(var(--fitdog-tv-offset-x, 0px), var(--fitdog-tv-offset-y, 0px))
+    scale(var(--fitdog-tv-scale, 1));
+  transform-origin: top left;
   overflow: hidden;
 }
 

@@ -7,6 +7,7 @@ import {
   clearTvDisplayScale,
   clearTvStageBox,
   collectTvLayoutDiagnostics,
+  computeTvDisplayOffsets,
   computeTvDisplayScale,
   logTvLayoutDiagnostics,
   measureTvFitViewport,
@@ -74,14 +75,19 @@ export function useDisplayTvLayout(enabled: boolean) {
       const stage = document.querySelector<HTMLElement>(".fitdog-tv-stage");
       if (stage) applyTvStageToVisibleViewport(stage, stageBox);
 
-      // Fit: always the pixels currently on screen, independent of page zoom.
+      // Fit: always the CSS pixels currently on screen — never screen/Fully
+      // physical resolution (that mix caused scale=1 + cropped 1920 canvas).
       const fitBox = measureTvFitViewport(window);
-      const scale = computeTvDisplayScale(fitBox.width, fitBox.height);
-      applyTvDisplayScale(scale);
+      const stageW = stage?.clientWidth || stageBox.width;
+      const stageH = stage?.clientHeight || stageBox.height;
+      // Prefer the smaller of painted stage vs fit so we never overflow.
+      const scaleW = Math.min(stageW, fitBox.width);
+      const scaleH = Math.min(stageH, fitBox.height);
+      const scale = computeTvDisplayScale(scaleW, scaleH);
+      const { offsetX, offsetY } = computeTvDisplayOffsets(scaleW, scaleH, scale);
+      applyTvDisplayScale(scale, offsetX, offsetY);
 
       if (debug) {
-        const stageW = stage?.clientWidth || stageBox.width;
-        const stageH = stage?.clientHeight || stageBox.height;
         logTvLayoutDiagnostics(
           collectTvLayoutDiagnostics(window, stageW, stageH, fitBox, scale)
         );

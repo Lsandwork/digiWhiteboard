@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   computeTvDisplayScale,
+  computeTvDisplayOffsets,
   isFullyKioskBrowser,
   isGoogleTvStreamerBrowser,
   isLayoutTiledVisualViewport,
@@ -35,6 +36,19 @@ assert.equal(computeTvDisplayScale(960, 540), 0.5);
 assert.equal(computeTvDisplayScale(3840, 2160), 2);
 assert.equal(computeTvDisplayScale(1920, 540), 0.5);
 assert.equal(computeTvDisplayScale(640, 360), 640 / 1920);
+
+// Perfect 16:9 fit → no letterbox offsets.
+assert.deepEqual(computeTvDisplayOffsets(1920, 1080, 1), { offsetX: 0, offsetY: 0 });
+assert.deepEqual(computeTvDisplayOffsets(960, 540, 0.5), { offsetX: 0, offsetY: 0 });
+// Tall stage letterboxes horizontally.
+{
+  const scale = computeTvDisplayScale(1080, 1920);
+  const paintedW = 1920 * scale;
+  assert.deepEqual(computeTvDisplayOffsets(1080, 1920, scale), {
+    offsetX: (1080 - paintedW) / 2,
+    offsetY: (1920 - 1080 * scale) / 2
+  });
+}
 
 const fullHd = measureTvViewport({ innerWidth: 1920, innerHeight: 1080 });
 assert.equal(fullHd.width, 1920);
@@ -161,6 +175,9 @@ assert.equal(fullyCornerFit.offsetTop, 0);
 assert.equal(computeTvDisplayScale(fullyCornerFit.width, fullyCornerFit.height), 720 / 1920);
 
 // Fully Kiosk under-reports a phone-sized WebView on a Full HD TV (no page zoom).
+// Fit/stage MUST use the CSS viewport (980×551), NOT Fully screen 1920×1080 —
+// mixing those units produced scale=1 and the zoomed/cropped TV failure.
+// Cast-TV works on the same device because it paints fluid inset:0 into 980×551.
 const fullyUnderReported = measureTvViewport({
   innerWidth: 980,
   innerHeight: 551,
@@ -178,11 +195,14 @@ const fullyUnderReported = measureTvViewport({
     scale: 1
   }
 });
-assert.equal(fullyUnderReported.width, 1920);
-assert.equal(fullyUnderReported.height, 1080);
+assert.equal(fullyUnderReported.width, 980);
+assert.equal(fullyUnderReported.height, 551);
 assert.equal(fullyUnderReported.offsetLeft, 0);
 assert.equal(fullyUnderReported.offsetTop, 0);
-assert.equal(computeTvDisplayScale(fullyUnderReported.width, fullyUnderReported.height), 1);
+assert.equal(
+  computeTvDisplayScale(fullyUnderReported.width, fullyUnderReported.height),
+  Math.min(980 / 1920, 551 / 1080)
+);
 
 const fullyUnderReportedFit = measureTvFitViewport({
   innerWidth: 980,
@@ -201,8 +221,12 @@ const fullyUnderReportedFit = measureTvFitViewport({
     scale: 1
   }
 });
-assert.equal(fullyUnderReportedFit.width, 1920);
-assert.equal(fullyUnderReportedFit.height, 1080);
+assert.equal(fullyUnderReportedFit.width, 980);
+assert.equal(fullyUnderReportedFit.height, 551);
+assert.equal(
+  computeTvDisplayScale(fullyUnderReportedFit.width, fullyUnderReportedFit.height),
+  Math.min(980 / 1920, 551 / 1080)
+);
 
 // Unzoomed Hi-Browser with a full visualViewport still fills normally.
 const hiBrowserUnzoomed = measureTvFitViewport({
@@ -434,15 +458,21 @@ assert.match(hook, /fitdog-tv-kiosk/);
 assert.match(hook, /tvDebug/);
 assert.match(hook, /logTvLayoutDiagnostics/);
 assert.match(hook, /fitdog-tv-google-tv/);
-assert.match(hook, /computeTvDisplayScale\(fitBox\.width, fitBox\.height\)/);
+assert.match(hook, /computeTvDisplayScale\(scaleW, scaleH\)/);
+assert.match(hook, /computeTvDisplayOffsets/);
+assert.match(hook, /Math\.min\(stageW, fitBox\.width\)/);
+assert.match(hook, /Math\.min\(stageH, fitBox\.height\)/);
 
 const css = readFileSync("app/globals.css", "utf8");
 assert.match(css, /text-size-adjust:\s*100%/);
 assert.match(css, /--fitdog-tv-scale:\s*min\(100dvw \/ 1920/);
+assert.match(css, /--fitdog-tv-offset-x/);
+assert.match(css, /--fitdog-tv-offset-y/);
 assert.match(css, /html\.fitdog-tv-kiosk/);
 assert.match(css, /zoom:\s*1/);
-assert.match(css, /html\.fitdog-tv-google-tv \.fitdog-tv-canvas/);
+assert.match(css, /html\.fitdog-tv-google-tv/);
 assert.match(css, /transform-origin:\s*top left/);
+assert.match(css, /translate\(var\(--fitdog-tv-offset-x/);
 
 const lobbyLayout = readFileSync("app/lobby/layout.tsx", "utf8");
 assert.match(lobbyLayout, /export const viewport/);

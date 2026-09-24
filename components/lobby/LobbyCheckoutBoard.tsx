@@ -599,7 +599,7 @@ export function LobbyCheckoutBoard({
       <div className="lobby-background lobby-background--light" aria-hidden />
       {castMode ? <CastModeStatusIndicator status={castHealth} /> : null}
 
-      <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby">
+      <TvLayoutCanvas enabled={showTvLayout} className="fitdog-tv-stage--lobby" surface="lobby">
         <div
           className={`lobby-content relative z-10 flex min-h-screen flex-col px-6 py-4 ${showTvLayout ? "fitdog-lobby-canvas-inner" : ""} ${checkoutSpotlight.active ? "lobby-content--spotlight" : ""}`}
         >
