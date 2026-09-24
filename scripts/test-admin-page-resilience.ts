@@ -109,7 +109,7 @@ assert.match(commissionsRoute, /listImportBatchesViaPostgres/);
 assert.match(commissionsRoute, /listCommissionRulesViaPostgres/);
 assert.match(commissionsRoute, /loadCommissionSubtabList/);
 assert.match(commissionsRoute, /COMMISSIONS_SUBTAB_QUERY_TIMEOUT_MS/);
-assert.match(commissionsRoute, /view === "rules" \|\| view === "report"/);
+assert.match(commissionsRoute, /view === "rules" \|\| view === "report" \|\| view === "ledger"/);
 assert.doesNotMatch(commissionsRoute, /listAdminUsers/);
 assert.doesNotMatch(commissionsRoute, /getServiceSupabase\(\)/);
 assert.doesNotMatch(commissionsRoute, /Promise\.any/);
@@ -263,6 +263,10 @@ assert.match(mediaLibrary, /from \+ pageSize/);
 
 const commissionsPanel = readFileSync("components/admin/PackageCommissionsPanel.tsx", "utf8");
 assert.match(commissionsPanel, /retry/);
+assert.match(commissionsPanel, /parseCommissionTrainerFilterValues/);
+assert.match(commissionsPanel, /mergeCommissionTrainerOptions/);
+assert.match(commissionsPanel, /trainerNames/);
+assert.match(commissionsPanel, /Trainers \(multi-select\)/);
 
 const liveFleetCron = readFileSync("app/api/cron/live-fleet-sync/route.ts", "utf8");
 assert.match(liveFleetCron, /SCHEMA_RECHECK_MS/);

@@ -40,8 +40,23 @@ export function buildCommissionLedgerRestPath(
     if (viewer.adminUserId) params.set("trainer_user_id", `eq.${viewer.adminUserId}`);
     else if (viewer.email) params.set("trainer_email", `ilike.${viewer.email}`);
     else params.set("trainer_user_id", "eq.00000000-0000-0000-0000-000000000000");
-  } else if (filters.trainerIds?.length) {
-    params.set("trainer_user_id", `in.${encodeInList(filters.trainerIds)}`);
+  } else if (filters.trainerIds?.length || filters.trainerNames?.length) {
+    const parts: string[] = [];
+    if (filters.trainerIds?.length) {
+      parts.push(`trainer_user_id.in.${encodeInList(filters.trainerIds)}`);
+    }
+    for (const name of filters.trainerNames ?? []) {
+      const trimmed = name.replace(/[(),*]/g, "").trim();
+      if (trimmed) parts.push(`trainer_name.ilike.*${trimmed}*`);
+    }
+    if (parts.length === 1 && filters.trainerIds?.length && !filters.trainerNames?.length) {
+      params.set("trainer_user_id", `in.${encodeInList(filters.trainerIds)}`);
+    } else if (parts.length === 1 && filters.trainerNames?.length === 1 && !filters.trainerIds?.length) {
+      const trimmed = filters.trainerNames[0]!.replace(/[(),*]/g, "").trim();
+      params.set("trainer_name", `ilike.*${trimmed}*`);
+    } else if (parts.length > 0) {
+      params.set("or", `(${parts.join(",")})`);
+    }
   }
 
   const dateField =
