@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   description: "Live Fitdog board for dogs actively checking in or checking out.",
   applicationName: RUFFOPS_META.applicationName,
   generator: RUFFOPS_META.generator,
+  authors: [{ name: RUFFOPS_META.author }],
+  creator: RUFFOPS_META.creator,
+  publisher: RUFFOPS_META.publisher,
   manifest: "/manifest.json"
 };
 

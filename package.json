@@ -2,6 +2,7 @@
   "name": "fitdog-gingr-status-board",
   "version": "0.1.0",
   "private": true,
+  "author": "Lonnie Sandoval <lonnie@fitdog.com> (SK9 LLC)",
   "scripts": {
     "dev": "node scripts/ruffops-dev.mjs",
     "build": "next build",
