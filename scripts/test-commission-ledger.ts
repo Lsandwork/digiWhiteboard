@@ -141,6 +141,32 @@ const trainerOptions = listCommissionTrainerOptions([
 assert.equal(trainerOptions.length, 1);
 assert.equal(trainerOptions[0]?.full_name, "Ivonne Campuzano");
 
+import {
+  commissionTrainerNameOptionId,
+  mergeCommissionTrainerOptions,
+  parseCommissionTrainerFilterValues
+} from "../lib/staff/commission-ledger/trainers";
+
+assert.equal(commissionTrainerNameOptionId("Amanda Smith Nguyen"), "name:Amanda Smith Nguyen");
+assert.deepEqual(
+  parseCommissionTrainerFilterValues([
+    "11111111-1111-4111-8111-111111111111",
+    "name:Amanda Smith Nguyen",
+    "Ivonne Campuzano"
+  ]),
+  {
+    trainerIds: ["11111111-1111-4111-8111-111111111111"],
+    trainerNames: ["Amanda Smith Nguyen", "Ivonne Campuzano"]
+  }
+);
+const mergedTrainers = mergeCommissionTrainerOptions(
+  [{ id: "11111111-1111-4111-8111-111111111111", full_name: "Amanda Smith Nguyen", email: "a@test.com" }],
+  [{ id: "name:Ivonne Campuzano", full_name: "Ivonne Campuzano", email: "" }]
+);
+assert.equal(mergedTrainers.length, 2);
+assert.ok(mergedTrainers.some((t) => t.full_name === "Amanda Smith Nguyen"));
+assert.ok(mergedTrainers.some((t) => t.full_name === "Ivonne Campuzano"));
+
 import { commissionDedupeKey, namesMatchCaseInsensitive } from "../lib/staff/commission-ledger/dedupe";
 
 assert.equal(
@@ -237,6 +263,19 @@ assert.match(restPath.path, /order=sale_date\.desc\.nullslast/);
 assert.match(restPath.path, /limit=25/);
 assert.doesNotMatch(restPath.path, /sale_date=gte/);
 assert.equal(restPath.pageSize, 25);
+
+const restTrainerNames = buildCommissionLedgerRestPath(
+  { isTrainerOnly: false },
+  { trainerNames: ["Amanda Smith Nguyen"], page: 1, pageSize: 25 }
+);
+assert.match(restTrainerNames.path, /trainer_name=ilike\.\*Amanda(\+|%20| )Smith(\+|%20| )Nguyen\*/);
+
+const namedPostgres = buildCommissionLedgerSelect(
+  { isTrainerOnly: false },
+  { trainerNames: ["Ivonne Campuzano"], page: 1, pageSize: 25 }
+);
+assert.match(namedPostgres.text, /trainer_name ilike/);
+assert.equal(namedPostgres.values[0], "%Ivonne Campuzano%");
 
 // `sslmode=require` in the connection string is parsed as verify-full and
 // overrides the client's ssl options, which rejected Supabase's pooler chain
