@@ -19,7 +19,7 @@ export default async function ContactPage({
       <PageHero
         eyebrow="Contact"
         title="Request an Operations Review"
-        description="Tell us what is happening inside your dog business. We will review your operation and identify where AI-powered systems and real-world consulting can make the fastest impact."
+        description="Tell us what’s breaking inside your dog business. We’ll look at the operation and say where platform, boards, or a hands-on review will move the needle first."
         secondaryLabel={`Call ${SITE.phoneDisplay}`}
         secondaryHref={SITE.phoneHref}
       />
@@ -28,9 +28,9 @@ export default async function ContactPage({
           <div className="card p-6">
             <h2 className="font-semibold text-white">What happens next</h2>
             <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm text-slate-400">
-              <li>We review your facility type, services, and biggest operational challenge.</li>
-              <li>We identify the highest-impact gaps — staff, dogs, clients, or systems.</li>
-              <li>We follow up with the next best step: audit, AI setup, or a focused strategy call.</li>
+              <li>We read your facility type, services, and the operational headache that woke you up.</li>
+              <li>We mark the biggest gaps — staff, dogs, clients, or systems.</li>
+              <li>We follow up with the next step: audit, product setup, or a focused strategy call.</li>
             </ol>
           </div>
           <div className="card p-6">
