@@ -55,7 +55,7 @@ assert.equal(fullHd.width, 1920);
 assert.equal(fullHd.height, 1080);
 assert.equal(computeTvDisplayScale(fullHd.width, fullHd.height), 1);
 
-// Hi-Browser / Hisense page zoom: stage stays full-bleed (casttv pattern).
+// Hi-Browser / Hisense page zoom: stage tracks the *visible* CSS box (casttv surface).
 const hiBrowserStage = measureTvViewport({
   innerWidth: 1920,
   innerHeight: 1080,
@@ -69,10 +69,10 @@ const hiBrowserStage = measureTvViewport({
     scale: 3
   }
 });
-assert.equal(hiBrowserStage.width, 1920);
-assert.equal(hiBrowserStage.height, 1080);
-assert.equal(hiBrowserStage.offsetLeft, 0);
-assert.equal(hiBrowserStage.offsetTop, 0);
+assert.equal(hiBrowserStage.width, 640);
+assert.equal(hiBrowserStage.height, 360);
+assert.equal(hiBrowserStage.offsetLeft, 1280);
+assert.equal(hiBrowserStage.offsetTop, 720);
 assert.equal(
   shouldLockTvKioskViewport({
     innerWidth: 1920,
@@ -128,7 +128,7 @@ assert.equal(genericCornerFit.width, 720);
 assert.equal(genericCornerFit.height, 405);
 assert.equal(computeTvDisplayScale(genericCornerFit.width, genericCornerFit.height), 720 / 1920);
 
-// Fully Kiosk page zoom: stage full screen, fit uses visible CSS pixels.
+// Fully Kiosk page zoom: stage + fit both use visible CSS pixels.
 const fullyCornerStage = measureTvViewport({
   innerWidth: 1920,
   innerHeight: 1080,
@@ -146,10 +146,10 @@ const fullyCornerStage = measureTvViewport({
     scale: 2.5
   }
 });
-assert.equal(fullyCornerStage.width, 1920);
-assert.equal(fullyCornerStage.height, 1080);
-assert.equal(fullyCornerStage.offsetLeft, 0);
-assert.equal(fullyCornerStage.offsetTop, 0);
+assert.equal(fullyCornerStage.width, 720);
+assert.equal(fullyCornerStage.height, 405);
+assert.equal(fullyCornerStage.offsetLeft, 1100);
+assert.equal(fullyCornerStage.offsetTop, 600);
 
 const fullyCornerFit = measureTvFitViewport({
   innerWidth: 1920,
@@ -473,6 +473,13 @@ assert.match(css, /zoom:\s*1/);
 assert.match(css, /html\.fitdog-tv-google-tv/);
 assert.match(css, /transform-origin:\s*top left/);
 assert.match(css, /translate\(var\(--fitdog-tv-offset-x/);
+// Cast-mode viewport units must not win over the TV canvas design space.
+assert.match(css, /html\.fitdog-tv-active\.fitdog-cast-mode \.fitdog-board-canvas-inner/);
+assert.match(css, /html\.fitdog-tv-active\.fitdog-cast-mode \.fitdog-board-canvas-inner[\s\S]*?max-height:\s*none/);
+assert.doesNotMatch(
+  css,
+  /html\.fitdog-tv-kiosk \.fitdog-tv-stage\s*\{[^}]*inset:\s*0\s*!important/
+);
 
 const lobbyLayout = readFileSync("app/lobby/layout.tsx", "utf8");
 assert.match(lobbyLayout, /export const viewport/);
