@@ -221,6 +221,12 @@ export function readEffectivePageZoom(win: ViewportReader) {
 /**
  * CSS pixels actually on screen. This is the box the 1920×1080 canvas must fit,
  * whether the TV is at 100% zoom, pinch-zoomed, or CSS-zoomed.
+ *
+ * NEVER mix `screen.width` / Fully `getScreenWidth()` into this box. Those are
+ * often physical pixels while `innerWidth` / `visualViewport` are CSS pixels.
+ * Mixing them produced scale=1 against a 1920 "fit" while the WebView was only
+ * ~980 CSS px wide — the zoomed/cropped staff+lobby TV failure. Cast-TV works
+ * on the same devices because it paints fluid `inset:0` into this CSS box.
  */
 export function measureVisibleCssBox(win: ViewportReader): TvViewportBox {
   const innerW = Math.max(win.innerWidth || 0, 1);
@@ -229,22 +235,6 @@ export function measureVisibleCssBox(win: ViewportReader): TvViewportBox {
   const clientH = Math.max(win.document?.documentElement?.clientHeight || 0, innerH);
   const pageZoom = readEffectivePageZoom(win);
   const vv = win.visualViewport;
-  const fullyKiosk = isFullyKioskBrowser(win);
-
-  const fullyW = Number(win.fully?.getScreenWidth?.() || 0);
-  const fullyH = Number(win.fully?.getScreenHeight?.() || 0);
-  const screenW = Math.max(fullyW, win.screen?.availWidth || 0, win.screen?.width || 0);
-  const screenH = Math.max(fullyH, win.screen?.availHeight || 0, win.screen?.height || 0);
-
-  // Prefer physical screen when Fully under-reports a phone-sized WebView.
-  if (fullyKiosk && pageZoom <= 1.02 && innerW < 1280 && screenW >= 1280) {
-    return {
-      width: Math.max(1, screenW),
-      height: Math.max(1, innerH < 720 && screenH >= 720 ? screenH : Math.max(screenH, innerH)),
-      offsetLeft: 0,
-      offsetTop: 0
-    };
-  }
 
   if (vv && vv.width > 0 && vv.height > 0) {
     const vvStillLayoutSized = vv.width >= innerW * 0.95 && vv.height >= innerH * 0.95;
@@ -326,34 +316,20 @@ export function resetTvBrowserZoom(win: ViewportReader) {
   }
 }
 
-function readLayoutScreenBox(win: ViewportReader): TvViewportBox {
+/**
+ * Full-bleed stage for kiosk-locked browsers: the CSS layout viewport only.
+ * Offsets stay 0 so we never stamp into a zoomed visualViewport corner.
+ * Do not substitute screen/Fully physical pixels — those must not drive layout.
+ */
+function readKioskFullBleedStage(win: ViewportReader): TvViewportBox {
   const innerW = Math.max(win.innerWidth || 0, 1);
   const innerH = Math.max(win.innerHeight || 0, 1);
   const clientW = Math.max(win.document?.documentElement?.clientWidth || 0, innerW);
   const clientH = Math.max(win.document?.documentElement?.clientHeight || 0, innerH);
-  const pageZoom = readPageZoomScale(win);
-  const fullyKiosk = isFullyKioskBrowser(win);
-
-  let width = Math.min(innerW, clientW);
-  let height = Math.min(innerH, clientH);
-  const fullyW = Number(win.fully?.getScreenWidth?.() || 0);
-  const fullyH = Number(win.fully?.getScreenHeight?.() || 0);
-  const screenW = Math.max(fullyW, win.screen?.availWidth || 0, win.screen?.width || 0);
-  const screenH = Math.max(fullyH, win.screen?.availHeight || 0, win.screen?.height || 0);
-
-  // Prefer physical screen when Fully under-reports a phone-sized WebView.
-  // Do not bump Google Streamer / Android TV Internet — those browsers often
-  // report ~960–1280 CSS px and then zoom; filling 1920 at scale 1 crops.
-  if (fullyKiosk && pageZoom <= 1.02 && width < 1280 && screenW >= 1280) {
-    width = screenW;
-  }
-  if (fullyKiosk && pageZoom <= 1.02 && height < 720 && screenH >= 720) {
-    height = screenH;
-  }
 
   return {
-    width: Math.max(1, width),
-    height: Math.max(1, height),
+    width: Math.max(1, Math.min(innerW, clientW)),
+    height: Math.max(1, Math.min(innerH, clientH)),
     offsetLeft: 0,
     offsetTop: 0
   };
@@ -362,14 +338,14 @@ function readLayoutScreenBox(win: ViewportReader): TvViewportBox {
 /**
  * Stage geometry for the outer `.fitdog-tv-stage` shell.
  *
- * Kiosk-locked Fully / Hi-Browser: full-bleed layout box (zoom is reset).
- * Google Streamer and other zoomable TVs: pin the stage to the *visible*
- * CSS box (visualViewport / CSS zoom) so a zoomed screen still shows the
- * whole 1920×1080 board instead of a cropped corner.
+ * Kiosk-locked Fully / Hi-Browser: full-bleed CSS layout box (zoom is reset;
+ * CSS also forces inset:0). Google Streamer and other zoomable TVs: pin the
+ * stage to the *visible* CSS box so a zoomed screen still shows the whole
+ * 1920×1080 board instead of a cropped corner.
  */
 export function measureTvViewport(win: ViewportReader): TvViewportBox {
   if (shouldLockTvKioskViewport(win)) {
-    return readLayoutScreenBox(win);
+    return readKioskFullBleedStage(win);
   }
   return measureVisibleCssBox(win);
 }
@@ -397,14 +373,43 @@ export function computeTvDisplayScale(viewportWidth: number, viewportHeight: num
   return Math.min(width / TV_DESIGN_WIDTH, height / TV_DESIGN_HEIGHT);
 }
 
-export function applyTvDisplayScale(scale: number) {
+/**
+ * Letterbox offsets so a top-left-origin scaled 1920×1080 canvas sits centered
+ * in the stage. Using transform-origin:center with a top-left layout box
+ * shifted content toward the bottom-right (the Entry Box TV failure).
+ */
+export function computeTvDisplayOffsets(
+  stageWidth: number,
+  stageHeight: number,
+  scale: number
+) {
+  const safeScale = Math.max(scale, 0.0001);
+  const paintedW = TV_DESIGN_WIDTH * safeScale;
+  const paintedH = TV_DESIGN_HEIGHT * safeScale;
+  return {
+    offsetX: (Math.max(stageWidth, 1) - paintedW) / 2,
+    offsetY: (Math.max(stageHeight, 1) - paintedH) / 2
+  };
+}
+
+export function applyTvDisplayScale(
+  scale: number,
+  offsetX = 0,
+  offsetY = 0
+) {
   if (typeof document === "undefined") return;
-  document.documentElement.style.setProperty("--fitdog-tv-scale", String(scale));
+  const root = document.documentElement.style;
+  root.setProperty("--fitdog-tv-scale", String(scale));
+  root.setProperty("--fitdog-tv-offset-x", `${offsetX}px`);
+  root.setProperty("--fitdog-tv-offset-y", `${offsetY}px`);
 }
 
 export function clearTvDisplayScale() {
   if (typeof document === "undefined") return;
-  document.documentElement.style.removeProperty("--fitdog-tv-scale");
+  const root = document.documentElement.style;
+  root.removeProperty("--fitdog-tv-scale");
+  root.removeProperty("--fitdog-tv-offset-x");
+  root.removeProperty("--fitdog-tv-offset-y");
 }
 
 export function applyTvStageToVisibleViewport(stage: HTMLElement, box: TvViewportBox) {

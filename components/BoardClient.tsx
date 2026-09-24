@@ -899,7 +899,7 @@ export function BoardClient({
         />
       ) : null}
 
-      <TvLayoutCanvas enabled={tvMode} className="fitdog-tv-stage--staff kennel-lines">
+      <TvLayoutCanvas enabled={tvMode} className="fitdog-tv-stage--staff kennel-lines" surface="staff">
         <div
           className={`mx-auto flex h-full w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6 ${tvMode ? "fitdog-board-canvas-inner" : "max-w-[1920px]"}`}
         >
