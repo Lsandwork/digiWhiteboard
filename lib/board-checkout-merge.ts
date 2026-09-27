@@ -1,6 +1,7 @@
 import { shouldExpireCheckinDog } from "@/lib/checkin-display";
 import { shouldExpireCheckoutDog } from "@/lib/checkout-display";
 import { getCheckoutMergeKey } from "@/lib/board-sticky-checkout";
+import { isTrainingReservationType } from "@/lib/gingr-board-sync";
 import type { LiveBoardResponse, LiveDog } from "@/lib/types";
 import { getStableDogPhotoKey, rememberStableDogPhoto } from "@/lib/dog-photo-display-cache";
 
@@ -288,6 +289,13 @@ export function isFastWebhookTransition(dog: LiveDog) {
 
 export function isWebhookCheckoutWithinAddGrace(dog: LiveDog, nowMs = Date.now()) {
   if (!isFastWebhookTransition(dog) || dog.display_status !== "checking_out") return false;
+  // Training & Classes never stays in Gingr's default BOH basket window, so keep
+  // webhook-prompted training checkouts visible for the full display window.
+  if (isTrainingReservationType(dog.reservation_type)) {
+    const until = dog.display_until ? new Date(dog.display_until).getTime() : null;
+    if (until != null && Number.isFinite(until) && until <= nowMs) return false;
+    return true;
+  }
   const started = dog.status_started_at ?? dog.updated_at;
   if (!started) return false;
   const startedMs = new Date(started).getTime();
