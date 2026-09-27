@@ -127,7 +127,101 @@ export type AssignedStopRef = {
   dogIds: string[];
   dogNames: string[];
   householdKey?: string | null;
+  serviceCanonicals?: Array<string | null | undefined>;
 };
+
+export type RouteCoverageIssue = {
+  code: "eligible_dog_missing" | "duplicate_assignment" | "service_mutated";
+  message: string;
+  dogName?: string | null;
+  reservationId?: string | null;
+};
+
+export type RouteCoverageReport = {
+  ok: boolean;
+  issues: RouteCoverageIssue[];
+  eligibleCount: number;
+  representedCount: number;
+};
+
+function itemIdentity(item: NormalizedReportItem): string {
+  return `${item.direction}|${item.reservationId || ""}|${item.dogId || ""}|${item.dogName || ""}|${item.serviceCanonical || item.serviceRaw || ""}`;
+}
+
+function stopMatchesItem(stop: AssignedStopRef, item: NormalizedReportItem): boolean {
+  if (stop.direction !== item.direction) return false;
+  if (item.reservationId && stop.reservationIds.includes(item.reservationId)) return true;
+  if (item.dogId && stop.dogIds.includes(item.dogId)) return true;
+  if (
+    item.dogName &&
+    stop.dogNames.some((name) => name.toLowerCase() === String(item.dogName).toLowerCase())
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * After generation: every eligible dog/leg must appear exactly once, and class/service
+ * must not have been rewritten by packing. Failures are visible — never silent drops.
+ */
+export function validateRouteCoverage(params: {
+  items: NormalizedReportItem[];
+  assignedStops: AssignedStopRef[];
+}): RouteCoverageReport {
+  const issues: RouteCoverageIssue[] = [];
+  const eligible = params.items.filter((item) => {
+    if (item.validationStatus === "error" && !item.addressRaw && !isFacilityHouseholdKey(item.householdKey)) {
+      return false;
+    }
+    return true;
+  });
+
+  const represented = new Set<string>();
+  for (const item of eligible) {
+    const matches = params.assignedStops.filter((stop) => stopMatchesItem(stop, item));
+    if (matches.length === 0) {
+      issues.push({
+        code: "eligible_dog_missing",
+        message: `${item.dogName || "Dog"} (${item.direction} ${item.serviceCanonical || item.serviceRaw || "service"}) is missing from all generated routes.`,
+        dogName: item.dogName,
+        reservationId: item.reservationId
+      });
+      continue;
+    }
+    represented.add(itemIdentity(item));
+    const uniqueStopIds = [...new Set(matches.map((stop) => stop.stopId))];
+    const vans = [...new Set(matches.map((stop) => `${stop.direction}:${stop.routeVanKey}`))];
+    if (uniqueStopIds.length > 1) {
+      issues.push({
+        code: "duplicate_assignment",
+        message: `${item.dogName || "Dog"} appears on multiple ${item.direction} stops/routes (${vans.join(", ")}).`,
+        dogName: item.dogName,
+        reservationId: item.reservationId
+      });
+    }
+    const expectedService = String(item.serviceCanonical || item.serviceRaw || "").trim();
+    if (!expectedService) continue;
+    const stopServices = matches.flatMap((stop) =>
+      (stop.serviceCanonicals || []).map((value) => String(value || "").trim()).filter(Boolean)
+    );
+    if (stopServices.length && !stopServices.includes(expectedService)) {
+      issues.push({
+        code: "service_mutated",
+        message: `${item.dogName || "Dog"} service changed during routing (${expectedService} → ${stopServices.join(", ") || "unknown"}).`,
+        dogName: item.dogName,
+        reservationId: item.reservationId
+      });
+    }
+  }
+
+  return {
+    ok: issues.length === 0,
+    issues,
+    eligibleCount: eligible.length,
+    representedCount: represented.size
+  };
+}
 
 /**
  * Reconcile expected legs against generated stop assignments.

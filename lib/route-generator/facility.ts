@@ -59,7 +59,14 @@ export function annotateFacilityItems(
       (item.raw?.pickup_location_name as string | undefined) ||
       (item.raw?.dropoff_location_name as string | undefined) ||
       null;
-    const facilityKey = detectFitdogFacility({
+    const explicitType = String(item.locationType || item.raw?.location_type || "")
+      .trim()
+      .toUpperCase();
+    // Never convert an explicit HOME/CUSTOM leg into a Fitdog facility stop.
+    if (explicitType === "HOME" || explicitType === "CUSTOM") {
+      return { ...item, facilityKey: null, atFacility: false };
+    }
+    let facilityKey = detectFitdogFacility({
       addressRaw: item.addressRaw,
       addressStreet: item.addressStreet,
       addressCity: item.addressCity,
@@ -67,6 +74,10 @@ export function annotateFacilityItems(
       locationName,
       locations
     });
+    // Scheduled FITDOG/HUB destination is the source of truth even when Gingr
+    // omitted a street — otherwise the stop is labeled with the dog's name at Club.
+    if (!facilityKey && explicitType === "FITDOG") facilityKey = "club";
+    if (!facilityKey && explicitType === "HUB") facilityKey = "hub";
     if (!facilityKey) return { ...item, facilityKey: null, atFacility: false };
 
     const facility = resolveBaseLocation(locations, facilityKey);

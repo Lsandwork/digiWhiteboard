@@ -15,9 +15,10 @@ import {
 } from "@/lib/route-generator/capacity";
 import type { HouseholdStopGroup } from "@/lib/route-generator/households";
 import { formatStopDisplayName } from "@/lib/route-generator/households";
-import { isFacilityHouseholdKey } from "@/lib/route-generator/facility";
+import { isFacilityHouseholdKey, facilityBaseKeyFromHousehold } from "@/lib/route-generator/facility";
 import {
   DEFAULT_FITDOG_LOCATIONS,
+  FITDOG_CLUB_STOP_NAME,
   homeBaseForVehiclePool,
   resolveBaseLocation,
   resolveRouteEndpoints,
@@ -25,9 +26,11 @@ import {
 } from "@/lib/route-generator/locations";
 import { buildCustomerStopNotes, formatPhoneForDriver } from "@/lib/route-generator/stop-notes";
 import {
+  classGroupingPenalty,
   estimateCustomerStopEtas,
   groupTimelinessSortKey,
   orderStopsForTimeliness,
+  primaryServiceLabel,
   sharedDogAffinityBonus,
   sharedDogTimingClashPenalty,
   windowCompatibilityPenalty
@@ -69,6 +72,8 @@ export type OptimizedStop = {
   etaArrival?: string | null;
   etaDeparture?: string | null;
   dogIds?: string[];
+  /** Per-dog class/service aligned with reservationIds — not the stop's first service. */
+  serviceCanonicals?: Array<CanonicalService | string | null>;
 };
 
 export type OptimizedRoute = {
@@ -125,6 +130,55 @@ function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: 
 }
 
 type StopCoord = { lat: number; lng: number };
+
+/**
+ * Presentation-only: one Club Fitdog destination stop per van on drop-off.
+ * Does not change each dog's canonical locationType / destination.
+ * Never merges Hub, Kenneth Hahn, Huntington, or HOME drop-offs.
+ */
+export function consolidateFitdogDestinationStops<T extends HouseholdStopGroup>(
+  facilityStops: T[],
+  locations: FitdogLocationsConfig = DEFAULT_FITDOG_LOCATIONS
+): T[] {
+  const club: T[] = [];
+  const other: T[] = [];
+  for (const stop of facilityStops) {
+    if (facilityBaseKeyFromHousehold(stop.householdKey) === "club") club.push(stop);
+    else other.push(stop);
+  }
+  if (club.length === 0) return facilityStops;
+  const items = club.flatMap((stop) => stop.items);
+  // Defensive: if a "club" group mixed in a HOME dog, do not swallow that home drop-off.
+  const homeItems = items.filter((item) => String(item.locationType || item.raw?.location_type || "").toUpperCase() === "HOME");
+  if (homeItems.length) {
+    return facilityStops;
+  }
+  const extraOf = (stop: T) => {
+    const rec = stop as T & { coord?: StopCoord | null; load?: number; large?: number };
+    return {
+      coord: rec.coord ?? null,
+      load: Number(rec.load) || 0,
+      large: Number(rec.large) || 0
+    };
+  };
+  const first = club[0]!;
+  const clubCoord =
+    locations.club.latitude != null && locations.club.longitude != null
+      ? { lat: locations.club.latitude, lng: locations.club.longitude }
+      : extraOf(first).coord;
+  const merged = {
+    ...first,
+    householdKey: club.length === 1 ? first.householdKey : `facility:club:consolidated`,
+    ownerName: FITDOG_CLUB_STOP_NAME,
+    address: locations.club.address,
+    items,
+    dogCount: items.length,
+    load: club.reduce((sum, stop) => sum + extraOf(stop).load, 0),
+    large: club.reduce((sum, stop) => sum + extraOf(stop).large, 0),
+    coord: clubCoord
+  } as T;
+  return [...other, merged];
+}
 
 function nearestNeighborOrder(
   stops: Array<HouseholdStopGroup & { coord: StopCoord | null; load: number; large: number }>,
@@ -303,8 +357,9 @@ export function optimizeRoutes(params: {
         const timingPenalty = windowCompatibilityPenalty(bucket.stops, stop, params.direction);
         const clash = sharedDogTimingClashPenalty(bucket.stops, stop);
         const affinity = sharedDogAffinityBonus(bucket.stops, stop);
-        // Lower is better: proximity + window mismatch + shared-dog clash − sequential affinity.
-        const score = dist + timingPenalty + clash - affinity;
+        const classPenalty = classGroupingPenalty(bucket.stops, stop);
+        // Lower is better: proximity + window mismatch + shared-dog clash + class mix − sequential affinity.
+        const score = dist + timingPenalty + clash + classPenalty - affinity;
         return { bucket, check, dist, score, clash };
       })
       .filter((c) => c.clash < 500 && (options?.ignoreCapacity || c.check.ok))
@@ -408,11 +463,14 @@ export function optimizeRoutes(params: {
   }
 
   const unlocked = enriched.filter((s) => !placedKeys.has(s.householdKey));
-  // Assign earliest deadlines first so late-window proximity packing cannot starve early classes.
+  // Window first, then real class/service, then load — geography is applied in rankCandidates.
   unlocked.sort((a, b) => {
     const aKey = groupTimelinessSortKey(a, params.direction);
     const bKey = groupTimelinessSortKey(b, params.direction);
     if (aKey !== bKey) return aKey - bKey;
+    const aClass = primaryServiceLabel(a);
+    const bClass = primaryServiceLabel(b);
+    if (aClass !== bClass) return aClass.localeCompare(bClass);
     return b.load - a.load || a.address.localeCompare(b.address);
   });
 
@@ -469,6 +527,30 @@ export function optimizeRoutes(params: {
   }
   }
 
+  if (!combined) {
+    const classToVans = new Map<string, Set<string>>();
+    for (const [vanKey, bucket] of buckets) {
+      if (!bucket.stops.length) continue;
+      for (const stop of bucket.stops) {
+        const label = primaryServiceLabel(stop);
+        if (!label) continue;
+        const vans = classToVans.get(label) ?? new Set<string>();
+        vans.add(vanKey);
+        classToVans.set(label, vans);
+      }
+    }
+    for (const [service, vans] of classToVans) {
+      if (vans.size < 2) continue;
+      const vanList = [...vans]
+        .sort()
+        .map((key) => key.replace("van_", "Van "))
+        .join(", ");
+      warnings.push(
+        `CLASS SPLIT: ${service} is on ${vanList} because capacity or another hard constraint required a split.`
+      );
+    }
+  }
+
   const routes: OptimizedRoute[] = [];
   for (const vanKey of FITDOG_VAN_KEYS) {
     const bucket = buckets.get(vanKey);
@@ -512,10 +594,14 @@ export function optimizeRoutes(params: {
       orderedHome.some((stop) => stop.items.some((item) => item.timeWindowStart || item.timeWindowEnd))
         ? orderedHome
         : nearestNeighborOrder(homeStops, startCoord, rng);
+    const orderedFacility =
+      params.direction === "dropoff"
+        ? consolidateFitdogDestinationStops(facilityStops, locations)
+        : facilityStops;
     const ordered =
       params.direction === "pickup"
-        ? [...facilityStops, ...orderedHomeFinal]
-        : [...orderedHomeFinal, ...facilityStops];
+        ? [...orderedFacility, ...orderedHomeFinal]
+        : [...orderedHomeFinal, ...orderedFacility];
 
     let distance = 0;
     let prev = startCoord;
@@ -565,6 +651,8 @@ export function optimizeRoutes(params: {
         )
       ];
       const isFacility = isFacilityHouseholdKey(stop.householdKey);
+      const isClubDropoff =
+        params.direction === "dropoff" && facilityBaseKeyFromHousehold(stop.householdKey) === "club";
       const phones = [
         ...new Set(
           stop.items
@@ -587,10 +675,12 @@ export function optimizeRoutes(params: {
         sequence: index + 1,
         stopKind: "customer",
         householdKey: stop.householdKey,
-        ownerName: stop.ownerName,
-        address: stop.address,
-        latitude: stop.coord?.lat ?? null,
-        longitude: stop.coord?.lng ?? null,
+        ownerName: isClubDropoff ? FITDOG_CLUB_STOP_NAME : stop.ownerName,
+        address: isClubDropoff ? locations.club.address : stop.address,
+        latitude: isClubDropoff ? locations.club.latitude ?? stop.coord?.lat ?? null : stop.coord?.lat ?? null,
+        longitude: isClubDropoff
+          ? locations.club.longitude ?? stop.coord?.lng ?? null
+          : stop.coord?.lng ?? null,
         dogCount: stop.dogCount,
         loadUnits: stop.load,
         largeDogs: stop.large,
@@ -598,6 +688,9 @@ export function optimizeRoutes(params: {
         dogNames: stop.items.map((i) => i.dogName || "Dog"),
         dogIds: stop.items.map((i) => i.dogId || "").filter(Boolean),
         reservationIds: stop.items.map((i) => i.reservationId || "").filter(Boolean),
+        serviceCanonicals: stop.items
+          .filter((i) => i.reservationId)
+          .map((i) => i.serviceCanonical || i.serviceRaw || null),
         locked: Boolean(lockedVanByHousehold?.[stop.householdKey]),
         ownerPhoneDisplay: phones[0] ?? null,
         requestedWindowStart: eta?.requestedWindowStart ?? null,
@@ -695,6 +788,12 @@ export function vanByReservationFromPickupRoutes(
  * Drop-off vans must match pickup vans: a dog only rides Van 3 drop-off if Van 3 picked them up.
  * Splits mixed households when dogs were collected by different vans.
  */
+function splitGroupDisplayName(group: HouseholdStopGroup, items: HouseholdStopGroup["items"]): string {
+  if (facilityBaseKeyFromHousehold(group.householdKey) === "club") return FITDOG_CLUB_STOP_NAME;
+  if (isFacilityHouseholdKey(group.householdKey)) return group.ownerName || formatStopDisplayName(items);
+  return formatStopDisplayName(items);
+}
+
 export function lockDropoffGroupsToPickupVans(params: {
   pickupRoutes: OptimizedRoute[];
   dropoffGroups: HouseholdStopGroup[];
@@ -749,7 +848,7 @@ export function lockDropoffGroupsToPickupVans(params: {
           householdKey: `${group.householdKey}::unassigned`,
           items,
           dogCount: items.length,
-          ownerName: formatStopDisplayName(items)
+          ownerName: splitGroupDisplayName(group, items)
         });
         continue;
       }
@@ -760,7 +859,7 @@ export function lockDropoffGroupsToPickupVans(params: {
         householdKey: splitKey,
         items,
         dogCount: items.length,
-        ownerName: formatStopDisplayName(items)
+        ownerName: splitGroupDisplayName(group, items)
       });
     }
   }

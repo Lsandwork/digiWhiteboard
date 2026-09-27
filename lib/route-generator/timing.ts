@@ -281,6 +281,40 @@ export function windowCompatibilityPenalty(
 }
 
 /**
+ * Soft class-together constraint. Same Gingr/RuffOps class on a van is preferred;
+ * mixing another class is penalized. Never a hard block — capacity/eligibility win.
+ */
+export function classGroupingPenalty(
+  existing: HouseholdStopGroup[],
+  candidate: HouseholdStopGroup
+): number {
+  const candidateClass = String(
+    candidate.items.find((item) => item.serviceCanonical)?.serviceCanonical ||
+      candidate.items[0]?.serviceRaw ||
+      ""
+  ).trim();
+  if (!candidateClass) return 0;
+  const existingClasses = new Set(
+    existing
+      .flatMap((stop) =>
+        stop.items.map((item) => String(item.serviceCanonical || item.serviceRaw || "").trim())
+      )
+      .filter(Boolean)
+  );
+  if (!existingClasses.size) return 0;
+  if (existingClasses.has(candidateClass)) return -20;
+  return 28;
+}
+
+export function primaryServiceLabel(group: HouseholdStopGroup): string {
+  return String(
+    group.items.find((item) => item.serviceCanonical)?.serviceCanonical ||
+      group.items[0]?.serviceRaw ||
+      ""
+  ).trim();
+}
+
+/**
  * Same dog already on this van for another reservation → prefer keeping sequential legs together
  * only when windows do not clash (bonus). Overlapping same-dog windows are a hard clash penalty.
  */

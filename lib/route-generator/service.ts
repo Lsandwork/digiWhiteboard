@@ -50,7 +50,7 @@ import {
   householdKeysShareStem
 } from "@/lib/route-generator/household-coords";
 import { geocodeMany } from "@/lib/route-generator/geocode";
-import { reconcileTransportLegs, formatMissingLeg } from "@/lib/route-generator/reconciliation";
+import { reconcileTransportLegs, formatMissingLeg, validateRouteCoverage } from "@/lib/route-generator/reconciliation";
 import { formatPostalAddress } from "@/lib/route-generator/destination";
 import { RouteGeneratorClientError } from "@/lib/route-generator/errors";
 import { writeRouteAuditEvent } from "@/lib/route-generator/audit";
@@ -1257,7 +1257,8 @@ export async function generatePlanForRun(params: {
         reservationIds: stop.reservationIds || [],
         dogIds: stop.dogIds || [],
         dogNames: stop.dogNames || [],
-        householdKey: stop.householdKey
+        householdKey: stop.householdKey,
+        serviceCanonicals: stop.serviceCanonicals || stop.serviceTypes || []
       }))
   );
   // Also mark optimizer-unassigned households' dogs as UNASSIGNED via missing match.
@@ -1265,12 +1266,24 @@ export async function generatePlanForRun(params: {
     items: annotatedAll,
     assignedStops: assignedStopRefs
   });
+  const coverage = validateRouteCoverage({
+    items: recoverable,
+    assignedStops: assignedStopRefs
+  });
+  if (!coverage.ok) {
+    pickupOpt.warnings.push(
+      ...coverage.issues.slice(0, 30).map((issue) => `COVERAGE: ${issue.message}`)
+    );
+    if (coverage.issues.length > 30) {
+      pickupOpt.warnings.push(`COVERAGE: ${coverage.issues.length - 30} additional issue(s) omitted.`);
+    }
+  }
   if (!reconciliation.ok) {
     // Force needs_review whenever any leg is missing — never approve a silent drop.
   }
 
   const planStatus =
-    reconciliation.ok && status === "ready_for_approval" && !usedSyntheticCustomerCoords
+    reconciliation.ok && coverage.ok && status === "ready_for_approval" && !usedSyntheticCustomerCoords
       ? "ready_for_approval"
       : "needs_review";
 
@@ -1310,12 +1323,14 @@ export async function generatePlanForRun(params: {
             ? summarizeOneBigRoute({ pickupOpt, dropoffOpt, needsReview, gingrTaxiImported })
             : null,
         reconciliation: {
-          ok: reconciliation.ok,
+          ok: reconciliation.ok && coverage.ok,
           expectedCount: reconciliation.expectedCount,
           assignedCount: reconciliation.assignedCount,
           unassignedCount: reconciliation.unassignedCount,
           blockedCount: reconciliation.blockedCount,
-          missing: reconciliation.missing.slice(0, 50).map(formatMissingLeg)
+          missing: reconciliation.missing.slice(0, 50).map(formatMissingLeg),
+          coverageOk: coverage.ok,
+          coverageIssues: coverage.issues.slice(0, 50).map((issue) => issue.message)
         }
       },
       created_by: params.actorAdminId ?? null,
@@ -1409,7 +1424,7 @@ export async function generatePlanForRun(params: {
         const itemRows = stop.reservationIds.map((reservationId, index) => ({
           stop_id: stopRow.id,
           dog_name: stop.dogNames[index] || null,
-          service_canonical: stop.serviceTypes[0] || null,
+          service_canonical: stop.serviceCanonicals?.[index] || stop.serviceTypes[0] || null,
           reservation_id: reservationId,
           dog_size: null,
           load_units: 1
@@ -1853,6 +1868,7 @@ export async function exportSamsaraCsv(params: {
       const etaDeparture = stopRecord.eta_departure
         ? new Date(String(stopRecord.eta_departure))
         : null;
+      const isStartingStop = stop.stop_kind === "depot_start" || stopIndex === 0;
       const synthesized = synthesizeStopSchedule({
         operatingDate,
         direction,
@@ -1860,21 +1876,24 @@ export async function exportSamsaraCsv(params: {
         stopCount: routeStops.length,
         vanKey: String(route.van_key ?? "")
       });
-      let scheduledArrival =
-        etaArrival && !Number.isNaN(etaArrival.getTime())
+      // Starting stop: blank arrival is how Samsara marks
+      // "Vehicle is expected to already be at this stop when the route begins."
+      let scheduledArrival = isStartingStop
+        ? ""
+        : etaArrival && !Number.isNaN(etaArrival.getTime())
           ? formatSamsaraCsvDateTime(etaArrival)
           : synthesized.arrival;
       let scheduledDeparture =
         etaDeparture && !Number.isNaN(etaDeparture.getTime())
           ? formatSamsaraCsvDateTime(etaDeparture)
           : synthesized.departure;
-      // Samsara requires both times; departure must be strictly after arrival.
+      // Samsara requires both times on later stops; departure must be strictly after arrival.
       const arrivalMs = etaArrival && !Number.isNaN(etaArrival.getTime()) ? etaArrival.getTime() : null;
       const departureMs = etaDeparture && !Number.isNaN(etaDeparture.getTime()) ? etaDeparture.getTime() : null;
-      if (arrivalMs != null && (departureMs == null || departureMs <= arrivalMs)) {
+      if (!isStartingStop && arrivalMs != null && (departureMs == null || departureMs <= arrivalMs)) {
         scheduledDeparture = formatSamsaraCsvDateTime(new Date(arrivalMs + 5 * 60_000));
       }
-      if (!scheduledArrival.trim()) scheduledArrival = synthesized.arrival;
+      if (!isStartingStop && !scheduledArrival.trim()) scheduledArrival = synthesized.arrival;
       if (!scheduledDeparture.trim()) scheduledDeparture = synthesized.departure;
 
       const aligned = ensureScheduleOnOperatingDate({
@@ -1884,9 +1903,10 @@ export async function exportSamsaraCsv(params: {
         direction,
         stopIndex,
         stopCount: routeStops.length,
-        vanKey: String(route.van_key ?? "")
+        vanKey: String(route.van_key ?? ""),
+        preserveBlankArrival: isStartingStop
       });
-      scheduledArrival = aligned.arrival;
+      scheduledArrival = isStartingStop ? "" : aligned.arrival;
       scheduledDeparture = aligned.departure;
       if (aligned.realigned) realignedScheduleCount += 1;
 

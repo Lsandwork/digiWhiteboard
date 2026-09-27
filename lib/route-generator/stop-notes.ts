@@ -64,7 +64,15 @@ export function buildCustomerStopNotes(params: {
   const reservationNotes = uniqueNonEmpty(items.map((item) => item.reservationNotes));
 
   const lines: string[] = [];
-  if (isFacility) {
+  if (isFacility && direction === "dropoff") {
+    lines.push("Dogs:");
+    if (dogNames.length) {
+      for (const name of dogNames) lines.push(`- ${name}`);
+    } else {
+      lines.push("- dogs");
+    }
+    if (facilityLabel) lines.push(`Location: ${facilityLabel}`);
+  } else if (isFacility) {
     lines.push(
       `Fitdog facility stop - ${dogNames.length || items.length} dog(s) already on-site: ${dogNames.join(", ") || "dogs"}`
     );
