@@ -1,10 +1,13 @@
 import type { GingrReservation } from "@/lib/integrations/gingr/types";
 import {
   type GingrRouteActivityId,
-  isDropOffService,
-  isPickUpService,
   matchGingrRouteActivity
 } from "@/lib/gingr-route-generator/activities";
+import {
+  logTransportationClassification,
+  normalizeReservationTransportation,
+  type GingrTransportationType
+} from "@/lib/gingr-route-generator/transportation";
 
 export type GingrRouteAddressStatus = "ok" | "missing" | "incomplete";
 
@@ -17,8 +20,14 @@ export type GingrRouteDog = {
   activities: GingrRouteActivityId[];
   /** Subject labels for RSVP-style columns (Canine Fitness, Adventure Hike, etc.). */
   activityLabels: string[];
+  /** FitDog van picks up from the owner's home (or taxi pickup). */
   pickup: boolean;
+  /** FitDog van drops off at the owner's home (or taxi drop-off). */
   dropoff: boolean;
+  ownerClubDropoff: boolean;
+  ownerClubPickup: boolean;
+  isTaxi: boolean;
+  transportationTypes: GingrTransportationType[];
   scheduledTime: string | null;
   scheduledTimeLabel: string | null;
   /** Notes visible to the client on the reservation. */
@@ -90,9 +99,18 @@ function reservationTypeName(reservation: GingrReservation): string {
   );
 }
 
-function reservationServices(reservation: GingrReservation): Array<Record<string, unknown>> {
-  const services = reservation.services;
-  return Array.isArray(services) ? services.map((item) => asRecord(item)) : [];
+function reservationServiceRows(reservation: GingrReservation): Array<Record<string, unknown>> {
+  const record = reservation as Record<string, unknown>;
+  const candidates = [record.services, record.additional_services, record.reservation_services, record.addons];
+  const rows: Array<Record<string, unknown>> = [];
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    for (const item of candidate) {
+      const row = asRecord(item);
+      if (Object.keys(row).length) rows.push(row);
+    }
+  }
+  return rows;
 }
 
 function serviceName(service: Record<string, unknown>): string {
@@ -264,7 +282,7 @@ function collectServiceNames(reservation: GingrReservation): string[] {
   const names: string[] = [];
   const typeName = reservationTypeName(reservation);
   if (typeName) names.push(typeName);
-  for (const service of reservationServices(reservation)) {
+  for (const service of reservationServiceRows(reservation)) {
     const name = serviceName(service);
     if (name) names.push(name);
   }
@@ -373,6 +391,10 @@ type Acc = {
   activityLabels: Set<string>;
   pickup: boolean;
   dropoff: boolean;
+  ownerClubDropoff: boolean;
+  ownerClubPickup: boolean;
+  isTaxi: boolean;
+  transportationTypes: Set<GingrTransportationType>;
   scheduledTime: string | null;
   notes: string | null;
   pickupInstructions: string | null;
@@ -400,101 +422,123 @@ export function normalizeGingrRouteReservations(
   const byAnimal = new Map<string, Acc>();
 
   for (const reservation of reservations) {
-    if (asRecord(reservation).cancelled_date) continue;
+    try {
+      if (asRecord(reservation).cancelled_date) continue;
 
-    const key = animalKey(reservation);
-    let acc = byAnimal.get(key);
-    if (!acc) {
-      acc = {
-        id: key,
-        animalId: animalIdFromReservation(reservation),
-        name: dogNameFromReservation(reservation),
-        owner: ownerDisplayName(reservation),
-        imageUrl: reservationPhoto(reservation),
-        activitySet: new Set(),
-        activityLabels: new Set(),
-        pickup: false,
-        dropoff: false,
-        scheduledTime: null,
-        notes: null,
-        pickupInstructions: null,
-        reservationIds: new Set(),
-        hasEligibleActivity: false,
-        homeStreet1: null,
-        homeStreet2: null,
-        homeCity: null,
-        homeState: null,
-        homePostalCode: null,
-        homeAddress: null,
-        ownerPhone: null,
-        ownerFullName: null,
-        addressStatus: "missing"
-      };
-      byAnimal.set(key, acc);
-    }
-
-    const rid = reservationNumericId(reservation);
-    if (rid) acc.reservationIds.add(rid);
-    if (!acc.imageUrl) acc.imageUrl = reservationPhoto(reservation);
-
-    const typeName = reservationTypeName(reservation);
-    const services = reservationServices(reservation);
-    const names = collectServiceNames(reservation);
-
-    for (const name of names) {
-      const activity = matchGingrRouteActivity(name);
-      if (activity) {
-        acc.hasEligibleActivity = true;
-        acc.activitySet.add(activity.id);
-        acc.activityLabels.add(activity.label);
+      const key = animalKey(reservation);
+      let acc = byAnimal.get(key);
+      if (!acc) {
+        acc = {
+          id: key,
+          animalId: animalIdFromReservation(reservation),
+          name: dogNameFromReservation(reservation),
+          owner: ownerDisplayName(reservation),
+          imageUrl: reservationPhoto(reservation),
+          activitySet: new Set(),
+          activityLabels: new Set(),
+          pickup: false,
+          dropoff: false,
+          ownerClubDropoff: false,
+          ownerClubPickup: false,
+          isTaxi: false,
+          transportationTypes: new Set(),
+          scheduledTime: null,
+          notes: null,
+          pickupInstructions: null,
+          reservationIds: new Set(),
+          hasEligibleActivity: false,
+          homeStreet1: null,
+          homeStreet2: null,
+          homeCity: null,
+          homeState: null,
+          homePostalCode: null,
+          homeAddress: null,
+          ownerPhone: null,
+          ownerFullName: null,
+          addressStatus: "missing"
+        };
+        byAnimal.set(key, acc);
       }
-      if (isPickUpService(name)) acc.pickup = true;
-      if (isDropOffService(name)) acc.dropoff = true;
-    }
 
-    if (matchGingrRouteActivity(typeName)) {
-      const t = extractTimeIso(reservation);
-      if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
-    }
+      const rid = reservationNumericId(reservation);
+      if (rid) acc.reservationIds.add(rid);
+      if (!acc.imageUrl) acc.imageUrl = reservationPhoto(reservation);
 
-    for (const service of services) {
-      const name = serviceName(service);
-      if (!matchGingrRouteActivity(name)) continue;
-      const t = extractTimeIso(reservation, service);
-      if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
-    }
+      const typeName = reservationTypeName(reservation);
+      const services = reservationServiceRows(reservation);
+      const names = collectServiceNames(reservation);
 
-    const clientNotes = extractClientNotes(reservation);
-    if (clientNotes && !acc.notes) acc.notes = clientNotes;
-    const pickupInstructions = extractPickupInstructions(reservation);
-    if (pickupInstructions && !acc.pickupInstructions) {
-      acc.pickupInstructions = pickupInstructions;
-    }
-    // Avoid duplicating the same text across both columns.
-    if (acc.notes && acc.pickupInstructions && acc.notes === acc.pickupInstructions) {
-      acc.notes = null;
-    }
+      for (const name of names) {
+        const activity = matchGingrRouteActivity(name);
+        if (activity) {
+          acc.hasEligibleActivity = true;
+          acc.activitySet.add(activity.id);
+          acc.activityLabels.add(activity.label);
+        }
+      }
 
-    const nextAddress = extractHomeAddressFromReservation(reservation);
-    const currentAddress = {
-      street1: acc.homeStreet1,
-      street2: acc.homeStreet2,
-      city: acc.homeCity,
-      state: acc.homeState,
-      postalCode: acc.homePostalCode,
-      fullAddress: acc.homeAddress,
-      status: acc.addressStatus
-    };
-    const chosen = preferAddress(currentAddress, nextAddress);
-    acc.homeStreet1 = chosen.street1;
-    acc.homeStreet2 = chosen.street2;
-    acc.homeCity = chosen.city;
-    acc.homeState = chosen.state;
-    acc.homePostalCode = chosen.postalCode;
-    acc.homeAddress = chosen.fullAddress;
-    acc.addressStatus = chosen.status;
-    if (!acc.ownerPhone) acc.ownerPhone = ownerPhone(reservation);
-    if (!acc.ownerFullName) acc.ownerFullName = ownerFullName(reservation);
+      const transport = normalizeReservationTransportation(reservation as Record<string, unknown>);
+      if (transport.fitdogHomePickup) acc.pickup = true;
+      if (transport.fitdogHomeDropoff) acc.dropoff = true;
+      if (transport.ownerClubDropoff) acc.ownerClubDropoff = true;
+      if (transport.ownerClubPickup) acc.ownerClubPickup = true;
+      if (transport.isTaxi) acc.isTaxi = true;
+      for (const type of transport.types) acc.transportationTypes.add(type);
+      logTransportationClassification({
+        appointmentId: rid,
+        service: typeName,
+        addon: transport.types.join(",") || null,
+        transportation: transport.types[0] ?? "UNKNOWN"
+      });
+
+      if (matchGingrRouteActivity(typeName)) {
+        const t = extractTimeIso(reservation);
+        if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
+      }
+
+      for (const service of services) {
+        const name = serviceName(service);
+        if (!matchGingrRouteActivity(name)) continue;
+        const t = extractTimeIso(reservation, service);
+        if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
+      }
+
+      const clientNotes = extractClientNotes(reservation);
+      if (clientNotes && !acc.notes) acc.notes = clientNotes;
+      const pickupInstructions = extractPickupInstructions(reservation);
+      if (pickupInstructions && !acc.pickupInstructions) {
+        acc.pickupInstructions = pickupInstructions;
+      }
+      if (acc.notes && acc.pickupInstructions && acc.notes === acc.pickupInstructions) {
+        acc.notes = null;
+      }
+
+      const nextAddress = extractHomeAddressFromReservation(reservation);
+      const currentAddress = {
+        street1: acc.homeStreet1,
+        street2: acc.homeStreet2,
+        city: acc.homeCity,
+        state: acc.homeState,
+        postalCode: acc.homePostalCode,
+        fullAddress: acc.homeAddress,
+        status: acc.addressStatus
+      };
+      const chosen = preferAddress(currentAddress, nextAddress);
+      acc.homeStreet1 = chosen.street1;
+      acc.homeStreet2 = chosen.street2;
+      acc.homeCity = chosen.city;
+      acc.homeState = chosen.state;
+      acc.homePostalCode = chosen.postalCode;
+      acc.homeAddress = chosen.fullAddress;
+      acc.addressStatus = chosen.status;
+      if (!acc.ownerPhone) acc.ownerPhone = ownerPhone(reservation);
+      if (!acc.ownerFullName) acc.ownerFullName = ownerFullName(reservation);
+    } catch (error) {
+      console.warn(
+        "[RouteGenerator] skipped malformed Gingr reservation:",
+        error instanceof Error ? error.message : error
+      );
+    }
   }
 
   const dogs: GingrRouteDog[] = [];
@@ -514,6 +558,10 @@ export function normalizeGingrRouteReservations(
       activityLabels: Array.from(acc.activityLabels),
       pickup: acc.pickup,
       dropoff: acc.dropoff,
+      ownerClubDropoff: acc.ownerClubDropoff,
+      ownerClubPickup: acc.ownerClubPickup,
+      isTaxi: acc.isTaxi,
+      transportationTypes: Array.from(acc.transportationTypes),
       scheduledTime: acc.scheduledTime,
       scheduledTimeLabel: formatTimeLabel(acc.scheduledTime),
       notes: acc.notes,
