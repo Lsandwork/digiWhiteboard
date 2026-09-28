@@ -1,8 +1,8 @@
 /**
  * Build FitDog home-transportation stops from normalized Gingr Route dogs.
  *
- * Only Pick Up (FROM HOME) and Drop Off (TO HOME) create stops.
- * Owner-transport dogs (no pickup/dropoff badges) are excluded.
+ * Only FitDog Pick Up (FROM HOME), Drop Off (TO HOME), and Taxi create van stops.
+ * Owner Club drop-off/pickup never consume a home address or vehicle stop.
  */
 
 import type { GingrRouteDog } from "@/lib/gingr-route-generator/normalize";

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Building2,
   Calendar,
   ChevronLeft,
   ChevronRight,
@@ -191,18 +192,23 @@ export function GingrRouteGeneratorWorkspace() {
       activityId: GingrRouteActivityId;
       pickups: GingrRouteDog[];
       dropoffs: GingrRouteDog[];
+      clubArrivals: GingrRouteDog[];
+      clubDepartures: GingrRouteDog[];
     }> = [];
 
     for (const activity of GINGR_ROUTE_ACTIVITIES) {
       const inActivity = filteredDogs.filter((d) => d.activities.includes(activity.id));
       const pickups = inActivity.filter((d) => d.pickup);
       const dropoffs = inActivity.filter((d) => d.dropoff);
-      // Route Plan shows FitDog transportation stops only — owner-transport dogs are omitted.
-      if (!pickups.length && !dropoffs.length) continue;
+      const clubArrivals = inActivity.filter((d) => d.ownerClubDropoff);
+      const clubDepartures = inActivity.filter((d) => d.ownerClubPickup);
+      if (!pickups.length && !dropoffs.length && !clubArrivals.length && !clubDepartures.length) continue;
       groups.push({
         activityId: activity.id,
         pickups,
-        dropoffs
+        dropoffs,
+        clubArrivals,
+        clubDepartures
       });
     }
     return groups;
@@ -520,7 +526,7 @@ export function GingrRouteGeneratorWorkspace() {
 
             <div className="grg-list-toolbar">
               <p className="grg-transport-legend">
-                Only dogs marked Pick Up or Drop Off require a FitDog transportation stop.
+                Only FitDog home/taxi stops go on the van route. Owner drop-off and pickup stay at the Club.
               </p>
               <button
                 type="button"
@@ -605,11 +611,11 @@ export function GingrRouteGeneratorWorkspace() {
                           {dog.pickup ? (
                             <span
                               className="grg-transport-badge grg-transport-badge--pickup"
-                              title="FitDog driver picks up from home"
+                              title={dog.isTaxi ? "FitDog taxi pickup from home" : "FitDog driver picks up from home"}
                             >
                               <Truck size={12} />
                               <span className="grg-transport-badge-text">
-                                <strong>PICK UP</strong>
+                                <strong>{dog.isTaxi ? "TAXI" : "PICK UP"}</strong>
                                 <em>From Home</em>
                               </span>
                             </span>
@@ -617,12 +623,36 @@ export function GingrRouteGeneratorWorkspace() {
                           {dog.dropoff ? (
                             <span
                               className="grg-transport-badge grg-transport-badge--dropoff"
-                              title="FitDog driver drops off to home"
+                              title={dog.isTaxi ? "FitDog taxi drop-off to home" : "FitDog driver drops off to home"}
                             >
                               <MapPin size={12} />
                               <span className="grg-transport-badge-text">
-                                <strong>DROP OFF</strong>
+                                <strong>{dog.isTaxi && !dog.pickup ? "TAXI" : "DROP OFF"}</strong>
                                 <em>To Home</em>
+                              </span>
+                            </span>
+                          ) : null}
+                          {dog.ownerClubDropoff ? (
+                            <span
+                              className="grg-transport-badge grg-transport-badge--club-in"
+                              title="Owner drops the dog off at Fitdog Club"
+                            >
+                              <Building2 size={12} />
+                              <span className="grg-transport-badge-text">
+                                <strong>OWNER DROP-OFF</strong>
+                                <em>At Club</em>
+                              </span>
+                            </span>
+                          ) : null}
+                          {dog.ownerClubPickup ? (
+                            <span
+                              className="grg-transport-badge grg-transport-badge--club-out"
+                              title="Owner picks the dog up at Fitdog Club"
+                            >
+                              <Building2 size={12} />
+                              <span className="grg-transport-badge-text">
+                                <strong>OWNER PICKUP</strong>
+                                <em>At Club</em>
                               </span>
                             </span>
                           ) : null}
@@ -634,8 +664,8 @@ export function GingrRouteGeneratorWorkspace() {
                               Address Required
                             </span>
                           ) : null}
-                          {!dog.pickup && !dog.dropoff ? (
-                            <span className="grg-transport-empty">Owner transport</span>
+                          {!dog.pickup && !dog.dropoff && !dog.ownerClubDropoff && !dog.ownerClubPickup ? (
+                            <span className="grg-transport-empty">No van route</span>
                           ) : null}
                         </div>
                         <div className="grg-dog-client-notes" title={dog.notes || undefined}>
@@ -705,7 +735,9 @@ export function GingrRouteGeneratorWorkspace() {
                 const count =
                   new Set([
                     ...group.pickups.map((d) => d.id),
-                    ...group.dropoffs.map((d) => d.id)
+                    ...group.dropoffs.map((d) => d.id),
+                    ...group.clubArrivals.map((d) => d.id),
+                    ...group.clubDepartures.map((d) => d.id)
                   ]).size;
                 return (
                   <section key={group.activityId} className="grg-route-section">
@@ -723,7 +755,7 @@ export function GingrRouteGeneratorWorkspace() {
                       <div className="grg-route-group">
                         <div className="grg-route-group-label">
                           <Truck size={12} />
-                          PICK UP (FROM HOME)
+                          FITDOG PICKUPS (FROM HOME)
                         </div>
                         <ol>
                           {group.pickups.map((dog, index) => (
@@ -731,7 +763,33 @@ export function GingrRouteGeneratorWorkspace() {
                               <span className="grg-route-index">{index + 1}.</span>
                               <div>
                                 <div className="grg-route-dog-name">{dog.name}</div>
-                                <div className="grg-route-dog-owner">{dog.owner}</div>
+                                <div className="grg-route-dog-owner">
+                                  {dog.isTaxi ? "Taxi · " : "Home Pickup · "}
+                                  {dog.owner}
+                                </div>
+                                {dog.scheduledTimeLabel ? (
+                                  <div className="grg-route-dog-time">{dog.scheduledTimeLabel}</div>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+
+                    {group.clubArrivals.length ? (
+                      <div className="grg-route-group">
+                        <div className="grg-route-group-label">
+                          <Building2 size={12} />
+                          CLUB ARRIVALS (OWNER DROP-OFF)
+                        </div>
+                        <ol>
+                          {group.clubArrivals.map((dog, index) => (
+                            <li key={`ca-${dog.id}`}>
+                              <span className="grg-route-index">{index + 1}.</span>
+                              <div>
+                                <div className="grg-route-dog-name">{dog.name}</div>
+                                <div className="grg-route-dog-owner">Owner Drop-Off · Fitdog Club</div>
                                 {dog.scheduledTimeLabel ? (
                                   <div className="grg-route-dog-time">{dog.scheduledTimeLabel}</div>
                                 ) : null}
@@ -746,7 +804,7 @@ export function GingrRouteGeneratorWorkspace() {
                       <div className="grg-route-group">
                         <div className="grg-route-group-label">
                           <MapPin size={12} />
-                          DROP OFF (TO HOME)
+                          FITDOG DROPOFFS (TO HOME)
                         </div>
                         <ol>
                           {group.dropoffs.map((dog, index) => (
@@ -754,7 +812,33 @@ export function GingrRouteGeneratorWorkspace() {
                               <span className="grg-route-index">{index + 1}.</span>
                               <div>
                                 <div className="grg-route-dog-name">{dog.name}</div>
-                                <div className="grg-route-dog-owner">{dog.owner}</div>
+                                <div className="grg-route-dog-owner">
+                                  {dog.isTaxi ? "Taxi · " : "Home Drop-Off · "}
+                                  {dog.owner}
+                                </div>
+                                {dog.scheduledTimeLabel ? (
+                                  <div className="grg-route-dog-time">{dog.scheduledTimeLabel}</div>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+
+                    {group.clubDepartures.length ? (
+                      <div className="grg-route-group">
+                        <div className="grg-route-group-label">
+                          <Building2 size={12} />
+                          CLUB DEPARTURES (OWNER PICKUP)
+                        </div>
+                        <ol>
+                          {group.clubDepartures.map((dog, index) => (
+                            <li key={`cd-${dog.id}`}>
+                              <span className="grg-route-index">{index + 1}.</span>
+                              <div>
+                                <div className="grg-route-dog-name">{dog.name}</div>
+                                <div className="grg-route-dog-owner">Owner Pickup · Fitdog Club</div>
                                 {dog.scheduledTimeLabel ? (
                                   <div className="grg-route-dog-time">{dog.scheduledTimeLabel}</div>
                                 ) : null}

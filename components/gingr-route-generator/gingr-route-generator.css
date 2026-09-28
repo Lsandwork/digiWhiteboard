@@ -570,6 +570,18 @@
   border: 1px solid #bfdbfe;
 }
 
+.grg-transport-badge--club-in {
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.grg-transport-badge--club-out {
+  background: #faf5ff;
+  color: #6b21a8;
+  border: 1px solid #e9d5ff;
+}
+
 .grg-dog-meta {
   min-width: 0;
   display: flex;
