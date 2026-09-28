@@ -126,6 +126,7 @@ export function buildTransportationStops(
 
   for (const dog of dogs) {
     // Owner handles transport — never create a home route stop.
+    // Owner-club and on-property never create a home route stop.
     if (!dog.pickup && !dog.dropoff) continue;
 
     if (dog.pickup) {

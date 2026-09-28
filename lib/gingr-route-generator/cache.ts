@@ -6,7 +6,9 @@ type CacheEntry = {
 };
 
 const CACHE_TTL_MS = 60_000;
+const UPLOAD_TTL_MS = 8 * 60 * 60 * 1000;
 const cache = new Map<string, CacheEntry>();
+const uploads = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<GingrRouteSchedulePayload>>();
 
 export function gingrRouteCacheKey(date: string) {
@@ -30,12 +32,33 @@ export function writeGingrRouteCache(date: string, payload: GingrRouteSchedulePa
   });
 }
 
+export function readGingrUploadOverlay(date: string): GingrRouteSchedulePayload | null {
+  const entry = uploads.get(gingrRouteCacheKey(date));
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    uploads.delete(gingrRouteCacheKey(date));
+    return null;
+  }
+  return { ...entry.payload, cached: true, source: "upload" };
+}
+
+export function writeGingrUploadOverlay(date: string, payload: GingrRouteSchedulePayload) {
+  const next = { ...payload, cached: true, source: "upload" as const };
+  uploads.set(gingrRouteCacheKey(date), {
+    payload: next,
+    expiresAt: Date.now() + UPLOAD_TTL_MS
+  });
+  writeGingrRouteCache(date, next);
+}
+
 export function invalidateGingrRouteCache(date?: string) {
   if (!date) {
     cache.clear();
+    uploads.clear();
     return;
   }
   cache.delete(gingrRouteCacheKey(date));
+  uploads.delete(gingrRouteCacheKey(date));
 }
 
 /** Deduplicate concurrent fetches for the same date. */

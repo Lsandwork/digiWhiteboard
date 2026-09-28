@@ -14256,15 +14256,20 @@ html.lobby-tv-display .lobby-main-grid {
 
 /* Embedded Gingr workspace (/gingr) */
 .admin-layout--gingr {
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .admin-main--gingr {
   display: flex;
   min-height: 0;
-  min-height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   flex-direction: column;
   padding: 0.75rem 1rem 1rem;
+  zoom: 1;
 }
 
 .gingr-mobile-bar {

@@ -439,4 +439,64 @@ assert.deepEqual(gingrDepotPlan("van_6", "dropoff"), { start: "club", end: "club
 }
 
 
+{
+  const pickup = makeStop({
+    dogId: "dog-sms",
+    dogName: "Jasper",
+    ownerName: "Ada",
+    ownerPhone: "3105550100",
+    kind: "PICK_UP"
+  });
+  const dropoff = makeStop({
+    dogId: "dog-sms",
+    dogName: "Jasper",
+    ownerName: "Ada",
+    ownerPhone: "3105550100",
+    kind: "DROP_OFF"
+  });
+  const geocoded = new Map([[pickup.homeAddress!, geoFor(pickup.homeAddress!)]]);
+  const built = buildGingrSamsaraCsvFromStops({
+    date,
+    stops: [pickup, dropoff],
+    geocoded,
+    vehicleName: "Van 01"
+  });
+  assert.equal(built.pickupTrackingStops.length, 1);
+  assert.equal(built.pickupTrackingStops[0]?.dogName, "Jasper");
+  assert.equal(built.pickupTrackingStops[0]?.ownerPhone, "3105550100");
+}
+
+{
+  const far = makeStop({
+    dogId: "far",
+    dogName: "FarDog",
+    kind: "PICK_UP",
+    homeAddress: "1000 E 1st St, Los Angeles, CA 90012, USA",
+    homeStreet1: "1000 E 1st St",
+    homeCity: "Los Angeles",
+    homePostalCode: "90012"
+  });
+  const near = makeStop({
+    dogId: "near",
+    dogName: "NearDog",
+    kind: "PICK_UP",
+    homeAddress: "200 Main St, Santa Monica, CA 90401, USA",
+    homeStreet1: "200 Main St",
+    homeCity: "Santa Monica",
+    homePostalCode: "90401"
+  });
+  const geocoded = new Map([
+    [far.homeAddress!, geoFor(far.homeAddress!, 34.05, -118.24)],
+    [near.homeAddress!, geoFor(near.homeAddress!, 34.02, -118.49)]
+  ]);
+  const built = buildGingrSamsaraCsvFromStops({
+    date,
+    stops: [far, near],
+    geocoded,
+    vehicleName: "Van 05"
+  });
+  const customers = built.rows.filter((r) => /Pickup/i.test(r.routeName) && !isFacilityStopName(r.stopName));
+  assert.equal(customers[0]?.stopName.includes("NearDog"), true, "export orders closer Santa Monica stop first");
+}
+
 console.log("test-gingr-samsara-export: all assertions passed");
