@@ -101,10 +101,10 @@ export function RufflySettingsPanel({ enabled = true }: { enabled?: boolean }) {
   const step = Number(settings.setup_step || 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-slate-900">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight text-[#1f2933]">Ruffly Settings</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-slate-700">
           Setup wizard, quiet hours, consent wording, and channel readiness. Sending flags stay off until each provider
           is tested.
         </p>
@@ -128,13 +128,22 @@ export function RufflySettingsPanel({ enabled = true }: { enabled?: boolean }) {
         <>
           <section className="rounded-2xl border border-orange-100 bg-[#fff8f3] p-4">
             <h3 className="font-semibold text-[#1f2933]">Setup wizard</h3>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-slate-700">
               Step {Math.min(step + 1, SETUP_STEPS.length)} of {SETUP_STEPS.length}
               {settings.setup_completed ? " · Complete" : ""}
             </p>
             <ol className="mt-3 max-h-56 space-y-1 overflow-auto text-sm">
               {SETUP_STEPS.map((label, index) => (
-                <li key={label} className={index < step ? "text-emerald-700" : index === step ? "font-medium text-[#ff6f26]" : "text-slate-500"}>
+                <li
+                  key={label}
+                  className={
+                    index < step
+                      ? "font-medium text-emerald-700"
+                      : index === step
+                        ? "font-semibold text-[#ff6f26]"
+                        : "text-slate-700"
+                  }
+                >
                   {index + 1}. {label}
                 </li>
               ))}
@@ -159,7 +168,7 @@ export function RufflySettingsPanel({ enabled = true }: { enabled?: boolean }) {
               <button
                 type="button"
                 disabled={busy}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium"
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 disabled:opacity-50"
                 onClick={() => void save({ setup_completed: true, setup_step: SETUP_STEPS.length }, "Ruffly marked launched.")}
               >
                 Mark launch complete
@@ -168,33 +177,33 @@ export function RufflySettingsPanel({ enabled = true }: { enabled?: boolean }) {
           </section>
 
           <section className="grid gap-4 md:grid-cols-2">
-            <label className="block rounded-2xl border border-slate-200 p-4 text-sm">
+            <label className="block rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-900">
               Business name
               <input
-                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-normal text-slate-900 placeholder:text-slate-500"
                 value={settings.business_name || ""}
                 onChange={(e) => setSettings((current) => ({ ...current, business_name: e.target.value }))}
               />
               <button
                 type="button"
                 disabled={busy}
-                className="mt-3 rounded-xl border border-slate-200 px-3 py-1.5 text-sm"
+                className="mt-3 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-900 disabled:opacity-50"
                 onClick={() => void save({ business_name: settings.business_name }, "Business profile saved.")}
               >
                 Save profile
               </button>
             </label>
-            <label className="block rounded-2xl border border-slate-200 p-4 text-sm">
+            <label className="block rounded-2xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-900">
               Consent wording version
               <input
-                className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2"
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-normal text-slate-900 placeholder:text-slate-500"
                 value={settings.consent_wording_version || "v1"}
                 onChange={(e) => setSettings((current) => ({ ...current, consent_wording_version: e.target.value }))}
               />
               <button
                 type="button"
                 disabled={busy}
-                className="mt-3 rounded-xl border border-slate-200 px-3 py-1.5 text-sm"
+                className="mt-3 rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-slate-900 disabled:opacity-50"
                 onClick={() =>
                   void save({ consent_wording_version: settings.consent_wording_version }, "Consent wording saved.")
                 }
@@ -204,21 +213,23 @@ export function RufflySettingsPanel({ enabled = true }: { enabled?: boolean }) {
             </label>
           </section>
 
-          <section className="rounded-2xl border border-slate-200 p-4">
-            <h3 className="font-semibold">Environment flags (read-only)</h3>
-            <p className="mt-1 text-sm text-slate-500">
+          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+            <h3 className="font-semibold text-[#1f2933]">Environment flags (read-only)</h3>
+            <p className="mt-1 text-sm text-slate-700">
               Sending and channel flags are controlled in Vercel env. Turn each sending flag on only after a successful
               provider test in Integrations.
             </p>
             <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
               {Object.entries(flags).map(([key, value]) => (
                 <div key={key} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
-                  <dt className="font-medium text-slate-700">{key}</dt>
-                  <dd className={value ? "text-emerald-700" : "text-slate-500"}>{value ? "on" : "off"}</dd>
+                  <dt className="font-semibold text-slate-800">{key}</dt>
+                  <dd className={value ? "font-semibold text-emerald-700" : "font-medium text-slate-700"}>
+                    {value ? "on" : "off"}
+                  </dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-xs font-medium text-slate-700">
               Direct Gingr booking remains off until Ruffly can successfully create bookings inside Gingr.
             </p>
           </section>
