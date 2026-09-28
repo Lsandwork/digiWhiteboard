@@ -15,19 +15,19 @@ export const metadata: Metadata = {
 const channels = [
   {
     title: "Email support",
-    copy: `Reach the team at ${SITE.email} for product questions, account assistance, and follow-ups on existing engagements.`
+    copy: `Write ${SITE.email} for product questions, account help, and follow-ups on work already underway.`
   },
   {
     title: "Phone support",
-    copy: `Call ${SITE.phoneDisplay}. Phone support is available as part of operations review follow-up and active customer assistance.`
+    copy: `Call ${SITE.phoneDisplay}. Phone help is part of ops-review follow-up and active customer assistance.`
   },
   {
     title: "Product guidance",
-    copy: "Need help with platform modules, lobby boards, department displays, or cast setups? Tell us which product area and we will route the right next step."
+    copy: "Stuck on platform modules, lobby boards, department displays, or cast setups? Name the product area and we’ll route the right next step."
   },
   {
     title: "New facility inquiries",
-    copy: "If you are evaluating ruffOPS for the first time, use Get Started so we can capture facility details and respond with a tailored recommendation."
+    copy: "Evaluating ruffOPS for the first time? Use Get Started so we get facility details and can answer with a real recommendation."
   }
 ];
 
@@ -55,8 +55,8 @@ export default function SupportPage() {
     <>
       <PageHero
         eyebrow="Support"
-        title="Help for teams running ruffOPS"
-        description="Product support, account assistance, and guidance for facilities using the management platform and digital whiteboards — through the same real channels we use every day."
+        title="Help for teams already running ruffOPS"
+        description="Product support and account help for facilities on the management platform and digital whiteboards — through the same real channels we use every day."
         secondaryLabel={`Email ${SITE.email}`}
         secondaryHref={`mailto:${SITE.email}`}
       />

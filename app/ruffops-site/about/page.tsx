@@ -6,37 +6,37 @@ import { SITE } from "@/lib/ruffops-site/config";
 export const metadata: Metadata = {
   title: "About — Operators Building for Pet Facilities",
   description:
-    "ruffOPS was created by operators who have lived the dog yard, the front desk, boarding chaos, incidents, and client complaints. Santa Monica on-site, nationwide online.",
+    "ruffOPS was built by people who have lived the dog yard, the front desk, boarding chaos, incidents, and client complaints. Santa Monica on-site, nationwide online.",
   openGraph: {
     title: `About | ${SITE.name}`,
-    description: "The story behind ruffOPS — built by people who understand real pet facility operations."
+    description: "The story behind ruffOPS — software shaped by real pet facility shifts, not a pitch deck."
   }
 };
 
 const sections = [
   {
     title: "Mission",
-    copy: "Help pet businesses run with clearer operations, stronger staff coordination, and digital whiteboards that match how facilities actually work — so dogs, teams, and clients all benefit."
+    copy: "Give pet facilities ops tools and digital whiteboards that match how the place actually runs — so dogs stay safer, staff stop guessing, and clients see a facility that looks like it knows what it’s doing."
   },
   {
     title: "The problem we solve",
-    copy: "Dog facilities manage daycare, boarding, grooming, training, transportation, and client expectations at once. Most tools were never designed for that pressure, so teams improvise with chat threads, paper, and disconnected screens."
+    copy: "A dog facility is daycare, boarding, grooming, training, transport, and a lobby full of opinions — at the same time. Most software never met that pressure, so teams invent it with group chats, paper, and three TVs that disagree."
   },
   {
     title: "Why ruffOPS was built",
-    copy: "We created this company because better operations protect dogs, staff, clients, reputation, and revenue at the same time — and generic software rarely understands the daily reality of a pet facility."
+    copy: "Better ops protect dogs, staff, clients, reputation, and revenue together. Generic SaaS rarely survives a busy Saturday. We built this because we had lived the mess."
   },
   {
     title: "Connection to the pet industry",
-    copy: "Our work is grounded in dog daycare, hotel, boarding, grooming, training, rescue, and multi-service environments. The platform and whiteboards are shaped by those workflows, not borrowed from another vertical."
+    copy: "Daycare, hotel, boarding, grooming, training, rescue, multi-service — the platform and whiteboards come from those workflows. Not a restaurant POS with a paw emoji taped on."
   },
   {
     title: "Vision",
-    copy: "A connected operations ecosystem where management software, staff boards, and lobby displays reinforce each other — so every location can run with more clarity and less chaos."
+    copy: "Management software, staff boards, and lobby displays that reinforce each other. One operational truth walking from the office to the yard to the front door."
   },
   {
     title: "How we work",
-    copy: "Santa Monica on-site support and nationwide online engagement. We start from your real facility constraints, then recommend platform modules, custom boards, advertising screens, or a focused operations review."
+    copy: "On-site in Santa Monica when you need boots on the floor. Online nationwide when you don’t. We start from your real constraints, then recommend platform modules, custom boards, advertising screens, or a tight ops review."
   }
 ];
 
@@ -45,8 +45,8 @@ export default function AboutPage() {
     <>
       <PageHero
         eyebrow="About"
-        title="Operators first. Technology second."
-        description="ruffOPS was created by people who have lived the dog yard, the front desk, boarding chaos, incidents, and client complaints — then built systems that fit that world."
+        title="Operators first. Software second."
+        description="ruffOPS was built by people who have lived the dog yard, the front desk, boarding chaos, incidents, and the client call that starts with “where’s my dog?” — then wrote systems that fit that day."
         secondaryLabel="Why ruffOPS"
         secondaryHref="/why-ruffops"
       />
@@ -66,12 +66,12 @@ export default function AboutPage() {
         <div className="card p-8">
           <h2 className="text-2xl font-bold text-white">Who we help</h2>
           <p className="mt-3 max-w-3xl text-slate-400">
-            Operators ready to modernize without losing control. From single-location daycares to multi-service facilities,
-            we help teams that take dog care and client trust seriously.
+            Operators who want modern tools without losing the plot. Single-location daycares and multi-service shops
+            that take dog care and client trust seriously — and are tired of improvising the middle.
           </p>
           <p className="mt-4 max-w-3xl text-slate-400">
-            Dog daycare, hotel, and boarding owners; grooming and training businesses; rescues and shelters; transportation
-            services; multi-service facilities; and operators who want to grow without the wheels coming off.
+            Daycare, hotel, and boarding owners. Grooming and training businesses. Rescues and shelters. Transport.
+            Multi-service facilities that want to grow without the wheels coming off at 5 p.m.
           </p>
           <p className="mt-6 text-sm text-slate-500">{SITE.serviceArea}</p>
         </div>

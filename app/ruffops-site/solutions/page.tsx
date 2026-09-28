@@ -9,10 +9,10 @@ import { PACKAGES, PRODUCT_SHOTS, SITE } from "@/lib/ruffops-site/config";
 export const metadata: Metadata = {
   title: "Solutions — Platform, Digital Whiteboards & Advertising",
   description:
-    "Explore ruffOPS solutions for pet businesses: custom SaaS management platform, lobby and department digital whiteboards, and remote advertising display services.",
+    "ruffOPS for pet facilities: custom SaaS management platform, lobby and department digital whiteboards, and remote advertising display services.",
   openGraph: {
     title: `Solutions | ${SITE.name}`,
-    description: "One connected ecosystem for pet facility operations, custom kiosk whiteboards, and lobby advertising screens."
+    description: "Ops platform, custom kiosk whiteboards, and lobby advertising screens — one stack for how dog facilities actually run."
   }
 };
 
@@ -21,8 +21,8 @@ export default function SolutionsPage() {
     <>
       <PageHero
         eyebrow="Solutions"
-        title="One platform. Screens that match how you operate."
-        description="ruffOPS connects management and staff workflows with fully custom digital whiteboards for lobby TVs and every department — plus optional advertising display services when you need screens deployed and managed remotely."
+        title="Ops tools and screens that match how you move dogs"
+        description="ruffOPS connects management and staff workflows with custom digital whiteboards for lobby TVs and every department — plus advertising displays when you need screens deployed and fed remotely."
         secondaryLabel="See Pricing"
         secondaryHref="/pricing"
       />
@@ -62,7 +62,7 @@ export default function SolutionsPage() {
 
       <MidCta
         title="Not sure where to start?"
-        description="Most facilities begin with either the management platform, lobby whiteboards, or a focused operations review. We’ll help you choose based on how your team actually works day to day."
+        description="Most places begin with the management platform, lobby whiteboards, or a short ops review. We’ll pick based on where your Saturday currently falls apart."
       />
       <FinalCta />
     </>

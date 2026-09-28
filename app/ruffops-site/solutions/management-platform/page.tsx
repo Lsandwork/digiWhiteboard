@@ -11,22 +11,22 @@ export const metadata: Metadata = {
     "ruffOPS management platform for pet facility owners, managers, and staff — live status, schedules, handoffs, alerts, and department workflows in one place.",
   openGraph: {
     title: `Custom SaaS Management Platform | ${SITE.name}`,
-    description: "One operations command center for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities."
+    description: "The ops command center for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities."
   }
 };
 
 const capabilities = [
-  ["Management dashboards", "Give owners and managers a clear view of facility status, priorities, and what needs attention across departments."],
-  ["Staff workspaces", "Floor teams get role-appropriate views for check-ins, tasks, handoffs, and live dog or room status — without digging through chat threads."],
-  ["Live facility visibility", "Track check-in / check-out flow and operational status so the front desk and floor stay aligned during busy windows."],
-  ["Department workflows", "Support front desk, yard, boarding, grooming, and transport workflows with the same connected system instead of siloed tools."],
-  ["Shift handoffs & alerts", "Reduce dropped context between shifts with clearer handoffs, alerts, and shared operational notes."],
-  ["Multi-device access", "Run from office desktops, lobby tablets, and floor devices so the same source of truth travels with the team."]
+  ["Management dashboards", "Owners and managers see facility status, priorities, and what needs a human — without hovering over every shift."],
+  ["Staff workspaces", "Floor teams get role-appropriate views for check-ins, tasks, handoffs, and live dog or room status — without spelunking through chat."],
+  ["Live facility visibility", "Track check-in / check-out and ops status so desk and floor stay aligned when the lobby gets loud."],
+  ["Department workflows", "Front desk, yard, boarding, grooming, and transport on one connected system instead of five siloed apps and a prayer."],
+  ["Shift handoffs & alerts", "Fewer dropped contexts between shifts — clearer handoffs, alerts, and notes the next person can actually use."],
+  ["Multi-device access", "Office desktops, lobby tablets, floor devices — same source of truth traveling with the team."]
 ];
 
 const faqs = [
-  ["Is this a generic pet software clone?", "No. ruffOPS is built around real facility operations — management and staff coordination, department workflows, and the digital whiteboards your lobby and rooms already depend on."],
-  ["Can it work with our existing booking tools?", "Many facilities already use booking or CRM tools. We design around your current stack and focus on operational visibility, staff coordination, and display workflows where those tools fall short."],
+  ["Is this a generic pet software clone?", "No. ruffOPS is built around real facility ops — management and staff coordination, department workflows, and the digital whiteboards your lobby and rooms already lean on."],
+  ["Can it work with our existing booking tools?", "Most facilities already have booking or CRM. We design around that stack and fill the gaps in operational visibility, staff coordination, and displays."],
   ["Who is it for?", "Dog daycares, boarding hotels, grooming and training businesses, rescues, transportation services, and multi-service pet facilities that need managers and floor staff on the same page."]
 ];
 
@@ -36,7 +36,7 @@ export default function ManagementPlatformPage() {
       <PageHero
         eyebrow="For managers & staff"
         title="Custom SaaS Management Platform"
-        description="One operations command center that keeps owners, managers, and staff connected — live status, schedules, handoffs, alerts, and department workflows in a single system built for pet facilities."
+        description="An ops command center owners, managers, and staff can share — live status, schedules, handoffs, alerts, and department workflows in one system built for pet facilities."
         secondaryLabel="Digital Whiteboards"
         secondaryHref="/solutions/digital-whiteboards"
       />
@@ -66,13 +66,13 @@ export default function ManagementPlatformPage() {
         <div className="container-page grid gap-10 lg:grid-cols-2 lg:items-center">
           <Reveal>
             <p className="eyebrow eyebrow--light">Why facilities choose it</p>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Less chaos between the desk, the yard, and leadership</h2>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Less chaos between the desk, the yard, and whoever’s supposed to be in charge</h2>
             <ul className="ro-check-list mt-6">
               {[
-                "Owners see what is happening without hovering over every shift",
+                "Owners see what’s happening without camping at the front desk",
                 "Managers get clearer priorities and fewer missed handoffs",
                 "Staff work from shared status instead of tribal knowledge",
-                "Lobby and department boards can reflect the same live operational truth"
+                "Lobby and department boards can show the same live truth"
               ].map((item) => (
                 <li key={item}>
                   <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-orange-500" />

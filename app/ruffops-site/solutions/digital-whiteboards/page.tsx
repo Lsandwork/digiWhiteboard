@@ -27,19 +27,19 @@ const features = [
 ];
 
 const useCases = [
-  ["Lobby guest experience", "Show arriving and departing dogs, facility energy, and branded lobby moments that make the front of house feel intentional — not like a waiting room TV."],
-  ["Checkout moments", "Highlight dogs ready for pickup with clear, room-readable layouts so clients and staff share the same visual cue during rush periods."],
-  ["Department staff boards", "Give yard, boarding, grooming, and transport teams dedicated boards that match how each department works."],
-  ["Brand-matched facilities", "Themes, motion, and content zones are designed around your brand and rooms — not a one-size-fits-all template."]
+  ["Lobby guest experience", "Arriving and departing dogs, facility energy, branded lobby moments — so the front of house feels intentional, not like a dentist waiting room with a mute TV."],
+  ["Checkout moments", "Dogs ready for pickup in layouts readable across the room, so clients and staff share the same visual cue when six cars hit the lot."],
+  ["Department staff boards", "Yard, boarding, grooming, and transport get boards that match how each department actually works."],
+  ["Brand-matched facilities", "Themes, motion, and content zones designed around your brand and rooms — not a one-size-fits-all template with your logo stapled on."]
 ];
 
 export default function DigitalWhiteboardsPage() {
   return (
     <>
       <PageHero
-        eyebrow="For lobby activities"
+        eyebrow="For lobby & floor"
         title="Custom Kiosk Digital Whiteboards"
-        description="Fully custom digital whiteboards for lobby TVs and staff kiosks — live updates, dog information, lobby activities, checkout experiences, and brand-matched themes built for real pet facilities."
+        description="Custom digital whiteboards for lobby TVs and staff kiosks — live updates, dog info, lobby activity, checkout moments, and brand-matched themes built for real pet facilities."
         secondaryLabel="Advertising Screens"
         secondaryHref="/solutions/advertising"
       />
@@ -83,7 +83,7 @@ export default function DigitalWhiteboardsPage() {
           <Reveal>
             <p className="eyebrow eyebrow--light">Real product visuals</p>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Designed for cast TVs and always-on kiosks</h2>
-            <p className="mt-4 max-w-2xl text-slate-600">These are real ruffOPS / Digi-Board lobby and staff board references from the product — not invented SaaS illustrations.</p>
+            <p className="mt-4 max-w-2xl text-slate-600">These are real ruffOPS / Digi-Board lobby and staff board references from the product — not invented SaaS clip art.</p>
           </Reveal>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
