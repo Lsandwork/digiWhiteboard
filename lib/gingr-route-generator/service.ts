@@ -1,10 +1,15 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
-import { buildGingrRouteSchedulePayload } from "@/lib/gingr-route-generator/normalize";
+import {
+  buildGingrRouteSchedulePayload,
+  type GingrRouteSchedulePayload
+} from "@/lib/gingr-route-generator/normalize";
 import {
   invalidateGingrRouteCache,
   readGingrRouteCache,
+  readGingrUploadOverlay,
   withGingrRouteInflight,
-  writeGingrRouteCache
+  writeGingrRouteCache,
+  writeGingrUploadOverlay
 } from "@/lib/gingr-route-generator/cache";
 
 function isValidDate(value: string) {
@@ -27,6 +32,8 @@ export async function loadGingrRouteSchedule(options: {
   const date = isValidDate(options.date) ? options.date : todayPacificDateKey();
 
   if (!options.refresh) {
+    const uploaded = readGingrUploadOverlay(date);
+    if (uploaded) return { ...uploaded, cacheHit: true as const };
     const cached = readGingrRouteCache(date);
     if (cached) return { ...cached, cacheHit: true as const };
   } else {
@@ -39,13 +46,21 @@ export async function loadGingrRouteSchedule(options: {
       throw new Error("GINGR_API_KEY is not configured.");
     }
     const reservations = await client.listReservationsByDate(date);
-    const next = buildGingrRouteSchedulePayload(date, reservations, {
-      cached: false,
-      fetchedAt: new Date().toISOString()
-    });
+    const next = {
+      ...buildGingrRouteSchedulePayload(date, reservations, {
+        cached: false,
+        fetchedAt: new Date().toISOString()
+      }),
+      source: "gingr_api" as const
+    };
     writeGingrRouteCache(date, next);
     return next;
   });
 
   return { ...payload, cacheHit: false as const };
+}
+
+export function saveUploadedGingrRouteSchedule(payload: GingrRouteSchedulePayload) {
+  writeGingrUploadOverlay(payload.date, payload);
+  return payload;
 }

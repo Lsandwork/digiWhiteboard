@@ -4,6 +4,8 @@ import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { getUserAccess } from "@/lib/admin/user-access";
 import { accessFromLegacyRole, canAccessRouteGenerator } from "@/lib/admin/permissions";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { parseGingrSendOwnerSmsParam } from "@/lib/gingr-route-generator/sms-opt-in";
+import { persistGingrPickupOwnerTracking } from "@/lib/gingr-route-generator/owner-tracking";
 import { buildGingrSamsaraExport } from "@/lib/gingr-route-generator/samsara-export";
 import { loadGingrRouteSchedule, todayPacificDateKey } from "@/lib/gingr-route-generator/service";
 
@@ -35,6 +37,7 @@ async function requireGingrRouteAccess(request: Request) {
 /**
  * GET /api/admin/gingr-route-generator/samsara-export?date=YYYY-MM-DD
  * Optional: &vehicle=Van%2001|02|03|05|06 (depot bookends depend on van)
+ * Optional: &sendOwnerSms=1 to persist pickup tracking and text owners (off by default)
  * Optional: &download=1 to return CSV attachment (default JSON summary + csv text).
  *
  * Uses Digi's exact Samsara bulk-upload headers from lib/route-generator/samsara-csv.ts.
@@ -48,6 +51,7 @@ export async function GET(request: Request) {
   const download = url.searchParams.get("download") === "1";
   const refresh = url.searchParams.get("refresh") === "1";
   const vehicleParam = url.searchParams.get("vehicle")?.trim() || "Van 01";
+  const sendOwnerSms = parseGingrSendOwnerSmsParam(url.searchParams.get("sendOwnerSms"));
 
   try {
     const payload = await loadGingrRouteSchedule({ date: dateParam, refresh });
@@ -77,6 +81,39 @@ export async function GET(request: Request) {
       );
     }
 
+    let ownerTracking: Awaited<ReturnType<typeof persistGingrPickupOwnerTracking>> | null = null;
+    let ownerTrackingError: string | null = null;
+    if (sendOwnerSms) {
+      try {
+        ownerTracking = await persistGingrPickupOwnerTracking({
+          date: payload.date,
+          vehicleName: result.summary.vehicleName,
+          stops: result.pickupTrackingStops,
+          sendSms: true,
+          actorEmail: gate.session?.email ?? null
+        });
+      } catch (error) {
+        ownerTrackingError =
+          error instanceof Error ? error.message.slice(0, 200) : "Unable to start live tracking SMS.";
+        console.error(
+          JSON.stringify({
+            scope: "gingr_route_generator",
+            event: "owner_tracking_error",
+            message: ownerTrackingError
+          })
+        );
+      }
+    } else {
+      ownerTracking = {
+        attempted: false,
+        reason: "opt_out",
+        created: 0,
+        smsQueued: 0,
+        smsEnabled: false,
+        smsErrors: []
+      };
+    }
+
     if (download) {
       return new NextResponse(result.csv, {
         status: 200,
@@ -92,7 +129,9 @@ export async function GET(request: Request) {
       ok: true,
       summary: result.summary,
       csv: result.csv,
-      missingAddressStops: result.summary.missingAddressStops
+      missingAddressStops: result.summary.missingAddressStops,
+      ownerTracking,
+      ownerTrackingError
     });
   } catch (error) {
     console.error(

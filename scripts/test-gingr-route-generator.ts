@@ -6,12 +6,23 @@ import assert from "node:assert/strict";
 import type { GingrReservation } from "../lib/integrations/gingr/types";
 import {
   GINGR_ROUTE_ACTIVITIES,
+  dogHasClassActivity,
   isDropOffService,
   isPickUpService,
-  matchGingrRouteActivity
+  matchGingrRouteActivity,
+  primarySubjectGroup,
+  sortGingrRouteActivities
 } from "../lib/gingr-route-generator/activities";
-import { classifyTransportationText } from "../lib/gingr-route-generator/transportation";
+import {
+  classifyTransportationText,
+  isInternalBoardingTaxiMarker
+} from "../lib/gingr-route-generator/transportation";
+import { gingrTransportDisplays } from "../lib/gingr-route-generator/transportation-display";
 import { buildTransportationStops } from "../lib/gingr-route-generator/transportation-stops";
+import {
+  dogMatchesActivityFilter,
+  groupDogsBySubject
+} from "../lib/gingr-route-generator/subject-groups";
 import {
   invalidateGingrRouteCache,
   readGingrRouteCache,
@@ -19,7 +30,10 @@ import {
   writeGingrRouteCache
 } from "../lib/gingr-route-generator/cache";
 import { normalizeGingrRouteReservations } from "../lib/gingr-route-generator/normalize";
+import { parseGingrSendOwnerSmsParam } from "../lib/gingr-route-generator/sms-opt-in";
 import { todayPacificDateKey } from "../lib/gingr-route-generator/service";
+import { parseGingrUploadText } from "../lib/gingr-route-generator/import-file";
+import { orderStopsByShortestPath } from "../lib/gingr-route-generator/shortest-route";
 import {
   appendAuthenticatedGlobalRoutes,
   GINGR_ROUTE_GENERATOR_NAV_ROUTE
@@ -53,6 +67,21 @@ assert.equal(matchGingrRouteActivity("Trail Foundations | Group Training")?.id, 
 assert.equal(matchGingrRouteActivity("Daycare Full Day")?.id, "club");
 
 assert.equal(GINGR_ROUTE_ACTIVITIES.length, 17);
+assert.equal(matchGingrRouteActivity("Activity | Leash Manners")?.id, "leash_manners");
+assert.equal(matchGingrRouteActivity("Cool Tricks | Group Training")?.id, "cool_tricks");
+assert.equal(matchGingrRouteActivity("Scent Work | Group Training")?.id, "scent_works");
+assert.equal(matchGingrRouteActivity("Fun & Fit Agility | Group Training")?.id, "fun_and_fit_agility");
+assert.equal(primarySubjectGroup(["club", "leash_manners"]).id, "leash_manners");
+assert.equal(primarySubjectGroup(["club", "leash_manners"]).label, "Leash Manners");
+assert.equal(primarySubjectGroup(["club"]).id, "club");
+assert.equal(sortGingrRouteActivities(["club", "leash_manners", "taxi"])[0], "leash_manners");
+assert.equal(dogHasClassActivity(["club", "cool_tricks"]), true);
+assert.equal(dogHasClassActivity(["club"]), false);
+for (const activity of GINGR_ROUTE_ACTIVITIES) {
+  if (activity.category === "class") {
+    assert.equal(primarySubjectGroup(["club", activity.id]).id, activity.id, activity.id);
+  }
+}
 
 // --- Normalize fixtures ---
 function reservation(partial: Record<string, unknown>): GingrReservation {
@@ -365,6 +394,277 @@ function ownerHome() {
   assert.equal(stops.pickupCount, 1, "duplicate pickup services still make one stop");
 }
 
+{
+  const routeDate = "2026-09-29";
+  const junoShaped = normalizeGingrRouteReservations(
+    [
+      reservation({
+        reservation_id: "208564",
+        animal_id: 6648,
+        a_name: "Juno",
+        a_o_first_name: "Avery",
+        a_o_last_name: "Stone",
+        reservation_type: { id: "12", type: "Overnight: Petite Suite" },
+        start_date: "2026-09-18T07:00:00-07:00",
+        end_date: "2026-10-12T18:00:00-07:00",
+        check_in_date: "2026-09-18T10:31:00-07:00",
+        check_out_date: null,
+        owner: ownerHome(),
+        services: [
+          {
+            id: "167597",
+            name: "Taxi Service - Business Only",
+            scheduled_at: "2026-09-18T07:00:00-07:00",
+            scheduled_until: "2026-09-18T08:00:00-07:00",
+            cost: 0,
+            assigned_to: null
+          },
+          {
+            id: "169355",
+            name: "Activity | Leash Manners",
+            scheduled_at: "2026-09-29T00:00:00-07:00",
+            scheduled_until: "2026-09-29T00:30:00-07:00",
+            cost: 0,
+            assigned_to: "Ivonne Campuzano"
+          },
+          {
+            id: "167598",
+            name: "Taxi Service - Business Only",
+            scheduled_at: "2026-10-12T18:00:00-07:00",
+            scheduled_until: "2026-10-12T19:00:00-07:00",
+            cost: 0,
+            assigned_to: null
+          }
+        ]
+      })
+    ],
+    routeDate
+  ).dogs.find((d) => d.name === "Juno");
+  assert.ok(junoShaped, "live-shaped overnight boarding dog remains eligible via Leash Manners");
+  assert.ok(junoShaped!.activities.includes("leash_manners"));
+  assert.equal(junoShaped!.activities[0], "leash_manners");
+  assert.equal(primarySubjectGroup(junoShaped!.activities).id, "leash_manners");
+  assert.equal(dogMatchesActivityFilter(junoShaped!, "class"), true);
+  assert.equal(dogMatchesActivityFilter(junoShaped!, "club"), false, "boarding class dogs are not in Club");
+  const junoGroups = groupDogsBySubject([junoShaped!]);
+  assert.equal(junoGroups[0]?.id, "leash_manners");
+  assert.ok(junoGroups[0]?.dogs.some((d) => d.name === "Juno"));
+  assert.ok(!junoGroups.some((g) => g.id === "club"));
+  assert.equal(junoShaped!.pickup, false, "other-day Business Only taxi is not a home pickup");
+  assert.equal(junoShaped!.dropoff, false, "other-day Business Only taxi is not a home drop-off");
+  assert.equal(junoShaped!.isTaxi, false);
+  assert.equal(junoShaped!.ownerClubDropoff, false, "do not invent owner-club from overnight");
+  assert.equal(junoShaped!.ownerClubPickup, false);
+  assert.equal(junoShaped!.alreadyOnProperty, true);
+  const junoStops = buildTransportationStops([junoShaped!], routeDate);
+  assert.equal(junoStops.stops.length, 0);
+  const junoDisplays = gingrTransportDisplays(junoShaped!);
+  assert.ok(!junoDisplays.some((d) => d.em === "From Home" || d.em === "To Home"));
+  assert.ok(junoDisplays.some((d) => d.kind === "on_property"));
+}
+
+{
+  const routeDate = "2026-09-29";
+  const jojoRes = reservation({
+    reservation_id: "209764",
+    animal_id: 501,
+    a_name: "JoJo",
+    a_o_first_name: "Jeffrey",
+    a_o_last_name: "Thomashow",
+    reservation_type: { type: "Overnight: Suite" },
+    start_date: "2026-09-17T07:00:00-07:00",
+    end_date: "2026-10-01T20:00:00-07:00",
+    check_in_date: "2026-09-17T16:52:00-07:00",
+    check_out_date: null,
+    owner: ownerHome(),
+    services: [
+      { name: "Free Daily Walk", scheduled_at: "2026-09-28T07:00:00-07:00" },
+      { name: "Activity | Leash Manners", scheduled_at: "2026-09-29T00:00:00-07:00" },
+      { name: "Free Daily Walk", scheduled_at: "2026-09-29T07:00:00-07:00" }
+    ]
+  });
+  const yukiRes = reservation({
+    reservation_id: "210722",
+    animal_id: 502,
+    a_name: "Yuki Goff",
+    a_o_first_name: "Jane",
+    a_o_last_name: "Goff",
+    reservation_type: { type: "Leash Manners | Group Training" },
+    start_date: "2026-09-29T00:00:00-07:00",
+    end_date: "2026-09-29T00:30:00-07:00",
+    services: [{ name: "Activity | Leash Manners", scheduled_at: "2026-09-29T00:00:00-07:00" }]
+  });
+
+  const tomorrow = normalizeGingrRouteReservations([jojoRes, yukiRes], routeDate);
+  const jojo = tomorrow.dogs.find((d) => d.name === "JoJo");
+  const yuki = tomorrow.dogs.find((d) => d.name === "Yuki Goff");
+  assert.ok(jojo);
+  assert.ok(yuki);
+  assert.ok(jojo!.activities.includes("leash_manners"));
+  assert.ok(yuki!.activities.includes("leash_manners"));
+  const leashGroup = groupDogsBySubject(tomorrow.dogs).find((g) => g.id === "leash_manners");
+  assert.ok(leashGroup);
+  assert.deepEqual(
+    leashGroup!.dogs.map((d) => d.name).sort(),
+    ["JoJo", "Yuki Goff"]
+  );
+  assert.ok(!groupDogsBySubject(tomorrow.dogs).some((g) => g.id === "club"));
+
+  const priorDay = normalizeGingrRouteReservations([jojoRes], "2026-09-28").dogs.find((d) => d.name === "JoJo");
+  assert.ok(priorDay);
+  assert.ok(!priorDay!.activities.includes("leash_manners"), "other-day class must not leak");
+  assert.ok(priorDay!.activities.includes("club"));
+}
+
+{
+  const routeDate = "2026-09-29";
+  const boardingHomePickup = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "board-pu",
+        animal_id: 8801,
+        a_name: "Maple",
+        reservation_type: { type: "Overnight: Petite Suite" },
+        check_in_date: "2026-09-18T10:00:00-07:00",
+        check_out_date: null,
+        owner: ownerHome(),
+        services: [
+          { name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` },
+          { name: "Pick Up", scheduled_at: `${routeDate}T07:00:00-07:00` }
+        ]
+      })
+    ],
+    routeDate
+  ).dogs[0];
+  assert.equal(boardingHomePickup.alreadyOnProperty, true);
+  assert.equal(boardingHomePickup.pickup, true, "same-day dated home pickup still applies");
+  assert.equal(boardingHomePickup.dropoff, false);
+  assert.equal(buildTransportationStops([boardingHomePickup], routeDate).pickupCount, 1);
+}
+
+{
+  const routeDate = "2026-09-29";
+  const boardingHomeDropoff = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "board-do",
+        animal_id: 8802,
+        a_name: "Cedar",
+        reservation_type: { type: "Overnight: Petite Suite" },
+        check_in_date: "2026-09-18T10:00:00-07:00",
+        check_out_date: null,
+        owner: ownerHome(),
+        services: [
+          { name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` },
+          { name: "Drop Off", scheduled_at: `${routeDate}T18:00:00-07:00` }
+        ]
+      })
+    ],
+    routeDate
+  ).dogs[0];
+  assert.equal(boardingHomeDropoff.alreadyOnProperty, true);
+  assert.equal(boardingHomeDropoff.dropoff, true, "same-day dated home drop-off still applies");
+  assert.equal(boardingHomeDropoff.pickup, false);
+  assert.equal(buildTransportationStops([boardingHomeDropoff], routeDate).dropoffCount, 1);
+}
+
+{
+  const datedTaxi = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "taxi-dated",
+        animal_id: 8803,
+        a_name: "CaboDated",
+        type: "Adventure Hike",
+        services: [
+          { name: "Adventure Hike", scheduled_at: `${date}T09:00:00-07:00` },
+          { name: "Door to Door Taxi", scheduled_at: `${date}T07:00:00-07:00` }
+        ],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.equal(datedTaxi.isTaxi, true);
+  assert.equal(datedTaxi.pickup, true);
+  assert.equal(datedTaxi.dropoff, true);
+  const datedTaxiStops = buildTransportationStops([datedTaxi], date);
+  assert.equal(datedTaxiStops.pickupCount, 1);
+  assert.equal(datedTaxiStops.dropoffCount, 1);
+}
+
+{
+  assert.equal(
+    isInternalBoardingTaxiMarker({
+      text: "Taxi Service - Business Only",
+      cost: 0,
+      assignedTo: null
+    }),
+    true
+  );
+  assert.equal(
+    isInternalBoardingTaxiMarker({ text: "Door to Door Taxi", cost: 0, assignedTo: null }),
+    false
+  );
+}
+
+{
+  const club = gingrTransportDisplays({
+    pickup: false,
+    dropoff: false,
+    ownerClubDropoff: true,
+    ownerClubPickup: true,
+    isTaxi: false,
+    alreadyOnProperty: false
+  });
+  assert.ok(club.every((d) => d.em !== "From Home" && d.em !== "To Home"));
+  assert.ok(club.every((d) => !d.homeVan));
+
+  const onProperty = gingrTransportDisplays({
+    pickup: false,
+    dropoff: false,
+    ownerClubDropoff: false,
+    ownerClubPickup: false,
+    isTaxi: false,
+    alreadyOnProperty: true
+  });
+  assert.deepEqual(
+    onProperty.map((d) => d.em),
+    ["At Fitdog"]
+  );
+  assert.ok(onProperty.every((d) => d.em !== "From Home" && d.em !== "To Home"));
+}
+
+{
+  const routeDate = "2026-09-29";
+  const boardingWithClubAddon = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "board-club",
+        animal_id: 8804,
+        a_name: "Willow",
+        reservation_type: { type: "Overnight: Petite Suite" },
+        check_in_date: "2026-09-18T10:00:00-07:00",
+        check_out_date: null,
+        addons: [{ name: "Owner Drop Off" }, { name: "Owner Pickup" }],
+        services: [{ name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` }],
+        owner: ownerHome()
+      })
+    ],
+    routeDate
+  ).dogs[0];
+  assert.equal(boardingWithClubAddon.alreadyOnProperty, true);
+  assert.equal(boardingWithClubAddon.pickup, false);
+  assert.equal(boardingWithClubAddon.dropoff, false);
+  assert.equal(boardingWithClubAddon.ownerClubDropoff, true);
+  assert.equal(boardingWithClubAddon.ownerClubPickup, true);
+  assert.equal(buildTransportationStops([boardingWithClubAddon], routeDate).stops.length, 0);
+  const clubOnProperty = gingrTransportDisplays(boardingWithClubAddon);
+  assert.ok(clubOnProperty.some((d) => d.kind === "owner_club_dropoff"));
+  assert.ok(clubOnProperty.some((d) => d.kind === "on_property"));
+  assert.ok(!clubOnProperty.some((d) => d.homeVan));
+}
+
 // --- todayPacificDateKey ---
 assert.match(todayPacificDateKey(new Date("2026-08-31T12:00:00-07:00")), /^\d{4}-\d{2}-\d{2}$/);
 
@@ -376,6 +676,7 @@ const samplePayload = {
   dogs: [],
   stats: {
     dogsScheduled: 0,
+    classCount: 0,
     adventureHike: 0,
     beachExcursion: 0,
     transportationRequired: 0
@@ -430,6 +731,38 @@ void (async () => {
     "sidebar Apps section includes Gingr Route Generator route leaf"
   );
   assert.equal(GINGR_ROUTE_GENERATOR_NAV_ROUTE.href, "/admin/gingr-route-generator");
+
+  assert.equal(parseGingrSendOwnerSmsParam(null), false);
+  assert.equal(parseGingrSendOwnerSmsParam(""), false);
+  assert.equal(parseGingrSendOwnerSmsParam("0"), false);
+  assert.equal(parseGingrSendOwnerSmsParam("1"), true);
+  assert.equal(parseGingrSendOwnerSmsParam("true"), true);
+  assert.equal(parseGingrSendOwnerSmsParam("YES"), true);
+
+  {
+    const csv = [
+      "Animal Name,Owner,Reservation Type,Add-ons,Address,City,State,Zip,Phone",
+      "Jasper,Ada Cole,Adventure Hike,Pick Up,123 Main St,Santa Monica,CA,90401,3105550100",
+      "Mochi,Alex Lee,Beach Excursion,Drop Off,900 Ocean Ave,Santa Monica,CA,90403,3105550199"
+    ].join("\n");
+    const reservations = parseGingrUploadText(csv, date);
+    assert.equal(reservations.length, 2);
+    const imported = normalizeGingrRouteReservations(reservations, date);
+    const jasper = imported.dogs.find((d) => d.name === "Jasper");
+    const mochi = imported.dogs.find((d) => d.name === "Mochi");
+    assert.ok(jasper && mochi);
+    assert.equal(jasper!.pickup, true);
+    assert.equal(mochi!.dropoff, true);
+    assert.ok(jasper!.activities.includes("adventure_hike"));
+  }
+
+  {
+    const start = { latitude: 34.02485, longitude: -118.47389 };
+    const near = { id: "near", latitude: 34.02, longitude: -118.49 };
+    const far = { id: "far", latitude: 34.05, longitude: -118.24 };
+    const ordered = orderStopsByShortestPath([far, near], start, start);
+    assert.equal(ordered[0]?.id, "near", "shortest path visits the closer home first");
+  }
 
   console.log("test-gingr-route-generator: all assertions passed");
 })().catch((error) => {
