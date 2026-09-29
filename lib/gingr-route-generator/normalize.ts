@@ -11,8 +11,15 @@ import {
   gingrTimestampDateKey,
   normalizeReservationTransportation,
   resolveBoardingOccupancy,
+  resolveVanStopDestinations,
   type GingrTransportationType
 } from "@/lib/gingr-route-generator/transportation";
+import {
+  collectAssignedToLabels,
+  ownerLastNameFromDisplay,
+  resolveRouteVanKey,
+  type GingrRouteVanKey
+} from "@/lib/gingr-route-generator/van-assignment";
 
 export type GingrRouteAddressStatus = "ok" | "missing" | "incomplete";
 
@@ -25,13 +32,20 @@ export type GingrRouteDog = {
   activities: GingrRouteActivityId[];
   /** Subject labels for RSVP-style columns (Canine Fitness, Adventure Hike, etc.). */
   activityLabels: string[];
-  /** FitDog van picks up from the owner's home (or taxi pickup). */
+  /** Dog is on a pickup route (home or Fitdog Club). */
   pickup: boolean;
-  /** FitDog van drops off at the owner's home (or taxi drop-off). */
+  /** Dog is on a drop-off route (home or Fitdog Club). */
   dropoff: boolean;
+  pickupDestination: "home" | "club";
+  dropoffDestination: "home" | "club";
   ownerClubDropoff: boolean;
   ownerClubPickup: boolean;
+  /** Van takes the dog back to Fitdog Club (Owner Pick Up | Fitdog Club). */
+  returnToClub: boolean;
   isTaxi: boolean;
+  assignedTo: string | null;
+  routeVanKey: GingrRouteVanKey;
+  ownerLastName: string | null;
   alreadyOnProperty: boolean;
   transportationTypes: GingrTransportationType[];
   scheduledTime: string | null;
@@ -443,9 +457,14 @@ type Acc = {
   activityLabels: Set<string>;
   pickup: boolean;
   dropoff: boolean;
+  pickupDestination: "home" | "club";
+  dropoffDestination: "home" | "club";
   ownerClubDropoff: boolean;
   ownerClubPickup: boolean;
+  returnToClub: boolean;
   isTaxi: boolean;
+  assignedLabels: Set<string>;
+  ownerLastName: string | null;
   alreadyOnProperty: boolean;
   transportationTypes: Set<GingrTransportationType>;
   scheduledTime: string | null;
@@ -491,9 +510,14 @@ export function normalizeGingrRouteReservations(
           activityLabels: new Set(),
           pickup: false,
           dropoff: false,
+          pickupDestination: "club",
+          dropoffDestination: "club",
           ownerClubDropoff: false,
           ownerClubPickup: false,
+          returnToClub: false,
           isTaxi: false,
+          assignedLabels: new Set(),
+          ownerLastName: null,
           alreadyOnProperty: false,
           transportationTypes: new Set(),
           scheduledTime: null,
@@ -532,11 +556,28 @@ export function normalizeGingrRouteReservations(
       }
 
       const transport = normalizeReservationTransportation(reservation as Record<string, unknown>, date);
-      if (transport.fitdogHomePickup) acc.pickup = true;
-      if (transport.fitdogHomeDropoff) acc.dropoff = true;
+      const destinations = resolveVanStopDestinations(transport);
+      if (destinations.pickup) {
+        acc.pickup = true;
+        if (destinations.pickup === "home") acc.pickupDestination = "home";
+      }
+      if (destinations.dropoff) {
+        acc.dropoff = true;
+        if (destinations.dropoff === "home") acc.dropoffDestination = "home";
+      }
       if (transport.ownerClubDropoff) acc.ownerClubDropoff = true;
       if (transport.ownerClubPickup) acc.ownerClubPickup = true;
+      acc.returnToClub = acc.dropoff && acc.dropoffDestination === "club";
       if (transport.isTaxi) acc.isTaxi = true;
+      for (const label of collectAssignedToLabels(reservation as Record<string, unknown>, date)) {
+        acc.assignedLabels.add(label);
+      }
+      const lastName = pickString(
+        asRecord(reservation.owner || reservation.client || reservation.customer).last_name,
+        reservation.a_o_last_name,
+        reservation.owner_last_name
+      );
+      if (lastName && !acc.ownerLastName) acc.ownerLastName = lastName;
       if (transport.alreadyOnProperty) acc.alreadyOnProperty = true;
       for (const type of transport.types) acc.transportationTypes.add(type);
       logTransportationClassification({
@@ -604,7 +645,13 @@ export function normalizeGingrRouteReservations(
       acc.imageUrl = `/api/gingr/animal-photo/image?animalId=${acc.animalId}`;
     }
     const activities = sortGingrRouteActivities(acc.activitySet);
-    const needsTransport = acc.pickup || acc.dropoff;
+    const routeVanKey = resolveRouteVanKey({
+      assignedLabels: Array.from(acc.assignedLabels),
+      isTaxi: acc.isTaxi,
+      activities
+    });
+    const ownerLastName = acc.ownerLastName || ownerLastNameFromDisplay(acc.owner);
+    const needsHomeAddress = acc.pickupDestination === "home" || acc.dropoffDestination === "home";
     dogs.push({
       id: acc.id,
       animalId: acc.animalId,
@@ -615,9 +662,15 @@ export function normalizeGingrRouteReservations(
       activityLabels: activities.map((id) => GINGR_ROUTE_ACTIVITY_BY_ID[id].label),
       pickup: acc.pickup,
       dropoff: acc.dropoff,
+      pickupDestination: acc.pickupDestination,
+      dropoffDestination: acc.dropoffDestination,
       ownerClubDropoff: acc.ownerClubDropoff,
       ownerClubPickup: acc.ownerClubPickup,
+      returnToClub: acc.dropoff && acc.dropoffDestination === "club",
       isTaxi: acc.isTaxi,
+      assignedTo: Array.from(acc.assignedLabels)[0] || null,
+      routeVanKey,
+      ownerLastName,
       alreadyOnProperty: acc.alreadyOnProperty,
       transportationTypes: Array.from(acc.transportationTypes),
       scheduledTime: acc.scheduledTime,
@@ -625,15 +678,15 @@ export function normalizeGingrRouteReservations(
       notes: acc.notes,
       pickupInstructions: acc.pickupInstructions,
       reservationIds: Array.from(acc.reservationIds),
-      homeAddress: needsTransport ? acc.homeAddress : null,
-      homeStreet1: needsTransport ? acc.homeStreet1 : null,
-      homeStreet2: needsTransport ? acc.homeStreet2 : null,
-      homeCity: needsTransport ? acc.homeCity : null,
-      homeState: needsTransport ? acc.homeState : null,
-      homePostalCode: needsTransport ? acc.homePostalCode : null,
-      ownerPhone: needsTransport ? acc.ownerPhone : null,
-      ownerFullName: needsTransport ? acc.ownerFullName : null,
-      addressStatus: needsTransport ? acc.addressStatus : "ok"
+      homeAddress: needsHomeAddress ? acc.homeAddress : null,
+      homeStreet1: needsHomeAddress ? acc.homeStreet1 : null,
+      homeStreet2: needsHomeAddress ? acc.homeStreet2 : null,
+      homeCity: needsHomeAddress ? acc.homeCity : null,
+      homeState: needsHomeAddress ? acc.homeState : null,
+      homePostalCode: needsHomeAddress ? acc.homePostalCode : null,
+      ownerPhone: acc.ownerPhone,
+      ownerFullName: acc.ownerFullName,
+      addressStatus: needsHomeAddress ? acc.addressStatus : "ok"
     });
   }
 

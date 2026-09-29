@@ -21,6 +21,7 @@ export type GingrRouteActivityId =
   | "trainer_led_hike"
   | "urban_recall"
   | "sport_sign_ups"
+  | "trainer_activity"
   | "club"
   | "taxi";
 
@@ -173,13 +174,22 @@ export const GINGR_ROUTE_ACTIVITIES: GingrRouteActivityMeta[] = [
     aliases: ["sport sign ups", "sports sign ups", "sport sign up", "sports sign up"]
   },
   {
+    id: "trainer_activity",
+    label: "Trainer Activity",
+    category: "class",
+    accent: "#475569",
+    accentSoft: "#F1F5F9",
+    accentText: "#334155",
+    aliases: ["activity with trainer", "trainer activity"]
+  },
+  {
     id: "club",
     label: "Club",
     category: "club",
     accent: "#57534E",
     accentSoft: "#F5F5F4",
     accentText: "#44403C",
-    aliases: ["daycare", "day care", "boarding", "overnight", "dog hotel"]
+    aliases: ["daycare", "day care", "boarding", "overnight", "dog hotel", "boarding at fitdog club"]
   },
   {
     id: "taxi",
@@ -277,7 +287,16 @@ export function matchGingrRouteActivity(
         }
       }
     }
-    return best;
+    if (best) return best;
+    const transport = classifyTransportationText(rawName);
+    if (transport !== "UNKNOWN") return null;
+    if (/\bgroup training\b/.test(token) || /\bactivity with trainer\b/.test(token)) {
+      return GINGR_ROUTE_ACTIVITY_BY_ID.trainer_activity;
+    }
+    if (/\bactivity\b/.test(token) && /\btrainer\b/.test(token)) {
+      return GINGR_ROUTE_ACTIVITY_BY_ID.trainer_activity;
+    }
+    return null;
   } catch {
     return null;
   }

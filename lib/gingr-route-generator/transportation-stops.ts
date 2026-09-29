@@ -1,11 +1,11 @@
 /**
- * Build FitDog home-transportation stops from normalized Gingr Route dogs.
- *
- * Only FitDog Pick Up (FROM HOME), Drop Off (TO HOME), and Taxi create van stops.
- * Owner Club drop-off/pickup never consume a home address or vehicle stop.
+ * Build van stops for every scheduled Gingr Route dog.
+ * Home addons/taxis use the owner address. Boarding and club addons use Fitdog Club.
  */
 
+import { DEFAULT_FITDOG_LOCATIONS } from "@/lib/route-generator/locations";
 import type { GingrRouteDog } from "@/lib/gingr-route-generator/normalize";
+import { clubPassengerNote, type GingrRouteVanKey } from "@/lib/gingr-route-generator/van-assignment";
 
 export type TransportationKind = "PICK_UP" | "DROP_OFF";
 
@@ -20,6 +20,8 @@ export type TransportationStop = {
   ownerFullName: string | null;
   ownerPhone: string | null;
   kind: TransportationKind;
+  destination: "home" | "club";
+  routeVanKey?: GingrRouteVanKey;
   activityLabels: string[];
   scheduledTime: string | null;
   notes: string | null;
@@ -33,11 +35,8 @@ export type TransportationStop = {
 };
 
 export type TransportationStopBuildResult = {
-  /** All transportation intents (including missing-address). */
   stops: TransportationStop[];
-  /** Stops with a usable home address (export candidates). */
   exportable: TransportationStop[];
-  /** Stops excluded because the home address is missing/incomplete. */
   missingAddress: TransportationStop[];
   pickupCount: number;
   dropoffCount: number;
@@ -57,12 +56,31 @@ function addressFingerprint(dog: GingrRouteDog): string {
   return parts.join("|") || "no-address";
 }
 
+export function fitdogClubStopAddress(): string {
+  return DEFAULT_FITDOG_LOCATIONS.club.address;
+}
+
+function clubAddressParts() {
+  return {
+    homeAddress: DEFAULT_FITDOG_LOCATIONS.club.address,
+    homeStreet1: "1712 21st St",
+    homeStreet2: null as string | null,
+    homeCity: "Santa Monica",
+    homeState: "CA",
+    homePostalCode: "90404"
+  };
+}
+
 function makeStop(
   date: string,
   dog: GingrRouteDog,
-  kind: TransportationKind
+  kind: TransportationKind,
+  destination: "home" | "club"
 ): TransportationStop {
-  const fingerprint = addressFingerprint(dog);
+  const club = destination === "club" ? clubAddressParts() : null;
+  const fingerprint = destination === "club" ? "fitdog-club" : addressFingerprint(dog);
+  const passenger = clubPassengerNote(dog.name, dog.ownerLastName);
+  const clubNotes = destination === "club" ? passenger : null;
   return {
     key: `${date}|${dog.id}|${kind}|${fingerprint}`,
     date,
@@ -73,18 +91,25 @@ function makeStop(
     ownerFullName: dog.ownerFullName,
     ownerPhone: dog.ownerPhone,
     kind,
+    destination,
+    routeVanKey: dog.routeVanKey,
     activityLabels: [...dog.activityLabels],
     scheduledTime: dog.scheduledTime,
-    notes: [dog.pickupInstructions ? `Pick Up Instructions: ${dog.pickupInstructions}` : null, dog.notes]
-      .filter(Boolean)
-      .join(" | ") || null,
-    homeAddress: dog.homeAddress,
-    homeStreet1: dog.homeStreet1,
-    homeStreet2: dog.homeStreet2,
-    homeCity: dog.homeCity,
-    homeState: dog.homeState,
-    homePostalCode: dog.homePostalCode,
-    addressStatus: dog.addressStatus
+    notes:
+      [
+        clubNotes,
+        dog.pickupInstructions ? `Pick Up Instructions: ${dog.pickupInstructions}` : null,
+        destination === "home" ? dog.notes : null
+      ]
+        .filter(Boolean)
+        .join(" | ") || null,
+    homeAddress: club?.homeAddress ?? dog.homeAddress,
+    homeStreet1: club?.homeStreet1 ?? dog.homeStreet1,
+    homeStreet2: club?.homeStreet2 ?? dog.homeStreet2,
+    homeCity: club?.homeCity ?? dog.homeCity,
+    homeState: club?.homeState ?? dog.homeState,
+    homePostalCode: club?.homePostalCode ?? dog.homePostalCode,
+    addressStatus: destination === "club" ? "ok" : dog.addressStatus
   };
 }
 
@@ -104,20 +129,15 @@ function mergeActivityLabels(target: TransportationStop, incoming: Transportatio
 }
 
 function compareStops(a: TransportationStop, b: TransportationStop): number {
+  if (a.routeVanKey !== b.routeVanKey) return a.routeVanKey.localeCompare(b.routeVanKey);
   if (a.kind !== b.kind) return a.kind === "PICK_UP" ? -1 : 1;
+  if (a.destination !== b.destination) return a.destination === "home" ? -1 : 1;
   const ta = a.scheduledTime || "99";
   const tb = b.scheduledTime || "99";
   if (ta !== tb) return ta.localeCompare(tb);
   return a.dogName.localeCompare(b.dogName);
 }
 
-/**
- * Build deduplicated home-transportation stops for a schedule day.
- *
- * Dedup key: date + dog + transportation kind + address.
- * Multiple activities on the same dog still yield at most one Pick Up and one Drop Off
- * unless the address differs (rare split-household case).
- */
 export function buildTransportationStops(
   dogs: GingrRouteDog[],
   date: string
@@ -125,18 +145,17 @@ export function buildTransportationStops(
   const byKey = new Map<string, TransportationStop>();
 
   for (const dog of dogs) {
-    // Owner handles transport — never create a home route stop.
-    // Owner-club and on-property never create a home route stop.
-    if (!dog.pickup && !dog.dropoff) continue;
+    const pickupDest = dog.pickup ? dog.pickupDestination : null;
+    const dropoffDest = dog.dropoff ? dog.dropoffDestination : dog.returnToClub ? "club" : null;
 
-    if (dog.pickup) {
-      const stop = makeStop(date, dog, "PICK_UP");
+    if (dog.pickup && pickupDest) {
+      const stop = makeStop(date, dog, "PICK_UP", pickupDest);
       const existing = byKey.get(stop.key);
       if (!existing) byKey.set(stop.key, stop);
       else mergeActivityLabels(existing, stop);
     }
-    if (dog.dropoff) {
-      const stop = makeStop(date, dog, "DROP_OFF");
+    if ((dog.dropoff || dog.returnToClub) && dropoffDest) {
+      const stop = makeStop(date, dog, "DROP_OFF", dropoffDest);
       const existing = byKey.get(stop.key);
       if (!existing) byKey.set(stop.key, stop);
       else mergeActivityLabels(existing, stop);
@@ -157,6 +176,7 @@ export function buildTransportationStops(
 }
 
 export function stopDisplayName(stop: TransportationStop): string {
+  if (stop.destination === "club") return "Fitdog Club";
   const kindLabel = stop.kind === "PICK_UP" ? "PICK UP FROM HOME" : "DROP OFF TO HOME";
   const owner = stop.ownerName ? ` (${stop.ownerName})` : "";
   return `${stop.dogName}${owner} - ${kindLabel}`;
