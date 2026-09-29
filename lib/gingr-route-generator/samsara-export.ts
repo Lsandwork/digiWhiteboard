@@ -364,18 +364,16 @@ export function mapTransportationStopsToExportRows(params: {
     }
     if (!customerRows.length) return;
 
-    const startPoint = plan.start
-      ? {
-          latitude: DEFAULT_FITDOG_LOCATIONS[plan.start].latitude,
-          longitude: DEFAULT_FITDOG_LOCATIONS[plan.start].longitude
-        }
-      : null;
-    const endPoint = plan.end
-      ? {
-          latitude: DEFAULT_FITDOG_LOCATIONS[plan.end].latitude,
-          longitude: DEFAULT_FITDOG_LOCATIONS[plan.end].longitude
-        }
-      : null;
+    const startLoc = plan.start ? DEFAULT_FITDOG_LOCATIONS[plan.start] : null;
+    const endLoc = plan.end ? DEFAULT_FITDOG_LOCATIONS[plan.end] : null;
+    const startPoint =
+      startLoc && startLoc.latitude != null && startLoc.longitude != null
+        ? { latitude: startLoc.latitude, longitude: startLoc.longitude }
+        : null;
+    const endPoint =
+      endLoc && endLoc.latitude != null && endLoc.longitude != null
+        ? { latitude: endLoc.latitude, longitude: endLoc.longitude }
+        : null;
     const orderedCustomers = orderStopsByShortestPath(
       customerRows.map((item) => ({
         ...item,

@@ -129,7 +129,9 @@ function mergeActivityLabels(target: TransportationStop, incoming: Transportatio
 }
 
 function compareStops(a: TransportationStop, b: TransportationStop): number {
-  if (a.routeVanKey !== b.routeVanKey) return a.routeVanKey.localeCompare(b.routeVanKey);
+  const vanA = a.routeVanKey || "";
+  const vanB = b.routeVanKey || "";
+  if (vanA !== vanB) return vanA.localeCompare(vanB);
   if (a.kind !== b.kind) return a.kind === "PICK_UP" ? -1 : 1;
   if (a.destination !== b.destination) return a.destination === "home" ? -1 : 1;
   const ta = a.scheduledTime || "99";
