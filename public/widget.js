@@ -3,9 +3,14 @@
   window.__rufflyWidgetLoaded = true;
 
   var script = document.currentScript;
-  var key = (script && script.getAttribute("data-ruffly-key")) || "";
+  var config = window.__RUFFLY_WIDGET__ || {};
+  var key =
+    (script && script.getAttribute("data-ruffly-key")) ||
+    config.key ||
+    "";
   var apiBase =
     (script && script.getAttribute("data-ruffly-api")) ||
+    config.api ||
     "https://staff.ruffops.com";
 
   var root = document.createElement("div");

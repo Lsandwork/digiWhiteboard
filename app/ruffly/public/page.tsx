@@ -1,7 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
+import Script from "next/script";
 
 export const dynamic = "force-dynamic";
+
+const WEBCHAT_SITE_KEY = process.env.RUFFLY_WEBCHAT_SITE_KEY?.trim() || "";
+const WEBCHAT_API_BASE = (process.env.RUFFLY_API_BASE_URL?.trim() || "https://staff.ruffops.com").replace(/\/$/, "");
 
 export default function RufflyPublicHomePage() {
   return (
@@ -20,7 +24,19 @@ export default function RufflyPublicHomePage() {
             Chat widget script
           </a>
         </div>
+        <p className="mt-6 text-sm text-slate-500">
+          Prefer chatting now? Use the orange <strong>Chat with Fitdog</strong> button in the corner.
+        </p>
       </div>
+
+      {WEBCHAT_SITE_KEY ? (
+        <>
+          <Script id="ruffly-webchat-config" strategy="beforeInteractive">
+            {`window.__RUFFLY_WIDGET__=${JSON.stringify({ key: WEBCHAT_SITE_KEY, api: WEBCHAT_API_BASE })};`}
+          </Script>
+          <Script src={`${WEBCHAT_API_BASE}/widget.js`} strategy="afterInteractive" />
+        </>
+      ) : null}
     </main>
   );
 }
