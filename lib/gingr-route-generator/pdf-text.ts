@@ -40,7 +40,7 @@ export function extractPdfText(buffer: Buffer): string {
     chunks.push(decodePdfLiteral(match[1] ?? ""));
   }
 
-  const tjArray = /\[(.*?)\]\s*TJ/gs;
+  const tjArray = /\[([\s\S]*?)\]\s*TJ/g;
   while ((match = tjArray.exec(raw))) {
     const inner = match[1] ?? "";
     const parts = inner.matchAll(/\(((?:\\.|[^\\)])*)\)|<([0-9A-Fa-f\s]+)>/g);
