@@ -18,7 +18,7 @@ import {
   isInternalBoardingTaxiMarker
 } from "../lib/gingr-route-generator/transportation";
 import { gingrTransportDisplays } from "../lib/gingr-route-generator/transportation-display";
-import { buildTransportationStops } from "../lib/gingr-route-generator/transportation-stops";
+import { buildTransportationStops, stopDisplayName } from "../lib/gingr-route-generator/transportation-stops";
 import {
   dogMatchesActivityFilter,
   groupDogsBySubject
@@ -51,22 +51,29 @@ assert.equal(matchGingrRouteActivity("Daycare Full Day")?.id, "club");
 assert.equal(matchGingrRouteActivity(""), null);
 
 assert.equal(isPickUpService("Pick Up - Adventure Hike"), true);
+assert.equal(isPickUpService("Fitdog to Pick Up @ Home"), true);
 assert.equal(isPickUpService("Door to Door Taxi"), true);
 assert.equal(isPickUpService("Owner Pick Up"), false);
 assert.equal(isPickUpService("Owner Drop Off"), false);
+assert.equal(isPickUpService("Owner Drop Off | Fitdog Club"), false);
+assert.equal(isPickUpService("Boarding @ Fitdog Club"), false);
 assert.equal(isDropOffService("Drop Off After Hike"), true);
+assert.equal(isDropOffService("Fitdog to Drop Off @ Home"), true);
 assert.equal(isDropOffService("Owner Drop Off"), false);
+assert.equal(isDropOffService("Owner Pick Up | Fitdog Club"), false);
 assert.equal(isDropOffService("Pick Up"), false);
 assert.equal(isDropOffService("Adventure Hike"), false);
 
 assert.equal(matchGingrRouteActivity("Sport Sign Ups")?.id, "sport_sign_ups");
+assert.equal(matchGingrRouteActivity("Activity with Trainer")?.id, "trainer_activity");
+assert.equal(matchGingrRouteActivity("Boarding @ Fitdog Club")?.id, "club");
 assert.equal(matchGingrRouteActivity("Foundational Obedience | Group Training")?.id, "foundational_obedience");
 assert.equal(matchGingrRouteActivity("Trainer Led Hike | Group Training")?.id, "trainer_led_hike");
 assert.equal(matchGingrRouteActivity("Urban Recall | Group Training")?.id, "urban_recall");
 assert.equal(matchGingrRouteActivity("Trail Foundations | Group Training")?.id, "trail_foundations");
 assert.equal(matchGingrRouteActivity("Daycare Full Day")?.id, "club");
 
-assert.equal(GINGR_ROUTE_ACTIVITIES.length, 17);
+assert.equal(GINGR_ROUTE_ACTIVITIES.length, 18);
 assert.equal(matchGingrRouteActivity("Activity | Leash Manners")?.id, "leash_manners");
 assert.equal(matchGingrRouteActivity("Cool Tricks | Group Training")?.id, "cool_tricks");
 assert.equal(matchGingrRouteActivity("Scent Work | Group Training")?.id, "scent_works");
@@ -98,17 +105,8 @@ const hikeReservation = reservation({
   a_o_last_name: "Smith",
   type: "Adventure Hike",
   start_date: `${date}T09:00:00`,
-  services: [{ name: "Adventure Hike", scheduled_at: `${date}T09:00:00` }]
-});
-
-const pickupReservation = reservation({
-  id: "1002",
-  animal_id: 42,
-  a_name: "Biscuit",
-  a_o_first_name: "Jane",
-  a_o_last_name: "Smith",
-  type: "Pick Up",
-  services: [{ name: "Pick Up - Adventure Hike" }]
+  services: [{ name: "Adventure Hike", scheduled_at: `${date}T09:00:00` }],
+  addons: [{ name: "Fitdog to Pick Up @ Home" }]
 });
 
 const beachReservation = reservation({
@@ -118,17 +116,8 @@ const beachReservation = reservation({
   a_o_first_name: "Alex",
   a_o_last_name: "Lee",
   type: "Beach Excursion",
-  services: [{ name: "Beach Excursion", scheduled_at: `${date}T10:30:00` }]
-});
-
-const dropoffReservation = reservation({
-  id: "2002",
-  animal_id: 77,
-  a_name: "Mochi",
-  a_o_first_name: "Alex",
-  a_o_last_name: "Lee",
-  type: "Drop Off",
-  services: [{ name: "Drop Off After Beach Excursion" }]
+  services: [{ name: "Beach Excursion", scheduled_at: `${date}T10:30:00` }],
+  addons: [{ name: "Fitdog to Drop Off @ Home" }]
 });
 
 const daycareReservation = reservation({
@@ -152,7 +141,7 @@ const duplicateHike = reservation({
 });
 
 const merged = normalizeGingrRouteReservations(
-  [hikeReservation, pickupReservation, beachReservation, dropoffReservation, daycareReservation, duplicateHike],
+  [hikeReservation, beachReservation, daycareReservation, duplicateHike],
   date
 );
 
@@ -187,7 +176,8 @@ const notesReservation = reservation({
   type: "Canine Fitness",
   notes: { reservation_notes: "Client note: soft mouth" },
   r_comments: "Gate code 9988 — leave in side yard",
-  services: [{ name: "Canine Fitness" }, { name: "Pick Up" }]
+  addons: [{ name: "Fitdog to Pick Up @ Home" }],
+  services: [{ name: "Canine Fitness" }]
 });
 const notesMerged = normalizeGingrRouteReservations([notesReservation], date);
 const pepper = notesMerged.dogs.find((d) => d.name === "Pepper");
@@ -208,6 +198,11 @@ function ownerHome() {
 }
 
 {
+  assert.equal(classifyTransportationText("Fitdog to Pick Up @ Home"), "FITDOG_HOME_PICKUP");
+  assert.equal(classifyTransportationText("Fitdog to Drop Off @ Home"), "FITDOG_HOME_DROPOFF");
+  assert.equal(classifyTransportationText("Owner Drop Off | Fitdog Club"), "OWNER_CLUB_DROPOFF");
+  assert.equal(classifyTransportationText("Owner Pick Up | Fitdog Club"), "OWNER_CLUB_PICKUP");
+  assert.equal(classifyTransportationText("Boarding @ Fitdog Club"), "BOARDING_CLUB");
   assert.equal(classifyTransportationText("Fitdog Pickup"), "FITDOG_HOME_PICKUP");
   assert.equal(classifyTransportationText("Owner Drop Off"), "OWNER_CLUB_DROPOFF");
   assert.equal(classifyTransportationText("Owner Drop-Off"), "OWNER_CLUB_DROPOFF");
@@ -241,22 +236,25 @@ function ownerHome() {
     date
   ).dogs.find((d) => d.name === "Juno");
   assert.ok(juno);
-  assert.equal(juno!.pickup, false, "Juno owner drop-off is not a Fitdog home pickup");
-  assert.equal(juno!.dropoff, false, "Juno owner pickup is not a Fitdog home drop-off");
+  assert.equal(juno!.pickupDestination, "club", "Juno owner drop-off is not a Fitdog home pickup");
+  assert.equal(juno!.dropoffDestination, "club", "Juno owner pickup is not a Fitdog home drop-off");
   assert.equal(juno!.ownerClubDropoff, true);
   assert.equal(juno!.ownerClubPickup, true);
   assert.ok(juno!.transportationTypes.includes("OWNER_CLUB_DROPOFF"));
   assert.ok(!juno!.transportationTypes.includes("FITDOG_HOME_PICKUP"));
   const stops = buildTransportationStops([juno!], date);
-  assert.equal(stops.stops.length, 0, "Juno home address must not enter the Fitdog pickup route");
+  assert.equal(juno!.returnToClub, true);
+  assert.equal(stops.stops.length, 2, "Owner club dogs get Fitdog Club pickup and drop-off");
+  assert.ok(stops.stops.every((s) => s.destination === "club"));
+  assert.match(stops.stops[0]!.homeAddress || "", /1712 21st/);
 }
 
 {
   const modes: Array<[string, string, keyof typeof import("../lib/gingr-route-generator/normalize") | string]> = [
-    ["Fitdog Pickup", "FITDOG_HOME_PICKUP", "pickup"],
-    ["Owner Drop Off", "OWNER_CLUB_DROPOFF", "ownerClubDropoff"],
-    ["Fitdog Drop Off", "FITDOG_HOME_DROPOFF", "dropoff"],
-    ["Owner Pickup", "OWNER_CLUB_PICKUP", "ownerClubPickup"]
+    ["Fitdog to Pick Up @ Home", "FITDOG_HOME_PICKUP", "pickup"],
+    ["Owner Drop Off | Fitdog Club", "OWNER_CLUB_DROPOFF", "ownerClubDropoff"],
+    ["Fitdog to Drop Off @ Home", "FITDOG_HOME_DROPOFF", "dropoff"],
+    ["Owner Pick Up | Fitdog Club", "OWNER_CLUB_PICKUP", "ownerClubPickup"]
   ];
   for (const [addon, expected, flag] of modes) {
     const dog = normalizeGingrRouteReservations(
@@ -277,21 +275,182 @@ function ownerHome() {
     assert.ok(dog.transportationTypes.includes(expected as "FITDOG_HOME_PICKUP"));
     if (flag === "pickup") {
       assert.equal(dog.pickup, true);
+      assert.equal(dog.dropoff, false);
+      assert.equal(dog.pickupDestination, "home");
       assert.equal(dog.ownerClubDropoff, false);
     }
     if (flag === "ownerClubDropoff") {
-      assert.equal(dog.pickup, false);
+      assert.equal(dog.pickup, true);
+      assert.equal(dog.dropoff, false);
+      assert.equal(dog.pickupDestination, "club");
       assert.equal(dog.ownerClubDropoff, true);
     }
     if (flag === "dropoff") {
+      assert.equal(dog.pickup, false);
       assert.equal(dog.dropoff, true);
+      assert.equal(dog.dropoffDestination, "home");
       assert.equal(dog.ownerClubPickup, false);
     }
     if (flag === "ownerClubPickup") {
-      assert.equal(dog.dropoff, false);
+      assert.equal(dog.pickup, false);
+      assert.equal(dog.dropoff, true);
+      assert.equal(dog.dropoffDestination, "club");
       assert.equal(dog.ownerClubPickup, true);
+      assert.equal(dog.returnToClub, true);
+      const clubStops = buildTransportationStops([dog], date);
+      assert.equal(clubStops.stops.length, 1);
+      assert.equal(clubStops.stops[0]!.kind, "DROP_OFF");
+      assert.equal(clubStops.stops[0]!.destination, "club");
     }
   }
+}
+
+{
+  const home = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "home-1",
+        animal_id: 920,
+        a_name: "River",
+        type: "Activity | Leash Manners",
+        addons: [{ name: "Fitdog to Pick Up @ Home" }, { name: "Fitdog to Drop Off @ Home" }],
+        services: [{ name: "Activity | Leash Manners" }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(home);
+  assert.ok(home.activities.includes("leash_manners"));
+  assert.equal(home.pickup, true);
+  assert.equal(home.dropoff, true);
+  assert.equal(home.ownerClubDropoff, false);
+  const homeStops = buildTransportationStops([home], date);
+  assert.equal(homeStops.pickupCount, 1);
+  assert.equal(homeStops.dropoffCount, 1);
+
+  const club = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "club-1",
+        animal_id: 921,
+        a_name: "Cove",
+        type: "Sport Sign Ups",
+        addons: [
+          { name: "Owner Drop Off | Fitdog Club" },
+          { name: "Owner Pick Up | Fitdog Club" },
+          { name: "Boarding @ Fitdog Club" }
+        ],
+        services: [{ name: "Sport Sign Ups" }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(club);
+  assert.ok(club.activities.includes("sport_sign_ups"));
+  assert.equal(club.pickupDestination, "club");
+  assert.equal(club.dropoffDestination, "club");
+  assert.equal(club.ownerClubDropoff, true);
+  assert.equal(club.ownerClubPickup, true);
+  assert.equal(club.returnToClub, true);
+  assert.equal(club.alreadyOnProperty, true);
+  const clubStops = buildTransportationStops([club], date);
+  assert.equal(clubStops.stops.length, 2);
+  assert.ok(clubStops.stops.every((s) => s.destination === "club"));
+
+  const taxi = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "taxi-1",
+        animal_id: 922,
+        a_name: "Cab",
+        type: "Taxi Service",
+        addons: [{ name: "Door to Door Taxi" }],
+        services: [{ name: "Taxi Service" }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(taxi);
+  assert.ok(taxi.activities.includes("taxi"));
+  assert.equal(taxi.isTaxi, true);
+  assert.equal(taxi.pickup, true);
+}
+
+{
+  const home = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "home-1",
+        animal_id: 920,
+        a_name: "River",
+        type: "Activity | Leash Manners",
+        addons: [{ name: "Fitdog to Pick Up @ Home" }, { name: "Fitdog to Drop Off @ Home" }],
+        services: [{ name: "Activity | Leash Manners" }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(home);
+  assert.ok(home.activities.includes("leash_manners"));
+  assert.equal(home.pickup, true);
+  assert.equal(home.dropoff, true);
+  assert.equal(home.ownerClubDropoff, false);
+  const homeStops = buildTransportationStops([home], date);
+  assert.equal(homeStops.pickupCount, 1);
+  assert.equal(homeStops.dropoffCount, 1);
+
+  const club = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "club-1",
+        animal_id: 921,
+        a_name: "Cove",
+        type: "Sport Sign Ups",
+        addons: [
+          { name: "Owner Drop Off | Fitdog Club" },
+          { name: "Owner Pick Up | Fitdog Club" },
+          { name: "Boarding @ Fitdog Club" }
+        ],
+        services: [{ name: "Sport Sign Ups" }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(club);
+  assert.ok(club.activities.includes("sport_sign_ups"));
+  assert.equal(club.pickupDestination, "club");
+  assert.equal(club.dropoffDestination, "club");
+  assert.equal(club.ownerClubDropoff, true);
+  assert.equal(club.ownerClubPickup, true);
+  assert.equal(club.returnToClub, true);
+  assert.equal(club.alreadyOnProperty, true);
+  const clubStops = buildTransportationStops([club], date);
+  assert.equal(clubStops.stops.length, 2);
+  assert.ok(clubStops.stops.every((s) => s.destination === "club"));
+
+  const taxi = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "taxi-1",
+        animal_id: 922,
+        a_name: "Cab",
+        type: "Taxi Service",
+        addons: [{ name: "Door to Door Taxi" }],
+        services: [{ name: "Taxi Service" }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(taxi);
+  assert.ok(taxi.activities.includes("taxi"));
+  assert.equal(taxi.isTaxi, true);
+  assert.equal(taxi.pickup, true);
 }
 
 {
@@ -322,7 +481,10 @@ function ownerHome() {
     ).dogs[0];
     assert.ok(dog, className);
     assert.equal(dog.ownerClubDropoff, true, className);
-    assert.equal(dog.pickup, false, className);
+    assert.equal(dog.pickup, true, className);
+    assert.equal(dog.pickupDestination, "club", className);
+    assert.equal(dog.dropoff, false, className);
+    assert.equal(buildTransportationStops([dog], date).stops.length, 1, className);
   }
 }
 
@@ -343,7 +505,7 @@ function ownerHome() {
   assert.ok(taxi);
   assert.equal(taxi.isTaxi, true);
   assert.equal(taxi.pickup, true);
-  assert.equal(taxi.dropoff, true);
+  assert.equal(taxi.dropoffDestination, "home", "taxi dogs get pickup and drop-off routes");
   const taxiStops = buildTransportationStops([taxi], date);
   assert.equal(taxiStops.pickupCount, 1);
   assert.equal(taxiStops.dropoffCount, 1);
@@ -373,7 +535,7 @@ function ownerHome() {
   assert.equal(result.dogs.length, 5);
   const arrayDog = result.dogs.find((d) => d.name === "ArrayAddon");
   assert.equal(arrayDog?.ownerClubDropoff, true);
-  assert.equal(arrayDog?.pickup, false);
+  assert.equal(arrayDog?.pickupDestination, "club");
 }
 
 {
@@ -384,7 +546,8 @@ function ownerHome() {
         animal_id: 42,
         a_name: "Biscuit",
         type: "Adventure Hike",
-        services: [{ name: "Pick Up - Adventure Hike" }, { name: "Pick Up" }],
+        addons: [{ name: "Fitdog to Pick Up @ Home" }, { name: "Fitdog to Pick Up @ Home" }],
+        services: [{ name: "Adventure Hike" }],
         owner: ownerHome()
       })
     ],
@@ -450,17 +613,18 @@ function ownerHome() {
   assert.equal(junoGroups[0]?.id, "leash_manners");
   assert.ok(junoGroups[0]?.dogs.some((d) => d.name === "Juno"));
   assert.ok(!junoGroups.some((g) => g.id === "club"));
-  assert.equal(junoShaped!.pickup, false, "other-day Business Only taxi is not a home pickup");
-  assert.equal(junoShaped!.dropoff, false, "other-day Business Only taxi is not a home drop-off");
+  assert.equal(junoShaped!.pickupDestination, "club", "other-day Business Only taxi is not a home pickup");
+  assert.equal(junoShaped!.dropoffDestination, "club", "other-day Business Only taxi is not a home drop-off");
   assert.equal(junoShaped!.isTaxi, false);
-  assert.equal(junoShaped!.ownerClubDropoff, false, "do not invent owner-club from overnight");
-  assert.equal(junoShaped!.ownerClubPickup, false);
+  assert.equal(junoShaped!.ownerClubDropoff, true, "boarding pickup is at Fitdog Club");
+  assert.equal(junoShaped!.ownerClubPickup, true, "boarding drop-off is at Fitdog Club");
   assert.equal(junoShaped!.alreadyOnProperty, true);
   const junoStops = buildTransportationStops([junoShaped!], routeDate);
-  assert.equal(junoStops.stops.length, 0);
+  assert.equal(junoStops.stops.length, 2);
+  assert.ok(junoStops.stops.every((s) => s.destination === "club"));
   const junoDisplays = gingrTransportDisplays(junoShaped!);
   assert.ok(!junoDisplays.some((d) => d.em === "From Home" || d.em === "To Home"));
-  assert.ok(junoDisplays.some((d) => d.kind === "on_property"));
+  assert.ok(junoDisplays.some((d) => d.em === "Fitdog Club"));
 }
 
 {
@@ -528,18 +692,18 @@ function ownerHome() {
         check_in_date: "2026-09-18T10:00:00-07:00",
         check_out_date: null,
         owner: ownerHome(),
+        addons: [{ name: "Fitdog to Pick Up @ Home" }],
         services: [
-          { name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` },
-          { name: "Pick Up", scheduled_at: `${routeDate}T07:00:00-07:00` }
+          { name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` }
         ]
       })
     ],
     routeDate
   ).dogs[0];
   assert.equal(boardingHomePickup.alreadyOnProperty, true);
-  assert.equal(boardingHomePickup.pickup, true, "same-day dated home pickup still applies");
-  assert.equal(boardingHomePickup.dropoff, false);
-  assert.equal(buildTransportationStops([boardingHomePickup], routeDate).pickupCount, 1);
+  assert.equal(boardingHomePickup.pickupDestination, "club");
+  assert.equal(boardingHomePickup.dropoffDestination, "club");
+  assert.equal(buildTransportationStops([boardingHomePickup], routeDate).stops.length, 2);
 }
 
 {
@@ -554,18 +718,18 @@ function ownerHome() {
         check_in_date: "2026-09-18T10:00:00-07:00",
         check_out_date: null,
         owner: ownerHome(),
+        addons: [{ name: "Fitdog to Drop Off @ Home" }],
         services: [
-          { name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` },
-          { name: "Drop Off", scheduled_at: `${routeDate}T18:00:00-07:00` }
+          { name: "Activity | Leash Manners", scheduled_at: `${routeDate}T00:00:00-07:00` }
         ]
       })
     ],
     routeDate
   ).dogs[0];
   assert.equal(boardingHomeDropoff.alreadyOnProperty, true);
-  assert.equal(boardingHomeDropoff.dropoff, true, "same-day dated home drop-off still applies");
-  assert.equal(boardingHomeDropoff.pickup, false);
-  assert.equal(buildTransportationStops([boardingHomeDropoff], routeDate).dropoffCount, 1);
+  assert.equal(boardingHomeDropoff.pickupDestination, "club");
+  assert.equal(boardingHomeDropoff.dropoffDestination, "club");
+  assert.equal(buildTransportationStops([boardingHomeDropoff], routeDate).stops.length, 2);
 }
 
 {
@@ -610,8 +774,10 @@ function ownerHome() {
 
 {
   const club = gingrTransportDisplays({
-    pickup: false,
-    dropoff: false,
+    pickup: true,
+    dropoff: true,
+    pickupDestination: "club",
+    dropoffDestination: "club",
     ownerClubDropoff: true,
     ownerClubPickup: true,
     isTaxi: false,
@@ -619,20 +785,6 @@ function ownerHome() {
   });
   assert.ok(club.every((d) => d.em !== "From Home" && d.em !== "To Home"));
   assert.ok(club.every((d) => !d.homeVan));
-
-  const onProperty = gingrTransportDisplays({
-    pickup: false,
-    dropoff: false,
-    ownerClubDropoff: false,
-    ownerClubPickup: false,
-    isTaxi: false,
-    alreadyOnProperty: true
-  });
-  assert.deepEqual(
-    onProperty.map((d) => d.em),
-    ["At Fitdog"]
-  );
-  assert.ok(onProperty.every((d) => d.em !== "From Home" && d.em !== "To Home"));
 }
 
 {
@@ -654,15 +806,46 @@ function ownerHome() {
     routeDate
   ).dogs[0];
   assert.equal(boardingWithClubAddon.alreadyOnProperty, true);
-  assert.equal(boardingWithClubAddon.pickup, false);
-  assert.equal(boardingWithClubAddon.dropoff, false);
+  assert.equal(boardingWithClubAddon.pickupDestination, "club");
+  assert.equal(boardingWithClubAddon.dropoffDestination, "club");
   assert.equal(boardingWithClubAddon.ownerClubDropoff, true);
   assert.equal(boardingWithClubAddon.ownerClubPickup, true);
-  assert.equal(buildTransportationStops([boardingWithClubAddon], routeDate).stops.length, 0);
+  assert.equal(boardingWithClubAddon.returnToClub, true);
+  const willowStops = buildTransportationStops([boardingWithClubAddon], routeDate);
+  assert.equal(willowStops.stops.length, 2);
+  assert.ok(willowStops.stops.every((s) => s.destination === "club"));
   const clubOnProperty = gingrTransportDisplays(boardingWithClubAddon);
   assert.ok(clubOnProperty.some((d) => d.kind === "owner_club_dropoff"));
-  assert.ok(clubOnProperty.some((d) => d.kind === "on_property"));
+  assert.ok(clubOnProperty.some((d) => d.kind === "owner_club_pickup" && d.em === "Fitdog Club"));
   assert.ok(!clubOnProperty.some((d) => d.homeVan));
+}
+
+{
+  const oscar = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "oscar-am",
+        animal_id: 930,
+        a_name: "Oscar",
+        type: "Taxi",
+        services: [{ name: "AM Taxi", scheduled_at: `${date}T08:00:00-07:00` }],
+        owner: ownerHome()
+      })
+    ],
+    date
+  ).dogs[0];
+  assert.ok(oscar);
+  assert.ok(oscar.activities.includes("taxi"));
+  assert.equal(oscar.isTaxi, true);
+  assert.equal(oscar.pickup, true, "AM taxi is a home pickup");
+  assert.equal(oscar.dropoffDestination, "home", "taxi dogs get pickup and drop-off routes");
+  assert.equal(oscar.routeVanKey, "van_5");
+  const oscarStops = buildTransportationStops([oscar], date);
+  assert.equal(oscarStops.pickupCount, 1);
+  assert.equal(oscarStops.dropoffCount, 1);
+  const oscarDisplays = gingrTransportDisplays(oscar);
+  assert.ok(oscarDisplays.some((d) => d.homeVan && d.em === "From Home"));
+  assert.ok(oscarDisplays.some((d) => d.em === "To Home"));
 }
 
 // --- todayPacificDateKey ---
@@ -742,8 +925,8 @@ void (async () => {
   {
     const csv = [
       "Animal Name,Owner,Reservation Type,Add-ons,Address,City,State,Zip,Phone",
-      "Jasper,Ada Cole,Adventure Hike,Pick Up,123 Main St,Santa Monica,CA,90401,3105550100",
-      "Mochi,Alex Lee,Beach Excursion,Drop Off,900 Ocean Ave,Santa Monica,CA,90403,3105550199"
+      "Jasper,Ada Cole,Adventure Hike,Fitdog to Pick Up @ Home,123 Main St,Santa Monica,CA,90401,3105550100",
+      "Mochi,Alex Lee,Beach Excursion,Fitdog to Drop Off @ Home,900 Ocean Ave,Santa Monica,CA,90403,3105550199"
     ].join("\n");
     const reservations = parseGingrUploadText(csv, date);
     assert.equal(reservations.length, 2);
@@ -762,6 +945,81 @@ void (async () => {
     const far = { id: "far", latitude: 34.05, longitude: -118.24 };
     const ordered = orderStopsByShortestPath([far, near], start, start);
     assert.equal(ordered[0]?.id, "near", "shortest path visits the closer home first");
+  }
+
+  {
+    const lumos = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "lumos-board",
+          animal_id: 401,
+          a_name: "Lumos",
+          a_o_last_name: "Liu",
+          type: "Overnight: Suite Blue Room",
+          addons: [{ name: "Boarding @ Fitdog Club" }],
+          services: [
+            { name: "Activity | Adventure Hike", assigned_to: "Van 1", scheduled_at: `${date}T07:00:00-07:00` }
+          ],
+          owner: { ...ownerHome(), last_name: "Liu" },
+          check_in_date: "2026-09-24T07:00:00-07:00",
+          check_out_date: "2026-09-29T20:00:00-07:00"
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.ok(lumos);
+    assert.equal(lumos!.routeVanKey, "van_1");
+    assert.equal(lumos!.pickupDestination, "club");
+    assert.equal(lumos!.dropoffDestination, "club");
+    const lumosStops = buildTransportationStops([lumos!], date);
+    assert.equal(lumosStops.stops.length, 2);
+    assert.ok(lumosStops.stops.every((s) => s.destination === "club"));
+    assert.ok(lumosStops.stops.every((s) => s.notes?.includes("Lumos Liu")));
+    assert.equal(stopDisplayName(lumosStops.stops[0]!), "Fitdog Club");
+  }
+
+  {
+    const ivonne = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "juno-ivonne",
+          animal_id: 208564,
+          a_name: "Juno",
+          a_o_last_name: "Berglund",
+          reservation_type: { type: "Overnight: Petite Suite" },
+          addons: [{ name: "Boarding @ Fitdog Club" }],
+          services: [
+            {
+              name: "Activity | Leash Manners",
+              assigned_to: "Ivonne Campuzano",
+              scheduled_at: `${date}T00:00:00-07:00`
+            }
+          ],
+          owner: { ...ownerHome(), last_name: "Berglund" },
+          check_in_date: "2026-09-18T10:00:00-07:00",
+          check_out_date: null
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.equal(ivonne!.routeVanKey, "van_5");
+    assert.equal(ivonne!.pickupDestination, "club");
+    const taxi = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "oscar-taxi",
+          animal_id: 930,
+          a_name: "Oscar",
+          type: "Full Day Daycare",
+          services: [{ name: "Taxi Service", scheduled_at: `${date}T07:00:00-07:00` }],
+          owner: ownerHome()
+        })
+      ],
+      date
+    ).dogs[0];
+    assert.equal(taxi!.routeVanKey, "van_5");
+    assert.equal(taxi!.pickupDestination, "home");
+    assert.equal(taxi!.dropoffDestination, "home");
   }
 
   console.log("test-gingr-route-generator: all assertions passed");

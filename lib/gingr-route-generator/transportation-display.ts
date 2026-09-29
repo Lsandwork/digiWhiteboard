@@ -1,6 +1,5 @@
 /**
  * Map normalized transportation state to UI labels.
- * Home-van booleans never label club or on-property as From Home / To Home.
  */
 
 export type GingrTransportDisplayKind =
@@ -18,23 +17,31 @@ export type GingrTransportDisplay = {
   title: string;
   strong: string;
   em: string;
-  /** True only for FitDog/taxi legs that go to the owner's home. */
   homeVan: boolean;
 };
 
 export type GingrTransportDisplayInput = {
   pickup: boolean;
   dropoff: boolean;
+  pickupDestination?: "home" | "club";
+  dropoffDestination?: "home" | "club";
   ownerClubDropoff: boolean;
   ownerClubPickup: boolean;
+  returnToClub?: boolean;
   isTaxi: boolean;
   alreadyOnProperty?: boolean;
 };
 
 export function gingrTransportDisplays(dog: GingrTransportDisplayInput): GingrTransportDisplay[] {
   const displays: GingrTransportDisplay[] = [];
+  const pickupDest = dog.pickup ? dog.pickupDestination || "home" : null;
+  const dropoffDest = dog.dropoff
+    ? dog.dropoffDestination || "home"
+    : dog.returnToClub
+      ? "club"
+      : null;
 
-  if (dog.pickup) {
+  if (pickupDest === "home") {
     displays.push({
       kind: dog.isTaxi ? "taxi_pickup" : "home_pickup",
       className: "grg-transport-badge--pickup",
@@ -43,48 +50,33 @@ export function gingrTransportDisplays(dog: GingrTransportDisplayInput): GingrTr
       em: "From Home",
       homeVan: true
     });
-  }
-
-  if (dog.dropoff) {
-    displays.push({
-      kind: dog.isTaxi && !dog.pickup ? "taxi_dropoff" : "home_dropoff",
-      className: "grg-transport-badge--dropoff",
-      title: dog.isTaxi ? "FitDog taxi drop-off to home" : "FitDog driver drops off to home",
-      strong: dog.isTaxi && !dog.pickup ? "TAXI" : "DROP OFF",
-      em: "To Home",
-      homeVan: true
-    });
-  }
-
-  if (dog.ownerClubDropoff) {
+  } else if (pickupDest === "club") {
     displays.push({
       kind: "owner_club_dropoff",
       className: "grg-transport-badge--club-in",
-      title: "Owner drops the dog off at Fitdog Club",
-      strong: "OWNER DROP-OFF",
-      em: "At Club",
+      title: "Pickup stop is Fitdog Club",
+      strong: "PICK UP",
+      em: "Fitdog Club",
       homeVan: false
     });
   }
 
-  if (dog.ownerClubPickup) {
+  if (dropoffDest === "home") {
+    displays.push({
+      kind: dog.isTaxi && pickupDest !== "home" ? "taxi_dropoff" : "home_dropoff",
+      className: "grg-transport-badge--dropoff",
+      title: dog.isTaxi ? "FitDog taxi drop-off to home" : "FitDog driver drops off to home",
+      strong: dog.isTaxi && pickupDest !== "home" ? "TAXI" : "DROP OFF",
+      em: "To Home",
+      homeVan: true
+    });
+  } else if (dropoffDest === "club") {
     displays.push({
       kind: "owner_club_pickup",
       className: "grg-transport-badge--club-out",
-      title: "Owner picks the dog up at Fitdog Club",
-      strong: "OWNER PICKUP",
-      em: "At Club",
-      homeVan: false
-    });
-  }
-
-  if (dog.alreadyOnProperty && !dog.pickup) {
-    displays.push({
-      kind: "on_property",
-      className: "grg-transport-badge--on-property",
-      title: "Dog is already checked in at Fitdog (boarding)",
-      strong: "ON PROPERTY",
-      em: "At Fitdog",
+      title: "Drop-off stop is Fitdog Club",
+      strong: "DROP OFF",
+      em: "Fitdog Club",
       homeVan: false
     });
   }

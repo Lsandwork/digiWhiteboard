@@ -16,6 +16,7 @@ import {
   GINGR_SAMSARA_SCHEMA_SOURCE,
   buildGingrSamsaraCsvFromStops,
   gingrDepotPlan,
+  isFacilityBookendRow,
   isFacilityStopName,
   vanKeyFromSamsaraVehicleName
 } from "../lib/gingr-route-generator/samsara-export";
@@ -56,6 +57,8 @@ function makeStop(
     ownerFullName: partial.ownerFullName ?? "Owner Name",
     ownerPhone: partial.ownerPhone ?? null,
     kind: partial.kind,
+    destination: partial.destination ?? "home",
+    routeVanKey: partial.routeVanKey,
     activityLabels: partial.activityLabels ?? ["Adventure Hike"],
     scheduledTime: partial.scheduledTime ?? null,
     notes: partial.notes ?? null,
@@ -69,8 +72,8 @@ function makeStop(
   };
 }
 
-function customerRows(rows: Array<{ stopName: string }>) {
-  return rows.filter((r) => !isFacilityStopName(r.stopName));
+function customerRows(rows: Array<{ stopName: string; stopNotes?: string }>) {
+  return rows.filter((r) => !isFacilityBookendRow(r));
 }
 
 function ownerWithAddress(extra?: Record<string, unknown>) {
@@ -153,7 +156,7 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
     date
   ).dogs;
   const built = buildTransportationStops(dogs, date);
-  assert.equal(built.stops.length, 0, "owner-transport dogs must not create stops");
+  assert.equal(built.stops.length, 0, "no travel addon means no van stop");
 }
 
 // 5) Multiple activities + one Pick Up → no duplicate Pick Up
@@ -177,7 +180,8 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
         a_o_first_name: "Sarah",
         a_o_last_name: "Miller",
         type: "Beach Excursion",
-        services: [{ name: "Beach Excursion" }, { name: "Pick Up" }],
+        addons: [{ name: "Fitdog to Pick Up @ Home" }],
+        services: [{ name: "Beach Excursion" }],
         owner: ownerWithAddress()
       })
     ],
@@ -199,7 +203,8 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
         a_o_first_name: "Sarah",
         a_o_last_name: "Miller",
         type: "Adventure Hike",
-        services: [{ name: "Adventure Hike" }, { name: "Pick Up" }],
+        addons: [{ name: "Fitdog to Pick Up @ Home" }],
+        services: [{ name: "Adventure Hike" }],
         owner: ownerWithAddress()
       }),
       reservation({
@@ -209,7 +214,8 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
         a_o_first_name: "Sarah",
         a_o_last_name: "Miller",
         type: "Beach Excursion",
-        services: [{ name: "Beach Excursion" }, { name: "Drop Off" }],
+        addons: [{ name: "Fitdog to Drop Off @ Home" }],
+        services: [{ name: "Beach Excursion" }],
         owner: ownerWithAddress()
       })
     ],
@@ -232,15 +238,16 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
         a_o_first_name: "Pat",
         a_o_last_name: "Nguyen",
         type: "Adventure Hike",
-        services: [{ name: "Adventure Hike" }, { name: "Drop Off" }],
+        addons: [{ name: "Fitdog to Drop Off @ Home" }],
+        services: [{ name: "Adventure Hike" }],
         owner: { first_name: "Pat", last_name: "Nguyen" }
       })
     ],
     date
   ).dogs;
   const built = buildTransportationStops(dogs, date);
-  assert.equal(built.exportable.length, 0);
-  assert.equal(built.missingAddress.length, 1);
+  assert.equal(built.exportable.filter((s) => s.destination === "home").length, 0);
+  assert.ok(built.missingAddress.some((s) => s.destination === "home"));
   assert.equal(dogs[0]!.addressStatus, "missing");
 }
 
@@ -281,7 +288,8 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
         a_o_first_name: "Sarah",
         a_o_last_name: "Miller",
         type: "Adventure Hike",
-        services: [{ name: "Adventure Hike" }, { name: "Pick Up" }],
+        addons: [{ name: "Fitdog to Pick Up @ Home" }],
+        services: [{ name: "Adventure Hike" }],
         owner: ownerWithAddress()
       }),
       reservation({
@@ -291,7 +299,8 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
         a_o_first_name: "Sarah",
         a_o_last_name: "Miller",
         type: "Adventure Hike",
-        services: [{ name: "Adventure Hike" }, { name: "Pick Up" }],
+        addons: [{ name: "Fitdog to Pick Up @ Home" }],
+        services: [{ name: "Adventure Hike" }],
         owner: ownerWithAddress()
       })
     ],
@@ -299,6 +308,8 @@ assert.ok(GINGR_SAMSARA_SCHEMA_SOURCE.includes("SAMSARA_BULK_UPLOAD_HEADERS"));
   ).dogs;
   const built = buildTransportationStops(dogs, date);
   assert.equal(built.stops.length, 1);
+  assert.equal(built.pickupCount, 1);
+  assert.equal(built.dropoffCount, 0);
 }
 
 // 11 + 12) Exact header row + column ordering in generated CSV
@@ -497,6 +508,35 @@ assert.deepEqual(gingrDepotPlan("van_6", "dropoff"), { start: "club", end: "club
   });
   const customers = built.rows.filter((r) => /Pickup/i.test(r.routeName) && !isFacilityStopName(r.stopName));
   assert.equal(customers[0]?.stopName.includes("NearDog"), true, "export orders closer Santa Monica stop first");
+}
+
+{
+  const dogs = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "club-return",
+        animal_id: 880,
+        a_name: "Cove",
+        type: "Sport Sign Ups",
+        addons: [{ name: "Owner Pick Up | Fitdog Club" }],
+        services: [{ name: "Sport Sign Ups" }],
+        owner: ownerWithAddress()
+      })
+    ],
+    date
+  ).dogs;
+  const builtStops = buildTransportationStops(dogs, date);
+  assert.equal(builtStops.stops.length, 1);
+  assert.equal(builtStops.stops[0]!.kind, "DROP_OFF");
+  assert.equal(builtStops.stops[0]!.destination, "club");
+  const built = buildGingrSamsaraCsvFromStops({
+    date,
+    stops: builtStops.exportable,
+    geocoded: new Map()
+  });
+  const customers = customerRows(built.rows);
+  assert.ok(customers.some((row) => /Fitdog Club/i.test(row.stopName)));
+  assert.ok(customers.some((row) => /Cove/i.test(row.stopNotes || "")));
 }
 
 console.log("test-gingr-samsara-export: all assertions passed");

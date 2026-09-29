@@ -98,7 +98,13 @@ const DogRow = memo(function DogRow({ dog }: { dog: GingrRouteDog }) {
             <em>{display.em}</em>
           </span>
         ))}
-        {(dog.pickup || dog.dropoff) && dog.addressStatus !== "ok" ? (
+        {dog.routeVanKey ? (
+          <span className="grg-transport-badge" title={dog.assignedTo || dog.routeVanKey}>
+            <strong>{dog.routeVanKey.replace("van_", "Van ")}</strong>
+          </span>
+        ) : null}
+        {(dog.pickupDestination === "home" || dog.dropoffDestination === "home") &&
+        dog.addressStatus !== "ok" ? (
           <span className="grg-transport-badge grg-transport-badge--address">Address Required</span>
         ) : null}
         {!displays.length ? <span className="grg-transport-empty">No van</span> : null}
@@ -125,7 +131,7 @@ export function GingrRouteGeneratorWorkspace() {
   const [exportingSamsara, setExportingSamsara] = useState(false);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [exportWarning, setExportWarning] = useState<string | null>(null);
-  const [exportVehicle, setExportVehicle] = useState("Van 01");
+  const [exportVehicle, setExportVehicle] = useState("All vans");
   const [sendLiveTrackingSms, setSendLiveTrackingSms] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const uploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -189,8 +195,8 @@ export function GingrRouteGeneratorWorkspace() {
     const dogs = payload?.dogs ?? [];
     const q = search.trim().toLowerCase();
     return dogs.filter((dog) => {
-      if (pickupOnly && !dog.pickup) return false;
-      if (dropoffOnly && !dog.dropoff) return false;
+      if (pickupOnly && dog.pickupDestination !== "home") return false;
+      if (dropoffOnly && dog.dropoffDestination !== "home") return false;
       if (!dogMatchesActivityFilter(dog, activityFilter)) return false;
       if (!q) return true;
       return (
@@ -204,37 +210,52 @@ export function GingrRouteGeneratorWorkspace() {
   const dogsBySubject = useMemo(() => groupDogsBySubject(filteredDogs), [filteredDogs]);
 
   const routeGroups = useMemo(() => {
-    return dogsBySubject
-      .map((group) => {
-        const colors = subjectGroupAccent(group.id);
-        const pickups = group.dogs.filter((d) => d.pickup);
-        const dropoffs = group.dogs.filter((d) => d.dropoff);
-        const clubArrivals = group.dogs.filter((d) => d.ownerClubDropoff);
-        const clubDepartures = group.dogs.filter((d) => d.ownerClubPickup);
-        if (!pickups.length && !dropoffs.length && !clubArrivals.length && !clubDepartures.length) {
-          return null;
-        }
+    const vans: Array<{ id: GingrRouteDog["routeVanKey"]; label: string }> = [
+      { id: "van_1", label: "Van 1" },
+      { id: "van_2", label: "Van 2" },
+      { id: "van_3", label: "Van 3" },
+      { id: "van_5", label: "Van 5 · Ivonne / Amanda / Taxi" }
+    ];
+    return vans
+      .map((van) => {
+        const dogs = filteredDogs.filter((d) => d.routeVanKey === van.id);
+        if (!dogs.length) return null;
         return {
-          groupId: group.id,
-          label: group.label,
-          ...colors,
-          pickups,
-          dropoffs,
-          clubArrivals,
-          clubDepartures
+          groupId: van.id,
+          label: van.label,
+          accent: "#1F2937",
+          accentSoft: "#F3F4F6",
+          accentText: "#111827",
+          pickups: dogs.filter((d) => d.pickupDestination === "home"),
+          clubPickups: dogs.filter((d) => d.pickupDestination === "club"),
+          dropoffs: dogs.filter((d) => d.dropoffDestination === "home"),
+          clubDropoffs: dogs.filter((d) => d.dropoffDestination === "club")
         };
       })
       .filter((group) => group !== null);
-  }, [dogsBySubject]);
+  }, [filteredDogs]);
 
-  const totalPickups = useMemo(() => filteredDogs.filter((d) => d.pickup).length, [filteredDogs]);
-  const totalDropoffs = useMemo(() => filteredDogs.filter((d) => d.dropoff).length, [filteredDogs]);
-  const exportEligibleCount = useMemo(
-    () => filteredDogs.filter((d) => d.pickup || d.dropoff).length,
+  const totalPickups = useMemo(
+    () => filteredDogs.filter((d) => d.pickupDestination === "home").length,
     [filteredDogs]
   );
+  const totalDropoffs = useMemo(
+    () => filteredDogs.filter((d) => d.dropoffDestination === "home").length,
+    [filteredDogs]
+  );
+  const totalReturnToClub = useMemo(
+    () => filteredDogs.filter((d) => d.dropoffDestination === "club" || d.pickupDestination === "club").length,
+    [filteredDogs]
+  );
+  const exportEligibleCount = useMemo(() => filteredDogs.length, [filteredDogs]);
   const missingAddressDogs = useMemo(
-    () => filteredDogs.filter((d) => (d.pickup || d.dropoff) && d.addressStatus && d.addressStatus !== "ok"),
+    () =>
+      filteredDogs.filter(
+        (d) =>
+          (d.pickupDestination === "home" || d.dropoffDestination === "home") &&
+          d.addressStatus &&
+          d.addressStatus !== "ok"
+      ),
     [filteredDogs]
   );
   const hasFilters = Boolean(search || activityFilter !== "all" || pickupOnly || dropoffOnly);
@@ -442,6 +463,7 @@ export function GingrRouteGeneratorWorkspace() {
           onChange={(e) => setExportVehicle(e.target.value)}
           aria-label="Samsara van"
         >
+          <option value="All vans">All vans</option>
           <option value="Van 01">Van 01</option>
           <option value="Van 02">Van 02</option>
           <option value="Van 03">Van 03</option>
@@ -607,18 +629,18 @@ export function GingrRouteGeneratorWorkspace() {
           <aside className="grg-route-panel">
             <div className="grg-route-header">
               <h2>Route Plan</h2>
-              <p>Class dogs stay in Class. Only home/taxi stops go to Samsara.</p>
+              <p>Van 1–3 from Gingr Assigned To. Ivonne, Amanda, and taxis share Van 5.</p>
             </div>
             <div className="grg-route-body">
               {loadState === "ready" && routeGroups.length === 0 ? (
-                <div className="grg-route-empty">No van or club transport for this filter.</div>
+                <div className="grg-route-empty">No van stops for this filter.</div>
               ) : null}
               {routeGroups.map((group) => {
                 const count = new Set([
                   ...group.pickups.map((d) => d.id),
+                  ...group.clubPickups.map((d) => d.id),
                   ...group.dropoffs.map((d) => d.id),
-                  ...group.clubArrivals.map((d) => d.id),
-                  ...group.clubDepartures.map((d) => d.id)
+                  ...group.clubDropoffs.map((d) => d.id)
                 ]).size;
                 return (
                   <section key={group.groupId} className="grg-route-section">
@@ -640,13 +662,13 @@ export function GingrRouteGeneratorWorkspace() {
                         </ol>
                       </div>
                     ) : null}
-                    {group.clubArrivals.length ? (
+                    {group.clubPickups.length ? (
                       <div className="grg-route-group">
-                        <div className="grg-route-group-label">CLUB ARRIVALS</div>
+                        <div className="grg-route-group-label">FITDOG CLUB PICKUPS</div>
                         <ol>
-                          {group.clubArrivals.map((dog, index) => (
-                            <li key={`ca-${dog.id}`}>
-                              {index + 1}. {dog.name}
+                          {group.clubPickups.map((dog, index) => (
+                            <li key={`cpu-${dog.id}`}>
+                              {index + 1}. {dog.name} {dog.ownerLastName || ""}
                             </li>
                           ))}
                         </ol>
@@ -664,13 +686,13 @@ export function GingrRouteGeneratorWorkspace() {
                         </ol>
                       </div>
                     ) : null}
-                    {group.clubDepartures.length ? (
+                    {group.clubDropoffs.length ? (
                       <div className="grg-route-group">
-                        <div className="grg-route-group-label">CLUB PICKUPS</div>
+                        <div className="grg-route-group-label">FITDOG CLUB DROP-OFFS</div>
                         <ol>
-                          {group.clubDepartures.map((dog, index) => (
-                            <li key={`cd-${dog.id}`}>
-                              {index + 1}. {dog.name}
+                          {group.clubDropoffs.map((dog, index) => (
+                            <li key={`cdo-${dog.id}`}>
+                              {index + 1}. {dog.name} {dog.ownerLastName || ""}
                             </li>
                           ))}
                         </ol>
@@ -687,6 +709,9 @@ export function GingrRouteGeneratorWorkspace() {
                 </div>
                 <div>
                   Home drop-offs <strong>{totalDropoffs}</strong>
+                </div>
+                <div>
+                  Club stops <strong>{totalReturnToClub}</strong>
                 </div>
               </div>
               <div className="grg-route-actions">

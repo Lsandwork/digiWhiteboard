@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   const dateParam = url.searchParams.get("date")?.trim() || todayPacificDateKey();
   const download = url.searchParams.get("download") === "1";
   const refresh = url.searchParams.get("refresh") === "1";
-  const vehicleParam = url.searchParams.get("vehicle")?.trim() || "Van 01";
+  const vehicleParam = url.searchParams.get("vehicle")?.trim() || "All vans";
   const sendOwnerSms = parseGingrSendOwnerSmsParam(url.searchParams.get("sendOwnerSms"));
 
   try {

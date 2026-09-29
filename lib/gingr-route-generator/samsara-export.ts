@@ -39,6 +39,11 @@ import {
   type TransportationStopBuildResult
 } from "@/lib/gingr-route-generator/transportation-stops";
 import { orderStopsByShortestPath } from "@/lib/gingr-route-generator/shortest-route";
+import {
+  samsaraVehicleNameForVan,
+  vanKeyFromExportVehicle,
+  type GingrRouteVanKey
+} from "@/lib/gingr-route-generator/van-assignment";
 
 export const GINGR_SAMSARA_SCHEMA_SOURCE =
   "lib/route-generator/samsara-csv.ts (SAMSARA_BULK_UPLOAD_HEADERS) — FitDog Digi Route Generator production bulk-upload schema";
@@ -211,6 +216,10 @@ export function isFacilityStopName(stopName: string): boolean {
   return FACILITY_STOP_NAME_RE.test(stopName);
 }
 
+export function isFacilityBookendRow(row: { stopName: string; stopNotes?: string }): boolean {
+  return /^(START|END):/.test(String(row.stopNotes || "").trim()) && isFacilityStopName(row.stopName);
+}
+
 function resolveStopAddress(stop: TransportationStop): string | null {
   if (stop.homeAddress) return stop.homeAddress;
   return formatPostalAddress({
@@ -225,7 +234,11 @@ function resolveStopAddress(stop: TransportationStop): string | null {
 
 function buildStopNotes(stop: TransportationStop): string {
   const parts = [
-    stop.kind === "PICK_UP" ? "PICK UP FROM HOME" : "DROP OFF TO HOME",
+    stop.destination === "club"
+      ? stop.notes || "Fitdog Club"
+      : stop.kind === "PICK_UP"
+        ? "PICK UP FROM HOME"
+        : "DROP OFF TO HOME",
     stop.activityLabels.length ? `Activities: ${stop.activityLabels.join(", ")}` : null,
     stop.ownerPhone ? `Phone: ${stop.ownerPhone}` : null,
     stop.notes ? `Notes: ${stop.notes}` : null
@@ -281,16 +294,25 @@ export function mapTransportationStopsToExportRows(params: {
   skippedGeocode: TransportationStop[];
   pickupTrackingStops: GingrPickupTrackingStop[];
 } {
-  const vehicleName = normalizeSamsaraVehicleName(params.vehicleName || DEFAULT_VEHICLE_INPUT);
-  const vanKey = vanKeyFromSamsaraVehicleName(vehicleName);
+  const requested = vanKeyFromExportVehicle(params.vehicleName);
   const skippedGeocode: TransportationStop[] = [];
   const rows: ExportStopRow[] = [];
   const pickupTrackingStops: GingrPickupTrackingStop[] = [];
 
-  const pickups = params.stops.filter((s) => s.kind === "PICK_UP");
-  const dropoffs = params.stops.filter((s) => s.kind === "DROP_OFF");
+  const grouped = new Map<GingrRouteVanKey, TransportationStop[]>();
+  for (const stop of params.stops) {
+    const fallback =
+      requested === "all" ? vanKeyFromSamsaraVehicleName(DEFAULT_VEHICLE_INPUT) : requested;
+    const van = (stop.routeVanKey || fallback) as GingrRouteVanKey;
+    if (requested !== "all" && van !== requested) continue;
+    const list = grouped.get(van) || [];
+    list.push(stop);
+    grouped.set(van, list);
+  }
 
   const appendWave = (
+    vanKey: string,
+    vehicleName: string,
     direction: "pickup" | "dropoff",
     waveStops: TransportationStop[]
   ) => {
@@ -322,7 +344,18 @@ export function mapTransportationStopsToExportRows(params: {
         skippedGeocode.push(stop);
         continue;
       }
-      const geo = params.geocoded.get(address) || params.geocoded.get(address.trim());
+      const club = DEFAULT_FITDOG_LOCATIONS.club;
+      const geo =
+        stop.destination === "club" && club.latitude != null && club.longitude != null
+          ? {
+              latitude: club.latitude,
+              longitude: club.longitude,
+              formattedAddress: club.address,
+              confidence: 1,
+              provider: "facility" as const,
+              cacheHit: true
+            }
+          : params.geocoded.get(address) || params.geocoded.get(address.trim());
       if (!geo) {
         skippedGeocode.push(stop);
         continue;
@@ -381,7 +414,7 @@ export function mapTransportationStopsToExportRows(params: {
         latitude: formatSamsaraCoordinate(item.geo.latitude),
         longitude: formatSamsaraCoordinate(item.geo.longitude)
       });
-      if (direction === "pickup") {
+      if (direction === "pickup" && item.stop.destination !== "club") {
         pickupTrackingStops.push({
           dogId: item.stop.dogId,
           dogName: item.stop.dogName,
@@ -433,8 +466,22 @@ export function mapTransportationStopsToExportRows(params: {
     });
   };
 
-  appendWave("pickup", pickups);
-  appendWave("dropoff", dropoffs);
+  const vans = Array.from(grouped.entries()).sort(([a], [b]) => a.localeCompare(b));
+  for (const [vanKey, vanStops] of vans) {
+    const vehicleName = samsaraVehicleNameForVan(vanKey);
+    appendWave(
+      vanKey,
+      vehicleName,
+      "pickup",
+      vanStops.filter((s) => s.kind === "PICK_UP")
+    );
+    appendWave(
+      vanKey,
+      vehicleName,
+      "dropoff",
+      vanStops.filter((s) => s.kind === "DROP_OFF")
+    );
+  }
   return { rows, skippedGeocode, pickupTrackingStops };
 }
 
@@ -542,7 +589,7 @@ export async function buildGingrSamsaraExport(params: {
     };
   }
 
-  const customerStopCount = rows.filter((r) => !isFacilityStopName(r.stopName)).length;
+  const customerStopCount = rows.filter((r) => !isFacilityBookendRow(r)).length;
   const routeCount = new Set(rows.map((r) => r.routeName)).size;
 
   return {
