@@ -7,7 +7,7 @@ import { gingrTimestampDateKey } from "@/lib/gingr-route-generator/transportatio
 import type { GingrRouteActivityId } from "@/lib/gingr-route-generator/activities";
 import { GINGR_ROUTE_ACTIVITY_BY_ID } from "@/lib/gingr-route-generator/activities";
 
-export type GingrRouteVanKey = "van_1" | "van_2" | "van_3" | "van_5";
+export type GingrRouteVanKey = "van_1" | "van_2" | "van_3" | "van_5" | "van_6";
 
 const CLUB_TRAINER_RE = /\b(ivonne|amanda)\b/;
 
@@ -31,7 +31,8 @@ export function parseGingrAssignedVan(raw: unknown): GingrRouteVanKey | null {
   if (/\bvan\s*0*1\b/.test(token) || token === "1") return "van_1";
   if (/\bvan\s*0*2\b/.test(token) || token === "2") return "van_2";
   if (/\bvan\s*0*3\b/.test(token) || token === "3") return "van_3";
-  if (/\bvan\s*0*5\b/.test(token) || /\bvan\s*0*6\b/.test(token)) return "van_5";
+  if (/\bvan\s*0*6\b/.test(token) || token === "6") return "van_6";
+  if (/\bvan\s*0*5\b/.test(token) || token === "5") return "van_5";
   if (CLUB_TRAINER_RE.test(token)) return "van_5";
   return null;
 }
@@ -41,6 +42,7 @@ export function isClubTrainerAssignee(raw: unknown): boolean {
 }
 
 export function samsaraVehicleNameForVan(vanKey: GingrRouteVanKey): string {
+  if (vanKey === "van_6") return "Van 06";
   if (vanKey === "van_5") return "Van 05";
   if (vanKey === "van_2") return "Van 02";
   if (vanKey === "van_3") return "Van 03";
@@ -102,18 +104,19 @@ export function resolveRouteVanKey(params: {
   isTaxi: boolean;
   activities: GingrRouteActivityId[];
 }): GingrRouteVanKey {
-  if (params.isTaxi) return "van_5";
-
   const parsed = params.assignedLabels
     .map((label) => parseGingrAssignedVan(label))
     .filter((key): key is GingrRouteVanKey => Boolean(key));
-  const outing = parsed.find((key) => key === "van_1" || key === "van_2" || key === "van_3");
-  if (outing) return outing;
-  if (parsed[0]) return parsed[0];
+  const clubVan = parsed.find((key) => key === "van_5" || key === "van_6");
+  if (params.isTaxi) return clubVan ?? "van_5";
 
+  const outing = parsed.find((key) => key === "van_1" || key === "van_2" || key === "van_3");
   const hasOuting = params.activities.some(
     (id) => GINGR_ROUTE_ACTIVITY_BY_ID[id]?.category === "outing"
   );
+  if (outing && hasOuting) return outing;
+  if (clubVan) return clubVan;
+  if (outing) return outing;
   return hasOuting ? "van_1" : "van_5";
 }
 

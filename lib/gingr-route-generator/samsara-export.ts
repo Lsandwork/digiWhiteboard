@@ -234,8 +234,10 @@ function resolveStopAddress(stop: TransportationStop): string | null {
 
 function buildStopNotes(stop: TransportationStop): string {
   const parts = [
-    stop.destination === "club"
-      ? stop.notes || "Fitdog Club"
+    stop.locationType === "FITDOG_CLUB"
+      ? [stop.kind === "PICK_UP" ? "PICK UP AT FITDOG CLUB" : "DROP OFF AT FITDOG CLUB", stop.notes]
+          .filter(Boolean)
+          .join(" | ")
       : stop.kind === "PICK_UP"
         ? "PICK UP FROM HOME"
         : "DROP OFF TO HOME",
@@ -346,7 +348,7 @@ export function mapTransportationStopsToExportRows(params: {
       }
       const club = DEFAULT_FITDOG_LOCATIONS.club;
       const geo =
-        stop.destination === "club" && club.latitude != null && club.longitude != null
+        stop.locationType === "FITDOG_CLUB" && club.latitude != null && club.longitude != null
           ? {
               latitude: club.latitude,
               longitude: club.longitude,
@@ -412,7 +414,7 @@ export function mapTransportationStopsToExportRows(params: {
         latitude: formatSamsaraCoordinate(item.geo.latitude),
         longitude: formatSamsaraCoordinate(item.geo.longitude)
       });
-      if (direction === "pickup" && item.stop.destination !== "club") {
+      if (direction === "pickup" && item.stop.locationType === "OWNER_HOME") {
         pickupTrackingStops.push({
           dogId: item.stop.dogId,
           dogName: item.stop.dogName,
@@ -625,9 +627,10 @@ export function buildGingrSamsaraCsvFromStops(params: {
   csv: string;
   rows: ExportStopRow[];
   pickupTrackingStops: GingrPickupTrackingStop[];
+  skippedGeocode: TransportationStop[];
   validation: ReturnType<typeof validateExport>;
 } {
-  const { rows, pickupTrackingStops } = mapTransportationStopsToExportRows(params);
+  const { rows, pickupTrackingStops, skippedGeocode } = mapTransportationStopsToExportRows(params);
   enforceMonotonicRouteSchedule(rows);
   const template = getCanonicalSamsaraTemplate();
   const built = buildCsv({ template, rows });
@@ -637,5 +640,5 @@ export function buildGingrSamsaraCsvFromStops(params: {
     csv: built.csv,
     operatingDate: params.date
   });
-  return { csv: built.csv, rows, pickupTrackingStops, validation };
+  return { csv: built.csv, rows, pickupTrackingStops, skippedGeocode, validation };
 }

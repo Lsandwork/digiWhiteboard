@@ -47,6 +47,8 @@ function makeStop(
     Pick<TransportationStop, "dogId" | "dogName" | "kind">
 ): TransportationStop {
   const address = partial.homeAddress ?? "123 Main St, Santa Monica, CA 90401, USA";
+  const locationType =
+    partial.locationType ?? (partial.destination === "club" ? "FITDOG_CLUB" : "OWNER_HOME");
   return {
     key: `${partial.date || date}|${partial.dogId}|${partial.kind}|${address}`,
     date: partial.date || date,
@@ -58,6 +60,9 @@ function makeStop(
     ownerPhone: partial.ownerPhone ?? null,
     kind: partial.kind,
     destination: partial.destination ?? "home",
+    locationType,
+    locationLabel: partial.locationLabel ?? (locationType === "FITDOG_CLUB" ? "Fitdog Club" : "Owner Home"),
+    transportOption: partial.transportOption ?? null,
     routeVanKey: partial.routeVanKey,
     activityLabels: partial.activityLabels ?? ["Adventure Hike"],
     scheduledTime: partial.scheduledTime ?? null,
@@ -526,17 +531,62 @@ assert.deepEqual(gingrDepotPlan("van_6", "dropoff"), { start: "club", end: "club
     date
   ).dogs;
   const builtStops = buildTransportationStops(dogs, date);
-  assert.equal(builtStops.stops.length, 1);
-  assert.equal(builtStops.stops[0]!.kind, "DROP_OFF");
-  assert.equal(builtStops.stops[0]!.destination, "club");
+  assert.equal(builtStops.stops.length, 0, "owner pick-up at club is not a Samsara van stop");
+  assert.equal(dogs[0]!.ownerClubPickup, true);
+  assert.equal(dogs[0]!.dropoff, false);
+}
+
+// Boarding @ Fitdog Club exports as a real Fitdog Club stop without needing a geocode.
+{
+  const dogs = normalizeGingrRouteReservations(
+    [
+      reservation({
+        id: "club-boarding-hike",
+        animal_id: 881,
+        a_name: "Scout",
+        reservation_type: { type: "Overnight: Petite Suite" },
+        check_in_date: "2026-09-18T10:00:00-07:00",
+        check_out_date: "2026-10-12T18:00:00-07:00",
+        addons: [{ name: "Boarding @ Fitdog Club" }],
+        services: [
+          {
+            name: "Activity | Adventure Hike",
+            assigned_to: "Van 1",
+            scheduled_at: `${date}T07:30:00-07:00`
+          }
+        ],
+        owner: ownerWithAddress()
+      })
+    ],
+    date
+  ).dogs;
+  const builtStops = buildTransportationStops(dogs, date);
+  assert.equal(builtStops.stops.length, 2, "boarding dog on a hike gets Club pickup and Club drop-off");
+  assert.equal(builtStops.missingAddress.length, 0);
+
   const built = buildGingrSamsaraCsvFromStops({
     date,
-    stops: builtStops.exportable,
-    geocoded: new Map()
+    stops: builtStops.stops,
+    geocoded: new Map(),
+    vehicleName: "Van 01"
   });
-  const customers = customerRows(built.rows);
-  assert.ok(customers.some((row) => /Fitdog Club/i.test(row.stopName)));
-  assert.ok(customers.some((row) => /Cove/i.test(row.stopNotes || "")));
+  assert.equal(built.skippedGeocode.length, 0, "Fitdog Club uses facility coordinates, not the geocoder");
+  const clubRows = built.rows.filter((r) => /Fitdog Club/i.test(r.stopName) && !isFacilityBookendRow(r));
+  assert.ok(clubRows.length >= 2, "both Club legs appear as customer stops");
+  for (const row of clubRows) {
+    assert.ok(/1712 21st St/i.test(row.stopAddress), "Club stop carries the Fitdog Club address");
+    assert.equal(row.latitude, "34.02485");
+    assert.equal(row.longitude, "-118.4738934");
+  }
+  assert.ok(
+    clubRows.some((r) => /PICK UP AT FITDOG CLUB/i.test(r.stopNotes)),
+    "Club pickup notes name the location"
+  );
+  assert.ok(
+    clubRows.some((r) => /DROP OFF AT FITDOG CLUB/i.test(r.stopNotes)),
+    "Club drop-off notes name the location"
+  );
+  assert.equal(built.pickupTrackingStops.length, 0, "no owner tracking SMS for a Club pickup");
 }
 
 console.log("test-gingr-samsara-export: all assertions passed");

@@ -173,23 +173,41 @@ export function isCanonicalTravelAddon(raw: unknown): boolean {
   return false;
 }
 
+function isOvernightStay(occupancy: BoardingOccupancy): boolean {
+  if (!occupancy.isOvernight) return false;
+  if (!occupancy.checkInDate) return occupancy.isOvernight;
+  if (!occupancy.checkOutDate) return true;
+  return occupancy.checkInDate !== occupancy.checkOutDate;
+}
+
+/**
+ * Only travel that belongs to `routeDate` counts.
+ * Undated reservation-level addons on a multi-day boarding stay are check-in
+ * (pickup / owner drop-off) or checkout (drop-off / owner pick-up) only.
+ * Nested addons inherit the parent appointment date and apply that day.
+ */
 function candidateAppliesToRouteDate(
   candidate: TransportCandidate,
   routeDate: string,
   occupancy: BoardingOccupancy
 ): boolean {
   if (candidate.scheduledDate) return candidate.scheduledDate === routeDate;
-  if (isCanonicalTravelAddon(candidate.text)) return true;
-  if (!occupancy.alreadyOnProperty) return true;
+
   const classified = classifyTransportationText(candidate.text);
-  if (
-    classified === "OWNER_CLUB_DROPOFF" ||
-    classified === "OWNER_CLUB_PICKUP" ||
-    classified === "BOARDING_CLUB"
-  ) {
-    return candidate.source === "addon";
+  if (classified === "BOARDING_CLUB") return true;
+
+  if (isOvernightStay(occupancy)) {
+    if (occupancy.alreadyOnProperty) return false;
+    if (occupancy.checkInDate && occupancy.checkInDate === routeDate) {
+      return classified === "FITDOG_HOME_PICKUP" || classified === "OWNER_CLUB_DROPOFF";
+    }
+    if (occupancy.checkOutDate && occupancy.checkOutDate === routeDate) {
+      return classified === "FITDOG_HOME_DROPOFF" || classified === "OWNER_CLUB_PICKUP";
+    }
+    return false;
   }
-  return false;
+
+  return true;
 }
 
 /** Pull display strings from Gingr addon/service payloads of unknown shape. */
@@ -219,7 +237,16 @@ export function collectGingrTextValues(value: unknown, depth = 0): string[] {
         out.push(...collectGingrTextValues(nested, depth + 1));
       }
     }
-    for (const key of ["addons", "addonData", "addon_data", "items", "services"]) {
+    for (const key of [
+      "addons",
+      "addonData",
+      "addon_data",
+      "items",
+      "services",
+      "options",
+      "appointment_options",
+      "reservation_options"
+    ]) {
       if (record[key] != null) out.push(...collectGingrTextValues(record[key], depth + 1));
     }
     return out;
@@ -452,7 +479,16 @@ function collectCandidatesFromValue(
         out.push(...collectCandidatesFromValue(record[key], source, nextInherited, depth + 1));
       }
     }
-    for (const key of ["addons", "addonData", "addon_data", "items", "services"]) {
+    for (const key of [
+      "addons",
+      "addonData",
+      "addon_data",
+      "items",
+      "services",
+      "options",
+      "appointment_options",
+      "reservation_options"
+    ]) {
       if (record[key] != null) {
         out.push(...collectCandidatesFromValue(record[key], source, nextInherited, depth + 1));
       }
@@ -492,7 +528,16 @@ function reservationTypeLabel(reservation: Record<string, unknown>): string {
 
 function listServiceLikeRows(reservation: Record<string, unknown>): Array<Record<string, unknown>> {
   const rows: Array<Record<string, unknown>> = [];
-  for (const key of ["addons", "addon", "additional_services", "reservation_services", "services"]) {
+  for (const key of [
+    "addons",
+    "addon",
+    "additional_services",
+    "reservation_services",
+    "services",
+    "options",
+    "appointment_options",
+    "reservation_options"
+  ]) {
     const value = reservation[key];
     if (!Array.isArray(value)) continue;
     for (const item of value) {
@@ -513,11 +558,26 @@ export function collectReservationTransportCandidates(
       ...collectCandidatesFromValue(reservation.addon, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.additional_services, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.reservation_services, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.appointment_options, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.options, "addon", emptyInherited),
+      ...collectCandidatesFromValue(reservation.reservation_options, "addon", emptyInherited),
       ...collectCandidatesFromValue(reservation.services, "service", emptyInherited)
     ].filter((candidate) => isCanonicalTravelAddon(candidate.text) && !isInternalBoardingTaxiMarker(candidate));
   } catch {
     return [];
   }
+}
+
+function taxiRowAppliesToRouteDate(
+  row: Record<string, unknown>,
+  routeDate: string,
+  occupancy: BoardingOccupancy
+): boolean {
+  const scheduled =
+    gingrTimestampDateKey(row.scheduled_at) || gingrTimestampDateKey(row.scheduled_until);
+  if (scheduled) return scheduled === routeDate;
+  if (occupancy.alreadyOnProperty) return false;
+  return true;
 }
 
 function applyTypeTravelDefaults(
@@ -531,49 +591,53 @@ function applyTypeTravelDefaults(
 
   if (isBoardingTypeName(typeName) || next.types.includes("BOARDING_CLUB")) {
     next.isBoardingStay = true;
-    next.alreadyOnProperty = next.alreadyOnProperty || occupancy.alreadyOnProperty || occupancy.isOvernight;
-    next.ownerClubDropoff = true;
-    next.ownerClubPickup = true;
-    next.returnToClub = true;
-    next.fitdogHomePickup = false;
-    next.fitdogHomeDropoff = false;
+    next.alreadyOnProperty =
+      next.alreadyOnProperty ||
+      occupancy.alreadyOnProperty ||
+      Boolean(
+        occupancy.isOvernight &&
+          occupancy.checkInDate &&
+          occupancy.checkInDate <= routeDate &&
+          (occupancy.checkOutDate == null || occupancy.checkOutDate >= routeDate)
+      );
     if (!next.types.includes("BOARDING_CLUB")) {
       next.types = [...next.types, "BOARDING_CLUB"];
+    }
+    if (next.alreadyOnProperty && !next.fitdogHomeDropoff) {
+      next.ownerClubPickup = true;
+      next.returnToClub = true;
     }
   }
 
   const taxiRows = listServiceLikeRows(reservation).filter((row) => {
     const name = String(row.name ?? row.service ?? row.type ?? row.s_name ?? "");
-    return isTaxiTypeName(name) && !isInternalBoardingTaxiMarker({ text: name, cost: row.cost, assignedTo: row.assigned_to });
+    return (
+      isTaxiTypeName(name) &&
+      !isInternalBoardingTaxiMarker({ text: name, cost: row.cost, assignedTo: row.assigned_to }) &&
+      taxiRowAppliesToRouteDate(row, routeDate, occupancy)
+    );
   });
-  const ownerClubTravel =
-    next.ownerClubDropoff ||
-    next.returnToClub ||
-    next.types.includes("OWNER_CLUB_DROPOFF") ||
-    next.types.includes("OWNER_CLUB_PICKUP") ||
-    next.types.includes("BOARDING_CLUB") ||
-    isBoardingTypeName(typeName);
-  if (!ownerClubTravel && (isTaxiTypeName(typeName) || taxiRows.length)) {
+  const typeIsTaxi = isTaxiTypeName(typeName) && !occupancy.alreadyOnProperty && !next.isBoardingStay;
+  if (typeIsTaxi || taxiRows.length) {
     next.isTaxi = true;
     if (!next.types.includes("TAXI")) next.types = [...next.types, "TAXI"];
     if (taxiRows.length) {
       for (const row of taxiRows) {
         const name = String(row.name ?? row.service ?? row.type ?? row.s_name ?? typeName);
         const scheduled = row.scheduled_at ?? row.scheduled_until;
-        if (scheduled && gingrTimestampDateKey(scheduled) && gingrTimestampDateKey(scheduled) !== routeDate) {
-          continue;
-        }
         const legs = taxiVanLegs(normalizeToken(name), scheduled);
         if (legs.pickup) next.fitdogHomePickup = true;
         if (legs.dropoff) next.fitdogHomeDropoff = true;
       }
-    } else if (isTaxiTypeName(typeName)) {
+    } else if (typeIsTaxi) {
       const legs = taxiVanLegs(normalizeToken(typeName));
       if (legs.pickup) next.fitdogHomePickup = true;
       if (legs.dropoff) next.fitdogHomeDropoff = true;
     }
     if (next.fitdogHomePickup && !next.fitdogHomeDropoff) {
       next.alreadyOnProperty = true;
+      next.ownerClubPickup = true;
+      next.returnToClub = true;
     }
   }
 
@@ -597,33 +661,44 @@ export function normalizeReservationTransportation(
   }
 }
 
+export type TransportLifecycle = {
+  startLocation: "home" | "club";
+  endLocation: "home" | "club";
+  homePickup: boolean;
+  homeDropoff: boolean;
+  /**
+   * Boarding @ Fitdog Club (or an in-progress stay) makes Fitdog Club the dog's
+   * transportation location. Direction is decided later by the day's activities.
+   */
+  clubLocation: boolean;
+};
+
 /**
- * Pickup route: Fitdog to Pick Up @ Home, Owner Drop Off, boarding, or taxi.
- * Drop-off route: Fitdog to Drop Off @ Home, Owner Pick Up, boarding, or taxi.
+ * Home legs come only from Fitdog to Pick Up / Drop Off @ Home (or a dated taxi).
+ * Owner club options and boarding describe where the dog is, not who drives.
  */
+export function resolveTransportLifecycle(flags: TransportationFlags): TransportLifecycle {
+  const homePickup = flags.fitdogHomePickup;
+  const homeDropoff = flags.fitdogHomeDropoff;
+  return {
+    homePickup,
+    homeDropoff,
+    startLocation: homePickup ? "home" : "club",
+    endLocation: homeDropoff ? "home" : "club",
+    clubLocation:
+      flags.isBoardingStay || flags.alreadyOnProperty || flags.types.includes("BOARDING_CLUB")
+  };
+}
+
 export function resolveVanStopDestinations(flags: TransportationFlags): {
   pickup: "home" | "club" | null;
   dropoff: "home" | "club" | null;
 } {
-  if (flags.isBoardingStay || flags.types.includes("BOARDING_CLUB")) {
-    return { pickup: "club", dropoff: "club" };
-  }
-
-  let pickup: "home" | "club" | null = null;
-  let dropoff: "home" | "club" | null = null;
-
-  if (flags.fitdogHomePickup) pickup = "home";
-  else if (flags.ownerClubDropoff) pickup = "club";
-
-  if (flags.fitdogHomeDropoff) dropoff = "home";
-  else if (flags.ownerClubPickup || flags.returnToClub) dropoff = "club";
-
-  if (flags.isTaxi) {
-    if (!pickup) pickup = "home";
-    if (!dropoff) dropoff = "home";
-  }
-
-  return { pickup, dropoff };
+  const lifecycle = resolveTransportLifecycle(flags);
+  return {
+    pickup: lifecycle.homePickup ? "home" : null,
+    dropoff: lifecycle.homeDropoff ? "home" : null
+  };
 }
 
 export function logTransportationClassification(input: {
