@@ -3,15 +3,17 @@ import {
   GINGR_ROUTE_ACTIVITY_BY_ID,
   dogHasClassActivity,
   type GingrRouteActivityId,
+  isRouteQualifyingActivity,
   matchGingrRouteActivity,
   sortGingrRouteActivities
 } from "@/lib/gingr-route-generator/activities";
 import {
   logTransportationClassification,
   gingrTimestampDateKey,
+  isInternalBoardingTaxiMarker,
   normalizeReservationTransportation,
   resolveBoardingOccupancy,
-  resolveVanStopDestinations,
+  resolveTransportLifecycle,
   type GingrTransportationType
 } from "@/lib/gingr-route-generator/transportation";
 import {
@@ -32,15 +34,19 @@ export type GingrRouteDog = {
   activities: GingrRouteActivityId[];
   /** Subject labels for RSVP-style columns (Canine Fitness, Adventure Hike, etc.). */
   activityLabels: string[];
-  /** Dog is on a pickup route (home or Fitdog Club). */
+  /** Fitdog van pickup from the owner's home. */
   pickup: boolean;
-  /** Dog is on a drop-off route (home or Fitdog Club). */
+  /** Fitdog van drop-off to the owner's home. */
   dropoff: boolean;
-  pickupDestination: "home" | "club";
-  dropoffDestination: "home" | "club";
+  pickupDestination: "home" | "club" | null;
+  dropoffDestination: "home" | "club" | null;
+  startLocation: "home" | "club";
+  endLocation: "home" | "club";
+  /** Boarding @ Fitdog Club — the Club is this dog's transportation location. */
+  clubTransportLocation: boolean;
   ownerClubDropoff: boolean;
   ownerClubPickup: boolean;
-  /** Van takes the dog back to Fitdog Club (Owner Pick Up | Fitdog Club). */
+  /** Owner Pick Up | Fitdog Club — the owner collects the dog at the Club. */
   returnToClub: boolean;
   isTaxi: boolean;
   assignedTo: string | null;
@@ -309,15 +315,72 @@ function stayCoversRouteDate(reservation: GingrReservation, routeDate: string): 
   return true;
 }
 
+/**
+ * A dated service row belongs to its own date. An undated row belongs to the
+ * reservation, so it only applies when the reservation itself applies to the date.
+ */
 function serviceAppliesToRouteDate(
   service: Record<string, unknown>,
   routeDate: string,
-  overnightStay: boolean
+  undatedRowApplies: boolean
 ): boolean {
   const scheduled =
     gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
   if (scheduled) return scheduled === routeDate;
-  return !overnightStay;
+  return undatedRowApplies;
+}
+
+/**
+ * Does this reservation describe something happening on the route date?
+ *
+ * Used to decide whether a transportation add-on can put a dog on the route by
+ * itself, so an add-on attached to another day's appointment never leaks.
+ */
+function reservationAppliesToRouteDate(
+  reservation: GingrReservation,
+  routeDate: string,
+  overnightStay: boolean
+): boolean {
+  const scheduledDates = new Set<string>();
+  for (const service of reservationServiceRows(reservation)) {
+    const scheduled =
+      gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
+    if (scheduled) scheduledDates.add(scheduled);
+  }
+  if (scheduledDates.has(routeDate)) return true;
+  if (overnightStay) return stayCoversRouteDate(reservation, routeDate);
+  const start = gingrTimestampDateKey(reservation.start_date);
+  if (start) return start === routeDate;
+  // Dated elsewhere but not on this date; otherwise an undated record from a
+  // date-scoped Gingr fetch belongs to the selected date.
+  return scheduledDates.size === 0;
+}
+
+/**
+ * Undated rows never apply mid-stay — a boarding stay's undated extras must not
+ * repeat on every day it spans.
+ */
+function undatedRowAppliesToRouteDate(
+  reservation: GingrReservation,
+  routeDate: string,
+  overnightStay: boolean
+): boolean {
+  if (overnightStay) return false;
+  return reservationAppliesToRouteDate(reservation, routeDate, overnightStay);
+}
+
+/**
+ * Match a Gingr service/type name to a route activity.
+ * A $0 facility "Taxi Service - Business Only" line is a boarding marker, so it
+ * must never register as the Taxi route service.
+ */
+function routeActivityForServiceName(rawName: string | null | undefined) {
+  const activity = matchGingrRouteActivity(rawName);
+  if (!activity) return null;
+  if (activity.category === "taxi" && isInternalBoardingTaxiMarker({ text: String(rawName || "") })) {
+    return null;
+  }
+  return activity;
 }
 
 /**
@@ -330,29 +393,39 @@ function collectRouteDayActivities(
 ): GingrRouteActivityId[] {
   const occupancy = resolveBoardingOccupancy(reservation as Record<string, unknown>, routeDate);
   const ids = new Set<GingrRouteActivityId>();
+  const undatedRowApplies = undatedRowAppliesToRouteDate(reservation, routeDate, occupancy.isOvernight);
+  // When the reservation carries dated route services, those dates are authoritative
+  // and the undated reservation type must not qualify the dog on other days.
+  let hasDatedRouteService = false;
 
   for (const service of reservationServiceRows(reservation)) {
     const name = serviceName(service);
-    const activity = matchGingrRouteActivity(name);
+    const activity = routeActivityForServiceName(name);
     if (!activity) continue;
-    if (!serviceAppliesToRouteDate(service, routeDate, occupancy.isOvernight)) continue;
+    const scheduled =
+      gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
+    if (scheduled && isRouteQualifyingActivity(activity.id)) hasDatedRouteService = true;
+    if (!serviceAppliesToRouteDate(service, routeDate, undatedRowApplies)) continue;
     ids.add(activity.id);
   }
 
   const typeName = reservationTypeName(reservation);
-  const typeActivity = matchGingrRouteActivity(typeName);
+  const typeActivity = routeActivityForServiceName(typeName);
   if (typeActivity) {
     const start = gingrTimestampDateKey(reservation.start_date);
     if (typeActivity.category === "club") {
       if (stayCoversRouteDate(reservation, routeDate)) ids.add(typeActivity.id);
-    } else if (!start || start === routeDate) {
+    } else if (start) {
+      if (start === routeDate) ids.add(typeActivity.id);
+    } else if (!hasDatedRouteService) {
+      // Undated record from a date-scoped Gingr fetch — it belongs to this date.
       ids.add(typeActivity.id);
     }
   }
 
   const flat = pickString(reservation.s_name, reservation.service_name);
-  const flatActivity = matchGingrRouteActivity(flat);
-  if (flatActivity && !occupancy.isOvernight) ids.add(flatActivity.id);
+  const flatActivity = routeActivityForServiceName(flat);
+  if (flatActivity && !occupancy.isOvernight && !hasDatedRouteService) ids.add(flatActivity.id);
 
   return Array.from(ids);
 }
@@ -457,8 +530,11 @@ type Acc = {
   activityLabels: Set<string>;
   pickup: boolean;
   dropoff: boolean;
-  pickupDestination: "home" | "club";
-  dropoffDestination: "home" | "club";
+  pickupDestination: "home" | "club" | null;
+  dropoffDestination: "home" | "club" | null;
+  startLocation: "home" | "club";
+  endLocation: "home" | "club";
+  clubTransportLocation: boolean;
   ownerClubDropoff: boolean;
   ownerClubPickup: boolean;
   returnToClub: boolean;
@@ -472,6 +548,8 @@ type Acc = {
   pickupInstructions: string | null;
   reservationIds: Set<number>;
   hasEligibleActivity: boolean;
+  /** An explicit Fitdog home van leg dated to this route date. */
+  hasRouteTransportLeg: boolean;
   homeStreet1: string | null;
   homeStreet2: string | null;
   homeCity: string | null;
@@ -510,8 +588,11 @@ export function normalizeGingrRouteReservations(
           activityLabels: new Set(),
           pickup: false,
           dropoff: false,
-          pickupDestination: "club",
-          dropoffDestination: "club",
+          pickupDestination: null,
+          dropoffDestination: null,
+          startLocation: "club",
+          endLocation: "club",
+          clubTransportLocation: false,
           ownerClubDropoff: false,
           ownerClubPickup: false,
           returnToClub: false,
@@ -525,6 +606,7 @@ export function normalizeGingrRouteReservations(
           pickupInstructions: null,
           reservationIds: new Set(),
           hasEligibleActivity: false,
+          hasRouteTransportLeg: false,
           homeStreet1: null,
           homeStreet2: null,
           homeCity: null,
@@ -545,29 +627,46 @@ export function normalizeGingrRouteReservations(
       const typeName = reservationTypeName(reservation);
       const services = reservationServiceRows(reservation);
       const occupancy = resolveBoardingOccupancy(reservation as Record<string, unknown>, date);
+      const undatedRowApplies = undatedRowAppliesToRouteDate(reservation, date, occupancy.isOvernight);
       const dayActivities = collectRouteDayActivities(reservation, date);
 
       for (const activityId of dayActivities) {
         const activity = GINGR_ROUTE_ACTIVITY_BY_ID[activityId];
         if (!activity) continue;
-        acc.hasEligibleActivity = true;
+        // Daycare/boarding/club presence is kept as a label but never qualifies a dog.
+        if (isRouteQualifyingActivity(activityId)) acc.hasEligibleActivity = true;
         acc.activitySet.add(activity.id);
         acc.activityLabels.add(activity.label);
       }
 
       const transport = normalizeReservationTransportation(reservation as Record<string, unknown>, date);
-      const destinations = resolveVanStopDestinations(transport);
-      if (destinations.pickup) {
+      const lifecycle = resolveTransportLifecycle(transport);
+      if (
+        (lifecycle.homePickup || lifecycle.homeDropoff) &&
+        reservationAppliesToRouteDate(reservation, date, occupancy.isOvernight)
+      ) {
+        acc.hasRouteTransportLeg = true;
+      }
+      if (lifecycle.homePickup) {
         acc.pickup = true;
-        if (destinations.pickup === "home") acc.pickupDestination = "home";
+        acc.pickupDestination = "home";
+        acc.startLocation = "home";
       }
-      if (destinations.dropoff) {
+      if (lifecycle.homeDropoff) {
         acc.dropoff = true;
-        if (destinations.dropoff === "home") acc.dropoffDestination = "home";
+        acc.dropoffDestination = "home";
+        acc.endLocation = "home";
       }
+      if (!lifecycle.homePickup && lifecycle.startLocation === "club") {
+        if (!acc.pickup) acc.startLocation = "club";
+      }
+      if (!lifecycle.homeDropoff && lifecycle.endLocation === "club") {
+        if (!acc.dropoff) acc.endLocation = "club";
+      }
+      if (lifecycle.clubLocation) acc.clubTransportLocation = true;
       if (transport.ownerClubDropoff) acc.ownerClubDropoff = true;
       if (transport.ownerClubPickup) acc.ownerClubPickup = true;
-      acc.returnToClub = acc.dropoff && acc.dropoffDestination === "club";
+      acc.returnToClub = acc.ownerClubPickup || (acc.endLocation === "club" && !acc.dropoff);
       if (transport.isTaxi) acc.isTaxi = true;
       for (const label of collectAssignedToLabels(reservation as Record<string, unknown>, date)) {
         acc.assignedLabels.add(label);
@@ -595,7 +694,7 @@ export function normalizeGingrRouteReservations(
       for (const service of services) {
         const name = serviceName(service);
         if (!matchGingrRouteActivity(name)) continue;
-        if (!serviceAppliesToRouteDate(service, date, occupancy.isOvernight)) continue;
+        if (!serviceAppliesToRouteDate(service, date, undatedRowApplies)) continue;
         const t = extractTimeIso(reservation, service);
         if (t && (!acc.scheduledTime || t < acc.scheduledTime)) acc.scheduledTime = t;
       }
@@ -640,7 +739,9 @@ export function normalizeGingrRouteReservations(
 
   const dogs: GingrRouteDog[] = [];
   for (const acc of Array.from(byAnimal.values())) {
-    if (!acc.hasEligibleActivity) continue;
+    // Route dogs need a qualifying service (outing, taxi, class) on the selected
+    // date, or an explicit Fitdog home van leg dated to it.
+    if (!acc.hasEligibleActivity && !acc.hasRouteTransportLeg) continue;
     if (!acc.imageUrl && acc.animalId) {
       acc.imageUrl = `/api/gingr/animal-photo/image?animalId=${acc.animalId}`;
     }
@@ -651,7 +752,7 @@ export function normalizeGingrRouteReservations(
       activities
     });
     const ownerLastName = acc.ownerLastName || ownerLastNameFromDisplay(acc.owner);
-    const needsHomeAddress = acc.pickupDestination === "home" || acc.dropoffDestination === "home";
+    const needsHomeAddress = acc.pickup || acc.dropoff;
     dogs.push({
       id: acc.id,
       animalId: acc.animalId,
@@ -664,9 +765,12 @@ export function normalizeGingrRouteReservations(
       dropoff: acc.dropoff,
       pickupDestination: acc.pickupDestination,
       dropoffDestination: acc.dropoffDestination,
+      startLocation: acc.startLocation,
+      endLocation: acc.endLocation,
+      clubTransportLocation: acc.clubTransportLocation || acc.alreadyOnProperty,
       ownerClubDropoff: acc.ownerClubDropoff,
       ownerClubPickup: acc.ownerClubPickup,
-      returnToClub: acc.dropoff && acc.dropoffDestination === "club",
+      returnToClub: acc.returnToClub,
       isTaxi: acc.isTaxi,
       assignedTo: Array.from(acc.assignedLabels)[0] || null,
       routeVanKey,

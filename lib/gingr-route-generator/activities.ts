@@ -221,6 +221,36 @@ export function dogHasClassActivity(activities: GingrRouteActivityId[]): boolean
   return activities.some((id) => isGingrClassActivity(id));
 }
 
+/**
+ * Only the outing category leaves Fitdog Club in a van (Adventure Hike, Beach
+ * Excursion, Recall At The Beach). Every Group Training is a class and stays on
+ * site, including Trainer Led Hike. This drives outing/van behavior only — a
+ * dog's pickup and drop-off come from its transportation add-ons regardless.
+ */
+export function isOffsiteGingrActivity(id: GingrRouteActivityId | null | undefined): boolean {
+  return Boolean(id && GINGR_ROUTE_ACTIVITY_BY_ID[id]?.category === "outing");
+}
+
+export function dogHasOffsiteActivity(activities: GingrRouteActivityId[]): boolean {
+  return activities.some((id) => isOffsiteGingrActivity(id));
+}
+
+/**
+ * Only outings, taxi service, and classes are route services.
+ *
+ * The "club" category (daycare, boarding, overnight, dog hotel, general club
+ * reservations) means the dog is at Fitdog that day — it is not an appointment
+ * the Route Generator drives, so it never qualifies a dog on its own.
+ */
+export function isRouteQualifyingActivity(id: GingrRouteActivityId | null | undefined): boolean {
+  const category = id ? GINGR_ROUTE_ACTIVITY_BY_ID[id]?.category : null;
+  return category === "class" || category === "outing" || category === "taxi";
+}
+
+export function dogHasRouteQualifyingActivity(activities: GingrRouteActivityId[]): boolean {
+  return activities.some((id) => isRouteQualifyingActivity(id));
+}
+
 const ACTIVITY_ORDER = new Map(GINGR_ROUTE_ACTIVITIES.map((activity, index) => [activity.id, index]));
 
 const CATEGORY_RANK: Record<GingrRouteActivityCategory, number> = {
