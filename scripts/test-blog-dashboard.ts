@@ -4,6 +4,7 @@ import { BLOG_APP_PATH, BLOG_NAV_PAGES } from "../lib/blog/constants";
 import { FITDOG_BLOG_ORANGE, FITDOG_BLOG_LOGO } from "../lib/blog/brand";
 import { comparePeriodLabel, planPipelineTransition } from "../lib/blog/workflow";
 import { buildArticlePreviewHtml, estimateReadingMinutes } from "../lib/blog/utils/article-preview-html";
+import { markdownToSimpleHtml } from "../lib/blog/utils/markdown";
 import { chunkSpeechText, pickBestSpeechVoice } from "../lib/blog/utils/natural-speech-voice";
 
 assert.equal(BLOG_APP_PATH, "/admin/automatic-blog");
@@ -125,5 +126,9 @@ const fakeVoices = [
   { name: "Samantha", lang: "en-US", localService: true }
 ] as Array<{ name: string; lang: string; localService: boolean }>;
 assert.equal(pickBestSpeechVoice(fakeVoices as never)?.name, "Samantha");
+
+const headingHtml = buildArticlePreviewHtml("## Beach day\n\nBring water.");
+assert.match(headingHtml, /id="beach-day"/);
+assert.match(markdownToSimpleHtml("## Beach day"), /<h2>Beach day<\/h2>/);
 
 console.log("blog-dashboard tests passed");
