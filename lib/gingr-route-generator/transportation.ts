@@ -156,7 +156,7 @@ export function isTaxiTypeName(raw: unknown): boolean {
   return /\btaxi\b/.test(token) || /\bdoor to door\b/.test(token);
 }
 
-export function isCanonicalTravelAddon(raw: unknown): boolean {
+function isCanonicalTravelAddonPart(raw: unknown): boolean {
   const token = normalizeToken(raw);
   if (!token) return false;
   const classified = classifyTransportationText(raw);
@@ -171,6 +171,12 @@ export function isCanonicalTravelAddon(raw: unknown): boolean {
   }
   if (classified === "BOARDING_CLUB" || (/\bboarding\b/.test(token) && atClub)) return true;
   return false;
+}
+
+export function isCanonicalTravelAddon(raw: unknown): boolean {
+  const parts = splitAppointmentOptionParts(raw);
+  if (parts.some((part) => isCanonicalTravelAddonPart(part))) return true;
+  return isCanonicalTravelAddonPart(raw);
 }
 
 function isOvernightStay(occupancy: BoardingOccupancy): boolean {
@@ -189,7 +195,8 @@ function isOvernightStay(occupancy: BoardingOccupancy): boolean {
 function candidateAppliesToRouteDate(
   candidate: TransportCandidate,
   routeDate: string,
-  occupancy: BoardingOccupancy
+  occupancy: BoardingOccupancy,
+  qualifyingServiceOnDate: boolean
 ): boolean {
   if (candidate.scheduledDate) return candidate.scheduledDate === routeDate;
 
@@ -197,6 +204,10 @@ function candidateAppliesToRouteDate(
   if (classified === "BOARDING_CLUB") return true;
 
   if (isOvernightStay(occupancy)) {
+    // Mid-stay class days: show owner club hand-offs tied to the activity, not stale check-in van addons.
+    if (occupancy.alreadyOnProperty && qualifyingServiceOnDate) {
+      return classified === "OWNER_CLUB_DROPOFF" || classified === "OWNER_CLUB_PICKUP";
+    }
     if (occupancy.alreadyOnProperty) return false;
     if (occupancy.checkInDate && occupancy.checkInDate === routeDate) {
       return classified === "FITDOG_HOME_PICKUP" || classified === "OWNER_CLUB_DROPOFF";
@@ -286,6 +297,51 @@ export function classifyTransportationText(raw: unknown): GingrTransportationTyp
   } catch {
     return "UNKNOWN";
   }
+}
+
+/** Split Gingr "appointment options" cells that list multiple choices in one string. */
+export function splitAppointmentOptionParts(raw: unknown): string[] {
+  const text = String(raw ?? "").trim();
+  if (!text) return [];
+  const parts = text
+    .split(/\s*[,;\n]\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.length ? parts : [text];
+}
+
+const APPOINTMENT_OPTION_LABEL: Partial<Record<GingrTransportationType, string>> = {
+  FITDOG_HOME_PICKUP: "Fitdog to Pick Up @ Home",
+  FITDOG_HOME_DROPOFF: "Fitdog to Drop Off @ Home",
+  OWNER_CLUB_DROPOFF: "Owner Drop Off | Fitdog Club",
+  OWNER_CLUB_PICKUP: "Owner Pick Up | Fitdog Club",
+  BOARDING_CLUB: "Boarding @ Fitdog Club",
+  TAXI: "Taxi Service"
+};
+
+/** Human-readable Gingr appointment option label for UI (canonical when recognized). */
+export function appointmentOptionLabel(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  for (const part of splitAppointmentOptionParts(trimmed)) {
+    const type = classifyTransportToken(normalizeToken(part));
+    if (type !== "UNKNOWN" && APPOINTMENT_OPTION_LABEL[type]) {
+      return APPOINTMENT_OPTION_LABEL[type]!;
+    }
+  }
+  const type = classifyTransportToken(normalizeToken(trimmed));
+  if (type !== "UNKNOWN" && APPOINTMENT_OPTION_LABEL[type]) return APPOINTMENT_OPTION_LABEL[type]!;
+  if (looksLikeTransportToken(normalizeToken(trimmed))) return trimmed;
+  return null;
+}
+
+function mergeFlagsFromOptionText(flags: TransportationFlags, raw: string): TransportationFlags {
+  let next = flags;
+  for (const part of splitAppointmentOptionParts(raw)) {
+    const type = classifyTransportToken(normalizeToken(part));
+    next = mergeTransportationFlags(next, type, part);
+  }
+  return next;
 }
 
 function classifyTransportToken(token: string): GingrTransportationType {
@@ -502,17 +558,37 @@ function collectCandidatesFromValue(
 function flagsFromCandidates(
   candidates: TransportCandidate[],
   routeDate: string,
-  occupancy: BoardingOccupancy
+  occupancy: BoardingOccupancy,
+  qualifyingServiceOnDate: boolean
 ): TransportationFlags {
   let flags = emptyTransportationFlags();
   flags.alreadyOnProperty = occupancy.alreadyOnProperty;
   for (const candidate of candidates) {
     if (isInternalBoardingTaxiMarker(candidate)) continue;
-    if (!candidateAppliesToRouteDate(candidate, routeDate, occupancy)) continue;
-    flags = mergeTransportationFlags(flags, classifyTransportationText(candidate.text), candidate.text);
+    if (!candidateAppliesToRouteDate(candidate, routeDate, occupancy, qualifyingServiceOnDate)) continue;
+    flags = mergeFlagsFromOptionText(flags, candidate.text);
   }
   flags.alreadyOnProperty = occupancy.alreadyOnProperty || flags.alreadyOnProperty;
   return flags;
+}
+
+/** Every explicit travel / appointment option on this reservation that applies to `routeDate`. */
+export function collectReservationAppointmentOptions(
+  reservation: Record<string, unknown>,
+  routeDate: string,
+  qualifyingServiceOnDate: boolean
+): string[] {
+  const occupancy = resolveBoardingOccupancy(reservation, routeDate);
+  const labels = new Set<string>();
+  for (const candidate of collectReservationTransportCandidates(reservation)) {
+    if (isInternalBoardingTaxiMarker(candidate)) continue;
+    if (!candidateAppliesToRouteDate(candidate, routeDate, occupancy, qualifyingServiceOnDate)) continue;
+    for (const part of splitAppointmentOptionParts(candidate.text)) {
+      const label = appointmentOptionLabel(part);
+      if (label) labels.add(label);
+    }
+  }
+  return Array.from(labels);
 }
 
 /** Travel addons only — never reservation type. Type is the activity category. */
@@ -580,6 +656,25 @@ function taxiRowAppliesToRouteDate(
   return true;
 }
 
+/**
+ * Gingr books real taxis as "Taxi Service - Business Only" rows dated to the
+ * ride (check-in morning, checkout evening, or a daycare morning). Dated to the
+ * route date, that row is the day's taxi; undated, it is only a billing line.
+ */
+export function isTaxiRowForRouteDate(
+  row: Record<string, unknown>,
+  routeDate: string,
+  occupancy: BoardingOccupancy
+): boolean {
+  const name = String(row.name ?? row.service ?? row.type ?? row.s_name ?? "");
+  if (isInternalBoardingTaxiMarker({ text: name })) {
+    const scheduled =
+      gingrTimestampDateKey(row.scheduled_at) || gingrTimestampDateKey(row.scheduled_until);
+    return scheduled === routeDate;
+  }
+  return isTaxiTypeName(name) && taxiRowAppliesToRouteDate(row, routeDate, occupancy);
+}
+
 function applyTypeTravelDefaults(
   flags: TransportationFlags,
   reservation: Record<string, unknown>,
@@ -609,14 +704,9 @@ function applyTypeTravelDefaults(
     }
   }
 
-  const taxiRows = listServiceLikeRows(reservation).filter((row) => {
-    const name = String(row.name ?? row.service ?? row.type ?? row.s_name ?? "");
-    return (
-      isTaxiTypeName(name) &&
-      !isInternalBoardingTaxiMarker({ text: name, cost: row.cost, assignedTo: row.assigned_to }) &&
-      taxiRowAppliesToRouteDate(row, routeDate, occupancy)
-    );
-  });
+  const taxiRows = listServiceLikeRows(reservation).filter((row) =>
+    isTaxiRowForRouteDate(row, routeDate, occupancy)
+  );
   const typeIsTaxi = isTaxiTypeName(typeName) && !occupancy.alreadyOnProperty && !next.isBoardingStay;
   if (typeIsTaxi || taxiRows.length) {
     next.isTaxi = true;
@@ -646,14 +736,17 @@ function applyTypeTravelDefaults(
 
 export function normalizeReservationTransportation(
   reservation: Record<string, unknown>,
-  routeDate: string
+  routeDate: string,
+  options?: { qualifyingServiceOnDate?: boolean }
 ): TransportationFlags {
   try {
     const occupancy = resolveBoardingOccupancy(reservation, routeDate);
+    const qualifyingServiceOnDate = options?.qualifyingServiceOnDate ?? true;
     const fromAddons = flagsFromCandidates(
       collectReservationTransportCandidates(reservation),
       routeDate,
-      occupancy
+      occupancy,
+      qualifyingServiceOnDate
     );
     return applyTypeTravelDefaults(fromAddons, reservation, routeDate, occupancy);
   } catch {

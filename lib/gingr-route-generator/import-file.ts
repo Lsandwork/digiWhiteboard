@@ -65,7 +65,7 @@ function mapCsvRows(text: string): MappedRow[] {
   const resIdH = pickHeader(headers, [/reservation id/, /booking id/, /^id$/]);
   const typeH = pickHeader(headers, [/reservation type/, /^type$/, /service type/]);
   const serviceH = pickHeader(headers, [/^service$/, /services/, /class/, /activity/]);
-  const addonH = pickHeader(headers, [/addon/, /add on/, /transport/]);
+  const addonH = pickHeader(headers, [/appointment option/, /addon/, /add on/, /transport/]);
   const addressH = pickHeader(headers, [/^address$/, /full address/, /street address/, /pickup address/]);
   const streetH = pickHeader(headers, [/^street$/, /address 1/, /address1/]);
   const cityH = pickHeader(headers, [/^city$/]);

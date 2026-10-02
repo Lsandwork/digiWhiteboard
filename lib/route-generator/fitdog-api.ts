@@ -197,7 +197,7 @@ function buildItem(params: {
   product: FitdogProduct;
   occurrence: FitdogOccurrence;
   serviceRaw: string;
-  serviceCanonical: CanonicalService;
+  serviceCanonical: CanonicalService | null;
 }): NormalizedReportItem {
   const { direction, product, occurrence, serviceRaw, serviceCanonical } = params;
   const owner = product.owner_detail || product.customer_detail || null;
@@ -479,6 +479,42 @@ export async function promoteSkippedOccurrenceToItems(params: {
     }
   }
   return { items, occurrence, className };
+}
+
+export type FitdogClassSignup = {
+  className: string;
+  pickup: NormalizedReportItem;
+  dropoff: NormalizedReportItem;
+};
+
+/**
+ * Every scheduled dog on every Fitdog class occurrence for the date, with its
+ * pickup and drop-off locations. Unlike the Digi pull, no class is skipped by
+ * name — the caller decides which classes are route services.
+ */
+export async function pullFitdogClassSignupsForDate(date: string): Promise<{
+  signups: FitdogClassSignup[];
+  occurrenceCount: number;
+}> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error("Operating date must be YYYY-MM-DD.");
+  }
+  const token = await fetchFitdogEmployeeAccessToken();
+  const occurrences = await fetchOccurrencesForDate(token.access_token, date);
+  const signups: FitdogClassSignup[] = [];
+  for (const occurrence of occurrences) {
+    const className = cleanText(occurrence.training_class_detail?.name);
+    if (!className) continue;
+    const serviceCanonical = normalizeServiceName(className);
+    const products = await fetchProductsForOccurrence(token.access_token, occurrence.id);
+    for (const product of products) {
+      if (!isScheduledProduct(product)) continue;
+      const leg = (direction: "pickup" | "dropoff") =>
+        buildItem({ direction, product, occurrence, serviceRaw: className, serviceCanonical });
+      signups.push({ className, pickup: leg("pickup"), dropoff: leg("dropoff") });
+    }
+  }
+  return { signups, occurrenceCount: occurrences.length };
 }
 
 /**

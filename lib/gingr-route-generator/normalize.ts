@@ -8,6 +8,7 @@ import {
   sortGingrRouteActivities
 } from "@/lib/gingr-route-generator/activities";
 import {
+  collectReservationAppointmentOptions,
   logTransportationClassification,
   gingrTimestampDateKey,
   isInternalBoardingTaxiMarker,
@@ -71,6 +72,8 @@ export type GingrRouteDog = {
   ownerPhone: string | null;
   ownerFullName: string | null;
   addressStatus: GingrRouteAddressStatus;
+  /** Canonical labels, e.g. Owner Drop Off | Fitdog Club. */
+  appointmentOptions: string[];
 };
 
 export type GingrRouteSchedulePayload = {
@@ -87,6 +90,8 @@ export type GingrRouteSchedulePayload = {
   cached: boolean;
   source?: "gingr_api" | "upload";
   uploadFileName?: string | null;
+  /** Problems pulling a secondary source (e.g. Fitdog class sign-ups); dogs from Gingr still load. */
+  warnings?: string[];
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -371,13 +376,20 @@ function undatedRowAppliesToRouteDate(
 
 /**
  * Match a Gingr service/type name to a route activity.
- * A $0 facility "Taxi Service - Business Only" line is a boarding marker, so it
- * must never register as the Taxi route service.
+ * "Taxi Service - Business Only" is the day's taxi only on a service row dated
+ * to the route date; as an undated line or reservation type it is billing only.
  */
-function routeActivityForServiceName(rawName: string | null | undefined) {
+function routeActivityForServiceName(
+  rawName: string | null | undefined,
+  datedToRouteDate = false
+) {
   const activity = matchGingrRouteActivity(rawName);
   if (!activity) return null;
-  if (activity.category === "taxi" && isInternalBoardingTaxiMarker({ text: String(rawName || "") })) {
+  if (
+    activity.category === "taxi" &&
+    isInternalBoardingTaxiMarker({ text: String(rawName || "") }) &&
+    !datedToRouteDate
+  ) {
     return null;
   }
   return activity;
@@ -400,10 +412,10 @@ function collectRouteDayActivities(
 
   for (const service of reservationServiceRows(reservation)) {
     const name = serviceName(service);
-    const activity = routeActivityForServiceName(name);
-    if (!activity) continue;
     const scheduled =
       gingrTimestampDateKey(service.scheduled_at) || gingrTimestampDateKey(service.scheduled_until);
+    const activity = routeActivityForServiceName(name, scheduled === routeDate);
+    if (!activity) continue;
     if (scheduled && isRouteQualifyingActivity(activity.id)) hasDatedRouteService = true;
     if (!serviceAppliesToRouteDate(service, routeDate, undatedRowApplies)) continue;
     ids.add(activity.id);
@@ -559,6 +571,7 @@ type Acc = {
   ownerPhone: string | null;
   ownerFullName: string | null;
   addressStatus: GingrRouteAddressStatus;
+  appointmentOptions: Set<string>;
 };
 
 /**
@@ -615,7 +628,8 @@ export function normalizeGingrRouteReservations(
           homeAddress: null,
           ownerPhone: null,
           ownerFullName: null,
-          addressStatus: "missing"
+          addressStatus: "missing",
+          appointmentOptions: new Set()
         };
         byAnimal.set(key, acc);
       }
@@ -639,7 +653,17 @@ export function normalizeGingrRouteReservations(
         acc.activityLabels.add(activity.label);
       }
 
-      const transport = normalizeReservationTransportation(reservation as Record<string, unknown>, date);
+      const qualifyingServiceOnDate = dayActivities.some((activityId) => isRouteQualifyingActivity(activityId));
+      const transport = normalizeReservationTransportation(reservation as Record<string, unknown>, date, {
+        qualifyingServiceOnDate
+      });
+      for (const label of collectReservationAppointmentOptions(
+        reservation as Record<string, unknown>,
+        date,
+        qualifyingServiceOnDate
+      )) {
+        acc.appointmentOptions.add(label);
+      }
       const lifecycle = resolveTransportLifecycle(transport);
       if (
         (lifecycle.homePickup || lifecycle.homeDropoff) &&
@@ -666,7 +690,7 @@ export function normalizeGingrRouteReservations(
       if (lifecycle.clubLocation) acc.clubTransportLocation = true;
       if (transport.ownerClubDropoff) acc.ownerClubDropoff = true;
       if (transport.ownerClubPickup) acc.ownerClubPickup = true;
-      acc.returnToClub = acc.ownerClubPickup || (acc.endLocation === "club" && !acc.dropoff);
+      acc.returnToClub = acc.ownerClubPickup;
       if (transport.isTaxi) acc.isTaxi = true;
       for (const label of collectAssignedToLabels(reservation as Record<string, unknown>, date)) {
         acc.assignedLabels.add(label);
@@ -790,27 +814,36 @@ export function normalizeGingrRouteReservations(
       homePostalCode: needsHomeAddress ? acc.homePostalCode : null,
       ownerPhone: acc.ownerPhone,
       ownerFullName: acc.ownerFullName,
-      addressStatus: needsHomeAddress ? acc.addressStatus : "ok"
+      addressStatus: needsHomeAddress ? acc.addressStatus : "ok",
+      appointmentOptions: Array.from(acc.appointmentOptions)
     });
   }
 
-  dogs.sort((a, b) => {
+  sortRouteDogs(dogs);
+
+  return {
+    date,
+    dogs,
+    stats: summarizeRouteDogs(dogs)
+  };
+}
+
+export function sortRouteDogs(dogs: GingrRouteDog[]): GingrRouteDog[] {
+  return dogs.sort((a, b) => {
     const ta = a.scheduledTime || "99";
     const tb = b.scheduledTime || "99";
     if (ta !== tb) return ta.localeCompare(tb);
     return a.name.localeCompare(b.name);
   });
+}
 
+export function summarizeRouteDogs(dogs: GingrRouteDog[]): GingrRouteSchedulePayload["stats"] {
   return {
-    date,
-    dogs,
-    stats: {
-      dogsScheduled: dogs.length,
-      classCount: dogs.filter((d) => dogHasClassActivity(d.activities)).length,
-      adventureHike: dogs.filter((d) => d.activities.includes("adventure_hike")).length,
-      beachExcursion: dogs.filter((d) => d.activities.includes("beach_excursion")).length,
-      transportationRequired: dogs.filter((d) => d.pickup || d.dropoff).length
-    }
+    dogsScheduled: dogs.length,
+    classCount: dogs.filter((d) => dogHasClassActivity(d.activities)).length,
+    adventureHike: dogs.filter((d) => d.activities.includes("adventure_hike")).length,
+    beachExcursion: dogs.filter((d) => d.activities.includes("beach_excursion")).length,
+    transportationRequired: dogs.filter((d) => d.pickup || d.dropoff).length
   };
 }
 

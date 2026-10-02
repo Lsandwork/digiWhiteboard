@@ -1,8 +1,18 @@
 import { createGingrClient } from "@/lib/integrations/gingr/client";
 import {
   buildGingrRouteSchedulePayload,
+  summarizeRouteDogs,
+  type GingrRouteDog,
   type GingrRouteSchedulePayload
 } from "@/lib/gingr-route-generator/normalize";
+import {
+  fitdogSignupsToRouteDogs,
+  mergeFitdogRouteDogs
+} from "@/lib/gingr-route-generator/fitdog-signups";
+import {
+  canUseFitdogEmployeeApi,
+  pullFitdogClassSignupsForDate
+} from "@/lib/route-generator/fitdog-api";
 import {
   invalidateGingrRouteCache,
   readGingrRouteCache,
@@ -25,6 +35,26 @@ export function todayPacificDateKey(now = new Date()) {
   }).format(now);
 }
 
+/** Outings, group classes, and taxi booked on the Fitdog platform for the date. */
+async function loadFitdogSignupDogs(date: string): Promise<{ dogs: GingrRouteDog[]; warnings: string[] }> {
+  if (!canUseFitdogEmployeeApi()) {
+    return {
+      dogs: [],
+      warnings: [
+        "Fitdog class sign-ups are not connected (FITDOG_EMPLOYEE_EMAIL / FITDOG_EMPLOYEE_PASSWORD), so outings and classes booked in the Fitdog app are missing."
+      ]
+    };
+  }
+  try {
+    const { signups } = await pullFitdogClassSignupsForDate(date);
+    return { dogs: fitdogSignupsToRouteDogs(signups, date), warnings: [] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn("[GingrRouteGenerator] Fitdog class sign-ups unavailable:", message);
+    return { dogs: [], warnings: [`Fitdog class sign-ups could not be loaded: ${message}`] };
+  }
+}
+
 export async function loadGingrRouteSchedule(options: {
   date: string;
   refresh?: boolean;
@@ -45,13 +75,21 @@ export async function loadGingrRouteSchedule(options: {
     if (!client.config.apiKey) {
       throw new Error("GINGR_API_KEY is not configured.");
     }
-    const reservations = await client.listReservationsByDate(date);
+    const [reservations, fitdog] = await Promise.all([
+      client.listReservationsByDate(date),
+      loadFitdogSignupDogs(date)
+    ]);
+    const gingr = buildGingrRouteSchedulePayload(date, reservations, {
+      cached: false,
+      fetchedAt: new Date().toISOString()
+    });
+    const dogs = mergeFitdogRouteDogs(gingr.dogs, fitdog.dogs);
     const next = {
-      ...buildGingrRouteSchedulePayload(date, reservations, {
-        cached: false,
-        fetchedAt: new Date().toISOString()
-      }),
-      source: "gingr_api" as const
+      ...gingr,
+      dogs,
+      stats: summarizeRouteDogs(dogs),
+      source: "gingr_api" as const,
+      ...(fitdog.warnings.length ? { warnings: fitdog.warnings } : {})
     };
     writeGingrRouteCache(date, next);
     return next;

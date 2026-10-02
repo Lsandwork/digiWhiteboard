@@ -40,6 +40,8 @@ export type GingrTransportDisplayInput = {
   ownerClubDropoff: boolean;
   ownerClubPickup: boolean;
   returnToClub?: boolean;
+  /** Canonical Gingr appointment option labels for this date. */
+  appointmentOptions?: string[];
   isTaxi: boolean;
   alreadyOnProperty?: boolean;
 };
@@ -62,37 +64,6 @@ export function gingrTransportDisplays(dog: GingrTransportDisplayInput): GingrTr
       homeVan: true,
       vanLeg: true
     });
-  } else if (clubPickupLeg) {
-    if (dog.ownerClubDropoff) {
-      displays.push({
-        kind: "owner_club_dropoff",
-        className: "grg-transport-badge--club-in",
-        title: "Owner brings the dog to Fitdog Club",
-        strong: "OWNER DROP OFF",
-        em: "At Club",
-        homeVan: false,
-        vanLeg: false
-      });
-    }
-    displays.push({
-      kind: "club_pickup",
-      className: "grg-transport-badge--pickup",
-      title: "Fitdog van picks the dog up at Fitdog Club",
-      strong: "PICK UP",
-      em: "At Fitdog Club",
-      homeVan: false,
-      vanLeg: true
-    });
-  } else if (dog.alreadyOnProperty) {
-    displays.push({
-      kind: "on_property",
-      className: "grg-transport-badge--club-in",
-      title: "Dog is already at Fitdog Club",
-      strong: "AT CLUB",
-      em: "Already on property",
-      homeVan: false,
-      vanLeg: false
-    });
   } else if (dog.ownerClubDropoff) {
     displays.push({
       kind: "owner_club_dropoff",
@@ -102,6 +73,43 @@ export function gingrTransportDisplays(dog: GingrTransportDisplayInput): GingrTr
       em: "At Club",
       homeVan: false,
       vanLeg: false
+    });
+  } else if (clubPickupLeg) {
+    displays.push({
+      kind: "club_pickup",
+      className: "grg-transport-badge--pickup",
+      title: "Fitdog van picks the dog up at Fitdog Club",
+      strong: "PICK UP",
+      em: "At Fitdog Club",
+      homeVan: false,
+      vanLeg: true
+    });
+  } else if (
+    dog.alreadyOnProperty &&
+    !dog.ownerClubDropoff &&
+    !dog.ownerClubPickup &&
+    !(dog.appointmentOptions?.length)
+  ) {
+    displays.push({
+      kind: "on_property",
+      className: "grg-transport-badge--club-in",
+      title: "Dog is already at Fitdog Club",
+      strong: "AT CLUB",
+      em: "Already on property",
+      homeVan: false,
+      vanLeg: false
+    });
+  }
+
+  if (clubPickupLeg && dog.ownerClubDropoff) {
+    displays.push({
+      kind: "club_pickup",
+      className: "grg-transport-badge--pickup",
+      title: "Fitdog van picks the dog up at Fitdog Club",
+      strong: "PICK UP",
+      em: "At Fitdog Club",
+      homeVan: false,
+      vanLeg: true
     });
   }
 
@@ -125,7 +133,7 @@ export function gingrTransportDisplays(dog: GingrTransportDisplayInput): GingrTr
       homeVan: false,
       vanLeg: true
     });
-  } else if (dog.ownerClubPickup || dog.returnToClub) {
+  } else if (dog.ownerClubPickup) {
     displays.push({
       kind: "owner_club_pickup",
       className: "grg-transport-badge--club-out",

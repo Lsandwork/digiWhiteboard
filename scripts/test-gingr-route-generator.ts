@@ -1809,6 +1809,148 @@ void (async () => {
     assert.notDeepEqual(today.dogs.map((d) => d.name), tomorrow.dogs.map((d) => d.name));
   }
 
+  // Fitdog class sign-ups merge (no Gingr browser login required).
+  {
+    const mergeDate = "2026-09-30";
+    const { fitdogSignupsToRouteDogs, mergeFitdogRouteDogs, routeDogMatchKey } = await import(
+      "../lib/gingr-route-generator/fitdog-signups"
+    );
+
+    const homeLeg = (dogId: string, name: string, last: string): import("../lib/route-generator/parser").NormalizedReportItem => ({
+      direction: "pickup",
+      reservationId: null,
+      customerId: "c1",
+      ownerFirstName: "Jane",
+      ownerLastName: last,
+      ownerFullName: `Jane ${last}`,
+      dogId,
+      dogName: name,
+      serviceRaw: "Adventure Hike",
+      serviceCanonical: "Adventure Hike",
+      locationType: "HOME",
+      addressRaw: "100 Main St, Santa Monica, CA 90401",
+      addressStreet: "100 Main St",
+      addressUnit: null,
+      addressCity: "Santa Monica",
+      addressState: "CA",
+      addressZip: "90401",
+      ownerPhoneMasked: null,
+      timeWindowStart: "08:30",
+      timeWindowEnd: "09:00",
+      dogSize: null,
+      specialNotes: null,
+      driverNotes: null,
+      reservationNotes: null,
+      householdKey: null,
+      validationStatus: "ok",
+      validationReasons: [],
+      raw: { phone: "3105550100" }
+    });
+
+    const clubLeg = (item: import("../lib/route-generator/parser").NormalizedReportItem): import("../lib/route-generator/parser").NormalizedReportItem => ({
+      ...item,
+      direction: "dropoff",
+      locationType: "FITDOG",
+      addressStreet: null,
+      addressCity: null,
+      addressState: null,
+      addressZip: null,
+      addressRaw: "Fitdog Club"
+    });
+
+    const signups = [
+      {
+        className: "Adventure Hike | Outing",
+        pickup: homeLeg("d-nikita", "Nikita", "Smith"),
+        dropoff: clubLeg(homeLeg("d-nikita", "Nikita", "Smith"))
+      },
+      {
+        className: "Foundations and Focus | Group Training",
+        pickup: homeLeg("d-mac", "Mac", "Jones"),
+        dropoff: clubLeg(homeLeg("d-mac", "Mac", "Jones"))
+      }
+    ];
+
+    const fitdogDogs = fitdogSignupsToRouteDogs(signups, mergeDate);
+    assert.equal(fitdogDogs.length, 2);
+    assert.ok(fitdogDogs.some((d) => d.name === "Nikita" && d.pickup && d.clubTransportLocation));
+    assert.equal(routeDogMatchKey({ name: "Nikita", ownerLastName: "Smith" }), "nikita|smith");
+
+    const gingrOnly = normalizeGingrRouteReservations(
+      [
+        reservation({
+          reservation_id: "8801",
+          animal_id: 8801,
+          a_name: "Penelope",
+          owner: ownerHome(),
+          type: "Sport Sign Ups",
+          services: [{ name: "Sport Sign Ups", scheduled_at: `${mergeDate}T10:00:00-07:00` }],
+          addons: [{ name: "Fitdog to Pick Up @ Home" }]
+        })
+      ],
+      mergeDate
+    ).dogs;
+    assert.equal(gingrOnly.length, 1);
+    const merged = mergeFitdogRouteDogs(gingrOnly, fitdogDogs);
+    assert.ok(merged.length >= 2, "unmatched Fitdog dogs are appended");
+    assert.ok(merged.some((d) => d.name === "Nikita"));
+    assert.ok(merged.some((d) => d.name === "Penelope"));
+  }
+
+  // Combined appointment option string → both owner club flags and labels.
+  {
+    const optionDate = "2026-10-02";
+    const combined = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "combo-options",
+          animal_id: 9400,
+          a_name: "Luci",
+          a_o_last_name: "Sears",
+          type: "Trail Foundations | Group Training",
+          addons: [
+            {
+              name: "Owner Drop Off | Fitdog Club, Owner Pick Up | Fitdog Club"
+            }
+          ],
+          services: [{ name: "Activity | Trail Foundations", scheduled_at: `${optionDate}T09:00:00-07:00` }],
+          owner: { ...ownerHome(), last_name: "Sears" }
+        })
+      ],
+      optionDate
+    ).dogs[0]!;
+    assert.equal(combined.ownerClubDropoff, true);
+    assert.equal(combined.ownerClubPickup, true);
+    assert.deepEqual(combined.appointmentOptions, [
+      "Owner Drop Off | Fitdog Club",
+      "Owner Pick Up | Fitdog Club"
+    ]);
+    const comboDisplays = gingrTransportDisplays(combined);
+    assert.ok(comboDisplays.some((d) => d.kind === "owner_club_dropoff"));
+    assert.ok(comboDisplays.some((d) => d.kind === "owner_club_pickup"));
+  }
+
+  // Class with no Gingr transport data must not invent an owner pick-up badge.
+  {
+    const optionDate = "2026-10-02";
+    const bareClass = normalizeGingrRouteReservations(
+      [
+        reservation({
+          id: "bare-class",
+          animal_id: 7486,
+          a_name: "Luci",
+          type: "Trail Foundations | Group Training",
+          services: [{ name: "Activity | Trail Foundations", scheduled_at: `${optionDate}T09:00:00-07:00` }],
+          owner: ownerHome()
+        })
+      ],
+      optionDate
+    ).dogs[0]!;
+    assert.equal(bareClass.returnToClub, false);
+    assert.equal(bareClass.ownerClubPickup, false);
+    assert.equal(gingrTransportDisplays(bareClass).length, 0);
+  }
+
   console.log("test-gingr-route-generator: all assertions passed");
 })().catch((error) => {
   console.error(error);

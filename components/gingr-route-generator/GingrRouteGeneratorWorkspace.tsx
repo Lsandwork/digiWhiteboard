@@ -93,6 +93,11 @@ const DogRow = memo(function DogRow({ dog }: { dog: GingrRouteDog }) {
         ))}
       </div>
       <div className="grg-dog-transport">
+        {dog.appointmentOptions?.length ? (
+          <span className="grg-transport-badge-text" title="Gingr appointment options">
+            {dog.appointmentOptions.join(", ")}
+          </span>
+        ) : null}
         {displays.map((display) => (
           <span key={display.kind} className={`grg-transport-badge ${display.className}`} title={display.title}>
             <strong>{display.strong}</strong>
