@@ -17,6 +17,7 @@
     "test:bad-signature": "tsx scripts/test-bad-signature.ts",
     "test:yard-links": "tsx scripts/test-yard-links.ts",
     "test:role-access": "tsx scripts/test-role-access.ts",
+    "test:user-interactions": "tsx scripts/test-user-interactions.ts",
     "test:ruffly": "tsx scripts/test-ruffly-core.ts && tsx scripts/test-ruffly-domain-routing.ts",
     "test:lobby-domain": "tsx scripts/test-lobby-domain-routing.ts",
     "test:ruffops-site": "tsx scripts/test-ruffops-site-domain.ts",

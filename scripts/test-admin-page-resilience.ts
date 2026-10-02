@@ -17,6 +17,8 @@ assert.equal(skipSettingsAndAccess(null), false);
 assert.equal(skipSettingsAndAccess("package_commissions"), true);
 assert.equal(skipSettingsAndAccess("my_shift"), true);
 assert.equal(skipSettingsAndAccess("crossover_communication"), true);
+assert.equal(skipSettingsAndAccess("user_interactions"), true);
+assert.equal(skipDashboardBackgroundHydrate("staff", "user_interactions"), true);
 assert.equal(skipSettingsAndAccess("overview"), false);
 assert.equal(skipSettingsAndAccess("settings"), false);
 assert.equal(skipHeavyBoardWidgets("staff", null), false);

@@ -59,6 +59,7 @@ export type AdminTab =
   | "trainer_push"
   | "cast_videos"
   | "trainer_entry"
+  | "user_interactions"
   | "crossover_communication"
   | "owner_follow_up"
   | "active_issues"
@@ -135,6 +136,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "trainer_push",
   "cast_videos",
   "trainer_entry",
+  "user_interactions",
   "crossover_communication",
   "owner_follow_up",
   "active_issues",

@@ -765,6 +765,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
   "front_desk_command",
   "ops_command_center",
   "shift_handoff",
+  "user_interactions",
   "crossover_communication",
   "push_notices",
   "yard_push_notices",
@@ -789,6 +790,7 @@ export const TEAM_LEADER_TABS = [
   "yard_command",
   "ops_command_center",
   "shift_handoff",
+  "user_interactions",
   "crossover_communication",
   "push_notices",
   "yard_push_notices",
@@ -809,6 +811,7 @@ export const TEAM_LEADER_TABS = [
 
 export const GROOMER_TABS = [
   "my_shift",
+  "user_interactions",
   "crossover_communication",
   "grooming_push",
   "whiteboard_preview",
@@ -824,6 +827,7 @@ export const GROOMER_TABS = [
 export const TRAINER_TABS = [
   "my_shift",
   "trainer_ops",
+  "user_interactions",
   "crossover_communication",
   "trainer_push",
   "package_commissions",
@@ -839,6 +843,7 @@ export const TRAINER_TABS = [
 export const DOG_HANDLER_TABS = [
   "my_shift",
   "driver_mode",
+  "user_interactions",
   "crossover_communication",
   "checklist",
   "walks_board",
@@ -1044,6 +1049,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   grooming_push: "push_grooming_request",
   trainer_push: "push_trainer_request",
   trainer_entry: "create_trainer_entry",
+  user_interactions: "view_front_desk_log",
   crossover_communication: "view_front_desk_log",
   owner_follow_up: "view_owner_follow_up",
   active_issues: "view_active_issues",
@@ -1704,6 +1710,7 @@ export function canAccessAdminTab(
   if (isMarketingLegacyRole(legacyRole)) {
     if (board === "staff") {
       return (
+        tab === "user_interactions" ||
         tab === "crossover_communication" ||
         tab === "bulk_photo_upload" ||
         tab === "media_library" ||
@@ -1830,6 +1837,10 @@ export function firstAccessibleAdminTab(
     return "my_shift";
   }
 
+  if (resolvedBoard === "staff" && canAccessAdminTab(access, "user_interactions", legacyRole, "staff", options)) {
+    return "user_interactions";
+  }
+
   // Fall back to Team Log whenever the role can open it.
   if (
     resolvedBoard === "staff" &&
@@ -1887,6 +1898,7 @@ export function firstAccessibleAdminTab(
   const tabs =
     resolvedBoard === "staff"
       ? [
+          "user_interactions",
           "crossover_communication",
           "push_notices",
           "grooming_push",

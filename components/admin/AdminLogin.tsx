@@ -14,7 +14,7 @@ const HELP_EMAIL = "Lonnie@fitdog.com";
 
 function defaultAdminRoute(_role?: string, isDemo?: boolean) {
   if (isDemo) return "/admin?board=staff&tab=demo_push";
-  return "/admin?board=staff&tab=crossover_communication";
+  return "/admin?board=staff&tab=user_interactions";
 }
 
 function resolvePostLoginRoute(requested: string | null, role?: string, isDemo?: boolean) {

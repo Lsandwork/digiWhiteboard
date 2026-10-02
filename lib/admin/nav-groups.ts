@@ -156,6 +156,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   trainer_push: "Trainer Push",
   cast_videos: "Cast Videos",
   trainer_entry: "Trainer's Entry",
+  user_interactions: "User Interactions",
   crossover_communication: "Team Log",
   owner_follow_up: "Owner Follow Up",
   active_issues: "Active Issues",
@@ -249,6 +250,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
   trainer_push: "Alert handlers when a dog needs training.",
   cast_videos: "Upload and push full-screen videos to displays.",
   trainer_entry: "Retired — use Team Log.",
+  user_interactions: "Log work, keep it visible until it is done, and find it later.",
   handler_shift_entry: "Retired — use Team Log.",
   package_commissions: "Track package and class sales, confirm commissions, and review trainer earnings.",
   track_incidents: "Track Gingr and manual incident reports with live webhook sync and a 5:00 AM Pacific catch-up.",
@@ -311,6 +313,7 @@ const PUSH_TO_BOARD_TABS: AdminTab[] = [
   "emergency_alerts"
 ];
 const FRONT_DESK_TABS: AdminTab[] = [
+  "user_interactions",
   "crossover_communication",
   "owner_follow_up",
   "active_issues",
@@ -560,7 +563,7 @@ export function buildTrainerNav(visibleTabs: AdminTab[]): NavEntry[] {
       "trainer_operations",
       "Front Desk & Floor",
       compactEntries([
-        group("front_desk", "Operations", ["crossover_communication"], visible),
+        group("front_desk", "Operations", ["user_interactions", "crossover_communication"], visible),
         ...singles(["bulk_photo_upload"], visible)
       ])
     )
@@ -638,7 +641,7 @@ export function buildTeamLeadNav(visibleTabs: AdminTab[]): NavEntry[] {
         group(
           "front_desk",
           "Operations",
-          ["crossover_communication", "owner_follow_up", "active_issues", "ruffops_checklist"],
+          ["user_interactions", "crossover_communication", "owner_follow_up", "active_issues", "ruffops_checklist"],
           visible
         ),
         ...singles(["bulk_photo_upload", "media_library"], visible)
@@ -707,7 +710,7 @@ export function buildGroomerNav(visibleTabs: AdminTab[]): NavEntry[] {
       "groomer_operations",
       "Front Desk & Floor",
       compactEntries([
-        group("front_desk", "Operations", ["crossover_communication"], visible),
+        group("front_desk", "Operations", ["user_interactions", "crossover_communication"], visible),
         ...singles(["bulk_photo_upload"], visible)
       ])
     )

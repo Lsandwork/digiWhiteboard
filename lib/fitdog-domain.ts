@@ -10,7 +10,7 @@
 import { isAdminDashboardPath } from "@/lib/admin/admin-paths";
 
 export const FITDOG_HOSTNAME = "fitdog.ruffops.com";
-export const FITDOG_LOGIN_REDIRECT_PATH = "/admin/login?next=%2Fadmin%3Fboard%3Dstaff%26tab%3Dcrossover_communication";
+export const FITDOG_LOGIN_REDIRECT_PATH = "/admin/login?next=%2Fadmin%3Fboard%3Dstaff%26tab%3Duser_interactions";
 
 /** Lowercase a Host header / hostname and strip any dev port (e.g. ":3000"). */
 export function normalizeHostname(host: string | null | undefined): string {
