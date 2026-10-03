@@ -225,7 +225,8 @@ export function UserInteractionsPanel() {
         subject: item.subject,
         message: item.details,
         details: item.details,
-        log_type: item.logType ?? "General Shift Note"
+        log_type: item.logType ?? "General Shift Note",
+        template_title: null
       });
       await mutate(
         {
@@ -433,7 +434,7 @@ export function UserInteractionsPanel() {
         <RefreshCw className="h-4 w-4" aria-hidden /> Refresh
       </button>
 
-      <Modal open={showNew} title="New interaction" onClose={() => setShowNew(false)} wide>
+      <Modal open={showNew} title="New interaction" onClose={() => setShowNew(false)} size="lg">
         <div className="user-interactions__form">
           <fieldset className="user-interactions__kind">
             <legend>What is this?</legend>
@@ -501,7 +502,7 @@ export function UserInteractionsPanel() {
         </div>
       </Modal>
 
-      <Modal open={Boolean(detail)} title={detail?.subject ?? "Interaction"} onClose={() => setDetail(null)} wide>
+      <Modal open={Boolean(detail)} title={detail?.subject ?? "Interaction"} onClose={() => setDetail(null)} size="lg">
         {detail ? (
           <div className="user-interactions__detail">
             <p className="whitespace-pre-wrap">{detail.details || "No details."}</p>
