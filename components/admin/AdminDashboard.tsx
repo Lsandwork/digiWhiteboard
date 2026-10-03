@@ -422,7 +422,15 @@ export function AdminDashboard() {
     }
 
     if (marketingAccount && board === "staff") {
-      if (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
+      if (
+        tab === "user_interactions" ||
+        tab === "crossover_communication" ||
+        tab === "bulk_photo_upload" ||
+        tab === "media_library" ||
+        tab === "help"
+      ) {
+        return;
+      }
       if (tab === "sa_apps_hub") {
         if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "marketing");
         goToBoardTab("marketing", "sa_apps_hub");
@@ -962,7 +970,7 @@ export function AdminDashboard() {
             displayName={displayLabel}
             roleKey={userAccess.primaryRole}
             roleLabel={userAccess.displayLabel}
-            onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)}
+            onNavigate={(nextTab, extra) => setActiveTab(nextTab as AdminTab, extra)}
           />
         ) : null}
         {tab === "ops_command_center" ? (
@@ -972,7 +980,7 @@ export function AdminDashboard() {
             displayName={displayLabel}
             roleKey={userAccess.primaryRole}
             roleLabel={userAccess.displayLabel}
-            onNavigate={(nextTab) => setActiveTab(nextTab as AdminTab)}
+            onNavigate={(nextTab, extra) => setActiveTab(nextTab as AdminTab, extra)}
           />
         ) : null}
         {tab === "front_desk_command" ? (

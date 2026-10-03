@@ -247,9 +247,8 @@ assert.match(route, /filterOpenInteractions\(allItems\)/);
 assert.doesNotMatch(route.slice(route.indexOf('view === "open"'), route.indexOf('view === "open"') + 800), /capStaffOpsListPayload/);
 
 const occFeed = readFileSync("lib/ops-command-center/adapters/staff-ops-feed.ts", "utf8");
-assert.match(occFeed, /hrefTab: "crossover_communication"/);
-assert.match(occFeed, /hrefTab: "owner_follow_up"/);
-assert.match(occFeed, /hrefTab: "active_issues"/);
+assert.match(occFeed, /hrefTab: "user_interactions"/);
+assert.match(occFeed, /hrefTab: "fitdog_alerts"/);
 
 const notify = readFileSync("lib/staff/admin-ops.ts", "utf8");
 assert.match(notify, /sendSuperAdminSmsAlertFireAndForget/);

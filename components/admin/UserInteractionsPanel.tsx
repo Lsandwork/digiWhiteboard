@@ -10,6 +10,7 @@ import {
   filterMyItems,
   filterOpenInteractions,
   filterOverdueInteractions,
+  pacificCalendarDate,
   searchInteractions,
   staffPriorityFromEmployee,
   type EmployeePriority,
@@ -53,6 +54,8 @@ export function UserInteractionsPanel() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [archivePage, setArchivePage] = useState(1);
+  const [archiveHasMore, setArchiveHasMore] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [detail, setDetail] = useState<UserInteractionItem | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -91,23 +94,29 @@ export function UserInteractionsPanel() {
     }
   }, []);
 
-  const loadArchive = useCallback(async () => {
-    const params = new URLSearchParams({ view: "archive", q: query, page: "1", limit: "40" });
+  const loadArchive = useCallback(async (page = 1, append = false) => {
+    const params = new URLSearchParams({ view: "archive", q: query, page: String(page), limit: "40" });
     if (completedToday) params.set("completedToday", "1");
     const response = await fetch(`/api/admin/staff-operations?${params}`, { cache: "no-store" });
-    const body = await readResponseJson<{ items?: UserInteractionItem[]; counts?: UserInteractionCounts; error?: string }>(
-      response
-    );
+    const body = await readResponseJson<{
+      items?: UserInteractionItem[];
+      counts?: UserInteractionCounts;
+      hasMore?: boolean;
+      page?: number;
+      error?: string;
+    }>(response);
     if (!response.ok) throw new Error("We couldn't load your interactions. Please try again.");
-    setArchiveItems(Array.isArray(body.items) ? body.items : []);
+    setArchiveItems((current) => (append ? [...current, ...(body.items ?? [])] : Array.isArray(body.items) ? body.items : []));
     if (body.counts) setCounts(body.counts);
+    setArchivePage(body.page ?? page);
+    setArchiveHasMore(Boolean(body.hasMore));
   }, [completedToday, query]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       await loadOpen();
-      if (view === "archive") await loadArchive();
+      if (view === "archive") await loadArchive(1, false);
     } catch {
       // Error state is set in loadOpen.
     }
@@ -120,8 +129,16 @@ export function UserInteractionsPanel() {
 
   useEffect(() => {
     if (view !== "archive") return;
-    void loadArchive().catch(() => setError("We couldn't load your interactions. Please try again."));
+    void loadArchive(1, false).catch(() => setError("We couldn't load your interactions. Please try again."));
   }, [loadArchive, view]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const focusId = new URLSearchParams(window.location.search).get("interaction");
+    if (!focusId) return;
+    const match = [...openItems, ...archiveItems].find((item) => item.id === focusId);
+    if (match) setDetail(match);
+  }, [archiveItems, openItems]);
 
   const list = useMemo(() => {
     if (view === "archive") return archiveItems;
@@ -194,6 +211,17 @@ export function UserInteractionsPanel() {
       await mutate({ action, id: item.id, assigned_to: assignedTo || null }, "Assignment updated.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Could not update assignment.", "error");
+    }
+  }
+
+  async function setDueDate(item: UserInteractionItem, due: string) {
+    const action =
+      item.kind === "follow_up" ? "update_follow_up" : item.kind === "issue" ? "update_issue" : "update_crossover";
+    const patch = item.kind === "follow_up" ? { due_date: due || null } : { due_at: due || null };
+    try {
+      await mutate({ action, id: item.id, ...patch }, "Due date updated.");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Could not update due date.", "error");
     }
   }
 
@@ -274,6 +302,23 @@ export function UserInteractionsPanel() {
                 {item.employeeStatus}
               </p>
               {item.historyLine ? <p className="user-interactions__history">{item.historyLine}</p> : null}
+              {permissions.canEdit && item.employeeStatus !== "Done" ? (
+                <label className="user-interactions__assign">
+                  Assigned to
+                  <select
+                    value={item.assignedTo || ""}
+                    onChange={(event) => void assignItem(item, event.target.value)}
+                    aria-label={`Assign ${item.subject}`}
+                  >
+                    <option value="">Unassigned</option>
+                    {assignOptions.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
             </div>
             <div className="user-interactions__actions">
               {item.employeeStatus !== "Done" && permissions.canEdit ? (
@@ -306,6 +351,16 @@ export function UserInteractionsPanel() {
         ))}
       </ul>
 
+      {view === "archive" && archiveHasMore ? (
+        <button
+          type="button"
+          className="admin-btn-secondary"
+          onClick={() => void loadArchive(archivePage + 1, true).catch(() => setError("We couldn't load your interactions. Please try again."))}
+        >
+          Load more
+        </button>
+      ) : null}
+
       {formOpen ? (
         <NewInteractionSheet
           assignOptions={assignOptions}
@@ -329,6 +384,7 @@ export function UserInteractionsPanel() {
           isMine={assignmentMatchesActor(detail, actor)}
           onClose={() => setDetail(null)}
           onAssign={(value) => void assignItem(detail, value)}
+          onDue={(value) => void setDueDate(detail, value)}
           onComplete={(note) => void completeItem(detail, note)}
           onReopen={() => void reopenItem(detail)}
         />
@@ -546,6 +602,7 @@ function DetailSheet({
   isMine,
   onClose,
   onAssign,
+  onDue,
   onComplete,
   onReopen
 }: {
@@ -556,6 +613,7 @@ function DetailSheet({
   isMine: boolean;
   onClose: () => void;
   onAssign: (value: string) => void;
+  onDue: (value: string) => void;
   onComplete: (note?: string) => void;
   onReopen: () => void;
 }) {
@@ -590,6 +648,16 @@ function DetailSheet({
         ) : (
           <p>Assigned to: {item.assignedTo || "Unassigned"}</p>
         )}
+        {canEdit ? (
+          <label>
+            Due
+            <input
+              type="date"
+              value={pacificCalendarDate(item.dueAt) ?? ""}
+              onChange={(event) => onDue(event.target.value)}
+            />
+          </label>
+        ) : null}
         {item.replies.length ? (
           <ul className="user-interactions__replies">
             {item.replies.map((reply) => (

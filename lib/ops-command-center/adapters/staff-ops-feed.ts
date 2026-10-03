@@ -100,7 +100,7 @@ export function followUpToWorkItem(row: OwnerFollowUp): OpsWorkItem {
     dueAt: row.due_date,
     dogName: row.dog_name,
     ownerName: row.owner_name,
-    hrefTab: "owner_follow_up",
+    hrefTab: "user_interactions",
     completable: false
   };
 }
@@ -116,7 +116,7 @@ export function issueToWorkItem(row: ActiveIssue): OpsWorkItem {
     dueAt: row.due_at,
     dogName: row.related_dog_name,
     ownerName: row.related_owner_name,
-    hrefTab: "active_issues",
+    hrefTab: "user_interactions",
     completable: false
   };
 }
@@ -135,7 +135,7 @@ export function openLogToWorkItem(row: CrossoverMessage): OpsWorkItem {
     dueAt: row.due_at ?? null,
     dogName: row.related_dog_name,
     ownerName: row.related_owner_name,
-    hrefTab: "crossover_communication",
+    hrefTab: "user_interactions",
     completable: false
   };
 }
