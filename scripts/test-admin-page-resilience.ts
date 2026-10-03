@@ -42,24 +42,29 @@ assert.equal(emptyOverviewPayload().metrics.length, 6);
 assert.ok(OVERVIEW_SETTINGS_POINTERS.some((pointer) => pointer.path === "staff_admin_ops->active_issues"));
 assert.ok(OVERVIEW_SETTINGS_POINTERS.every((pointer) => !pointer.path.includes("crossover_messages")));
 assert.equal(STAFF_OPS_LIST_MESSAGE_LIMIT, 120);
-assert.equal(
-  capStaffOpsListPayload({
-    crossover_messages: Array.from({ length: 200 }, (_, i) => ({
-      id: `m${i}`,
-      created_at: "2026-01-01T00:00:00.000Z"
-    })),
+{
+  const capped = capStaffOpsListPayload({
+    crossover_messages: [
+      { id: "open-old", status: "Open", created_at: "2020-01-01T00:00:00.000Z" },
+      ...Array.from({ length: 199 }, (_, i) => ({
+        id: `m${i}`,
+        status: "Resolved",
+        created_at: "2026-01-01T00:00:00.000Z"
+      }))
+    ],
     crossover_message_replies: [
-      { id: "r1", crossover_message_id: "m0", created_at: "2026-01-01T00:00:00.000Z" },
-      { id: "r2", crossover_message_id: "m199", created_at: "2026-01-01T00:00:00.000Z" }
+      { id: "r1", crossover_message_id: "open-old", created_at: "2026-01-01T00:00:00.000Z" },
+      { id: "r2", crossover_message_id: "m0", created_at: "2026-01-01T00:00:00.000Z" }
     ],
     owner_follow_ups: [],
     active_issues: [],
     activity_logs: [],
     staff_directory: [],
     notifications: []
-  } as never).crossover_messages.length,
-  120
-);
+  } as never);
+  assert.ok(capped.crossover_messages.some((m) => m.id === "open-old"), "open rows survive list cap");
+  assert.ok(capped.crossover_messages.length <= 120, "closed rows still capped for classic Team Log payload");
+}
 
 assert.equal(SERVICE_SUPABASE_TIMEOUT_MS, 8_000);
 assert.equal(SERVICE_SUPABASE_CRON_TIMEOUT_MS, 20_000);

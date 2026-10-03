@@ -40,6 +40,10 @@ import {
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
+import {
+  buildUserInteractionsViewPayload,
+  parseUserInteractionsViewParam
+} from "@/lib/user-interactions/api-view";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 15;
@@ -141,6 +145,30 @@ export async function GET(request: Request) {
       adminUserId: session?.adminUserId ?? null,
       role: role ?? null
     };
+    const url = new URL(request.url);
+    const uiView = parseUserInteractionsViewParam(url.searchParams.get("view"));
+    if (uiView) {
+      const actorDisplayName =
+        (await resolveSessionDisplayName(getServiceSupabase(), session)) ?? session?.email ?? null;
+      return NextResponse.json(
+        buildUserInteractionsViewPayload(state, {
+          view: uiView,
+          search: url.searchParams.get("q") ?? undefined,
+          page: Number(url.searchParams.get("page") ?? "1") || 1,
+          pageSize: Number(url.searchParams.get("pageSize") ?? "") || undefined,
+          actor: {
+            email: readerSession.email,
+            adminUserId: readerSession.adminUserId,
+            displayName: actorDisplayName,
+            role: readerSession.role
+          },
+          permissions: {
+            canCreate: canCreateShiftLogEntry(role),
+            canEdit: canMutateFrontDeskLog(role)
+          }
+        })
+      );
+    }
     return NextResponse.json({
       ...capStaffOpsListPayload(state),
       // Never expose other users' notifications in the payload.

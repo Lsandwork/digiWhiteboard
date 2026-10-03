@@ -44,6 +44,7 @@ import {
 } from "@/components/admin/ops-command-center/RoleWorkspaces";
 import { SystemHealthDebuggingApp } from "@/components/admin/system-health/SystemHealthDebuggingApp";
 import { StaffOperationsPanel } from "@/components/admin/StaffOperationsPanel";
+import { UserInteractionsPanel } from "@/components/admin/user-interactions/UserInteractionsPanel";
 import { StaffDirectoryPanel } from "@/components/admin/StaffDirectoryPanel";
 import { StaffCreateUserPage } from "@/components/admin/StaffCreateUserPage";
 import { IntegrationsPanel } from "@/components/admin/IntegrationsPanel";
@@ -421,7 +422,7 @@ export function AdminDashboard() {
     }
 
     if (marketingAccount && board === "staff") {
-      if (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
+      if (tab === "user_interactions" || tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help") return;
       if (tab === "sa_apps_hub") {
         if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "marketing");
         goToBoardTab("marketing", "sa_apps_hub");
@@ -669,7 +670,7 @@ export function AdminDashboard() {
     : isFrontDeskCoordinatorLoginEmail(data.username)
       ? "Front Desk Coordinator"
       : userAccess.displayLabel;
-  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "package_group_walks", "ruffops_checklist", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
+  const showPreview = !["settings", "push_notices", "yard_push_notices", "emergency_alerts", "cast_videos", "cast_tv", "grooming_push", "trainer_push", "trainer_entry", "user_interactions", "crossover_communication", "owner_follow_up", "active_issues", "fitdog_alerts", "vip_auto_book", "whiteboard_preview", "yard_links", "walks_board", "package_group_walks", "ruffops_checklist", "tl_digi_board", "management_support", "ms_hub", "ms_groomer_complaints", "ms_groomer_requests", "ms_trainer_complaints", "ms_trainer_requests", "admin_trainer_entries", "package_commissions", "track_incidents", "vet_visits", "route_generator", "live_fleet", "my_shift", "ops_command_center", "front_desk_command", "yard_command", "driver_mode", "overnight_command", "trainer_ops", "ops_system_health", "shift_handoff", "sa_floor_hub", "sa_whiteboard_hub", "sa_people_hub", "sa_apps_hub", "sa_admin_hub", "analytics", "reports", "templates", "notifications", "staff_directory", "staff_create_user", "users", "logs", "integrations", "help", "demo_push", "remote_cast", "write_ups", "write_up_review", "complaint_review", "hr_hub", "hr_consult", "hr_pip", "bulk_photo_upload", "media_library", "handler_shift_entry"].includes(tab);
   const hubNavRole = currentRole;
   const showRoleHubNav = isHubNavRole(hubNavRole) && board === "staff";
   // Plain filter (not useMemo): this block runs only after the `if (!data)` early return.
@@ -884,6 +885,8 @@ export function AdminDashboard() {
         {tab === "trainer_push" ? <TrainerPushPanel /> : null}
 
         {tab === "trainer_entry" ? <TrainerEntryPanel /> : null}
+
+        {tab === "user_interactions" ? <UserInteractionsPanel /> : null}
 
         {tab === "crossover_communication" ? <StaffOperationsPanel tab="crossover" /> : null}
 

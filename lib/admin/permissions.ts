@@ -786,6 +786,7 @@ const TEAM_LEADER_PERMISSIONS: PermissionKey[] = [
 
 export const FRONT_DESK_COORDINATOR_TABS = [
   "my_shift",
+  "user_interactions",
   "front_desk_command",
   "ops_command_center",
   "shift_handoff",
@@ -810,6 +811,7 @@ export const FRONT_DESK_COORDINATOR_TABS = [
 
 export const TEAM_LEADER_TABS = [
   "my_shift",
+  "user_interactions",
   "yard_command",
   "ops_command_center",
   "shift_handoff",
@@ -833,6 +835,7 @@ export const TEAM_LEADER_TABS = [
 
 export const GROOMER_TABS = [
   "my_shift",
+  "user_interactions",
   "crossover_communication",
   "grooming_push",
   "whiteboard_preview",
@@ -847,6 +850,7 @@ export const GROOMER_TABS = [
 
 export const TRAINER_TABS = [
   "my_shift",
+  "user_interactions",
   "trainer_ops",
   "crossover_communication",
   "trainer_push",
@@ -862,6 +866,7 @@ export const TRAINER_TABS = [
 
 export const DOG_HANDLER_TABS = [
   "my_shift",
+  "user_interactions",
   "driver_mode",
   "crossover_communication",
   "checklist",
@@ -1068,6 +1073,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   grooming_push: "push_grooming_request",
   trainer_push: "push_trainer_request",
   trainer_entry: "create_trainer_entry",
+  user_interactions: "view_front_desk_log",
   crossover_communication: "view_front_desk_log",
   owner_follow_up: "view_owner_follow_up",
   active_issues: "view_active_issues",
@@ -1776,6 +1782,7 @@ export function canAccessAdminTab(
   if (isMarketingLegacyRole(legacyRole)) {
     if (board === "staff") {
       return (
+        tab === "user_interactions" ||
         tab === "crossover_communication" ||
         tab === "bulk_photo_upload" ||
         tab === "media_library" ||
@@ -1902,7 +1909,13 @@ export function firstAccessibleAdminTab(
     return "my_shift";
   }
 
-  // Fall back to Team Log whenever the role can open it.
+  // Employee default: User Interactions (Team Log remains available for management/classic).
+  if (
+    resolvedBoard === "staff" &&
+    canAccessAdminTab(access, "user_interactions", legacyRole, "staff", options)
+  ) {
+    return "user_interactions";
+  }
   if (
     resolvedBoard === "staff" &&
     canAccessAdminTab(access, "crossover_communication", legacyRole, "staff", options)

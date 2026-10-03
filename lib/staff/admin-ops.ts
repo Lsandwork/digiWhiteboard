@@ -6,11 +6,12 @@ import {
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
   isPacificToday,
-  pacificYesterdayIso,
   priorityRank,
   shouldAlertManagement,
   shiftLogDetails
 } from "@/lib/staff/front-desk-log";
+import { capRecordsPreservingOpen } from "@/lib/user-interactions/unified";
+import { isStaffOpsStatusOpen } from "@/lib/user-interactions/lifecycle";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
@@ -428,9 +429,10 @@ function parseState(value: unknown): StaffOpsState {
   const state = value as Partial<StaffOpsState>;
   const directory = Array.isArray(state.staff_directory) ? state.staff_directory : DEFAULT_STAFF_DIRECTORY;
   return {
-    crossover_messages: sortNewest(Array.isArray(state.crossover_messages) ? state.crossover_messages : []).slice(
-      0,
-      MAX_CROSSOVER_MESSAGES
+    crossover_messages: capRecordsPreservingOpen(
+      sortNewest(Array.isArray(state.crossover_messages) ? state.crossover_messages : []),
+      MAX_CROSSOVER_MESSAGES,
+      isStaffOpsStatusOpen
     ),
     crossover_message_replies: sortNewest(Array.isArray(state.crossover_message_replies) ? state.crossover_message_replies : []),
     owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
@@ -497,14 +499,22 @@ export const STAFF_OPS_LIST_MESSAGE_LIMIT = 120;
 
 /** First paint for Team Log — keep the stored blob intact, trim the HTTP payload. */
 export function capStaffOpsListPayload(state: StaffOpsState): StaffOpsState {
-  const crossover_messages = state.crossover_messages.slice(0, STAFF_OPS_LIST_MESSAGE_LIMIT);
+  const crossover_messages = capRecordsPreservingOpen(
+    state.crossover_messages,
+    STAFF_OPS_LIST_MESSAGE_LIMIT,
+    isStaffOpsStatusOpen
+  );
   const ids = new Set(crossover_messages.map((item) => item.id));
   return {
     ...state,
     crossover_messages,
     crossover_message_replies: state.crossover_message_replies.filter((reply) => ids.has(reply.crossover_message_id)),
-    owner_follow_ups: state.owner_follow_ups.slice(0, STAFF_OPS_LIST_MESSAGE_LIMIT),
-    active_issues: state.active_issues.slice(0, STAFF_OPS_LIST_MESSAGE_LIMIT)
+    owner_follow_ups: capRecordsPreservingOpen(
+      state.owner_follow_ups,
+      STAFF_OPS_LIST_MESSAGE_LIMIT,
+      isStaffOpsStatusOpen
+    ),
+    active_issues: capRecordsPreservingOpen(state.active_issues, STAFF_OPS_LIST_MESSAGE_LIMIT, isStaffOpsStatusOpen)
   };
 }
 
@@ -1069,10 +1079,13 @@ function applyCrossoverMessagePatch(
         resolved_at:
           status === "Resolved" || status === "Completed" || status === "Check Out"
             ? item.resolved_at ?? now
-            : status === "Archived"
-              ? item.resolved_at
-              : null,
-        archived_at: status === "Archived" ? item.archived_at ?? now : item.archived_at ?? null,
+            : isStaffOpsStatusOpen(status)
+              ? null
+              : status === "Archived"
+                ? item.resolved_at
+                : null,
+        archived_at:
+          status === "Archived" ? item.archived_at ?? now : isStaffOpsStatusOpen(status) ? null : item.archived_at ?? null,
         resolution_notes:
           patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes ?? null
       };
@@ -1233,15 +1246,12 @@ export async function moveCrossoverMessages(
         ...item,
         status: "Archived" as const,
         archived_at: item.archived_at ?? now,
-        // Leave today's Crossover immediately so the row lands in Archived Log.
-        created_at: isPacificToday(item.created_at) ? pacificYesterdayIso() : item.created_at,
         updated_at: now
       };
     }
     return {
       ...item,
       status: "Open" as const,
-      created_at: now,
       resolved_at: null,
       archived_at: null,
       updated_at: now
@@ -1428,7 +1438,12 @@ export async function updateOwnerFollowUp(
         source: patch.source !== undefined ? cleanString(patch.source, "Manual") : item.source,
         urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
         updated_at: now,
-        resolved_at: status === "Resolved" ? item.resolved_at ?? now : status === "Archived" ? item.resolved_at : null
+        resolved_at:
+          status === "Resolved" || status === "Completed" || status === "Check Out"
+            ? item.resolved_at ?? now
+            : isStaffOpsStatusOpen(status)
+              ? null
+              : item.resolved_at
       };
       return updated;
     })
@@ -1562,7 +1577,12 @@ export async function updateActiveIssue(supabase: SupabaseClient, id: string, pa
         related_owner_name: patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name) : item.related_owner_name,
         related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name) : item.related_dog_name,
         updated_at: now,
-        resolved_at: status === "Resolved" ? item.resolved_at ?? now : status === "Archived" ? item.resolved_at : null
+        resolved_at:
+          status === "Resolved" || status === "Completed" || status === "Check Out"
+            ? item.resolved_at ?? now
+            : isStaffOpsStatusOpen(status)
+              ? null
+              : item.resolved_at
       };
       return updated;
     })
