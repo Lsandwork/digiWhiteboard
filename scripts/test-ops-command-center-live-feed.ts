@@ -30,7 +30,7 @@ const followUp = followUpToWorkItem({
 
 assert.equal(followUp.kind, "owner_follow_up");
 assert.equal(followUp.priority, "critical");
-assert.equal(followUp.hrefTab, "owner_follow_up");
+assert.equal(followUp.hrefTab, "user_interactions");
 assert.equal(followUp.completable, false);
 
 const issue = issueToWorkItem({
@@ -57,7 +57,7 @@ const issue = issueToWorkItem({
 
 assert.equal(issue.kind, "active_issue");
 assert.equal(issue.priority, "high");
-assert.equal(issue.hrefTab, "active_issues");
+assert.equal(issue.hrefTab, "user_interactions");
 
 const alert = alertToWorkItem({
   id: "al-1",
@@ -122,7 +122,7 @@ const openLog = openLogToWorkItem({
   resolved_at: null
 } as CrossoverMessage);
 assert.equal(openLog.kind, "open_log");
-assert.equal(openLog.hrefTab, "crossover_communication");
+assert.equal(openLog.hrefTab, "user_interactions");
 assert.equal(openLog.priority, "high");
 
 console.log("ops-command-center-live-feed: ok");

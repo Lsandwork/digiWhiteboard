@@ -13,6 +13,7 @@ import type { OpsWorkItem } from "@/lib/ops-command-center/adapters/staff-ops-fe
 import type { OpsDog } from "@/lib/ops-command-center/types";
 import {
   availableActionsForKind,
+  parseWorkItemId,
   workItemActionLabel,
   type WorkItemAction
 } from "@/lib/ops-command-center/work-item-actions";
@@ -37,6 +38,15 @@ const ACTION_BUTTON_CLASS: Record<WorkItemAction, string> = {
   delete: "border-rose-400/30 text-rose-100 hover:bg-rose-500/10"
 };
 
+function navigateWorkItem(
+  item: { id: string; hrefTab?: string | null },
+  onNavigate?: (tab: string, extra?: Record<string, string>) => void
+) {
+  if (!item.hrefTab || !onNavigate) return;
+  const parsed = parseWorkItemId(item.id);
+  onNavigate(item.hrefTab, parsed?.sourceId ? { interaction: parsed.sourceId } : undefined);
+}
+
 function formatNow() {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Los_Angeles",
@@ -57,7 +67,7 @@ export function OpsCommandCenterPanel({
   roleLabel
 }: {
   mode: Mode;
-  onNavigate?: (tab: string) => void;
+  onNavigate?: (tab: string, extra?: Record<string, string>) => void;
   email?: string | null;
   displayName?: string | null;
   roleKey?: string;
@@ -408,7 +418,7 @@ export function OpsCommandCenterPanel({
                       actions={item.actions?.length ? item.actions : availableActionsForKind(item.kind || inferKind(item.id))}
                       busy={busyItemId === item.id}
                       onAction={runWorkItemAction}
-                      onNavigate={item.hrefTab && onNavigate ? () => onNavigate(item.hrefTab!) : undefined}
+                      onNavigate={item.hrefTab && onNavigate ? () => navigateWorkItem(item, onNavigate) : undefined}
                     />
                   </div>
                 </li>
@@ -548,7 +558,7 @@ export function OpsCommandCenterPanel({
                     actions={availableActionsForKind(item.kind)}
                     busy={busyItemId === item.id}
                     onAction={runWorkItemAction}
-                    onNavigate={item.hrefTab && onNavigate ? () => onNavigate(item.hrefTab!) : undefined}
+                    onNavigate={item.hrefTab && onNavigate ? () => navigateWorkItem(item, onNavigate) : undefined}
                   />
                 </li>
               ))}
@@ -580,7 +590,7 @@ export function OpsCommandCenterPanel({
                     actions={availableActionsForKind(item.kind)}
                     busy={busyItemId === item.id}
                     onAction={runWorkItemAction}
-                    onNavigate={item.hrefTab && onNavigate ? () => onNavigate(item.hrefTab!) : undefined}
+                    onNavigate={item.hrefTab && onNavigate ? () => navigateWorkItem(item, onNavigate) : undefined}
                   />
                 </li>
               ))}

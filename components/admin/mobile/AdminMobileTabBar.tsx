@@ -33,7 +33,7 @@ const PRIMARY: TabDef[] = [
     id: "floor",
     label: "Floor",
     icon: ClipboardList,
-    tabs: ["fitdog_alerts", "crossover_communication", "active_issues", "owner_follow_up"]
+    tabs: ["user_interactions", "fitdog_alerts", "crossover_communication", "active_issues", "owner_follow_up"]
   },
   {
     id: "photos",

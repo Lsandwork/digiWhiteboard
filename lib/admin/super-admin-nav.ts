@@ -95,6 +95,7 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
         id: "operations",
         title: "Front desk & floor",
         links: [
+          tabLink("user_interactions", "User Interactions", "Log work and keep it visible until it is done."),
           tabLink("crossover_communication", "Team Log", "Team handoff log between shifts."),
           tabLink("owner_follow_up", "Owner Follow Up", "Owner callbacks and follow-ups."),
           tabLink("active_issues", "Active Issues", "Open floor issues and escalations."),

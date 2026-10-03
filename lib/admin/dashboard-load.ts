@@ -52,6 +52,7 @@ export function skipDashboardBackgroundHydrate(board: AdminBoardType, tab: strin
     tab === "live_fleet" ||
     tab === "ops_command_center" ||
     tab === "my_shift" ||
+    tab === "user_interactions" ||
     tab === "fitdog_alerts" ||
     tab === "track_incidents" ||
     tab === "vet_visits" ||

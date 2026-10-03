@@ -15,12 +15,11 @@ import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/
 import {
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
-  isPacificToday,
-  pacificYesterdayIso,
   priorityRank,
   shouldAlertManagement,
   shiftLogDetails
 } from "@/lib/staff/front-desk-log";
+import { isUnresolvedStaffOpsStatus, retainUnresolvedThenCapClosed } from "@/lib/staff/user-interactions";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
@@ -439,8 +438,8 @@ function parseState(value: unknown): StaffOpsState {
   const state = value as Partial<StaffOpsState>;
   const directory = Array.isArray(state.staff_directory) ? state.staff_directory : [];
   return {
-    crossover_messages: sortNewest(Array.isArray(state.crossover_messages) ? state.crossover_messages : []).slice(
-      0,
+    crossover_messages: retainUnresolvedThenCapClosed(
+      Array.isArray(state.crossover_messages) ? state.crossover_messages : [],
       MAX_CROSSOVER_MESSAGES
     ),
     crossover_message_replies: sortNewest(Array.isArray(state.crossover_message_replies) ? state.crossover_message_replies : []),
@@ -1121,7 +1120,12 @@ function applyCrossoverMessagePatch(
             : status === "Archived"
               ? item.resolved_at
               : null,
-        archived_at: status === "Archived" ? item.archived_at ?? now : item.archived_at ?? null,
+        archived_at:
+          status === "Archived"
+            ? item.archived_at ?? now
+            : status === "Resolved" || status === "Completed" || status === "Check Out"
+              ? item.archived_at ?? null
+              : null,
         resolution_notes:
           patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes ?? null
       };
@@ -1210,14 +1214,20 @@ export async function updateCrossoverMessage(
   const nextResolution = String(updated.resolution_notes ?? "").trim();
   const resolutionChanged = Boolean(nextResolution && nextResolution !== previousResolution);
   const statusChanged = Boolean(previous && previous.status !== updated.status);
-  if (resolutionChanged || (statusChanged && nextResolution)) {
+  const reopened =
+    Boolean(previous) &&
+    !isUnresolvedStaffOpsStatus(previous!.status) &&
+    isUnresolvedStaffOpsStatus(updated.status);
+  if (resolutionChanged || (statusChanged && nextResolution) || reopened) {
     reply = {
       id: newId(),
       crossover_message_id: id,
-      message: resolutionChanged
-        ? nextResolution
-        : `${updated.status}${nextResolution ? ` — ${nextResolution}` : ""}`,
-      update_type: resolutionChanged ? "Resolution" : "Status Update",
+      message: reopened
+        ? `Reopened by ${actor || "Staff"}`
+        : resolutionChanged
+          ? nextResolution
+          : `${updated.status}${nextResolution ? ` — ${nextResolution}` : ""}`,
+      update_type: reopened ? "Reopen" : resolutionChanged ? "Resolution" : "Status Update",
       created_by: actor,
       created_at: nowIso()
     };
@@ -1225,6 +1235,16 @@ export async function updateCrossoverMessage(
       ...next,
       crossover_message_replies: sortNewest([reply, ...next.crossover_message_replies]).slice(0, 5_000)
     };
+    if (reopened) {
+      next = createActivityLog(next, {
+        activity_type: "shift_log.updated",
+        title: `Reopened: ${updated.subject}`,
+        description: `Reopened by ${actor || "Staff"}`,
+        source_table: "crossover_messages",
+        source_id: updated.id,
+        created_by: actor
+      });
+    }
   }
 
   await saveState(supabase, next);
@@ -1282,15 +1302,12 @@ export async function moveCrossoverMessages(
         ...item,
         status: "Archived" as const,
         archived_at: item.archived_at ?? now,
-        // Leave today's Crossover immediately so the row lands in Archived Log.
-        created_at: isPacificToday(item.created_at) ? pacificYesterdayIso() : item.created_at,
         updated_at: now
       };
     }
     return {
       ...item,
       status: "Open" as const,
-      created_at: now,
       resolved_at: null,
       archived_at: null,
       updated_at: now

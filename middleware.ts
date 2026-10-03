@@ -266,12 +266,12 @@ async function runMiddleware(request: NextRequest) {
       // Marketing accounts may use Team Log and Bulk Photo Upload on the staff board.
       if (
         board === "staff" &&
-        (tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help" || !tab)
+        (tab === "user_interactions" || tab === "crossover_communication" || tab === "bulk_photo_upload" || tab === "media_library" || tab === "help" || !tab)
       ) {
         if (!tab) {
           url.pathname = "/admin";
           url.searchParams.set("board", "staff");
-          url.searchParams.set("tab", "crossover_communication");
+          url.searchParams.set("tab", "user_interactions");
           return NextResponse.redirect(url);
         }
         return NextResponse.next();

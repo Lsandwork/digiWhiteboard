@@ -560,18 +560,12 @@ export async function buildOpsCommandCenterSnapshot(input: {
   const assignedLogs = yardTeamLead
     ? assignedOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map(openLogToWorkItem)
     : groomerDashboard
-      ? assignedGroomerOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map((item) => ({
-          ...openLogToWorkItem(item),
-          hrefTab: "crossover_communication"
-        }))
+      ? assignedGroomerOpenLogMessages(staffFeed.crossoverMessages || [], shiftActor).map(openLogToWorkItem)
       : [];
   const assignedIssues = yardTeamLead
     ? assignedActiveIssues(staffFeed.issues || [], shiftActor).map(issueToWorkItem)
     : groomerDashboard
-      ? assignedGroomerActiveIssues(staffFeed.issues || [], shiftActor).map((item) => ({
-          ...issueToWorkItem(item),
-          hrefTab: "crossover_communication"
-        }))
+      ? assignedGroomerActiveIssues(staffFeed.issues || [], shiftActor).map(issueToWorkItem)
       : [];
   const previousNotes = yardTeamLead
     ? previousTeamLeadShiftNotes(staffFeed.crossoverMessages || [], shiftActor, staffFeed.staffDirectory || [])

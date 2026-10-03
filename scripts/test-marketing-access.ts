@@ -34,7 +34,7 @@ assert.equal(canAccessAdminTab(access, "sa_apps_hub", "marketing", "marketing"),
 assert.equal(canAccessAdminTab(access, "bulk_photo_upload", "marketing", "marketing"), true);
 assert.equal(canAccessAdminTab(access, "sa_apps_hub", "marketing", "staff"), false);
 assert.equal(firstAccessibleAdminTab(access, "marketing", "lobby"), "content");
-assert.equal(firstAccessibleAdminTab(access, "marketing", "staff"), "crossover_communication");
+assert.equal(firstAccessibleAdminTab(access, "marketing", "staff"), "user_interactions");
 assert.equal(firstAccessibleAdminTab(access, "marketing", "marketing"), "cast_tv");
 
 console.log("Marketing account access tests passed.");

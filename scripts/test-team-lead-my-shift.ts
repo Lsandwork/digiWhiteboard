@@ -282,7 +282,7 @@ assert.equal(deskNotes.notes.some((note) => note.id === "fd-angelica"), false);
 
 const workItem = openLogToWorkItem(openAssigned);
 assert.equal(workItem.kind, "open_log");
-assert.equal(workItem.hrefTab, "crossover_communication");
+assert.equal(workItem.hrefTab, "user_interactions");
 assert.deepEqual(parseWorkItemId(workItem.id), { kind: "open_log", sourceId: "ol-1" });
 assert.ok(availableActionsForKind("open_log").includes("resolved"));
 assert.ok(availableActionsForKind("open_log").includes("in_progress"));

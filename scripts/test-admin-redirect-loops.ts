@@ -55,10 +55,16 @@ function adminRedirectStep(
   }
 
   if (isAdminDashboardPath(pathname) && !isDemo && isLobbyDigiBoardOnlyLegacyRole(role)) {
-    const marketingStaffTabs = ["crossover_communication", "bulk_photo_upload", "media_library", "help"];
+    const marketingStaffTabs = [
+      "user_interactions",
+      "crossover_communication",
+      "bulk_photo_upload",
+      "media_library",
+      "help"
+    ];
     if (board === "staff" && (tab === null || marketingStaffTabs.includes(tab))) {
       if (!tab) {
-        return { pathname: "/admin", board: "staff", tab: "crossover_communication" };
+        return { pathname: "/admin", board: "staff", tab: "user_interactions" };
       }
       return null;
     }
@@ -120,6 +126,7 @@ const BOARDS: (string | null)[] = [null, "staff", "lobby", "marketing"];
 const TABS: (string | null)[] = [
   null,
   "crossover_communication",
+  "user_interactions",
   "my_shift",
   "overview",
   "push_notices",

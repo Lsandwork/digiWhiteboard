@@ -37,6 +37,15 @@ import {
   updateStaffDirectoryMember,
   updateOwnerFollowUp
 } from "@/lib/staff/admin-ops";
+import {
+  filterArchiveInteractions,
+  filterCompletedToday,
+  filterOpenInteractions,
+  interactionCounts,
+  listUnifiedInteractions,
+  paginateInteractions,
+  searchInteractions
+} from "@/lib/staff/user-interactions";
 import { listVisibleStaffDirectory } from "@/lib/staff/directory-store";
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
@@ -143,6 +152,57 @@ export async function GET(request: Request) {
       adminUserId: session?.adminUserId ?? null,
       role: role ?? null
     };
+    const view = url.searchParams.get("view");
+    if (view === "open" || view === "archive") {
+      if (!state) {
+        return NextResponse.json(
+          { error: "We couldn't load your interactions. Please try again." },
+          { status: 503 }
+        );
+      }
+      const actorName =
+        directory.find(
+          (member) =>
+            member.email?.trim().toLowerCase() === (session?.email ?? "").trim().toLowerCase() ||
+            member.admin_user_id === session?.adminUserId
+        )?.name ?? null;
+      const actor = {
+        email: readerSession.email,
+        adminUserId: readerSession.adminUserId,
+        name: actorName,
+        role: readerSession.role
+      };
+      const allItems = listUnifiedInteractions(state);
+      const counts = interactionCounts(allItems, actor);
+      const permissions = {
+        canCreate: canCreateShiftLogEntry(role),
+        canEdit: canMutateFrontDeskLog(role),
+        canView: canUseFrontDeskLog(role, session),
+        canManageRecords: canManageStaffOperations(role)
+      };
+      if (view === "open") {
+        return NextResponse.json({
+          items: filterOpenInteractions(allItems),
+          counts,
+          currentUser: { ...readerSession, name: actorName },
+          permissions,
+          staff_directory: directory
+        });
+      }
+      const query = String(url.searchParams.get("q") ?? "");
+      const completedToday = url.searchParams.get("completedToday") === "1";
+      const page = Number(url.searchParams.get("page") ?? 1);
+      const limit = Number(url.searchParams.get("limit") ?? 30);
+      const archived = completedToday ? filterCompletedToday(allItems) : filterArchiveInteractions(allItems);
+      const paged = paginateInteractions(searchInteractions(archived, query), page, limit);
+      return NextResponse.json({
+        ...paged,
+        counts,
+        currentUser: { ...readerSession, name: actorName },
+        permissions,
+        staff_directory: directory
+      });
+    }
     if (!state) {
       if (rosterRequest) {
         return NextResponse.json({
