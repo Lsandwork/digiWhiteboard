@@ -114,7 +114,7 @@ export async function loadBodyCheckRoster(options?: { businessDate?: string; for
   const businessDate = options?.businessDate || todayInLosAngeles();
   const throughDate = addCalendarDays(businessDate, 7);
   const coverageNote =
-    "Roster uses POST /api/v1/reservations (checked-in plus the selected date through 7 days). Appointment rows are reservation types such as grooming, training, hikes, and outings. No separate Gingr appointments endpoint is configured.";
+    "Roster uses POST /api/v1/reservations (checked-in plus the selected date through 7 days) and keeps one row per Gingr dog. A dog is checked in only when a reservation has a check-in and no check-out. Photos come from POST /api/v1/animals through the existing animal-photo proxy. Appointment rows are reservation types such as grooming, training, hikes, and outings.";
 
   if (!options?.force && cache && cache.businessDate === businessDate && Date.now() - cache.at < CACHE_TTL_MS) {
     return {

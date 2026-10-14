@@ -46,8 +46,12 @@ function cancelled(record: Record<string, unknown>): boolean {
   return status.includes("cancel") || status.includes("void");
 }
 
+function hasCheckedOut(record: Record<string, unknown>): boolean {
+  return Boolean(record.check_out_stamp || record.check_out_date || record.checked_out_at);
+}
+
 function checkedIn(record: Record<string, unknown>): boolean {
-  if (record.check_out_stamp || record.check_out_date || record.checked_out_at) return false;
+  if (hasCheckedOut(record)) return false;
   if (record.check_in_stamp || record.check_in_date || record.checked_in_at) return true;
   if (record.checked_in === true || record.checked_in === "1" || record.checked_in === "true") return true;
   const status = pickString(record.status, record.status_string, record.state)?.toLowerCase() ?? "";
@@ -86,7 +90,7 @@ export function mapReservation(row: GingrReservation | unknown, businessDate: st
   const category = classifyService(serviceType);
   const startsAt = pickString(record.start_date, record.start, record.appointment_time, record.check_in_date);
   const startDay = dateOnly(startsAt);
-  const isIn = sourceCheckedIn || checkedIn(record);
+  const isIn = hasCheckedOut(record) ? false : sourceCheckedIn || checkedIn(record);
   return {
     key: `${animalId}:${reservationId ?? "none"}`,
     gingrAnimalId: animalId,
@@ -145,12 +149,55 @@ export function mergeRosterSources(
   };
   ingest(checkedInRows, true);
   ingest(rangedRows, false);
-  const rows = [...byKey.values()].sort((a, b) => {
+  const rows = collapseToOneRowPerDog([...byKey.values()]);
+  return { rows, droppedMissingIdentity };
+}
+
+/** One roster card per Gingr dog. A checked-in visit wins over later reservations for the same dog. */
+function collapseToOneRowPerDog(rows: BodyCheckRosterRow[]): BodyCheckRosterRow[] {
+  const groups = new Map<string, BodyCheckRosterRow[]>();
+  for (const row of rows) {
+    const group = groups.get(row.gingrAnimalId) ?? [];
+    group.push(row);
+    groups.set(row.gingrAnimalId, group);
+  }
+
+  const collapsed = [...groups.values()].map((group) => {
+    const checkedInRows = group.filter((row) => row.checkedIn);
+    const arrivals = group.filter((row) => row.isArrivalToday && !row.checkedIn);
+    const primary =
+      checkedInRows[0] ??
+      arrivals[0] ??
+      [...group].sort((a, b) => (a.startsAt ?? "9999").localeCompare(b.startsAt ?? "9999"))[0];
+    const checkedIn = checkedInRows.length > 0;
+    const isArrivalToday = !checkedIn && arrivals.length > 0;
+    const isUpcoming = !checkedIn && !isArrivalToday && group.some((row) => row.isUpcoming);
+    const services = [...new Set(group.map((row) => row.serviceType).filter((value): value is string => Boolean(value)))];
+    const extraServices = services.filter((service) => service !== primary.serviceType);
+    return {
+      ...primary,
+      key: primary.gingrAnimalId,
+      reservationId: (checkedInRows[0] ?? primary).reservationId,
+      serviceType:
+        extraServices.length && primary.serviceType
+          ? `${primary.serviceType} + ${extraServices.length} more`
+          : primary.serviceType ?? services[0] ?? null,
+      photoUrl: group.find((row) => row.photoUrl)?.photoUrl ?? null,
+      ownerName: group.find((row) => row.ownerName)?.ownerName ?? primary.ownerName,
+      checkedIn,
+      checkedInAt: checkedInRows.find((row) => row.checkedInAt)?.checkedInAt ?? null,
+      isArrivalToday,
+      isUpcoming,
+      isAppointment: group.some((row) => row.isAppointment)
+    };
+  });
+
+  collapsed.sort((a, b) => {
     if (a.checkedIn !== b.checkedIn) return a.checkedIn ? -1 : 1;
     if (a.isArrivalToday !== b.isArrivalToday) return a.isArrivalToday ? -1 : 1;
     return a.dogName.localeCompare(b.dogName);
   });
-  return { rows, droppedMissingIdentity };
+  return collapsed;
 }
 
 export function filterRoster(
