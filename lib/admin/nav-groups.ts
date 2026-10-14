@@ -211,6 +211,7 @@ const TAB_LABELS: Record<AdminTab, string> = {
   walks_board: "Walks Board",
   package_group_walks: "Package Group Walks",
   ruffops_checklist: "RuffOps Checklist",
+  body_checks: "Body Checks",
   tl_digi_board: "TL Digi Board",
   route_generator: "Route Generator",
   live_fleet: "Live Fleet",
@@ -284,6 +285,7 @@ const TAB_DESCRIPTIONS: Partial<Record<AdminTab, string>> = {
     "Checked-in dogs with Monthly Unlimited or 20-Day PLUS Package that include today's complimentary group walk.",
   ruffops_checklist:
     "Shared Gingr-style checklist for yard reminders, walks, medications, additional services, and live alerts.",
+  body_checks: "Floor body checks for ears, nails, and coat, saved as historical reports.",
   tl_digi_board: "Configure the Team Lead Alerts + Reminders display",
   route_generator: "Pull Fitdog reports, build van routes, export Samsara CSVs, and track owner SMS / live maps.",
   live_fleet: "Real-time Fitdog van map powered by Samsara GPS, joined with today's Route Generator assignments.",

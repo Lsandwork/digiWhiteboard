@@ -8,7 +8,7 @@ import {
   isThemeMode,
   normalizeThemeMode
 } from "../lib/theme/constants";
-import { resolveInitialTheme } from "../lib/theme/storage";
+import { defaultThemeForPath, resolveInitialTheme } from "../lib/theme/storage";
 import { THEME_BOOT_SCRIPT } from "../lib/theme/boot-script";
 
 function testThemeModeValidation() {
@@ -38,6 +38,18 @@ function testBootScriptShape() {
   assert.match(THEME_BOOT_SCRIPT, /fitdog_theme_preference/);
   assert.match(THEME_BOOT_SCRIPT, /dark/);
   assert.match(THEME_BOOT_SCRIPT, /clear/);
+  assert.match(THEME_BOOT_SCRIPT, /staff-cast/);
+}
+
+function testOperationsDefaultTheme() {
+  assert.equal(defaultThemeForPath("/admin"), "light");
+  assert.equal(defaultThemeForPath("/admin/login"), "light");
+  assert.equal(defaultThemeForPath("/ruffly"), "light");
+  assert.equal(defaultThemeForPath("/"), "dark");
+  assert.equal(defaultThemeForPath("/display/staff-whiteboard"), "dark");
+  assert.equal(defaultThemeForPath("/lobby/checkouts"), "dark");
+  assert.equal(defaultThemeForPath("/cast/receiver"), "dark");
+  assert.equal(defaultThemeForPath("/cast-tv"), "dark");
 }
 
 function main() {
@@ -45,6 +57,7 @@ function main() {
   testResolveInitialTheme();
   testStorageKey();
   testBootScriptShape();
+  testOperationsDefaultTheme();
   console.log("theme-system: all checks passed");
 }
 

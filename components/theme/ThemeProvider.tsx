@@ -15,7 +15,7 @@ import {
   THEME_BROADCAST_CHANNEL,
   isThemeMode
 } from "@/lib/theme/constants";
-import { readLocalTheme, resolveInitialTheme, writeLocalTheme } from "@/lib/theme/storage";
+import { defaultThemeForPath, readLocalTheme, resolveInitialTheme, writeLocalTheme } from "@/lib/theme/storage";
 import type { ThemeContextValue, ThemeMode } from "@/lib/theme/types";
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -44,7 +44,10 @@ async function persistAccountTheme(theme: ThemeMode) {
 }
 
 function readClientTheme(): ThemeMode {
-  return resolveInitialTheme(readLocalTheme(), false);
+  const stored = readLocalTheme();
+  if (stored) return stored;
+  if (typeof window === "undefined") return resolveInitialTheme(null, false);
+  return defaultThemeForPath(window.location.pathname);
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {

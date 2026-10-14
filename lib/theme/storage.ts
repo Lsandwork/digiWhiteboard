@@ -1,10 +1,19 @@
 import { DEFAULT_THEME, THEME_STORAGE_KEY, isThemeMode, normalizeThemeMode } from "./constants";
 import type { ThemeMode } from "./types";
 
+/** Live boards and cast surfaces stay on the dark display default. */
+const DISPLAY_SURFACE = /^\/$|^\/(display|lobby|staff-cast|lobby-cast|cast-tv|demo|boards)(\/|$)|^\/cast(\/|$)/;
+
+export function defaultThemeForPath(pathname: string): ThemeMode {
+  const path = (pathname.split("?")[0] || "/").replace(/\/+$/, "") || "/";
+  return DISPLAY_SURFACE.test(path) ? "dark" : "light";
+}
+
 export function readLocalTheme(): ThemeMode | null {
   if (typeof window === "undefined") return null;
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (!stored) return null;
     return isThemeMode(stored) ? stored : normalizeThemeMode(stored, DEFAULT_THEME);
   } catch {
     return null;

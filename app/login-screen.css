@@ -1,16 +1,18 @@
 /* Fitdog Digi-Board login screen — scoped; uses existing theme tokens */
 
 .login-screen {
-  --login-navy: #0b1b32;
-  --login-navy-soft: #12243f;
-  --login-orange: #f36c21;
-  --login-orange-hot: #ff7a2f;
-  --login-cream: #f7f3ec;
+  --login-navy: #17365d;
+  --login-navy-soft: #24507a;
+  --login-orange: #168ff0;
+  --login-orange-hot: #168ff0;
+  --login-orange-hover: #0878d1;
+  --login-cream: #f0f8fd;
   --login-card: #ffffff;
-  --login-muted: #5b6b7f;
-  --login-input-border: #d7dde6;
+  --login-muted: #61758d;
+  --login-input-border: #dce8f2;
   --login-input-bg: #ffffff;
-  --login-shadow: 0 18px 48px rgba(11, 27, 50, 0.12);
+  --login-shadow: 0 18px 48px rgba(23, 54, 93, 0.08);
+  --login-accent-shadow: rgba(22, 143, 240, 0.28);
 
   position: relative;
   min-height: 100dvh;
@@ -25,12 +27,16 @@
 html[data-theme="dark"] .login-screen {
   --login-navy: #e8eef7;
   --login-navy-soft: #1a2a42;
+  --login-orange: #f36c21;
+  --login-orange-hot: #ff7a2f;
+  --login-orange-hover: #ff7a2f;
   --login-cream: #0b1118;
   --login-card: #152232;
   --login-muted: #94a3b8;
   --login-input-border: #334155;
   --login-input-bg: rgba(10, 16, 23, 0.72);
   --login-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  --login-accent-shadow: rgba(243, 108, 33, 0.35);
   background: var(--background);
   color: var(--text-primary);
 }
@@ -51,8 +57,8 @@ html[data-theme="dark"] .login-screen {
   min-width: 0;
   padding: clamp(1.25rem, 2.4vw, 2.25rem) clamp(1.25rem, 2.5vw, 2.5rem) 1.25rem;
   background:
-    radial-gradient(circle at 12% 18%, rgba(243, 108, 33, 0.12), transparent 28%),
-    linear-gradient(180deg, #fff9f2 0%, #f4eee4 42%, #eef5f0 100%);
+    radial-gradient(circle at 12% 18%, rgba(22, 143, 240, 0.08), transparent 28%),
+    linear-gradient(180deg, #f7fbfe 0%, #f0f8fd 55%, #e7f4fc 100%);
   overflow: hidden;
 }
 
@@ -140,6 +146,11 @@ html[data-theme="dark"] .login-screen__headline-navy {
   margin-top: 0.15rem;
 }
 
+html:not([data-theme="dark"]) .login-screen__underline {
+  /* Recolor the decorative stroke to the operations blue. The SVG file stays unchanged. */
+  filter: hue-rotate(184deg) saturate(1.35) brightness(0.92);
+}
+
 .login-screen__support {
   margin: 1rem 0 0;
   max-width: 24rem;
@@ -209,6 +220,10 @@ html[data-theme="dark"] .login-screen__features {
   height: 2.15rem;
   border-radius: 9999px;
   background: var(--login-orange);
+  box-shadow: 0 0 0 3px rgba(22, 143, 240, 0.18);
+}
+
+html[data-theme="dark"] .login-screen__feature-icon {
   box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.2);
 }
 
@@ -235,8 +250,8 @@ html[data-theme="dark"] .login-screen__features {
   min-width: 0;
   padding: clamp(1.25rem, 3vw, 2.5rem);
   background:
-    radial-gradient(circle at 85% 12%, rgba(243, 108, 33, 0.08), transparent 24%),
-    radial-gradient(circle at 10% 90%, rgba(11, 27, 50, 0.05), transparent 30%),
+    radial-gradient(circle at 85% 12%, rgba(22, 143, 240, 0.1), transparent 24%),
+    radial-gradient(circle at 10% 90%, rgba(23, 54, 93, 0.04), transparent 30%),
     var(--login-cream);
 }
 
@@ -362,6 +377,10 @@ html[data-theme="dark"] .login-screen__input {
 
 .login-screen__input:focus {
   border-color: var(--login-orange);
+  box-shadow: 0 0 0 3px rgba(22, 143, 240, 0.2);
+}
+
+html[data-theme="dark"] .login-screen__input:focus {
   box-shadow: 0 0 0 3px rgba(243, 108, 33, 0.18);
 }
 
@@ -454,19 +473,20 @@ html[data-theme="dark"] .login-screen__error {
   width: 100%;
   min-height: 52px;
   border: 0;
-  border-radius: 0.9rem;
-  background: linear-gradient(180deg, var(--login-orange-hot), var(--login-orange));
+  border-radius: 999px;
+  background: var(--login-orange);
   color: #fff;
   font-size: 1.02rem;
   font-weight: 800;
-  box-shadow: 0 10px 24px rgba(243, 108, 33, 0.35);
+  box-shadow: 0 10px 24px var(--login-accent-shadow);
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease, opacity 0.15s ease;
 }
 
 .login-screen__submit:hover:not(:disabled) {
   filter: brightness(1.05);
-  box-shadow: 0 12px 28px rgba(243, 108, 33, 0.42);
+  background: var(--login-orange-hover);
+  box-shadow: 0 12px 28px var(--login-accent-shadow);
 }
 
 .login-screen__submit:active:not(:disabled) {
