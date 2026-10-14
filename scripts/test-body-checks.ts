@@ -97,10 +97,61 @@ const merged = mergeRosterSources(
   ],
   "2026-10-14"
 );
-assert.equal(merged.rows.length, 3);
-assert.equal(merged.rows.filter((row) => row.gingrAnimalId === "a-1" && row.checkedIn).length, 1);
-assert.equal(merged.rows.find((row) => row.reservationId === "res-2")?.isAppointment, true);
+assert.equal(merged.rows.length, 2);
+const luna = merged.rows.find((row) => row.gingrAnimalId === "a-1");
+assert.equal(luna?.checkedIn, true);
+assert.equal(luna?.reservationId, "res-1");
+assert.equal(luna?.isAppointment, true);
+assert.equal(luna?.isUpcoming, false);
 assert.equal(merged.rows.find((row) => row.reservationId === "res-3")?.gingrAnimalId, "a-2");
+
+const checkedOut = mergeRosterSources(
+  [
+    {
+      reservation_id: "res-out",
+      animal: { id: "a-9", name: "Atlas" },
+      reservation_type: { type: "Daycare" },
+      check_in_date: "2026-10-14T08:00:00-07:00",
+      check_out_date: "2026-10-14T12:00:00-07:00"
+    }
+  ],
+  [],
+  "2026-10-14"
+);
+assert.equal(checkedOut.rows.length, 1);
+assert.equal(checkedOut.rows[0]?.checkedIn, false);
+
+const atlas = mergeRosterSources(
+  [
+    {
+      reservation_id: "211893",
+      animal: { id: "7456", name: "Atlas" },
+      reservation_type: { type: "Trainer Led Hike | Group Training" },
+      start_date: "2026-10-14T08:40:00-07:00",
+      check_in_date: "2026-10-14T08:40:00-07:00"
+    }
+  ],
+  [
+    {
+      reservation_id: "211520",
+      animal: { id: "7456", name: "Atlas" },
+      reservation_type: { type: "Trainer Led Hike | Group Training" },
+      start_date: "2026-10-21T00:00:00-07:00"
+    },
+    {
+      reservation_id: "211893",
+      animal: { id: "7456", name: "Atlas" },
+      reservation_type: { type: "Trainer Led Hike | Group Training" },
+      start_date: "2026-10-14T08:40:00-07:00",
+      check_in_date: "2026-10-14T08:40:00-07:00"
+    }
+  ],
+  "2026-10-14"
+);
+assert.equal(atlas.rows.length, 1);
+assert.equal(atlas.rows[0]?.checkedIn, true);
+assert.equal(atlas.rows[0]?.reservationId, "211893");
+assert.equal(atlas.rows[0]?.isUpcoming, false);
 
 const counts = countRoster(merged.rows, { submittedToday: 2, unresolvedFollowUps: 1 });
 assert.equal(counts.dogs, 2);
@@ -154,6 +205,8 @@ const dashboard = readFileSync(join(root, "components/admin/AdminDashboard.tsx")
 assert.match(dashboard, /tab === "body_checks" \? <BodyChecksPanel/);
 const panel = readFileSync(join(root, "components/admin/body-checks/BodyChecksPanel.tsx"), "utf8");
 assert.match(panel, /Submit Body Check Report/);
+assert.match(panel, /Sync Now/);
+assert.match(panel, /tlDogPhotoCandidates/);
 assert.doesNotMatch(panel, /localStorage/);
 
 const reportsRoute = readFileSync(join(root, "app/api/admin/body-checks/reports/route.ts"), "utf8");

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { tlDogPhotoCandidates } from "@/lib/tl-digi-board/animal-photos";
 import {
   BODY_GROOMING_FINDINGS,
   BODY_PHYSICAL_FINDINGS,
@@ -108,9 +109,11 @@ function labelsFor(catalog: FindingDef[], ids: string[], other: string) {
     .map((item) => (item.requiresDetail && other.trim() ? `${item.label}: ${other.trim()}` : item.label));
 }
 
-function DogPhoto({ name, url }: { name: string; url: string | null }) {
-  const [failed, setFailed] = useState(false);
-  if (!url || failed) {
+function DogPhoto({ name, animalId, url }: { name: string; animalId: string; url: string | null }) {
+  const candidates = tlDogPhotoCandidates(animalId, url);
+  const [index, setIndex] = useState(0);
+  const src = candidates[index];
+  if (!src || index >= candidates.length) {
     return (
       <span className="body-checks__photo-fallback" aria-hidden="true">
         {name.slice(0, 1).toUpperCase()}
@@ -118,9 +121,14 @@ function DogPhoto({ name, url }: { name: string; url: string | null }) {
     );
   }
   return (
-    // Gingr photo URLs are remote and vary by host, so they stay as a plain image.
+    // Profile photos are loaded through the existing Gingr animal-photo proxy.
     // eslint-disable-next-line @next/next/no-img-element
-    <img className="body-checks__photo" src={url} alt="" onError={() => setFailed(true)} />
+    <img
+      className="body-checks__photo"
+      src={src}
+      alt=""
+      onError={() => setIndex((current) => current + 1)}
+    />
   );
 }
 
@@ -170,10 +178,15 @@ export function BodyChecksPanel() {
   const [savedSort, setSavedSort] = useState<"newest" | "oldest">("newest");
   const [savedPage, setSavedPage] = useState(0);
   const [openReport, setOpenReport] = useState<{ report: BodyCheckReport; events: FollowUpEvent[] } | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const rosterRequest = useRef(0);
 
   const loadRoster = useCallback(
     async (refresh = false) => {
+      const requestId = rosterRequest.current + 1;
+      rosterRequest.current = requestId;
       setLoading(true);
+      if (refresh) setSyncing(true);
       setRosterError(null);
       const params = new URLSearchParams({ filter, q: query });
       if (date) params.set("date", date);
@@ -181,6 +194,7 @@ export function BodyChecksPanel() {
       try {
         const response = await fetch(`/api/admin/body-checks/roster?${params.toString()}`, { cache: "no-store" });
         const payload = (await response.json()) as RosterPayload;
+        if (requestId !== rosterRequest.current) return;
         if (!response.ok && !payload.syncedAt) {
           setRoster(payload.rows ? payload : null);
           setRosterError(payload.error || "Gingr roster is unavailable.");
@@ -188,9 +202,13 @@ export function BodyChecksPanel() {
         }
         setRoster(payload);
       } catch {
+        if (requestId !== rosterRequest.current) return;
         setRosterError("Gingr roster is unavailable.");
       } finally {
-        setLoading(false);
+        if (requestId === rosterRequest.current) {
+          setLoading(false);
+          setSyncing(false);
+        }
       }
     },
     [date, filter, query]
@@ -363,8 +381,8 @@ export function BodyChecksPanel() {
               aria-label="Search dogs"
             />
             <input className="admin-input" type="date" value={date} onChange={(event) => setDate(event.target.value)} aria-label="Roster date" />
-            <button className="admin-btn-secondary" type="button" onClick={() => void loadRoster(true)}>
-              Refresh
+            <button className="admin-btn-secondary" type="button" disabled={syncing} onClick={() => void loadRoster(true)}>
+              {syncing ? "Syncing…" : "Sync Now"}
             </button>
           </div>
           <div className="body-checks__filters">
@@ -389,7 +407,7 @@ export function BodyChecksPanel() {
           <div className="body-checks__list">
             {roster?.rows.map((row) => (
               <article key={row.key} className="body-checks__row">
-                <DogPhoto name={row.dogName} url={row.photoUrl} />
+                <DogPhoto name={row.dogName} animalId={row.gingrAnimalId} url={row.photoUrl} />
                 <div>
                   <strong>{row.dogName}</strong>
                   <div className="body-checks__meta">
@@ -502,7 +520,7 @@ export function BodyChecksPanel() {
       {wizard ? (
         <div className="body-checks__wizard" role="dialog" aria-label={`Body check for ${wizard.dog.dogName}`}>
           <div className="body-checks__dog">
-            <DogPhoto name={wizard.dog.dogName} url={wizard.dog.photoUrl} />
+            <DogPhoto name={wizard.dog.dogName} animalId={wizard.dog.gingrAnimalId} url={wizard.dog.photoUrl} />
             <div>
               <strong>{wizard.dog.dogName}</strong>
               <div className="body-checks__meta">
@@ -600,7 +618,7 @@ export function BodyChecksPanel() {
       {openReport ? (
         <div className="body-checks__detail" role="dialog" aria-label={`Report for ${openReport.report.dogName}`}>
           <div className="body-checks__dog">
-            <DogPhoto name={openReport.report.dogName} url={openReport.report.photoUrl} />
+            <DogPhoto name={openReport.report.dogName} animalId={openReport.report.gingrAnimalId} url={openReport.report.photoUrl} />
             <div>
               <strong>{openReport.report.dogName}</strong>
               <div className="body-checks__meta">
