@@ -1128,6 +1128,7 @@ export const TAB_PERMISSIONS: Partial<Record<string, PermissionKey>> = {
   walks_board: "view_admin_panel",
   package_group_walks: "view_admin_panel",
   ruffops_checklist: "view_admin_panel",
+  body_checks: "view_admin_panel",
   tl_digi_board: "manage_tl_digi_board",
   settings: "view_admin_panel",
   help: "view_admin_panel",
@@ -1585,6 +1586,14 @@ export function canAccessAdminTab(
 
   // Every authenticated staff member can view and complete Package Group Walks.
   if (tab === "package_group_walks") {
+    if (board !== "staff") return false;
+    if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
+    if (isMarketingLegacyRole(legacyRole)) return false;
+    return true;
+  }
+
+  // Floor handlers record body checks. Marketing and the lobby board stay out.
+  if (tab === "body_checks") {
     if (board !== "staff") return false;
     if (isFullAdminLegacyRole(legacyRole) || isSuperAdminAccess(access)) return true;
     if (isMarketingLegacyRole(legacyRole)) return false;

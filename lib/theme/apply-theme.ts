@@ -14,7 +14,7 @@ export function applyThemeToDocument(theme: ThemeMode) {
   if (meta) {
     meta.setAttribute(
       "content",
-      theme === "dark" ? "#02060b" : theme === "clear" ? "#ffffff" : "#f7f9fc"
+      theme === "dark" ? "#02060b" : theme === "clear" ? "#ffffff" : "#f0f8fd"
     );
   }
 }

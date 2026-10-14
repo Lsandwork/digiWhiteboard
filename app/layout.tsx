@@ -15,6 +15,7 @@ import "../lib/fitdog-dashboard/theme-clear.css";
 import "../lib/fitdog-dashboard/theme-readable-canvas.css";
 import "../lib/theme/button-states.css";
 import "../lib/staff/whiteboard-theme.css";
+import "../lib/theme/professional.css";
 
 export const metadata: Metadata = {
   title: "Fitdog Health & Social Club",
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f9fc" },
+    { media: "(prefers-color-scheme: light)", color: "#f0f8fd" },
     { media: "(prefers-color-scheme: dark)", color: "#02060b" }
   ],
   width: "device-width",

@@ -10,8 +10,13 @@
     0 4px 14px rgba(255, 111, 38, 0.12);
 }
 
-html[data-theme="clear"] .crossover-btn--active,
 html[data-theme="light"] .crossover-btn--active {
+  background: var(--brand-soft);
+  color: var(--brand);
+  box-shadow: 0 0 0 1px rgba(22, 143, 240, 0.22);
+}
+
+html[data-theme="clear"] .crossover-btn--active {
   background: var(--brand-soft);
   color: var(--brand);
   box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
@@ -37,8 +42,17 @@ html:not([data-theme]) .admin-theme .admin-btn-primary:hover:not(:disabled) {
 
 html[data-theme="light"] .admin-theme .crossover-btn--primary,
 html[data-theme="light"] .admin-theme .admin-btn-primary {
-  background: linear-gradient(180deg, #fb923c 0%, #f97316 58%, #ea580c 100%);
+  border-color: #0878d1;
+  background: #168ff0;
   color: #ffffff;
+  box-shadow: 0 8px 16px rgba(22, 143, 240, 0.22);
+}
+
+html[data-theme="light"] .admin-theme .crossover-btn--primary:hover:not(:disabled),
+html[data-theme="light"] .admin-theme .admin-btn-primary:hover:not(:disabled) {
+  background: #0878d1;
+  color: #ffffff;
+  filter: none;
 }
 
 /* Clear: keep dark navy labels on light-blue CTAs (loaded last for specificity) */

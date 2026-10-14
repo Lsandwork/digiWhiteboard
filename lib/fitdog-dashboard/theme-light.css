@@ -1,42 +1,41 @@
-/* Light theme overrides for Fitdog admin dashboard — matches Staff Directory reference */
+/* Light theme — professional blue-and-white operations console */
 
 html[data-theme="light"] .admin-theme {
-  --fitdog-bg: #f7f9fc;
+  --fitdog-bg: #f0f8fd;
   --fitdog-sidebar: #ffffff;
   --fitdog-surface: #ffffff;
   --fitdog-surface-elevated: #ffffff;
-  --fitdog-border: #dde5ef;
-  --fitdog-text: #12213a;
-  --fitdog-text-secondary: #64748b;
-  --fitdog-orange: #f97316;
-  --fitdog-amber: #f59e0b;
-  --fitdog-success: #16a34a;
+  --fitdog-border: #dce8f2;
+  --fitdog-text: #17365d;
+  --fitdog-text-secondary: #61758d;
+  /* Shared chrome uses this token as the brand accent. */
+  --fitdog-orange: #168ff0;
+  --fitdog-amber: #d97706;
+  --fitdog-success: #1f9d55;
   --fitdog-warning: #d97706;
-  --fitdog-danger: #dc2626;
-  --fitdog-info: #2563eb;
-  --fitdog-teal: #0d9488;
+  --fitdog-danger: #e11d48;
+  --fitdog-info: #168ff0;
+  --fitdog-teal: #0f9f8f;
 
-  --admin-bg: #f7f9fc;
+  --admin-bg: #f0f8fd;
   --admin-card: #ffffff;
-  --admin-card-alt: #ffffff;
-  --admin-border: #dde5ef;
-  --admin-muted: #64748b;
-  --crossover-bg: #f7f9fc;
+  --admin-card-alt: #f7fbfe;
+  --admin-border: #dce8f2;
+  --admin-muted: #61758d;
+  --crossover-bg: #f0f8fd;
   --crossover-card: #ffffff;
-  --crossover-card-alt: #ffffff;
-  --crossover-border: #dde5ef;
-  --crossover-amber: #f59e0b;
-  --crossover-gold: #f97316;
-  --crossover-text: #12213a;
-  --crossover-muted: #64748b;
-  --crossover-green: #16a34a;
-  --crossover-red: #dc2626;
+  --crossover-card-alt: #f7fbfe;
+  --crossover-border: #dce8f2;
+  --crossover-amber: #d97706;
+  --crossover-gold: #168ff0;
+  --crossover-text: #17365d;
+  --crossover-muted: #61758d;
+  --crossover-green: #1f9d55;
+  --crossover-red: #e11d48;
 
-  background:
-    radial-gradient(circle at 12% 0%, rgba(249, 115, 22, 0.05), transparent 32%),
-    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.04), transparent 28%),
-    var(--fitdog-bg);
+  background: var(--fitdog-bg);
   color: var(--fitdog-text);
+  font-family: "Segoe UI", "Avenir Next", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
 }
 
 html[data-theme="light"] .admin-sidebar {
@@ -56,10 +55,11 @@ html[data-theme="light"] .admin-nav-item:hover {
 
 html[data-theme="light"] .admin-nav-item--active,
 html[data-theme="light"] .admin-nav-item--active-parent {
-  color: #0f172a;
-  background: #e8f1ff; /* Calendly-like soft active wash */
+  color: #0878d1;
+  background: #e7f4fc;
   border: none;
   box-shadow: none;
+  font-weight: 650;
 }
 
 html[data-theme="light"] .admin-nav-item--active .admin-nav-item__icon,
@@ -75,15 +75,15 @@ html[data-theme="light"] .admin-user-card {
 }
 
 html[data-theme="light"] .admin-user-card__avatar {
-  background: linear-gradient(135deg, rgba(249, 115, 22, 0.18), rgba(251, 191, 36, 0.12));
-  color: var(--fitdog-text);
+  background: #e7f4fc;
+  color: #0878d1;
 }
 
 html[data-theme="light"] .admin-btn-primary {
-  border-color: rgba(249, 115, 22, 0.45);
-  background: linear-gradient(180deg, #fb923c, var(--fitdog-orange) 58%, #ea580c);
+  border-color: #0878d1;
+  background: #168ff0;
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
+  box-shadow: 0 8px 16px rgba(22, 143, 240, 0.22);
 }
 
 html[data-theme="light"] .admin-btn-secondary {
@@ -94,7 +94,7 @@ html[data-theme="light"] .admin-btn-secondary {
 }
 
 html[data-theme="light"] .admin-btn-secondary:hover:not(:disabled) {
-  border-color: rgba(249, 115, 22, 0.35);
+  border-color: #168ff0;
   background: var(--surface-hover);
 }
 
@@ -290,9 +290,9 @@ html[data-theme="light"] .fitdog-action-icon-btn {
 }
 
 html[data-theme="light"] .fitdog-action-icon-btn:hover:not(:disabled) {
-  border-color: rgba(249, 115, 22, 0.35);
+  border-color: #168ff0;
   background: var(--brand-soft);
-  color: var(--fitdog-orange);
+  color: #0878d1;
 }
 
 html[data-theme="light"] .admin-preview-column .admin-card {
@@ -301,7 +301,7 @@ html[data-theme="light"] .admin-preview-column .admin-card {
 
 html[data-theme="light"] .admin-sidebar-help-card {
   border-color: var(--fitdog-border);
-  background: linear-gradient(180deg, #fff7ed, #ffffff);
+  background: #f7fbfe;
 }
 
 html[data-theme="light"] .admin-nav-section {
@@ -315,9 +315,9 @@ html[data-theme="light"] .admin-nav-section--active {
 }
 
 html[data-theme="light"] .admin-tab--active {
-  border-bottom-color: #006bff; /* Calendly blue underline */
-  color: #0f172a;
-  font-weight: 600;
+  border-bottom-color: #168ff0;
+  color: #17365d;
+  font-weight: 650;
 }
 
 html[data-theme="light"] .admin-status-dot {
@@ -328,10 +328,10 @@ html[data-theme="light"] .admin-status-dot {
 /* Staff board light surfaces */
 html[data-theme="light"] .kennel-lines {
   background:
-    radial-gradient(circle at 22% 18%, rgba(249, 115, 22, 0.06), transparent 24%),
-    radial-gradient(circle at 82% 22%, rgba(37, 99, 235, 0.05), transparent 23%),
-    linear-gradient(135deg, rgba(37, 99, 235, 0.03) 1px, transparent 1px),
-    linear-gradient(45deg, rgba(249, 115, 22, 0.03) 1px, transparent 1px),
+    radial-gradient(circle at 22% 18%, rgba(22, 143, 240, 0.05), transparent 24%),
+    radial-gradient(circle at 82% 22%, rgba(22, 143, 240, 0.04), transparent 23%),
+    linear-gradient(135deg, rgba(22, 143, 240, 0.035) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(22, 143, 240, 0.03) 1px, transparent 1px),
     var(--background);
   background-size: auto, auto, 96px 96px, 116px 116px, auto;
 }
@@ -389,14 +389,14 @@ html[data-theme="light"] .admin-filter-chip,
 }
 
 .admin-filter-chip:hover {
-  border-color: rgba(249, 115, 22, 0.45);
+  border-color: var(--brand);
   color: var(--text-primary);
 }
 
 html[data-theme="light"] .admin-filter-chip--active {
   background: var(--brand-soft);
-  color: var(--brand);
-  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
+  color: #0878d1;
+  box-shadow: 0 0 0 1px rgba(22, 143, 240, 0.2);
 }
 
 html[data-theme="light"] .admin-badge {
@@ -418,16 +418,16 @@ html[data-theme="light"] .admin-badge--info {
 
 /* Crossover dashboard (Staff Directory, ops panels) */
 html[data-theme="light"] .crossover-dashboard {
-  --crossover-bg: #f7f9fc;
+  --crossover-bg: #f0f8fd;
   --crossover-card: #ffffff;
-  --crossover-card-alt: #ffffff;
-  --crossover-border: #dde5ef;
-  --crossover-amber: #f59e0b;
-  --crossover-gold: #f97316;
-  --crossover-text: #12213a;
-  --crossover-muted: #64748b;
-  --crossover-green: #16a34a;
-  --crossover-red: #dc2626;
+  --crossover-card-alt: #f7fbfe;
+  --crossover-border: #dce8f2;
+  --crossover-amber: #d97706;
+  --crossover-gold: #168ff0;
+  --crossover-text: #17365d;
+  --crossover-muted: #61758d;
+  --crossover-green: #1f9d55;
+  --crossover-red: #e11d48;
   color: var(--crossover-text);
 }
 
@@ -444,16 +444,16 @@ html[data-theme="light"] .crossover-filters {
 }
 
 html[data-theme="light"] .crossover-stat-card__icon {
-  background: rgba(249, 115, 22, 0.1);
-  color: var(--crossover-gold);
-  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.12);
+  background: #e7f4fc;
+  color: #0878d1;
+  box-shadow: inset 0 0 0 1px rgba(22, 143, 240, 0.16);
 }
 
 html[data-theme="light"] .crossover-btn--primary {
-  border-color: rgba(249, 115, 22, 0.45);
-  background: linear-gradient(180deg, #fb923c, #f97316 58%, #ea580c);
+  border-color: #0878d1;
+  background: #168ff0;
   color: #ffffff;
-  box-shadow: 0 8px 18px rgba(249, 115, 22, 0.22);
+  box-shadow: 0 8px 16px rgba(22, 143, 240, 0.22);
 }
 
 html[data-theme="light"] .crossover-btn--outline {
@@ -463,7 +463,7 @@ html[data-theme="light"] .crossover-btn--outline {
 }
 
 html[data-theme="light"] .crossover-btn--outline:hover:not(:disabled) {
-  border-color: rgba(249, 115, 22, 0.35);
+  border-color: #168ff0;
   background: var(--surface-hover);
   color: var(--text-primary);
 }
@@ -598,7 +598,7 @@ html[data-theme="light"] .cast-tv-admin-card__name-input {
 }
 
 html[data-theme="light"] .admin-theme a:not(.admin-btn-primary):not(.admin-btn-secondary):not(.crossover-btn):not(.crossover-btn--primary):not(.crossover-btn--outline):not(.crossover-btn--ghost):not(.admin-nav-item) {
-  color: #c2410c;
+  color: #0878d1;
 }
 
 html[data-theme="light"] .admin-icon-btn {
@@ -608,9 +608,9 @@ html[data-theme="light"] .admin-icon-btn {
 }
 
 html[data-theme="light"] .admin-icon-btn:hover:not(:disabled) {
-  border-color: rgba(249, 115, 22, 0.35);
+  border-color: #168ff0;
   background: var(--brand-soft);
-  color: var(--brand);
+  color: #0878d1;
 }
 
 

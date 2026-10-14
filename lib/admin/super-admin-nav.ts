@@ -111,6 +111,7 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
             "RuffOps Checklist",
             "Shared Gingr-style checklist for yard reminders, walks, meds, services, and alerts."
           ),
+          tabLink("body_checks", "Body Checks", "Ears, nails, and coat checks saved as historical reports."),
           tabLink("track_incidents", "Track Incidents", "Incident tracking with Gingr sync."),
           tabLink("vet_visits", "Vet Visits", "Vet visits and required owner follow-up."),
           tabLink("checklist", "Check List", "Personal handler checklist."),

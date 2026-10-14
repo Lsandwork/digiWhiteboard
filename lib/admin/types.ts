@@ -102,6 +102,7 @@ export type AdminTab =
   | "walks_board"
   | "package_group_walks"
   | "ruffops_checklist"
+  | "body_checks"
   | "tl_digi_board"
   | "route_generator"
   | "live_fleet"
@@ -179,6 +180,7 @@ export const ADMIN_TABS: AdminTab[] = [
   "walks_board",
   "package_group_walks",
   "ruffops_checklist",
+  "body_checks",
   "tl_digi_board",
   "route_generator",
   "live_fleet",
