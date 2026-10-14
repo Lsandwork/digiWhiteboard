@@ -1,17 +1,17 @@
 export const SITE = {
   name: "ruffOPS",
   shortName: "ruffOPS",
-  lockup: "Connected spaces. Happier pets.",
-  tagline: "The ultimate operations platform for pet businesses.",
+  lockup: "One board. One truth. Happier dogs.",
+  tagline: "Ops software for dog daycares that already ran out of whiteboards.",
   description:
-    "ruffOPS is the all-in-one operations platform for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities — connecting management and staff, powering custom lobby and department digital whiteboards, and keeping clients engaged from anywhere.",
+    "ruffOPS is the operations platform and digital whiteboard stack for dog daycares, boarding hotels, grooming, training, and multi-service pet facilities — management tools, staff boards, and lobby TVs that finally agree on what’s happening.",
   url: "https://www.ruffops.com",
   email: "hello@ruffops.com",
   phoneDisplay: "(855) 783-3677",
   phoneHref: "tel:+18557833677",
   location: "Santa Monica, CA",
   serviceArea:
-    "Built for pet facilities nationwide · On-site support in Santa Monica, CA and within 10 miles",
+    "Nationwide online · On-site in Santa Monica, CA and within 10 miles",
   /** Real staff Digi-Board authentication — not a fake marketing login. */
   loginHref: "https://staff.ruffops.com/admin/login",
   /** @deprecated Prefer loginHref — kept for older chrome references. */
@@ -40,10 +40,10 @@ export const SECONDARY_CTA = {
 } as const;
 
 export const FOOTER_PRODUCT_LINKS = [
-  { label: "Powerful SaaS Platform", href: "/solutions/management-platform" },
+  { label: "Management Platform", href: "/solutions/management-platform" },
   { label: "Digital Whiteboards", href: "/solutions/digital-whiteboards" },
   { label: "Advertising Screens", href: "/solutions/advertising" },
-  { label: "Expert Support", href: "/support" }
+  { label: "Support", href: "/support" }
 ] as const;
 
 /** Consultative pricing — no invented monthly rates. */
@@ -56,17 +56,17 @@ export const PACKAGES = [
     price: "Custom facility pricing",
     audience: "For managers & staff",
     summary:
-      "One operations command center for owners, managers, and staff — live status, schedules, handoffs, alerts, and department workflows in one place.",
+      "The command center owners and floor staff actually share — live check-ins, schedules, handoffs, alerts, and department workflows without another group chat archaeology dig.",
     bullets: [
-      "Real-time check-ins & status",
-      "Staff communication & scheduling",
-      "Reports & analytics",
-      "Works from any device",
-      "Department workflows for front desk, yard, boarding, grooming, and transport",
-      "Role-based access for leadership and floor teams"
+      "Live check-ins and dog/room status",
+      "Staff messaging and scheduling that sticks",
+      "Reports you can read before the next rush",
+      "Runs on desk, tablet, and floor devices",
+      "Front desk, yard, boarding, grooming, and transport flows",
+      "Role-based access so leadership and floor see the right slice"
     ],
-    note: "Built for facilities that need the whole team aligned — not another forgotten login.",
-    cta: "Explore the Platform",
+    note: "For facilities that need the whole team on one story — not another login nobody opens.",
+    cta: "See the Platform",
     href: "/solutions/management-platform",
     image: "/assets/crossover-dashboard/hero-mockup-reference.png",
     imageAlt: "ruffOPS management platform on desktop and mobile"
@@ -77,19 +77,19 @@ export const PACKAGES = [
     featured: false,
     name: "Custom Kiosk Digital Whiteboards",
     price: "Lobby + department displays",
-    audience: "For lobby activities",
+    audience: "For lobby & floor",
     summary:
-      "Fully custom digital whiteboards for lobby TVs and staff kiosks — designed for your brand, rooms, and daily flow.",
+      "Custom digital whiteboards for lobby TVs and staff kiosks — built around your brand, your rooms, and the Saturday crush, not a waiting-room slideshow.",
     bullets: [
-      "Fully custom, branded for your business",
-      "Synced with your platform in real-time",
-      "Engage clients while they wait",
-      "Drive a better client experience",
-      "Staff whiteboards for every department",
-      "Cast-ready layouts for TV, tablet, and kiosk hardware"
+      "Branded for your facility, not a template farm",
+      "Synced live with the platform",
+      "Something worth staring at while clients wait",
+      "Checkout spotlights the floor can see across the room",
+      "Staff boards per department",
+      "Cast-ready for TV, tablet, and kiosk hardware"
     ],
-    note: "The board guests see in the lobby — and the boards your team actually runs from.",
-    cta: "See Whiteboard Solutions",
+    note: "The lobby board guests notice — and the boards your team actually runs from.",
+    cta: "See the Boards",
     href: "/solutions/digital-whiteboards",
     image: "/assets/lobby-whiteboard/light-v2/reference/Fitdog-Lobby-Whiteboard-Light-Approved-Mockup.png",
     imageAlt: "Custom lobby digital whiteboard showing facility activities"
@@ -100,18 +100,18 @@ export const PACKAGES = [
     featured: false,
     name: "Remote Digital Whiteboard Advertising",
     price: "Rental or consulting",
-    audience: "Rental or consulting services",
+    audience: "Rental or consulting",
     summary:
-      "Deploy branded display screens with remote content updates, advertising management, and setup consulting for pet facilities.",
+      "Branded lobby screens with remote content updates, ad management, and setup help — when you want the walls working without babysitting a USB stick.",
     bullets: [
-      "Turnkey rental service (equipment + support)",
-      "Full ad creation & management",
-      "Direct partnership with your business",
-      "Consulting & setup options",
-      "Content scheduling for lobby and waiting areas"
+      "Turnkey rental (equipment + support)",
+      "Ad creation and day-to-day management",
+      "Direct with your facility, not a faceless network",
+      "Consulting and setup if you already own screens",
+      "Scheduling for lobby and waiting areas"
     ],
-    note: "Ideal when you want premium lobby screens without building the display stack alone.",
-    cta: "Talk About Screens",
+    note: "Premium lobby screens without building the display stack yourself.",
+    cta: "Talk Screens",
     href: "/solutions/advertising",
     image: "/assets/fitdog-lobby-whiteboard/slideshow/14-show-off-your-dog.png",
     imageAlt: "Lobby advertising display with branded pet facility content"

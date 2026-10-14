@@ -62,8 +62,8 @@ type MidCtaProps = {
 };
 
 export function MidCta({
-  title = "Ready to transform your operations?",
-  description = "Tell us about your facility and we’ll map the right mix of platform modules, lobby boards, and department displays.",
+  title = "Want the desk, the yard, and the TV to stop arguing?",
+  description = "Tell us how your facility runs. We’ll map platform modules, lobby boards, and department displays that fit the day you actually have.",
   secondaryLabel = "Explore Solutions",
   secondaryHref = "/solutions"
 }: MidCtaProps) {
@@ -92,10 +92,10 @@ export function FinalCta() {
       <div className="ro-cta-dark-media" />
       <div className="ro-cta-dark-shade" />
       <div className="container-page relative text-center">
-        <p className="eyebrow">Built for pet businesses. Designed for success.</p>
-        <h2 className="mx-auto mt-5">Ready to transform your operations?</h2>
+        <p className="eyebrow">Dog facilities. Real Saturday pressure.</p>
+        <h2 className="mx-auto mt-5">Show us how your rush hour actually runs</h2>
         <SiteLink href={PRIMARY_CTA.href} className="btn-primary mt-8">
-          Get Started Today
+          Get Started
           <ArrowRight className="h-4 w-4" />
         </SiteLink>
       </div>
