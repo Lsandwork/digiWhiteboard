@@ -19,41 +19,32 @@ export async function enqueueRufflyJob(input: {
 }) {
   const supabase = getServiceSupabase();
   const runAfter = new Date(Date.now() + (input.runAfterMinutes ?? 0) * 60_000).toISOString();
-  const { data, error } = await supabase
+  // ON CONFLICT cannot target the partial unique index on idempotency_key (Postgres 42P10),
+  // so insert and treat a duplicate key as "already queued".
+  const inserted = await supabase
     .from("ruffly_job_queue")
-    .upsert(
-      {
-        job_type: input.jobType,
-        payload: input.payload,
-        idempotency_key: input.idempotencyKey ?? null,
-        run_after: runAfter,
-        max_attempts: input.maxAttempts ?? 8,
-        status: "pending",
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "idempotency_key", ignoreDuplicates: true }
-    )
+    .insert({
+      job_type: input.jobType,
+      payload: input.payload,
+      idempotency_key: input.idempotencyKey ?? null,
+      run_after: runAfter,
+      max_attempts: input.maxAttempts ?? 8,
+      status: "pending"
+    })
     .select("id")
-    .maybeSingle();
+    .single();
+  if (!inserted.error) return inserted.data;
 
-  if (error && !String(error.message).includes("duplicate")) {
-    // Partial unique index upsert can fail on null keys — insert instead
-    const inserted = await supabase
+  if (input.idempotencyKey && inserted.error.code === "23505") {
+    const { data: existing, error } = await supabase
       .from("ruffly_job_queue")
-      .insert({
-        job_type: input.jobType,
-        payload: input.payload,
-        idempotency_key: input.idempotencyKey ?? null,
-        run_after: runAfter,
-        max_attempts: input.maxAttempts ?? 8,
-        status: "pending"
-      })
       .select("id")
-      .single();
-    if (inserted.error) throw inserted.error;
-    return inserted.data;
+      .eq("idempotency_key", input.idempotencyKey)
+      .maybeSingle();
+    if (error) throw new Error(`ruffly_job_queue lookup failed: ${error.message}`);
+    return existing;
   }
-  return data;
+  throw new Error(`ruffly_job_queue insert failed: ${inserted.error.message}`);
 }
 
 export async function claimDueRufflyJobs(limit = 20) {

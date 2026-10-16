@@ -8,10 +8,39 @@ import {
   verifyGingrWebhookSignature
 } from "@/lib/integrations/gingr/webhooks/verify";
 
+/**
+ * Gingr sends these with no signature field at all. Ruffly takes no action on them, so they
+ * are recorded as ignored and acknowledged; an unsigned event of any other type is rejected.
+ */
+const UNSIGNED_GINGR_EVENT_TYPES = new Set(["reservation_accepted", "reservation_confirmed", "reservation_cancelled"]);
+
 export async function ingestGingrWebhook(payload: GingrWebhookPayload) {
   const supabase = getServiceSupabase();
   const valid = verifyGingrWebhookSignature(payload);
   const idempotencyKey = gingrWebhookIdempotencyKey(payload);
+
+  if (!valid && !payload.signature && UNSIGNED_GINGR_EVENT_TYPES.has(String(payload.webhook_type ?? ""))) {
+    const { data } = await supabase
+      .from("ruffly_webhook_events")
+      .upsert(
+        {
+          provider: "gingr",
+          event_type: String(payload.webhook_type),
+          external_id: payload.entity_id == null ? null : String(payload.entity_id),
+          idempotency_key: idempotencyKey,
+          signature_valid: false,
+          payload: {},
+          sanitized_payload: sanitizeGingrWebhookPayload(payload),
+          status: "ignored",
+          last_error: null,
+          attempts: 1
+        },
+        { onConflict: "idempotency_key" }
+      )
+      .select("id")
+      .single();
+    return { ok: true, ignored: true, eventId: data?.id };
+  }
 
   const existing = await supabase
     .from("ruffly_webhook_events")
@@ -142,7 +171,12 @@ export async function processStoredGingrWebhook(eventId: string) {
       .eq("id", eventId);
     return { ok: true };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Webhook processing failed.";
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof (err as { message?: unknown })?.message === "string"
+          ? String((err as { message: string }).message)
+          : "Webhook processing failed.";
     await supabase
       .from("ruffly_webhook_events")
       .update({

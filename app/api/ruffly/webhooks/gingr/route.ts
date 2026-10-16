@@ -53,7 +53,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: result.error }, { status: result.status || 400 });
     }
     // Acknowledge quickly; expensive work is queued.
-    return NextResponse.json({ ok: true, duplicate: result.duplicate ?? false, eventId: result.eventId });
+    return NextResponse.json({
+      ok: true,
+      duplicate: result.duplicate ?? false,
+      ignored: result.ignored ?? false,
+      eventId: result.eventId
+    });
   } catch (error) {
     await board;
     const message = error instanceof Error ? error.message : "Webhook ingest failed.";
