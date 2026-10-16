@@ -52,13 +52,41 @@ export function skipDashboardBackgroundHydrate(board: AdminBoardType, tab: strin
     tab === "live_fleet" ||
     tab === "ops_command_center" ||
     tab === "my_shift" ||
+    tab === "front_desk_command" ||
+    tab === "yard_command" ||
+    tab === "overnight_command" ||
+    tab === "trainer_ops" ||
+    tab === "shift_handoff" ||
     tab === "fitdog_alerts" ||
     tab === "track_incidents" ||
     tab === "vet_visits" ||
     tab === "vip_auto_book" ||
     tab === "walks_board" ||
     tab === "package_group_walks" ||
+    tab === "ruffops_checklist" ||
+    tab === "body_checks" ||
     tab === "tl_digi_board" ||
+    tab === "crossover_communication" ||
+    tab === "owner_follow_up" ||
+    tab === "active_issues" ||
+    tab === "notifications" ||
+    tab === "management_support" ||
+    tab === "ms_hub" ||
+    tab === "staff_directory" ||
+    tab === "users" ||
+    tab === "help" ||
+    tab === "hr_hub" ||
+    tab === "hr_consult" ||
+    tab === "hr_pip" ||
+    tab === "write_ups" ||
+    tab === "write_up_review" ||
+    tab === "bulk_photo_upload" ||
+    tab === "media_library" ||
+    tab === "sa_floor_hub" ||
+    tab === "sa_whiteboard_hub" ||
+    tab === "sa_people_hub" ||
+    tab === "sa_apps_hub" ||
+    tab === "sa_admin_hub" ||
     tab === "reports" ||
     tab === "analytics"
   ) {

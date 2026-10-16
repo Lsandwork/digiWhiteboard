@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
 import { resolveSessionDisplayName } from "@/lib/admin/actor-display";
 import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
-import { withTimeoutFallback } from "@/lib/server-ttl-cache";
+import { getOrLoadTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { humanizeUnknownError } from "@/lib/safe-url";
 import {
   accessFromLegacyRole,
@@ -15,7 +15,7 @@ import { loadOpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot"
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { loadCommandCenterView } from "@/lib/ops-command-center/action-queue";
 import { searchOpsDogs } from "@/lib/ops-command-center/dogs";
-import { searchBoardDogs } from "@/lib/ops-command-center/adapters/staff-ops-feed";
+import { loadAdminBoardLanes, searchBoardDogs } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { createOpsTask, updateOpsTaskStatus } from "@/lib/ops-command-center/tasks";
 import {
   acknowledgeOpsNotification,
@@ -100,6 +100,15 @@ export async function GET(request: Request) {
   if (view === "handoffs") {
     const handoffs = await withTimeoutFallback(listRecentShiftHandoffs(20), OPS_SNAPSHOT_TIMEOUT_MS, []);
     return NextResponse.json({ handoffs });
+  }
+  if (view === "board_lanes") {
+    // Admin-only lanes from live_transition_dogs — do not call /api/board/checkouts (Gingr path).
+    const lanes = await withTimeoutFallback(
+      getOrLoadTtlCache("ops:admin-board-lanes", 10_000, () => loadAdminBoardLanes(40)),
+      OPS_SNAPSHOT_TIMEOUT_MS,
+      { checking_in: [], checking_out: [] }
+    );
+    return NextResponse.json(lanes, { headers: { "Cache-Control": "no-store" } });
   }
 
   try {

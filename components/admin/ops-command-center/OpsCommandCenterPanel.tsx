@@ -18,8 +18,11 @@ import {
 } from "@/lib/ops-command-center/work-item-actions";
 import { toCrossoverBulkPayload } from "@/lib/staff/bulk-shift-log";
 import type { ShiftLogType } from "@/lib/staff/front-desk-log";
+import { readPanelCache, writePanelCache } from "@/lib/admin/panel-session-cache";
 
 type Mode = "my_shift" | "ops_command_center";
+
+const MY_SHIFT_PANEL_CACHE_MS = 90_000;
 
 const SEVERITY_DOT: Record<string, string> = {
   critical: "bg-red-500",
@@ -63,15 +66,21 @@ export function OpsCommandCenterPanel({
   roleKey?: string;
   roleLabel?: string;
 }) {
-  const [data, setData] = useState<OpsCommandCenterSnapshot>(() =>
-    emptyOpsCommandCenterSnapshot({
+  const cacheKey = `ops-panel:${mode}`;
+  const [data, setData] = useState<OpsCommandCenterSnapshot>(() => {
+    const cached = readPanelCache<OpsCommandCenterSnapshot>(cacheKey, MY_SHIFT_PANEL_CACHE_MS);
+    if (cached?.greetingName || cached?.shiftSummary) return cached;
+    return emptyOpsCommandCenterSnapshot({
       email,
       displayName,
       roleKey: roleKey || "viewer",
       roleLabel: roleLabel || "Staff"
-    })
-  );
-  const [loading, setLoading] = useState(true);
+    });
+  });
+  const [loading, setLoading] = useState(() => {
+    const cached = readPanelCache<OpsCommandCenterSnapshot>(cacheKey, MY_SHIFT_PANEL_CACHE_MS);
+    return !(cached?.greetingName || cached?.shiftSummary);
+  });
   const [pollMs, setPollMs] = useState(60_000);
   const dataRef = useRef<OpsCommandCenterSnapshot | null>(data);
   const [query, setQuery] = useState("");
@@ -94,6 +103,7 @@ export function OpsCommandCenterPanel({
       const body = await readResponseJson<OpsCommandCenterSnapshot & { error?: string }>(res);
       if (body.greetingName || body.shiftSummary) {
         dataRef.current = body;
+        writePanelCache(cacheKey, body);
         setData(body);
         setPollMs(body.stale ? 90_000 : 60_000);
         return;
@@ -102,6 +112,7 @@ export function OpsCommandCenterPanel({
         throw new Error(body.error || "Failed to load command center");
       }
       dataRef.current = body as OpsCommandCenterSnapshot;
+      writePanelCache(cacheKey, body as OpsCommandCenterSnapshot);
       setData(body as OpsCommandCenterSnapshot);
       setPollMs(60_000);
     } catch {
@@ -111,7 +122,7 @@ export function OpsCommandCenterPanel({
       window.clearTimeout(timeout);
       setLoading(false);
     }
-  }, []);
+  }, [cacheKey]);
 
   useEffect(() => {
     const boot = window.setTimeout(() => void load(), 0);

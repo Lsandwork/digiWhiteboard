@@ -9,8 +9,10 @@ import {
 } from "@/lib/hung-table-guard";
 import {
   OPS_SNAPSHOT_BUILD_TIMEOUT_MS,
+  OPS_SNAPSHOT_CACHE_KEY,
   OPS_SNAPSHOT_LAST_GOOD_KEY,
   OPS_SNAPSHOT_LAST_GOOD_TTL_MS,
+  OPS_SNAPSHOT_POSITIVE_TTL_MS,
   OPS_SNAPSHOT_TIMEOUT_MS
 } from "@/lib/ops-command-center/constants";
 import { listOpenOpsTasks } from "@/lib/ops-command-center/tasks";
@@ -820,6 +822,12 @@ export async function loadOpsCommandCenterSnapshot(input: {
   roleLabel: string;
   access?: UserAccess | null;
 }): Promise<OpsCommandCenterSnapshot> {
+  const warmKey = `${OPS_SNAPSHOT_CACHE_KEY}:${input.adminUserId || input.email || "anon"}:${input.roleKey}`;
+  const warm = getTtlCache<OpsCommandCenterSnapshot>(warmKey);
+  if (warm && !warm.pending && !warm.stale) {
+    return warm;
+  }
+
   try {
     const snapshot = await withTimeoutFallback(
       buildOpsCommandCenterSnapshot(input),
@@ -828,6 +836,7 @@ export async function loadOpsCommandCenterSnapshot(input: {
     );
     if (snapshot) {
       if (shouldCacheOpsSnapshot(snapshot)) {
+        setTtlCache(warmKey, snapshot, OPS_SNAPSHOT_POSITIVE_TTL_MS);
         setTtlCache(OPS_SNAPSHOT_LAST_GOOD_KEY, snapshot, OPS_SNAPSHOT_LAST_GOOD_TTL_MS);
       }
       return snapshot;

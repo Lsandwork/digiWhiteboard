@@ -54,6 +54,10 @@ import { StaffDirectoryValidationError } from "@/lib/staff/directory-reconciliat
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import {
+  STAFF_OPS_LIST_CACHE_KEY,
+  STAFF_OPS_LIST_CACHE_TTL_MS
+} from "@/lib/ops-command-center/constants";
+import {
   buildUserInteractionsViewPayload,
   parseUserInteractionsViewParam
 } from "@/lib/user-interactions/api-view";
@@ -62,7 +66,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 15;
 
 const STAFF_OPS_LOAD_TIMEOUT_MS = 8_000;
-const STAFF_OPS_CACHE_TTL_MS = 20_000;
 
 function crossoverForbiddenResponse() {
   return NextResponse.json({ error: "You do not have permission to access Crossover Communication." }, { status: 403 });
@@ -141,7 +144,7 @@ export async function GET(request: Request) {
 
   try {
     const state = await withTimeoutFallback(
-      getOrLoadTtlCache("staff-ops:list", STAFF_OPS_CACHE_TTL_MS, () =>
+      getOrLoadTtlCache(STAFF_OPS_LIST_CACHE_KEY, STAFF_OPS_LIST_CACHE_TTL_MS, () =>
         listStaffOps(getServiceSupabase({ timeoutMs: STAFF_OPS_LOAD_TIMEOUT_MS }))
       ),
       STAFF_OPS_LOAD_TIMEOUT_MS,
