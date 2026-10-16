@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAdminSessionFromRequest } from "@/lib/admin/session";
+import { resolveSessionDisplayName } from "@/lib/admin/actor-display";
 import { OPS_SNAPSHOT_TIMEOUT_MS } from "@/lib/ops-command-center/constants";
 import { withTimeoutFallback } from "@/lib/server-ttl-cache";
 import { humanizeUnknownError } from "@/lib/safe-url";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/admin/permissions";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { loadOpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
+import { getServiceSupabase } from "@/lib/supabase/server";
 import { loadCommandCenterView } from "@/lib/ops-command-center/action-queue";
 import { searchOpsDogs } from "@/lib/ops-command-center/dogs";
 import { searchBoardDogs } from "@/lib/ops-command-center/adapters/staff-ops-feed";
@@ -102,10 +104,16 @@ export async function GET(request: Request) {
 
   try {
     const roleKey = legacyRoleToRoleKey(gate.session.role);
+    const personName = await withTimeoutFallback(
+      resolveSessionDisplayName(getServiceSupabase({ timeoutMs: 2_000 }), gate.session),
+      2_000,
+      null
+    );
     const snapshot = await loadOpsCommandCenterSnapshot({
       adminUserId: gate.session.adminUserId,
       email: gate.session.email,
-      displayName: gate.access.displayLabel || null,
+      // Prefer the person's full name — never the account-type label ("Super Admin").
+      displayName: personName,
       roleKey,
       roleLabel: ROLE_LABELS[roleKey] || gate.access.displayLabel || "Staff",
       access: gate.access

@@ -91,15 +91,15 @@ function HubLauncher({
 }) {
   return (
     <section className="space-y-5">
-      <header className="rounded-2xl border border-admin-border bg-gradient-to-br from-[#132033] via-[#101826] to-[#0b1220] p-5">
+      <header className="rounded-2xl border border-admin-border bg-admin-card p-5">
         <p className="text-xs uppercase tracking-[0.18em] text-admin-muted">Menu hub</p>
-        <h2 className="mt-1 text-2xl font-semibold text-white">{hub.title}</h2>
+        <h2 className="admin-text-emphasis mt-1 text-2xl font-semibold">{hub.title}</h2>
         <p className="mt-1 max-w-3xl text-sm text-admin-muted">{hub.description}</p>
       </header>
 
       {hub.sections.map((section) => (
-        <section key={section.id} className="rounded-2xl border border-admin-border bg-black/20 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-white">{section.title}</h3>
+        <section key={section.id} className="rounded-2xl border border-admin-border bg-admin-card p-4">
+          <h3 className="admin-text-emphasis mb-3 text-sm font-semibold">{section.title}</h3>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {section.links.map((link) => (
               <HubButton
@@ -174,7 +174,7 @@ function HubButton({
     <span className="flex items-start gap-3">
       <HubAppMark link={link} />
       <span className="min-w-0">
-        <span className="flex items-center gap-1.5 text-sm font-medium text-white">
+        <span className="admin-text-emphasis flex items-center gap-1.5 text-sm font-medium">
           {label}
           {isRoute ? (
             <ExternalLink className="h-3.5 w-3.5 text-admin-muted" />

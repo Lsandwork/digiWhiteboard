@@ -146,10 +146,47 @@ export type OpsCommandCenterSnapshot = {
   };
 };
 
+/** Account-type labels must never appear in "Good evening, …" — use the person's name. */
+const ROLE_GREETING_BLOCKLIST = new Set(
+  [
+    "Super Admin",
+    "Admin",
+    "Management",
+    "Front Desk - Coordinator",
+    "Team Lead",
+    "Groomer",
+    "Dog Handler",
+    "Trainer",
+    "Driver/Hiker",
+    "Overnight",
+    "Maintenance",
+    "Staff",
+    "Marketing Account",
+    "Viewer",
+    "Super",
+    "Front",
+    "Team",
+    "Dog",
+    "Driver",
+    "Marketing"
+  ].map((value) => value.toLowerCase())
+);
+
 function greetingNameFromEmail(email?: string | null, displayName?: string | null) {
-  if (displayName?.trim()) return displayName.trim().split(/\s+/)[0];
+  const trimmed = displayName?.trim();
+  if (trimmed) {
+    const first = trimmed.split(/\s+/)[0] ?? "";
+    const looksLikeRole =
+      ROLE_GREETING_BLOCKLIST.has(trimmed.toLowerCase()) || ROLE_GREETING_BLOCKLIST.has(first.toLowerCase());
+    if (!looksLikeRole) return first;
+  }
   const local = email?.split("@")[0] || "Team";
-  return local.charAt(0).toUpperCase() + local.slice(1);
+  const fromEmail = local
+    .replace(/[._]+/g, " ")
+    .trim()
+    .split(/\s+/)[0];
+  if (!fromEmail) return "Team";
+  return fromEmail.charAt(0).toUpperCase() + fromEmail.slice(1);
 }
 
 function toolsForRole(roleKey: string): Array<{ tab: string; label: string }> {
