@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "crypto";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { isSmsOptOutRequest } from "../lib/ruffly/consent/opt-out";
 import { destinationsForFeedbackRating, isReviewGatingDisabled } from "../lib/ruffly/reviews/no-gating";
 import { detectHandoffSignals, shouldHandoffToStaff } from "../lib/ruffly/ai/guardrails";
@@ -81,5 +83,18 @@ assert.equal(hasPermission(viewer, "ruffly.view"), false);
 
 const marketing = accessFromLegacyRole("u3", "m@fitdog.com", "marketing");
 assert.equal(hasPermission(marketing, "ruffly.campaigns.view"), true);
+
+{
+  const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
+  // ON CONFLICT cannot target the partial unique index; a duplicate key must mean "already queued".
+  const jobs = read("lib/ruffly/queue/jobs.ts");
+  assert.doesNotMatch(jobs, /onConflict: "idempotency_key"/);
+  assert.match(jobs, /inserted\.error\.code === "23505"/);
+  // Gingr never signs reservation lifecycle events; they are ignored, not failed as invalid.
+  const ingest = read("lib/integrations/gingr/webhooks/process.ts");
+  assert.match(ingest, /UNSIGNED_GINGR_EVENT_TYPES = new Set\(\["reservation_accepted", "reservation_confirmed", "reservation_cancelled"\]\)/);
+  assert.match(ingest, /!valid && !payload\.signature && UNSIGNED_GINGR_EVENT_TYPES\.has/);
+  assert.match(ingest, /status: "ignored"/);
+}
 
 console.log("ruffly core tests passed");
