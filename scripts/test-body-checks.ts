@@ -120,6 +120,107 @@ const checkedOut = mergeRosterSources(
 );
 assert.equal(checkedOut.rows.length, 1);
 assert.equal(checkedOut.rows[0]?.checkedIn, false);
+assert.equal(checkedOut.rows[0]?.wentHomeToday, true);
+assert.equal(checkedOut.rows[0]?.checkedOutAt, "2026-10-14T12:00:00-07:00");
+
+// Shapes from the 10/15 Gingr report: dogs that came and left must never read as "Coming today".
+const day = mergeRosterSources(
+  [
+    {
+      reservation_id: "r-in",
+      animal: { id: "d-in", name: "Bodhi" },
+      reservation_type: { type: "Overnight: Suite" },
+      start_date: "2026-10-14T09:30:00-07:00",
+      check_in_date: "2026-10-14T10:45:48-07:00"
+    },
+    {
+      reservation_id: "r-race",
+      animal: { id: "d-race", name: "Pepper" },
+      reservation_type: { type: "Daycare" },
+      start_date: "2026-10-15T08:00:00-07:00",
+      check_in_date: "2026-10-15T08:05:00-07:00"
+    }
+  ],
+  [
+    {
+      reservation_id: "r-daycare",
+      animal: { id: "d-daycare", name: "Milo" },
+      reservation_type: { type: "Daycare" },
+      start_date: "2026-10-15T07:30:00-07:00",
+      check_in_date: "2026-10-15T07:41:00-07:00",
+      check_out_date: "2026-10-15T17:02:00-07:00"
+    },
+    {
+      reservation_id: "r-board",
+      animal: { id: "d-board", name: "Dougal" },
+      reservation_type: { type: "Overnight: Den" },
+      start_date: "2026-10-11T07:00:00-07:00",
+      check_in_date: "2026-10-11T07:40:02-07:00",
+      check_out_date: "2026-10-15T18:46:25-07:00"
+    },
+    {
+      reservation_id: "r-expected",
+      animal: { id: "d-expected", name: "Rosie" },
+      reservation_type: { type: "Daycare" },
+      start_date: "2026-10-15T09:00:00-07:00",
+      confirmed_date: "2026-10-12T10:00:00-07:00"
+    },
+    {
+      reservation_id: "r-race",
+      animal: { id: "d-race", name: "Pepper" },
+      reservation_type: { type: "Daycare" },
+      start_date: "2026-10-15T08:00:00-07:00",
+      check_in_date: "2026-10-15T08:05:00-07:00",
+      check_out_date: "2026-10-15T16:10:00-07:00"
+    },
+    {
+      reservation_id: "r-am",
+      animal: { id: "d-split", name: "Koda" },
+      reservation_type: { type: "Daycare" },
+      start_date: "2026-10-15T07:00:00-07:00",
+      check_in_date: "2026-10-15T07:10:00-07:00",
+      check_out_date: "2026-10-15T11:00:00-07:00"
+    },
+    {
+      reservation_id: "r-groom",
+      animal: { id: "d-split", name: "Koda" },
+      reservation_type: { type: "Grooming" },
+      start_date: "2026-10-15T15:00:00-07:00"
+    },
+    {
+      reservation_id: "r-next",
+      animal: { id: "d-daycare", name: "Milo" },
+      reservation_type: { type: "Daycare" },
+      start_date: "2026-10-17T07:30:00-07:00"
+    }
+  ],
+  "2026-10-15"
+);
+const byName = new Map(day.rows.map((row) => [row.dogName, row]));
+assert.equal(byName.get("Bodhi")?.checkedIn, true);
+assert.equal(byName.get("Bodhi")?.checkedInAt, "2026-10-14T10:45:48-07:00");
+assert.equal(byName.get("Milo")?.wentHomeToday, true);
+assert.equal(byName.get("Milo")?.isArrivalToday, false);
+assert.equal(byName.get("Milo")?.isUpcoming, false);
+assert.equal(byName.get("Milo")?.checkedOutAt, "2026-10-15T17:02:00-07:00");
+assert.equal(byName.get("Dougal")?.wentHomeToday, true);
+assert.equal(byName.get("Dougal")?.checkedIn, false);
+assert.equal(byName.get("Rosie")?.isArrivalToday, true);
+assert.equal(byName.get("Pepper")?.checkedIn, false, "a check-out from either pull beats the checked-in pull");
+assert.equal(byName.get("Pepper")?.wentHomeToday, true);
+assert.equal(byName.get("Koda")?.isArrivalToday, true, "a later same-day appointment still makes the dog expected");
+assert.equal(byName.get("Koda")?.wentHomeToday, false);
+assert.deepEqual(
+  day.rows.map((row) => row.dogName),
+  ["Bodhi", "Koda", "Rosie", "Dougal", "Milo", "Pepper"]
+);
+const dayCounts = countRoster(day.rows, { submittedToday: 0, unresolvedFollowUps: 0 });
+assert.equal(dayCounts.checkedIn, 1);
+assert.equal(dayCounts.arrivals, 2);
+assert.equal(dayCounts.wentHome, 3);
+assert.equal(dayCounts.upcoming, 0);
+assert.equal(filterRoster(day.rows, { filter: "went_home" }).length, 3);
+assert.equal(filterRoster(day.rows, { filter: "arriving" }).length, 2);
 
 const atlas = mergeRosterSources(
   [

@@ -13,7 +13,7 @@ export const MY_SHIFT_FACILITY_SYNC_START_HOUR = 6;
 export const MY_SHIFT_FACILITY_SYNC_END_HOUR = 19;
 export const MY_SHIFT_FACILITY_TIMEZONE = "America/Los_Angeles";
 
-export type FacilityBirthdayPresence = "checked_in" | "scheduled";
+export type FacilityBirthdayPresence = "checked_in" | "scheduled" | "went_home";
 
 export type FacilityBirthdayDog = {
   id: string;
@@ -224,7 +224,7 @@ export function facilityFeedToWorkItems(feed: MyShiftFacilityFeed): OpsWorkItem[
     detail: [
       row.age != null ? `Turns ${row.age}` : null,
       row.ownerName,
-      row.presence === "checked_in" ? "Checked in" : "Scheduled today",
+      row.presence === "checked_in" ? "Checked in" : row.presence === "went_home" ? "Went home" : "Scheduled today",
       row.birthdate
     ]
       .filter(Boolean)
@@ -337,12 +337,15 @@ export async function syncMyShiftFacilityFeed(options?: {
     const dogName = dogNameFromReservation(reservation);
     if (!animalId || !dogName) continue;
     const existing = candidates.get(animalId);
+    const record = reservation as Record<string, unknown>;
+    const wentHome = Boolean(record.check_out_date || record.check_out_stamp || record.checked_out_at);
     candidates.set(animalId, {
       animalId,
       dogName: existing?.dogName || dogName,
       ownerName: existing?.ownerName || ownerNameFromReservation(reservation),
       reservationId: existing?.reservationId || pickString(reservation.reservation_id, reservation.id),
-      presence: existing?.presence || "scheduled",
+      // Any still-open reservation today keeps the dog "scheduled"; only all-closed means gone home.
+      presence: existing?.presence === "scheduled" || !wentHome ? "scheduled" : "went_home",
       birthdate: existing?.birthdate || birthdateFromReservation(reservation)
     });
   }

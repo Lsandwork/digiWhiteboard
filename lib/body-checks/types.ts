@@ -30,6 +30,7 @@ export const ROSTER_FILTERS = [
   "all",
   "checked_in",
   "arriving",
+  "went_home",
   "upcoming",
   "appointments",
   "follow_up"
@@ -55,6 +56,9 @@ export type BodyCheckRosterRow = {
   startsAt: string | null;
   checkedIn: boolean;
   checkedInAt: string | null;
+  /** Gingr recorded a check-out for this visit on the roster date; the dog has gone home. */
+  wentHomeToday: boolean;
+  checkedOutAt: string | null;
   isArrivalToday: boolean;
   isUpcoming: boolean;
   isAppointment: boolean;
@@ -64,6 +68,7 @@ export type RosterCounts = {
   dogs: number;
   checkedIn: number;
   arrivals: number;
+  wentHome: number;
   upcoming: number;
   appointments: number;
   submittedToday: number;

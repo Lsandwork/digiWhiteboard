@@ -60,6 +60,7 @@ function reservationCancelled(reservation: GingrReservation): boolean {
 
 function isCheckedInReservation(reservation: GingrReservation): boolean {
   const record = reservation as Record<string, unknown>;
+  if (record.check_out_stamp || record.check_out_date || record.checked_out_at) return false;
   if (record.check_in_stamp || record.check_in_date || record.checked_in === true || record.checked_in === "1") {
     return true;
   }
