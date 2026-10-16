@@ -182,6 +182,7 @@ function parseListFilters(url: URL): CommissionListFilters {
   return {
     q: url.searchParams.get("q") ?? undefined,
     trainerIds: getList("trainerIds") ?? getList("trainer"),
+    trainerNames: getList("trainerNames"),
     dateField,
     dateFrom: normalizeCommissionDateFilter(url.searchParams.get("dateFrom") ?? undefined),
     dateTo: normalizeCommissionDateFilter(url.searchParams.get("dateTo") ?? undefined),
@@ -379,7 +380,7 @@ export async function GET(request: Request) {
   const view = url.searchParams.get("view") ?? "ledger";
   const fast = url.searchParams.get("fast") === "1";
   const trainersPromise =
-    canManage && (view === "rules" || view === "report")
+    canManage && (view === "rules" || view === "report" || view === "ledger")
       ? withTimeoutFallback(
           listCommissionTrainersFromDb(getServiceSupabase({ timeoutMs: COMMISSIONS_OPTIONAL_TIMEOUT_MS })),
           COMMISSIONS_OPTIONAL_TIMEOUT_MS,
