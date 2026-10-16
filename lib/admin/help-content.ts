@@ -289,11 +289,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     id: "role-menu-dog-handler",
     title: "Daycare / Driver / Hiker menu: where are my tools?",
-    summary: "Handler panels keep My Shift and Driver Mode up front. Checklist, walks, photos, write-ups, and Team Log live under Floor Ops.",
+    summary: "Handler panels keep My Shift up front. Checklist, walks, photos, write-ups, and Team Log live under Floor Ops.",
     category: "Admin Dashboard",
     keywords: ["daycare", "driver", "hiker", "handler", "menu", "checklist", "write ups"],
     steps: [
-      "Primary tabs: My Shift, Driver / Hiker Mode, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Primary tabs: My Shift, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
       "Floor Ops opens Team Log, Checklist, Walks Board, photo upload / Media Library, and Write Ups.",
       "Apps opens Gingr when you need the business system of record. Driver/Hiker (Transportation) also gets Route Generator there."
     ],
@@ -952,7 +952,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["dog handler", "daycare", "handler", "walks", "checklist", "team log", "driver", "hiker", "my shift"],
     steps: [
       "Sign in at Fitdog Digi-Board with your assigned email and password.",
-      "Primary tabs: My Shift, Driver / Hiker Mode, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
+      "Primary tabs: My Shift, Floor Ops, Apps, Submit Request, Notifications, Settings, Help.",
       "Open Floor Ops → Check List for today’s dog-handler daily recurring push notices and mark each one completed.",
       "Use the Staff Digital Whiteboard for live check-ins, check-outs, and yard reminders (including grooming catch notices).",
       "Open Floor Ops → Walks Board when the 2-hour alarm sounds. Update the physical No Plays, Grooming, and Walks Board, check No Plays during the walk, take and upload pictures, then mark complete. This alarm cannot be snoozed.",

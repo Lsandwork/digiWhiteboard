@@ -467,7 +467,6 @@ export function buildAdminNav(visibleTabs: AdminTab[], board: AdminBoardType): N
             "ops_command_center",
             "front_desk_command",
             "yard_command",
-            "driver_mode",
             "overnight_command",
             "trainer_ops",
             "shift_handoff",

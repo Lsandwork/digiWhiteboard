@@ -22,7 +22,6 @@ const QUICK_TABS: Array<{ tab: string; label: string; keywords: string }> = [
   { tab: "ops_command_center", label: "Ops Command Center", keywords: "management live ops" },
   { tab: "front_desk_command", label: "Front Desk Command", keywords: "arriving checkout pickup" },
   { tab: "yard_command", label: "Yard Command", keywords: "walks break body check" },
-  { tab: "driver_mode", label: "Driver / Hiker Mode", keywords: "route stop van samsara" },
   { tab: "overnight_command", label: "Overnight Command", keywords: "rounds medication feeding" },
   { tab: "trainer_ops", label: "Trainer Ops", keywords: "session homework training" },
   { tab: "ops_system_health", label: "System Health & Debugging", keywords: "gingr twilio samsara integrations cursor debug route audit errors" },
