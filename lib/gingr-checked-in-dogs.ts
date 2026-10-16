@@ -203,8 +203,26 @@ export async function fetchCurrentlyCheckedInDogsRobust(options?: {
     dayListError = error instanceof Error ? error.message : "day list query failed";
   }
 
+  // The day list is pulled after the checked-in queries, so its check-out stamps are newer.
+  const checkedOutReservationIds = new Set(
+    dayListRows
+      .map(asRecord)
+      .filter((record): record is Record<string, unknown> =>
+        Boolean(record && (record.check_out_stamp || record.check_out_date || record.checked_out_at))
+      )
+      .map((record) => pickString(record.reservation_id, record.id))
+      .filter((id): id is string => Boolean(id))
+  );
+
   const fromCheckedInFlag = dedupeDogs(
     [...checkedInQueryRows, ...datedCheckedInRows]
+      .filter((row) => {
+        const record = asRecord(row);
+        if (!record || record.cancelled_date || record.cancelled_at) return false;
+        if (record.check_out_stamp || record.check_out_date || record.checked_out_at) return false;
+        const id = pickString(record.reservation_id, record.id);
+        return !id || !checkedOutReservationIds.has(id);
+      })
       .map(mapReservationRow)
       .filter((dog): dog is CheckedInGingrDog => Boolean(dog))
   );

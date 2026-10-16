@@ -129,6 +129,7 @@ export function mapGingrReservationToTaxiRow(
     phone: pickString(owner.cell_phone, owner.home_phone, owner.phone, reservation.phone),
     status: pickString(
       reservation.cancelled_date ? "cancelled" : null,
+      reservation.check_out_date ? "checked_out" : null,
       reservation.check_in_date ? "checked_in" : null,
       reservation.status
     ),

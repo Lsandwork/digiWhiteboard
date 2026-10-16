@@ -98,6 +98,10 @@
   color: var(--text-primary, #f8fafc);
 }
 
+.body-checks__row--gone {
+  opacity: 0.62;
+}
+
 .body-checks__photo,
 .body-checks__photo-fallback {
   width: 56px;

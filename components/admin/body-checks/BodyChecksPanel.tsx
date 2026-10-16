@@ -59,6 +59,7 @@ const FILTERS: { id: RosterFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "checked_in", label: "Checked in" },
   { id: "arriving", label: "Coming today" },
+  { id: "went_home", label: "Went home" },
   { id: "upcoming", label: "Upcoming" },
   { id: "appointments", label: "Appointments" },
   { id: "follow_up", label: "Follow-ups" }
@@ -100,6 +101,27 @@ function formatWhen(iso: string | null | undefined) {
     minute: "2-digit",
     timeZone: "America/Los_Angeles"
   }).format(date);
+}
+
+function formatClock(iso: string | null | undefined) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Los_Angeles" }).format(date);
+}
+
+function rosterStatus(row: BodyCheckRosterRow): { label: string; tone: string } {
+  if (row.checkedIn) {
+    const at = formatClock(row.checkedInAt);
+    return { label: at ? `Checked in ${at}` : "Checked in", tone: "admin-badge--green" };
+  }
+  if (row.isArrivalToday) return { label: "Coming today", tone: "admin-badge--info" };
+  if (row.wentHomeToday) {
+    const at = formatClock(row.checkedOutAt);
+    return { label: at ? `Went home ${at}` : "Went home", tone: "" };
+  }
+  if (row.isUpcoming) return { label: "Upcoming", tone: "admin-badge--info" };
+  return { label: "Reservation", tone: "admin-badge--info" };
 }
 
 function labelsFor(catalog: FindingDef[], ids: string[], other: string) {
@@ -407,6 +429,7 @@ export function BodyChecksPanel() {
           <div className="body-checks__counts">
             <Count label="Checked in" value={counts?.checkedIn} />
             <Count label="Coming today" value={counts?.arrivals} />
+            <Count label="Went home" value={counts?.wentHome} />
             <Count label="Appointments" value={counts?.appointments} />
             <Count label="Submitted" value={counts?.submittedToday} />
             <Count label="Follow-ups" value={counts?.unresolvedFollowUps} />
@@ -444,8 +467,10 @@ export function BodyChecksPanel() {
             <div className="body-checks__card">No dogs match this date and filter. An empty list here means Gingr returned no matching reservations.</div>
           ) : null}
           <div className="body-checks__list">
-            {(roster?.rows ?? []).map((row) => (
-              <article key={row.key} className="body-checks__row">
+            {(roster?.rows ?? []).map((row) => {
+              const status = rosterStatus(row);
+              return (
+              <article key={row.key} className={`body-checks__row${row.wentHomeToday ? " body-checks__row--gone" : ""}`}>
                 <DogPhoto name={row.dogName} animalId={row.gingrAnimalId} url={row.photoUrl} />
                 <div>
                   <strong>{row.dogName}</strong>
@@ -454,9 +479,7 @@ export function BodyChecksPanel() {
                     {row.startsAt ? ` · ${formatWhen(row.startsAt)}` : ""}
                   </div>
                   <div className="body-checks__badges">
-                    <span className={`admin-badge ${row.checkedIn ? "admin-badge--green" : "admin-badge--info"}`}>
-                      {row.checkedIn ? "Checked in" : row.isArrivalToday ? "Coming today" : row.isUpcoming ? "Upcoming" : "Reservation"}
-                    </span>
+                    <span className={`admin-badge ${status.tone}`.trim()}>{status.label}</span>
                     {row.checkedToday ? <span className="admin-badge admin-badge--info">Body check saved</span> : null}
                     {row.hasFollowUp ? <span className="admin-badge admin-badge--amber">Follow-up open</span> : null}
                   </div>
@@ -465,9 +488,12 @@ export function BodyChecksPanel() {
                   Start Body Check
                 </button>
               </article>
-            ))}
+              );
+            })}
           </div>
-          <p className="body-checks__meta">Checked-in dogs and reservations for the next 7 days, one row per dog.</p>
+          <p className="body-checks__meta">
+            Checked-in dogs, dogs still expected, dogs that went home today, and reservations for the next 7 days, one row per dog.
+          </p>
         </>
       ) : view === "saved" && !wizard && !openReport ? (
         <>

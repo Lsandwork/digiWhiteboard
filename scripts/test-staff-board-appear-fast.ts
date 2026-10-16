@@ -46,6 +46,14 @@ assert.ok(getGingrBoardRefreshIntervalMs() <= 2000);
   assert.match(webhook, /Promise\.all\(\[reservationQuery, visibleQuery\]\)/);
   assert.match(webhook, /resolveActiveBoardWebhookType/);
   assert.match(webhook, /timeoutMs: WEBHOOK_WRITE_TIMEOUT_MS/);
+  // Gingr delivers to the Ruffly URL; it must hand every delivery to the board receiver.
+  const rufflyWebhook = source("app/api/ruffly/webhooks/gingr/route.ts");
+  assert.match(rufflyWebhook, /import \{ POST as boardGingrWebhook \} from "@\/app\/api\/gingr\/webhook\/route"/);
+  assert.match(rufflyWebhook, /const board = forwardToBoardPipeline\(rawBody, request\.url\)/);
+  assert.ok(
+    rufflyWebhook.indexOf("forwardToBoardPipeline(rawBody") < rufflyWebhook.indexOf("isRufflyEnabled()"),
+    "board hand-off must run even when Ruffly is disabled"
+  );
 }
 
 {
