@@ -25,13 +25,28 @@ export async function requireBodyCheckAccess(request: Request) {
       supabase: null
     };
   }
-  const supabase = getServiceSupabase({ timeoutMs: 8_000 });
+  let supabase;
+  try {
+    supabase = getServiceSupabase({ timeoutMs: 8_000 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Body Checks storage is unavailable.";
+    return {
+      error: NextResponse.json({ error: message }, { status: 503 }),
+      session: null,
+      actor: null,
+      supabase: null
+    };
+  }
   let name = session.email;
   const userId = normalizeAdminUserId(session.adminUserId);
   if (userId) {
-    const { data } = await supabase.from("admin_users").select("full_name, email").eq("id", userId).maybeSingle();
-    const fullName = String(data?.full_name ?? "").trim();
-    if (fullName) name = fullName;
+    try {
+      const { data } = await supabase.from("admin_users").select("full_name, email").eq("id", userId).maybeSingle();
+      const fullName = String(data?.full_name ?? "").trim();
+      if (fullName) name = fullName;
+    } catch {
+      name = session.email;
+    }
   }
   return {
     error: null,
