@@ -446,6 +446,15 @@ export function AdminDashboard() {
       return;
     }
 
+    // Front Desk Command is hidden for all users (see canAccessAdminTab) —
+    // deep links and in-app navigation buttons must not open it either.
+    // Send the user to their normal first accessible tab instead.
+    if (tab === "front_desk_command") {
+      const fallbackTab = firstAccessibleAdminTab(access, effectiveRole, effectiveBoard, { isDemo }) as AdminTab;
+      goToBoardTab(effectiveBoard, fallbackTab);
+      return;
+    }
+
     if ((tab === "route_generator" || tab === "live_fleet" || tab === "package_commissions" || tab === "ops_system_health" || tab === "body_checks") && board !== "staff") {
       if (typeof window !== "undefined") window.localStorage.setItem("fitdog_admin_board", "staff");
       goToBoardTab("staff", tab);
