@@ -1,9 +1,12 @@
 import {
   fetchCurrentlyCheckedInDogs,
   fetchFighterRotationIcon,
+  fetchGingrCustomAnimalIcons,
+  isFighterRotationIcon,
   type CheckedInGingrDog,
   type FighterRotationIcon
 } from "@/lib/gingr-custom-animal-icons";
+import { sendFighterRotationCheckInEmail } from "@/lib/staff/fighter-rotation-email";
 import {
   createAndPushStaffNotice,
   FIGHTER_ROTATION_PUSH_SOURCE,
@@ -155,20 +158,72 @@ async function mapPool<T, R>(items: T[], concurrency: number, worker: (item: T) 
 
 export async function evaluateFighterRotationAlertForCheckIn(
   supabase: SupabaseClient,
-  dog: Pick<LiveDog, "gingr_animal_id" | "animal_name" | "id">
+  dog: Pick<LiveDog, "gingr_animal_id" | "animal_name" | "id" | "owner_name">
 ) {
   const arrivingAnimalId = dog.gingr_animal_id ? String(dog.gingr_animal_id) : "";
   const arrivingDogName = String(dog.animal_name ?? "").trim();
   if (!arrivingAnimalId || !arrivingDogName) {
-    return { alerted: false as const, reason: "missing_animal" as const };
+    return { alerted: false as const, emailed: false as const, reason: "missing_animal" as const };
   }
+
+  // Fetch the arriving dog's icon first: the contact@ email fires for EVERY
+  // Fighter/Rotation dog checking in, even with no conflict / no other dogs in.
+  let arrivingIcon: FighterRotationIcon | null = null;
+  try {
+    arrivingIcon = await fetchFighterRotationIcon(arrivingAnimalId);
+  } catch (error) {
+    console.error("fighter-rotation: arriving icon fetch failed", error);
+  }
+  // An icon with no comment text still counts — the email shows that no note text was returned.
+  let hasFighterRotationIcon = Boolean(arrivingIcon);
+  if (!arrivingIcon) {
+    try {
+      const rawIcons = await fetchGingrCustomAnimalIcons(arrivingAnimalId);
+      const raw = rawIcons.find((icon) => isFighterRotationIcon(icon));
+      if (raw) {
+        hasFighterRotationIcon = true;
+        arrivingIcon = {
+          animalId: arrivingAnimalId,
+          title: raw.title,
+          comment: raw.comment ?? "",
+          iconId: raw.id
+        };
+      }
+    } catch {
+      // Icon lookup already logged above; whiteboard/email simply will not fire.
+    }
+  }
+
+  const emailArrivingDog = async (comments: string[]) => {
+    if (!hasFighterRotationIcon) return false;
+    try {
+      const result = await sendFighterRotationCheckInEmail({
+        dogName: arrivingDogName,
+        ownerName: dog.owner_name ?? null,
+        comments,
+        checkedInAt: new Date().toISOString()
+      });
+      if (!result.ok) {
+        console.error("fighter-rotation: check-in email failed", result.error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error("fighter-rotation: check-in email failed", error);
+      return false;
+    }
+  };
 
   let checkedInDogs: CheckedInGingrDog[];
   try {
     checkedInDogs = await fetchCurrentlyCheckedInDogs();
   } catch (error) {
     console.error("fighter-rotation: checked-in fetch failed", error);
-    return { alerted: false as const, reason: "checked_in_fetch_failed" as const };
+    // Whiteboard conflict check needs the checked-in list; the email does not.
+    const emailed = await emailArrivingDog(
+      arrivingIcon?.comment ? [`${arrivingDogName}: ${arrivingIcon.comment}`] : []
+    );
+    return { alerted: false as const, emailed, reason: "checked_in_fetch_failed" as const };
   }
 
   // Ensure arriving dog is considered present even if Gingr stamp lags the webhook.
@@ -180,52 +235,64 @@ export async function evaluateFighterRotationAlertForCheckIn(
   }
 
   const others = checkedInDogs.filter((row) => row.animalId !== arrivingAnimalId);
-  if (!others.length) {
-    return { alerted: false as const, reason: "no_other_checked_in" as const };
-  }
-
-  let arrivingIcon: FighterRotationIcon | null = null;
-  try {
-    arrivingIcon = await fetchFighterRotationIcon(arrivingAnimalId);
-  } catch (error) {
-    console.error("fighter-rotation: arriving icon fetch failed", error);
-  }
 
   const otherIcons = new Map<string, FighterRotationIcon | null>();
-  await mapPool(others, 4, async (other) => {
-    try {
-      otherIcons.set(other.animalId, await fetchFighterRotationIcon(other.animalId));
-    } catch (error) {
-      console.error("fighter-rotation: other icon fetch failed", other.animalId, error);
-      otherIcons.set(other.animalId, null);
-    }
-    return other.animalId;
-  });
+  if (others.length) {
+    await mapPool(others, 4, async (other) => {
+      try {
+        otherIcons.set(other.animalId, await fetchFighterRotationIcon(other.animalId));
+      } catch (error) {
+        console.error("fighter-rotation: other icon fetch failed", other.animalId, error);
+        otherIcons.set(other.animalId, null);
+      }
+      return other.animalId;
+    });
+  }
 
-  const conflict = evaluateFighterRotationConflicts({
-    arrivingAnimalId,
-    arrivingDogName,
-    arrivingIcon,
-    checkedInDogs,
-    otherIcons
-  });
+  const conflict = others.length
+    ? evaluateFighterRotationConflicts({
+        arrivingAnimalId,
+        arrivingDogName,
+        arrivingIcon,
+        checkedInDogs,
+        otherIcons
+      })
+    : null;
+
+  // Every Fighter/Rotation check-in emails contact@ with the icon comments/notes.
+  // Webhook caller already drops continuing/duplicate transitions, so this runs
+  // once per check-in session. Whiteboard dedupe below must not block the email,
+  // and an already-active board notice means this check-in was already handled.
+  let emailed = false;
+  if (hasFighterRotationIcon) {
+    const noticeInputForActiveCheck = conflict ? buildFighterRotationNoticeInput(conflict) : null;
+    const active = await loadActiveStaffPushNotice(supabase, { mutate: false }).catch(() => null);
+    const alreadyActive =
+      Boolean(active?.is_active && active.source === FIGHTER_ROTATION_NOTICE_SOURCE) &&
+      Boolean(active?.message?.includes(arrivingDogName)) &&
+      (!noticeInputForActiveCheck ||
+        active?.source_id === noticeInputForActiveCheck.source_id ||
+        !conflict ||
+        !conflict.relatedDogs.length ||
+        conflict.relatedDogs.every((related) => Boolean(active?.message?.includes(related.dogName))));
+    if (!alreadyActive) {
+      emailed = await emailArrivingDog(
+        conflict?.comments ?? (arrivingIcon?.comment ? [`${arrivingDogName}: ${arrivingIcon.comment}`] : [])
+      );
+    } else {
+      return { alerted: false as const, emailed: false as const, reason: "already_active" as const, conflict };
+    }
+  }
+
+  if (!others.length) {
+    return { alerted: false as const, emailed, reason: "no_other_checked_in" as const };
+  }
 
   if (!conflict) {
-    return { alerted: false as const, reason: "no_conflict" as const };
+    return { alerted: false as const, emailed, reason: "no_conflict" as const };
   }
 
   const noticeInput = buildFighterRotationNoticeInput(conflict);
-  const active = await loadActiveStaffPushNotice(supabase, { mutate: false }).catch(() => null);
-  if (
-    active?.is_active &&
-    active.source === FIGHTER_ROTATION_NOTICE_SOURCE &&
-    (active.source_id === noticeInput.source_id ||
-      (Boolean(active.message?.includes(arrivingDogName)) &&
-        conflict.relatedDogs.every((dog) => Boolean(active.message?.includes(dog.dogName)))))
-  ) {
-    return { alerted: false as const, reason: "already_active" as const, conflict };
-  }
-
   const notice = await createAndPushStaffNotice(supabase, noticeInput, "gingr_checkin");
-  return { alerted: true as const, notice, conflict };
+  return { alerted: true as const, emailed, notice, conflict };
 }

@@ -102,4 +102,50 @@ assert.match(notice.message, /Fighter\/Rotations:/);
 assert.match(notice.message, /Rex is checking in/);
 assert.match(notice.message as string, /Separate from Rex/, "icon comment/note must be in the board message");
 
+// Email to contact@ for every Fighter/Rotation check-in — icon notes displayed in the body.
+{
+  const { buildFighterRotationCheckInEmail, FIGHTER_ROTATION_EMAIL_SUBJECT, FIGHTER_ROTATION_EMAIL_TO } =
+    require("../lib/staff/fighter-rotation-email") as typeof import("../lib/staff/fighter-rotation-email");
+  assert.equal(FIGHTER_ROTATION_EMAIL_TO, "contact@fitdog.com");
+  assert.equal(FIGHTER_ROTATION_EMAIL_SUBJECT, "Gingr Fighter / Rotation DOG Checking in");
+  const email = buildFighterRotationCheckInEmail({
+    dogName: "Rex",
+    ownerName: "Jane <Owner>",
+    comments: ["Rex: Separate from Max — no yard time together", "Max: Watch Rex at the gate <b>closely</b>"],
+    checkedInAt: "2026-10-16T12:00:00.000Z"
+  });
+  assert.equal(email.to, "contact@fitdog.com");
+  assert.equal(email.subject, "Gingr Fighter / Rotation DOG Checking in");
+  assert.match(email.text, /Rex: Separate from Max/);
+  assert.match(email.text, /Max: Watch Rex at the gate closely/, "HTML stripped from icon notes in text body");
+  assert.match(email.html, /Rex: Separate from Max/);
+  assert.match(email.html, /Jane &lt;Owner&gt;/, "owner name escaped in HTML body");
+  assert.doesNotMatch(email.html, /<b>closely<\/b>/, "icon note HTML must not render as markup");
+
+  // Send path: configured provider receives exactly one transactional email to contact@.
+  const { sendFighterRotationCheckInEmail } =
+    require("../lib/staff/fighter-rotation-email") as typeof import("../lib/staff/fighter-rotation-email");
+  let sent: unknown = null;
+  void sendFighterRotationCheckInEmail(
+    { dogName: "Rex", comments: ["Rex: Separate from Max"] },
+    {
+      id: "stub",
+      displayName: "Stub",
+      isConfigured: () => true,
+      testConnection: async () => ({ ok: true, message: "ok" }),
+      send: async (input: unknown) => {
+        sent = input;
+        return { ok: true, providerMessageId: "msg-1" };
+      }
+    }
+  ).then((result: { ok: boolean }) => {
+    assert.equal(result.ok, true);
+    const record = sent as { to: string; subject: string; purpose: string; text: string };
+    assert.equal(record.to, "contact@fitdog.com");
+    assert.equal(record.subject, "Gingr Fighter / Rotation DOG Checking in");
+    assert.equal(record.purpose, "transactional");
+    assert.match(record.text, /Separate from Max/);
+  });
+}
+
 console.log("fighter-rotation-alerts: ok");
