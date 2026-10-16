@@ -1,0 +1,4879 @@
+[
+  {
+    "reservation_id": "205975",
+    "standing_reservation": false,
+    "start_date": "2026-09-20T09:00:00-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-20T08:45:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-06-22T10:12:37-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Den &lt; 25lbs<br>",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none&nbsp;&nbsp;&nbsp;&nbsp;</p>"
+    },
+    "animal": {
+      "id": "4176",
+      "name": "Minnie",
+      "breed": "Border Terrier"
+    },
+    "owner": {
+      "id": "3555",
+      "first_name": "Ann",
+      "last_name": "Leland",
+      "address_1": "2960 Neilson Way",
+      "address_2": "unit 102",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90405",
+      "email": "leland4488@yahoo.com",
+      "home_phone": null,
+      "cell_phone": "(310) 452-4488"
+    },
+    "services": [
+      {
+        "id": "165386",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-20T07:00:00-07:00",
+        "scheduled_until": "2026-09-20T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "165387",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-21T07:00:00-07:00",
+        "scheduled_until": "2026-09-21T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-21T14:37:28-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165388",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-22T07:00:00-07:00",
+        "scheduled_until": "2026-09-22T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "165389",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-23T07:00:00-07:00",
+        "scheduled_until": "2026-09-23T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Jasslyn Lopez",
+        "completed_at": "2026-09-23T06:53:58-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165390",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-24T07:00:00-07:00",
+        "scheduled_until": "2026-09-24T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:00-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165391",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-25T07:00:00-07:00",
+        "scheduled_until": "2026-09-25T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-25T07:42:33-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165392",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-26T07:55:48-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165393",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:08-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169370",
+        "name": "Concierge Service - Business Only",
+        "scheduled_at": "2026-09-27T12:00:00-07:00",
+        "scheduled_until": "2026-09-27T12:30:00-07:00",
+        "cost": 544.82,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "165394",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:27:55-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165395",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:08-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165396",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "165385",
+        "name": "Complete Spa",
+        "scheduled_at": "2026-09-30T15:30:00-07:00",
+        "scheduled_until": "2026-09-30T16:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Michael D",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "165397",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "208509",
+    "standing_reservation": false,
+    "start_date": "2026-09-16T07:00:00-07:00",
+    "end_date": "2026-10-04T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-16T07:15:56-07:00",
+    "check_out_date": null,
+    "created_date": "2026-08-16T13:33:38-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<p><a href=\"Grooming::\">Grooming::</a>&nbsp;Oatmeal Shampoo&nbsp;</p>",
+      "animal_notes": "<p>&nbsp;Indy has been at your facility many times with Jenny Gelb (her previous foster parent)</p>\n",
+      "owner_notes": "<p>&nbsp;&nbsp;Indy was previously attending doggy day care with her previous foster parent, Jennie Gelb at your facility until late January. She should be on file through her.</p>\n"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None&nbsp;</p>\n"
+    },
+    "animal": {
+      "id": "7196",
+      "name": "Indy",
+      "breed": "German Shepherd mix"
+    },
+    "owner": {
+      "id": "6154",
+      "first_name": "Maureen",
+      "last_name": "McClurg",
+      "address_1": "1807 Speyer Lane",
+      "address_2": null,
+      "city": "Redondo Beach",
+      "region": "California",
+      "postal": "90278",
+      "email": "maureen.a.mcclurg@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 403-1583"
+    },
+    "services": [
+      {
+        "id": "167494",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-16T07:00:00-07:00",
+        "scheduled_until": "2026-09-16T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167476",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-16T13:00:00-07:00",
+        "scheduled_until": "2026-09-16T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:02-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167495",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-17T07:00:00-07:00",
+        "scheduled_until": "2026-09-17T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-17T21:48:41-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167477",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-17T13:00:00-07:00",
+        "scheduled_until": "2026-09-17T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167496",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-18T07:00:00-07:00",
+        "scheduled_until": "2026-09-18T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-18T21:24:36-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167478",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-18T13:00:00-07:00",
+        "scheduled_until": "2026-09-18T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:00-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167497",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-19T07:00:00-07:00",
+        "scheduled_until": "2026-09-19T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167479",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-19T13:00:00-07:00",
+        "scheduled_until": "2026-09-19T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:44:59-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167498",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-20T07:00:00-07:00",
+        "scheduled_until": "2026-09-20T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167480",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-20T13:00:00-07:00",
+        "scheduled_until": "2026-09-20T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:06-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167499",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-21T07:00:00-07:00",
+        "scheduled_until": "2026-09-21T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-21T14:37:34-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167481",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-21T13:00:00-07:00",
+        "scheduled_until": "2026-09-21T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:32-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167500",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-22T07:00:00-07:00",
+        "scheduled_until": "2026-09-22T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167482",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-22T13:00:00-07:00",
+        "scheduled_until": "2026-09-22T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:34-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167501",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-23T07:00:00-07:00",
+        "scheduled_until": "2026-09-23T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Jasslyn Lopez",
+        "completed_at": "2026-09-23T06:53:58-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167483",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-23T13:00:00-07:00",
+        "scheduled_until": "2026-09-23T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:42-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167502",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-24T07:00:00-07:00",
+        "scheduled_until": "2026-09-24T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167484",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-24T13:00:00-07:00",
+        "scheduled_until": "2026-09-24T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:46-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167503",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-25T07:00:00-07:00",
+        "scheduled_until": "2026-09-25T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-25T07:42:35-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167485",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-25T13:00:00-07:00",
+        "scheduled_until": "2026-09-25T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:49-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167504",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-26T07:55:49-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167486",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-26T13:00:00-07:00",
+        "scheduled_until": "2026-09-26T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:46:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167505",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:08-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167487",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-27T13:00:00-07:00",
+        "scheduled_until": "2026-09-27T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:46:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167506",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:27:51-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167488",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-28T13:00:00-07:00",
+        "scheduled_until": "2026-09-28T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:46:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167507",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:09-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167489",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-29T13:00:00-07:00",
+        "scheduled_until": "2026-09-29T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:42:56-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167508",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:02-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167490",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-30T13:00:00-07:00",
+        "scheduled_until": "2026-09-30T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167509",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167491",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-10-01T13:00:00-07:00",
+        "scheduled_until": "2026-10-01T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167493",
+        "name": "Complete Spa",
+        "scheduled_at": "2026-10-01T14:30:00-07:00",
+        "scheduled_until": "2026-10-01T15:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167510",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167492",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-10-02T13:00:00-07:00",
+        "scheduled_until": "2026-10-02T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167814",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167815",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "208564",
+    "standing_reservation": false,
+    "start_date": "2026-09-18T07:00:00-07:00",
+    "end_date": "2026-10-12T18:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-18T10:31:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-08-17T12:21:58-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "12",
+      "type": "Overnight: Petite Suite"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": "<p>Juno is a sweet 9 year old, 13 lb chihuaua mix. Her super power is comfort — she finds and the softest, coziest spot in every room and loves to be near humans to cuddle. She is the sweetest, most gentle pup, and I feel so lucky that we found each other back in 2018. In addition to human attention, she enjoys long spry walks under the palm trees, sitting at windows watching nature, and playing with her nylabones and dog friends! Juno is a respectful, house trained, quiet dog. She is a momma and she radiates that vibe. Juno is a warm addition to every pack she joins!<br></p>"
+    },
+    "warnings": {
+      "medicines": "Simparica and Heartguard on the 1st of every month with a meal. She accepts the chewables as treats",
+      "allergies": "<p>No known allergies. Sensitive stomach so we only rarely give her 1-ingredient freeze dried meat treats. Will accept human affection instead of treats as reward</p>"
+    },
+    "animal": {
+      "id": "6648",
+      "name": "Juno",
+      "breed": "Chihuahua mix"
+    },
+    "owner": {
+      "id": "5699",
+      "first_name": "Micaela",
+      "last_name": "Berglund",
+      "address_1": "917 19th St",
+      "address_2": "Unit #103",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "micaelaberglund@mac.com",
+      "home_phone": null,
+      "cell_phone": "(435) 655-5444"
+    },
+    "services": [
+      {
+        "id": "167597",
+        "name": "Taxi Service - Business Only",
+        "scheduled_at": "2026-09-18T07:00:00-07:00",
+        "scheduled_until": "2026-09-18T08:00:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167599",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-18T17:00:00-07:00",
+        "scheduled_until": "2026-09-18T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-18T21:24:55-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167600",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-19T17:00:00-07:00",
+        "scheduled_until": "2026-09-19T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:06-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167601",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-20T17:00:00-07:00",
+        "scheduled_until": "2026-09-20T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:09-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167602",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-21T17:00:00-07:00",
+        "scheduled_until": "2026-09-21T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-21T22:05:31-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167627",
+        "name": "Complete Spa",
+        "scheduled_at": "2026-09-22T12:30:00-07:00",
+        "scheduled_until": "2026-09-22T13:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Michael D",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167603",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-22T17:00:00-07:00",
+        "scheduled_until": "2026-09-22T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:45:41-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167604",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-23T17:00:00-07:00",
+        "scheduled_until": "2026-09-23T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-23T19:02:19-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167605",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-24T17:00:00-07:00",
+        "scheduled_until": "2026-09-24T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:18-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167606",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-25T17:00:00-07:00",
+        "scheduled_until": "2026-09-25T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-25T15:31:34-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167607",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-26T17:00:00-07:00",
+        "scheduled_until": "2026-09-26T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-26T21:32:09-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167608",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-27T17:00:00-07:00",
+        "scheduled_until": "2026-09-27T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:44-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167609",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-28T17:00:00-07:00",
+        "scheduled_until": "2026-09-28T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:28:07-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169376",
+        "name": "Activity | Leash Manners",
+        "scheduled_at": "2026-09-29T00:00:00-07:00",
+        "scheduled_until": "2026-09-29T00:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Ivonne Campuzano",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167610",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-29T17:00:00-07:00",
+        "scheduled_until": "2026-09-29T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T21:49:15-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "167611",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-30T17:00:00-07:00",
+        "scheduled_until": "2026-09-30T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167612",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-01T17:00:00-07:00",
+        "scheduled_until": "2026-10-01T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167629",
+        "name": "Complete Spa",
+        "scheduled_at": "2026-10-02T14:30:00-07:00",
+        "scheduled_until": "2026-10-02T15:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167613",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-02T17:00:00-07:00",
+        "scheduled_until": "2026-10-02T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167614",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-03T17:00:00-07:00",
+        "scheduled_until": "2026-10-03T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167615",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-04T17:00:00-07:00",
+        "scheduled_until": "2026-10-04T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167616",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-05T17:00:00-07:00",
+        "scheduled_until": "2026-10-05T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167617",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-06T17:00:00-07:00",
+        "scheduled_until": "2026-10-06T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167618",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-07T17:00:00-07:00",
+        "scheduled_until": "2026-10-07T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167619",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-08T17:00:00-07:00",
+        "scheduled_until": "2026-10-08T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167620",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-09T17:00:00-07:00",
+        "scheduled_until": "2026-10-09T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167621",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-10T17:00:00-07:00",
+        "scheduled_until": "2026-10-10T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167622",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-11T17:00:00-07:00",
+        "scheduled_until": "2026-10-11T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167628",
+        "name": "Complete Spa",
+        "scheduled_at": "2026-10-12T12:00:00-07:00",
+        "scheduled_until": "2026-10-12T13:00:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167623",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-12T17:00:00-07:00",
+        "scheduled_until": "2026-10-12T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167598",
+        "name": "Taxi Service - Business Only",
+        "scheduled_at": "2026-10-12T18:00:00-07:00",
+        "scheduled_until": "2026-10-12T19:00:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "208761",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:00:00-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T10:38:34-07:00",
+    "check_out_date": null,
+    "created_date": "2026-08-20T09:52:49-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>NA&nbsp;</p>\n"
+    },
+    "animal": {
+      "id": "6631",
+      "name": "Oscar",
+      "breed": "Bernedoodle"
+    },
+    "owner": {
+      "id": "5683",
+      "first_name": "Zachary",
+      "last_name": "Cohen",
+      "address_1": "1050 Palisair Place",
+      "address_2": null,
+      "city": "Pacific Palisades",
+      "region": "California",
+      "postal": "90272",
+      "email": "zjcohen@me.com",
+      "home_phone": null,
+      "cell_phone": "(310) 748-9500"
+    },
+    "services": [
+      {
+        "id": "167744",
+        "name": "Taxi Service - Business Only",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T08:00:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "209150",
+    "standing_reservation": false,
+    "start_date": "2026-09-27T09:00:00-07:00",
+    "end_date": "2026-10-03T09:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-27T14:03:33-07:00",
+    "check_out_date": null,
+    "created_date": "2026-08-27T18:35:26-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "12",
+      "type": "Overnight: Petite Suite"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": "<p>Allergy to</p><p>chicken. Gets overwhelmed when too many dogs, heading instinct kicks in. Very active and high energy loves games and people :)</p>"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>Chicken&nbsp;</p>"
+    },
+    "animal": {
+      "id": "5662",
+      "name": "Lona",
+      "breed": "Australian Shepherd"
+    },
+    "owner": {
+      "id": "4855",
+      "first_name": "Laura",
+      "last_name": "Rogers Baysinger",
+      "address_1": "7600 w Manchester Ave Apt 350",
+      "address_2": null,
+      "city": "Playa Del Rey ",
+      "region": "California",
+      "postal": "90293",
+      "email": "lrogers.a@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(201) 406-9687"
+    },
+    "services": [
+      {
+        "id": "168000",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-27T13:00:00-07:00",
+        "scheduled_until": "2026-09-27T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:46:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168001",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-09-30T13:00:00-07:00",
+        "scheduled_until": "2026-09-30T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "167999",
+        "name": "Nail Trim",
+        "scheduled_at": "2026-10-02T09:00:00-07:00",
+        "scheduled_until": "2026-10-02T09:30:00-07:00",
+        "cost": 15,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169280",
+        "name": "Bath & Brush out",
+        "scheduled_at": "2026-10-02T12:00:00-07:00",
+        "scheduled_until": "2026-10-02T13:00:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168002",
+        "name": "Puzzle Playtime",
+        "scheduled_at": "2026-10-03T13:00:00-07:00",
+        "scheduled_until": "2026-10-03T13:15:00-07:00",
+        "cost": 15,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "209764",
+    "standing_reservation": false,
+    "start_date": "2026-09-17T07:00:00-07:00",
+    "end_date": "2026-10-01T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-17T16:52:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-09T07:57:53-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "3",
+      "type": "Overnight: Suite"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "No meds but please keep an eye on back right leg contact owner if notice limping",
+      "allergies": "<p>None we're aware of</p>"
+    },
+    "animal": {
+      "id": "4004",
+      "name": "JoJo",
+      "breed": "Blue Heeler"
+    },
+    "owner": {
+      "id": "3402",
+      "first_name": "Jeffrey",
+      "last_name": "Thomashow",
+      "address_1": "2622 28th street",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90405",
+      "email": "jeffrey.thomashow@gmail.com",
+      "home_phone": "(973) 809-7638",
+      "cell_phone": "(908) 380-6586"
+    },
+    "services": [
+      {
+        "id": "168490",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-18T07:00:00-07:00",
+        "scheduled_until": "2026-09-18T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-18T21:24:44-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168839",
+        "name": "Nail Trim",
+        "scheduled_at": "2026-09-18T09:00:00-07:00",
+        "scheduled_until": "2026-09-18T09:30:00-07:00",
+        "cost": 15,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168491",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-19T07:00:00-07:00",
+        "scheduled_until": "2026-09-19T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168492",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-20T07:00:00-07:00",
+        "scheduled_until": "2026-09-20T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168493",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-21T07:00:00-07:00",
+        "scheduled_until": "2026-09-21T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-21T14:37:36-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168494",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-22T07:00:00-07:00",
+        "scheduled_until": "2026-09-22T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168495",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-23T07:00:00-07:00",
+        "scheduled_until": "2026-09-23T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Jasslyn Lopez",
+        "completed_at": "2026-09-23T06:53:58-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168496",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-24T07:00:00-07:00",
+        "scheduled_until": "2026-09-24T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:06-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168497",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-25T07:00:00-07:00",
+        "scheduled_until": "2026-09-25T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-25T07:42:38-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168498",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-26T07:55:52-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168499",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:10-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168500",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:27:53-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169377",
+        "name": "Activity | Leash Manners",
+        "scheduled_at": "2026-09-29T00:00:00-07:00",
+        "scheduled_until": "2026-09-29T00:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Ivonne Campuzano",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168501",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:10-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168502",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:07-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168503",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168504",
+        "name": "Bath & Brush out",
+        "scheduled_at": "2026-10-01T09:00:00-07:00",
+        "scheduled_until": "2026-10-01T10:00:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "209923",
+    "standing_reservation": false,
+    "start_date": "2026-09-22T08:30:00-07:00",
+    "end_date": "2026-10-05T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-22T09:58:55-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-11T18:04:56-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>NA</p>"
+    },
+    "animal": {
+      "id": "975",
+      "name": "Fiorella ",
+      "breed": "Puggle"
+    },
+    "owner": {
+      "id": "843",
+      "first_name": "Michael",
+      "last_name": "Kirby",
+      "address_1": "2210 Washington Ave",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "rocco.kirby@yahoo.com",
+      "home_phone": "(310) 463-8258",
+      "cell_phone": "(310) 663-9994"
+    },
+    "services": [
+      {
+        "id": "168603",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-22T07:00:00-07:00",
+        "scheduled_until": "2026-09-22T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168591",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-22T17:00:00-07:00",
+        "scheduled_until": "2026-09-22T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168604",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-23T07:00:00-07:00",
+        "scheduled_until": "2026-09-23T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Jasslyn Lopez",
+        "completed_at": "2026-09-23T06:53:58-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168592",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-23T17:00:00-07:00",
+        "scheduled_until": "2026-09-23T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-23T19:02:18-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168605",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-24T07:00:00-07:00",
+        "scheduled_until": "2026-09-24T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:09-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168593",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-24T17:00:00-07:00",
+        "scheduled_until": "2026-09-24T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:17-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168606",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-25T07:00:00-07:00",
+        "scheduled_until": "2026-09-25T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-25T07:42:41-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168594",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-25T17:00:00-07:00",
+        "scheduled_until": "2026-09-25T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-25T07:43:10-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168607",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-26T07:55:54-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168595",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-26T17:00:00-07:00",
+        "scheduled_until": "2026-09-26T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-26T21:32:05-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168608",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:12-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168596",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-27T17:00:00-07:00",
+        "scheduled_until": "2026-09-27T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:37-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168609",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:27:54-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168597",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-28T17:00:00-07:00",
+        "scheduled_until": "2026-09-28T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:28:02-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168610",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:11-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168598",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-29T17:00:00-07:00",
+        "scheduled_until": "2026-09-29T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:18-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168611",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:08-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168599",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-30T17:00:00-07:00",
+        "scheduled_until": "2026-09-30T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168612",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168600",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-01T17:00:00-07:00",
+        "scheduled_until": "2026-10-01T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168613",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168601",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-02T17:00:00-07:00",
+        "scheduled_until": "2026-10-02T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168614",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168602",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-03T17:00:00-07:00",
+        "scheduled_until": "2026-10-03T17:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168700",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168701",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-05T07:00:00-07:00",
+        "scheduled_until": "2026-10-05T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168702",
+        "name": "Complete Spa",
+        "scheduled_at": "2026-10-05T10:00:00-07:00",
+        "scheduled_until": "2026-10-05T11:00:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210040",
+    "standing_reservation": false,
+    "start_date": "2026-09-29T17:00:00-07:00",
+    "end_date": "2026-10-07T11:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-29T11:24:37-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-14T15:21:48-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "12",
+      "type": "Overnight: Petite Suite"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>N/A</p>"
+    },
+    "animal": {
+      "id": "5153",
+      "name": "Gracie",
+      "breed": "Labrador Retriever"
+    },
+    "owner": {
+      "id": "4424",
+      "first_name": "Matt",
+      "last_name": "Sarazen",
+      "address_1": "5122 Maplewood Avenue",
+      "address_2": "APT 204",
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90004",
+      "email": "matthew.sarazen@gmail.com",
+      "home_phone": "(864) 590-3039",
+      "cell_phone": "(713) 679-8546"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210162",
+    "standing_reservation": false,
+    "start_date": "2026-09-29T07:00:00-07:00",
+    "end_date": "2026-10-02T18:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-29T09:03:17-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-16T10:37:45-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "3",
+      "type": "Overnight: Suite"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Suites<br>",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7093",
+      "name": "Miller",
+      "breed": "Golden Retriever"
+    },
+    "owner": {
+      "id": "1960",
+      "first_name": "Robert",
+      "last_name": "Connolly",
+      "address_1": "4080 Glencoe Avenue ",
+      "address_2": "Apt# 121",
+      "city": "Marina del Rey",
+      "region": "California",
+      "postal": "90292",
+      "email": "robert.r.connolly@gmail.com",
+      "home_phone": "(313) 806-2394",
+      "cell_phone": "(310) 562-5806"
+    },
+    "services": [
+      {
+        "id": "169388",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:11-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169389",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:09-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169390",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169391",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168803",
+        "name": "Bath & Brush out",
+        "scheduled_at": "2026-10-02T13:30:00-07:00",
+        "scheduled_until": "2026-10-02T14:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210335",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:00:00-07:00",
+    "end_date": "2026-09-30T17:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:16:07-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-20T16:08:57-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "40",
+      "type": "CORE | Day Train"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>No</p>\n"
+    },
+    "animal": {
+      "id": "7688",
+      "name": "Bruno ",
+      "breed": "Pembroke Welsh Corgi"
+    },
+    "owner": {
+      "id": "6554",
+      "first_name": "Brynja",
+      "last_name": "Seagren",
+      "address_1": "2200 Colorado Avenue, 524",
+      "address_2": "524",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90404",
+      "email": "brynja1986@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(303) 919-6092"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210354",
+    "standing_reservation": false,
+    "start_date": "2026-09-29T07:00:00-07:00",
+    "end_date": "2026-10-19T14:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-29T09:56:25-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-21T08:47:12-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "12",
+      "type": "Overnight: Petite Suite"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": "<p>n/a&nbsp;</p>\n",
+      "owner_notes": "<p>Other emergency contact: Gina: 213.400.7920</p>"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>n/a&nbsp;</p>\n"
+    },
+    "animal": {
+      "id": "7342",
+      "name": "Bandit ",
+      "breed": "Standard Schnauzer"
+    },
+    "owner": {
+      "id": "6273",
+      "first_name": "Ryan ",
+      "last_name": "Harris ",
+      "address_1": "1000 Lake Street Unit G ",
+      "address_2": null,
+      "city": "Venice ",
+      "region": "California",
+      "postal": "90291",
+      "email": "ryanimagines@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(747) 215-4005"
+    },
+    "services": [
+      {
+        "id": "168929",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:12-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168930",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:39-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168931",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168932",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168933",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168934",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168935",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-05T07:00:00-07:00",
+        "scheduled_until": "2026-10-05T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168936",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-06T07:00:00-07:00",
+        "scheduled_until": "2026-10-06T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168937",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-07T07:00:00-07:00",
+        "scheduled_until": "2026-10-07T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168938",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-08T07:00:00-07:00",
+        "scheduled_until": "2026-10-08T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168939",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-09T07:00:00-07:00",
+        "scheduled_until": "2026-10-09T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168940",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-10T07:00:00-07:00",
+        "scheduled_until": "2026-10-10T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168941",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-11T07:00:00-07:00",
+        "scheduled_until": "2026-10-11T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168942",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-12T07:00:00-07:00",
+        "scheduled_until": "2026-10-12T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168943",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-13T07:00:00-07:00",
+        "scheduled_until": "2026-10-13T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168944",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-14T07:00:00-07:00",
+        "scheduled_until": "2026-10-14T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168945",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-15T07:00:00-07:00",
+        "scheduled_until": "2026-10-15T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168946",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-16T07:00:00-07:00",
+        "scheduled_until": "2026-10-16T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168947",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-17T07:00:00-07:00",
+        "scheduled_until": "2026-10-17T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168948",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-18T07:00:00-07:00",
+        "scheduled_until": "2026-10-18T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168949",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-19T07:00:00-07:00",
+        "scheduled_until": "2026-10-19T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210415",
+    "standing_reservation": false,
+    "start_date": "2026-09-29T07:00:00-07:00",
+    "end_date": "2026-10-05T19:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-29T10:03:36-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-22T09:14:12-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "3",
+      "type": "Overnight: Suite"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Suites<br>",
+      "animal_notes": null,
+      "owner_notes": "<p>It is important to know that no one is to pick up Violet other than Kerri Blumenthal (310-971-0816)‬, <span style=\"color: rgb(33,37,41);background-color: rgb(255,255,255);font-size: 14px;font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, \"Helvetica Neue\", Arial, \"Noto Sans\", \"Liberation Sans\", sans-serif, \"Apple Color Emoji\", \"Segoe UI Emoji\", \"Segoe UI Symbol\", \"Noto Color Emoji;\">John Zemke (‭310-804-7716), and</span> me (Steven Luff)‬.  A past relationship has picked up Violet before without consent and she may try to do it again.  Violet is not her dog.  Thank you!</p>\n"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None that I know of.</p>"
+    },
+    "animal": {
+      "id": "2609",
+      "name": "Violet",
+      "breed": "Formosan Mountain Dog"
+    },
+    "owner": {
+      "id": "2228",
+      "first_name": "Steven",
+      "last_name": "Luff",
+      "address_1": "1211 Pearl Street",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90405",
+      "email": "stevenluff@earthlink.net",
+      "home_phone": null,
+      "cell_phone": "(323) 377-4943"
+    },
+    "services": [
+      {
+        "id": "168997",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-29T17:00:00-07:00",
+        "scheduled_until": "2026-09-29T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T21:49:15-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "168998",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-30T17:00:00-07:00",
+        "scheduled_until": "2026-09-30T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "168999",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-01T17:00:00-07:00",
+        "scheduled_until": "2026-10-01T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169000",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-02T17:00:00-07:00",
+        "scheduled_until": "2026-10-02T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169001",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-03T17:00:00-07:00",
+        "scheduled_until": "2026-10-03T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169002",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-04T17:00:00-07:00",
+        "scheduled_until": "2026-10-04T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169003",
+        "name": "Private Walk",
+        "scheduled_at": "2026-10-05T17:00:00-07:00",
+        "scheduled_until": "2026-10-05T17:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210450",
+    "standing_reservation": false,
+    "start_date": "2026-09-28T14:00:00-07:00",
+    "end_date": "2026-10-06T19:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-28T15:01:35-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-22T16:39:14-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Den < 25lbs<br>Huck’s hearing isn’t great anymore so please try to get his attention before surprising him or waking him up thank you!\n\nHe takes fluoxetine once daily in a pill pocket, but you can give him an extra half if he seems very anxious.",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "Add extra 1/2 pill if needed. ",
+      "allergies": "<p>N/A</p>"
+    },
+    "animal": {
+      "id": "3012",
+      "name": "Huck",
+      "breed": "Spaniel Mix"
+    },
+    "owner": {
+      "id": "2579",
+      "first_name": "Jack",
+      "last_name": "Mulholland",
+      "address_1": "2236 San Marco Dr",
+      "address_2": null,
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90068",
+      "email": "jack@jackmulhol.land",
+      "home_phone": null,
+      "cell_phone": "(310) 691-9286"
+    },
+    "services": [
+      {
+        "id": "169040",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:27:57-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169041",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:13-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169042",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:12-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169043",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169044",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169045",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169046",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169047",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-05T07:00:00-07:00",
+        "scheduled_until": "2026-10-05T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169048",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-06T07:00:00-07:00",
+        "scheduled_until": "2026-10-06T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210501",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:30:00-07:00",
+    "end_date": "2026-09-30T17:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:35:04-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-23T12:22:12-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "Please feed her lunch after her first walk ",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>N/A</p>"
+    },
+    "animal": {
+      "id": "5835",
+      "name": "Telluride (Telly)",
+      "breed": "German Shorthaired Pointer"
+    },
+    "owner": {
+      "id": "5008",
+      "first_name": "Katerina (Kat)",
+      "last_name": "Miheliuthakis",
+      "address_1": "1169 North Curson Avenue",
+      "address_2": "Apt 5",
+      "city": "West Hollywood",
+      "region": "California",
+      "postal": "90046",
+      "email": "katerina_miheliuthaki22@yahoo.com",
+      "home_phone": null,
+      "cell_phone": "(661) 886-5573"
+    },
+    "services": [
+      {
+        "id": "169085",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-30T11:30:00-07:00",
+        "scheduled_until": "2026-09-30T12:00:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169086",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-30T14:30:00-07:00",
+        "scheduled_until": "2026-09-30T15:00:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210514",
+    "standing_reservation": false,
+    "start_date": "2026-09-24T08:00:00-07:00",
+    "end_date": "2026-10-04T14:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-24T12:33:20-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-23T18:43:03-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Den < 25lbs<br>Lila gets 1/2 cup food 2x/day (breakfast and dinner) \nShe takes 7.5 mg Prozac (fluoxetine) in the morning \nShe takes 0.2 clonidine 2x/day (am and pm -I usually give with meals)\n\nI put the pills in a pill pocket. In the morning I use the bigger hickory ones while at night I use the smaller cheese pockets \n\nI will be out of the country but feel free to email me!",
+      "animal_notes": null,
+      "owner_notes": "<p></p>\n"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7142",
+      "name": "Lila",
+      "breed": "Chihuahua mix"
+    },
+    "owner": {
+      "id": "6111",
+      "first_name": "Lisa",
+      "last_name": "Miller",
+      "address_1": "2726 Montana Ave",
+      "address_2": "Unit D",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "lisamillerlm@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 977-6599"
+    },
+    "services": [
+      {
+        "id": "169102",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-24T07:00:00-07:00",
+        "scheduled_until": "2026-09-24T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-24T21:59:16-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169103",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-25T07:00:00-07:00",
+        "scheduled_until": "2026-09-25T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-25T07:43:05-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169104",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-26T07:56:24-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169105",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:29-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169106",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:27:59-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169107",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:13-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169108",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:13-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169109",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169110",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169111",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169112",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210515",
+    "standing_reservation": false,
+    "start_date": "2026-09-25T17:00:00-07:00",
+    "end_date": "2026-10-10T17:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-25T16:44:34-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-23T19:07:38-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Den <45lbs<br>",
+      "animal_notes": null,
+      "owner_notes": "<p>door code : 0801 then hit lock button</p>"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none</p>"
+    },
+    "animal": {
+      "id": "5024",
+      "name": "Bodhi",
+      "breed": "golden doodle"
+    },
+    "owner": {
+      "id": "4307",
+      "first_name": "Sophia",
+      "last_name": "Moreno",
+      "address_1": "2629 arizona avenue",
+      "address_2": null,
+      "city": "santa Monica",
+      "region": "California",
+      "postal": "90404",
+      "email": "sophialmoreno@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(650) 248-3826"
+    },
+    "services": [
+      {
+        "id": "169129",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-25T07:00:00-07:00",
+        "scheduled_until": "2026-09-25T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-25T21:23:42-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169121",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-25T12:00:00-07:00",
+        "scheduled_until": "2026-09-25T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-25T21:23:48-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169130",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-26T07:56:26-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169113",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-26T12:00:00-07:00",
+        "scheduled_until": "2026-09-26T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-26T21:32:06-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169131",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:33-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169122",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-27T12:00:00-07:00",
+        "scheduled_until": "2026-09-27T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:39-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169132",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:28:00-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169114",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-28T12:00:00-07:00",
+        "scheduled_until": "2026-09-28T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:28:04-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169133",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:14-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169123",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-29T12:00:00-07:00",
+        "scheduled_until": "2026-09-29T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:42:47-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169134",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:15-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169115",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-30T12:00:00-07:00",
+        "scheduled_until": "2026-09-30T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169135",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169124",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-01T12:00:00-07:00",
+        "scheduled_until": "2026-10-01T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169136",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169116",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-02T12:00:00-07:00",
+        "scheduled_until": "2026-10-02T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169137",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169125",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-03T12:00:00-07:00",
+        "scheduled_until": "2026-10-03T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169138",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169117",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-04T12:00:00-07:00",
+        "scheduled_until": "2026-10-04T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169139",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-05T07:00:00-07:00",
+        "scheduled_until": "2026-10-05T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169126",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-05T12:00:00-07:00",
+        "scheduled_until": "2026-10-05T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169140",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-06T07:00:00-07:00",
+        "scheduled_until": "2026-10-06T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169118",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-06T12:00:00-07:00",
+        "scheduled_until": "2026-10-06T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169141",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-07T07:00:00-07:00",
+        "scheduled_until": "2026-10-07T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169127",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-07T12:00:00-07:00",
+        "scheduled_until": "2026-10-07T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169142",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-08T07:00:00-07:00",
+        "scheduled_until": "2026-10-08T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169119",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-08T12:00:00-07:00",
+        "scheduled_until": "2026-10-08T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169143",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-09T07:00:00-07:00",
+        "scheduled_until": "2026-10-09T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169128",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-09T12:00:00-07:00",
+        "scheduled_until": "2026-10-09T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169144",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-10T07:00:00-07:00",
+        "scheduled_until": "2026-10-10T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169120",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-10T12:00:00-07:00",
+        "scheduled_until": "2026-10-10T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210520",
+    "standing_reservation": false,
+    "start_date": "2026-09-29T12:30:00-07:00",
+    "end_date": "2026-10-04T08:30:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-29T14:03:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-24T07:05:50-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Den &lt;45lbs<br>",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>N/A</p>"
+    },
+    "animal": {
+      "id": "6380",
+      "name": "Digby",
+      "breed": "Goldendoodle"
+    },
+    "owner": {
+      "id": "5465",
+      "first_name": "Erika",
+      "last_name": "Larsen",
+      "address_1": "515 OCEAN AVENUE",
+      "address_2": "UNIT 305N",
+      "city": "SANTA MONICA",
+      "region": "California",
+      "postal": "90402",
+      "email": "erikaplarsen@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(612) 804-2471"
+    },
+    "services": [
+      {
+        "id": "169169",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:16-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169170",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:16-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169171",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169172",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169173",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-03T07:00:00-07:00",
+        "scheduled_until": "2026-10-03T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169174",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-04T07:00:00-07:00",
+        "scheduled_until": "2026-10-04T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210561",
+    "standing_reservation": false,
+    "start_date": "2026-09-26T07:00:00-07:00",
+    "end_date": "2026-10-02T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-26T17:23:17-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-24T13:37:59-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>"
+    },
+    "animal": {
+      "id": "7578",
+      "name": "Mazzy",
+      "breed": "Australian Cattle Dog"
+    },
+    "owner": {
+      "id": "6460",
+      "first_name": "Mireille",
+      "last_name": "Soria",
+      "address_1": "663 Hightree rd",
+      "address_2": null,
+      "city": "santa monica",
+      "region": "California",
+      "postal": "90402",
+      "email": "mireillesoria@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(818) 599-1799"
+    },
+    "services": [
+      {
+        "id": "169186",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-26T07:00:00-07:00",
+        "scheduled_until": "2026-09-26T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-26T21:32:02-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169187",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-27T07:00:00-07:00",
+        "scheduled_until": "2026-09-27T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:34-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169260",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-27T12:00:00-07:00",
+        "scheduled_until": "2026-09-27T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-27T18:21:41-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169188",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-28T07:00:00-07:00",
+        "scheduled_until": "2026-09-28T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:28:01-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169261",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-28T12:00:00-07:00",
+        "scheduled_until": "2026-09-28T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-28T21:28:07-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169189",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-29T07:00:00-07:00",
+        "scheduled_until": "2026-09-29T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "Lane swarens",
+        "completed_at": "2026-09-29T15:17:17-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169262",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-29T12:00:00-07:00",
+        "scheduled_until": "2026-09-29T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": "Julie moss",
+        "completed_at": "2026-09-29T14:42:51-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169190",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": "David ortiz",
+        "completed_at": "2026-09-30T07:13:18-07:00",
+        "is_pup_pod": false
+      },
+      {
+        "id": "169263",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-30T12:00:00-07:00",
+        "scheduled_until": "2026-09-30T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169191",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169264",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-01T12:00:00-07:00",
+        "scheduled_until": "2026-10-01T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169192",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-02T07:00:00-07:00",
+        "scheduled_until": "2026-10-02T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169265",
+        "name": "Group Walk",
+        "scheduled_at": "2026-10-02T12:00:00-07:00",
+        "scheduled_until": "2026-10-02T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210565",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:00:00-07:00",
+    "end_date": "2026-09-30T18:45:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:27:59-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-24T15:57:04-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "41",
+      "type": "FitPuppy Special | Day Train"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": "<p>Tylerkim15@gmail.com :&nbsp;smithmichaellane@gmail.com</p><p></p><p></p>\n<p></p>"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>fresh cut grass makes her paws get sores.&nbsp;</p>\n"
+    },
+    "animal": {
+      "id": "7494",
+      "name": "Pepper",
+      "breed": "Mixed Breed"
+    },
+    "owner": {
+      "id": "6389",
+      "first_name": "Tyler",
+      "last_name": "Smith",
+      "address_1": "11457 Venice Blvd",
+      "address_2": "Unit 5",
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90066",
+      "email": "smithmichaellane@gmail.com",
+      "home_phone": "(253) 882-9992",
+      "cell_phone": "(213) 357-6066"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210736",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:30:00-07:00",
+    "end_date": "2026-09-30T15:30:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:17:43-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-28T17:00:58-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7491",
+      "name": "Obie",
+      "breed": "Maltipoo"
+    },
+    "owner": {
+      "id": "6386",
+      "first_name": "Hannah",
+      "last_name": "Haverty",
+      "address_1": "11665 mayfield avenue apt 7",
+      "address_2": null,
+      "city": "Los Angeles ",
+      "region": "California",
+      "postal": "90049",
+      "email": "hannahhaverty127@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(404) 285-4331"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210801",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T00:00:00-07:00",
+    "end_date": "2026-09-30T00:30:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:00:52-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-29T14:36:50-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "51",
+      "type": "Trainer Led Hike | Group Training"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "Beef"
+    },
+    "animal": {
+      "id": "4260",
+      "name": "Remy",
+      "breed": "Border Collie Mix"
+    },
+    "owner": {
+      "id": "3624",
+      "first_name": "Jennifer",
+      "last_name": "Solomon",
+      "address_1": "350 16th Street",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90402",
+      "email": "jlewin3@yahoo.com",
+      "home_phone": null,
+      "cell_phone": "(310) 869-8696"
+    },
+    "services": [
+      {
+        "id": "169418",
+        "name": "Activity | Trainer Led Hike",
+        "scheduled_at": "2026-09-30T00:00:00-07:00",
+        "scheduled_until": "2026-09-30T00:30:00-07:00",
+        "cost": 0,
+        "assigned_to": "Ivonne Campuzano",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210809",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:45:00-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:47:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-29T17:11:52-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "Thank you!",
+      "animal_notes": "<p>He is a very good boy who has a ton of energy and of playfulness but is a bit hyper</p>",
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None that we know about but we suspect something as he exhibits some allergenic tendencies (scratching self, biting own tail, eating own fur)</p>"
+    },
+    "animal": {
+      "id": "6144",
+      "name": "Toby",
+      "breed": "Golden Retriever"
+    },
+    "owner": {
+      "id": "5269",
+      "first_name": "Melissa",
+      "last_name": "Piken",
+      "address_1": "1122 10th st.",
+      "address_2": "Apt. 4",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "lspiken@gmail.com",
+      "home_phone": "(516) 526-0449",
+      "cell_phone": "(847) 722-6784"
+    },
+    "services": [
+      {
+        "id": "169496",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-30T12:00:00-07:00",
+        "scheduled_until": "2026-09-30T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169426",
+        "name": "Private Walk",
+        "scheduled_at": "2026-09-30T14:00:00-07:00",
+        "scheduled_until": "2026-09-30T14:30:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210812",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T12:00:00-07:00",
+    "end_date": "2026-10-01T19:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T12:57:58-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-29T19:47:48-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "4",
+      "type": "Overnight: Den"
+    },
+    "notes": {
+      "reservation_notes": "<b>Lodging Type:</b> Den < 25lbs<br>",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>na</p>"
+    },
+    "animal": {
+      "id": "4187",
+      "name": "Guillermo",
+      "breed": "Chihuahua mix"
+    },
+    "owner": {
+      "id": "3564",
+      "first_name": "Ayesha",
+      "last_name": "Bhasin",
+      "address_1": "303 California Ave #22",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "ayeshabhasin@yahoo.com",
+      "home_phone": "(213) 300-3012",
+      "cell_phone": "(714) 809-8700"
+    },
+    "services": [
+      {
+        "id": "169430",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-09-30T07:00:00-07:00",
+        "scheduled_until": "2026-09-30T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169431",
+        "name": "Free Daily Walk",
+        "scheduled_at": "2026-10-01T07:00:00-07:00",
+        "scheduled_until": "2026-10-01T07:15:00-07:00",
+        "cost": 0,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      },
+      {
+        "id": "169429",
+        "name": "Teeth Brushing",
+        "scheduled_at": "2026-10-01T14:00:00-07:00",
+        "scheduled_until": "2026-10-01T14:30:00-07:00",
+        "cost": 17,
+        "assigned_to": "Micheal M",
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210813",
+    "standing_reservation": false,
+    "start_date": "2026-09-29T19:48:44-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:00:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-29T19:48:44-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7018",
+      "name": "Willow",
+      "breed": "Dauschund Mix"
+    },
+    "owner": {
+      "id": "6007",
+      "first_name": "Laura",
+      "last_name": "Collin",
+      "address_1": "1457 Centinela Ave",
+      "address_2": "Unit 5",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90404",
+      "email": "collinla@yahoo.com",
+      "home_phone": null,
+      "cell_phone": "(310) 486-8591"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210819",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:30:00-07:00",
+    "end_date": "2026-09-30T18:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:06:18-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T06:39:33-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": "<p></p>\n",
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>N/A</p>\n"
+    },
+    "animal": {
+      "id": "7158",
+      "name": "Smiley",
+      "breed": "Chihuahua mix"
+    },
+    "owner": {
+      "id": "6123",
+      "first_name": "Molly",
+      "last_name": "Thompson",
+      "address_1": "1112 11th St",
+      "address_2": "4",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "mollykanethompson@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(973) 464-9969"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210822",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:21:14-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:21:14-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T07:21:14-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>"
+    },
+    "animal": {
+      "id": "5609",
+      "name": "Captain America",
+      "breed": "Labrador Retriever"
+    },
+    "owner": {
+      "id": "4807",
+      "first_name": "Rachael",
+      "last_name": "Sharma",
+      "address_1": "767 Sunset Ave",
+      "address_2": null,
+      "city": "Venice",
+      "region": "California",
+      "postal": "90291",
+      "email": "rachael.e.abraham@gmail.com",
+      "home_phone": "(585) 953-9867",
+      "cell_phone": "(408) 529-1415"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210825",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:25:18-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:25:18-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T07:25:18-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7346",
+      "name": "Loulou",
+      "breed": "Bernese Mountain Dog"
+    },
+    "owner": {
+      "id": "6276",
+      "first_name": "Zac",
+      "last_name": "Carroll",
+      "address_1": "1014 Oakwood Ave ",
+      "address_2": null,
+      "city": "Venice",
+      "region": "California",
+      "postal": "90291",
+      "email": "carroll.zac@gmail.com",
+      "home_phone": "(513) 505-6472",
+      "cell_phone": "(978) 210-3611"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210826",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:26:24-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:26:24-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T07:26:24-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>"
+    },
+    "animal": {
+      "id": "5724",
+      "name": "Sunrise",
+      "breed": "Labrador Retriever"
+    },
+    "owner": {
+      "id": "4912",
+      "first_name": "Stephen",
+      "last_name": "Schwartz",
+      "address_1": "142 N Carmelina Ave",
+      "address_2": null,
+      "city": "Los Angeles ",
+      "region": "California",
+      "postal": "90049",
+      "email": "steve4424@yahoo.com",
+      "home_phone": "(310) 453-6118",
+      "cell_phone": "(310) 210-5965"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210827",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T07:37:52-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T07:37:52-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T07:37:52-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>n/a</p>"
+    },
+    "animal": {
+      "id": "5899",
+      "name": "Leo",
+      "breed": "Aussie / Shepherd Mix"
+    },
+    "owner": {
+      "id": "5065",
+      "first_name": "danielle",
+      "last_name": "mills",
+      "address_1": "14000 Marquesas Way ",
+      "address_2": "Apt #1225 ",
+      "city": "Marina Del Rey",
+      "region": "California",
+      "postal": "90292 ",
+      "email": "daniellem30@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(973) 986-2552"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210830",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:04:50-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:04:50-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:04:50-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": "<p>&nbsp;he has anxiety medicine you can give him as well up to 4 lets a say day</p>\n",
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>Nomnnomenone</p>\n"
+    },
+    "animal": {
+      "id": "7104",
+      "name": "Beau ",
+      "breed": "Australian Cattle Dog"
+    },
+    "owner": {
+      "id": "6076",
+      "first_name": "Leigh",
+      "last_name": "Shane ",
+      "address_1": "3974 Moore St",
+      "address_2": "Apt 201 ",
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90066",
+      "email": "leigh.shane@yahoo.com",
+      "home_phone": null,
+      "cell_phone": "(310) 948-9008"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210831",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:08:51-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:08:00-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:08:51-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": "<p>&gt;For Dropoff: Please keep him on a short leash and be stern with him on the barking as I am getting in trouble with the building. Also, he developed this habit of grabbing his leash and running to the door on his way home, please do not let him do this as he thinks it’s a game. GATE CODE: 191605<br></p>"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none that I know of</p>"
+    },
+    "animal": {
+      "id": "4359",
+      "name": "Winston",
+      "breed": "Beagle"
+    },
+    "owner": {
+      "id": "3712",
+      "first_name": "Zaleena",
+      "last_name": "Mohamed",
+      "address_1": "13603 Marina Pointe Drive",
+      "address_2": "Apt. C519",
+      "city": "Marina Del Rey",
+      "region": "California",
+      "postal": "90292",
+      "email": "zaleenam@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 883-4616"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210832",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:19:37-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:19:37-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:19:37-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": "<p></p>\n",
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7267",
+      "name": "Ivy",
+      "breed": "Golden Retriever"
+    },
+    "owner": {
+      "id": "6214",
+      "first_name": "Ryan",
+      "last_name": "Mcgee",
+      "address_1": "846 4th St",
+      "address_2": "205",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "ryanmcgee726@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(508) 667-7016"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210836",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:38:47-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:38:47-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:38:47-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": null
+    },
+    "animal": {
+      "id": "5145",
+      "name": "Rio",
+      "breed": "Standard Poodle"
+    },
+    "owner": {
+      "id": "4418",
+      "first_name": "Miguel",
+      "last_name": "Delgado",
+      "address_1": "11924 West Washington Blvd.",
+      "address_2": "Apt. 408",
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90066",
+      "email": "migueld3747@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(818) 433-2591"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210837",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:40:36-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:40:36-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:40:36-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None&nbsp;</p>\n"
+    },
+    "animal": {
+      "id": "7589",
+      "name": "Tina ",
+      "breed": "Bernedoodle"
+    },
+    "owner": {
+      "id": "6469",
+      "first_name": "Jennifer",
+      "last_name": "Candy-Sullivan",
+      "address_1": "11650 Mayfield Ave",
+      "address_2": "8 ",
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90049",
+      "email": "jencandy@mac.com",
+      "home_phone": null,
+      "cell_phone": "(310) 748-5717"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210838",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:43:13-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:43:13-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:43:13-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none</p>"
+    },
+    "animal": {
+      "id": "6869",
+      "name": "Louie",
+      "breed": "Dashchund"
+    },
+    "owner": {
+      "id": "5878",
+      "first_name": "Amy ",
+      "last_name": "Jaffe",
+      "address_1": "1436 Harvard Street #4",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90404",
+      "email": "handlertaper@yaho.com",
+      "home_phone": "(310) 795-2036",
+      "cell_phone": "(310) 721-0473"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210841",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:00:00-07:00",
+    "end_date": "2026-09-30T18:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:09:44-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:54:02-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None known</p>"
+    },
+    "animal": {
+      "id": "3950",
+      "name": "Vesper",
+      "breed": "Siberian Husky"
+    },
+    "owner": {
+      "id": "3358",
+      "first_name": "Nathan",
+      "last_name": "Guest",
+      "address_1": "2726 Montana Avenue",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "nathan.guest@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(202) 489-7676"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210842",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T08:58:47-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T08:58:47-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T08:58:47-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": "<p>I am looking for training for my almost 3yr old lab, Louie.  He did a boot camp at 7 months and is a fun, playful dog with a  lot of energy. He is pretty easy going and loves to go on walks. For the last couple of years he has stayed at my cousins with their 2 labs during the week while I am working in WLA.  I feel he needs to get some good training and I, as well, need to learn whatever skills are necessary.  We routinely go to the dog park near my home in the Coronado Cays and he runs around, plays, and checks out the other dogs...when he is not sniffing all over the park.  He plays catch, is easily distracted when he sees another dog to check out.  Of late he has started growling at other dogs when they are on leash...he can be in my car or on leash with me on a walk.  I don't know what to do for this.  At the park he runs around and does not growl.  So, I need training for that.  I also would like to use your day care services, sports classes and excursions (he would love those!).  If somebody could contact me at 310-753-7379 I would appreciate it.</p>\n"
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>seasonal environmental.  he gets a shot for them as necessary</p>\n"
+    },
+    "animal": {
+      "id": "7539",
+      "name": "Louie",
+      "breed": "Lab Retriever"
+    },
+    "owner": {
+      "id": "6430",
+      "first_name": "Lynda",
+      "last_name": "Cole",
+      "address_1": "26 Green Turtle Rd",
+      "address_2": null,
+      "city": "Coronado Cays",
+      "region": "California",
+      "postal": "92118",
+      "email": "4TheTurtle@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 753-7379"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210844",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:07:05-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:07:05-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T09:07:05-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7271",
+      "name": "Barrett",
+      "breed": "cavapoo"
+    },
+    "owner": {
+      "id": "399",
+      "first_name": "Paula",
+      "last_name": "Dobbins",
+      "address_1": "2909 10th Street",
+      "address_2": "#5",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90405",
+      "email": "pdobbins@xrds.org",
+      "home_phone": null,
+      "cell_phone": "(310) 488-7323"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210845",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:11:25-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:11:25-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T09:11:25-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": "<p>when being boarded, can someone please wipe his eyes with a dry towel (or even paper towel)? as they get very wet then irritated. thank you :)<br></p>",
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>sensitive to chicken!</p>"
+    },
+    "animal": {
+      "id": "5825",
+      "name": "Luca",
+      "breed": "Bernedoodle"
+    },
+    "owner": {
+      "id": "5002",
+      "first_name": "liza",
+      "last_name": "pasciuto",
+      "address_1": "835 4th street apartment 204",
+      "address_2": null,
+      "city": "SANTA MONICA",
+      "region": "California",
+      "postal": "90403",
+      "email": "lizapasciuto@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 919-6311"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210849",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:39:11-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:39:11-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T09:39:11-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "No medications",
+      "allergies": "<p>None</p>"
+    },
+    "animal": {
+      "id": "4875",
+      "name": "Barkley",
+      "breed": "Poodle mix"
+    },
+    "owner": {
+      "id": "4172",
+      "first_name": "Theresa",
+      "last_name": "Pablos",
+      "address_1": "817 14th St",
+      "address_2": "Apt D",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "zeyzammy4@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(210) 355-6670"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210850",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:45:25-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:45:25-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T09:45:25-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7518",
+      "name": "Lucy",
+      "breed": "Pit Mix"
+    },
+    "owner": {
+      "id": "6412",
+      "first_name": "Tasha",
+      "last_name": "Baum",
+      "address_1": "1023 S. Gretna Green Way",
+      "address_2": null,
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90049",
+      "email": "tashabaum@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 617-9000"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210851",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T09:45:27-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T09:45:27-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T09:45:27-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>None</p>\n"
+    },
+    "animal": {
+      "id": "7677",
+      "name": "Lola",
+      "breed": "Chihuahua"
+    },
+    "owner": {
+      "id": "6412",
+      "first_name": "Tasha",
+      "last_name": "Baum",
+      "address_1": "1023 S. Gretna Green Way",
+      "address_2": null,
+      "city": "Los Angeles",
+      "region": "California",
+      "postal": "90049",
+      "email": "tashabaum@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 617-9000"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210857",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T10:25:24-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T10:25:24-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T10:25:24-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "1",
+      "type": "Full Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": "",
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none</p>"
+    },
+    "animal": {
+      "id": "7384",
+      "name": "Sparky",
+      "breed": "Lab Mix"
+    },
+    "owner": {
+      "id": "6304",
+      "first_name": "Ryan Speed",
+      "last_name": "Trattner",
+      "address_1": "1812 Broadway Santa Monica ",
+      "address_2": "345 N Maple Dr, Beverly Hills",
+      "city": "santa monica/beverly hills ",
+      "region": "California",
+      "postal": "90210",
+      "email": "ryantrattner@gmail.com",
+      "home_phone": "(213) 205-7049",
+      "cell_phone": "(310) 592-7418"
+    },
+    "services": [
+      {
+        "id": "169490",
+        "name": "Group Walk",
+        "scheduled_at": "2026-09-30T12:00:00-07:00",
+        "scheduled_until": "2026-09-30T12:15:00-07:00",
+        "cost": 5,
+        "assigned_to": null,
+        "completed_by": null,
+        "completed_at": null,
+        "is_pup_pod": false
+      }
+    ],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210861",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T11:18:47-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T11:18:47-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T11:18:47-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "2",
+      "type": "Half Day Daycare"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none</p>\n"
+    },
+    "animal": {
+      "id": "7585",
+      "name": "Sundance",
+      "breed": "Cairn Terrier"
+    },
+    "owner": {
+      "id": "6466",
+      "first_name": "Florence",
+      "last_name": "Grace",
+      "address_1": "1926 Montana Avenue",
+      "address_2": null,
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90403",
+      "email": "flograce@me.com",
+      "home_phone": null,
+      "cell_phone": "(310) 994-4418"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210862",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T11:24:06-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T11:24:06-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T11:24:06-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "16",
+      "type": "First Day Assessment"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": "<p></p>\n",
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none</p>\n"
+    },
+    "animal": {
+      "id": "7728",
+      "name": "Andy Bear",
+      "breed": "Aussie / Shepherd Mix"
+    },
+    "owner": {
+      "id": "6590",
+      "first_name": "debbie",
+      "last_name": "weissmann",
+      "address_1": "602 21st street",
+      "address_2": null,
+      "city": "santa monica",
+      "region": "California",
+      "postal": "90402",
+      "email": "debbie.weis2010@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(310) 722-7750"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210864",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T12:07:42-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T12:07:42-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T12:07:42-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "8",
+      "type": "Stay & Play"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>none</p>"
+    },
+    "animal": {
+      "id": "4308",
+      "name": "Harper",
+      "breed": "Labradoodle"
+    },
+    "owner": {
+      "id": "3668",
+      "first_name": "Erica",
+      "last_name": "Marshall",
+      "address_1": "2021 Ocean Ave",
+      "address_2": "#219",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90405",
+      "email": "eprosser@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(810) 434-3201"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  },
+  {
+    "reservation_id": "210865",
+    "standing_reservation": false,
+    "start_date": "2026-09-30T12:07:43-07:00",
+    "end_date": "2026-09-30T20:00:00-07:00",
+    "cancelled_date": null,
+    "confirmed_date": null,
+    "check_in_date": "2026-09-30T12:07:43-07:00",
+    "check_out_date": null,
+    "created_date": "2026-09-30T12:07:43-07:00",
+    "wait_list_date": null,
+    "reservation_type": {
+      "id": "8",
+      "type": "Stay & Play"
+    },
+    "notes": {
+      "reservation_notes": null,
+      "animal_notes": null,
+      "owner_notes": null
+    },
+    "warnings": {
+      "medicines": "",
+      "allergies": "<p>N/A</p>"
+    },
+    "animal": {
+      "id": "4937",
+      "name": "Darcy",
+      "breed": "Labradoodle"
+    },
+    "owner": {
+      "id": "3668",
+      "first_name": "Erica",
+      "last_name": "Marshall",
+      "address_1": "2021 Ocean Ave",
+      "address_2": "#219",
+      "city": "Santa Monica",
+      "region": "California",
+      "postal": "90405",
+      "email": "eprosser@gmail.com",
+      "home_phone": null,
+      "cell_phone": "(810) 434-3201"
+    },
+    "services": [],
+    "deposit": [],
+    "transaction": []
+  }
+]

@@ -20,7 +20,9 @@ import {
   createActiveIssue,
   createCrossoverMessage,
   createCrossoverMessages,
+  applyStaffDirectoryReconciliation,
   createStaffDirectoryMember,
+  previewStaffDirectoryReconciliation,
   deleteCrossoverMessage,
   deleteStaffDirectoryMember,
   createOwnerFollowUp,
@@ -48,6 +50,7 @@ import {
   parseStaffOpsRevision
 } from "@/lib/user-interactions/staff-ops-auth";
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
+import { StaffDirectoryValidationError } from "@/lib/staff/directory-reconciliation";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
 import {
@@ -182,6 +185,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({
       ...capStaffOpsListPayload(state),
+      staff_ops_revision: state._revision ?? 0,
       // Never expose other users' notifications in the payload.
       notifications: notificationsForSession(state, readerSession),
       currentUser: {
@@ -332,6 +336,23 @@ export async function POST(request: Request) {
       await deleteStaffDirectoryMember(supabase, id, actorDisplayName, writeOpts);
       result = { id };
       auditAction = "staff.directory.delete";
+    } else if (action === "preview_staff_directory_reconciliation") {
+      if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
+      result = await previewStaffDirectoryReconciliation(supabase);
+      auditAction = "staff.directory.reconciliation_preview";
+    } else if (action === "apply_staff_directory_reconciliation") {
+      if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
+      if (body.confirm !== true) {
+        return NextResponse.json({ error: "Reconciliation apply requires explicit confirmation." }, { status: 400 });
+      }
+      const approvedAccountIds = Array.isArray(body.approved_account_ids)
+        ? body.approved_account_ids.map((id: unknown) => String(id ?? "")).filter(Boolean)
+        : null;
+      result = await applyStaffDirectoryReconciliation(supabase, actorDisplayName, {
+        ...writeOpts,
+        approvedAccountIds
+      });
+      auditAction = "staff.directory.reconciliation_apply";
     } else if (action === "push_to_whiteboard") {
       const title = String(body.title ?? "").trim();
       const message = String(body.message ?? "").trim();
@@ -412,6 +433,9 @@ export async function POST(request: Request) {
         { error: error.message, code: "staff_ops_atomic_unavailable" },
         { status: 503 }
       );
+    }
+    if (error instanceof StaffDirectoryValidationError) {
+      return NextResponse.json({ error: error.message, code: "staff_directory_validation" }, { status: 400 });
     }
     const message = error instanceof Error ? error.message : "Unable to save Staff Admin record.";
     if (message.includes("only delete Team Log entries")) {

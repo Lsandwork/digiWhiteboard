@@ -23,6 +23,17 @@ import {
 } from "@/lib/user-interactions/staff-ops-auth";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
+import { listAdminUsers } from "@/lib/admin/users";
+import {
+  applyStaffDirectoryReconciliation as applyReconciliationToDirectory,
+  assertStaffDirectoryIntegrity,
+  buildStaffDirectoryReconciliationReport,
+  normalizeDirectoryEmail,
+  STAFF_DIRECTORY_DEPARTMENTS,
+  validateStaffDirectoryFields,
+  type DirectoryAccountInput,
+  type StaffDirectoryReconciliationReport
+} from "@/lib/staff/directory-reconciliation";
 import {
   clearInboxNotificationsKeepingAssigned,
   dispatchStaffOpsNotifications,
@@ -223,18 +234,7 @@ export type MutateStaffOpsOptions = {
 
 export type StaffOpsWriteOptions = MutateStaffOpsOptions;
 
-export const STAFF_DEPARTMENTS = [
-  "Front Desk",
-  "Team Lead",
-  "Daycare",
-  "Hikers",
-  "Grooming",
-  "Training",
-  "Management",
-  "Marketing",
-  "Maintenance",
-  "Transportation"
-] as const;
+export const STAFF_DEPARTMENTS = STAFF_DIRECTORY_DEPARTMENTS;
 
 export const FRONT_DESK_DEPARTMENT = "Front Desk";
 export const TEAM_LEAD_DEPARTMENT = "Team Lead";
@@ -473,6 +473,11 @@ function parseState(value: unknown): StaffOpsState {
   };
 }
 
+/** Exported for tests: missing staff_directory -> seed default; explicit [] stays []. */
+export function parseStaffOpsState(value: unknown): StaffOpsState {
+  return parseState(value);
+}
+
 async function loadStateFromAdminSettings(supabase: SupabaseClient) {
   const loaded = await loadAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState, emptyState());
   if (loaded === null) return null;
@@ -549,6 +554,8 @@ async function mutateStaffOpsState(
     }
     const revision = state._revision ?? 0;
     const next = mutator(state);
+    // Validation boundary: a malformed/missing directory must never be persisted over saved data.
+    assertStaffDirectoryIntegrity(next.staff_directory);
     next._revision = revision + 1;
     const fresh = await loadState(supabase);
     if ((fresh._revision ?? 0) !== revision) {
@@ -1818,6 +1825,7 @@ export async function createStaffDirectoryMember(
   actorAdminId?: string | null,
   writeOptions?: StaffOpsWriteOptions
 ) {
+  validateStaffDirectoryFields(input, { partial: false });
   const name = cleanString(input.name);
   if (!name) throw new Error("Staff member name is required.");
   const now = nowIso();
@@ -1854,16 +1862,22 @@ export async function createStaffDirectoryMember(
     created_at: now,
     updated_at: now
   };
-  await mutateStaffOpsState(supabase, (state) =>
-    createActivityLog({ ...state, staff_directory: sortNewest([member, ...state.staff_directory]) }, {
+  await mutateStaffOpsState(supabase, (state) => {
+    if (member.admin_user_id && state.staff_directory.some((m) => m.admin_user_id === member.admin_user_id)) {
+      throw new Error("That login account is already linked to another staff directory profile.");
+    }
+    if (member.email && state.staff_directory.some((m) => normalizeDirectoryEmail(m.email) === normalizeDirectoryEmail(member.email))) {
+      throw new Error("That email is already used by another staff directory profile.");
+    }
+    return createActivityLog({ ...state, staff_directory: sortNewest([member, ...state.staff_directory]) }, {
       activity_type: "staff_directory.created",
       title: `Added staff member: ${member.name}`,
       description: member.department,
       source_table: "staff_directory",
       source_id: member.id,
       created_by: actor
-    })
-  , writeOptions);
+    });
+  }, writeOptions);
   return member;
 }
 
@@ -1875,6 +1889,7 @@ export async function updateStaffDirectoryMember(
   actorAdminId?: string | null,
   writeOptions?: StaffOpsWriteOptions
 ) {
+  validateStaffDirectoryFields(patch, { partial: true });
   const now = nowIso();
   const preState = await loadState(supabase);
   const existing = preState.staff_directory.find((member) => member.id === id);
@@ -1907,12 +1922,25 @@ export async function updateStaffDirectoryMember(
   await mutateStaffOpsState(supabase, (state) => {
     const row = state.staff_directory.find((member) => member.id === id);
     if (!row) throw new Error("Staff member not found.");
+    // Rebase on the freshest row: fields absent from this patch keep their latest saved values.
+    const rebasedName = patch.name !== undefined ? cleanString(patch.name) : row.name;
+    const rebasedEmail = patch.email !== undefined ? optionalString(patch.email) : row.email;
+    const rebasedRole = patch.dashboard_role !== undefined ? ((patch.dashboard_role as AdminUserRole | null) ?? null) : row.dashboard_role;
+    const rebasedDepartment = patch.department !== undefined
+      ? cleanString(patch.department, departmentForDashboardRole(rebasedRole) ?? row.department)
+      : patch.dashboard_role !== undefined ? departmentForDashboardRole(rebasedRole) ?? row.department : row.department;
+    if (login.admin_user_id && state.staff_directory.some((m) => m.id !== id && m.admin_user_id === login.admin_user_id)) {
+      throw new Error("That login account is already linked to another staff directory profile.");
+    }
+    if (rebasedEmail && state.staff_directory.some((m) => m.id !== id && normalizeDirectoryEmail(m.email) === normalizeDirectoryEmail(rebasedEmail))) {
+      throw new Error("That email is already used by another staff directory profile.");
+    }
     const updated: StaffDirectoryMember = {
       ...row,
-      name: nextName,
+      name: rebasedName,
       role: patch.role !== undefined ? optionalString(patch.role) : row.role,
-      department: nextDepartment,
-      email: nextEmail,
+      department: rebasedDepartment,
+      email: rebasedEmail,
       phone: patch.phone !== undefined ? optionalString(patch.phone) : row.phone,
       status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : row.status,
       notes: patch.notes !== undefined ? optionalString(patch.notes) : row.notes,
@@ -1950,18 +1978,6 @@ export async function deleteStaffDirectoryMember(
   const existing = preState.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
 
-  // Staff directory delete must free the dashboard login email so the person can be re-added.
-  if (existing.admin_user_id && isAdminUserUuid(existing.admin_user_id)) {
-    try {
-      await deleteAdminUser(supabase, existing.admin_user_id);
-    } catch {
-      // Fall through to email-based cleanup below.
-    }
-  }
-  if (existing.email) {
-    await deleteAdminUserByEmail(supabase, existing.email);
-  }
-
   await mutateStaffOpsState(supabase, (state) => {
     const row = state.staff_directory.find((member) => member.id === id);
     if (!row) throw new Error("Staff member not found.");
@@ -1977,6 +1993,101 @@ export async function deleteStaffDirectoryMember(
       }
     );
   }, writeOptions);
+
+  // Only after the directory row is durably removed, free the dashboard login
+  // (existing behaviour). If this fails the orphan login can be reclaimed on re-add.
+  if (existing.admin_user_id && isAdminUserUuid(existing.admin_user_id)) {
+    try {
+      await deleteAdminUser(supabase, existing.admin_user_id);
+    } catch {
+      // Fall through to email-based cleanup below.
+    }
+  }
+  if (existing.email) {
+    await deleteAdminUserByEmail(supabase, existing.email);
+  }
+}
+
+export type StaffDirectoryReconciliationPreview = {
+  revision: number;
+  report: StaffDirectoryReconciliationReport;
+};
+
+async function loadDirectoryAccounts(supabase: SupabaseClient): Promise<DirectoryAccountInput[]> {
+  const users = await listAdminUsers(supabase);
+  return users.map((u) => ({ id: u.id, full_name: u.full_name, email: u.email, role: u.role, status: u.status }));
+}
+
+/** Dry-run only: reads directory + accounts, writes nothing. */
+export async function previewStaffDirectoryReconciliation(
+  supabase: SupabaseClient
+): Promise<StaffDirectoryReconciliationPreview> {
+  const [state, accounts] = await Promise.all([loadState(supabase), loadDirectoryAccounts(supabase)]);
+  const parsed = parseState(state);
+  return { revision: parsed._revision ?? 0, report: buildStaffDirectoryReconciliationReport(parsed.staff_directory, accounts) };
+}
+
+/**
+ * Apply only unambiguous additions/links from a fresh report, rebased inside
+ * the CAS mutate. Never creates logins, changes roles/status, or deletes profiles.
+ */
+export async function applyStaffDirectoryReconciliation(
+  supabase: SupabaseClient,
+  actor: string | null,
+  options?: StaffOpsWriteOptions & { approvedAccountIds?: string[] | null }
+) {
+  const accounts = await loadDirectoryAccounts(supabase);
+  const accountsById = new Map(accounts.map((a) => [a.id, a]));
+  const approved = options?.approvedAccountIds ? new Set(options.approvedAccountIds) : null;
+  let applied: ReturnType<typeof applyReconciliationToDirectory> | null = null;
+  let freshReport: StaffDirectoryReconciliationReport | null = null;
+  const nextState = await mutateStaffOpsState(supabase, (state) => {
+    freshReport = buildStaffDirectoryReconciliationReport(state.staff_directory, accounts);
+    applied = applyReconciliationToDirectory(state.staff_directory, freshReport, accountsById, {
+      approvedAccountIds: approved,
+      now: nowIso(),
+      newId
+    });
+    if (!applied.appliedAdditions.length && !applied.appliedLinks.length) return state;
+    let next: StaffOpsState = { ...state, staff_directory: applied.directory };
+    for (const link of applied.appliedLinks) {
+      next = createActivityLog(next, {
+        activity_type: "staff_directory.linked",
+        title: `Linked staff profile: ${link.name}`,
+        description: `Reconciliation linked login ${link.email} without changing account role, status, or credentials.`,
+        source_table: "staff_directory",
+        source_id: link.memberId,
+        created_by: actor
+      });
+    }
+    for (const addition of applied.appliedAdditions) {
+      next = createActivityLog(next, {
+        activity_type: "staff_directory.created",
+        title: `Added staff member: ${addition.name}`,
+        description: `Reconciliation added profile for existing login ${addition.email}; no login was created.`,
+        source_table: "staff_directory",
+        source_id: addition.accountId,
+        created_by: actor
+      });
+    }
+    return createActivityLog(next, {
+      activity_type: "staff_directory.reconciliation_applied",
+      title: `Staff directory reconciliation applied: ${applied.appliedAdditions.length} added, ${applied.appliedLinks.length} linked`,
+      description: `Flagged for review: ${freshReport.flagged.length}. Skipped: ${applied.skippedAccountIds.length}.`,
+      source_table: "staff_directory",
+      source_id: null,
+      created_by: actor
+    });
+  }, options);
+  const appliedResult = applied as ReturnType<typeof applyReconciliationToDirectory> | null;
+  return {
+    revision: nextState._revision ?? 0,
+    report: freshReport,
+    appliedAdditions: appliedResult?.appliedAdditions ?? [],
+    appliedLinks: appliedResult?.appliedLinks ?? [],
+    skippedAccountIds: appliedResult?.skippedAccountIds ?? [],
+    directoryCount: nextState.staff_directory.length
+  };
 }
 
 export async function markStaffNotificationRead(

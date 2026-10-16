@@ -122,7 +122,8 @@
     "test:blog": "tsx scripts/test-automatic-blog.ts && tsx scripts/test-fitdog-blog-public.ts && tsx scripts/test-blogs-domain-routing.ts && tsx scripts/test-why-fitdog.ts && tsx scripts/test-blog-dashboard.ts && tsx scripts/test-blog-help-guide.ts && tsx scripts/test-blog-posting-social.ts && tsx scripts/test-blog-real-images.ts",
     "test:blog-public": "tsx scripts/test-fitdog-blog-public.ts",
     "blog:activate": "tsx scripts/activate-automatic-blog.ts",
-    "blog:seed": "tsx scripts/seed-blog-via-pg.ts"
+    "blog:seed": "tsx scripts/seed-blog-via-pg.ts",
+    "test:staff-directory": "tsx scripts/test-staff-directory-reconciliation.ts && tsx scripts/test-staff-ops-concurrency.ts && tsx scripts/test-directory-login.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

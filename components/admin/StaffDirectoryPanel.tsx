@@ -15,7 +15,17 @@ import { STAFF_DEPARTMENTS, departmentForDashboardRole } from "@/lib/staff/admin
 type StaffDirectoryPayload = {
   staff_directory: StaffDirectoryMember[];
   activity_logs: StaffActivityLog[];
+  staff_ops_revision?: number;
+  _revision?: number;
   currentUser: { email: string | null; adminUserId: string | null; role: string };
+};
+
+type ReconciliationReport = {
+  proposedAdditions: { accountId: string; name: string; email: string }[];
+  proposedLinks: { accountId: string; memberId: string; name: string; email: string }[];
+  flagged: { kind: string; message: string }[];
+  excludedAccounts: { email: string | null; reason: string }[];
+  summary: { proposedAdditions: number; proposedLinks: number; unchanged: number; flagged: number; excluded: number };
 };
 
 type StaffMemberForm = {
@@ -122,6 +132,10 @@ export function StaffDirectoryPanel() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<StaffDirectoryMember | null>(null);
   const [deleteMember, setDeleteMember] = useState<StaffDirectoryMember | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reconReport, setReconReport] = useState<ReconciliationReport | null>(null);
+  const [reconBusy, setReconBusy] = useState(false);
+  const staffOpsRevision = data?.staff_ops_revision ?? data?._revision ?? 0;
 
   const load = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -132,8 +146,11 @@ export function StaffDirectoryPanel() {
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load staff directory.");
       setData(body as StaffDirectoryPayload);
+      setLoadError(null);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to load staff directory.", "error");
+      const message = error instanceof Error ? error.message : "Unable to load staff directory.";
+      if (!silent) setLoadError(message);
+      showToast(message, "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -164,9 +181,14 @@ export function StaffDirectoryPanel() {
       const response = await fetch("/api/admin/staff-operations", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...payload, staff_ops_revision: staffOpsRevision })
       });
       const body = await readResponseJson(response);
+      if (response.status === 409 || body.code === "staff_ops_conflict") {
+        showToast("This directory changed while you were editing. Reloading the latest version — please retry.", "error");
+        await load(true);
+        return false;
+      }
       if (!response.ok) throw new Error(body.error ?? label);
       showToast(success, "success");
       await load(true);
@@ -176,6 +198,61 @@ export function StaffDirectoryPanel() {
       return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function previewReconciliation() {
+    setReconBusy(true);
+    try {
+      const response = await fetch("/api/admin/staff-operations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: "preview_staff_directory_reconciliation" })
+      });
+      const body = await readResponseJson(response);
+      if (!response.ok) throw new Error(body.error ?? "Unable to preview reconciliation.");
+      setReconReport((body.result as { report: ReconciliationReport }).report);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to preview reconciliation.", "error");
+    } finally {
+      setReconBusy(false);
+    }
+  }
+
+  async function applyReconciliation() {
+    if (!reconReport) return;
+    const approved = [
+      ...reconReport.proposedAdditions.map((item) => item.accountId),
+      ...reconReport.proposedLinks.map((item) => item.accountId)
+    ];
+    if (!approved.length) return;
+    setReconBusy(true);
+    try {
+      const response = await fetch("/api/admin/staff-operations", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "apply_staff_directory_reconciliation",
+          confirm: true,
+          approved_account_ids: approved,
+          staff_ops_revision: staffOpsRevision
+        })
+      });
+      const body = await readResponseJson(response);
+      if (response.status === 409) {
+        showToast("Directory changed during reconciliation. Preview again before applying.", "error");
+        setReconReport(null);
+        await load(true);
+        return;
+      }
+      if (!response.ok) throw new Error(body.error ?? "Unable to apply reconciliation.");
+      showToast("Staff directory reconciliation applied.", "success");
+      setReconReport(null);
+      await load(true);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Unable to apply reconciliation.", "error");
+    } finally {
+      setReconBusy(false);
     }
   }
 
@@ -239,6 +316,7 @@ export function StaffDirectoryPanel() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <a className="crossover-btn crossover-btn--outline" href="/admin?board=lobby&tab=users">User Accounts</a>
           {loading || refreshing ? <span className="crossover-badge crossover-badge--status-pending">{loading ? "Loading..." : "Refreshing..."}</span> : null}
           {canManageDirectory ? (
             <button type="button" className="crossover-btn crossover-btn--primary inline-flex items-center gap-2" onClick={() => setAddOpen(true)} disabled={busy}>
@@ -247,6 +325,27 @@ export function StaffDirectoryPanel() {
           ) : null}
         </div>
       </header>
+
+      {loadError && !data ? (
+        <section className="admin-card p-5" role="alert">
+          <h3 className="text-lg font-black text-white">Staff Directory could not be loaded</h3>
+          <p className="mt-1 text-sm text-admin-muted">{loadError} This is a loading error — not an empty directory.</p>
+          <button type="button" className="crossover-btn crossover-btn--primary mt-3" onClick={() => void load()}>Retry</button>
+        </section>
+      ) : null}
+      {data && data.staff_directory.length === 0 ? (
+        <section className="admin-card p-5">
+          <p className="text-sm text-admin-muted">The saved Staff Directory is genuinely empty. Login accounts still live under User Accounts.</p>
+        </section>
+      ) : null}
+      {data && data.staff_directory.length > 0 && members.length === 0 ? (
+        <section className="admin-card p-5">
+          <p className="text-sm text-admin-muted">
+            Filters are hiding all {data.staff_directory.length} saved director{data.staff_directory.length === 1 ? "y entry" : "y entries"}.
+          </p>
+          <button type="button" className="crossover-btn crossover-btn--outline mt-3" onClick={() => { setQuery(""); setDepartment(""); setStatus(""); }}>Clear filters</button>
+        </section>
+      ) : null}
 
       <section className="crossover-stat-grid md:grid-cols-3">
         <div className="crossover-stat-card">
@@ -369,7 +468,7 @@ export function StaffDirectoryPanel() {
                 ))}
                 {!members.length ? (
                   <tr>
-                    <td className="crossover-table__empty-row text-admin-muted" colSpan={canManageDirectory ? 7 : 6}>No staff members found.</td>
+                    <td className="crossover-table__empty-row text-admin-muted" colSpan={canManageDirectory ? 7 : 6}>{(data?.staff_directory.length ?? 0) > 0 ? "No staff members match the current filters." : "No staff members in the directory."}</td>
                   </tr>
                 ) : null}
               </tbody>
@@ -433,6 +532,32 @@ export function StaffDirectoryPanel() {
             ) : null}
           </div>
         </section>
+        {canManageDirectory ? (
+          <section className="admin-card p-5">
+            <h3 className="text-lg font-black text-white">Sync with User Accounts</h3>
+            <p className="mt-1 text-sm text-admin-muted">
+              Directory profiles and login accounts are separate. Preview finds eligible logins with no profile and unambiguous links — it changes nothing. Apply adds only those profiles/links; it never creates logins or changes roles, passwords, or account status. Ambiguous and placeholder matches stay flagged for review.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" className="admin-btn-secondary" disabled={reconBusy} onClick={() => void previewReconciliation()}>
+                {reconBusy ? "Working..." : "Preview reconciliation (dry run)"}
+              </button>
+              {reconReport && (reconReport.summary.proposedAdditions > 0 || reconReport.summary.proposedLinks > 0) ? (
+                <button type="button" className="admin-btn-primary" disabled={reconBusy} onClick={() => void applyReconciliation()}>
+                  Apply {reconReport.summary.proposedAdditions + reconReport.summary.proposedLinks} approved change(s)
+                </button>
+              ) : null}
+            </div>
+            {reconReport ? (
+              <div className="mt-3 grid gap-2 text-sm text-admin-muted">
+                <p>{reconReport.summary.proposedAdditions} to add · {reconReport.summary.proposedLinks} to link · {reconReport.summary.unchanged} unchanged · {reconReport.summary.flagged} flagged · {reconReport.summary.excluded} login(s) excluded (demo/test/disabled)</p>
+                {reconReport.proposedAdditions.map((item) => (<p key={item.accountId}>Add profile: {item.name} ({item.email})</p>))}
+                {reconReport.proposedLinks.map((item) => (<p key={item.accountId}>Link profile: {item.name} ({item.email})</p>))}
+                {reconReport.flagged.map((item, index) => (<p key={`${item.kind}-${index}`}>Review: {item.message}</p>))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
         {canManageDirectory ? (
           <section className="admin-card p-5">
             <h3 className="text-lg font-black text-white">Checklist Assignments</h3>
