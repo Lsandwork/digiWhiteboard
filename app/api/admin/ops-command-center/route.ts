@@ -11,6 +11,7 @@ import {
 } from "@/lib/admin/permissions";
 import { isAdminRequest, unauthorizedAdminResponse } from "@/lib/admin/api-auth";
 import { loadOpsCommandCenterSnapshot } from "@/lib/ops-command-center/snapshot";
+import { loadCommandCenterView } from "@/lib/ops-command-center/action-queue";
 import { searchOpsDogs } from "@/lib/ops-command-center/dogs";
 import { searchBoardDogs } from "@/lib/ops-command-center/adapters/staff-ops-feed";
 import { createOpsTask, updateOpsTaskStatus } from "@/lib/ops-command-center/tasks";
@@ -35,7 +36,7 @@ import {
 } from "@/lib/ops-command-center/overnight-handoff";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 15;
+export const maxDuration = 30;
 
 async function requireOpsAccess(request: Request) {
   if (!isAdminRequest(request)) return { error: unauthorizedAdminResponse() };
@@ -82,6 +83,17 @@ export async function GET(request: Request) {
     await escalateMissedOvernightRounds().catch(() => 0);
     const rounds = await withTimeoutFallback(ensureOvernightRoundsForDate(), OPS_SNAPSHOT_TIMEOUT_MS, []);
     return NextResponse.json({ rounds });
+  }
+  if (view === "live_floor") {
+    try {
+      const commandCenter = await loadCommandCenterView({ force: url.searchParams.get("refresh") === "1" });
+      return NextResponse.json(commandCenter, { headers: { "Cache-Control": "no-store" } });
+    } catch (error) {
+      return NextResponse.json(
+        { error: humanizeUnknownError(error, "Unable to load the Command Center. Retry shortly.") },
+        { status: 503 }
+      );
+    }
   }
   if (view === "handoffs") {
     const handoffs = await withTimeoutFallback(listRecentShiftHandoffs(20), OPS_SNAPSHOT_TIMEOUT_MS, []);
