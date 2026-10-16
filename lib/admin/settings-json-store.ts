@@ -144,6 +144,38 @@ export async function loadAdminSettingsJsonPointers(
   }
 }
 
+/**
+ * Patch one JSON key only if stored `_revision` matches (staff_admin_ops OCC).
+ * Returns true on success, false on stale revision (-1), null when migration 076 RPC is unavailable.
+ */
+export async function saveAdminSettingsJsonKeyIfRevision(
+  supabase: SupabaseClient,
+  key: string,
+  value: unknown,
+  expectedRevision: number
+): Promise<boolean | null> {
+  const payload = value as Record<string, unknown>;
+  const { data, error } = await supabase.rpc("patch_admin_settings_json_if_revision", {
+    p_key: key,
+    p_expected_revision: expectedRevision,
+    p_value: payload
+  });
+
+  if (!error) {
+    if (typeof data === "number" && data === -1) return false;
+    invalidateTtlCache("settings:");
+    invalidateTtlCache("admin-settings:key:");
+    invalidateTtlCache("staff-ops:");
+    return true;
+  }
+
+  if (error.code === "PGRST202" || error.message?.includes("patch_admin_settings_json_if_revision")) {
+    return null;
+  }
+  if (isMissingAdminSettingsRelation(error)) return false;
+  throw error;
+}
+
 /** Patch one JSON key via Postgres jsonb_set — no read/modify/write of the full blob. */
 export async function saveAdminSettingsJsonKey(
   supabase: SupabaseClient,

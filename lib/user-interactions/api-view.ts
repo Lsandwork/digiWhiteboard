@@ -1,4 +1,5 @@
 import type { StaffOpsState } from "@/lib/staff/admin-ops";
+import type { UserInteractionsCapabilities } from "@/lib/user-interactions/staff-ops-auth";
 import {
   applyUserInteractionFilter,
   buildAllUnifiedInteractions,
@@ -17,11 +18,14 @@ export type UserInteractionsViewResponse = {
   pageSize: number;
   total: number;
   currentUser: UserInteractionsActor & { role: string | null };
-  permissions: {
+  permissions: UserInteractionsCapabilities & {
+    /** @deprecated use canCreateNote */
     canCreate: boolean;
+    /** @deprecated use granular capability flags */
     canEdit: boolean;
   };
   staffDirectory: StaffOpsState["staff_directory"];
+  staffOpsRevision: number;
 };
 
 export function buildUserInteractionsViewPayload(
@@ -32,7 +36,8 @@ export function buildUserInteractionsViewPayload(
     page?: number;
     pageSize?: number;
     actor: UserInteractionsActor & { role: string | null };
-    permissions: { canCreate: boolean; canEdit: boolean };
+    permissions: UserInteractionsCapabilities;
+    staffOpsRevision: number;
   }
 ): UserInteractionsViewResponse {
   const all = buildAllUnifiedInteractions(state);
@@ -52,8 +57,13 @@ export function buildUserInteractionsViewPayload(
     pageSize: paged.pageSize,
     total: paged.total,
     currentUser: options.actor,
-    permissions: options.permissions,
-    staffDirectory: state.staff_directory ?? []
+    permissions: {
+      ...options.permissions,
+      canCreate: options.permissions.canCreateNote,
+      canEdit: options.permissions.canUpdateNote
+    },
+    staffDirectory: state.staff_directory ?? [],
+    staffOpsRevision: options.staffOpsRevision
   };
 }
 

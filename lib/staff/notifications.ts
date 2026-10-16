@@ -16,6 +16,7 @@ export type StaffNotificationTarget =
   | { kind: "department_pool"; department: string };
 
 export type StaffNotificationSourceTab =
+  | "user_interactions"
   | "crossover_communication"
   | "owner_follow_up"
   | "active_issues"

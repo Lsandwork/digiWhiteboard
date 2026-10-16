@@ -39,6 +39,8 @@ type NotificationResponseModalProps = {
 
 function sourceTabLabel(tab: string | null | undefined): string {
   switch (tab) {
+    case "user_interactions":
+      return "User Interactions";
     case "crossover_communication":
       return "Team Log";
     case "owner_follow_up":
@@ -55,9 +57,14 @@ function sourceTabLabel(tab: string | null | undefined): string {
 }
 
 function sourceTabForReport(report: ManagementReport | null, sourceTab: string): AdminTab | null {
-  if (sourceTab === "crossover_communication") return "crossover_communication";
-  if (sourceTab === "owner_follow_up") return "owner_follow_up";
-  if (sourceTab === "active_issues") return "active_issues";
+  if (
+    sourceTab === "user_interactions" ||
+    sourceTab === "crossover_communication" ||
+    sourceTab === "owner_follow_up" ||
+    sourceTab === "active_issues"
+  ) {
+    return "user_interactions";
+  }
   if (sourceTab === "push_notices") return "push_notices";
   if (sourceTab === "vip_auto_book") return "vip_auto_book";
   if (report?.report_type === "employee_write_up") return "management_support";

@@ -6,7 +6,10 @@ import { loadEnvFiles } from "./load-env-local";
 /**
  * One-time maintenance: apply migration 075 (if needed), trim bloated Team Log
  * history inside admin_settings, and report before/after sizes.
- * Pass --apply to write changes.
+ *
+ * DEFAULT: dry run only (no writes).
+ * Pass --apply to write changes AND --confirm-production to allow writes against production DB.
+ * Open crossover rows are always preserved when trimming (newest closed rows drop first).
  */
 const PROJECT_REF = "tzkocaucqtmmnrttxira";
 const MAX_CROSSOVER = 500;
@@ -24,9 +27,24 @@ function sortNewest<T extends { created_at?: string | null }>(items: T[]) {
   );
 }
 
+const OPEN_STATUSES = new Set(["Open", "In Progress", "Waiting on Owner", "Waiting on Staff", "Pending Review", "Needs Management Review"]);
+
+function capPreservingOpen<T extends { status?: string | null; created_at?: string | null }>(items: T[], limit: number): T[] {
+  const sorted = sortNewest(items);
+  const openRows = sorted.filter((item) => item.status && OPEN_STATUSES.has(String(item.status)));
+  const closedRows = sorted.filter((item) => !item.status || !OPEN_STATUSES.has(String(item.status)));
+  const closedBudget = Math.max(0, limit - openRows.length);
+  return [...openRows, ...closedRows.slice(0, closedBudget)];
+}
+
 async function main() {
   loadEnvFiles();
   const apply = process.argv.includes("--apply");
+  const confirmProduction = process.argv.includes("--confirm-production");
+  if (apply && !confirmProduction) {
+    console.error("Refusing to write: pass --confirm-production together with --apply.");
+    process.exit(1);
+  }
   const client = new Client({
     connectionString: directUrl(),
     ssl: { rejectUnauthorized: false },
@@ -62,7 +80,7 @@ async function main() {
   if (apply && (crossover.length > MAX_CROSSOVER || notifications.length > MAX_NOTIFICATIONS)) {
     const trimmed = {
       ...ops,
-      crossover_messages: sortNewest(crossover as Array<{ created_at?: string | null }>).slice(0, MAX_CROSSOVER),
+      crossover_messages: capPreservingOpen(crossover as Array<{ status?: string | null; created_at?: string | null }>, MAX_CROSSOVER),
       notifications: sortNewest(notifications as Array<{ created_at?: string | null }>).slice(0, MAX_NOTIFICATIONS)
     };
     await client.query(`select public.patch_admin_settings_json($1, $2::jsonb)`, ["staff_admin_ops", JSON.stringify(trimmed)]);

@@ -31,12 +31,22 @@ import {
   markStaffNotificationRead,
   moveCrossoverMessages,
   bulkUpdateCrossoverMessages,
+  reopenCrossoverMessage,
   replyToCrossoverMessage,
   updateActiveIssue,
   updateCrossoverMessage,
   updateStaffDirectoryMember,
   updateOwnerFollowUp
 } from "@/lib/staff/admin-ops";
+import {
+  accessForStaffOpsSession,
+  assertStaffOpsPostAuthorized,
+  buildUserInteractionsCapabilities,
+  StaffOpsAuthorizationError,
+  StaffOpsAtomicSaveUnavailableError,
+  StaffOpsConflictError,
+  parseStaffOpsRevision
+} from "@/lib/user-interactions/staff-ops-auth";
 import { notificationReaderKey, notificationsForSession } from "@/lib/staff/notifications";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getOrLoadTtlCache, invalidateTtlCache, withTimeoutFallback } from "@/lib/server-ttl-cache";
@@ -162,10 +172,11 @@ export async function GET(request: Request) {
             displayName: actorDisplayName,
             role: readerSession.role
           },
-          permissions: {
-            canCreate: canCreateShiftLogEntry(role),
-            canEdit: canMutateFrontDeskLog(role)
-          }
+          permissions: buildUserInteractionsCapabilities(
+            accessForStaffOpsSession(readerSession.adminUserId, readerSession.email, role),
+            role
+          ),
+          staffOpsRevision: state._revision ?? 0
         })
       );
     }
@@ -222,48 +233,59 @@ export async function POST(request: Request) {
     if (NOTIFICATION_ACTIONS.has(action) && !canAccessCrossoverCommunication(role) && !canManageStaffOperations(role)) {
       return staffOpsForbiddenResponse();
     }
-    if (
-      !CROSSOVER_ACTIONS.has(action) &&
-      !NOTIFICATION_ACTIONS.has(action) &&
-      action !== "create_staff_member" &&
-      action !== "update_staff_member" &&
-      action !== "delete_staff_member" &&
-      !canManageStaffOperations(role)
-    ) {
+    if (action === "push_to_whiteboard" && !canManageStaffOperations(role)) {
       return staffOpsForbiddenResponse();
+    }
+
+    const staffOpsAccess = accessForStaffOpsSession(session?.adminUserId, session?.email, role);
+    try {
+      assertStaffOpsPostAuthorized(staffOpsAccess, role, action, body);
+    } catch (error) {
+      if (error instanceof StaffOpsAuthorizationError) {
+        return NextResponse.json({ error: error.message }, { status: 403 });
+      }
+      throw error;
     }
 
     let result: unknown;
     let auditAction = "staff.ops.action";
+    const staffOpsRevision = parseStaffOpsRevision(body);
+    const writeOpts = staffOpsRevision !== undefined ? { expectedRevision: staffOpsRevision } : undefined;
 
     if (action === "create_crossover") {
-      result = await createCrossoverMessage(supabase, body, actor, actorDisplayName);
+      result = await createCrossoverMessage(supabase, body, actor, actorDisplayName, writeOpts);
       auditAction = "staff.crossover.create";
     } else if (action === "create_crossover_bulk") {
       const entries = Array.isArray(body.entries) ? (body.entries as Record<string, unknown>[]) : [];
-      result = await createCrossoverMessages(supabase, entries, actor, actorDisplayName);
+      result = await createCrossoverMessages(supabase, entries, actor, actorDisplayName, writeOpts);
       auditAction = "staff.crossover.create_bulk";
     } else if (action === "update_crossover") {
       const id = String(body.id ?? "");
-      result = await updateCrossoverMessage(supabase, id, body, actorDisplayName);
+      result = await updateCrossoverMessage(supabase, id, body, actorDisplayName, writeOpts);
       auditAction = "staff.crossover.update";
     } else if (action === "move_crossover") {
       const ids = Array.isArray(body.ids) ? body.ids.map((id: unknown) => String(id ?? "")) : [];
       const targetLog = String(body.target_log ?? "") as "crossover" | "open" | "archived";
-      result = await moveCrossoverMessages(supabase, ids, targetLog, actorDisplayName);
+      result = await moveCrossoverMessages(supabase, ids, targetLog, actorDisplayName, writeOpts);
       auditAction = "staff.crossover.move";
     } else if (action === "bulk_update_crossover") {
       const ids = Array.isArray(body.ids) ? body.ids.map((id: unknown) => String(id ?? "")) : [];
-      result = await bulkUpdateCrossoverMessages(supabase, ids, body, actorDisplayName);
+      result = await bulkUpdateCrossoverMessages(supabase, ids, body, actorDisplayName, writeOpts);
       auditAction = "staff.crossover.bulk_update";
     } else if (action === "delete_crossover") {
       const id = String(body.id ?? "");
       if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
-      result = await deleteCrossoverMessage(supabase, id, actorDisplayName, {
-        email: session?.email ?? null,
-        adminUserId: session?.adminUserId ?? null,
-        role: role ?? null
-      });
+      result = await deleteCrossoverMessage(
+        supabase,
+        id,
+        actorDisplayName,
+        {
+          email: session?.email ?? null,
+          adminUserId: session?.adminUserId ?? null,
+          role: role ?? null
+        },
+        writeOpts
+      );
       auditAction = "staff.crossover.delete";
     } else if (action === "reply_crossover") {
       const id = String(body.id ?? "");
@@ -273,36 +295,41 @@ export async function POST(request: Request) {
         body.message,
         actor,
         String(body.update_type ?? "Internal Note"),
-        actorDisplayName
+        actorDisplayName,
+        writeOpts
       );
       auditAction = "staff.shift_log.update";
+    } else if (action === "reopen_crossover") {
+      const id = String(body.id ?? "");
+      result = await reopenCrossoverMessage(supabase, id, actor, actorDisplayName, writeOpts);
+      auditAction = "staff.crossover.reopen";
     } else if (action === "create_follow_up") {
-      result = await createOwnerFollowUp(supabase, body, actorDisplayName);
+      result = await createOwnerFollowUp(supabase, body, actorDisplayName, writeOpts);
       auditAction = "staff.follow_up.create";
     } else if (action === "update_follow_up") {
       const id = String(body.id ?? "");
-      result = await updateOwnerFollowUp(supabase, id, body, actorDisplayName);
+      result = await updateOwnerFollowUp(supabase, id, body, actorDisplayName, writeOpts);
       auditAction = "staff.follow_up.update";
     } else if (action === "create_issue") {
-      result = await createActiveIssue(supabase, body, actorDisplayName);
+      result = await createActiveIssue(supabase, body, actorDisplayName, writeOpts);
       auditAction = "staff.issue.create";
     } else if (action === "update_issue") {
       const id = String(body.id ?? "");
-      result = await updateActiveIssue(supabase, id, body, actorDisplayName);
+      result = await updateActiveIssue(supabase, id, body, actorDisplayName, writeOpts);
       auditAction = "staff.issue.update";
     } else if (action === "create_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
-      result = await createStaffDirectoryMember(supabase, body, actorDisplayName, actorAdminId);
+      result = await createStaffDirectoryMember(supabase, body, actorDisplayName, actorAdminId, writeOpts);
       auditAction = "staff.directory.create";
     } else if (action === "update_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
-      result = await updateStaffDirectoryMember(supabase, id, body, actorDisplayName, actorAdminId);
+      result = await updateStaffDirectoryMember(supabase, id, body, actorDisplayName, actorAdminId, writeOpts);
       auditAction = "staff.directory.update";
     } else if (action === "delete_staff_member") {
       if (!canManageStaffDirectory(role)) return staffOpsForbiddenResponse();
       const id = String(body.id ?? "");
-      await deleteStaffDirectoryMember(supabase, id, actorDisplayName);
+      await deleteStaffDirectoryMember(supabase, id, actorDisplayName, writeOpts);
       result = { id };
       auditAction = "staff.directory.delete";
     } else if (action === "push_to_whiteboard") {
@@ -330,7 +357,7 @@ export async function POST(request: Request) {
         adminUserId: session?.adminUserId ?? null,
         role: role ?? null
       };
-      result = await markStaffNotificationRead(supabase, notificationId, readerKey, readerSession);
+      result = await markStaffNotificationRead(supabase, notificationId, readerKey, readerSession, writeOpts);
       auditAction = "staff.notification.read";
     } else if (action === "mark_all_notifications_read") {
       const readerKey = notificationReaderKey(session?.email, session?.adminUserId);
@@ -339,7 +366,7 @@ export async function POST(request: Request) {
         adminUserId: session?.adminUserId ?? null,
         role: role ?? null
       };
-      const nextState = await markAllStaffNotificationsRead(supabase, readerKey, readerSession);
+      const nextState = await markAllStaffNotificationsRead(supabase, readerKey, readerSession, writeOpts);
       // Return only this user's visible notifications after mark-all.
       result = {
         ...nextState,
@@ -353,7 +380,7 @@ export async function POST(request: Request) {
         adminUserId: session?.adminUserId ?? null,
         role: role ?? null
       };
-      const nextState = await clearStaffInboxNotifications(supabase, readerKey, readerSession);
+      const nextState = await clearStaffInboxNotifications(supabase, readerKey, readerSession, writeOpts);
       result = {
         ...nextState,
         notifications: notificationsForSession(nextState, readerSession)
@@ -377,9 +404,21 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, result });
   } catch (error) {
+    if (error instanceof StaffOpsConflictError) {
+      return NextResponse.json({ error: error.message, code: "staff_ops_conflict" }, { status: 409 });
+    }
+    if (error instanceof StaffOpsAtomicSaveUnavailableError) {
+      return NextResponse.json(
+        { error: error.message, code: "staff_ops_atomic_unavailable" },
+        { status: 503 }
+      );
+    }
     const message = error instanceof Error ? error.message : "Unable to save Staff Admin record.";
     if (message.includes("only delete Team Log entries")) {
       return NextResponse.json({ error: message }, { status: 403 });
+    }
+    if (message.includes("resolution note is required")) {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
     return NextResponse.json({ error: message }, { status: 500 });
   }

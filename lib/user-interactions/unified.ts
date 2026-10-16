@@ -127,10 +127,27 @@ function issueRow(row: ActiveIssue): UnifiedInteraction {
   };
 }
 
+/**
+ * Linked follow-ups created from Team Log share the crossover row — show one card (the note).
+ * Auto-generated active issues tied to a crossover/follow-up source appear on the source row lifecycle.
+ */
+function shouldOmitFollowUpFromUnifiedList(followUp: OwnerFollowUp, state: StaffOpsState): boolean {
+  if (followUp.source_id && state.crossover_messages.some((m) => m.id === followUp.source_id)) {
+    return true;
+  }
+  return state.crossover_messages.some((m) => m.linked_owner_follow_up_id === followUp.id);
+}
+
+function shouldOmitIssueFromUnifiedList(issue: ActiveIssue): boolean {
+  if (issue.source_table === "crossover_messages" && issue.source_id) return true;
+  if (issue.source_table === "owner_follow_ups" && issue.source_id) return true;
+  return false;
+}
+
 export function buildAllUnifiedInteractions(state: StaffOpsState): UnifiedInteraction[] {
   const notes = state.crossover_messages.map(noteRow);
-  const followUps = state.owner_follow_ups.map(followUpRow);
-  const issues = state.active_issues.map(issueRow);
+  const followUps = state.owner_follow_ups.filter((f) => !shouldOmitFollowUpFromUnifiedList(f, state)).map(followUpRow);
+  const issues = state.active_issues.filter((i) => !shouldOmitIssueFromUnifiedList(i)).map(issueRow);
   return [...notes, ...followUps, ...issues].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
@@ -148,27 +165,35 @@ function normalizeToken(value: string | null | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
-function directoryNames(directory: StaffDirectoryMember[], actor: UserInteractionsActor): string[] {
-  const tokens = new Set<string>();
-  for (const key of [actor.displayName, actor.email, actor.adminUserId]) {
-    const n = normalizeToken(key);
-    if (n) tokens.add(n);
-  }
+function actorMatchKeys(directory: StaffDirectoryMember[], actor: UserInteractionsActor): Set<string> {
+  const keys = new Set<string>();
+  const adminId = actor.adminUserId?.trim();
+  if (adminId) keys.add(normalizeToken(adminId));
+  const email = normalizeToken(actor.email);
+  if (email) keys.add(email);
   const member =
     directory.find((m) => m.admin_user_id && m.admin_user_id === actor.adminUserId) ??
-    directory.find((m) => normalizeToken(m.email) === normalizeToken(actor.email));
-  if (member?.name) tokens.add(normalizeToken(member.name));
-  return [...tokens];
+    directory.find((m) => normalizeToken(m.email) === email);
+  if (member?.name) keys.add(normalizeToken(member.name));
+  const display = normalizeToken(actor.displayName);
+  if (display) keys.add(display);
+  return keys;
+}
+
+function tokenEquals(a: string, b: string): boolean {
+  return a.length > 0 && a === b;
 }
 
 export function matchesMyItems(row: UnifiedInteraction, actor: UserInteractionsActor, directory: StaffDirectoryMember[]): boolean {
-  const keys = directoryNames(directory, actor);
-  if (!keys.length) return false;
+  const keys = actorMatchKeys(directory, actor);
+  if (!keys.size) return false;
   const assigned = normalizeToken(row.assignedTo);
-  if (assigned && keys.some((k) => assigned.includes(k) || k.includes(assigned))) return true;
-  if (!assigned || assigned === "unassigned") {
-    const creator = normalizeToken(row.submittedBy);
-    if (creator && keys.some((k) => creator.includes(k) || k.includes(creator))) return true;
+  if (assigned && assigned !== "unassigned" && [...keys].some((k) => tokenEquals(assigned, k))) {
+    return true;
+  }
+  const creator = normalizeToken(row.submittedBy);
+  if ((!assigned || assigned === "unassigned") && creator && [...keys].some((k) => tokenEquals(creator, k))) {
+    return true;
   }
   return false;
 }
@@ -228,11 +253,14 @@ export function userInteractionCounts(
   now = new Date()
 ) {
   const open = filterOpenInteractions(rows);
+  const closed = filterArchiveInteractions(rows);
+  const completedToday = closed.filter((r) => matchesCompletedToday(r, now));
   return {
     open: open.length,
     mine: open.filter((r) => matchesMyItems(r, actor, directory)).length,
     overdue: open.filter((r) => matchesOverdue(r, now)).length,
-    archive: filterArchiveInteractions(rows).length
+    archive: closed.length,
+    completedToday: completedToday.length
   };
 }
 

@@ -81,6 +81,7 @@ export function canManagePushNotices(role?: string | null, access?: UserAccess |
 
 export function canManageStaffOperations(role?: string | null) {
   return (
+    isFullAdminRole(role) ||
     role === "owner_admin" ||
     role === "manager_admin" ||
     role === "assistant_manager" ||

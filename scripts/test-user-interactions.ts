@@ -12,7 +12,7 @@ import {
   capRecordsPreservingOpen,
   filterOpenInteractions
 } from "../lib/user-interactions/unified";
-import { isOverduePacificDueDate, pacificTodayKey } from "../lib/user-interactions/pacific";
+import { isDueTomorrowPacific, isOverduePacificDueDate, pacificTodayKey, pacificTomorrowKey } from "../lib/user-interactions/pacific";
 
 function note(partial: Partial<CrossoverMessage>): CrossoverMessage {
   return {
@@ -91,6 +91,7 @@ function note(partial: Partial<CrossoverMessage>): CrossoverMessage {
 
 // TEST 8 — filter open statuses
 {
+  assert.equal(isStaffOpsStatusOpen(null), false);
   assert.equal(isStaffOpsStatusOpen("Open"), true);
   assert.equal(isStaffOpsStatusOpen("In Progress"), true);
   assert.equal(isStaffOpsStatusOpen("Resolved"), false);
@@ -125,6 +126,52 @@ function note(partial: Partial<CrossoverMessage>): CrossoverMessage {
   const mine = applyUserInteractionFilter(all, "mine", { email: "sarah@fitdog.com", adminUserId: null, displayName: "Sarah Smith" }, state.staff_directory);
   assert.equal(mine.length, 1);
   assert.equal(mine[0]!.sourceId, "mine");
+}
+
+// Pacific tomorrow uses Pacific calendar, not server local date
+{
+  const now = new Date("2026-03-15T20:00:00.000Z");
+  const today = pacificTodayKey(now);
+  const tomorrowKey = pacificTomorrowKey(now);
+  assert.notEqual(today, tomorrowKey);
+  const dueIso = new Date(Date.UTC(2026, 2, 16, 20, 0, 0)).toISOString();
+  assert.equal(isDueTomorrowPacific(dueIso, now), true);
+}
+
+// Linked follow-up from Team Log is not duplicated in unified list
+{
+  const state: StaffOpsState = {
+    crossover_messages: [note({ id: "log1", status: "Open" })],
+    crossover_message_replies: [],
+    owner_follow_ups: [
+      {
+        id: "fu1",
+        subject: "Follow",
+        owner_name: "Owner",
+        dog_name: null,
+        logged_by: "Staff",
+        assigned_to: "Staff",
+        department: null,
+        priority: "Normal",
+        due_date: null,
+        status: "Open",
+        follow_up_notes: null,
+        source: "Team Log",
+        source_id: "log1",
+        urgent: false,
+        created_at: "2026-01-02T12:00:00.000Z",
+        updated_at: "2026-01-02T12:00:00.000Z",
+        resolved_at: null
+      }
+    ],
+    active_issues: [],
+    activity_logs: [],
+    staff_directory: [],
+    notifications: []
+  };
+  const rows = buildAllUnifiedInteractions(state);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]!.sourceId, "log1");
 }
 
 console.log("test-user-interactions: all assertions passed");

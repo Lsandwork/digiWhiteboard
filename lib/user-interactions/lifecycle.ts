@@ -13,7 +13,7 @@ export const CLOSED_STAFF_OPS_STATUSES: StaffOpsStatus[] = [
 const CLOSED_SET = new Set<string>(CLOSED_STAFF_OPS_STATUSES);
 
 export function isStaffOpsStatusOpen(status: StaffOpsStatus | string | null | undefined): boolean {
-  if (!status) return true;
+  if (!status) return false;
   return !CLOSED_SET.has(String(status));
 }
 
@@ -25,6 +25,7 @@ export type EmployeeStatusLabel = "Open" | "In progress" | "Waiting" | "Done";
 
 export function employeeStatusLabel(status: StaffOpsStatus | string | null | undefined): EmployeeStatusLabel {
   const s = String(status ?? "Open");
+  if (s === "Check Out") return "Done";
   if (CLOSED_SET.has(s)) return "Done";
   if (s === "In Progress") return "In progress";
   if (

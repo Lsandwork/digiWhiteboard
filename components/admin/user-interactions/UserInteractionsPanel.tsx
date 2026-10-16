@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import { Modal } from "@/components/admin/ui/Modal";
 import { useToast } from "@/components/admin/ui/ToastProvider";
 import { readResponseJson } from "@/lib/http/read-response-json";
 import type { StaffDirectoryMember } from "@/lib/staff/admin-ops";
 import type { UserInteractionsViewResponse } from "@/lib/user-interactions/api-view";
+import type { UserInteractionsCapabilities } from "@/lib/user-interactions/staff-ops-auth";
 import {
   completionStatusForNote,
   mapEmployeePriorityToBackend,
@@ -33,10 +34,55 @@ function activeStaffOptions(directory: StaffDirectoryMember[] | undefined) {
   return [...new Set(["Front Desk Team", "Team Leaders", "Management", ...names])];
 }
 
+function assigneeOptions(directory: StaffDirectoryMember[] | undefined, current: string | null | undefined) {
+  const base = activeStaffOptions(directory);
+  const cur = current?.trim();
+  if (cur && !base.includes(cur)) {
+    return [`${cur} (inactive)`, ...base];
+  }
+  return base;
+}
+
+function assigneeSelectValue(current: string | null | undefined): string {
+  const cur = current?.trim();
+  if (!cur) return "";
+  const base = activeStaffOptions(undefined);
+  if (base.includes(cur)) return cur;
+  return `${cur} (inactive)`;
+}
+
+function assigneeFromSelectValue(value: string): string {
+  return value.replace(/\s+\(inactive\)$/, "").trim();
+}
+
+function canCompleteRow(item: UnifiedInteraction, caps: UserInteractionsCapabilities): boolean {
+  if (item.sourceTable === "crossover_messages") return caps.canCompleteNote;
+  if (item.sourceTable === "owner_follow_ups") return caps.canCompleteFollowUp;
+  return caps.canCompleteIssue;
+}
+
+function canReopenRow(item: UnifiedInteraction, caps: UserInteractionsCapabilities): boolean {
+  if (item.sourceTable === "crossover_messages") return caps.canUpdateNote;
+  if (item.sourceTable === "owner_follow_ups") return caps.canUpdateFollowUp;
+  return caps.canUpdateIssue;
+}
+
+function canAssignRow(item: UnifiedInteraction, caps: UserInteractionsCapabilities): boolean {
+  if (item.sourceTable === "crossover_messages") return caps.canAssignNote;
+  if (item.sourceTable === "owner_follow_ups") return caps.canAssignFollowUp;
+  return caps.canAssignIssue;
+}
+
+function canCreateAny(caps: UserInteractionsCapabilities | undefined): boolean {
+  if (!caps) return false;
+  return caps.canCreateNote || caps.canCreateFollowUp || caps.canCreateIssue;
+}
+
 export function UserInteractionsPanel() {
   const { showToast } = useToast();
   const [filter, setFilter] = useState<UserInteractionsFilter>("open");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<UserInteractionsViewResponse | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -57,39 +103,61 @@ export function UserInteractionsPanel() {
   const [priority, setPriority] = useState<"Normal" | "High" | "Urgent">("Normal");
   const [dueDate, setDueDate] = useState("");
 
-  const assignOptions = useMemo(() => activeStaffOptions(data?.staffDirectory), [data?.staffDirectory]);
+  const loadSeq = useRef(0);
+  const caps = data?.permissions;
 
-  const load = useCallback(async () => {
-    setLoadError(false);
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        view: filter,
-        page: String(page),
-        q: search.trim()
-      });
-      const res = await fetch(`/api/admin/staff-operations?${params.toString()}`, { cache: "no-store" });
-      const body = await readResponseJson<UserInteractionsViewResponse & { error?: string }>(res);
-      if (!res.ok || !body.interactions) {
-        throw new Error(body.error || "load failed");
-      }
-      setData(body);
-    } catch {
-      setLoadError(true);
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, page, search]);
+  const staffOptions = useMemo(
+    () => assigneeOptions(data?.staffDirectory, detail?.assignedTo ?? assignedTo),
+    [data?.staffDirectory, detail?.assignedTo, assignedTo]
+  );
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 0);
+    const t = window.setTimeout(() => setDebouncedSearch(searchInput.trim()), 320);
     return () => window.clearTimeout(t);
+  }, [searchInput]);
+
+  const load = useCallback(
+    async (signal: AbortSignal) => {
+      const seq = ++loadSeq.current;
+      setLoadError(false);
+      setLoading(true);
+      try {
+        const params = new URLSearchParams({
+          view: filter,
+          page: String(page),
+          q: debouncedSearch
+        });
+        const res = await fetch(`/api/admin/staff-operations?${params.toString()}`, {
+          cache: "no-store",
+          signal
+        });
+        const body = await readResponseJson<UserInteractionsViewResponse & { error?: string }>(res);
+        if (seq !== loadSeq.current) return;
+        if (!res.ok || !body.interactions) {
+          throw new Error(body.error || "load failed");
+        }
+        setData(body);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        if (seq !== loadSeq.current) return;
+        setLoadError(true);
+        setData(null);
+      } finally {
+        if (seq === loadSeq.current) setLoading(false);
+      }
+    },
+    [filter, page, debouncedSearch]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
   }, [load]);
 
   useEffect(() => {
     setPage(1);
-  }, [filter, search]);
+  }, [filter, debouncedSearch]);
 
   async function mutate(payload: Record<string, unknown>, success: string) {
     setBusy(true);
@@ -97,12 +165,19 @@ export function UserInteractionsPanel() {
       const res = await fetch("/api/admin/staff-operations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ...payload,
+          staff_ops_revision: data?.staffOpsRevision
+        })
       });
-      const body = await readResponseJson<{ error?: string }>(res);
+      const body = await readResponseJson<{ error?: string; code?: string }>(res);
+      if (res.status === 409) {
+        throw new Error(body.error || "Someone else updated this record. Refresh and try again.");
+      }
       if (!res.ok) throw new Error(body.error || "Save failed");
       showToast(success, "success");
-      await load();
+      const controller = new AbortController();
+      await load(controller.signal);
       return true;
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Something went wrong.", "error");
@@ -265,24 +340,12 @@ export function UserInteractionsPanel() {
   async function reopenItem(item: UnifiedInteraction) {
     const parsed = parseUnifiedInteractionId(item.id);
     if (!parsed) return;
-    const action =
-      parsed.sourceTable === "crossover_messages"
-        ? "update_crossover"
-        : parsed.sourceTable === "owner_follow_ups"
-          ? "update_follow_up"
-          : "update_issue";
-    await mutate({ action, id: parsed.sourceId, status: "Open" }, "Reopened.");
     if (parsed.sourceTable === "crossover_messages") {
-      await mutate(
-        {
-          action: "reply_crossover",
-          id: parsed.sourceId,
-          message: `Reopened by ${data?.currentUser.displayName ?? "staff"}.`,
-          update_type: "Reopen"
-        },
-        "Update added."
-      );
+      await mutate({ action: "reopen_crossover", id: parsed.sourceId }, "Reopened.");
+      return;
     }
+    const action = parsed.sourceTable === "owner_follow_ups" ? "update_follow_up" : "update_issue";
+    await mutate({ action, id: parsed.sourceId, status: "Open" }, "Reopened.");
   }
 
   function onCompleteClick(item: UnifiedInteraction) {
@@ -298,16 +361,23 @@ export function UserInteractionsPanel() {
     void completeItem(item);
   }
 
-  const counts = data?.counts ?? { open: 0, mine: 0, overdue: 0, archive: 0 };
+  const counts = data?.counts ?? { open: 0, mine: 0, overdue: 0, archive: 0, completedToday: 0 };
   const rows = data?.interactions ?? [];
-  const staffOptions = assignOptions;
+  const permissions = caps;
 
   if (loadError) {
     return (
       <div className="user-interactions">
         <div className="user-interactions__error">
           <p>We couldn&apos;t load your interactions. Please try again.</p>
-          <button type="button" className="crossover-btn crossover-btn--primary" onClick={() => void load()}>
+          <button
+            type="button"
+            className="crossover-btn crossover-btn--primary"
+            onClick={() => {
+              const controller = new AbortController();
+              void load(controller.signal);
+            }}
+          >
             Try again
           </button>
         </div>
@@ -325,7 +395,7 @@ export function UserInteractionsPanel() {
         <button
           type="button"
           className="user-interactions__new-btn crossover-btn crossover-btn--primary"
-          disabled={!data?.permissions.canCreate || busy}
+          disabled={!canCreateAny(permissions) || busy}
           onClick={() => {
             resetForm();
             setFormKind("note");
@@ -365,7 +435,7 @@ export function UserInteractionsPanel() {
           className={`user-interactions__chip ${filter === "completed_today" ? "user-interactions__chip--active" : ""}`}
           onClick={() => setFilter("completed_today")}
         >
-          Completed today
+          Completed today {counts.completedToday ?? 0}
         </button>
       </div>
 
@@ -374,8 +444,8 @@ export function UserInteractionsPanel() {
         <input
           className="crossover-input crossover-search__input"
           placeholder="Search interactions…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
       </label>
 
@@ -397,14 +467,16 @@ export function UserInteractionsPanel() {
             </div>
             <div className="user-interactions__card-actions">
               {row.employeeStatus !== "Done" ? (
-                <button type="button" className="crossover-btn crossover-btn--primary" disabled={busy} onClick={() => onCompleteClick(row)}>
-                  Complete
-                </button>
-              ) : (
+                permissions && canCompleteRow(row, permissions) ? (
+                  <button type="button" className="crossover-btn crossover-btn--primary" disabled={busy} onClick={() => onCompleteClick(row)}>
+                    Complete
+                  </button>
+                ) : null
+              ) : permissions && canReopenRow(row, permissions) ? (
                 <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => void reopenItem(row)}>
                   Reopen
                 </button>
-              )}
+              ) : null}
               <button type="button" className="crossover-btn crossover-btn--outline" disabled={busy} onClick={() => setDetail(row)}>
                 View
               </button>
@@ -430,7 +502,15 @@ export function UserInteractionsPanel() {
         </div>
       ) : null}
 
-      <button type="button" className="user-interactions__refresh crossover-btn crossover-btn--outline" onClick={() => void load()} disabled={busy}>
+      <button
+        type="button"
+        className="user-interactions__refresh crossover-btn crossover-btn--outline"
+        onClick={() => {
+          const controller = new AbortController();
+          void load(controller.signal);
+        }}
+        disabled={busy}
+      >
         <RefreshCw className="h-4 w-4" aria-hidden /> Refresh
       </button>
 
@@ -438,12 +518,19 @@ export function UserInteractionsPanel() {
         <div className="user-interactions__form">
           <fieldset className="user-interactions__kind">
             <legend>What is this?</legend>
-            {(["note", "follow_up", "issue"] as const).map((kind) => (
-              <label key={kind}>
-                <input type="radio" name="kind" checked={formKind === kind} onChange={() => setFormKind(kind)} />
-                {kind === "note" ? "Note" : kind === "follow_up" ? "Follow-up" : "Issue"}
-              </label>
-            ))}
+            {(["note", "follow_up", "issue"] as const)
+              .filter((kind) => {
+                if (!permissions) return kind === "note";
+                if (kind === "note") return permissions.canCreateNote;
+                if (kind === "follow_up") return permissions.canCreateFollowUp;
+                return permissions.canCreateIssue;
+              })
+              .map((kind) => (
+                <label key={kind}>
+                  <input type="radio" name="kind" checked={formKind === kind} onChange={() => setFormKind(kind)} />
+                  {kind === "note" ? "Note" : kind === "follow_up" ? "Follow-up" : "Issue"}
+                </label>
+              ))}
           </fieldset>
           {formError ? <p className="user-interactions__form-error">{formError}</p> : null}
           <label>
@@ -495,7 +582,17 @@ export function UserInteractionsPanel() {
             <button type="button" className="crossover-btn crossover-btn--outline" onClick={() => setShowNew(false)}>
               Cancel
             </button>
-            <button type="button" className="crossover-btn crossover-btn--primary" disabled={busy} onClick={() => void submitNew()}>
+            <button
+              type="button"
+              className="crossover-btn crossover-btn--primary"
+              disabled={
+                busy ||
+                (formKind === "note" && !permissions?.canCreateNote) ||
+                (formKind === "follow_up" && !permissions?.canCreateFollowUp) ||
+                (formKind === "issue" && !permissions?.canCreateIssue)
+              }
+              onClick={() => void submitNew()}
+            >
               Submit
             </button>
           </div>
@@ -511,23 +608,24 @@ export function UserInteractionsPanel() {
               Assigned to
               <select
                 className="crossover-input w-full mt-1"
-                value={detail.assignedTo ?? ""}
-                disabled={busy}
+                value={assigneeSelectValue(detail.assignedTo)}
+                disabled={busy || !permissions || !canAssignRow(detail, permissions)}
                 onChange={(e) => {
                   const parsed = parseUnifiedInteractionId(detail.id);
                   if (!parsed) return;
+                  const assignee = assigneeFromSelectValue(e.target.value);
                   const action =
                     parsed.sourceTable === "crossover_messages"
                       ? "update_crossover"
                       : parsed.sourceTable === "owner_follow_ups"
                         ? "update_follow_up"
                         : "update_issue";
-                  void mutate({ action, id: parsed.sourceId, assigned_to: e.target.value }, "Assignment updated.").then((ok) => {
-                    if (ok) setDetail({ ...detail, assignedTo: e.target.value });
+                  void mutate({ action, id: parsed.sourceId, assigned_to: assignee }, "Assignment updated.").then((ok) => {
+                    if (ok) setDetail({ ...detail, assignedTo: assignee });
                   });
                 }}
               >
-                {staffOptions.map((name) => (
+                {assigneeOptions(data?.staffDirectory, detail.assignedTo).map((name) => (
                   <option key={name} value={name}>
                     {name}
                   </option>

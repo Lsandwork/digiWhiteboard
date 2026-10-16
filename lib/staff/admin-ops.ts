@@ -1,7 +1,11 @@
 import type { AdminUserRole } from "@/lib/admin/users";
 import { deleteAdminUser, deleteAdminUserByEmail, isAdminUserUuid } from "@/lib/admin/users";
 import { displayActorLabel, buildActorNameLookup } from "@/lib/admin/actor-display";
-import { loadAdminSettingsJsonKey, saveAdminSettingsJsonKey } from "@/lib/admin/settings-json-store";
+import {
+  loadAdminSettingsJsonKey,
+  saveAdminSettingsJsonKey,
+  saveAdminSettingsJsonKeyIfRevision
+} from "@/lib/admin/settings-json-store";
 import {
   canDeleteFrontDeskLogEntry,
   isAssessmentDogLog,
@@ -12,6 +16,11 @@ import {
 } from "@/lib/staff/front-desk-log";
 import { capRecordsPreservingOpen } from "@/lib/user-interactions/unified";
 import { isStaffOpsStatusOpen } from "@/lib/user-interactions/lifecycle";
+import { assertResolutionNoteIfRequired } from "@/lib/user-interactions/resolution-validation";
+import {
+  StaffOpsAtomicSaveUnavailableError,
+  StaffOpsConflictError
+} from "@/lib/user-interactions/staff-ops-auth";
 import { deriveLegacyCrossoverFields, legacyFieldValuesFromMessage, resolveCrossoverMessage } from "@/lib/staff/crossover-templates";
 import { syncStaffDirectoryLoginAccount } from "@/lib/staff/directory-login";
 import {
@@ -186,6 +195,8 @@ export type StaffOpsState = {
   activity_logs: StaffActivityLog[];
   staff_directory: StaffDirectoryMember[];
   notifications: StaffNotification[];
+  /** Optimistic concurrency token — incremented on each successful save. */
+  _revision?: number;
 };
 
 export type StaffOpsEntity = "crossover" | "follow_up" | "issue";
@@ -200,7 +211,17 @@ const ACTIVITY_LOG_SOURCE = "staff_admin_ops";
 const MAX_TEXT = 1200;
 /** Keep recent Team Log rows only — unbounded history bloats the shared settings blob. */
 const MAX_CROSSOVER_MESSAGES = 500;
+const MAX_OWNER_FOLLOW_UPS = 500;
+const MAX_ACTIVE_ISSUES = 500;
 const MAX_NOTIFICATIONS = 150;
+const STAFF_OPS_SAVE_RETRIES = 5;
+
+export type MutateStaffOpsOptions = {
+  /** When set, reject immediately if server revision differs (User Interactions optimistic lock). */
+  expectedRevision?: number | null;
+};
+
+export type StaffOpsWriteOptions = MutateStaffOpsOptions;
 
 export const STAFF_DEPARTMENTS = [
   "Front Desk",
@@ -435,11 +456,20 @@ function parseState(value: unknown): StaffOpsState {
       isStaffOpsStatusOpen
     ),
     crossover_message_replies: sortNewest(Array.isArray(state.crossover_message_replies) ? state.crossover_message_replies : []),
-    owner_follow_ups: sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
-    active_issues: sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
+    owner_follow_ups: capRecordsPreservingOpen(
+      sortNewest(Array.isArray(state.owner_follow_ups) ? state.owner_follow_ups : []),
+      MAX_OWNER_FOLLOW_UPS,
+      isStaffOpsStatusOpen
+    ),
+    active_issues: capRecordsPreservingOpen(
+      sortNewest(Array.isArray(state.active_issues) ? state.active_issues : []),
+      MAX_ACTIVE_ISSUES,
+      isStaffOpsStatusOpen
+    ),
     activity_logs: sortNewest(Array.isArray(state.activity_logs) ? state.activity_logs : []).slice(0, 100),
     staff_directory: directory.map(normalizeStaffDirectoryMember),
-    notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : []).slice(0, MAX_NOTIFICATIONS)
+    notifications: sortNewest(Array.isArray(state.notifications) ? state.notifications : []).slice(0, MAX_NOTIFICATIONS),
+    _revision: typeof state._revision === "number" && Number.isFinite(state._revision) ? state._revision : 0
   };
 }
 
@@ -449,8 +479,21 @@ async function loadStateFromAdminSettings(supabase: SupabaseClient) {
   return loaded;
 }
 
-async function saveStateToAdminSettings(supabase: SupabaseClient, state: StaffOpsState) {
-  return saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, parseState(state));
+async function saveStateToAdminSettings(
+  supabase: SupabaseClient,
+  state: StaffOpsState,
+  expectedRevision?: number
+): Promise<"ok" | "conflict" | "miss"> {
+  const payload = parseState(state);
+  if (expectedRevision !== undefined) {
+    const cas = await saveAdminSettingsJsonKeyIfRevision(supabase, SETTINGS_STORE_KEY, payload, expectedRevision);
+    if (cas === false) return "conflict";
+    if (cas === true) return "ok";
+    // Migration 076 not applied (or RPC unreachable) — do not fall back to non-atomic patch.
+    throw new StaffOpsAtomicSaveUnavailableError();
+  }
+  if (await saveAdminSettingsJsonKey(supabase, SETTINGS_STORE_KEY, payload)) return "ok";
+  return "miss";
 }
 
 async function loadStateFromActivityLog(supabase: SupabaseClient) {
@@ -489,10 +532,39 @@ async function loadState(supabase: SupabaseClient) {
     ?? emptyState();
 }
 
-async function saveState(supabase: SupabaseClient, state: StaffOpsState) {
-  if (await saveStateToAdminSettings(supabase, state)) return;
-  if (await saveStateToActivityLog(supabase, state)) return;
-  throw new Error("Staff admin storage is not available.");
+/** Load → mutate → save with revision check (retries on concurrent writers). */
+async function mutateStaffOpsState(
+  supabase: SupabaseClient,
+  mutator: (state: StaffOpsState) => StaffOpsState,
+  options?: MutateStaffOpsOptions
+): Promise<StaffOpsState> {
+  let clientRevisionChecked = false;
+  for (let attempt = 0; attempt < STAFF_OPS_SAVE_RETRIES; attempt++) {
+    const state = await loadState(supabase);
+    if (!clientRevisionChecked && options?.expectedRevision != null) {
+      clientRevisionChecked = true;
+      if ((state._revision ?? 0) !== options.expectedRevision) {
+        throw new StaffOpsConflictError();
+      }
+    }
+    const revision = state._revision ?? 0;
+    const next = mutator(state);
+    next._revision = revision + 1;
+    const fresh = await loadState(supabase);
+    if ((fresh._revision ?? 0) !== revision) {
+      if (attempt === STAFF_OPS_SAVE_RETRIES - 1) throw new StaffOpsConflictError();
+      continue;
+    }
+    const saved = await saveStateToAdminSettings(supabase, next, revision);
+    if (saved === "conflict") {
+      if (attempt === STAFF_OPS_SAVE_RETRIES - 1) throw new StaffOpsConflictError();
+      continue;
+    }
+    if (saved === "ok") return next;
+    if (await saveStateToActivityLog(supabase, next)) return next;
+    throw new Error("Staff admin storage is not available.");
+  }
+  throw new StaffOpsConflictError();
 }
 
 export const STAFF_OPS_LIST_MESSAGE_LIMIT = 120;
@@ -557,32 +629,33 @@ export async function enrichStaffOpsActorLabels(supabase: SupabaseClient, state:
 
 export async function appendStaffOpsActivityEntries(
   supabase: SupabaseClient,
-  entries: Omit<StaffActivityLog, "id" | "created_at">[]
+  entries: Omit<StaffActivityLog, "id" | "created_at">[],
+  options?: StaffOpsWriteOptions
 ) {
-  let state = await loadState(supabase);
-  for (const entry of entries) {
-    state = createActivityLog(state, entry);
-  }
-  await saveState(supabase, state);
+  return mutateStaffOpsState(supabase, (state) => {
+    let next = state;
+    for (const entry of entries) {
+      next = createActivityLog(next, entry);
+    }
+    return next;
+  }, options);
 }
 
 export async function dispatchStaffOpsNotificationEvent(
   supabase: SupabaseClient,
-  event: StaffOpsNotificationEvent
+  event: StaffOpsNotificationEvent,
+  options?: StaffOpsWriteOptions
 ) {
-  let state = await loadState(supabase);
-  state = notifyState(state, event);
-  await saveState(supabase, state);
+  return mutateStaffOpsState(supabase, (state) => notifyState(state, event), options);
 }
 
 export async function dispatchPersonalStaffEmailNotification(
   supabase: SupabaseClient,
   event: StaffOpsNotificationEvent,
-  email: string
+  email: string,
+  options?: StaffOpsWriteOptions
 ) {
-  let state = await loadState(supabase);
-  state = appendStaffEmailNotification(state, event, email);
-  await saveState(supabase, state);
+  return mutateStaffOpsState(supabase, (state) => appendStaffEmailNotification(state, event, email), options);
 }
 
 export function createActivityLog(state: StaffOpsState, input: Omit<StaffActivityLog, "id" | "created_at">) {
@@ -604,15 +677,15 @@ function notifyState(state: StaffOpsState, event: StaffOpsNotificationEvent) {
 }
 
 function crossoverTab(): StaffOpsNotificationEvent["sourceTab"] {
-  return "crossover_communication";
+  return "user_interactions";
 }
 
 function followUpTab(): StaffOpsNotificationEvent["sourceTab"] {
-  return "owner_follow_up";
+  return "user_interactions";
 }
 
 function issueTab(): StaffOpsNotificationEvent["sourceTab"] {
-  return "active_issues";
+  return "user_interactions";
 }
 
 function maybeCreateActiveIssueFromCrossover(state: StaffOpsState, message: CrossoverMessage, actor: string | null) {
@@ -746,7 +819,8 @@ export async function createCrossoverMessage(
   supabase: SupabaseClient,
   input: Record<string, unknown>,
   actor: string | null,
-  displayName?: string | null
+  displayName?: string | null,
+  options?: StaffOpsWriteOptions
 ) {
   const subject = cleanString(input.subject);
   const rawDetails = cleanString(input.details ?? input.message);
@@ -809,61 +883,70 @@ export async function createCrossoverMessage(
     archived_at: null,
     resolution_notes: null
   };
-  let state = await loadState(supabase);
-  state = createActivityLog({ ...state, crossover_messages: sortNewest([record, ...state.crossover_messages]) }, {
-    activity_type: "shift_log.created",
-    title: `Log created: ${record.subject}`,
-    description: `${record.log_type} • ${shiftLogAssignedLabel(record)} • By ${submitterLabel ?? "Staff"}`,
-    source_table: "crossover_messages",
-    source_id: record.id,
-    created_by: submitterLabel
-  });
-
-  if (Boolean(input.create_owner_follow_up)) {
-    const followUpResult = appendOwnerFollowUpFromLogState(state, record, actor);
-    state = followUpResult.state;
-    record.linked_owner_follow_up_id = followUpResult.followUpId;
-  }
-  if (Boolean(input.create_active_issue) || (record.log_type === "Owner Complaint" && isUrgent(record.priority, record.urgent, record.needs_management_review))) {
-    state = maybeCreateActiveIssueFromCrossover(state, record, actor);
-    const linked = state.active_issues.find((issue) => issue.source_table === "crossover_messages" && issue.source_id === record.id);
-    if (linked) record.linked_active_issue_id = linked.id;
-  }
-
   const alertNow = isUrgent(record.priority, record.urgent, record.needs_management_review);
-  if (alertNow) {
-    state = notifyState(state, {
-      eventType: "created",
-      sourceTable: "crossover_messages",
-      sourceId: record.id,
-      sourceTab: crossoverTab(),
-      title: `Management alert: ${record.subject}`,
-      body: buildShiftLogAlertBody(record),
-      priority: record.priority,
-      urgent: record.urgent,
-      needsManagementReview: record.needs_management_review,
-      assignedTo: record.assigned_to ?? record.assigned_team,
-      actor
-    });
-    record.management_alerted_at = now;
-    state = {
-      ...state,
-      crossover_messages: state.crossover_messages.map((item) => (item.id === record.id ? { ...record, management_alerted_at: now } : item))
-    };
-    state = createActivityLog(state, {
-      activity_type: "shift_log.management_alerted",
-      title: "Management alerted",
-      description: record.subject,
+
+  await mutateStaffOpsState(supabase, (state) => {
+    let next = createActivityLog({ ...state, crossover_messages: sortNewest([record, ...state.crossover_messages]) }, {
+      activity_type: "shift_log.created",
+      title: `Log created: ${record.subject}`,
+      description: `${record.log_type} • ${shiftLogAssignedLabel(record)} • By ${submitterLabel ?? "Staff"}`,
       source_table: "crossover_messages",
       source_id: record.id,
-      created_by: actor
+      created_by: submitterLabel
     });
-  }
 
-  await saveState(supabase, {
-    ...state,
-    crossover_messages: state.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item))
-  });
+    if (Boolean(input.create_owner_follow_up)) {
+      const followUpResult = appendOwnerFollowUpFromLogState(next, record, actor);
+      next = followUpResult.state;
+      record.linked_owner_follow_up_id = followUpResult.followUpId;
+    }
+    if (
+      Boolean(input.create_active_issue) ||
+      (record.log_type === "Owner Complaint" && isUrgent(record.priority, record.urgent, record.needs_management_review))
+    ) {
+      next = maybeCreateActiveIssueFromCrossover(next, record, actor);
+      const linked = next.active_issues.find(
+        (issue) => issue.source_table === "crossover_messages" && issue.source_id === record.id
+      );
+      if (linked) record.linked_active_issue_id = linked.id;
+    }
+
+    if (alertNow) {
+      next = notifyState(next, {
+        eventType: "created",
+        sourceTable: "crossover_messages",
+        sourceId: record.id,
+        sourceTab: crossoverTab(),
+        title: `Management alert: ${record.subject}`,
+        body: buildShiftLogAlertBody(record),
+        priority: record.priority,
+        urgent: record.urgent,
+        needsManagementReview: record.needs_management_review,
+        assignedTo: record.assigned_to ?? record.assigned_team,
+        actor
+      });
+      record.management_alerted_at = now;
+      next = {
+        ...next,
+        crossover_messages: next.crossover_messages.map((item) =>
+          item.id === record.id ? { ...record, management_alerted_at: now } : item
+        )
+      };
+      next = createActivityLog(next, {
+        activity_type: "shift_log.management_alerted",
+        title: "Management alerted",
+        description: record.subject,
+        source_table: "crossover_messages",
+        source_id: record.id,
+        created_by: actor
+      });
+    }
+
+    return {
+      ...next,
+      crossover_messages: next.crossover_messages.map((item) => (item.id === record.id ? { ...item, ...record } : item))
+    };
+  }, options);
   if (alertNow) {
     const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
     triggerShellyAlertFireAndForget("urgent_front_desk", `front-desk:${record.id}`);
@@ -890,7 +973,8 @@ export async function createCrossoverMessages(
   supabase: SupabaseClient,
   entries: Record<string, unknown>[],
   actor: string | null,
-  displayName?: string | null
+  displayName?: string | null,
+  options?: StaffOpsWriteOptions
 ) {
   if (!entries.length) throw new Error("Add at least one entry.");
   if (entries.length > 25) throw new Error("Submit up to 25 entries at a time.");
@@ -898,7 +982,9 @@ export async function createCrossoverMessages(
   const errors: string[] = [];
   for (const [index, entry] of entries.entries()) {
     try {
-      records.push(await createCrossoverMessage(supabase, entry, actor, displayName));
+      // Client revision applies to the first row only; later rows rely on internal OCC retries.
+      const rowOpts = index === 0 ? options : undefined;
+      records.push(await createCrossoverMessage(supabase, entry, actor, displayName, rowOpts));
     } catch (error) {
       errors.push(`Row ${index + 1}: ${error instanceof Error ? error.message : "Unable to save."}`);
     }
@@ -972,14 +1058,13 @@ export async function replyToCrossoverMessage(
   message: unknown,
   actor: string | null,
   updateType = "Internal Note",
-  displayName?: string | null
+  displayName?: string | null,
+  options?: StaffOpsWriteOptions
 ) {
   const text = cleanString(message);
   if (!text) throw new Error("Update text is required.");
-  const state = await loadState(supabase);
-  const parent = state.crossover_messages.find((item) => item.id === id);
-  if (!parent) throw new Error("Shift log entry not found.");
   const authorLabel = cleanString(displayName) || actor;
+  let parent!: CrossoverMessage;
   const reply: CrossoverReply = {
     id: newId(),
     crossover_message_id: id,
@@ -988,17 +1073,20 @@ export async function replyToCrossoverMessage(
     created_by: authorLabel,
     created_at: nowIso()
   };
-  // Never drop conversation history — keep a generous shared reply trail for every log.
-  const replies = sortNewest([reply, ...state.crossover_message_replies]).slice(0, 5_000);
-  const next = createActivityLog({ ...state, crossover_message_replies: replies }, {
-    activity_type: "shift_log.update_added",
-    title: "Update added to shift log",
-    description: `${authorLabel ?? "Staff"}: ${text}`,
-    source_table: "crossover_messages",
-    source_id: id,
-    created_by: authorLabel
-  });
-  await saveState(supabase, next);
+  await mutateStaffOpsState(supabase, (state) => {
+    const found = state.crossover_messages.find((item) => item.id === id);
+    if (!found) throw new Error("Shift log entry not found.");
+    parent = found;
+    const replies = sortNewest([reply, ...state.crossover_message_replies]).slice(0, 5_000);
+    return createActivityLog({ ...state, crossover_message_replies: replies }, {
+      activity_type: "shift_log.update_added",
+      title: "Update added to shift log",
+      description: `${authorLabel ?? "Staff"}: ${text}`,
+      source_table: "crossover_messages",
+      source_id: id,
+      created_by: authorLabel
+    });
+  }, options);
   const commentKeyword = findSuperAdminSmsKeyword(text);
   if (isCriticalOrUrgentStaffNote(parent) || commentKeyword) {
     sendSuperAdminSmsAlertFireAndForget(
@@ -1015,6 +1103,27 @@ export async function replyToCrossoverMessage(
     );
   }
   return reply;
+}
+
+function resolveLinkedOwnerFollowUp(
+  state: StaffOpsState,
+  followUpId: string,
+  resolutionNote: string | null | undefined,
+  now: string
+): StaffOpsState {
+  return {
+    ...state,
+    owner_follow_ups: state.owner_follow_ups.map((item) => {
+      if (item.id !== followUpId || !isStaffOpsStatusOpen(item.status)) return item;
+      return {
+        ...item,
+        status: "Resolved" as StaffOpsStatus,
+        resolved_at: item.resolved_at ?? now,
+        resolution_notes: (resolutionNote?.trim() || item.resolution_notes) ?? null,
+        updated_at: now
+      };
+    })
+  };
 }
 
 function applyCrossoverMessagePatch(
@@ -1096,6 +1205,14 @@ function applyCrossoverMessagePatch(
   const updatedRecord = updated as CrossoverMessage;
   if (updatedRecord.status === "Resolved" || updatedRecord.status === "Completed" || updatedRecord.status === "Check Out") {
     next = markLinkedIssuePendingReview(next, "crossover_messages", updatedRecord.id, actor);
+    if (updatedRecord.linked_owner_follow_up_id) {
+      next = resolveLinkedOwnerFollowUp(
+        next,
+        updatedRecord.linked_owner_follow_up_id,
+        updatedRecord.resolution_notes,
+        now
+      );
+    }
   }
   if (Boolean(patch.create_active_issue)) next = maybeCreateActiveIssueFromCrossover(next, updatedRecord, actor);
   if (Boolean(patch.create_owner_follow_up)) {
@@ -1162,36 +1279,48 @@ export async function updateCrossoverMessage(
   supabase: SupabaseClient,
   id: string,
   patch: Record<string, unknown>,
-  actor: string | null
+  actor: string | null,
+  options?: StaffOpsWriteOptions
 ): Promise<{ record: CrossoverMessage; reply: CrossoverReply | null }> {
-  const state = await loadState(supabase);
-  const previous = state.crossover_messages.find((item) => item.id === id);
-  const { state: patched, updated } = applyCrossoverMessagePatch(state, id, patch, actor);
-  let next = patched;
+  let previous: CrossoverMessage | undefined;
+  let updated!: CrossoverMessage;
   let reply: CrossoverReply | null = null;
 
-  const previousResolution = String(previous?.resolution_notes ?? "").trim();
-  const nextResolution = String(updated.resolution_notes ?? "").trim();
-  const resolutionChanged = Boolean(nextResolution && nextResolution !== previousResolution);
-  const statusChanged = Boolean(previous && previous.status !== updated.status);
-  if (resolutionChanged || (statusChanged && nextResolution)) {
-    reply = {
-      id: newId(),
-      crossover_message_id: id,
-      message: resolutionChanged
-        ? nextResolution
-        : `${updated.status}${nextResolution ? ` — ${nextResolution}` : ""}`,
-      update_type: resolutionChanged ? "Resolution" : "Status Update",
-      created_by: actor,
-      created_at: nowIso()
-    };
-    next = {
-      ...next,
-      crossover_message_replies: sortNewest([reply, ...next.crossover_message_replies]).slice(0, 5_000)
-    };
-  }
+  await mutateStaffOpsState(supabase, (state) => {
+    previous = state.crossover_messages.find((item) => item.id === id);
+    if (!previous) throw new Error("Shift log entry not found.");
+    const nextStatus = patch.status !== undefined ? normalizeStatus(patch.status, previous.status) : previous.status;
+    const nextPriority = patch.priority !== undefined ? normalizePriority(patch.priority) : previous.priority;
+    const nextUrgent = patch.urgent !== undefined ? Boolean(patch.urgent) : previous.urgent;
+    assertResolutionNoteIfRequired(nextPriority, nextUrgent, nextStatus, patch.resolution_notes);
 
-  await saveState(supabase, next);
+    const { state: patched, updated: record } = applyCrossoverMessagePatch(state, id, patch, actor);
+    updated = record;
+    let next = patched;
+
+    const previousResolution = String(previous.resolution_notes ?? "").trim();
+    const nextResolution = String(updated.resolution_notes ?? "").trim();
+    const resolutionChanged = Boolean(nextResolution && nextResolution !== previousResolution);
+    const statusChanged = previous.status !== updated.status;
+    if (resolutionChanged || (statusChanged && nextResolution)) {
+      reply = {
+        id: newId(),
+        crossover_message_id: id,
+        message: resolutionChanged
+          ? nextResolution
+          : `${updated.status}${nextResolution ? ` — ${nextResolution}` : ""}`,
+        update_type: resolutionChanged ? "Resolution" : "Status Update",
+        created_by: actor,
+        created_at: nowIso()
+      };
+      next = {
+        ...next,
+        crossover_message_replies: sortNewest([reply, ...next.crossover_message_replies]).slice(0, 5_000)
+      };
+    }
+    return next;
+  }, options);
+
   const wasAlert = previous ? staffContentNeedsSuperAdminSms(previous) : false;
   const nowAlert = staffContentNeedsSuperAdminSms(updated);
   if (nowAlert && !wasAlert) {
@@ -1204,7 +1333,7 @@ export async function updateCrossoverMessage(
           : `${updated.priority}${updated.urgent ? "/URGENT" : ""} note escalated: ${updated.subject}`,
         detail: buildShiftLogAlertBody(updated),
         idempotencyKey: `sa-sms:front-desk:${updated.id}:escalated`,
-        adminPath: "/admin?board=staff&tab=crossover_communication"
+        adminPath: "/admin?board=staff&tab=user_interactions"
       },
       supabase
     );
@@ -1212,11 +1341,40 @@ export async function updateCrossoverMessage(
   return { record: updated, reply };
 }
 
+export async function reopenCrossoverMessage(
+  supabase: SupabaseClient,
+  id: string,
+  actor: string | null,
+  displayName: string | null,
+  options?: StaffOpsWriteOptions
+): Promise<CrossoverMessage> {
+  let reopened!: CrossoverMessage;
+  await mutateStaffOpsState(supabase, (state) => {
+    const { state: patched, updated } = applyCrossoverMessagePatch(state, id, { status: "Open" }, actor);
+    reopened = updated;
+    const message = `Reopened by ${displayName?.trim() || actor || "staff"}.`;
+    const reply: CrossoverReply = {
+      id: newId(),
+      crossover_message_id: id,
+      message,
+      update_type: "Reopen",
+      created_by: actor,
+      created_at: nowIso()
+    };
+    return {
+      ...patched,
+      crossover_message_replies: sortNewest([reply, ...patched.crossover_message_replies]).slice(0, 5_000)
+    };
+  }, options);
+  return reopened;
+}
+
 export async function moveCrossoverMessages(
   supabase: SupabaseClient,
   ids: string[],
   targetLog: "crossover" | "open" | "archived",
-  actor: string | null
+  actor: string | null,
+  options?: StaffOpsWriteOptions
 ) {
   const uniqueIds = [...new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!uniqueIds.length) throw new Error("Select at least one log entry to move.");
@@ -1225,14 +1383,32 @@ export async function moveCrossoverMessages(
   }
 
   const now = nowIso();
-  const state = await loadState(supabase);
   const idSet = new Set(uniqueIds);
   let moved = 0;
+  const label =
+    targetLog === "open" ? "Open Log" : targetLog === "archived" ? "Archived Log" : "Crossover Log";
 
-  const crossover_messages = state.crossover_messages.map((item) => {
-    if (!idSet.has(item.id)) return item;
-    moved += 1;
-    if (targetLog === "open") {
+  await mutateStaffOpsState(supabase, (state) => {
+    const crossover_messages = state.crossover_messages.map((item) => {
+      if (!idSet.has(item.id)) return item;
+      moved += 1;
+      if (targetLog === "open") {
+        return {
+          ...item,
+          status: "Open" as const,
+          resolved_at: null,
+          archived_at: null,
+          updated_at: now
+        };
+      }
+      if (targetLog === "archived") {
+        return {
+          ...item,
+          status: "Archived" as const,
+          archived_at: item.archived_at ?? now,
+          updated_at: now
+        };
+      }
       return {
         ...item,
         status: "Open" as const,
@@ -1240,43 +1416,24 @@ export async function moveCrossoverMessages(
         archived_at: null,
         updated_at: now
       };
-    }
-    if (targetLog === "archived") {
-      return {
-        ...item,
-        status: "Archived" as const,
-        archived_at: item.archived_at ?? now,
-        updated_at: now
-      };
-    }
-    return {
-      ...item,
-      status: "Open" as const,
-      resolved_at: null,
-      archived_at: null,
-      updated_at: now
+    });
+
+    if (!moved) throw new Error("No matching log entries found to move.");
+
+    let next: StaffOpsState = {
+      ...state,
+      crossover_messages: sortNewest(crossover_messages)
     };
-  });
-
-  if (!moved) throw new Error("No matching log entries found to move.");
-
-  const label =
-    targetLog === "open" ? "Open Log" : targetLog === "archived" ? "Archived Log" : "Crossover Log";
-
-  let next: StaffOpsState = {
-    ...state,
-    crossover_messages: sortNewest(crossover_messages)
-  };
-  next = createActivityLog(next, {
-    activity_type: "shift_log.moved",
-    title: `Moved ${moved} log entr${moved === 1 ? "y" : "ies"} to ${label}`,
-    description: uniqueIds.slice(0, 8).join(", "),
-    source_table: "crossover_messages",
-    source_id: null,
-    created_by: actor
-  });
-
-  await saveState(supabase, next);
+    next = createActivityLog(next, {
+      activity_type: "shift_log.moved",
+      title: `Moved ${moved} log entr${moved === 1 ? "y" : "ies"} to ${label}`,
+      description: uniqueIds.slice(0, 8).join(", "),
+      source_table: "crossover_messages",
+      source_id: null,
+      created_by: actor
+    });
+    return next;
+  }, options);
   return { moved, target_log: targetLog, ids: uniqueIds };
 }
 
@@ -1284,22 +1441,25 @@ export async function bulkUpdateCrossoverMessages(
   supabase: SupabaseClient,
   ids: string[],
   patch: Record<string, unknown>,
-  actor: string | null
+  actor: string | null,
+  options?: StaffOpsWriteOptions
 ) {
   const uniqueIds = [...new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean))];
   if (!uniqueIds.length) throw new Error("Select at least one log entry.");
 
-  let state = await loadState(supabase);
   const updatedIds: string[] = [];
   const now = nowIso();
-  for (const id of uniqueIds) {
-    if (!state.crossover_messages.some((item) => item.id === id)) continue;
-    const result = applyCrossoverMessagePatch(state, id, patch, actor, now);
-    state = result.state;
-    updatedIds.push(id);
-  }
-  if (!updatedIds.length) throw new Error("No matching log entries found.");
-  await saveState(supabase, state);
+  await mutateStaffOpsState(supabase, (state) => {
+    let next = state;
+    for (const id of uniqueIds) {
+      if (!next.crossover_messages.some((item) => item.id === id)) continue;
+      const result = applyCrossoverMessagePatch(next, id, patch, actor, now);
+      next = result.state;
+      updatedIds.push(id);
+    }
+    if (!updatedIds.length) throw new Error("No matching log entries found.");
+    return next;
+  }, options);
   return { updated: updatedIds.length, ids: updatedIds };
 }
 
@@ -1307,33 +1467,40 @@ export async function deleteCrossoverMessage(
   supabase: SupabaseClient,
   id: string,
   actor: string | null,
-  options: { email?: string | null; adminUserId?: string | null; role?: string | null }
+  deleteOptions: { email?: string | null; adminUserId?: string | null; role?: string | null },
+  writeOptions?: StaffOpsWriteOptions
 ) {
-  const state = await loadState(supabase);
-  const existing = state.crossover_messages.find((item) => item.id === id);
-  if (!existing) throw new Error("Shift log entry not found.");
-  if (!canDeleteFrontDeskLogEntry(existing, options)) {
-    throw new Error("You can only delete Team Log entries that you created.");
-  }
+  await mutateStaffOpsState(supabase, (state) => {
+    const existing = state.crossover_messages.find((item) => item.id === id);
+    if (!existing) throw new Error("Shift log entry not found.");
+    if (!canDeleteFrontDeskLogEntry(existing, deleteOptions)) {
+      throw new Error("You can only delete Team Log entries that you created.");
+    }
 
-  let next: StaffOpsState = {
-    ...state,
-    crossover_messages: state.crossover_messages.filter((item) => item.id !== id),
-    crossover_message_replies: state.crossover_message_replies.filter((reply) => reply.crossover_message_id !== id)
-  };
-  next = createActivityLog(next, {
-    activity_type: "shift_log.deleted",
-    title: `Log deleted: ${existing.subject}`,
-    description: `Deleted by ${actor ?? "Staff"}`,
-    source_table: "crossover_messages",
-    source_id: id,
-    created_by: actor
-  });
-  await saveState(supabase, next);
+    let next: StaffOpsState = {
+      ...state,
+      crossover_messages: state.crossover_messages.filter((item) => item.id !== id),
+      crossover_message_replies: state.crossover_message_replies.filter((reply) => reply.crossover_message_id !== id)
+    };
+    next = createActivityLog(next, {
+      activity_type: "shift_log.deleted",
+      title: `Log deleted: ${existing.subject}`,
+      description: `Deleted by ${actor ?? "Staff"}`,
+      source_table: "crossover_messages",
+      source_id: id,
+      created_by: actor
+    });
+    return next;
+  }, writeOptions);
   return { id };
 }
 
-export async function createOwnerFollowUp(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {
+export async function createOwnerFollowUp(
+  supabase: SupabaseClient,
+  input: Record<string, unknown>,
+  actor: string | null,
+  options?: StaffOpsWriteOptions
+) {
   const subject = cleanString(input.subject);
   const owner = cleanString(input.owner_name);
   const assignedTo = cleanString(input.assigned_to);
@@ -1359,30 +1526,30 @@ export async function createOwnerFollowUp(supabase: SupabaseClient, input: Recor
     updated_at: now,
     resolved_at: null
   };
-  let state = await loadState(supabase);
-  state = createActivityLog({ ...state, owner_follow_ups: sortNewest([record, ...state.owner_follow_ups]) }, {
-    activity_type: "follow_up.created",
-    title: `New follow up: ${record.subject}`,
-    description: `Assigned to ${record.assigned_to}`,
-    source_table: "owner_follow_ups",
-    source_id: record.id,
-    created_by: actor
-  });
-  state = maybeCreateActiveIssueFromOwnerFollowUp(state, record, actor);
-  state = notifyState(state, {
-    eventType: "created",
-    sourceTable: "owner_follow_ups",
-    sourceId: record.id,
-    sourceTab: followUpTab(),
-    title: `New follow-up: ${record.subject}`,
-    body: record.follow_up_notes,
-    priority: record.priority,
-    urgent: record.urgent,
-    assignedTo: record.assigned_to,
-    mentionText: record.follow_up_notes,
-    actor
-  });
-  await saveState(supabase, state);
+  await mutateStaffOpsState(supabase, (state) => {
+    let next = createActivityLog({ ...state, owner_follow_ups: sortNewest([record, ...state.owner_follow_ups]) }, {
+      activity_type: "follow_up.created",
+      title: `New follow up: ${record.subject}`,
+      description: `Assigned to ${record.assigned_to}`,
+      source_table: "owner_follow_ups",
+      source_id: record.id,
+      created_by: actor
+    });
+    next = maybeCreateActiveIssueFromOwnerFollowUp(next, record, actor);
+    return notifyState(next, {
+      eventType: "created",
+      sourceTable: "owner_follow_ups",
+      sourceId: record.id,
+      sourceTab: followUpTab(),
+      title: `New follow-up: ${record.subject}`,
+      body: record.follow_up_notes,
+      priority: record.priority,
+      urgent: record.urgent,
+      assignedTo: record.assigned_to,
+      mentionText: record.follow_up_notes,
+      actor
+    });
+  }, options);
   if (
     staffContentNeedsSuperAdminSms({
       priority: record.priority,
@@ -1412,72 +1579,88 @@ export async function updateOwnerFollowUp(
   supabase: SupabaseClient,
   id: string,
   patch: Record<string, unknown>,
-  actor: string | null
+  actor: string | null,
+  options?: StaffOpsWriteOptions
 ) {
-  const now = nowIso();
-  const state = await loadState(supabase);
-  let updated: OwnerFollowUp | null = null;
-  let next: StaffOpsState = {
-    ...state,
-    owner_follow_ups: state.owner_follow_ups.map((item) => {
-      if (item.id !== id) return item;
-      const status = normalizeStatus(patch.status, item.status);
-      updated = {
-        ...item,
-        subject: patch.subject !== undefined ? cleanString(patch.subject) : item.subject,
-        owner_name: patch.owner_name !== undefined ? cleanString(patch.owner_name) : item.owner_name,
-        dog_name: patch.dog_name !== undefined ? optionalString(patch.dog_name) : item.dog_name,
-        assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
-        department: patch.department !== undefined ? optionalString(patch.department) : item.department,
-        priority: patch.priority !== undefined ? normalizePriority(patch.priority) : item.priority,
-        due_date: patch.due_date !== undefined ? normalizeDate(patch.due_date) : item.due_date,
-        status,
-        follow_up_notes: patch.follow_up_notes !== undefined ? optionalString(patch.follow_up_notes) : item.follow_up_notes,
-        resolution_notes:
-          patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes ?? null,
-        source: patch.source !== undefined ? cleanString(patch.source, "Manual") : item.source,
-        urgent: patch.urgent !== undefined ? Boolean(patch.urgent) : item.urgent,
-        updated_at: now,
-        resolved_at:
-          status === "Resolved" || status === "Completed" || status === "Check Out"
-            ? item.resolved_at ?? now
-            : isStaffOpsStatusOpen(status)
-              ? null
-              : item.resolved_at
-      };
-      return updated;
-    })
-  };
-  if (!updated) throw new Error("Owner follow up not found.");
-  const updatedRecord = updated as OwnerFollowUp;
-  if (updatedRecord.status === "Resolved") next = markLinkedIssuePendingReview(next, "owner_follow_ups", updatedRecord.id, actor);
-  next = maybeCreateActiveIssueFromOwnerFollowUp(next, updatedRecord, actor);
-  next = createActivityLog(next, {
-    activity_type: "follow_up.updated",
-    title: `Updated follow up: ${updatedRecord.subject}`,
-    description: `Status: ${updatedRecord.status}`,
-    source_table: "owner_follow_ups",
-    source_id: updatedRecord.id,
-    created_by: actor
-  });
-  next = notifyState(next, {
-    eventType: "updated",
-    sourceTable: "owner_follow_ups",
-    sourceId: updatedRecord.id,
-    sourceTab: followUpTab(),
-    title: `Follow-up updated: ${updatedRecord.subject}`,
-    body: updatedRecord.follow_up_notes,
-    priority: updatedRecord.priority,
-    urgent: updatedRecord.urgent,
-    assignedTo: updatedRecord.assigned_to,
-    mentionText: updatedRecord.follow_up_notes,
-    actor
-  });
-  await saveState(supabase, next);
+  let updatedRecord!: OwnerFollowUp;
+  await mutateStaffOpsState(supabase, (state) => {
+    const now = nowIso();
+    const existing = state.owner_follow_ups.find((item) => item.id === id);
+    if (!existing) throw new Error("Owner follow up not found.");
+    const status = normalizeStatus(patch.status, existing.status);
+    const priority = patch.priority !== undefined ? normalizePriority(patch.priority) : existing.priority;
+    const urgent = patch.urgent !== undefined ? Boolean(patch.urgent) : existing.urgent;
+    assertResolutionNoteIfRequired(priority, urgent, status, patch.resolution_notes);
+
+    let updated: OwnerFollowUp | null = null;
+    let next: StaffOpsState = {
+      ...state,
+      owner_follow_ups: state.owner_follow_ups.map((item) => {
+        if (item.id !== id) return item;
+        updated = {
+          ...item,
+          subject: patch.subject !== undefined ? cleanString(patch.subject) : item.subject,
+          owner_name: patch.owner_name !== undefined ? cleanString(patch.owner_name) : item.owner_name,
+          dog_name: patch.dog_name !== undefined ? optionalString(patch.dog_name) : item.dog_name,
+          assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
+          department: patch.department !== undefined ? optionalString(patch.department) : item.department,
+          priority,
+          due_date: patch.due_date !== undefined ? normalizeDate(patch.due_date) : item.due_date,
+          status,
+          follow_up_notes: patch.follow_up_notes !== undefined ? optionalString(patch.follow_up_notes) : item.follow_up_notes,
+          resolution_notes:
+            patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes ?? null,
+          source: patch.source !== undefined ? cleanString(patch.source, "Manual") : item.source,
+          urgent,
+          updated_at: now,
+          resolved_at:
+            status === "Resolved" || status === "Completed" || status === "Check Out"
+              ? item.resolved_at ?? now
+              : isStaffOpsStatusOpen(status)
+                ? null
+                : item.resolved_at
+        };
+        return updated;
+      })
+    };
+    if (!updated) throw new Error("Owner follow up not found.");
+    updatedRecord = updated;
+    if (updatedRecord.status === "Resolved") {
+      next = markLinkedIssuePendingReview(next, "owner_follow_ups", updatedRecord.id, actor);
+    }
+    next = maybeCreateActiveIssueFromOwnerFollowUp(next, updatedRecord, actor);
+    next = createActivityLog(next, {
+      activity_type: "follow_up.updated",
+      title: `Updated follow up: ${updatedRecord.subject}`,
+      description: `Status: ${updatedRecord.status}`,
+      source_table: "owner_follow_ups",
+      source_id: updatedRecord.id,
+      created_by: actor
+    });
+    next = notifyState(next, {
+      eventType: "updated",
+      sourceTable: "owner_follow_ups",
+      sourceId: updatedRecord.id,
+      sourceTab: followUpTab(),
+      title: `Follow-up updated: ${updatedRecord.subject}`,
+      body: updatedRecord.follow_up_notes,
+      priority: updatedRecord.priority,
+      urgent: updatedRecord.urgent,
+      assignedTo: updatedRecord.assigned_to,
+      mentionText: updatedRecord.follow_up_notes,
+      actor
+    });
+    return next;
+  }, options);
   return updatedRecord;
 }
 
-export async function createActiveIssue(supabase: SupabaseClient, input: Record<string, unknown>, actor: string | null) {
+export async function createActiveIssue(
+  supabase: SupabaseClient,
+  input: Record<string, unknown>,
+  actor: string | null,
+  options?: StaffOpsWriteOptions
+) {
   const title = cleanString(input.title);
   if (!title) throw new Error("Issue title is required.");
   const now = nowIso();
@@ -1502,30 +1685,30 @@ export async function createActiveIssue(supabase: SupabaseClient, input: Record<
     updated_at: now,
     resolved_at: null
   };
-  const state = await loadState(supabase);
-  const next = notifyState(
-    createActivityLog({ ...state, active_issues: sortNewest([record, ...state.active_issues]) }, {
-      activity_type: "issue.created",
-      title: `New issue: ${record.title}`,
-      description: `${record.category} • ${record.priority}`,
-      source_table: "active_issues",
-      source_id: record.id,
-      created_by: actor
-    }),
-    {
-      eventType: "created",
-      sourceTable: "active_issues",
-      sourceId: record.id,
-      sourceTab: issueTab(),
-      title: `New active issue: ${record.title}`,
-      body: record.notes,
-      priority: record.priority,
-      assignedTo: record.assigned_to,
-      mentionText: record.notes,
-      actor
-    }
-  );
-  await saveState(supabase, next);
+  await mutateStaffOpsState(supabase, (state) =>
+    notifyState(
+      createActivityLog({ ...state, active_issues: sortNewest([record, ...state.active_issues]) }, {
+        activity_type: "issue.created",
+        title: `New issue: ${record.title}`,
+        description: `${record.category} • ${record.priority}`,
+        source_table: "active_issues",
+        source_id: record.id,
+        created_by: actor
+      }),
+      {
+        eventType: "created",
+        sourceTable: "active_issues",
+        sourceId: record.id,
+        sourceTab: issueTab(),
+        title: `New active issue: ${record.title}`,
+        body: record.notes,
+        priority: record.priority,
+        assignedTo: record.assigned_to,
+        mentionText: record.notes,
+        actor
+      }
+    )
+  , options);
   if (record.priority === "Urgent" || record.priority === "High" || record.priority === "Critical") {
     const { triggerShellyAlertFireAndForget } = await import("@/lib/shelly-alert");
     triggerShellyAlertFireAndForget("urgent_front_desk", `active-issue:${record.id}`);
@@ -1554,64 +1737,77 @@ export async function createActiveIssue(supabase: SupabaseClient, input: Record<
   return record;
 }
 
-export async function updateActiveIssue(supabase: SupabaseClient, id: string, patch: Record<string, unknown>, actor: string | null) {
-  const now = nowIso();
-  const state = await loadState(supabase);
-  let updated: ActiveIssue | null = null;
-  const updatedState = {
-    ...state,
-    active_issues: state.active_issues.map((item) => {
-      if (item.id !== id) return item;
-      const status = normalizeStatus(patch.status, item.status);
-      updated = {
-        ...item,
-        title: patch.title !== undefined ? cleanString(patch.title) : item.title,
-        category: patch.category !== undefined ? normalizeCategory(patch.category) : item.category,
-        source: patch.source !== undefined ? normalizeSource(patch.source) : item.source,
-        assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
-        priority: patch.priority !== undefined ? normalizePriority(patch.priority) : item.priority,
-        due_at: patch.due_at !== undefined ? normalizeDate(patch.due_at) : item.due_at,
-        status,
-        notes: patch.notes !== undefined ? optionalString(patch.notes) : item.notes,
-        resolution_notes: patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes,
-        related_owner_name: patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name) : item.related_owner_name,
-        related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name) : item.related_dog_name,
-        updated_at: now,
-        resolved_at:
-          status === "Resolved" || status === "Completed" || status === "Check Out"
-            ? item.resolved_at ?? now
-            : isStaffOpsStatusOpen(status)
-              ? null
-              : item.resolved_at
-      };
-      return updated;
-    })
-  };
-  if (!updated) throw new Error("Active issue not found.");
-  const updatedRecord = updated as ActiveIssue;
-  const next = notifyState(
-    createActivityLog(updatedState, {
-      activity_type: "issue.updated",
-      title: `Updated issue: ${updatedRecord.title}`,
-      description: `Status: ${updatedRecord.status}`,
-      source_table: "active_issues",
-      source_id: id,
-      created_by: actor
-    }),
-    {
-      eventType: "updated",
-      sourceTable: "active_issues",
-      sourceId: id,
-      sourceTab: issueTab(),
-      title: `Active issue updated: ${updatedRecord.title}`,
-      body: updatedRecord.notes,
-      priority: updatedRecord.priority,
-      assignedTo: updatedRecord.assigned_to,
-      mentionText: updatedRecord.notes,
-      actor
-    }
-  );
-  await saveState(supabase, next);
+export async function updateActiveIssue(
+  supabase: SupabaseClient,
+  id: string,
+  patch: Record<string, unknown>,
+  actor: string | null,
+  options?: StaffOpsWriteOptions
+) {
+  let updatedRecord!: ActiveIssue;
+  await mutateStaffOpsState(supabase, (state) => {
+    const now = nowIso();
+    const existing = state.active_issues.find((item) => item.id === id);
+    if (!existing) throw new Error("Active issue not found.");
+    const status = normalizeStatus(patch.status, existing.status);
+    const priority = patch.priority !== undefined ? normalizePriority(patch.priority) : existing.priority;
+    assertResolutionNoteIfRequired(priority, false, status, patch.resolution_notes);
+
+    let updated: ActiveIssue | null = null;
+    const updatedState = {
+      ...state,
+      active_issues: state.active_issues.map((item) => {
+        if (item.id !== id) return item;
+        updated = {
+          ...item,
+          title: patch.title !== undefined ? cleanString(patch.title) : item.title,
+          category: patch.category !== undefined ? normalizeCategory(patch.category) : item.category,
+          source: patch.source !== undefined ? normalizeSource(patch.source) : item.source,
+          assigned_to: patch.assigned_to !== undefined ? optionalString(patch.assigned_to) : item.assigned_to,
+          priority,
+          due_at: patch.due_at !== undefined ? normalizeDate(patch.due_at) : item.due_at,
+          status,
+          notes: patch.notes !== undefined ? optionalString(patch.notes) : item.notes,
+          resolution_notes: patch.resolution_notes !== undefined ? optionalString(patch.resolution_notes) : item.resolution_notes,
+          related_owner_name:
+            patch.related_owner_name !== undefined ? optionalString(patch.related_owner_name) : item.related_owner_name,
+          related_dog_name: patch.related_dog_name !== undefined ? optionalString(patch.related_dog_name) : item.related_dog_name,
+          updated_at: now,
+          resolved_at:
+            status === "Resolved" || status === "Completed" || status === "Check Out"
+              ? item.resolved_at ?? now
+              : isStaffOpsStatusOpen(status)
+                ? null
+                : item.resolved_at
+        };
+        return updated;
+      })
+    };
+    if (!updated) throw new Error("Active issue not found.");
+    updatedRecord = updated;
+    return notifyState(
+      createActivityLog(updatedState, {
+        activity_type: "issue.updated",
+        title: `Updated issue: ${updatedRecord.title}`,
+        description: `Status: ${updatedRecord.status}`,
+        source_table: "active_issues",
+        source_id: id,
+        created_by: actor
+      }),
+      {
+        eventType: "updated",
+        sourceTable: "active_issues",
+        sourceId: id,
+        sourceTab: issueTab(),
+        title: `Active issue updated: ${updatedRecord.title}`,
+        body: updatedRecord.notes,
+        priority: updatedRecord.priority,
+        assignedTo: updatedRecord.assigned_to,
+        mentionText: updatedRecord.notes,
+        actor
+      }
+    );
+  }, options);
   return updatedRecord;
 }
 
@@ -1619,7 +1815,8 @@ export async function createStaffDirectoryMember(
   supabase: SupabaseClient,
   input: Record<string, unknown>,
   actor: string | null,
-  actorAdminId?: string | null
+  actorAdminId?: string | null,
+  writeOptions?: StaffOpsWriteOptions
 ) {
   const name = cleanString(input.name);
   if (!name) throw new Error("Staff member name is required.");
@@ -1657,16 +1854,16 @@ export async function createStaffDirectoryMember(
     created_at: now,
     updated_at: now
   };
-  const state = await loadState(supabase);
-  const next = createActivityLog({ ...state, staff_directory: sortNewest([member, ...state.staff_directory]) }, {
-    activity_type: "staff_directory.created",
-    title: `Added staff member: ${member.name}`,
-    description: member.department,
-    source_table: "staff_directory",
-    source_id: member.id,
-    created_by: actor
-  });
-  await saveState(supabase, next);
+  await mutateStaffOpsState(supabase, (state) =>
+    createActivityLog({ ...state, staff_directory: sortNewest([member, ...state.staff_directory]) }, {
+      activity_type: "staff_directory.created",
+      title: `Added staff member: ${member.name}`,
+      description: member.department,
+      source_table: "staff_directory",
+      source_id: member.id,
+      created_by: actor
+    })
+  , writeOptions);
   return member;
 }
 
@@ -1675,11 +1872,12 @@ export async function updateStaffDirectoryMember(
   id: string,
   patch: Record<string, unknown>,
   actor: string | null,
-  actorAdminId?: string | null
+  actorAdminId?: string | null,
+  writeOptions?: StaffOpsWriteOptions
 ) {
   const now = nowIso();
-  const state = await loadState(supabase);
-  const existing = state.staff_directory.find((member) => member.id === id);
+  const preState = await loadState(supabase);
+  const existing = preState.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
 
   const nextName = patch.name !== undefined ? cleanString(patch.name) : existing.name;
@@ -1705,46 +1903,51 @@ export async function updateStaffDirectoryMember(
     actorAdminId ?? null
   );
 
-  let updated: StaffDirectoryMember | null = null;
-  const updatedState: StaffOpsState = {
-    ...state,
-    staff_directory: state.staff_directory.map((member) => {
-      if (member.id !== id) return member;
-      updated = {
-        ...member,
-        name: nextName,
-        role: patch.role !== undefined ? optionalString(patch.role) : member.role,
-        department: nextDepartment,
-        email: nextEmail,
-        phone: patch.phone !== undefined ? optionalString(patch.phone) : member.phone,
-        status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : member.status,
-        notes: patch.notes !== undefined ? optionalString(patch.notes) : member.notes,
-        checklist_items: patch.checklist_items !== undefined ? normalizeChecklistItems(patch.checklist_items) : member.checklist_items ?? null,
-        admin_user_id: login.admin_user_id,
-        dashboard_role: login.dashboard_role,
-        updated_at: now
-      };
-      return updated;
-    })
-  };
-  if (!updated) throw new Error("Staff member not found.");
-  const updatedRecord = updated as StaffDirectoryMember;
-  if (!updatedRecord.name) throw new Error("Staff member name is required.");
-  const next = createActivityLog(updatedState, {
-    activity_type: "staff_directory.updated",
-    title: `Updated staff member: ${updatedRecord.name}`,
-    description: updatedRecord.status,
-    source_table: "staff_directory",
-    source_id: updatedRecord.id,
-    created_by: actor
-  });
-  await saveState(supabase, next);
+  let updatedRecord!: StaffDirectoryMember;
+  await mutateStaffOpsState(supabase, (state) => {
+    const row = state.staff_directory.find((member) => member.id === id);
+    if (!row) throw new Error("Staff member not found.");
+    const updated: StaffDirectoryMember = {
+      ...row,
+      name: nextName,
+      role: patch.role !== undefined ? optionalString(patch.role) : row.role,
+      department: nextDepartment,
+      email: nextEmail,
+      phone: patch.phone !== undefined ? optionalString(patch.phone) : row.phone,
+      status: patch.status === "Inactive" ? "Inactive" : patch.status === "Active" ? "Active" : row.status,
+      notes: patch.notes !== undefined ? optionalString(patch.notes) : row.notes,
+      checklist_items:
+        patch.checklist_items !== undefined ? normalizeChecklistItems(patch.checklist_items) : row.checklist_items ?? null,
+      admin_user_id: login.admin_user_id,
+      dashboard_role: login.dashboard_role,
+      updated_at: now
+    };
+    if (!updated.name) throw new Error("Staff member name is required.");
+    updatedRecord = updated;
+    const updatedState: StaffOpsState = {
+      ...state,
+      staff_directory: state.staff_directory.map((member) => (member.id === id ? updated : member))
+    };
+    return createActivityLog(updatedState, {
+      activity_type: "staff_directory.updated",
+      title: `Updated staff member: ${updated.name}`,
+      description: updated.status,
+      source_table: "staff_directory",
+      source_id: updated.id,
+      created_by: actor
+    });
+  }, writeOptions);
   return updatedRecord;
 }
 
-export async function deleteStaffDirectoryMember(supabase: SupabaseClient, id: string, actor: string | null) {
-  const state = await loadState(supabase);
-  const existing = state.staff_directory.find((member) => member.id === id);
+export async function deleteStaffDirectoryMember(
+  supabase: SupabaseClient,
+  id: string,
+  actor: string | null,
+  writeOptions?: StaffOpsWriteOptions
+) {
+  const preState = await loadState(supabase);
+  const existing = preState.staff_directory.find((member) => member.id === id);
   if (!existing) throw new Error("Staff member not found.");
 
   // Staff directory delete must free the dashboard login email so the person can be re-added.
@@ -1759,50 +1962,60 @@ export async function deleteStaffDirectoryMember(supabase: SupabaseClient, id: s
     await deleteAdminUserByEmail(supabase, existing.email);
   }
 
-  const next = createActivityLog({ ...state, staff_directory: state.staff_directory.filter((member) => member.id !== id) }, {
-    activity_type: "staff_directory.deleted",
-    title: `Deleted staff member: ${existing.name}`,
-    description: existing.department,
-    source_table: "staff_directory",
-    source_id: existing.id,
-    created_by: actor
-  });
-  await saveState(supabase, next);
+  await mutateStaffOpsState(supabase, (state) => {
+    const row = state.staff_directory.find((member) => member.id === id);
+    if (!row) throw new Error("Staff member not found.");
+    return createActivityLog(
+      { ...state, staff_directory: state.staff_directory.filter((member) => member.id !== id) },
+      {
+        activity_type: "staff_directory.deleted",
+        title: `Deleted staff member: ${row.name}`,
+        description: row.department,
+        source_table: "staff_directory",
+        source_id: row.id,
+        created_by: actor
+      }
+    );
+  }, writeOptions);
 }
 
 export async function markStaffNotificationRead(
   supabase: SupabaseClient,
   notificationId: string,
   readerKey: string,
-  session?: { email?: string | null; adminUserId?: string | null; role?: string | null }
+  session?: { email?: string | null; adminUserId?: string | null; role?: string | null },
+  writeOptions?: StaffOpsWriteOptions
 ) {
-  const state = await loadState(supabase);
-  if (session && !sessionCanAccessNotification(state, notificationId, session)) {
-    throw new Error("Notification not found.");
-  }
-  const next = markNotificationRead(state, notificationId, readerKey);
-  await saveState(supabase, next);
-  return next.notifications.find((notification) => notification.id === notificationId) ?? null;
+  let found: StaffNotification | null = null;
+  await mutateStaffOpsState(supabase, (state) => {
+    if (session && !sessionCanAccessNotification(state, notificationId, session)) {
+      throw new Error("Notification not found.");
+    }
+    const next = markNotificationRead(state, notificationId, readerKey);
+    found = next.notifications.find((notification) => notification.id === notificationId) ?? null;
+    return next;
+  }, writeOptions);
+  return found;
 }
 
 export async function markAllStaffNotificationsRead(
   supabase: SupabaseClient,
   readerKey: string,
-  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null },
+  writeOptions?: StaffOpsWriteOptions
 ) {
-  const state = await loadState(supabase);
-  const next = markAllNotificationsRead(state, readerKey, session);
-  await saveState(supabase, next);
-  return next;
+  return mutateStaffOpsState(supabase, (state) => markAllNotificationsRead(state, readerKey, session), writeOptions);
 }
 
 export async function clearStaffInboxNotifications(
   supabase: SupabaseClient,
   readerKey: string,
-  session: { email?: string | null; adminUserId?: string | null; role?: string | null }
+  session: { email?: string | null; adminUserId?: string | null; role?: string | null },
+  writeOptions?: StaffOpsWriteOptions
 ) {
-  const state = await loadState(supabase);
-  const next = clearInboxNotificationsKeepingAssigned(state, readerKey, session);
-  await saveState(supabase, next);
-  return next;
+  return mutateStaffOpsState(
+    supabase,
+    (state) => clearInboxNotificationsKeepingAssigned(state, readerKey, session),
+    writeOptions
+  );
 }

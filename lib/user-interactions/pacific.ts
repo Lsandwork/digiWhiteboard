@@ -50,12 +50,20 @@ export function isDueTodayPacific(dueIso: string | null | undefined, now = new D
   return dueKey != null && dueKey === pacificTodayKey(now);
 }
 
+/** Pacific calendar date for the day after `now` (server-UTC safe). */
+export function pacificTomorrowKey(now = new Date()): string {
+  const todayKey = pacificTodayKey(now);
+  const [y, m, d] = todayKey.split("-").map(Number);
+  if (!y || !m || !d) return todayKey;
+  const anchor = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  anchor.setUTCDate(anchor.getUTCDate() + 1);
+  return pacificDateKey(anchor) ?? todayKey;
+}
+
 export function isDueTomorrowPacific(dueIso: string | null | undefined, now = new Date()): boolean {
   const dueKey = pacificDueDateKey(dueIso);
   if (!dueKey) return false;
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return dueKey === pacificTodayKey(tomorrow);
+  return dueKey === pacificTomorrowKey(now);
 }
 
 export function overdueDayCountPacific(dueIso: string | null | undefined, now = new Date()): number | null {
