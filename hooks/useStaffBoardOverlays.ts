@@ -5,7 +5,7 @@ import { fetchBoardJson } from "@/lib/board-fetch";
 import { getBrowserSupabase } from "@/lib/supabase/browser";
 import {
   BOARD_OVERLAY_BROADCAST_EVENT,
-  BOARD_OVERLAY_BROADCAST_TOPIC
+  getBoardOverlayChannelName
 } from "@/lib/staff/board-overlay-broadcast-shared";
 import type { CastVideoNotice } from "@/lib/staff/cast-video-notices";
 import type { GroomingPushNotice } from "@/lib/staff/grooming-push-notices";
@@ -107,7 +107,6 @@ export function useStaffBoardOverlays(options?: {
   // Subscription failure is non-fatal — the poll above remains the
   // recovery mechanism. The channel is removed on unmount/remount so
   // subscriptions never accumulate.
-  const channelIdRef = useRef(0);
   const lastFreshLoadAtRef = useRef(0);
   useEffect(() => {
     if (!enabled) return;
@@ -116,8 +115,9 @@ export function useStaffBoardOverlays(options?: {
     try {
       supabase = getBrowserSupabase();
       if (!supabase) return;
-      channelIdRef.current += 1;
-      channel = supabase.channel(`${BOARD_OVERLAY_BROADCAST_TOPIC}:${department}:${channelIdRef.current}`);
+      // Broadcast delivery is by exact topic — this name must equal the
+      // server's publish topic (see board-overlay-broadcast-shared).
+      channel = supabase.channel(getBoardOverlayChannelName());
       channel
         .on("broadcast", { event: BOARD_OVERLAY_BROADCAST_EVENT }, () => {
           // Coalesce duplicates/bursts: a broadcast is only a hint to

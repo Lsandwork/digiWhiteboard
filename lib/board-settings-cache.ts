@@ -108,6 +108,22 @@ export function invalidateBoardOverlayCaches() {
   invalidateTtlCache("admin-settings:key:");
 }
 
+const FRESH_OVERLAY_MIN_INTERVAL_MS = 2_000;
+let lastFreshOverlayClaimAtMs = 0;
+
+/**
+ * Server-side bound on cache-bypassing overlay loads: at most one fresh
+ * (uncached) load per instance per window, no matter who asks. This keeps
+ * the public board endpoint's TTL cost protection intact against repeated
+ * `fresh=1` requests while matching the boards' own broadcast coalescing;
+ * anything coalesced is recovered by the normal poll.
+ */
+export function claimFreshOverlayLoad(nowMs = Date.now()) {
+  if (nowMs - lastFreshOverlayClaimAtMs < FRESH_OVERLAY_MIN_INTERVAL_MS) return false;
+  lastFreshOverlayClaimAtMs = nowMs;
+  return true;
+}
+
 /** Drop in-memory board snapshots after a live_transition_dogs webhook write. */
 export function invalidateBoardTransitionCaches() {
   invalidateTtlCache("board-checkouts:");

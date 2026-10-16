@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { emptyStaffBoardOverlays, loadStaffBoardOverlays } from "@/lib/staff/board-overlays";
-import { invalidateBoardOverlayCaches } from "@/lib/board-settings-cache";
+import { claimFreshOverlayLoad, invalidateBoardOverlayCaches } from "@/lib/board-settings-cache";
 import { debugBoardLog } from "@/lib/server-ttl-cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -16,8 +16,10 @@ export async function GET(request: Request) {
   try {
     // Event-driven fetch: drop this instance's overlay caches so a change
     // broadcast can never be answered with pre-change data. Polls without
-    // `fresh` keep the shared TTL cache that bounds Supabase reads.
-    if (fresh) invalidateBoardOverlayCaches();
+    // `fresh` keep the shared TTL cache that bounds Supabase reads, and
+    // fresh loads themselves are claim-bounded per instance so repeated
+    // `fresh=1` requests cannot bypass that cost protection.
+    if (fresh && claimFreshOverlayLoad()) invalidateBoardOverlayCaches();
     const overlays = await loadStaffBoardOverlays(getServiceSupabase(), { department });
     debugBoardLog(debugBoard, "board overlays ok", {
       department,

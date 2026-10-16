@@ -12,7 +12,8 @@ const {
   buildBoardOverlayBroadcastRequest,
   publishBoardOverlayChange
 } = await import("../lib/staff/board-overlay-broadcast");
-const { invalidateBoardOverlayCaches } = await import("../lib/board-settings-cache");
+const { claimFreshOverlayLoad, invalidateBoardOverlayCaches } = await import("../lib/board-settings-cache");
+const { getBoardOverlayChannelName } = await import("../lib/staff/board-overlay-broadcast-shared");
 const { getTtlCache, setTtlCache } = await import("../lib/server-ttl-cache");
 const { BOARD_REALTIME_CONFIRM_MS, LOBBY_REALTIME_DEBOUNCE_MS } = await import(
   "../lib/board-checkout-merge"
@@ -85,6 +86,30 @@ const { BOARD_REALTIME_CONFIRM_MS, LOBBY_REALTIME_DEBOUNCE_MS } = await import(
   assert.equal(getTtlCache("admin-settings:key:staff_push_notices"), null);
   assert.notEqual(getTtlCache("board-checkouts:fast"), null, "checkout caches untouched by overlay freshness");
   console.log("ok - fresh overlay invalidation is targeted and instance-local by design");
+}
+
+// 4b. The subscribing channel name must equal the publish topic exactly —
+//     Broadcast delivers by topic, and a suffixed channel would silently
+//     receive nothing (regression guard for the original PR bug).
+{
+  assert.equal(getBoardOverlayChannelName(), BOARD_OVERLAY_BROADCAST_TOPIC);
+  const request = buildBoardOverlayBroadcastRequest(
+    "https://example.supabase.co",
+    buildBoardOverlayBroadcastPayload("staff_push_notice")
+  );
+  assert.equal(request.body.messages[0]?.topic, getBoardOverlayChannelName());
+  console.log("ok - client channel name matches the server publish topic exactly");
+}
+
+// 4c. Fresh (cache-bypassing) overlay loads are claim-bounded per instance,
+//     so repeated fresh=1 requests cannot defeat the TTL cost protection.
+{
+  const t0 = 1_000_000;
+  assert.equal(claimFreshOverlayLoad(t0), true);
+  assert.equal(claimFreshOverlayLoad(t0 + 500), false);
+  assert.equal(claimFreshOverlayLoad(t0 + 1_999), false);
+  assert.equal(claimFreshOverlayLoad(t0 + 2_000), true);
+  console.log("ok - fresh overlay loads are bounded to one per 2s per instance");
 }
 
 // 5. Lobby event-first refresh aligns with the staff confirm window and is
