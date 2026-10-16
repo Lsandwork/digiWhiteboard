@@ -119,6 +119,11 @@ export function isUrgentPushAlert(input: {
   return priority === "urgent" || priority === "emergency" || mode === "urgent" || mode === "emergency";
 }
 
+/** Push sources that must never leave the staff digital whiteboard as an SMS text alert. */
+export function isWhiteboardOnlyPushSource(source?: string | null) {
+  return String(source ?? "").trim().toLowerCase() === "fighter_rotation";
+}
+
 /** SMS Lonnie whenever an urgent/emergency alert is pushed live. Stable idempotency prevents retry duplicates. */
 export function sendUrgentAlertSmsFireAndForget(
   input: {
@@ -133,6 +138,8 @@ export function sendUrgentAlertSmsFireAndForget(
   },
   supabase?: SupabaseClient | null
 ) {
+  // Fighter / Rotations: staff digital whiteboard only — never an SMS text alert.
+  if (isWhiteboardOnlyPushSource(input.source)) return;
   if (!isUrgentPushAlert(input)) return;
   const baseKey = `sa-sms:urgent:push:${input.id}`;
   const idempotencyKey = input.resendId ? `${baseKey}:resend:${input.resendId}`.slice(0, 64) : baseKey.slice(0, 64);

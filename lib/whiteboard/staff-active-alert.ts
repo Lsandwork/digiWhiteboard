@@ -25,6 +25,7 @@ export type StaffActiveAlert = {
   categoryLabel: string;
   title: string;
   message: string | null;
+  source?: string | null;
   imageUrl?: string | null;
   icon: StaffActiveAlertIcon;
   createdAt: string | null;
@@ -98,6 +99,7 @@ export function staffPushNoticeToActiveAlert(notice: StaffPushNotice): StaffActi
     categoryLabel: resolvePushCategoryLabel(notice),
     title: formatAlertTitle(notice.title),
     message: notice.message,
+    source: notice.source ?? null,
     imageUrl: notice.image_url ?? null,
     icon: resolvePushIcon(notice),
     createdAt: notice.created_at,
@@ -150,6 +152,7 @@ function castPushToActiveAlert(notice: CastLitePushNotice): StaffActiveAlert {
     categoryLabel,
     title: formatAlertTitle(notice.title),
     message: notice.message,
+    source: notice.source ?? null,
     imageUrl: notice.image_url ?? null,
     icon,
     createdAt: null,

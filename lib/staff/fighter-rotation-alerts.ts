@@ -6,6 +6,7 @@ import {
 } from "@/lib/gingr-custom-animal-icons";
 import {
   createAndPushStaffNotice,
+  FIGHTER_ROTATION_PUSH_SOURCE,
   loadActiveStaffPushNotice,
   type StaffPushNoticeInput
 } from "@/lib/staff/push-notices";
@@ -13,7 +14,7 @@ import type { LiveDog } from "@/lib/types";
 
 type SupabaseClient = ReturnType<typeof import("@/lib/supabase/server").getServiceSupabase>;
 
-export const FIGHTER_ROTATION_NOTICE_SOURCE = "fighter_rotation";
+export const FIGHTER_ROTATION_NOTICE_SOURCE = FIGHTER_ROTATION_PUSH_SOURCE;
 export const FIGHTER_ROTATION_NOTICE_TITLE = "FIGHTER / ROTATIONS";
 const FIGHTER_ROTATION_DURATION_MINUTES = 8;
 
@@ -70,7 +71,8 @@ export function findDogsMentionedInComment(
 
 export function buildFighterRotationNoticeInput(conflict: FighterRotationConflict): StaffPushNoticeInput {
   const related = conflict.relatedDogs.map((dog) => dog.dogName).join(", ");
-  const commentBlock = conflict.comments.filter(Boolean).join("\n\n");
+  // Board renders these verbatim (large) — keep the full icon comment/note text, tags stripped.
+  const commentBlock = conflict.comments.map((comment) => stripHtml(comment)).filter(Boolean).join("\n\n");
   const message = [
     `${conflict.arrivingDogName} is checking in.`,
     related ? `Named in notes / also checked in: ${related}.` : "Other dogs are currently checked in.",

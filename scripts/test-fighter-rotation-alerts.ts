@@ -97,7 +97,9 @@ const notice = buildFighterRotationNoticeInput(namedConflict!);
 assert.equal(notice.title, FIGHTER_ROTATION_NOTICE_TITLE);
 assert.equal(notice.priority, "urgent");
 assert.equal(notice.display_mode, "urgent");
+assert.equal(notice.source, "fighter_rotation");
 assert.match(notice.message, /Fighter\/Rotations:/);
 assert.match(notice.message, /Rex is checking in/);
+assert.match(notice.message as string, /Separate from Rex/, "icon comment/note must be in the board message");
 
 console.log("fighter-rotation-alerts: ok");

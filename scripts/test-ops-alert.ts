@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseChecklistItems } from "../lib/ops-alert/checklist";
-import { opsAlertFromStaffPushNotice } from "../lib/ops-alert/from-staff-push";
+import {
+  isFighterRotationNotice,
+  opsAlertFromStaffPushNotice,
+  parseFighterRotationMessage
+} from "../lib/ops-alert/from-staff-push";
 import { resolveOpsAlertAccent, resolveOpsAlertAction } from "../lib/ops-alert/status";
 import type { StaffPushNotice } from "../lib/staff/push-notices";
 
@@ -83,6 +87,45 @@ assert.equal(resolveOpsAlertAction({ accent: "green", status: "completed" }).act
   assert.match(css, /@media \(min-width: 1100px\)/);
   assert.match(css, /@media \(max-width: 720px\)/);
   assert.doesNotMatch(css, /width:\s*min\(100%, 56rem\)/);
+  // Fighter/Rotations sub-text + icon notes must be TV-readable, not the small default message size.
+  assert.match(css, /\.subtitleLarge \{[\s\S]*?font-size:\s*clamp\(1\.45rem/);
+  assert.match(css, /\.messageLarge \{[\s\S]*?font-size:\s*clamp\(1\.5rem/);
+  assert.match(css, /\.message \{[\s\S]*?white-space:\s*pre-line/);
+}
+
+// Fighter / Rotations: icon comments/notes are the large body; arriving line is the large sub-text.
+{
+  const fighterMessage = [
+    "Rex is checking in.",
+    "Named in notes / also checked in: Max, Buddy.",
+    "Fighter/Rotations: Max: Separate from Rex — no yard time together",
+    "",
+    "Rex: Small group only, watch energy at gate"
+  ].join("\n");
+  const parsed = parseFighterRotationMessage(fighterMessage);
+  assert.equal(parsed.subtitle, "Rex is checking in. Named in notes / also checked in: Max, Buddy.");
+  assert.match(parsed.comments ?? "", /Separate from Rex/);
+  assert.match(parsed.comments ?? "", /Small group only/);
+
+  const fighterNotice = {
+    ...notice,
+    id: "fighter-1",
+    title: "FIGHTER / ROTATIONS",
+    message: fighterMessage,
+    priority: "urgent",
+    display_mode: "urgent",
+    notice_type: undefined,
+    source: "fighter_rotation",
+    source_id: "99:1"
+  } as StaffPushNotice;
+  assert.equal(isFighterRotationNotice(fighterNotice), true);
+  const fighterAlert = opsAlertFromStaffPushNotice(fighterNotice);
+  assert.equal(fighterAlert.emphasizeMessage, true);
+  assert.equal(fighterAlert.subtitle, parsed.subtitle);
+  assert.equal(fighterAlert.checklistItems.length, 0, "icon notes must not be checklist-absorbed");
+  assert.match(fighterAlert.message ?? "", /Separate from Rex — no yard time together/);
+  assert.match(fighterAlert.message ?? "", /Small group only, watch energy at gate/);
+  assert.doesNotMatch(fighterAlert.message ?? "", /Rex is checking in/, "arriving line lives in subtitle, not duplicated in body");
 }
 
 console.log("ops-alert checks passed");
