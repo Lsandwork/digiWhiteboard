@@ -30,6 +30,8 @@ export type OpsAlertViewModel = {
   scheduledTime?: string | null;
   audience?: string | null;
   message?: string | null;
+  /** Render `message` (and subtitle) at TV distance size — e.g. Fighter/Rotations icon notes. */
+  emphasizeMessage?: boolean;
   checklistItems: string[];
   metaRows: OpsAlertMetaRow[];
   accent: OpsAlertAccent;

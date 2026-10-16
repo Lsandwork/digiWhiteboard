@@ -189,6 +189,9 @@ export const DEFAULT_STAFF_PUSH_NOTICES: readonly Pick<
 const NOTICE_SELECT = "*";
 const MAX_TITLE_LENGTH = 120;
 const MAX_MESSAGE_LENGTH = 600;
+/** Fighter/Rotations board alerts must carry the full Gingr icon comments/notes. */
+const FIGHTER_ROTATION_MAX_MESSAGE_LENGTH = 1800;
+export const FIGHTER_ROTATION_PUSH_SOURCE = "fighter_rotation";
 export const DEFAULT_NOTICE_DURATION_MINUTES = 5;
 const MIN_NOTICE_DURATION_MINUTES = 1;
 const MAX_NOTICE_DURATION_MINUTES = 240;
@@ -281,7 +284,10 @@ function addRecurrenceDate(value: string, recurrence: StaffPushNoticeRecurrence)
 
 export function normalizeNoticeInput(input: StaffPushNoticeInput) {
   const title = String(input.title ?? "").trim().slice(0, MAX_TITLE_LENGTH);
-  const message = String(input.message ?? "").trim().slice(0, MAX_MESSAGE_LENGTH);
+  const sourceForLength = input.source != null ? String(input.source).trim().slice(0, 80) : null;
+  const maxMessageLength =
+    sourceForLength === FIGHTER_ROTATION_PUSH_SOURCE ? FIGHTER_ROTATION_MAX_MESSAGE_LENGTH : MAX_MESSAGE_LENGTH;
+  const message = String(input.message ?? "").trim().slice(0, maxMessageLength);
   const image_url = normalizePushNoticeImageUrl(input.image_url);
   const priority = normalizePriority(input.priority);
   const recurrence = normalizeRecurrence(input.recurrence);

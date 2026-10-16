@@ -3,6 +3,7 @@ import {
   findSuperAdminSmsKeyword,
   isCriticalOrUrgentStaffNote,
   isUrgentPushAlert,
+  isWhiteboardOnlyPushSource,
   resolveSuperAdminPhones,
   staffContentNeedsSuperAdminSms,
   textTriggersSuperAdminSms
@@ -42,6 +43,13 @@ assert.equal(isUrgentPushAlert({ priority: "urgent", display_mode: "normal" }), 
 assert.equal(isUrgentPushAlert({ priority: "normal", display_mode: "urgent" }), true);
 assert.equal(isUrgentPushAlert({ priority: "emergency" }), true);
 assert.equal(isUrgentPushAlert({ priority: "important", display_mode: "normal" }), false);
+
+// Fighter / Rotations are staff-whiteboard-only — never SMS text alerts.
+assert.equal(isWhiteboardOnlyPushSource("fighter_rotation"), true);
+assert.equal(isWhiteboardOnlyPushSource(" Fighter_Rotation "), true);
+assert.equal(isWhiteboardOnlyPushSource("heat_alert"), false);
+assert.equal(isWhiteboardOnlyPushSource(null), false);
+assert.equal(isWhiteboardOnlyPushSource(undefined), false);
 
 void (async () => {
   const phones = await resolveSuperAdminPhones();

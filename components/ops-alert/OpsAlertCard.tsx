@@ -66,7 +66,9 @@ export function OpsAlertCard({ alert, fullscreen = false, compact = false, lowMo
 
       <p className={styles.alertType}>{alert.alertType}</p>
       <h2 className={styles.title}>{alert.title}</h2>
-      {alert.subtitle ? <p className={styles.subtitle}>{alert.subtitle}</p> : null}
+      {alert.subtitle ? (
+        <p className={`${styles.subtitle} ${alert.emphasizeMessage ? styles.subtitleLarge : ""}`}>{alert.subtitle}</p>
+      ) : null}
 
       {alert.mediaUrl ? (
         <div className={styles.media}>
@@ -104,7 +106,9 @@ export function OpsAlertCard({ alert, fullscreen = false, compact = false, lowMo
         </ul>
       ) : null}
 
-      {alert.message ? <p className={styles.message}>{alert.message}</p> : null}
+      {alert.message ? (
+        <p className={`${styles.message} ${alert.emphasizeMessage ? styles.messageLarge : ""}`}>{alert.message}</p>
+      ) : null}
       {alert.note ? <p className={styles.note}>{alert.note}</p> : null}
 
       {alert.action !== "none" && alert.actionLabel ? (

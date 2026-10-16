@@ -49,11 +49,47 @@ function buildMetaRows(options: {
   return rows;
 }
 
+export const FIGHTER_ROTATION_ALERT_SOURCE = "fighter_rotation";
+
+export function isFighterRotationNotice(notice: Pick<StaffPushNotice, "source" | "title">) {
+  return (
+    String(notice.source ?? "").trim().toLowerCase() === FIGHTER_ROTATION_ALERT_SOURCE ||
+    notice.title.trim().toUpperCase() === "FIGHTER / ROTATIONS"
+  );
+}
+
+/**
+ * Fighter/Rotations message shape (see buildFighterRotationNoticeInput):
+ *   "<Dog> is checking in."
+ *   "Named in notes / also checked in: …" | "Other dogs are currently checked in."
+ *   "Fighter/Rotations: <Dog>: <icon comment>\n\n<Dog>: <icon comment>"
+ * The icon comments/notes are the payload staff must read — never checklist-absorbed or dropped.
+ */
+export function parseFighterRotationMessage(message: string | null | undefined) {
+  const raw = String(message ?? "").replace(/\r\n/g, "\n").trim();
+  if (!raw) return { subtitle: null as string | null, comments: null as string | null };
+
+  const marker = "fighter/rotations:";
+  const lower = raw.toLowerCase();
+  const markerIndex = lower.indexOf(marker);
+  const head = markerIndex >= 0 ? raw.slice(0, markerIndex).trim() : raw;
+  const comments =
+    markerIndex >= 0 ? raw.slice(markerIndex + marker.length).trim() : "";
+
+  const headLines = head.split("\n").map((line) => line.trim()).filter(Boolean);
+  const subtitle = headLines.join(" ") || null;
+  return { subtitle, comments: comments || null };
+}
+
 export function opsAlertFromStaffPushNotice(notice: StaffPushNotice): OpsAlertViewModel {
   const isDailyReminder = isDailyReminderPushNotice(notice);
   const isDogHandler = isDogHandlerComplaintNotice(notice);
-  const checklistItems = parseChecklistItems(notice.message);
-  const message = residualMessage(notice.message, checklistItems);
+  const isFighterRotation = isFighterRotationNotice(notice);
+  const fighter = isFighterRotation ? parseFighterRotationMessage(notice.message) : null;
+  const checklistItems = isFighterRotation ? [] : parseChecklistItems(notice.message);
+  const message = isFighterRotation
+    ? fighter?.comments ?? notice.message
+    : residualMessage(notice.message, checklistItems);
 
   const scheduledTime = notice.daily_reminder_scheduled_time
     ? formatDailyReminderTime(notice.daily_reminder_scheduled_time)
@@ -99,10 +135,11 @@ export function opsAlertFromStaffPushNotice(notice: StaffPushNotice): OpsAlertVi
     id: notice.id,
     alertType,
     title: isDailyReminder ? notice.title : notice.title,
-    subtitle: null,
+    subtitle: isFighterRotation ? fighter?.subtitle ?? null : null,
     scheduledTime,
     audience,
     message: isDogHandler && !checklistItems.length ? notice.message : message,
+    emphasizeMessage: isFighterRotation,
     checklistItems,
     metaRows: buildMetaRows({ scheduledTime, audience, extra }),
     accent,
@@ -129,8 +166,14 @@ export function opsAlertFromStaffPushNotice(notice: StaffPushNotice): OpsAlertVi
 export function opsAlertFromActiveAlert(alert: StaffActiveAlert): OpsAlertViewModel {
   const isDailyReminder = alert.type === "daily_reminder";
   const isDogHandler = alert.type === "owner_complaint";
-  const checklistItems = parseChecklistItems(alert.message);
-  const message = residualMessage(alert.message, checklistItems);
+  const isFighterRotation =
+    String(alert.source ?? "").trim().toLowerCase() === FIGHTER_ROTATION_ALERT_SOURCE ||
+    alert.title.trim().toUpperCase() === "FIGHTER / ROTATIONS";
+  const fighter = isFighterRotation ? parseFighterRotationMessage(alert.message) : null;
+  const checklistItems = isFighterRotation ? [] : parseChecklistItems(alert.message);
+  const message = isFighterRotation
+    ? fighter?.comments ?? alert.message
+    : residualMessage(alert.message, checklistItems);
 
   const scheduledRaw = alert.dailyReminderMeta?.scheduledTime ?? null;
   const scheduledTime = scheduledRaw
@@ -166,10 +209,11 @@ export function opsAlertFromActiveAlert(alert: StaffActiveAlert): OpsAlertViewMo
     id: alert.id,
     alertType: alertType.toUpperCase(),
     title: alert.title,
-    subtitle: null,
+    subtitle: isFighterRotation ? fighter?.subtitle ?? null : null,
     scheduledTime,
     audience,
     message: isDogHandler && !checklistItems.length ? alert.message : message,
+    emphasizeMessage: isFighterRotation,
     checklistItems,
     metaRows: buildMetaRows({ scheduledTime, audience, extra }),
     accent,
