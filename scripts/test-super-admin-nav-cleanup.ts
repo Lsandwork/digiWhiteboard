@@ -32,7 +32,7 @@ for (const tab of SUPER_ADMIN_PRIMARY_TABS) {
 }
 
 const linked = new Set(allSuperAdminHubLinkedTabs());
-const alwaysHidden = new Set<AdminTab>(["trainer_entry", "handler_shift_entry"]);
+const alwaysHidden = new Set<AdminTab>(["trainer_entry", "handler_shift_entry", "driver_mode"]);
 const primary = new Set<string>(SUPER_ADMIN_PRIMARY_TABS);
 
 for (const tab of ADMIN_TABS) {

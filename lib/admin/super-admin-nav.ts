@@ -85,7 +85,6 @@ export const SUPER_ADMIN_HUBS: Record<(typeof SUPER_ADMIN_HUB_TABS)[number], Sup
           tabLink("front_desk_command", "Front Desk Command", "Arrivals, pickups, and front desk speed lane."),
           tabLink("ops_command_center", "Ops Command Center", "Live floor ops, tasks, alerts, and Gingr health."),
           tabLink("yard_command", "Yard Command", "Yard occupancy and next actions."),
-          tabLink("driver_mode", "Driver / Hiker Mode", "Next-stop driver / hiker workflow."),
           tabLink("overnight_command", "Overnight Command", "Overnight rounds and escalations."),
           tabLink("trainer_ops", "Trainer Ops", "Training session ops around Gingr bookings."),
           tabLink("shift_handoff", "Shift Handoff", "Structured shift handoff with acknowledgement.")

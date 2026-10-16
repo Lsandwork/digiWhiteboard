@@ -21,7 +21,6 @@ const PRIMARY: TabDef[] = [
       "ops_command_center",
       "front_desk_command",
       "yard_command",
-      "driver_mode",
       "overnight_command",
       "overview",
       "checklist",

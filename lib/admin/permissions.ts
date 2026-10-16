@@ -867,7 +867,6 @@ export const TRAINER_TABS = [
 export const DOG_HANDLER_TABS = [
   "my_shift",
   "user_interactions",
-  "driver_mode",
   "crossover_communication",
   "checklist",
   "walks_board",
@@ -1560,6 +1559,11 @@ export function canAccessAdminTab(
 
   // Retired entry tools — deny before the full-admin early return so they leave admin/management nav.
   if (tab === "trainer_entry" || tab === "handler_shift_entry") {
+    return false;
+  }
+
+  // Temporarily hidden for all roles — Driver / Hiker Mode tab is off until ready.
+  if (tab === "driver_mode") {
     return false;
   }
 

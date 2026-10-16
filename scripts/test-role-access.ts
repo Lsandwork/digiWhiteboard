@@ -150,6 +150,21 @@ assert.equal(
   "super admin no longer sees Trainer's Entry"
 );
 assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "daycare"), "driver_mode", "daycare", "staff"),
+  false,
+  "Driver / Hiker Mode is temporarily hidden for dog handlers"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "driver"), "driver_mode", "driver", "staff"),
+  false,
+  "Driver / Hiker Mode is temporarily hidden for drivers"
+);
+assert.equal(
+  canAccessAdminTab(accessFromLegacyRole(null, null, "owner_admin"), "driver_mode", "owner_admin", "staff"),
+  false,
+  "Driver / Hiker Mode is temporarily hidden for all roles including super admin"
+);
+assert.equal(
   canAccessAdminTab(accessFromLegacyRole(null, null, "marketing"), "walks_board", "marketing", "staff"),
   false,
   "marketing accounts should not open Walks Board on staff"

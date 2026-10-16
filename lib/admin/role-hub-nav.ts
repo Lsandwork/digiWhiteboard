@@ -150,7 +150,6 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "My Panel",
     primary: [
       { tab: "my_shift" },
-      { tab: "driver_mode", label: "Driver / Hiker" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
       { tab: "management_support", label: "Submit Request" },
@@ -164,7 +163,6 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "My Panel",
     primary: [
       { tab: "my_shift" },
-      { tab: "driver_mode" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
       { tab: "management_support", label: "Submit Request" },
@@ -178,7 +176,6 @@ export const ROLE_HUB_NAV: Record<HubNavRole, RoleHubNavConfig> = {
     sectionLabel: "My Panel",
     primary: [
       { tab: "my_shift" },
-      { tab: "driver_mode", label: "Hiker Mode" },
       { tab: "sa_floor_hub" },
       { tab: "sa_apps_hub", label: "Apps" },
       { tab: "management_support", label: "Submit Request" },
@@ -274,7 +271,7 @@ export function allHubLinkedTabsForVisible(visibleTabs: Iterable<AdminTab>): Adm
 export function uncoveredVisibleTabs(role: HubNavRole, visibleTabs: AdminTab[]): AdminTab[] {
   const primary = new Set(rolePrimaryTabs(role));
   const linked = new Set(allHubLinkedTabsForVisible(visibleTabs));
-  const alwaysHidden = new Set<AdminTab>(["trainer_entry", "handler_shift_entry"]);
+  const alwaysHidden = new Set<AdminTab>(["trainer_entry", "handler_shift_entry", "driver_mode"]);
   const lobbyOnly = new Set<AdminTab>(["promotions", "schedule", "lobby_slideshow", "cast_tv"]);
 
   return visibleTabs.filter((tab) => {
