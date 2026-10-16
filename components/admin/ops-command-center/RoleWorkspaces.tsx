@@ -32,8 +32,11 @@ type BoardDog = {
   gingr_animal_id?: string | null;
 };
 
+/** Admin-only lanes — never call /api/board/checkouts (shared with Gingr live board). */
 async function fetchBoardDogs() {
-  const res = await fetch("/api/board/checkouts", { cache: "no-store" }).catch(() => null);
+  const res = await fetch("/api/admin/ops-command-center?view=board_lanes", { cache: "no-store" }).catch(
+    () => null
+  );
   if (!res || !res.ok) return { checking_in: [] as BoardDog[], checking_out: [] as BoardDog[] };
   const body = await readResponseJson(res);
   return {
@@ -61,7 +64,9 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
   const [feedError, setFeedError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch("/api/board/checkouts", { cache: "no-store" }).catch(() => null);
+    const res = await fetch("/api/admin/ops-command-center?view=board_lanes", { cache: "no-store" }).catch(
+      () => null
+    );
     if (!res || !res.ok) {
       setFeedError("Unable to refresh arriving/leaving dogs. Showing last known board state.");
       return;
@@ -83,7 +88,8 @@ export function FrontDeskCommandPanel({ onNavigate }: { onNavigate?: (tab: strin
 
   useEffect(() => {
     void load();
-    return startVisibilityAwareInterval(() => void load(), 15_000);
+    // Admin lanes are cheaper than the public board route — 30s is enough for the desk.
+    return startVisibilityAwareInterval(() => void load(), 30_000);
   }, [load]);
 
   return (

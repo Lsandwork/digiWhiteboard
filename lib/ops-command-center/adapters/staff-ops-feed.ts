@@ -5,6 +5,11 @@
 
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { isInfrastructureError } from "@/lib/safe-url";
+import { getOrLoadTtlCache } from "@/lib/server-ttl-cache";
+import {
+  STAFF_OPS_LIST_CACHE_KEY,
+  STAFF_OPS_LIST_CACHE_TTL_MS
+} from "@/lib/ops-command-center/constants";
 
 type SupabaseClient = ReturnType<typeof getServiceSupabase>;
 import {
@@ -173,11 +178,14 @@ export async function loadStaffOpsFeed(supabaseClient?: SupabaseClient) {
   let opsTimedOut = false;
   let alertsTimedOut = false;
   const [ops, alerts] = await Promise.all([
-    listStaffOps(supabase).catch((error: unknown) => {
-      opsFailed = true;
-      opsTimedOut = isInfrastructureError(error);
-      return null;
-    }),
+    // Same key/TTL as /api/admin/staff-operations so My Shift reuses a warm Team Log list.
+    getOrLoadTtlCache(STAFF_OPS_LIST_CACHE_KEY, STAFF_OPS_LIST_CACHE_TTL_MS, () => listStaffOps(supabase)).catch(
+      (error: unknown) => {
+        opsFailed = true;
+        opsTimedOut = isInfrastructureError(error);
+        return null;
+      }
+    ),
     listOpenAlerts(supabase).catch((error: unknown) => {
       alertsFailed = true;
       alertsTimedOut = isInfrastructureError(error);
@@ -278,6 +286,59 @@ export async function loadBoardLaneSamples(
   return {
     arriving: (arriving.data || []).map((row) => mapRow(row as Record<string, unknown>)),
     leaving: (leaving.data || []).map((row) => mapRow(row as Record<string, unknown>))
+  };
+}
+
+/** Admin Front Desk / Yard lanes — DB only, never hits Gingr or the public board route. */
+export type AdminBoardLaneDog = {
+  id: string;
+  animal_name: string;
+  owner_name?: string | null;
+  photo_url?: string | null;
+  display_status?: string | null;
+  current_status?: string | null;
+  room?: string | null;
+  gingr_animal_id?: string | null;
+};
+
+export async function loadAdminBoardLanes(
+  limit = 40,
+  supabaseClient?: SupabaseClient
+): Promise<{ checking_in: AdminBoardLaneDog[]; checking_out: AdminBoardLaneDog[] }> {
+  const supabase = supabaseClient ?? getServiceSupabase();
+  const mapRow = (row: Record<string, unknown>): AdminBoardLaneDog => ({
+    id: String(row.id),
+    animal_name: String(row.animal_name || "Dog"),
+    owner_name: row.owner_name ? String(row.owner_name) : null,
+    photo_url: row.photo_url ? String(row.photo_url) : null,
+    display_status: row.display_status ? String(row.display_status) : null,
+    current_status: row.current_status ? String(row.current_status) : null,
+    room: row.room ? String(row.room) : null,
+    gingr_animal_id: row.gingr_animal_id ? String(row.gingr_animal_id) : null
+  });
+
+  const select =
+    "id, animal_name, owner_name, photo_url, display_status, current_status, room, gingr_animal_id";
+  const [arriving, leaving] = await Promise.all([
+    supabase
+      .from("live_transition_dogs")
+      .select(select)
+      .eq("display_status", "checking_in")
+      .eq("hidden", false)
+      .order("status_started_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("live_transition_dogs")
+      .select(select)
+      .eq("display_status", "checking_out")
+      .eq("hidden", false)
+      .order("status_started_at", { ascending: false })
+      .limit(limit)
+  ]);
+
+  return {
+    checking_in: (arriving.data || []).map((row) => mapRow(row as Record<string, unknown>)),
+    checking_out: (leaving.data || []).map((row) => mapRow(row as Record<string, unknown>))
   };
 }
 

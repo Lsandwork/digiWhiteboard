@@ -1,6 +1,7 @@
 "use client";
 
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { readPanelCache, writePanelCache } from "@/lib/admin/panel-session-cache";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -326,10 +327,17 @@ function displayCrossoverMessage(item: CrossoverMessage) {
   return shiftLogDetails(item);
 }
 
+const STAFF_OPS_PANEL_CACHE_KEY = "staff-ops-panel";
+const STAFF_OPS_PANEL_CACHE_MS = 90_000;
+
 export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
   const { showToast } = useToast();
-  const [data, setData] = useState<StaffOpsPayload | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<StaffOpsPayload | null>(() =>
+    readPanelCache<StaffOpsPayload>(STAFF_OPS_PANEL_CACHE_KEY, STAFF_OPS_PANEL_CACHE_MS)
+  );
+  const [loading, setLoading] = useState(
+    () => !readPanelCache<StaffOpsPayload>(STAFF_OPS_PANEL_CACHE_KEY, STAFF_OPS_PANEL_CACHE_MS)
+  );
   const [busy, setBusy] = useState(false);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [page, setPage] = useState(1);
@@ -338,7 +346,8 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
   const staffOptions = useMemo(() => activeStaffOptions(data?.staff_directory), [data?.staff_directory]);
 
   const load = useCallback(async (options?: { quiet?: boolean }) => {
-    if (!options?.quiet) setLoading(true);
+    const quiet = options?.quiet || Boolean(data);
+    if (!quiet) setLoading(true);
     try {
       const controller = new AbortController();
       const timeout = window.setTimeout(() => controller.abort(), 12_000);
@@ -348,26 +357,34 @@ export function StaffOperationsPanel({ tab }: { tab: StaffOpsTab }) {
       }).finally(() => window.clearTimeout(timeout));
       const body = await readResponseJson(response);
       if (!response.ok) throw new Error(body.error ?? "Unable to load Staff Admin records.");
-      setData(body as StaffOpsPayload);
+      const payload = body as StaffOpsPayload;
+      writePanelCache(STAFF_OPS_PANEL_CACHE_KEY, payload);
+      setData(payload);
     } catch (error) {
-      const aborted = error instanceof DOMException && error.name === "AbortError";
-      showToast(
-        aborted
-          ? "Team Log is taking too long to load. Tap Retry."
-          : error instanceof Error
-            ? error.message
-            : "Unable to load Staff Admin records.",
-        "error"
-      );
+      if (data) {
+        // Keep last-good paint; only toast when we have nothing to show.
+      } else {
+        const aborted = error instanceof DOMException && error.name === "AbortError";
+        showToast(
+          aborted
+            ? "Team Log is taking too long to load. Tap Retry."
+            : error instanceof Error
+              ? error.message
+              : "Unable to load Staff Admin records.",
+          "error"
+        );
+      }
     } finally {
-      if (!options?.quiet) setLoading(false);
+      setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, data]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
+    const timer = window.setTimeout(() => void load({ quiet: Boolean(data) }), 0);
     return () => window.clearTimeout(timer);
-  }, [load]);
+    // Mount once — remounts reuse panel session cache for instant paint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
