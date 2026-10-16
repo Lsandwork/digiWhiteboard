@@ -1581,6 +1581,14 @@ export function canAccessAdminTab(
     return false;
   }
 
+  // Temporarily hidden for ALL users (including full/super admins) —
+  // Front Desk Command is off until explicitly reactivated. The panel,
+  // role tab lists, and data remain in place; removing this block (and
+  // the matching dashboard redirect) restores it exactly as before.
+  if (tab === "front_desk_command") {
+    return false;
+  }
+
   // Route Generator / Live Fleet are staff-board only — check before the full-admin early return
   // so lobby/marketing never treat the tab as accessible (which made nav clicks look dead).
   if (tab === "route_generator") {
